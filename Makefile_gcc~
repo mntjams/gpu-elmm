@@ -1,0 +1,181 @@
+## -*- Makefile -*-
+##
+## User: lada
+## Time: 29.3.2006 11:32:57
+## Makefile created by Sun Studio.
+##
+## This file is generated automatically.
+##
+
+# Remove the conflicting .mod extension. Make thinks .mod is a Modula2
+# extension but the f90 compiler uses it for a module file.SUFFIXES
+.SUFFIXES: .o .c .c~ .cc .cc~ .y .y~ .l .l~ .s .s~ .sh .sh~ .S .S~ .ln .h .h~ .f .f~ .F .F~ .p .p~ .r .r~ .f90 .f90~ .ftn .ftn~ .cps .cps~ .C .C~ .Y .Y~ .L .L~ .java .java~ .class
+
+
+#### Compiler and tool definitions shared by all build targets  -fopenmp ,invalid#####
+FC = gfortran-4.5
+BASICOPTS = -C -fbacktrace -ggdb
+ADVOPTS = -pedantic -Wall  -fcheck=all -ffpe-trap=zero,overflow
+FFLAGS = $(BASICOPTS)
+
+
+# Define the target directories.
+TARGETDIR_a.out=Sun-i386-Linux
+
+
+all: $(TARGETDIR_a.out)/a.out
+
+## Target: a.out
+OBJS_a.out =  \
+	$(TARGETDIR_a.out)/mudcom.o \
+	$(TARGETDIR_a.out)/mud3sp.o \
+	$(TARGETDIR_a.out)/dmudcom.o \
+	$(TARGETDIR_a.out)/dmud3sp.o \
+	$(TARGETDIR_a.out)/fftpack.o \
+	$(TARGETDIR_a.out)/pois3d.o \
+	$(TARGETDIR_a.out)/hw3crt.o \
+	$(TARGETDIR_a.out)/parameters.o \
+	$(TARGETDIR_a.out)/multigrid.o \
+	$(TARGETDIR_a.out)/wallmodels.o \
+	$(TARGETDIR_a.out)/scalars.o \
+	$(TARGETDIR_a.out)/turbinlet.o \
+	$(TARGETDIR_a.out)/geometric.o \
+	$(TARGETDIR_a.out)/boundaries.o \
+	$(TARGETDIR_a.out)/smagorinsky.o \
+	$(TARGETDIR_a.out)/outputs.o \
+	$(TARGETDIR_a.out)/poisson.o \
+	$(TARGETDIR_a.out)/initial.o \
+	$(TARGETDIR_a.out)/cds.o \
+	$(TARGETDIR_a.out)/upwind.o \
+	$(TARGETDIR_a.out)/laxfried.o \
+	$(TARGETDIR_a.out)/laxwend.o \
+	$(TARGETDIR_a.out)/tsteps.o \
+	$(TARGETDIR_a.out)/diplomka.o 
+USERLIBS_a.out = $(SYSLIBS_a.out)
+DEPLIBS_a.out = 
+LDLIBS_a.out = $(USERLIBS_a.out) -llapack
+
+
+# Link or archive
+$(TARGETDIR_a.out)/a.out: $(TARGETDIR_a.out) $(OBJS_a.out) $(DEPLIBS_a.out)
+	$(LINK.f) $(FFLAGS_a.out) $(CPPFLAGS_a.out) -o $@ $(OBJS_a.out) $(LDLIBS_a.out)
+
+
+# Compile source files into .o files
+$(TARGETDIR_a.out)/mudcom.o: $(TARGETDIR_a.out) MUDPACK-5.0.1/mudcom.f
+	$(COMPILE.f)   $(FFLAGS_a.out)$(CPPFLAGS_a.out)  -o $@ MUDPACK-5.0.1/mudcom.f
+
+$(TARGETDIR_a.out)/mud3sp.o: $(TARGETDIR_a.out) MUDPACK-5.0.1/mud3sp.f
+	$(COMPILE.f)  $(FFLAGS_a.out) $(CPPFLAGS_a.out)  -o $@ MUDPACK-5.0.1/mud3sp.f
+
+$(TARGETDIR_a.out)/dmudcom.o: $(TARGETDIR_a.out) MUDPACK-dp/mudcom.f
+	$(COMPILE.f)  $(FFLAGS_a.out) $(CPPFLAGS_a.out)  -o $@ MUDPACK-dp/mudcom.f
+
+$(TARGETDIR_a.out)/dmud3sp.o: $(TARGETDIR_a.out) MUDPACK-dp/mud3sp.f
+	$(COMPILE.f)  $(FFLAGS_a.out) $(CPPFLAGS_a.out)  -o $@ MUDPACK-dp/mud3sp.f
+
+$(TARGETDIR_a.out)/fftpack.o: $(TARGETDIR_a.out) fishpack4/fftpack.f
+	$(COMPILE.f)  $(FFLAGS_a.out) $(CPPFLAGS_a.out)  -o $@ fishpack4/fftpack.f
+
+$(TARGETDIR_a.out)/pois3d.o: $(TARGETDIR_a.out) fishpack4/pois3d.f
+	$(COMPILE.f)  $(FFLAGS_a.out) $(CPPFLAGS_a.out)  -o $@ fishpack4/pois3d.f
+
+$(TARGETDIR_a.out)/hw3crt.o: $(TARGETDIR_a.out) fishpack4/hw3crt.f
+	$(COMPILE.f)  $(FFLAGS_a.out) $(CPPFLAGS_a.out)  -o $@ fishpack4/hw3crt.f
+
+$(TARGETDIR_a.out)/parameters.o: $(TARGETDIR_a.out) parameters.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ parameters.f90
+
+$(TARGETDIR_a.out)/scalars.o: $(TARGETDIR_a.out) scalars.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ scalars.f90
+
+$(TARGETDIR_a.out)/boundaries.o: $(TARGETDIR_a.out) boundaries.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ boundaries.f90
+
+$(TARGETDIR_a.out)/outputs.o: $(TARGETDIR_a.out) outputs.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ outputs.f90
+
+$(TARGETDIR_a.out)/poisson.o: $(TARGETDIR_a.out) poisson.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ poisson.f90
+
+$(TARGETDIR_a.out)/initial.o: $(TARGETDIR_a.out) initial.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ initial.f90
+
+$(TARGETDIR_a.out)/cds.o: $(TARGETDIR_a.out) cds.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ cds.f90
+
+$(TARGETDIR_a.out)/upwind.o: $(TARGETDIR_a.out) upwind.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ upwind.f90
+
+$(TARGETDIR_a.out)/laxfried.o: $(TARGETDIR_a.out) laxfried.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ laxfried.f90
+
+$(TARGETDIR_a.out)/laxwend.o: $(TARGETDIR_a.out) laxwend.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ laxwend.f90
+
+$(TARGETDIR_a.out)/wallmodels.o: $(TARGETDIR_a.out) wallmodels.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ wallmodels.f90
+
+$(TARGETDIR_a.out)/multigrid.o: $(TARGETDIR_a.out) multigrid.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ multigrid.f90
+
+$(TARGETDIR_a.out)/turbinlet.o: $(TARGETDIR_a.out) turbinlet.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ turbinlet.f90
+
+$(TARGETDIR_a.out)/geometric.o: $(TARGETDIR_a.out) geometric.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ geometric.f90
+
+$(TARGETDIR_a.out)/smagorinsky.o: $(TARGETDIR_a.out) smagorinsky.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ smagorinsky.f90
+
+$(TARGETDIR_a.out)/tsteps.o: $(TARGETDIR_a.out) tsteps.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ tsteps.f90
+
+$(TARGETDIR_a.out)/diplomka.o: $(TARGETDIR_a.out) diplomka.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(ADVOPTS) $(CPPFLAGS_a.out) -o $@ diplomka.f90
+
+
+
+#### Clean target deletes all generated files ####
+clean:
+	rm -f \
+		$(TARGETDIR_a.out)/a.out \
+		$(TARGETDIR_a.out)/mudcom.o \
+		$(TARGETDIR_a.out)/mud3sp.o \
+		$(TARGETDIR_a.out)/dmudcom.o \
+		$(TARGETDIR_a.out)/dmud3sp.o \
+		$(TARGETDIR_a.out)/fish.o \
+		$(TARGETDIR_a.out)/comf.o \
+		$(TARGETDIR_a.out)/fftpack.o \
+		$(TARGETDIR_a.out)/pois3d.o \
+		$(TARGETDIR_a.out)/hw3crt.o \
+		$(TARGETDIR_a.out)/parameters.o \
+		$(TARGETDIR_a.out)/scalars.o \
+		$(TARGETDIR_a.out)/boundaries.o \
+		$(TARGETDIR_a.out)/outputs.o \
+		$(TARGETDIR_a.out)/poisson.o \
+		$(TARGETDIR_a.out)/initial.o \
+		$(TARGETDIR_a.out)/cds.o \
+		$(TARGETDIR_a.out)/upwind.o \
+		$(TARGETDIR_a.out)/laxfried.o \
+		$(TARGETDIR_a.out)/laxwend.o \
+		$(TARGETDIR_a.out)/wallmodels.o \
+		$(TARGETDIR_a.out)/multigrid.o \
+		$(TARGETDIR_a.out)/turbinlet.o \
+		$(TARGETDIR_a.out)/geometric.o \
+		$(TARGETDIR_a.out)/smagorinsky.o \
+		$(TARGETDIR_a.out)/tsteps.o \
+		$(TARGETDIR_a.out)/diplomka.o
+	rm -f *.mod
+	#rm -f -r $(TARGETDIR_a.out)
+
+
+# Create the target directory (if needed)
+$(TARGETDIR_a.out):
+	mkdir -p $(TARGETDIR_a.out)
+
+
+# Enable dependency checking
+.KEEP_STATE:
+.KEEP_STATE_FILE:.make.state.Sun-i386-Linux
+
