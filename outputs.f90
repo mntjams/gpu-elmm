@@ -1151,16 +1151,16 @@ endif
   subroutine FRAME(U,V,W,Pr,n)
   real(KND):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   integer n,i,j,k,l
-  character(12):: fname
+  character(13):: fname
   character(70):: str
   character(8)::  scalname="scalar00"
   integer mini,maxi,minj,maxj,mink,maxk
 
   if (framedimension==3) then
   fname(1:5)="frame"
-  write(fname(6:8),"(I3.3)") n
-  fname(9:12)=".vtk"
-  write(*,*) "Saving frame:",fname(1:6),"   time:",time
+  write(fname(6:9),"(I4.4)") n
+  fname(10:13)=".vtk"
+  write(*,*) "Saving frame:",fname(6:9),"   time:",time
   
   OPEN(11,file=fname)
   write (11,"(A)") "# vtk DataFile Version 2.0"
@@ -1288,9 +1288,9 @@ endif
    endif
 
   fname(1:5)="frame"
-  write(fname(6:8),"(I3.3)") n
-  fname(9:12)=".vtk"
-  write(*,*) "Saving frame:",fname(1:6),"   time:",time
+  write(fname(6:9),"(I4.4)") n
+  fname(10:13)=".vtk"
+  write(*,*) "Saving frame:",fname(6:9),"   time:",time
   
   OPEN(11,file=fname)
   write (11,"(A)") "# vtk DataFile Version 2.0"

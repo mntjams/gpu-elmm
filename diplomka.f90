@@ -103,7 +103,6 @@ implicit none
   endif
 
   if ((tasktype==4.or.tasktype==7).and.averaging==1) then
-   write(*,*) tasktype
     allocate(profUavg(1:Uny),profUavg2(1:Uny),profuuavg(1:Uny),profvvavg(1:Vny),profwwavg(1:Wny),proftauavg(1:Prny))
     allocate(profU(1:Uny),profuu(1:Uny),profvv(1:Vny),profww(1:Wny),proftau(1:Prny))
    profUavg=0
@@ -118,7 +117,6 @@ implicit none
    proftauavg=0
    proftau=0
   elseif (tasktype==8) then
-  write(*,*) tasktype
     allocate(profU(0:Unz+1),profV(0:Vnz+1),profUavg(0:Unz+1),profVavg(0:Vnz+1),profUavg2(0:Unz+1),profVavg2(0:Vnz+1))
     allocate(profuuavg(1:Unz),profvvavg(1:Vnz),profwwavg(0:Wnz),profuu(1:Unz),profvv(1:Vnz),profww(0:Wnz))
     allocate(profuw(0:Prnz),profuwavg(0:Prnz),profuwsgs(0:Prnz),profuwsgsavg(0:Prnz))
@@ -164,9 +162,7 @@ implicit none
  write (*,*) "Setting up initial conditions..."
  call INITCONDS(U,V,W,Pr)
 ! write (*,*) "Saving initial condiions..."
-! call OUTPUT(U,V,W,Pr,"in.vtk")
- !casove kroky
- !v kazdem podkroku vsechny cleny -adv. cleny PPM - diff. cleny C-N
+
  fnum=0
  time=starttime
  step=0
@@ -192,7 +188,6 @@ implicit none
                           (probez-zW(pWk))/(zW(pWk+1)-zW(pWk)),&
                           W(pWi,pWj,pWk),W(pWi+1,pWj,pWk),W(pWi,pWj+1,pWk),W(pWi,pWj,pWk+1),&
                           W(pWi+1,pWj+1,pWk),W(pWi+1,pWj,pWk+1),W(pWi,pWj+1,pWk+1),W(pWi+1,pWj+1,pWk+1))
-   write (*,*) probek+1,Wnz+1,size(PR,3)
    Prtime(step)=Trilinint((probex-xPr(probei))/(xPr(probei+1)-xPr(probei)),&
                           (probey-yPr(probej))/(yPr(probej+1)-yPr(probej)),&
                           (probez-zPr(probek))/(zPr(probek+1)-zPr(probek)),&
@@ -382,7 +377,7 @@ implicit none
     endif
     write(21,*) time,S2,S
    endif
-   if (wallmodeltype>0.and.TBtypeB==DIRICHLET) then
+   if (wallmodeltype>0.and.buoyancy==1.and.TBtypeB==DIRICHLET) then
     S2=SUM(BsideTFLArr(1:Prnx,1:Prny))/(Prnx*Prny)
     S=-S*S2
     write(*,*) "Tstar",S,"tflux", S2
@@ -441,10 +436,10 @@ implicit none
     endif
    endif
 
-   if (time+dt>=endtime.and.time<endtime-0.01*dt.and.tasktype==3) then
-    call OUTPUTU2(U,V,W)
-    write (*,*) "U2 saved."
-   endif
+!    if (time+dt>=endtime.and.time<endtime-0.01*dt.and.tasktype==3) then
+!     call OUTPUTU2(U,V,W)
+!     write (*,*) "U2 saved."
+!    endif
    
     if ((steady==1) .and. (delta<eps)) then
       write (*,*) "Steady state reached."

@@ -108,6 +108,7 @@ implicit none
    dist=sqrt(WMP%distx**2+WMP%disty**2+WMP%distz**2)
 
    vel=0
+   ustar=0
    dp=0
    dptrans=0
    if (abs(WMP%disty)/dymin<1.E-2.and.abs(WMP%distz)/dzmin<1.E-2) vel=vel+((U(i,j,k)+U(i-1,j,k))/2._KND-WMP%wallu)**2

@@ -755,7 +755,7 @@ contains
 
 
   if (computescalars>0.and..not.released) call EXPLOSION
-write(*,*) maxval(SCALAR)
+
   if (computescalars>0) then
    write (*,*) "*scalars*",SUM(SCALAR(1:Prnx,1:Prny,1:Prnz,:))
    SCALAR_2=0
@@ -1121,7 +1121,7 @@ write(*,*) maxval(SCALAR)
       endif
      endif
 
-     intvel=IBLinInt(p0,p1,p2,vel1,vel2)
+     intvel=IBLinInt(p0,p1,p2,vel1,vel2)*.9
 
 
     elseif (IBP%interp==2) then

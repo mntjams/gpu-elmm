@@ -504,6 +504,9 @@ integer,intent(IN):: level,i,j,k,nulx,nuly,nulz
  ind=(1-nulx)+i+(j-nuly)*(CoefMG(level)%nx+(1-nulx))+(k-nulz)*(CoefMG(level)%nx+1-nulx)*(CoefMG(level)%ny+1-nuly)
 endfunction ind
 
+
+
+
 subroutine MG_GE(level)
 integer,intent(IN)::level
 integer i,j,k,l,info
@@ -690,6 +693,386 @@ character(1),save:: equed
  endif
 
 endsubroutine MG_GE
+
+
+subroutine MG_LU(level)
+integer,intent(IN)::level
+integer i,j,k,l,info
+integer,allocatable,dimension(:),save:: ige,ipivot,work2
+real(KND),allocatable,dimension(:),save:: xge,bge,work,R,C,ferr,berr
+real(KND),allocatable,dimension(:,:),save:: age,af
+real(KND) Ap,rcond
+integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
+character(1),save:: equed
+
+ if (called==0) then
+  nx=CoefMG(level)%nx
+  ny=CoefMG(level)%ny
+  nz=CoefMG(level)%nz
+
+  if (BtypeE==PERIODIC) then
+   nulx=1
+  else
+   nulx=0
+  endif
+  if (BtypeN==PERIODIC) then
+   nuly=1
+  else
+   nuly=0
+  endif
+  if (BtypeT==PERIODIC) then
+   nulz=1
+  else
+   nulz=0
+  endif
+  nxyz=(nx+(1-nulx))*(ny+(1-nuly))*(nz+(1-nulz))
+  allocate(xge(nxyz))
+  allocate(bge(nxyz))
+  allocate(ige(nxyz))
+  allocate(ipivot(nxyz))
+  allocate(age(nxyz,nxyz))
+  allocate(af(nxyz,nxyz))
+  allocate(work(4*nxyz))
+  allocate(work2(nxyz))
+  allocate(R(nxyz))
+  allocate(C(nxyz))
+  allocate(ferr(nxyz))
+  allocate(berr(nxyz))
+
+  called=1
+
+
+  age=0
+!   bge=0
+  xge=0
+  ige=0
+     do k=nulz,nz
+        do j=nuly,ny
+           do i=nulx,nx
+             l=ind(level,nulx,nuly,nulz,i,j,k)
+             Ap=0
+             if (i>nulx) then
+                       age(l,ind(level,nulx,nuly,nulz,i-1,j,k))=CoefMG(level)%Aw
+                       Ap=Ap+CoefMG(level)%Aw
+             elseif (BtypeW==PERIODIC) then
+                       age(l,ind(level,nulx,nuly,nulz,nx,j,k))=CoefMG(level)%Aw
+                       Ap=Ap+CoefMG(level)%Aw
+             endif
+             if (i<nx) then
+                       age(l,ind(level,nulx,nuly,nulz,i+1,j,k))=CoefMG(level)%Ae
+                       Ap=Ap+CoefMG(level)%Ae
+             elseif (BtypeE==PERIODIC) then
+                       age(l,ind(level,nulx,nuly,nulz,nulx,j,k))=CoefMG(level)%Ae
+                       Ap=Ap+CoefMG(level)%Ae
+             endif
+             if (j>nuly) then
+                       age(l,ind(level,nulx,nuly,nulz,i,j-1,k))=CoefMG(level)%As
+                       Ap=Ap+CoefMG(level)%As
+             elseif (BtypeS==PERIODIC) then
+                       age(l,ind(level,nulx,nuly,nulz,i,ny,k))=CoefMG(level)%As
+                       Ap=Ap+CoefMG(level)%As
+             endif
+             if (j<ny) then
+                       age(l,ind(level,nulx,nuly,nulz,i,j+1,k))=CoefMG(level)%An
+                       Ap=Ap+CoefMG(level)%An
+             elseif (BtypeN==PERIODIC) then
+                       age(l,ind(level,nulx,nuly,nulz,i,nuly,k))=CoefMG(level)%An
+                       Ap=Ap+CoefMG(level)%An
+             endif
+             if (k>nulz) then
+                       age(l,ind(level,nulx,nuly,nulz,i,j,k-1))=CoefMG(level)%Ab
+                       Ap=Ap+CoefMG(level)%Ab
+             elseif (BtypeB==PERIODIC) then
+                       age(l,ind(level,nulx,nuly,nulz,i,j,nz))=CoefMG(level)%Ab
+                       Ap=Ap+CoefMG(level)%Ab
+             endif
+             if (k<nz) then
+                       age(l,ind(level,nulx,nuly,nulz,i,j,k+1))=CoefMG(level)%At
+                       Ap=Ap+CoefMG(level)%At
+             elseif (BtypeT==PERIODIC) then
+                       age(l,ind(level,nulx,nuly,nulz,i,j,nulz))=CoefMG(level)%At
+                       Ap=Ap+CoefMG(level)%At
+             endif
+
+             age(l,l)=-Ap
+!              bge(l)=RHSMG(level)%Arr(i,j,k)
+            enddo
+        enddo
+    enddo
+
+    l=ind(level,nulx,nuly,nulz,nx,ny,nz)
+    age(1,:)=0
+    age(1,1)=age(2,2)
+!     bge(1)=0
+    
+
+    if (KND==DBL) then
+     call  DGETRF(nxyz,nxyz,age,nxyz,ipivot,info)
+    else
+     call  SGETRF(nxyz,nxyz,age,nxyz,ipivot,info)
+    endif
+
+    if (info/=0) then
+     STOP
+     write (*,*) "info",info
+    endif
+ endif
+
+
+    do k=nulz,nz
+       do j=nuly,ny
+          do i=nulx,nx
+            l=ind(level,nulx,nuly,nulz,i,j,k)
+            bge(l)=RHSMG(level)%Arr(i,j,k)
+          enddo
+       enddo
+    enddo     
+    bge(1)=0
+
+    if (KND==DBL) then
+     call DGETRS("N",nxyz,1,age,nxyz,ipivot,bge,nxyz,info)
+    else
+     call SGETRS("N",nxyz,1,age,nxyz,ipivot,bge,nxyz,info)
+    endif
+     
+    if (info/=0) then
+     STOP
+     write (*,*) "info",info
+    endif
+ 
+!  do i=1,l
+!   write (*,*) "diag",i,l,age(i,i)
+!  enddo
+
+
+!  call DGESV(nxyz,1,age,nxyz,ipivot,bge,nxyz,info)
+
+!  call DGETRI(nxyz,age,nxyz,ipivot,work,nxyz,info)
+
+!  do i=1,l
+!   do j=1,l
+!    write (*,*) age(i,j)
+!   enddo
+!  enddo
+!  xge=bge
+!  call LEGS(age,nxyz,bge,xge,ige)
+
+     do k=nulz,nz
+        do j=nuly,ny
+           do i=nulx,nx
+             l=ind(level,nulx,nuly,nulz,i,j,k)
+             PhiMG(level)%Arr(i,j,k)=bge(l)
+           enddo
+        enddo
+     enddo
+
+ if (BtypeE==PERIODIC) then
+  PhiMG(level)%Arr(0,:,:)=PhiMG(level)%Arr(nx,:,:)
+ endif
+ if (BtypeN==PERIODIC) then
+  PhiMG(level)%Arr(:,0,:)=PhiMG(level)%Arr(:,ny,:)
+ endif
+ if (BtypeT==PERIODIC) then
+  PhiMG(level)%Arr(:,:,0)=PhiMG(level)%Arr(:,:,nz)
+ endif
+
+endsubroutine MG_LU
+
+
+
+
+
+subroutine MG_INV(level)
+integer,intent(IN)::level
+integer i,j,k,l,info,ldwork
+integer,allocatable,dimension(:):: ipivot
+real(KND),allocatable,dimension(:),save:: xge,bge,work
+real(KND),allocatable,dimension(:,:),save:: age
+real(KND) Ap
+integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
+
+ if (called==0) then
+  nx=CoefMG(level)%nx
+  ny=CoefMG(level)%ny
+  nz=CoefMG(level)%nz
+
+  if (BtypeE==PERIODIC) then
+   nulx=1
+  else
+   nulx=0
+  endif
+  if (BtypeN==PERIODIC) then
+   nuly=1
+  else
+   nuly=0
+  endif
+  if (BtypeT==PERIODIC) then
+   nulz=1
+  else
+   nulz=0
+  endif
+  nxyz=(nx+(1-nulx))*(ny+(1-nuly))*(nz+(1-nulz))
+  allocate(xge(nxyz))
+  allocate(bge(nxyz))
+  allocate(ipivot(nxyz))
+  allocate(age(nxyz,nxyz))
+
+
+  called=1
+
+
+  age=0
+!   bge=0
+  xge=0
+     do k=nulz,nz
+        do j=nuly,ny
+           do i=nulx,nx
+             l=ind(level,nulx,nuly,nulz,i,j,k)
+             Ap=0
+             if (i>nulx) then
+                       age(l,ind(level,nulx,nuly,nulz,i-1,j,k))=CoefMG(level)%Aw
+                       Ap=Ap+CoefMG(level)%Aw
+             elseif (BtypeW==PERIODIC) then
+                       age(l,ind(level,nulx,nuly,nulz,nx,j,k))=CoefMG(level)%Aw
+                       Ap=Ap+CoefMG(level)%Aw
+             endif
+             if (i<nx) then
+                       age(l,ind(level,nulx,nuly,nulz,i+1,j,k))=CoefMG(level)%Ae
+                       Ap=Ap+CoefMG(level)%Ae
+             elseif (BtypeE==PERIODIC) then
+                       age(l,ind(level,nulx,nuly,nulz,nulx,j,k))=CoefMG(level)%Ae
+                       Ap=Ap+CoefMG(level)%Ae
+             endif
+             if (j>nuly) then
+                       age(l,ind(level,nulx,nuly,nulz,i,j-1,k))=CoefMG(level)%As
+                       Ap=Ap+CoefMG(level)%As
+             elseif (BtypeS==PERIODIC) then
+                       age(l,ind(level,nulx,nuly,nulz,i,ny,k))=CoefMG(level)%As
+                       Ap=Ap+CoefMG(level)%As
+             endif
+             if (j<ny) then
+                       age(l,ind(level,nulx,nuly,nulz,i,j+1,k))=CoefMG(level)%An
+                       Ap=Ap+CoefMG(level)%An
+             elseif (BtypeN==PERIODIC) then
+                       age(l,ind(level,nulx,nuly,nulz,i,nuly,k))=CoefMG(level)%An
+                       Ap=Ap+CoefMG(level)%An
+             endif
+             if (k>nulz) then
+                       age(l,ind(level,nulx,nuly,nulz,i,j,k-1))=CoefMG(level)%Ab
+                       Ap=Ap+CoefMG(level)%Ab
+             elseif (BtypeB==PERIODIC) then
+                       age(l,ind(level,nulx,nuly,nulz,i,j,nz))=CoefMG(level)%Ab
+                       Ap=Ap+CoefMG(level)%Ab
+             endif
+             if (k<nz) then
+                       age(l,ind(level,nulx,nuly,nulz,i,j,k+1))=CoefMG(level)%At
+                       Ap=Ap+CoefMG(level)%At
+             elseif (BtypeT==PERIODIC) then
+                       age(l,ind(level,nulx,nuly,nulz,i,j,nulz))=CoefMG(level)%At
+                       Ap=Ap+CoefMG(level)%At
+             endif
+
+             age(l,l)=-Ap
+!              bge(l)=RHSMG(level)%Arr(i,j,k)
+            enddo
+        enddo
+    enddo
+
+    l=ind(level,nulx,nuly,nulz,nx,ny,nz)
+    age(1,:)=0
+    age(1,1)=age(2,2)
+!     bge(1)=0
+    
+
+    if (KND==DBL) then
+     call  DGETRF(nxyz,nxyz,age,nxyz,ipivot,info)
+    else
+     call  SGETRF(nxyz,nxyz,age,nxyz,ipivot,info)
+    endif
+
+    if (info/=0) then
+     STOP
+     write (*,*) "info",info
+    endif
+
+    allocate(work(1))
+
+    if (KND==DBL) then
+     call DGETRI(nxyz,age,nxyz,ipivot,work,-1,info)
+    else
+     call SGETRI(nxyz,age,nxyz,ipivot,work,-1,info)
+    endif
+     
+    if (info/=0) then
+     STOP
+     write (*,*) "info",info
+    endif
+
+    ldwork=work(1)
+    deallocate(work)
+    allocate(work(ldwork))
+
+    if (KND==DBL) then
+     call DGETRI(nxyz,age,nxyz,ipivot,work,ldwork,info)
+    else
+     call SGETRI(nxyz,age,nxyz,ipivot,work,ldwork,info)
+    endif
+     
+    if (info/=0) then
+     STOP
+     write (*,*) "info",info
+    endif
+
+ endif
+
+
+    do k=nulz,nz
+       do j=nuly,ny
+          do i=nulx,nx
+            l=ind(level,nulx,nuly,nulz,i,j,k)
+            bge(l)=RHSMG(level)%Arr(i,j,k)
+          enddo
+       enddo
+    enddo     
+    bge(1)=0
+
+ 
+!     do j=1,nxyz !rows of X{j}
+!      xge(j)=0
+!      do i=1,nxyz !columns of A(i,j)
+!       xge(j)=xge(i,j)+age(j,i)*b(i)
+!      enddo
+!     enddo
+
+    xge=0
+    do j=1,nxyz !rows of X{j}
+     do i=1,nxyz !columns of A(i,j) if (age(i,j)>100*tiny(1._KND)) 
+      xge(i)=xge(i)+age(i,j)*bge(j)
+     enddo
+    enddo
+
+
+
+     do k=nulz,nz
+        do j=nuly,ny
+           do i=nulx,nx
+             l=ind(level,nulx,nuly,nulz,i,j,k)
+             PhiMG(level)%Arr(i,j,k)=xge(l)
+           enddo
+        enddo
+     enddo
+
+ if (BtypeE==PERIODIC) then
+  PhiMG(level)%Arr(0,:,:)=PhiMG(level)%Arr(nx,:,:)
+ endif
+ if (BtypeN==PERIODIC) then
+  PhiMG(level)%Arr(:,0,:)=PhiMG(level)%Arr(:,ny,:)
+ endif
+ if (BtypeT==PERIODIC) then
+  PhiMG(level)%Arr(:,:,0)=PhiMG(level)%Arr(:,:,nz)
+ endif
+
+endsubroutine MG_INV
 
 
 
@@ -991,7 +1374,7 @@ real(KND) R1
 integer k
 !   write (*,*) "cgc",level
   if (level == minmglevel) then !1
-        call MG_GE(level)
+        call MG_INV(level)
         call MG_res(level,R)
 !        write (*,*) "GEres",sqrt(R)
 

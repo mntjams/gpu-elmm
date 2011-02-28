@@ -2549,7 +2549,7 @@ contains
   if (h0<=h1-h0) then
    IBLinInt=-(h0/(h1-h0))*vel1
   elseif  (h1-h0<h1/10._KND) then
-   IBLinInt= (-((2*h0-h1)*vel2)/(h2-h1))
+   IBLinInt= 0
   else   
    IBLinInt=-((h2-2*h0)*vel1+(2*h0-h1)*vel2)/(h2-h1)
   endif

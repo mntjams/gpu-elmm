@@ -153,8 +153,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   elseif (poissmet==2) then
       call POISSFISH(Phi,RHS)
   elseif (poissmet==3) then
-     Phi=0
-      call POISSVEL(Phi,RHS)
+      RHS2=RHS
+      call POISSFISH(Phi,RHS)
+      RHS=RHS2
       call POISSSOR(Phi,RHS)
   elseif (poissmet==4) then
       call POISSMG(Phi,RHS)
@@ -311,42 +312,42 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 !   write (11,*)
 !   CLOSE(11)
 !   20 continue
-  OPEN(11,file="RHS2.vtk")
-  write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
-  write (11,"(A)") "ASCII"
-  write (11,"(A)") "DATASET RECTILINEAR_GRID"
-  str="DIMENSIONS"
-  write (str(12:),*) Prnx,Prny,Prnz
-  write (11,"(A)") str
-  str="X_COORDINATES"
-  write (str(15:),*) Prnx,"float"
-  write (11,"(A)") str
-  write (11,*) xPr(1:Prnx)
-  str="Y_COORDINATES"
-  write (str(15:),*) Prny,"float"
-  write (11,"(A)") str
-  write (11,*) yPr(1:Prny)
-  str="Z_COORDINATES"
-  write (str(15:),*) Prnz,"float"
-  write (11,"(A)") str
-  write (11,*) zPr(1:Prnz)
-  str="POINT_DATA"
-  write (str(12:),*) Prnx*Prny*Prnz
-  write (11,"(A)") str
-
-  
-  write (11,"(A)") "SCALARS RHS float"
-  write (11,"(A)") "LOOKUP_TABLE default"
-  do k=1,Prnz
-   do j=1,Prny
-    do i=1,Prnx
-      Write (11,*) coef*RHS(i,j,k)*dt*3./(1./dxmin+1./dymin+1./dzmin)
-    enddo
-   enddo
-  enddo 
-  write (11,*)
-  CLOSE(11)
+!   OPEN(11,file="RHS2.vtk")
+!   write (11,"(A)") "# vtk DataFile Version 2.0"
+!   write (11,"(A)") "diplomka output file"
+!   write (11,"(A)") "ASCII"
+!   write (11,"(A)") "DATASET RECTILINEAR_GRID"
+!   str="DIMENSIONS"
+!   write (str(12:),*) Prnx,Prny,Prnz
+!   write (11,"(A)") str
+!   str="X_COORDINATES"
+!   write (str(15:),*) Prnx,"float"
+!   write (11,"(A)") str
+!   write (11,*) xPr(1:Prnx)
+!   str="Y_COORDINATES"
+!   write (str(15:),*) Prny,"float"
+!   write (11,"(A)") str
+!   write (11,*) yPr(1:Prny)
+!   str="Z_COORDINATES"
+!   write (str(15:),*) Prnz,"float"
+!   write (11,"(A)") str
+!   write (11,*) zPr(1:Prnz)
+!   str="POINT_DATA"
+!   write (str(12:),*) Prnx*Prny*Prnz
+!   write (11,"(A)") str
+! 
+!   
+!   write (11,"(A)") "SCALARS RHS float"
+!   write (11,"(A)") "LOOKUP_TABLE default"
+!   do k=1,Prnz
+!    do j=1,Prny
+!     do i=1,Prnx
+!       Write (11,*) coef*RHS(i,j,k)*dt*3./(1./dxmin+1./dymin+1./dzmin)
+!     enddo
+!    enddo
+!   enddo 
+!   write (11,*)
+!   CLOSE(11)
 !   30 continue
   endsubroutine PR_CORRECT
 
@@ -608,7 +609,10 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
    
     Phi(1:Prnx,1:Prny,1:Prnz)=RHS(1:Prnx,1:Prny,1:Prnz)
    
-   if (ierr/=0) write (*,*) "error ",IERR
+   if (ierr/=0) then
+     write (*,*) "error ",IERR
+     STOP
+   endif
    if (pertrb>1e-3) write (*,*) "pertrb",PERTRB
 
   end subroutine POISSFISH
