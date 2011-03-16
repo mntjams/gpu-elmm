@@ -850,7 +850,7 @@ contains
    where(Wtype>0) W2=0
 !    if (buoyancy==1) where(Prtype(1:Prnx,1:Prny,1:Prnz)>0) temperature(1:Prnx,1:Prny,1:Prnz)=temperature_ref
 
-
+   call NULLINTERIOR(U2,V2,W2)
    U=U2
    V=V2
    W=W2
@@ -978,15 +978,17 @@ contains
   
   
   subroutine EXPLOSION
-  real(KND) xs,xf,ys,yf,zs,zf,dxp,dyp,dzp,ct,cr,xp,yp,zp,p
+  real(KND) xc,yc,xs,xf,ys,yf,zs,zf,dxp,dyp,dzp,ct,cr,xp,yp,zp,p
   integer i,j,k,xi,yj,zk,nprobx,nproby,nprobz
   ct=7
   cr=1.5
-  xs=-cr
-  ys=-cr
+  xc=3*cos((xheading-70)*pi/180.)
+  yc=3*sin((xheading-70)*pi/180.)
+  xs=xc-cr
+  ys=yc-cr
   zs=0
-  xf=cr
-  yf=cr
+  xf=xc+cr
+  yf=yc+cr
   zf=ct
   nprobx=100
   nproby=100
@@ -1005,7 +1007,7 @@ contains
       do i=0,nprobx
        xp=xs+i*dxp
         call GridCoords(xi,yj,zk,xp,yp,zp)
-        if ((xp)**2+(yp)**2<cr**2) then
+        if ((xp-xc)**2+(yp-yc)**2<cr**2) then
         if   (zp<ct*0.2) then
          SCALAR(xi,yj,zk,:)=SCALAR(xi,yj,zk,:)+percdistrib(:)*0.2
          p=p+1
@@ -1268,7 +1270,7 @@ contains
     else
      intvel=0
     endif
-
+intvel=0
     if (IBP%component==1) then
      IBP%MSourc=(intvel-U(x,y,z))/dt
     elseif (IBP%component==2) then
@@ -1312,6 +1314,7 @@ contains
        Q(x,y,z)=Q(x,y,z)+W(x,y,z)/(dzPr(z))
        Q(x,y,z+1)=Q(x,y,z+1)-W(x,y,z)/(dzPr(z+1))
       endif
+     Q(x,y,z)=0
      if (associated(IBP%next)) then
       IBP=>IBP%next
      else

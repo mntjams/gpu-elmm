@@ -35,6 +35,8 @@ implicit none
   real(KND),allocatable:: xU(:),xPr(:),yV(:),yPr(:),zW(:),zPr(:)          !coordinates of grid points
   real(KND),allocatable:: dxU(:),dxPr(:),dyV(:),dyPr(:),dzW(:),dzPr(:)    !dxPr(i)=xU(i)-xU(i-1), dxU(i)=xPr(i+1)-xPr(i)
 
+  real(KND) xheading !true geographic heading of the x axis
+
   real(KND),allocatable,dimension(:,:,:):: temperature,temperatureavg
 
 

@@ -480,7 +480,7 @@ contains
 
 
 
-  pure subroutine KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
+   subroutine KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
   real(KND),intent(INOUT)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
   real(KND),intent(IN):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(IN):: sctype
@@ -496,7 +496,6 @@ contains
    endif
   
   A=coef*dt
-
   SLOPE=0
   do i=0,Prnx
    do j=1,Prny
@@ -508,7 +507,9 @@ contains
       SR=(SCAL(i,j,k)-SCAL(i+1,j,k))!/dxU(i)
       SL=(SCAL(i+1,j,k)-SCAL(i+2,j,k))!/dxU(i-1)
      endif
-     SLOPE(i,j,k)=FLUXLIMITER((SR+eps)/(SL+eps))
+!      if (abs(SR+eps*sign(1._KND,SL))>1E5*abs(SL+eps*sign(1._KND,SL)))&
+!        write(*,*) SR,SL,SR+eps*sign(1._KND,SL),SL+eps*sign(1._KND,SL)
+     SLOPE(i,j,k)=FLUXLIMITER((SR+eps*sign(1._KND,SL))/(SL+eps*sign(1._KND,SL)))
     enddo
    enddo
   enddo
@@ -528,6 +529,7 @@ contains
    enddo
   enddo    
 
+
   SLOPE=0
   do i=1,Prnx
    do j=0,Prny
@@ -539,7 +541,9 @@ contains
       SR=(SCAL(i,j,k)-SCAL(i,j+1,k))!/dxU(i)
       SL=(SCAL(i,j+1,k)-SCAL(i,j+2,k))!/dxU(i-1)
      endif
-     SLOPE(i,j,k)=FLUXLIMITER((SR+eps)/(SL+eps))
+!      if (abs(SR+eps*sign(1._KND,SL))>1E5*abs(SL+eps*sign(1._KND,SL)))&
+!          write(*,*) SR,SL,SR+eps*sign(1._KND,SL),SL+eps*sign(1._KND,SL)
+     SLOPE(i,j,k)=FLUXLIMITER((SR+eps*sign(1._KND,SL))/(SL+eps*sign(1._KND,SL)))
     enddo
    enddo
   enddo
@@ -560,6 +564,7 @@ contains
    enddo
   enddo    
 
+
   SLOPE=0
   do i=1,Prnx
    do j=1,Prny
@@ -571,10 +576,13 @@ contains
       SR=(SCAL(i,j,k)-SCAL(i,j,k+1))!/dxU(i)
       SL=(SCAL(i,j,k+1)-SCAL(i,j,k+2))!/dxU(i-1)
      endif
-     SLOPE(i,j,k)=FLUXLIMITER((SR+eps)/(SL+eps))
+!      if (abs(SR+eps*sign(1._KND,SL))>1E5*abs(SL+eps*sign(1._KND,SL)))&
+!        write(*,*) SR,SL,SR+eps*sign(1._KND,SL),SL+eps*sign(1._KND,SL)
+     SLOPE(i,j,k)=FLUXLIMITER((SR+eps*sign(1._KND,SL))/(SL+eps*sign(1._KND,SL)))
     enddo
    enddo
   enddo
+
 
   do i=1,Prnx
    do j=1,Prny
@@ -1391,6 +1399,20 @@ contains
   endif
   endfunction AerResist
 
+  pure real(KND) function DepositionVelocity3(dp,rhop,press,temp,z,z0,zL,ustar) !EMRAS recommended values
+  real(KND),intent(IN):: dp,rhop,press,temp,z,z0,zL,ustar
+
+   if (dp<1E-6) then
+    DepositionVelocity3=0.5E-4
+   elseif (dp<2E-6) then
+    DepositionVelocity3=1.5E-4
+   elseif (dp<10E-6) then
+    DepositionVelocity3=10E-4
+   else
+    DepositionVelocity3=80E-4
+   endif
+  endfunction DepositionVelocity3
+
 
 
    real(KND) function DepositionVelocity2(dp,press,temp,z,z0,zL,ustar)
@@ -1412,7 +1434,7 @@ contains
   endfunction DepositionVelocity2
 
 
-  pure real(KND) function DepositionVelocity(dp,rhop,press,temp,z,z0,zL,ustar)
+  pure real(KND) function DepositionVelocity(dp,rhop,press,temp,z,z0,zL,ustar) !Kharchenko
   real(KND),intent(IN):: dp,rhop,press,temp,z,z0,zL,ustar
   real(DBL) visc,us,Intz,Intexp,BD,tp
   real(DBL),parameter:: zexp=0.01
@@ -1451,7 +1473,7 @@ contains
    press=101300
    temp=temperature_ref
    If ((.2_KND*WMP%distz)**2>(WMP%distx)**2+(WMP%disty)**2.and.WMP%distz>0) then
-    depvel=DepositionVelocity(partdiam,rhop,press,temp,WMP%distz,WMP%z0,0._KND,WMP%ustar)
+    depvel=DepositionVelocity3(partdiam,rhop,press,temp,WMP%distz,WMP%z0,0._KND,WMP%ustar)
    else
     depvel=0
    endif

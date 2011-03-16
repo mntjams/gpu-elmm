@@ -1020,65 +1020,67 @@ contains
 
 
 !SURO EXPERIMENTS IN FRAME OF REFERENCE FOR WIND DIRECTION FROM PHI
-!     phi=180! 4.5.2010....252,     22.6.2010.....191
-!     phi=MOD((phi-250._KND)/180._KND*pi,2._KND*pi)
-!      allocate(FirstSB)
-!   
-!      FirstSB%numofbody=1
-!      FirstSB%typeofbody=1
-! 
-!     allocate(FirstSB%Polyhedron)
-!     allocate(FirstSB%Polyhedron%Planes(5))
-!     
-!     FirstSB%Polyhedron%nplanes=5
-!     FirstSB%Polyhedron%Planes(1)%a=0
-!     FirstSB%Polyhedron%Planes(1)%b=0
-!     FirstSB%Polyhedron%Planes(1)%c=1
-!     FirstSB%Polyhedron%Planes(1)%d=-3.2
-!     FirstSB%Polyhedron%Planes(1)%GL=.false.
-! 
-!           a=1
-!           b=0
-!           a2=a*cos(phi)-b*sin(phi)
-!           b2=a*sin(phi)+b*cos(phi)
-!     FirstSB%Polyhedron%Planes(2)%a=a2
-!     FirstSB%Polyhedron%Planes(2)%b=b2
-!     FirstSB%Polyhedron%Planes(2)%c=0
-!     FirstSB%Polyhedron%Planes(2)%d=-14.5
-!     FirstSB%Polyhedron%Planes(2)%GL=.false.
-! 
-!           a=-1
-!           b=0
-!           a2=a*cos(phi)-b*sin(phi)
-!           b2=a*sin(phi)+b*cos(phi)
-!     FirstSB%Polyhedron%Planes(3)%a=a2
-!     FirstSB%Polyhedron%Planes(3)%b=b2
-!     FirstSB%Polyhedron%Planes(3)%c=0
-!     FirstSB%Polyhedron%Planes(3)%d=12
-!     FirstSB%Polyhedron%Planes(3)%GL=.false.
-! 
-!           a=0
-!           b=1
-!           a2=a*cos(phi)-b*sin(phi)
-!           b2=a*sin(phi)+b*cos(phi)
-!     FirstSB%Polyhedron%Planes(4)%a=a2
-!     FirstSB%Polyhedron%Planes(4)%b=b2
-!     FirstSB%Polyhedron%Planes(4)%c=0
-!     FirstSB%Polyhedron%Planes(4)%d=-5.2
-!     FirstSB%Polyhedron%Planes(4)%GL=.false.
-! 
-!           a=0
-!           b=-1
-!           a2=a*cos(phi)-b*sin(phi)
-!           b2=a*sin(phi)+b*cos(phi)
-!     FirstSB%Polyhedron%Planes(5)%a=a2
-!     FirstSB%Polyhedron%Planes(5)%b=b2
-!     FirstSB%Polyhedron%Planes(5)%c=0
-!     FirstSB%Polyhedron%Planes(5)%d=-5.2
-!     FirstSB%Polyhedron%Planes(5)%GL=.false.
-! 
-!     FirstSB%rough=.true.
-!     FirstSB%z0=0.005
+    xheading=288
+    phi=108! 4.5.2010....108 (po staru 252),     22.6.2010.....191
+    phi=MOD((phi-250._KND)/180._KND*pi,2._KND*pi)
+
+     allocate(FirstSB)
+  
+     FirstSB%numofbody=1
+     FirstSB%typeofbody=1
+
+    allocate(FirstSB%Polyhedron)
+    allocate(FirstSB%Polyhedron%Planes(5))
+    
+    FirstSB%Polyhedron%nplanes=5
+    FirstSB%Polyhedron%Planes(1)%a=0
+    FirstSB%Polyhedron%Planes(1)%b=0
+    FirstSB%Polyhedron%Planes(1)%c=1
+    FirstSB%Polyhedron%Planes(1)%d=-6
+    FirstSB%Polyhedron%Planes(1)%GL=.false.
+
+          a=1
+          b=0
+          a2=a*cos(phi)-b*sin(phi)
+          b2=a*sin(phi)+b*cos(phi)
+    FirstSB%Polyhedron%Planes(2)%a=a2
+    FirstSB%Polyhedron%Planes(2)%b=b2
+    FirstSB%Polyhedron%Planes(2)%c=0
+    FirstSB%Polyhedron%Planes(2)%d=-14.5
+    FirstSB%Polyhedron%Planes(2)%GL=.false.
+
+          a=-1
+          b=0
+          a2=a*cos(phi)-b*sin(phi)
+          b2=a*sin(phi)+b*cos(phi)
+    FirstSB%Polyhedron%Planes(3)%a=a2
+    FirstSB%Polyhedron%Planes(3)%b=b2
+    FirstSB%Polyhedron%Planes(3)%c=0
+    FirstSB%Polyhedron%Planes(3)%d=12
+    FirstSB%Polyhedron%Planes(3)%GL=.false.
+
+          a=0
+          b=1
+          a2=a*cos(phi)-b*sin(phi)
+          b2=a*sin(phi)+b*cos(phi)
+    FirstSB%Polyhedron%Planes(4)%a=a2
+    FirstSB%Polyhedron%Planes(4)%b=b2
+    FirstSB%Polyhedron%Planes(4)%c=0
+    FirstSB%Polyhedron%Planes(4)%d=-5.2
+    FirstSB%Polyhedron%Planes(4)%GL=.false.
+
+          a=0
+          b=-1
+          a2=a*cos(phi)-b*sin(phi)
+          b2=a*sin(phi)+b*cos(phi)
+    FirstSB%Polyhedron%Planes(5)%a=a2
+    FirstSB%Polyhedron%Planes(5)%b=b2
+    FirstSB%Polyhedron%Planes(5)%c=0
+    FirstSB%Polyhedron%Planes(5)%d=-5.2
+    FirstSB%Polyhedron%Planes(5)%GL=.false.
+
+    FirstSB%rough=.true.
+    FirstSB%z0=0.005
 ! 
 !     allocate(FirstSB%next)
 !     CurrentSB=>FirstSB%next
@@ -1427,7 +1429,7 @@ contains
 !     FirstSB%Polyhedron%Planes(4)%d=-1
 !     FirstSB%Polyhedron%Planes(4)%GL=.false.
 
-   call InitChannelIT2
+!    call InitChannelIT2
 
   endsubroutine InitSolidBodies
 
