@@ -19,7 +19,7 @@ FFLAGS = $(BASICOPTS)
 
 
 # Define the target directories.
-TARGETDIR_CLMM=bin
+TARGETDIR_CLMM=bin/sun/debug
 
 
 all: $(TARGETDIR_CLMM)/CLMM
@@ -176,5 +176,5 @@ $(TARGETDIR_CLMM):
 
 # Enable dependency checking
 .KEEP_STATE:
-.KEEP_STATE_FILE:.make.state.bin
+.KEEP_STATE_FILE:.make.state.bin.sun
 
