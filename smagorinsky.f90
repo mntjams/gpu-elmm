@@ -9,7 +9,7 @@ module SMAGORINSKY
  
   subroutine SMAG(U,V,W)
   integer i,j,k
-  real(KND),dimension(-2:,-2:,-2:):: U,V,W
+  real(KND),dimension(-2:,-2:,-2:),intent(INOUT):: U,V,W
 
   call Bound_CondU(U)
   call Bound_CondV(V)
@@ -29,8 +29,9 @@ module SMAGORINSKY
 
   
   subroutine SMAG2(U,V,W,width)
-  integer i,j,k,width
+  integer,intent(IN):: width
   real(KND),dimension(-2:,-2:,-2:):: U,V,W
+  integer i,j,k 
 
   call Bound_CondU(U)
   call Bound_CondV(V)
@@ -51,7 +52,7 @@ module SMAGORINSKY
 
   real(KND) function NUSMAG2(i,j,k,U,V,W,width2)
   integer,intent(IN):: i,j,k,width2
-  real(KND),dimension(-2:,-2:,-2:):: U,V,W
+  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V,W
   real(KND) S(1:3,1:3)
   real(KND) width,SBAR
 
@@ -63,7 +64,7 @@ module SMAGORINSKY
 
   real(KND) function NUSMAG(i,j,k,U,V,W)
   integer,intent(IN):: i,j,k
-  real(KND),dimension(-2:,-2:,-2:):: U,V,W
+  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V,W
   real(KND) S(1:3,1:3)
   real(KND) width,SBAR
 
@@ -77,7 +78,7 @@ module SMAGORINSKY
 
 
   real(KND) function STRAINU(S)
-  real(KND) S(1:3,1:3)
+  real(KND),intent(IN):: S(1:3,1:3)
   integer::ii,jj
      
   STRAINU=0
@@ -92,10 +93,12 @@ module SMAGORINSKY
   
   
   subroutine STRAINIJ(i,j,k,U,V,W,S)
-  real(KND),dimension(-2:,-2:,-2:):: U,V,W
-  real(KND) D(1:3,1:3),S(1:3,1:3)
+  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V,W
+  real(KND),intent(OUT):: S(1:3,1:3)
   integer,intent(IN):: i,j,k
+  real(KND) D(1:3,1:3)
   integer::ii,jj
+
   D=0
 
   if (i>-2.and.i<Prnx+3) D(1,1)=(U(i,j,k)-U(i-1,j,k))/dxPr(i)
@@ -340,46 +343,8 @@ module SMAGORINSKY
   write(*,*) "Average dynamic constant:",Strain/(Prnx*Prny*Prnz)
   write(*,*) "Maximal dynamic constant:",MAXVAL(CSDYN(1:Prnx,1:Prny,1:Prnz))
 
-!   goto 20
-!   OPEN(11,file="CSDYN.vtk")
-!   write (11,"(A)") "# vtk DataFile Version 2.0"
-!   write (11,"(A)") "diplomka output file"
-!   write (11,"(A)") "ASCII"
-!   write (11,"(A)") "DATASET RECTILINEAR_GRID"
-!   str="DIMENSIONS"
-!   write (str(12:),*) Prnx,Prny,Prnz
-!   write (11,"(A)") str
-!   str="X_COORDINATES"
-!   write (str(15:),*) Prnx,"float"
-!   write (11,"(A)") str
-!   write (11,*) xPr(1:Prnx)
-!   str="Y_COORDINATES"
-!   write (str(15:),*) Prny,"float"
-!   write (11,"(A)") str
-!   write (11,*) yPr(1:Prny)
-!   str="Z_COORDINATES"
-!   write (str(15:),*) Prnz,"float"
-!   write (11,"(A)") str
-!   write (11,*) zPr(1:Prnz)
-!   str="POINT_DATA"
-!   write (str(12:),*) Prnx*Prny*Prnz
-!   write (11,"(A)") str
-! 
-!   
-!   write (11,"(A)") "SCALARS CSDYN float"
-!   write (11,"(A)") "LOOKUP_TABLE default"
-!   do k=1,Prnz
-!    do j=1,Prny
-!     do i=1,Prnx
-!       Write (11,*) CSDYN(i,j,k)
-!     enddo
-!    enddo
-!   enddo
-!   write (11,*)
-!   CLOSE(11)
-! 20  continue
- 
-  !csdyn=0.029
+
+
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
@@ -400,8 +365,8 @@ module SMAGORINSKY
 
 
   subroutine VREMAN(U,V,W)
+  real(KND),dimension(-2:,-2:,-2:),intent(INOUT):: U,V,W
   integer i,j,k,ii,jj
-  real(KND),dimension(-2:,-2:,-2:):: U,V,W
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)::bb
   real(KND),dimension(1:3,1:3,-1:Prnx+2,-1:Prny+2,-1:Prnz+2)::a,b
   real(KND),parameter::c=0.05
@@ -491,9 +456,10 @@ module SMAGORINSKY
  subroutine TRAPESFIELD2(U1,U2,nx,ny,nz)
  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U1
  real(KND),dimension(-2:,-2:,-2:),intent(OUT):: U2
+ integer,intent(IN):: nx,ny,nz
  real(KND),dimension(-1:1):: F
  real(KND) S,S1
- integer nx,ny,nz,ii,jj,i,j,k,kk
+ integer ii,jj,i,j,k,kk
 
  F=(/ 1,2,1 /)
  U2=0
@@ -525,8 +491,10 @@ module SMAGORINSKY
 
 
  subroutine FILTER(U1,U2,nx,ny,nz,width)
- real(KND),dimension(-2:,-2:,-2:):: U1,U2
- integer nx,ny,nz,width
+ real(KND),dimension(-2:,-2:,-2:),intent(IN):: U1
+ real(KND),dimension(-2:,-2:,-2:),intent(OUT):: U2
+ integer,intent(IN):: nx,ny,nz
+ integer width
  call TRAPESFIELD(U1,U2,nx,ny,nz)
  endsubroutine FILTER
  

@@ -480,7 +480,7 @@ contains
 
 
 
-   subroutine KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
+  subroutine KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
   real(KND),intent(INOUT)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
   real(KND),intent(IN):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(IN):: sctype
@@ -1237,8 +1237,8 @@ contains
 
 
   subroutine ScalFlSOURC(SCAL,sctype)  !Virtual scalar source for the Immersed Boundary Method with prescribed scalar flux on the boundary
-   real(KND) SCAL(-1:,-1:,-1:)
-   integer sctype
+   real(KND),intent(INOUT):: SCAL(-1:,-1:,-1:)
+   integer,intent(IN):: sctype
    real(KND) intscal,intTDiff
    type(TScalFlIBPoint),pointer:: SIBP
    integer xi,yj,zk,dirx,diry,dirz,n1,i
@@ -1334,18 +1334,15 @@ contains
   endfunction BrownDiffusivity
 
 
-   real(KND) function BrownEff(dp,press,temp)
+  pure real(KND) function BrownEff(dp,press,temp)
   real(KND),intent(IN):: dp,press,temp
   real(KND) Sc
   Sc=(AirDynVisc(temp)/AirDensity(press,temp))/BrownDiffusivity(dp,press,temp)
-  write (*,*) "AirDynVisc",AirDynVisc(temp)
-  write(*,*) "AirDensity", AirDensity(press,temp)
-  write (*,*) "BrownDiffusivity",BrownDiffusivity(dp,press,temp)
   BrownEff=Sc**(-0.54_KND)
   endfunction BrownEff
 
 
-   real(KND) function ImpactEff(dp,press,temp,ustar,visc)
+  pure real(KND) function ImpactEff(dp,press,temp,ustar,visc)
   real(KND),intent(IN):: dp,press,temp,ustar,visc
   real(KND) St
   St=SedimVelocity2(dp,press,temp)*ustar**2/visc
@@ -1415,22 +1412,14 @@ contains
 
 
 
-   real(KND) function DepositionVelocity2(dp,press,temp,z,z0,zL,ustar)
+  pure real(KND) function DepositionVelocity2(dp,press,temp,z,z0,zL,ustar)
   real(KND),intent(IN):: dp,press,temp,z,z0,zL,ustar
   real(KND) SurfResist,St,visc
 
-   write(*,*) "*"
    visc=AirDynVisc(temp)/AirDensity(press,temp)
-   write(*,*) "**"
    St=SedimVelocity2(dp,press,temp)*ustar**2/(visc)
-   write(*,*) "***"
-   write(*,*) "BE",BrownEff(dp,press,temp)
-   write(*,*) "IE",ImpactEff(dp,press,temp,ustar,visc)
-   write(*,*) "sedim vel:",SedimVelocity2(dp,press,temp)
    SurfResist=1._KND/(3._KND*ustar*(BrownEff(dp,press,temp)+ImpactEff(dp,press,temp,ustar,visc)))
-   write(*,*) "Surfresist",Surfresist
    DepositionVelocity2=SedimVelocity2(dp,press,temp)+1._KND/(AerResist(z,z0,zL,ustar,visc)+SurfResist)
-   write (*,*) "AerResist",AerResist(z,z0,zL,ustar,visc)
   endfunction DepositionVelocity2
 
 
@@ -1465,7 +1454,7 @@ contains
   endfunction DepositionVelocity
 
 
-   real(KND) function DepositionFlux(WMP,conc,partdiam,rhop)
+  pure real(KND) function DepositionFlux(WMP,conc,partdiam,rhop)
   type(WMPoint),intent(IN):: WMP
   real(KND),intent(IN):: conc,partdiam,rhop
   real(KND):: press,temp,depvel
@@ -1482,10 +1471,11 @@ contains
   endfunction DepositionFlux
 
   subroutine Deposition(SCAL,coef)
-  real(KND),dimension(-1:,-1:,-1:,1:):: SCAL
+  real(KND),dimension(-1:,-1:,-1:,1:),intent(INOUT):: SCAL
+  real(KND),intent(IN):: coef
   type(WMPoint),pointer:: WMP 
   integer i
-  real(KND) coef,deptmp
+  real(KND) deptmp
    if (associated(FirstWMPoint)) then
    WMP => FirstWMPoint
    do

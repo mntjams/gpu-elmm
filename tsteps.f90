@@ -17,12 +17,12 @@ logical:: released=.false.
 
 contains
   subroutine TMARCHEUL(U,V,W,Pr,delta)
-  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(OUT):: delta
   real(KND),allocatable,dimension(:,:,:),save:: Q
   real(KND),dimension(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),LBOUND(U,3):UBOUND(U,3)):: U2
   real(KND),dimension(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),LBOUND(V,3):UBOUND(V,3)):: V2
   real(KND),dimension(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),LBOUND(W,3):UBOUND(W,3)):: W2
-  real(KND) delta
   integer i,j,k
   real(KND),allocatable,dimension(:,:,:,:),save:: SCALAR_2
   real(KND),allocatable,dimension(:,:,:),save:: temperature2
@@ -237,7 +237,8 @@ contains
 
   
   subroutine TMARCHRK2(U,V,W,Pr,delta)
-  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(OUT):: delta
   real(KND),allocatable,dimension(:,:,:),save:: Q
   real(KND),DIMENSION(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),&
                                               LBOUND(U,3):UBOUND(U,3)):: U2,Ustar
@@ -245,7 +246,7 @@ contains
                                               LBOUND(V,3):UBOUND(V,3)):: V2,Vstar
   real(KND),DIMENSION(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),&
                                               LBOUND(W,3):UBOUND(W,3)):: W2,Wstar
-  real(KND) delta,p,odey2,odeystar
+  real(KND) p,odey2,odeystar
   integer i,j,k
   real(KND),allocatable,dimension(:,:,:,:),save:: SCALAR_2
   real(KND),allocatable,dimension(:,:,:),save:: temperature2
@@ -627,7 +628,8 @@ contains
 
   
   subroutine TMARCHRK3(U,V,W,Pr,delta)
-  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(OUT):: delta
   real(KND),allocatable,dimension(:,:,:),save:: Q
   real(KND),DIMENSION(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),&
                                               LBOUND(U,3):UBOUND(U,3))::U2,Ustar
@@ -641,7 +643,7 @@ contains
    LBOUND(TEMPERATURE,3):UBOUND(TEMPERATURE,3))::TEMPERATURE_adv,TEMPERATURE2
   real(KND),dimension(1:3),save:: alpha,gamma,rho
   integer i,j,k,l
-  real(KND) delta,p,ODEy2,ODEystar
+  real(KND) p,ODEy2,ODEystar
   integer,save:: called=0
 
 
@@ -868,9 +870,9 @@ contains
   
    
   subroutine TMARCHSHIFTINLET(U,V,W,Pr,delta) !Only shifts inlet in the x direction, for debugging purposes
-  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(OUT):: delta
   integer i,j,k
-  real(KND) delta
   real(KND),allocatable,dimension(:,:,:,:),save:: SCALAR_2
   real(KND),allocatable,dimension(:,:,:),save:: temperature2
   integer,save:: called=0
@@ -1043,7 +1045,7 @@ contains
 
 
   subroutine MOMSOURC(U,V,W)
-   real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+   real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
    real(KND) intvel,p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7
    type(TIBPoint),pointer:: IBP
    integer x,y,z,dirx,diry,dirz,n
@@ -1282,8 +1284,8 @@ contains
    
 
   subroutine MASS_SOURC(Q,U,V,W)
-  real(KND),dimension(-2:,-2:,-2:):: U,V,W
-  real(KND) Q(0:,0:,0:)
+  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V,W
+  real(KND),intent(OUT):: Q(0:,0:,0:)
   type(TIBPoint),pointer:: IBP
   integer x,y,z
 
@@ -1322,7 +1324,7 @@ contains
 
 
   subroutine TIMESTEPCW(U,V,W)
-  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  real(KND),intent(IN):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer i,j,k
   real(KND) m,p
   m=0
@@ -1348,7 +1350,7 @@ contains
 
   
   subroutine TIMESTEPEUL(U,V,W)
-  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  real(KND),intent(IN):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer i,j,k,maxI,maxJ,maxK
   real(KND) m,p
   m=0
@@ -1435,9 +1437,10 @@ contains
 
 
   subroutine OTHERTERMS(U,V,W,U2,V2,W2,Pr,coef)
-   real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-   real(KND) U2(-2:,-2:,-2:),V2(-2:,-2:,-2:),W2(-2:,-2:,-2:)
-   real(KND) coef
+   real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+   real(KND),intent(INOUT):: Pr(1:,1:,1:)
+   real(KND),intent(INOUT):: U2(-2:,-2:,-2:),V2(-2:,-2:,-2:),W2(-2:,-2:,-2:)
+   real(KND),intent(IN):: coef
        
    real(KND),DIMENSION(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),LBOUND(U,3):UBOUND(U,3)):: U3, Apu
    real(KND),DIMENSION(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),LBOUND(V,3):UBOUND(V,3)):: V3, ApV
@@ -1947,8 +1950,9 @@ contains
 
 
   subroutine UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
-  real(KND),DIMENSION(-2:,-2:,-2:):: U,V,W,U2,V2,W2,U3,V3,W3
-  real(KND) dxmin2,dymin2,dzmin2,Ap,Ap2,Ap3,Ap4,p,S,coef
+  real(KND),DIMENSION(-2:,-2:,-2:),intent(INOUT):: U,V,W,U2,V2,W2,U3,V3,W3
+  real(KND),intent(IN):: coef
+  real(KND) dxmin2,dymin2,dzmin2,Ap,Ap2,Ap3,Ap4,p,S
   integer i,j,k,l,Unyz,Vnyz,Wnyz
 
    dxmin2=dxmin*dxmin
@@ -2115,7 +2119,7 @@ contains
   endsubroutine UNIFREDBLACK
 
   subroutine ATTENUATETOP(U,V,W,Pr)
-  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   integer i,j,k,bufn
   real(KND) p,ze,zs,zb
 
@@ -2189,8 +2193,8 @@ contains
 
 
   subroutine ATTENUATEOUT(U,V,W,Pr,temperature)
-  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),optional:: temperature(-1:,-1:,-1:)
+  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),optional,intent(INOUT):: temperature(-1:,-1:,-1:)
   integer i,j,k,bufn
   real(KND) p,xe,xs,xb
 
@@ -2275,7 +2279,7 @@ contains
   endfunction Dampf
 
   subroutine NULLINTERIOR(U,V,W)
-  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer i,j,k
 
   
