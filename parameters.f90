@@ -1,6 +1,6 @@
 module PARAMETERS
 implicit none
-  integer,parameter :: DBL=KIND(1.0D0),SNG=KIND(1.0E0),KND=SNG !KND is default real kind for the whole program
+  integer,parameter :: DBL=KIND(1.0D0),SNG=KIND(1.0E0),KND=SNG,SINT=selected_int_kind(2),SLOG=SINT !KND is default real kind for the whole program
   real(KND) :: pi !computed at the first line of main
   real(KND),parameter :: Karman=0.41
   real(KND),parameter :: BoltzC=1.3806503E-23
@@ -11,7 +11,7 @@ implicit none
   real(KND) prgradientx,prgradienty,temperature_ref,grav_acc,freetempgradient,coriolisparam
   real(KND) SHEARG,Uinlet,ustarsurfin,z0inlet,z0W,z0E,z0S,z0N,z0B,z0T,stressgradin,urefin,zrefin,powerexpin,windangle
   real(KND),dimension(:),allocatable:: scalsrcx,scalsrcy,scalsrcz
-   real(KND) totalscalsource
+  real(KND) totalscalsource
 
   integer,dimension(:),allocatable:: scalsrci,scalsrcj,scalsrck
   integer pointscalsource
@@ -41,9 +41,9 @@ implicit none
 
 
   real(KND),allocatable:: Visc(:,:,:),TDiff(:,:,:),tstress(:,:,:,:,:)  !(turbulent) vicosity, (turbulent) thermal diffusivity
-  integer,allocatable,dimension(:,:,:):: Utype,Vtype,Wtype,Prtype !number of solid body inside the point is or 0
+  integer(sint),allocatable,dimension(:,:,:):: Utype,Vtype,Wtype,Prtype !number of solid body inside the point is or 0
 
-  logical,allocatable,dimension(:,:,:):: REDBLACKU,REDBLACKV,REDBLACKW,REDBLACKPR !Fs and Ts for red-black iteration
+  logical(slog),allocatable,dimension(:,:,:):: REDBLACKU,REDBLACKV,REDBLACKW,REDBLACKPR !Fs and Ts for red-black iteration
 
   real(KND) x0,y0,z0
   integer step,deb !for debugging purposes
@@ -65,12 +65,14 @@ implicit none
 
   real(KND) SsideScal,NsideScal,BsideScal,TsideScal,WsideScal,EsideScal  !scalarss or scalar fluxes on boundaries
 
+  integer vtkformat
+
   integer,parameter:: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
                         TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
   integer,parameter:: NOINLET=0,CONSTANT=1,SHEAR=2,PARABOLIC=3,CONSTPROF=1,LOGPROF=2,POWERPROF=3  !inlet profile types
   integer,parameter:: GENERALGRID=1,UNIFORMGRID=2
   integer,parameter:: minmodlim=1,extminmodlim=2,gammalim=3,vanalbadalim=4,vanleerlim=5,superbeelim=6
-
+  integer,parameter:: textvtk=1,binaryvtk=2
   real(KND) probex,probey,probez
 
 endmodule PARAMETERS

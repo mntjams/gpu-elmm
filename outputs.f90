@@ -20,8 +20,13 @@ module OUTPUTS
  real(KND),allocatable,DIMENSION(:):: Utime,Vtime,Wtime,Prtime,temptime,CDtime,CLtime,deltime,tke,dissip,dissip2
  real(KND),allocatable,DIMENSION(:,:):: scaltime !which scalar, time
  real(KND),allocatable,DIMENSION(:,:,:):: scalptime !which scalar, position, time
-
-
+ logical:: outputframePr=.false.
+ logical:: outputframeU=.true.
+ logical:: outputframevort=.false.
+ logical:: outputframelambda2=.false.
+ logical:: outputframescalars=.false.
+ logical:: outputframesumscalars=.true.
+ logical:: outputframeT=.true.
 contains
 
  subroutine OUTPUT(U,V,W,Pr)
@@ -368,7 +373,7 @@ contains
  
   OPEN(11,file="out.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
+  write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
   write (11,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
@@ -524,7 +529,7 @@ contains
  if (computescalars>0) then
   OPEN(11,file="scalars.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
+  write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
   write (11,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
@@ -582,7 +587,7 @@ contains
 
   OPEN(11,file="deposition.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
+  write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
   write (11,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
@@ -628,7 +633,7 @@ contains
   if (averaging==1) then
   OPEN(11,file="avg.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
+  write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
   write (11,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
@@ -714,7 +719,7 @@ contains
   if (computescalars>0) then
   OPEN(11,file="scalarsavg.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
+  write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
   write (11,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
@@ -777,7 +782,7 @@ contains
    enddo
   OPEN(11,file="pattern.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
+  write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
   write (11,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
@@ -932,7 +937,7 @@ endif
 
   OPEN(11,file="U.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
+  write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
   write (11,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
@@ -990,7 +995,7 @@ endif
   
   OPEN(11,file="V.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
+  write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
   write (11,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
@@ -1049,7 +1054,7 @@ endif
   
   OPEN(11,file="W.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
+  write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
   write (11,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
@@ -1107,7 +1112,7 @@ endif
 !  if (tasktype==3) then
 !   OPEN(11,file="px.vtk")
 !   write (11,"(A)") "# vtk DataFile Version 2.0"
-!   write (11,"(A)") "diplomka output file"
+!   write (11,"(A)") "CLMM output file"
 !   write (11,"(A)") "ASCII"
 !   write (11,"(A)") "DATASET RECTILINEAR_GRID"
 !   str="DIMENSIONS"
@@ -1154,243 +1159,571 @@ endif
   character(13):: fname
   character(70):: str
   character(8)::  scalname="scalar00"
+  character,parameter:: lf=char(10)
   integer mini,maxi,minj,maxj,mink,maxk
 
-  if (framedimension==3) then
-  fname(1:5)="frame"
-  write(fname(6:9),"(I4.4)") n
-  fname(10:13)=".vtk"
-  write(*,*) "Saving frame:",fname(6:9),"   time:",time
-  
-  OPEN(11,file=fname)
-  write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
-  write (11,"(A)") "ASCII"
-  write (11,"(A)") "DATASET RECTILINEAR_GRID"
-  str="DIMENSIONS"
-  write (str(12:),*) Prnx,Prny,Prnz
-  write (11,"(A)") str
-  str="X_COORDINATES"
-  write (str(15:),'(i5,2x,a)') Prnx,"float"
-  write (11,"(A)") str
-  write (11,*) xPr(1:Prnx)
-  str="Y_COORDINATES"
-  write (str(15:),'(i5,2x,a)') Prny,"float"
-  write (11,"(A)") str
-  write (11,*) yPr(1:Prny)
-  str="Z_COORDINATES"
-  write (str(15:),'(i5,2x,a)') Prnz,"float"
-  write (11,"(A)") str
-  write (11,*) zPr(1:Prnz)
-  str="POINT_DATA"
-  write (str(12:),*) Prnx*Prny*Prnz
-  write (11,"(A)") str
 
-  
-  write (11,"(A)") "SCALARS p float"
-  write (11,"(A)") "LOOKUP_TABLE default"
-  do k=1,Prnz
-   do j=1,Prny
-    do i=1,Prnx
-      Write (11,*) Pr(i,j,k)
-    enddo
-   enddo
-  enddo
-  write (11,*)
+  vtkformat=binaryvtk
+  if (vtkformat==textvtk) then
 
+   if (framedimension==3) then
+   fname(1:5)="frame"
+   write(fname(6:9),"(I4.4)") n
+   fname(10:13)=".vtk"
+   write(*,*) "Saving frame:",fname(6:9),"   time:",time
+   
+   OPEN(11,file=fname)
+   write (11,"(A)") "# vtk DataFile Version 2.0"
+   write (11,"(A)") "CLMM output file"
+   write (11,"(A)") "ASCII"
+   write (11,"(A)") "DATASET RECTILINEAR_GRID"
+   str="DIMENSIONS"
+   write (str(12:),*) Prnx,Prny,Prnz
+   write (11,"(A)") str
+   str="X_COORDINATES"
+   write (str(15:),'(i5,2x,a)') Prnx,"float"
+   write (11,"(A)") str
+   write (11,*) xPr(1:Prnx)
+   str="Y_COORDINATES"
+   write (str(15:),'(i5,2x,a)') Prny,"float"
+   write (11,"(A)") str
+   write (11,*) yPr(1:Prny)
+   str="Z_COORDINATES"
+   write (str(15:),'(i5,2x,a)') Prnz,"float"
+   write (11,"(A)") str
+   write (11,*) zPr(1:Prnz)
+   str="POINT_DATA"
+   write (str(12:),*) Prnx*Prny*Prnz
+   write (11,"(A)") str 
 
-  write (11,*) "SCALARS lambda2 float"
-  write (11,*) "LOOKUP_TABLE default"
-  do k=1,Prnz
-   do j=1,Prny
-    do i=1,Prnx
-      Write (11,*) Lambda2(i,j,k,U,V,W)
-    enddo
-   enddo
-  enddo 
-  write (11,*)
-  
-  do l=1,computescalars
-  write(scalname(7:8),"(I2.2)") l
-  write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
-  write (11,"(A)") "LOOKUP_TABLE default"
-  do k=1,Prnz
-   do j=1,Prny
-    do i=1,Prnx
-      Write (11,*) SCALAR(i,j,k,l)
-    enddo
-   enddo
-  enddo
-  write (11,*)
-  enddo  
-
-  if (buoyancy>0) then
-    write (11,*) "SCALARS temperature float"
-   write (11,*) "LOOKUP_TABLE default"
-   do k=1,Prnz
-    do j=1,Prny
-     do i=1,Prnx
-       Write (11,*) Temperature(i,j,k)
+   if (outputframePr) then
+    write (11,"(A)") "SCALARS p float"
+    write (11,"(A)") "LOOKUP_TABLE default"
+    do k=1,Prnz
+     do j=1,Prny
+      do i=1,Prnx
+        Write (11,*) Pr(i,j,k)
+      enddo
      enddo
     enddo
-   enddo 
-   write (11,*)
-  endif
-   
-
-  write (11,"(A)") "VECTORS u float"
-  do k=1,Prnz
-   do j=1,Prny
-    do i=1,Prnx
-      Write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
+    write (11,*)
+   endif
+  
+   if (outputframelambda2) then
+    write (11,*) "SCALARS lambda2 float"
+    write (11,*) "LOOKUP_TABLE default"
+    do k=1,Prnz
+     do j=1,Prny
+      do i=1,Prnx
+        Write (11,*) Lambda2(i,j,k,U,V,W)
+      enddo
+     enddo
+    enddo 
+    write (11,*)
+   endif
+  
+   if (outputframescalars) then
+    do l=1,computescalars
+     write(scalname(7:8),"(I2.2)") l
+     write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
+     write (11,"(A)") "LOOKUP_TABLE default"
+     do k=1,Prnz
+      do j=1,Prny
+       do i=1,Prnx
+         Write (11,*) SCALAR(i,j,k,l)
+       enddo
+      enddo
+     enddo
+     write (11,*)
     enddo
-   enddo
-  enddo
-  write (11,*)
-
-  write (11,"(A)") "VECTORS vort float"
-  do k=1,Prnz
-   do j=1,Prny
-    do i=1,Prnx
-      Write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
-                      -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
-                   (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
-                      -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),&
-                   (V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
-                      -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin)
-    enddo
-   enddo
-  enddo
-  CLOSE(11)
-
-  else
-   if (slicedir==1) then
-    call Gridcoords(mini,minj,mink,slicex,(yV(Prny+1)+yV(0))/2._KND,(zW(Prnz+1)+zW(0))/2._KND)
-    maxi=mini
-    minj=1
-    maxj=Prny
-    mink=1
-    maxk=Prnz
-   elseif (slicedir==2) then
-    call Gridcoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._KND,slicex,(zW(Prnz+1)+zW(0))/2._KND)
-    maxj=minj
-    mini=1
-    maxi=Prnx
-    mink=1
-    maxk=Prnz
-   else
-    call Gridcoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._KND,(yV(Prny+1)+yV(0))/2._KND,slicex)
-    maxk=mink
-    mini=1
-    maxi=Prnx
-    minj=1
-    maxj=Prny
+   elseif (outputframesumscalars.and.computescalars>0) then
+     write (11,"(A,1X,A,1X,A)") "SCALARS", "scalar" , "float"
+     write (11,"(A)") "LOOKUP_TABLE default"
+     do k=1,Prnz
+      do j=1,Prny
+       do i=1,Prnx
+         Write (11,*) SUM(SCALAR(i,j,k,:))
+       enddo
+      enddo
+     enddo
+     write (11,*)
    endif
 
-  fname(1:5)="frame"
-  write(fname(6:9),"(I4.4)") n
-  fname(10:13)=".vtk"
-  write(*,*) "Saving frame:",fname(6:9),"   time:",time
-  
-  OPEN(11,file=fname)
-  write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
-  write (11,"(A)") "ASCII"
-  write (11,"(A)") "DATASET RECTILINEAR_GRID"
-  str="DIMENSIONS"
-  write (str(12:),*) maxi-mini+1,maxj-minj+1,maxk-mink+1
-  write (11,"(A)") str
-  str="X_COORDINATES"
-  write (str(15:),'(i5,2x,a)') maxi-mini+1,"float"
-  write (11,"(A)") str
-  write (11,*) xPr(mini:maxi)
-  str="Y_COORDINATES"
-  write (str(15:),'(i5,2x,a)') maxj-minj+1,"float"
-  write (11,"(A)") str
-  write (11,*) yPr(minj:maxj)
-  str="Z_COORDINATES"
-  write (str(15:),'(i5,2x,a)') maxk-mink+1,"float"
-  write (11,"(A)") str
-  write (11,*) zPr(mink:maxk)
-  str="POINT_DATA"
-  write (str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
-  write (11,"(A)") str
-
-  
-  write (11,"(A)") "SCALARS p float"
-  write (11,"(A)") "LOOKUP_TABLE default"
-  do k=mink,maxk
-   do j=minj,maxj
-    do i=mini,maxi
-      Write (11,*) Pr(i,j,k)
-    enddo
-   enddo
-  enddo
-  write (11,*)
-
-
-  write (11,*) "SCALARS lambda2 float"
-  write (11,*) "LOOKUP_TABLE default"
-  do k=mink,maxk
-   do j=minj,maxj
-    do i=mini,maxi
-      Write (11,*) Lambda2(i,j,k,U,V,W)
-    enddo
-   enddo
-  enddo 
-  write (11,*)
-  
-  do l=1,computescalars
-  write(scalname(7:8),"(I2.2)") l
-  write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
-  write (11,"(A)") "LOOKUP_TABLE default"
-  do k=mink,maxk
-   do j=minj,maxj
-    do i=mini,maxi
-      Write (11,*) SCALAR(i,j,k,l)
-    enddo
-   enddo
-  enddo
-  write (11,*)
-  enddo  
-
-  if (buoyancy>0) then
-    write (11,*) "SCALARS temperature float"
-   write (11,*) "LOOKUP_TABLE default"
-   do k=mink,maxk
-    do j=minj,maxj
-     do i=mini,maxi
-       Write (11,*) Temperature(i,j,k)
+   if (outputframeT) then
+    if (buoyancy>0) then
+      write (11,*) "SCALARS temperature float"
+      write (11,*) "LOOKUP_TABLE default"
+      do k=1,Prnz
+       do j=1,Prny
+        do i=1,Prnx
+          Write (11,*) Temperature(i,j,k)
+        enddo
+       enddo
+      enddo 
+      write (11,*)
+    endif
+   endif
+   
+   if (outputframeU) then
+    write (11,"(A)") "VECTORS u float"
+    do k=1,Prnz
+     do j=1,Prny
+      do i=1,Prnx
+        Write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
+      enddo
      enddo
     enddo
-   enddo 
-   write (11,*)
-  endif
-  
-  write (11,"(A)") "VECTORS u float"
-  do k=mink,maxk
-   do j=minj,maxj
-    do i=mini,maxi
-      Write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
-    enddo
-   enddo
-  enddo
-  write (11,*)
+    write (11,*)
+   endif
 
-  write (11,"(A)") "VECTORS vort float"
-  do k=mink,maxk
-   do j=minj,maxj
-    do i=mini,maxi
-      Write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
-                      -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
-                   (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
-                      -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),&
-                   (V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
-                      -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin)
+   if (outputframevort) then
+    write (11,"(A)") "VECTORS vort float"
+    do k=1,Prnz
+     do j=1,Prny
+      do i=1,Prnx
+        Write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+                       -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
+                     (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
+                       -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),&
+                     (V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
+                        -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin)
+      enddo
+     enddo
     enddo
-   enddo
-  enddo
-  CLOSE(11)
+    CLOSE(11)
+   endif
+
+  
+  else
+   if (slicedir==1) then
+     call Gridcoords(mini,minj,mink,slicex,(yV(Prny+1)+yV(0))/2._KND,(zW(Prnz+1)+zW(0))/2._KND)
+     maxi=mini
+     minj=1
+     maxj=Prny
+     mink=1
+     maxk=Prnz
+    elseif (slicedir==2) then
+     call Gridcoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._KND,slicex,(zW(Prnz+1)+zW(0))/2._KND)
+     maxj=minj
+     mini=1
+     maxi=Prnx
+     mink=1
+     maxk=Prnz
+    else
+     call Gridcoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._KND,(yV(Prny+1)+yV(0))/2._KND,slicex)
+     maxk=mink
+     mini=1
+     maxi=Prnx
+     minj=1
+     maxj=Prny
+    endif
+
+   fname(1:5)="frame"
+   write(fname(6:9),"(I4.4)") n
+   fname(10:13)=".vtk"
+   write(*,*) "Saving frame:",fname(6:9),"   time:",time
+   
+   OPEN(11,file=fname)
+   write (11,"(A)") "# vtk DataFile Version 2.0"
+   write (11,"(A)") "CLMM output file"
+   write (11,"(A)") "ASCII"
+   write (11,"(A)") "DATASET RECTILINEAR_GRID"
+   str="DIMENSIONS"
+   write (str(12:),*) maxi-mini+1,maxj-minj+1,maxk-mink+1
+   write (11,"(A)") str
+   str="X_COORDINATES"
+   write (str(15:),'(i5,2x,a)') maxi-mini+1,"float"
+   write (11,"(A)") str
+   write (11,*) xPr(mini:maxi)
+   str="Y_COORDINATES"
+   write (str(15:),'(i5,2x,a)') maxj-minj+1,"float"
+   write (11,"(A)") str
+   write (11,*) yPr(minj:maxj)
+   str="Z_COORDINATES"
+   write (str(15:),'(i5,2x,a)') maxk-mink+1,"float"
+   write (11,"(A)") str
+   write (11,*) zPr(mink:maxk)
+   str="POINT_DATA"
+   write (str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
+   write (11,"(A)") str
+
+   if (outputframePr) then
+    write (11,"(A)") "SCALARS p float"
+    write (11,"(A)") "LOOKUP_TABLE default"
+    do k=mink,maxk
+     do j=minj,maxj
+      do i=mini,maxi
+        Write (11,*) Pr(i,j,k)
+      enddo
+     enddo
+    enddo
+    write (11,*)
+   endif
+
+   if (outputframelambda2) then
+    write (11,*) "SCALARS lambda2 float"
+    write (11,*) "LOOKUP_TABLE default"
+    do k=mink,maxk
+     do j=minj,maxj
+      do i=mini,maxi
+        Write (11,*) Lambda2(i,j,k,U,V,W)
+      enddo
+     enddo
+    enddo 
+    write (11,*)
+   endif
+  
+   if (outputframescalars) then
+    do l=1,computescalars
+     write(scalname(7:8),"(I2.2)") l
+     write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
+     write (11,"(A)") "LOOKUP_TABLE default"
+     do k=mink,maxk
+      do j=minj,maxj
+       do i=mini,maxi
+         Write (11,*) SCALAR(i,j,k,l)
+       enddo
+      enddo
+     enddo
+     write (11,*)
+    enddo
+   elseif (outputframesumscalars.and.computescalars>0) then
+     write (11,"(A,1X,A,1X,A)") "SCALARS", "scalar" , "float"
+     write (11,"(A)") "LOOKUP_TABLE default"
+     do k=mink,maxk
+      do j=minj,maxj
+       do i=mini,maxi
+         Write (11,*) SUM(SCALAR(i,j,k,:))
+       enddo
+      enddo
+     enddo
+     write (11,*)
+   endif
+
+   if (outputframeT) then
+    if (buoyancy>0) then
+     write (11,*) "SCALARS temperature float"
+     write (11,*) "LOOKUP_TABLE default"
+     do k=mink,maxk
+      do j=minj,maxj
+       do i=mini,maxi
+         Write (11,*) Temperature(i,j,k)
+       enddo
+      enddo
+     enddo 
+     write (11,*)
+    endif
+   endif
+
+   if (outputframeU) then
+    write (11,"(A)") "VECTORS u float"
+    do k=mink,maxk
+     do j=minj,maxj
+      do i=mini,maxi
+        Write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
+      enddo
+     enddo
+    enddo
+    write (11,*)
+   endif
+
+   if (outputframevort) then
+    write (11,"(A)") "VECTORS vort float"
+    do k=mink,maxk
+     do j=minj,maxj
+      do i=mini,maxi
+        Write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+                        -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
+                     (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
+                       -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),&
+                     (V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
+                       -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin)
+      enddo
+     enddo
+    enddo
+   endif  
+   CLOSE(11)
+   endif
+
+
+  else  !Binary VTK format
+
+
+
+   if (framedimension==3) then
+   fname(1:5)="frame"
+   write(fname(6:9),"(I4.4)") n
+   fname(10:13)=".vtk"
+   write(*,*) "Saving frame:",fname(6:9),"   time:",time
+   
+   OPEN(20,file=fname,access='stream',status='replace',form="unformatted",action="write")
+   write (20) "# vtk DataFile Version 2.0",lf
+   write (20) "CLMM output file",lf
+   write (20) "BINARY",lf
+   write (20) "DATASET RECTILINEAR_GRID",lf
+   str="DIMENSIONS"
+   write (str(12:),*) Prnx,Prny,Prnz
+   write (20) str,lf
+   str="X_COORDINATES"
+   write (str(15:),'(i5,2x,a)') Prnx,"float"
+   write (20) str,lf
+   write (20) (real(xPr(i),SNG),i=1,Prnx),lf
+   str="Y_COORDINATES"
+   write (str(15:),'(i5,2x,a)') Prny,"float"
+   write (20) str,lf
+   write (20) (real(yPr(j),SNG),j=1,Prny),lf
+   str="Z_COORDINATES"
+   write (str(15:),'(i5,2x,a)') Prnz,"float"
+   write (20) str,lf
+   write (20) (real(zPr(k),SNG),k=1,Prnz),lf
+   str="POINT_DATA"
+   write (str(12:),*) Prnx*Prny*Prnz
+   write (20) str,lf
+
+   if (outputframePr) then
+    write (20) "SCALARS p float",lf
+    write (20) "LOOKUP_TABLE default",lf
+    write (20) (((real(Pr(1:Prnx,1:Prny,1:Prnz),SNG),i=1,Prnx),j=1,Prny),k=1,Prnz)
+    write (20) lf
+   endif
+  
+   if (outputframelambda2) then
+    write (20) "SCALARS lambda2 float",lf
+    write (20) "LOOKUP_TABLE default",lf
+    do k=1,Prnz
+     do j=1,Prny
+      do i=1,Prnx
+        Write (20) real(Lambda2(i,j,k,U,V,W),SNG)
+      enddo
+     enddo
+    enddo 
+    write (20) lf
+   endif
+  
+   if (outputframescalars) then
+    do l=1,computescalars
+     write(scalname(7:8),"(I2.2)") l
+     write (20) "SCALARS ", scalname , " float",lf
+     write (20) "LOOKUP_TABLE default",lf
+     do k=1,Prnz
+      do j=1,Prny
+       do i=1,Prnx
+         Write (20) real(SCALAR(i,j,k,l),SNG)
+       enddo
+      enddo
+     enddo
+     write (20) lf
+    enddo
+   elseif (outputframesumscalars.and.computescalars>0) then
+     write (20) "SCALARS ", "scalar" , " float",lf
+     write (20) "LOOKUP_TABLE default",lf
+     do k=1,Prnz
+      do j=1,Prny
+       do i=1,Prnx
+         Write (20) real(SUM(SCALAR(i,j,k,:)),SNG)
+       enddo
+      enddo
+     enddo
+     write (20) lf
+   endif
+
+   if (outputframeT) then
+    if (buoyancy>0) then
+      write (20) "SCALARS temperature float",lf
+      write (20) "LOOKUP_TABLE default",lf
+      do k=1,Prnz
+       do j=1,Prny
+        do i=1,Prnx
+          Write (20) real(Temperature(i,j,k),SNG)
+        enddo
+       enddo
+      enddo 
+      write (20) lf
+    endif
+   endif
+   
+   if (outputframeU) then
+    write (20) "VECTORS u float",lf
+    do k=1,Prnz
+     do j=1,Prny
+      do i=1,Prnx
+        Write (20) real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG),real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG)&
+         ,real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG)
+      enddo
+     enddo
+    enddo
+    write (20) lf
+   endif
+
+   if (outputframevort) then
+    write (20) "VECTORS vort float",lf
+    do k=1,Prnz
+     do j=1,Prny
+      do i=1,Prnx
+        Write (20) real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+                       -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG),&
+                     real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
+                       -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG),&
+                     real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
+                        -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin),SNG)
+      enddo
+     enddo
+    enddo
+    CLOSE(20)
+   endif
+
+  
+  else
+   if (slicedir==1) then
+     call Gridcoords(mini,minj,mink,slicex,(yV(Prny+1)+yV(0))/2._KND,(zW(Prnz+1)+zW(0))/2._KND)
+     maxi=mini
+     minj=1
+     maxj=Prny
+     mink=1
+     maxk=Prnz
+    elseif (slicedir==2) then
+     call Gridcoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._KND,slicex,(zW(Prnz+1)+zW(0))/2._KND)
+     maxj=minj
+     mini=1
+     maxi=Prnx
+     mink=1
+     maxk=Prnz
+    else
+     call Gridcoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._KND,(yV(Prny+1)+yV(0))/2._KND,slicex)
+     maxk=mink
+     mini=1
+     maxi=Prnx
+     minj=1
+     maxj=Prny
+    endif
+
+   fname(1:5)="frame"
+   write(fname(6:9),"(I4.4)") n
+   fname(10:13)=".vtk"
+   write(*,*) "Saving frame:",fname(6:9),"   time:",time
+   
+   OPEN(20,file=fname,access='stream',status='replace',form="unformatted",action="write")
+   write (20) "# vtk DataFile Version 2.0",lf
+   write (20) "CLMM output file",lf
+   write (20) "BINARY",lf
+   write (20) "DATASET RECTILINEAR_GRID",lf
+   str="DIMENSIONS"
+   write (str(12:),*) maxi-mini+1,maxj-minj+1,maxk-mink+1
+   write (20) str,lf
+   str="X_COORDINATES"
+   write (str(15:),'(i5,2x,a)') maxi-mini+1,"float"
+   write (20) str,lf
+   write (20) (real(xPr(i),SNG),i=mini,maxi),lf
+   str="Y_COORDINATES"
+   write (str(15:),'(i5,2x,a)') maxj-minj+1,"float"
+   write (20) str,lf
+   write (20) (real(yPr(j),SNG),j=minj,maxj),lf
+   str="Z_COORDINATES"
+   write (str(15:),'(i5,2x,a)') maxk-mink+1,"float"
+   write (20) str,lf
+   write (20) (real(zPr(k),SNG),k=mink,maxk),lf
+   str="POINT_DATA"
+   write (str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
+   write (20) str,lf
+
+   if (outputframePr) then
+    write (20) "SCALARS p float",lf
+    write (20) "LOOKUP_TABLE default",lf
+    do k=mink,maxk
+     do j=minj,maxj
+      do i=mini,maxi
+        Write (20) real(Pr(i,j,k),SNG)
+      enddo
+     enddo
+    enddo
+    write (20) lf
+   endif
+
+   if (outputframelambda2) then
+    write (20) "SCALARS lambda2 float",lf
+    write (20) "LOOKUP_TABLE default",lf
+    do k=mink,maxk
+     do j=minj,maxj
+      do i=mini,maxi
+        Write (20) real(Lambda2(i,j,k,U,V,W),SNG)
+      enddo
+     enddo
+    enddo 
+    write (20) lf
+   endif
+  
+   if (outputframescalars) then
+    do l=1,computescalars
+     write(scalname(7:8),"(I2.2)") l
+     write (20) "SCALARS ", scalname , " float",lf
+     write (20) "LOOKUP_TABLE default",lf
+     do k=mink,maxk
+      do j=minj,maxj
+       do i=mini,maxi
+         Write (20) real(SCALAR(i,j,k,l),SNG)
+       enddo
+      enddo
+     enddo
+     write (20) lf
+    enddo
+   elseif (outputframesumscalars.and.computescalars>0) then
+     write (20) "SCALARS ", "scalar" , " float",lf
+     write (20) "LOOKUP_TABLE default",lf
+     do k=mink,maxk
+      do j=minj,maxj
+       do i=mini,maxi
+         Write (20) real(SUM(SCALAR(i,j,k,:)),SNG)
+       enddo
+      enddo
+     enddo
+     write (20) lf
+   endif
+
+   if (outputframeT) then
+    if (buoyancy>0) then
+     write (20) "SCALARS temperature float",lf
+     write (20) "LOOKUP_TABLE default",lf
+     do k=mink,maxk
+      do j=minj,maxj
+       do i=mini,maxi
+         Write (20) real(Temperature(i,j,k),SNG)
+       enddo
+      enddo
+     enddo 
+     write (20) lf
+    endif
+   endif
+
+   if (outputframeU) then
+    write (20) "VECTORS u float",lf
+    do k=mink,maxk
+     do j=minj,maxj
+      do i=mini,maxi
+        Write (20) real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG),real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG)&
+         ,real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG)
+      enddo
+     enddo
+    enddo
+    write (20) lf
+   endif
+
+   if (outputframevort) then
+    write (20) "VECTORS vort float",lf
+    do k=mink,maxk
+     do j=minj,maxj
+      do i=mini,maxi
+        Write (20) real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+                        -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG),&
+                     real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
+                       -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG),&
+                     real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
+                       -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin),SNG)
+      enddo
+     enddo
+    enddo
+   endif  
+   CLOSE(20)
+   endif
 
   endif
   endsubroutine FRAME
@@ -1741,7 +2074,7 @@ endif
 
   OPEN(11,file="U2.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
+  write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
   write (11,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
@@ -1779,7 +2112,7 @@ endif
   
   OPEN(11,file="V2.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
+  write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
   write (11,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
@@ -1818,7 +2151,7 @@ endif
   
   OPEN(11,file="W2.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "diplomka output file"
+  write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
   write (11,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"

@@ -131,7 +131,7 @@ $(TARGETDIR_a.out)/tsteps.o: $(TARGETDIR_a.out) tsteps.f90
 	$(COMPILE.f) $(FFLAGS_a.out) $(CPPFLAGS_a.out)  -o $@ tsteps.f90
 
 $(TARGETDIR_a.out)/diplomka.o: $(TARGETDIR_a.out) diplomka.f90
-	$(COMPILE.f) $(FFLAGS_a.out) $(CPPFLAGS_a.out)  -o $@ diplomka.f90
+	$(COMPILE.f) $(FFLAGS_a.out) $(CPPFLAGS_a.out) -xfilebyteorder=big4:%all -o $@ diplomka.f90
 
 
 

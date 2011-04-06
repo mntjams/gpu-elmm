@@ -15,7 +15,7 @@
 #### Compiler and tool definitions shared by all build targets  -fopenmp ,invalid#####
 FC = gfortran-4.5
 BASICOPTS = -C -fbacktrace -ggdb
-ADVOPTS = -pedantic -Wall  -fcheck=all -ffpe-trap=zero,overflow
+ADVOPTS = -pedantic -Wall  -fcheck=all -ffpe-trap=zero,overflow -fconvert=big-endian
 FFLAGS = $(BASICOPTS)
 
 
@@ -37,9 +37,9 @@ OBJS_a.out =  \
 	$(TARGETDIR_a.out)/parameters.o \
 	$(TARGETDIR_a.out)/multigrid.o \
 	$(TARGETDIR_a.out)/wallmodels.o \
+	$(TARGETDIR_a.out)/geometric.o \
 	$(TARGETDIR_a.out)/scalars.o \
 	$(TARGETDIR_a.out)/turbinlet.o \
-	$(TARGETDIR_a.out)/geometric.o \
 	$(TARGETDIR_a.out)/boundaries.o \
 	$(TARGETDIR_a.out)/smagorinsky.o \
 	$(TARGETDIR_a.out)/outputs.o \

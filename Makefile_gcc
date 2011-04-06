@@ -15,7 +15,7 @@
 #### Compiler and tool definitions shared by all build targets  -fopenmp ,invalid#####
 FC = gfortran-4.5
 BASICOPTS = -C -fbacktrace -ggdb
-ADVOPTS = -pedantic -Wall  -fcheck=all -ffpe-trap=zero,overflow
+ADVOPTS = -pedantic -Wall  -fcheck=all -ffpe-trap=zero,overflow -fconvert=big-endian
 FFLAGS = $(BASICOPTS)
 
 

@@ -1052,16 +1052,16 @@ contains
  endsubroutine INITCONDS
 
   subroutine INIT_RANDOM_SEED()
-  integer :: i, n, clock
-  integer, dimension(:), allocatable :: seed
+  integer:: i, n, clock
+  integer,dimension(:),allocatable:: seed
           
    call RANDOM_SEED(size = n)
    allocate(seed(n))
           
    call SYSTEM_CLOCK(COUNT=clock)
           
-   seed = clock + 37 * (/ (i - 1, i = 1, n) /)
-   call RANDOM_SEED(PUT = seed)
+   seed=clock+37*(/(i-1,i=1,n)/)
+   call RANDOM_SEED(PUT=seed)
     
    deallocate(seed)
   endsubroutine
