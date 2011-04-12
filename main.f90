@@ -7,35 +7,23 @@ use OUTPUTS
 use SCALARS
 use GEOMETRIC
 use WALLMODELS
-!use fish
+
 implicit none
 
-!definice promennych, souboru...
+
 
   
   real(KND),allocatable:: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)
   real(KND),allocatable:: Ulat(:,:,:),Vlat(:,:,:),Wlat(:,:,:)
-  integer l,fnum,i,j,k,nWM
-  integer probei,probej,probek,pUi,pUj,pUk,pVi,pVj,pVk,pWi,pWj,pWk
-  integer procs,omp_get_num_procs!,nthreads,omp_get_num_threads
-  real(KND) delta,S,S2
-  TYPE(WMPoint),pointer:: WMP
+  integer:: l,fnum,i,j,k,nWM
+  integer:: probei,probej,probek
+  integer:: pUi,pUj,pUk,pVi,pVj,pVk,pWi,pWj,pWk
+  real(KND):: delta,S,S2
+  type(WMPoint),pointer:: WMP
 
   pi=2.0_KND*acos(0.0_KND)
-!inicializace parametru
-  !S=0
-  !!$OMP PARALLEL PRIVATE(i) SHARED(S)
-  !nthreads=OMP_GET_NUM_THREADS()
-  !write (*,*) "Threads:",nthreads
-  !!$OMP DO
-  !do i=1,10000
-  ! nthreads=OMP_GET_NUM_THREADS()
-  ! S=S+1
-  !enddo
-  !!$OMP ENDDO
-  !write(*,*) "Threads in do:",nthreads,S
-  !!$OMP ENDPARALLEL
- 
+
+
   write (*,*) "Reading parameters..."
   call readparams
 
@@ -157,7 +145,7 @@ implicit none
   call GridCoordsV(pVi,pVj,pVk,probex,probey,probez)
   call GridCoordsW(pWi,pWj,pWk,probex,probey,probez)
 
-!pocatecni podminky
+
  Pr=0
  write (*,*) "Setting up initial conditions..."
  call INITCONDS(U,V,W,Pr)
@@ -169,9 +157,9 @@ implicit none
  times(0)=0
 
 
- if (wallmodeltype>0) OPEN(21,file="Retau.txt")
- if (tasktype==5) OPEN(22,file="momthick.txt")
- if (wallmodeltype>0.and.TBtypeB==DIRICHLET) OPEN(23,file="tfluxtime.txt")
+ if (wallmodeltype>0) open(21,file="Retau.txt")
+ if (tasktype==5) open(22,file="momthick.txt")
+ if (wallmodeltype>0.and.TBtypeB==DIRICHLET) open(23,file="tfluxtime.txt")
  
    Utime(step)=Trilinint((probex-xU(pUi))/(xU(pUi+1)-xU(pUi)),&
                           (probey-yPr(pUj))/(yPr(pUj+1)-yPr(pUj)),&
@@ -234,15 +222,6 @@ implicit none
 
    if (tempmet==1) then
        call TMARCHEUL(U,V,W,Pr,delta)
-   elseif (tempmet==2) then
-       if (step==1) then 
-         Ulat=U
-         Vlat=V
-         Wlat=W
-         call TMARCHEUL(U,V,W,Pr,delta)
-       else
-!          call TMARCHAB2(U,V,W,Pr,Ulat,Vlat,Wlat,delta)
-       endif
     elseif (tempmet==3) then
        call TMARCHRK2(U,V,W,Pr,delta)
     elseif (tempmet==4) then
@@ -363,7 +342,7 @@ implicit none
      if (associated(WMP%next)) then
       WMP=>WMP%next
      else
-      EXIT
+      exit
      endif
     enddo
     endif
@@ -443,21 +422,21 @@ implicit none
    
     if ((steady==1) .and. (delta<eps)) then
       write (*,*) "Steady state reached."
-      EXIT
+      exit
     endif  
     if ((steady==0) .and. (time>=endtime)) then
       write (*,*) "Time limit reached."
-      EXIT
+      exit
     endif
 
     if (dt<abs(CFL*dxmin/Uinlet/100._KND)) then
       write (*,*) "Solution diverged."
-      EXIT
+      exit
     endif  
   enddo 
-  if ((wallmodeltype>0)) CLOSE(21)
-  if (tasktype==5) CLOSE(22)
- if (wallmodeltype>0.and.TBtypeB==DIRICHLET) CLOSE(23)
+  if ((wallmodeltype>0)) close(21)
+  if (tasktype==5) close(22)
+ if (wallmodeltype>0.and.TBtypeB==DIRICHLET) close(23)
 
 
 

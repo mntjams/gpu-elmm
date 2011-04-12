@@ -3,13 +3,13 @@ module SMAGORINSKY
  use BOUNDARIES
  implicit none
  
- real(KND),PARAMETER:: CSMAG=0.1_KND
+ real(KND),parameter:: CSMAG=0.1_KND
  
  contains
  
   subroutine SMAG(U,V,W)
   integer i,j,k
-  real(KND),dimension(-2:,-2:,-2:),intent(INOUT):: U,V,W
+  real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W
 
   call Bound_CondU(U)
   call Bound_CondV(V)
@@ -29,7 +29,7 @@ module SMAGORINSKY
 
   
   subroutine SMAG2(U,V,W,width)
-  integer,intent(IN):: width
+  integer,intent(in):: width
   real(KND),dimension(-2:,-2:,-2:):: U,V,W
   integer i,j,k 
 
@@ -51,8 +51,8 @@ module SMAGORINSKY
   endsubroutine SMAG2
 
   real(KND) function NUSMAG2(i,j,k,U,V,W,width2)
-  integer,intent(IN):: i,j,k,width2
-  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V,W
+  integer,intent(in):: i,j,k,width2
+  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
   real(KND) S(1:3,1:3)
   real(KND) width,SBAR
 
@@ -63,8 +63,8 @@ module SMAGORINSKY
   endfunction NUSMAG2
 
   real(KND) function NUSMAG(i,j,k,U,V,W)
-  integer,intent(IN):: i,j,k
-  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V,W
+  integer,intent(in):: i,j,k
+  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
   real(KND) S(1:3,1:3)
   real(KND) width,SBAR
 
@@ -78,7 +78,7 @@ module SMAGORINSKY
 
 
   real(KND) function STRAINU(S)
-  real(KND),intent(IN):: S(1:3,1:3)
+  real(KND),intent(in):: S(1:3,1:3)
   integer::ii,jj
      
   STRAINU=0
@@ -93,9 +93,9 @@ module SMAGORINSKY
   
   
   subroutine STRAINIJ(i,j,k,U,V,W,S)
-  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V,W
-  real(KND),intent(OUT):: S(1:3,1:3)
-  integer,intent(IN):: i,j,k
+  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+  real(KND),intent(out):: S(1:3,1:3)
+  integer,intent(in):: i,j,k
   real(KND) D(1:3,1:3)
   integer::ii,jj
 
@@ -310,7 +310,7 @@ module SMAGORINSKY
   do k=-1,Prnz+2
    do j=-1,Prny+2
     do i=-1,Prnx+2
-     if (abs(M(1,1,i,j,k))<1.E-4_KND*abs(L(1,1,i,j,k))) then
+     if (abs(M(1,1,i,j,k))<1.e-4_KND*abs(L(1,1,i,j,k))) then
                              CSDYN(i,j,k)=0
                              if (i>0.and.i<Prnx+1.and.j>0.and.j<Prny+1.and.k>0.and.k<Prnz+1.) Sums=Sums+1
                             else
@@ -365,7 +365,7 @@ module SMAGORINSKY
 
 
   subroutine VREMAN(U,V,W)
-  real(KND),dimension(-2:,-2:,-2:),intent(INOUT):: U,V,W
+  real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W
   integer i,j,k,ii,jj
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)::bb
   real(KND),dimension(1:3,1:3,-1:Prnx+2,-1:Prny+2,-1:Prnz+2)::a,b
@@ -406,7 +406,7 @@ module SMAGORINSKY
   forall(k=-1:Prnz+2,j=-1:Prny+2,i=-1:Prnx+2)
        a(1,1,i,j,k)=sum(a(:,:,i,j,k)**2)
   endforall
-  forall(k=-1:Prnz+2,j=-1:Prny+2,i=-1:Prnx+2,abs(a(1,1,i,j,k))>1E-5.and.bb(i,j,k)>0)
+  forall(k=-1:Prnz+2,j=-1:Prny+2,i=-1:Prnx+2,abs(a(1,1,i,j,k))>1e-5.and.bb(i,j,k)>0)
        Visc(i,j,k)=c*sqrt(bb(i,j,k)/a(1,1,i,j,k))
   endforall
 !   S=0
@@ -436,9 +436,9 @@ module SMAGORINSKY
 
 
  subroutine TRAPESFIELD(U1,U2,nx,ny,nz)
- real(KND),dimension(-2:,-2:,-2:),intent(IN):: U1
- real(KND),dimension(-2:,-2:,-2:),intent(OUT):: U2
- integer,intent(IN):: nx,ny,nz
+ real(KND),dimension(-2:,-2:,-2:),intent(in):: U1
+ real(KND),dimension(-2:,-2:,-2:),intent(out):: U2
+ integer,intent(in):: nx,ny,nz
  integer i,j,k
  U2=0
  do k=-1,nz+2
@@ -454,9 +454,9 @@ module SMAGORINSKY
 
 
  subroutine TRAPESFIELD2(U1,U2,nx,ny,nz)
- real(KND),dimension(-2:,-2:,-2:),intent(IN):: U1
- real(KND),dimension(-2:,-2:,-2:),intent(OUT):: U2
- integer,intent(IN):: nx,ny,nz
+ real(KND),dimension(-2:,-2:,-2:),intent(in):: U1
+ real(KND),dimension(-2:,-2:,-2:),intent(out):: U2
+ integer,intent(in):: nx,ny,nz
  real(KND),dimension(-1:1):: F
  real(KND) S,S1
  integer ii,jj,i,j,k,kk
@@ -491,9 +491,9 @@ module SMAGORINSKY
 
 
  subroutine FILTER(U1,U2,nx,ny,nz,width)
- real(KND),dimension(-2:,-2:,-2:),intent(IN):: U1
- real(KND),dimension(-2:,-2:,-2:),intent(OUT):: U2
- integer,intent(IN):: nx,ny,nz
+ real(KND),dimension(-2:,-2:,-2:),intent(in):: U1
+ real(KND),dimension(-2:,-2:,-2:),intent(out):: U2
+ integer,intent(in):: nx,ny,nz
  integer width
  call TRAPESFIELD(U1,U2,nx,ny,nz)
  endsubroutine FILTER

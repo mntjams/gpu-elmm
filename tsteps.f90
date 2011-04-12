@@ -17,8 +17,8 @@ logical:: released=.false.
 
 contains
   subroutine TMARCHEUL(U,V,W,Pr,delta)
-  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),intent(OUT):: delta
+  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(out):: delta
   real(KND),allocatable,dimension(:,:,:),save:: Q
   real(KND),dimension(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),LBOUND(U,3):UBOUND(U,3)):: U2
   real(KND),dimension(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),LBOUND(V,3):UBOUND(V,3)):: V2
@@ -47,35 +47,17 @@ contains
   call BOUND_CONDW(W)
   if (buoyancy==1)  call Bound_Temp(temperature)
 
-  
-!   if (tasktype==1) then
-!   do k=1,Prnz/2
-!    do j=Prny*3/7,Prny*4/7
-!     do i=Prnx*3/10,Prnx*4/10
-!      U(i,j,k)=0
-!      U(i-1,j,k)=0
-!      V(i,j,k)=0
-!      V(i,j-1,k)=0
-!      W(i,j,k)=0
-!      W(i,j,k-1)=0
-!     enddo
-!    enddo
-!   enddo
-!   endif
+ 
 
-  U2=1E19
-  V2=1E19
-  W2=1E19
-  !casovy krok
- ! if ((convmet==3)) then
+  U2=1e19
+  V2=1e19
+  W2=1e19
+
       call timestepEUL(U,V,W)
-  !else!if ((convmet==1).or.(convmet==2)) then
-  !    call timestepCW(U,V,W)
-  !endif
+
   if (steady==0.and.dt+time>endtime)  dt=endtime-time
   write (*,*) "time:",time,"dt: ",dt
-  !nejdrive vypocet fireal(KND) U(:,:),V(:,:),W(:,:),Fx(:,:),Fy(:,:),Fz(:,:)
-  !vypocte adv. cleny a spocte U2'
+
 
 
   if (convmet==1) then
@@ -92,31 +74,12 @@ contains
   call CoriolisForce(U2,V2,U,V,1._KND)
   if (buoyancy==1) call BuoyancyForce(W2,temperature,1._KND)
 
-  !vypocte dif. cleny a tlak. grad. a spocte U2''
-  call OTHERTERMS(U,V,W,U2,V2,W2,Pr,1._KND)
-  !U2=U+U2
-  !V2=V+V2
-  !W2=W+W2
 
+  call OTHERTERMS(U,V,W,U2,V2,W2,Pr,1._KND)
 
 
   if (BtypeT==FREESLIPBUFF)  call ATTENUATETOP(U2,V2,W2,Pr)
 
-
-!   if (tasktype==1) then
-!   do k=1,Prnz/2
-!    do j=Prny*3/7,Prny*4/7
-!     do i=Prnx*3/10,Prnx*4/10
-!      U(i,j,k)=0
-!      U(i-1,j,k)=0
-!      V(i,j,k)=0
-!      V(i,j-1,k)=0
-!      W(i,j,k)=0
-!      W(i,j,k-1)=0
-!     enddo 
-!    enddo
-!   enddo
-!   endif
 
   if (masssourc==1) then
       call MASS_SOURC(Q,U2,V2,W2)
@@ -128,7 +91,6 @@ contains
   call BOUND_CONDV(V2)
   call BOUND_CONDW(W2)
 
-  !spocte opravu rychlosti na kontinuitu
   if (poissmet>0) then
   if (masssourc==1) then
     call PR_CORRECT(U2,V2,W2,Pr,1._KND,Q)
@@ -138,43 +100,6 @@ contains
   endif
 
 
-
-!   if (tasktype==1) then
-!    elseif (tasktype==6) then
-! !    if (MOD(Prny,2)==1) then
-! !     SCALAR1(tilenx+1,Prny/2+1,1)=SCALAR1(tilenx+1,Prny/2+1,1)+dt/(dxmin*dymin*dzmin)
-! !     SCALAR2(tilenx+1,Prny/2+1,(tilenz*3)/2)=SCALAR2(tilenx+1,Prny/2+1,(tilenz*3)/2)+dt/(dxmin*dymin*dzmin)
-! !    else
-! ! !     SCALAR1(tilenx+1,Prny/2,1)=SCALAR1(tilenx+1,Prny/2,1)+dt/(2*dxmin*dymin*dzmin)
-! ! !     SCALAR1(tilenx+1,Prny/2+1,1)=SCALAR1(tilenx+1,Prny/2+1,1)+dt/(2*dxmin*dymin*dzmin)
-! ! !     SCALAR2(tilenx+1,Prny/2,(tilenz*3)/2)=SCALAR2(tilenx+1,Prny/2,(tilenz*3)/2)+dt/(2*dxmin*dymin*dzmin)
-! ! !     SCALAR2(tilenx+1,Prny/2+1,(tilenz*3)/2)=SCALAR2(tilenx+1,Prny/2+1,(tilenz*3)/2)+dt/(2*dxmin*dymin*dzmin)
-! !    endif
-!     if (computescalars==2) then
-!     elseif (tasktype==7) then
-!     do k=1,Prnz
-!      do i=1,Prnx
-!       SCALAR1(i,1,k)=SCALAR1(i,1,k)+dt/(2*dzmin*dxmin*dymin*Prnx*Prny)
-!       SCALAR1(i,Prny,k)=SCALAR1(i,Prny,k)-dt/(2*dzmin*dxmin*dymin*Prnx*Prny)
-!      enddo
-!     enddo  
-!     do k=1,Prnz
-!      do i=1,Prnx
-!       SCALAR2(i,1,k)=1
-!       SCALAR2(i,Prny,k)=-1
-!      enddo
-!     enddo  
-!    else   
-!    SCALAR1(Prnx/5,Prny/2,Prnz/2)=SCALAR1(Prnx/5,Prny/2,Prnz/2)+dt/(dxmin*dymin*dzmin)
-!    SCALAR2(Prnx/5,Prny/2,1)=SCALAR2(Prnx/5,Prny/2,1)+dt/(dxmin*dymin*dzmin)
-!    endif
-!   else
-!    !SCALAR1(Prnx/5,Prny/2,Prnz/2)=SCALAR1(Prnx/5,Prny/2,Prnz/2)+dt/(dxmin*dymin*dzmin)
-!    !SCALAR2(Prnx/5,1,Prnz/2)=SCALAR2(Prnx/5,1,Prnz/2)+dt/(dxmin*dymin*dzmin)
-!   
-!   endif
-  
-
   
   if (computescalars>0) then
    SCALAR_2=0
@@ -183,11 +108,13 @@ contains
    enddo
    SCALAR=SCALAR+SCALAR_2
    if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
+    endforall
    else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
+    endforall
    endif
    call Bound_Visc(TDiff)
    do i=1,computescalars
@@ -200,11 +127,13 @@ contains
     
   if (buoyancy>0) then
    if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
+    endforall
    else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
+    endforall
    endif
    call Bound_Visc(TDiff)
    temperature2=0
@@ -224,11 +153,6 @@ contains
   delta=delta/dt
 
 
-!   where(Utype>0) U2=0
-!   where(Vtype>0) V2=0
-!   where(Wtype>0) W2=0
-!   if (buoyancy==1) where(Prtype>0) temperature=temperature_ref
-
   U=U2
   V=V2
   W=W2
@@ -237,14 +161,14 @@ contains
 
   
   subroutine TMARCHRK2(U,V,W,Pr,delta)
-  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),intent(OUT):: delta
+  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(out):: delta
   real(KND),allocatable,dimension(:,:,:),save:: Q
-  real(KND),DIMENSION(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),&
+  real(KND),dimension(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),&
                                               LBOUND(U,3):UBOUND(U,3)):: U2,Ustar
-  real(KND),DIMENSION(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),&
+  real(KND),dimension(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),&
                                               LBOUND(V,3):UBOUND(V,3)):: V2,Vstar
-  real(KND),DIMENSION(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),&
+  real(KND),dimension(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),&
                                               LBOUND(W,3):UBOUND(W,3)):: W2,Wstar
   real(KND) p,odey2,odeystar
   integer i,j,k
@@ -273,36 +197,16 @@ contains
 
   
 
-  !casovy krok
-!   if (tasktype==1.or.tasktype==6) then
-!   do m=1,patternny
-!    do l=1,patternnx
-!     do k=1,Zu
-!      do j=Yd,Yu
-!       do i=Xd,Xup
-!        U(i+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k)=0
-!        U(i-1+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k)=0
-!        V(i+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k)=0
-!        V(i+(l-1)*boxnx*2,j-1+((m-1)*boxny*3)/2,k)=0
-!        W(i+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k)=0
-!        W(i+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k-1)=0
-!       enddo 
-!      enddo
-!     enddo
-!    enddo
-!   enddo
-!   endif
 
       call timestepEUL(U,V,W)
 
   if (steady==0.and.dt+time>endtime)  dt=endtime-time
   write (*,*) "time:",time,"dt: ",dt
-  !nejdrive vypocet fireal(KND) U(:,:),V(:,:),W(:,:),Fx(:,:),Fy(:,:),Fz(:,:)
-  U2=1E9
-  V2=1E9
-  W2=1E9
 
-  !vypocte adv. cleny a spocte U2'
+  U2=1e9
+  V2=1e9
+  W2=1e9
+
 
 
   if (convmet>0) then
@@ -339,58 +243,14 @@ contains
    W2(1:Wnx,1:Wny,1:Wnz)=0
   endif 
  
-!   if (tasktype==1.or.tasktype==6) then
-!   do m=1,patternny
-!    do l=1,patternnx
-!     do k=1,Zu
-!      do j=Yd,Yu
-!       do i=Xd,Xup
-!        U2(i+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k)=0
-!        U2(i-1+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k)=0
-!        V2(i+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k)=0
-!        V2(i+(l-1)*boxnx*2,j-1+((m-1)*boxny*3)/2,k)=0
-!        W2(i+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k)=0
-!        W2(i+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k-1)=0
-!       enddo 
-!      enddo
-!     enddo
-!    enddo
-!   enddo
-!   endif
-
-  !vypocte dif. cleny a tlak. grad. a spocte U2''
 
    call OTHERTERMS(U,V,W,U2,V2,W2,Pr,1._KND)
-! U2=U+U2
-! V2=V+V2
-! W2=W+W2
-  
-!   if (tasktype==1.or.tasktype==6) then
-!   do m=1,patternny
-!    do l=1,patternnx
-!     do k=1,Zu
-!      do j=Yd,Yu
-!       do i=Xd,Xup
-!        U2(i+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k)=0
-!        U2(i-1+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k)=0
-!        V2(i+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k)=0
-!        V2(i+(l-1)*boxnx*2,j-1+((m-1)*boxny*3)/2,k)=0
-!        W2(i+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k)=0
-!        W2(i+(l-1)*boxnx*2,j+((m-1)*boxny*3)/2,k-1)=0
-!       enddo 
-!      enddo
-!     enddo
-!    enddo
-!   enddo
-!   endif
 
 
   if (BtypeT==FREESLIPBUFF)  call ATTENUATETOP(U2,V2,W2,Pr)
-!   if (BtypeE==NEUMANN) call ATTENUATEOUT(U2,V2,W2,Pr)
+  if (BtypeE==NEUMANN) call ATTENUATEOUT(U2,V2,W2,Pr)
 
   
-!spocte zdroje hmoty
-
   if (masssourc==1) then
       call MASS_SOURC(Q,U2,V2,W2)
   endif
@@ -401,16 +261,6 @@ contains
   call BOUND_CONDW(W2)
   
 
-!   do k=1,Unz
-!    do j=1,Uny
-!     do i=1,Unx
-!      call RANDOM_NUMBER(p)
-!      U2(i,j,k)=U2(i,j,k)*(1+0.02_KND*(0.5_KND-p))
-!     enddo
-!    enddo
-!   enddo   
-
-  !spocte opravu rychlosti na kontinuitu
   if (poissmet>0) then
   if (masssourc==1) then
     call PR_CORRECT(U2,V2,W2,Pr,1._KND,Q)
@@ -425,61 +275,6 @@ contains
   call BOUND_CONDW(W2)
   
   
-!   if (tasktype==1) then
-!    if ((time>=300).and.(time<300+dt)) then
-!     p=0
-!     p2=0
-!     do i=1,Prnx
-!      do j=1,Prny
-!       do k=1,Prnz
-!        if (Sqrt((xPr(i)-2._KND)**2+(yPr(j)-0._KND)**2+(zPr(k))**2)<3) then
-!         Scalar1(i,j,k)=1
-!         p=p+1
-!        endif
-!        if (Sqrt((xPr(i)-2._KND)**2+(yPr(j)+3._KND)**2+(zPr(k))**2)<3) then
-!         Scalar2(i,j,k)=1
-!         p2=p2+1
-!        endif
-!       enddo
-!      enddo
-!     enddo
-!     p=p*dxmin*dymin*dzmin
-!     p2=p2*dxmin*dymin*dzmin
-!     Scalar1=Scalar1/p
-!     Scalar2=Scalar2/p2
-!    endif
-!   elseif (tasktype==6) then
-! !    if (MOD(Prny,2)==1) then
-! !     SCALAR1(tilenx+1,Prny/2+1,1)=SCALAR1(tilenx+1,Prny/2+1,1)+dt/(dxmin*dymin*dzmin)
-! !     SCALAR2(tilenx+1,Prny/2+1,(tilenz*3)/2)=SCALAR2(tilenx+1,Prny/2+1,(tilenz*3)/2)+dt/(dxmin*dymin*dzmin)
-! !    else
-!     SCALAR1(tilenx+1,Prny/2,1)=SCALAR1(tilenx+1,Prny/2,1)+dt/(2*dxmin*dymin*dzmin)
-!     SCALAR1(tilenx+1,Prny/2+1,1)=SCALAR1(tilenx+1,Prny/2+1,1)+dt/(2*dxmin*dymin*dzmin)
-!     SCALAR2(tilenx+1,Prny/2,(tilenz*3)/2)=SCALAR2(tilenx+1,Prny/2,(tilenz*3)/2)+dt/(2*dxmin*dymin*dzmin)
-!     SCALAR2(tilenx+1,Prny/2+1,(tilenz*3)/2)=SCALAR2(tilenx+1,Prny/2+1,(tilenz*3)/2)+dt/(2*dxmin*dymin*dzmin)
-! !    endif
-!   if (computescalars==2) then
-!   elseif (tasktype==7) then
-!     do k=1,Prnz
-!      do i=1,Prnx
-!       SCALAR1(i,1,k)=SCALAR1(i,1,k)+dt/(2*dzmin*dxmin*dymin*Prnx*Prny)
-!       SCALAR1(i,Prny,k)=SCALAR1(i,Prny,k)-dt/(2*dzmin*dxmin*dymin*Prnx*Prny)
-!      enddo
-!     enddo  
-!     do k=1,Prnz
-!      do i=1,Prnx
-!       SCALAR2(i,1,k)=1
-!       SCALAR2(i,Prny,k)=-1
-!      enddo
-!     enddo  
-!   else   
-! !    SCALAR1(Prnx/5,Prny/2,Prnz/2)=SCALAR1(Prnx/5,Prny/2,Prnz/2)+dt/(dxmin*dymin*dzmin)
-! !    SCALAR2(Prnx/5,Prny/2,1)=SCALAR2(Prnx/5,Prny/2,1)+dt/(dxmin*dymin*dzmin)
-!   endif
-!   
-!   SCALAR1_2=0
-!   SCALAR2_2=0
-!   endif
 
   if (computescalars>=4)then
    if (time>(endtime-starttime)/3._KND.and.maxval(scalar(:,:,:,1))==0) then
@@ -529,19 +324,9 @@ contains
       enddo
      enddo
     enddo
-!     do k=1,Prnz
-!      do j=1,Prny
-!       do i=1,Prnx
-!        if (((xPr(i)>-3.5.and.xPr(i)<3.5).or.(xPr(i)>3.5.and.xPr(i-1)<-3.5)).and.&
-!            ((yPr(j)>-3.5.and.yPr(j)<3.5).or.(yPr(j)>3.5.and.yPr(j-1)<-3.5)).and.&
-!            (zPr(k)<12.or.(zPr(k)>12.and.zPr(k-1)<0))) then
-!         SCALAR(i,j,k,5)=0.5
-!        endif
-!       enddo
-!      enddo
-!     enddo
     SCALAR=SCALAR/p
    endif
+
   elseif (computescalars>0.and.partdistrib>0) then
    if (time>(endtime-starttime)/2._KND.and.maxval(scalar(:,:,:,1))==0) then
     p=0
@@ -568,11 +353,13 @@ contains
    enddo
    SCALAR=SCALAR+SCALAR_2
    if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
+    endforall
    else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
+    endforall
    endif
    call Bound_Visc(TDiff)
     do i=1,computescalars
@@ -585,11 +372,13 @@ contains
 
   if (buoyancy>0) then
    if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
+    endforall
    else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
+    endforall
    endif
    call Bound_Visc(TDiff)
    temperature2=0
@@ -628,22 +417,23 @@ contains
 
   
   subroutine TMARCHRK3(U,V,W,Pr,delta)
-  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),intent(OUT):: delta
+  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(out):: delta
+
   real(KND),allocatable,dimension(:,:,:),save:: Q
-  real(KND),DIMENSION(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),&
+  real(KND),dimension(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),&
                                               LBOUND(U,3):UBOUND(U,3))::U2,Ustar
-  real(KND),DIMENSION(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),&
+  real(KND),dimension(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),&
                                               LBOUND(V,3):UBOUND(V,3))::V2,Vstar
-  real(KND),DIMENSION(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),&
+  real(KND),dimension(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),&
                                               LBOUND(W,3):UBOUND(W,3))::W2,Wstar
-  real(KND),DIMENSION(LBOUND(SCALAR,1):UBOUND(SCALAR,1),LBOUND(SCALAR,2):UBOUND(SCALAR,2),&
+  real(KND),dimension(LBOUND(SCALAR,1):UBOUND(SCALAR,1),LBOUND(SCALAR,2):UBOUND(SCALAR,2),&
                 LBOUND(SCALAR,3):UBOUND(SCALAR,3),LBOUND(SCALAR,4):UBOUND(SCALAR,4))::SCALAR_adv,SCALAR_2
-  real(KND),DIMENSION(LBOUND(TEMPERATURE,1):UBOUND(TEMPERATURE,1),LBOUND(TEMPERATURE,2):UBOUND(TEMPERATURE,2),&
+  real(KND),dimension(LBOUND(TEMPERATURE,1):UBOUND(TEMPERATURE,1),LBOUND(TEMPERATURE,2):UBOUND(TEMPERATURE,2),&
    LBOUND(TEMPERATURE,3):UBOUND(TEMPERATURE,3))::TEMPERATURE_adv,TEMPERATURE2
   real(KND),dimension(1:3),save:: alpha,gamma,rho
   integer i,j,k,l
-  real(KND) p,ODEy2,ODEystar
+  real(KND) p
   integer,save:: called=0
 
 
@@ -685,13 +475,12 @@ contains
    U2=0
    V2=0
    W2=0
-  !vypocte adv. cleny a spocte U2'
 
   if (convmet>0) then
    if (l>1) then
-     U2=U2+Ustar*rho(l)!call CDU2(U2,Ustar,Vstar,Wstar,rho(l))
-     V2=V2+Vstar*rho(l)!call CDV2(V2,Ustar,Vstar,Wstar,rho(l))
-     W2=W2+Wstar*rho(l)!call CDW2(W2,Ustar,Vstar,Wstar,rho(l))
+     U2=U2+Ustar*rho(l)
+     V2=V2+Vstar*rho(l)
+     W2=W2+Wstar*rho(l)
    endif
 
    Ustar=0
@@ -717,13 +506,6 @@ contains
    W2=W2+Wstar*gamma(l)
   endif
 
-
-!   odey2=0
-!   if (l>1)   odey2=odey2+odeystar*(rho(l))
-!   odeystar=odey*dt!sin(time)*dt
-!   odey2=odey2+odeystar*gamma(l)
-!   odey=odey+odey2
-!   if (l==3) write (*,*) "ODEy", odey-exp(time+dt)
 
 
   call OTHERTERMS(U,V,W,U2,V2,W2,Pr,2.*alpha(l))
@@ -759,18 +541,15 @@ contains
   if (computescalars>0.and..not.released) call EXPLOSION
 
   if (computescalars>0) then
-   write (*,*) "*scalars*",SUM(SCALAR(1:Prnx,1:Prny,1:Prnz,:))
    SCALAR_2=0
    if (l>1) then
     SCALAR_2=SCALAR_2+SCALAR_adv*rho(l)
    endif
-   write (*,*) "**scalars**",SUM(SCALAR_2(1:Prnx,1:Prny,1:Prnz,:))
    SCALAR_adv=0
    do i=1,computescalars
     call KAPPASCALAR(SCALAR_adv(:,:,:,i),SCALAR(:,:,:,i),U2,V2,W2,2,1._KND)
    enddo
    SCALAR_2=SCALAR_2+SCALAR_adv*gamma(l)
-   write (*,*) "***scalars***",SUM(SCALAR_2(1:Prnx,1:Prny,1:Prnz,:))
 
    if (pointscalsource==1) then
     do i=1,computescalars
@@ -778,35 +557,35 @@ contains
       percdistrib(i)*(rho(l)+gamma(l))*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
     enddo
    endif
-   write (*,*) "****scalars****",SUM(SCALAR_2(1:Prnx,1:Prny,1:Prnz,:))
 
    SCALAR=SCALAR+SCALAR_2
-   write (*,*) "***scalars***",SUM(SCALAR(1:Prnx,1:Prny,1:Prnz,:))
    if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
+    endforall
    else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
+    endforall
    endif
    call Bound_Visc(TDiff)
     do i=1,computescalars
       call DIFFSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),2,2._KND*alpha(l))
     enddo
-   write (*,*) "**scalars**",SUM(SCALAR_2(1:Prnx,1:Prny,1:Prnz,:))
     if (computedeposition>0) call Deposition(SCALAR_2,2._KND*alpha(l))
     if (computegravsettling>0) call Gravsettling(SCALAR_2,2._KND*alpha(l))
-   write (*,*) "*scalars*",SUM(SCALAR_2(1:Prnx,1:Prny,1:Prnz,:))
    SCALAR=SCALAR_2
   endif
 
   if (buoyancy>0) then
    if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
+    endforall
    else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
+    endforall
    endif
    call Bound_Visc(TDiff)
    temperature2=0
@@ -818,8 +597,6 @@ contains
    temperature_adv=0
    call KAPPASCALAR(temperature_adv,temperature,U2,V2,W2,1,1._KND)
    temperature2=temperature2+temperature_adv*gamma(l)
-!    temperature_adv=0
-!    if (l<3) call PLMSCALAR(temperature_adv,temperature,U2,V2,W2,1,)
 
    temperature=temperature+temperature2
    call Bound_Temp(temperature)
@@ -827,30 +604,18 @@ contains
    temperature=temperature2
    endif
 
-! ! for debugging rotation advection test
-! ! if (tasktype==2) then 
-! !  do j=1,Prny
-! !   do i=1,Prnx
-! !    if (xPr(i)>1.5.or.xPr(i)<-1.5.or.yPr(j)>1.5.or.yPr(j)<-1.5) temperature(i,j,:)=0
-! !   enddo
-! !  enddo
-! ! endif
 
 
    if (l==1) delta=0
    delta=delta+SUM(ABS(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
    delta=delta+SUM(ABS(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
    delta=delta+SUM(ABS(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
-!   Ustar=U
-!   Vstar=V
-!   Wstar=W
 
 
 
    where(Utype>0) U2=0
    where(Vtype>0) V2=0
    where(Wtype>0) W2=0
-!    if (buoyancy==1) where(Prtype(1:Prnx,1:Prny,1:Prnz)>0) temperature(1:Prnx,1:Prny,1:Prnz)=temperature_ref
 
    call NULLINTERIOR(U2,V2,W2)
    U=U2
@@ -870,8 +635,8 @@ contains
   
    
   subroutine TMARCHSHIFTINLET(U,V,W,Pr,delta) !Only shifts inlet in the x direction, for debugging purposes
-  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),intent(OUT):: delta
+  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(out):: delta
   integer i,j,k
   real(KND),allocatable,dimension(:,:,:,:),save:: SCALAR_2
   real(KND),allocatable,dimension(:,:,:),save:: temperature2
@@ -927,9 +692,9 @@ contains
   enddo
   endif
 
-!   if (poissmet>0) then
-!     call PR_CORRECT(U,V,W,Pr,1._KND)
-!   endif
+  if (poissmet>0) then
+    call PR_CORRECT(U,V,W,Pr,1._KND)
+  endif
 
   if (computescalars>0)then
    if (time>5.and.maxval(scalar(:,:,:,1))==0) then
@@ -938,37 +703,7 @@ contains
    endif
   endif
   
-!   if (computescalars>0) then
-!    SCALAR_2=0
-!    do i=1,computescalars
-!     call ADVSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),U,V,W,2,1._KND)
-!    enddo
-!    SCALAR=SCALAR+SCALAR_2
-!    if (Re>0) then
-!     forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
-!      TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
-!    else
-!     forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
-!      TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
-!    endif
-!    call Bound_Visc(TDiff)
-!    do i=1,computescalars
-!     call DIFFSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),2,1._KND)
-!     SCALAR_2(:,:,:,i)=SCALAR(:,:,:,i)
-!    enddo
-!    if (computedeposition>0) call Deposition(SCALAR_2,1._KND)
-!    SCALAR=SCALAR_2
-!   endif
-! 
-!   if (buoyancy>0) then
-!    temperature2=0
-!    call Bound_Temp(temperature)
-!    call ADVSCALAR(temperature2,temperature,U,V,W,1,1._KND)
-!    temperature=temperature+temperature2
-!    call Bound_Temp(temperature)
-!    call DIFFSCALAR(temperature2,temperature,1,1._KND)
-!    temperature=temperature2
-!   endif
+
 
    if (wallmodeltype>0) then
                    call ComputeViscsWM(U,V,W,Pr)
@@ -1045,7 +780,7 @@ contains
 
 
   subroutine MOMSOURC(U,V,W)
-   real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
    real(KND) intvel,p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7
    type(TIBPoint),pointer:: IBP
    integer x,y,z,dirx,diry,dirz,n
@@ -1275,7 +1010,7 @@ contains
     if (associated(IBP%next)) then
      IBP=>IBP%next
     else
-     EXIT
+     exit
     endif
    enddo
   endif
@@ -1284,8 +1019,8 @@ contains
    
 
   subroutine MASS_SOURC(Q,U,V,W)
-  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V,W
-  real(KND),intent(OUT):: Q(0:,0:,0:)
+  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+  real(KND),intent(out):: Q(0:,0:,0:)
   type(TIBPoint),pointer:: IBP
   integer x,y,z
 
@@ -1310,7 +1045,7 @@ contains
      if (associated(IBP%next)) then
       IBP=>IBP%next
      else
-      EXIT
+      exit
      endif
     enddo
    endif
@@ -1324,7 +1059,7 @@ contains
 
 
   subroutine TIMESTEPCW(U,V,W)
-  real(KND),intent(IN):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer i,j,k
   real(KND) m,p
   m=0
@@ -1350,7 +1085,7 @@ contains
 
   
   subroutine TIMESTEPEUL(U,V,W)
-  real(KND),intent(IN):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer i,j,k,maxI,maxJ,maxK
   real(KND) m,p
   m=0
@@ -1372,8 +1107,8 @@ contains
     enddo
    enddo
   enddo
-!   write (*,*) maxi,maxj,maxk
-!   write (*,*) U(maxi,maxj,maxk),U(maxi-1,maxj,maxk),V(maxi,maxj,maxk),V(maxi,maxj-1,maxk),W(maxi,maxj,maxk),W(maxi,maxj,maxk-1)
+
+
   if (m>0) then 
    dt=MIN(CFL/(m),dxmin/Uref)
   else
@@ -1388,9 +1123,9 @@ contains
 
 
   subroutine BUOYANCYFORCE(W2,theta,coef)
-  real(KND),dimension(-2:,-2:,-2:),intent(INOUT):: W2
-  real(KND),dimension(-1:,-1:,-1:),intent(IN):: theta
-  real(KND),intent(IN):: coef
+  real(KND),dimension(-2:,-2:,-2:),intent(inout):: W2
+  real(KND),dimension(-1:,-1:,-1:),intent(in):: theta
+  real(KND),intent(in):: coef
   real(KND) A
   integer i,j,k
 
@@ -1405,9 +1140,9 @@ contains
   endsubroutine BUOYANCYFORCE
 
   subroutine CORIOLISFORCE(U2,V2,U,V,coef)
-  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V
-  real(KND),dimension(-2:,-2:,-2:),intent(INOUT):: U2,V2
-  real(KND),intent(IN):: coef
+  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V
+  real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2
+  real(KND),intent(in):: coef
   real(KND) A
   integer i,j,k
 
@@ -1437,14 +1172,14 @@ contains
 
 
   subroutine OTHERTERMS(U,V,W,U2,V2,W2,Pr,coef)
-   real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-   real(KND),intent(INOUT):: Pr(1:,1:,1:)
-   real(KND),intent(INOUT):: U2(-2:,-2:,-2:),V2(-2:,-2:,-2:),W2(-2:,-2:,-2:)
-   real(KND),intent(IN):: coef
+   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+   real(KND),intent(inout):: Pr(1:,1:,1:)
+   real(KND),intent(inout):: U2(-2:,-2:,-2:),V2(-2:,-2:,-2:),W2(-2:,-2:,-2:)
+   real(KND),intent(in):: coef
        
-   real(KND),DIMENSION(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),LBOUND(U,3):UBOUND(U,3)):: U3, Apu
-   real(KND),DIMENSION(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),LBOUND(V,3):UBOUND(V,3)):: V3, ApV
-   real(KND),DIMENSION(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),LBOUND(W,3):UBOUND(W,3)):: W3, ApW
+   real(KND),dimension(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),LBOUND(U,3):UBOUND(U,3)):: U3, Apu
+   real(KND),dimension(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),LBOUND(V,3):UBOUND(V,3)):: V3, ApV
+   real(KND),dimension(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),LBOUND(W,3):UBOUND(W,3)):: W3, ApW
    real(KND) p,S,Su,Sv,Sw,Suavg,Svavg,Swavg,Af,Ap,Apre,Aprn,Aprt,Ap2,Str(3,3)
 
    integer i,j,k,l,x,y,z
@@ -1503,10 +1238,14 @@ contains
                      call VREMAN(U,V,W)
    else 
                      Visc=1._KND/Re
-   endif                
-!    write(*,*) "NUt", SUM(Visc(1:Prnx,1:Prny,1:Prnz))/(Prnx*Prny*Prnz)
-!    write(*,*) "maxNUt", MAXVAL(Visc(1:Prnx,1:Prny,1:Prnz))
-!    write(*,*) "minNUt", MINVAL(Visc(1:Prnx,1:Prny,1:Prnz))
+   endif
+
+   if (debuglevel>0) then               
+    write(*,*) "NUt", SUM(Visc(1:Prnx,1:Prny,1:Prnz))/(Prnx*Prny*Prnz)
+    write(*,*) "maxNUt", MAXVAL(Visc(1:Prnx,1:Prny,1:Prnz))
+    write(*,*) "minNUt", MINVAL(Visc(1:Prnx,1:Prny,1:Prnz))
+   endif
+
    if (wallmodeltype>0) then
                    call ComputeViscsWM(U,V,W,Pr)
    endif
@@ -1627,7 +1366,7 @@ contains
      if (associated(IBP%next)) then
       IBP=>IBP%next
      else
-      EXIT
+      exit
      endif
     enddo
    endif
@@ -1728,9 +1467,9 @@ contains
     Suavg=abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))
     Svavg=abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
     Swavg=abs(MAXVAL(W3(1:Wnx,1:Wny,1:Wnz)))
-    if (Suavg<=1E-3_KND) Suavg=1
-    if (Svavg<=1E-3_KND) Svavg=1
-    if (Swavg<=1E-3_KND) Swavg=1
+    if (Suavg<=1e-3_KND) Suavg=1
+    if (Svavg<=1e-3_KND) Svavg=1
+    if (Swavg<=1e-3_KND) Swavg=1
     do l=1,maxCNiter
       call BOUND_CONDU(U3)
       call BOUND_CONDV(V3)
@@ -1868,7 +1607,7 @@ contains
      !$OMP END PARALLEL
      S=max(Su/Suavg,Sv/Svavg,Sw/Swavg)
      write (*,*) "CN ",l,S
-     if (S<=epsCN) EXIT
+     if (S<=epsCN) exit
     enddo
    endif
 
@@ -1877,47 +1616,7 @@ contains
    W2=W3
   
    else
-!      Ustar=U3
-!      Vstar=V3
-!      Wstar=W3
-!   
-!    call BOUND_CONDU(Ustar)
-!    call BOUND_CONDV(Vstar)
-!    call Bound_CONDW(Wstar)
-!    Ap2=coef*dt/(Re)
-!     do k=1,Unz
-!     do j=1,Uny
-!      do i=1,Unx
-!       U3(i,j,k)=Ustar(i,j,k)+Ap*(&
-!       (((Ustar(i+1,j,k)-Ustar(i,j,k))/dxPr(i+1)-(Ustar(i,j,k)-Ustar(i-1,j,k))/dxPr(i))/dxU(i)+&
-!        ((Ustar(i,j+1,k)-Ustar(i,j,k))/dyV(j)-(Ustar(i,j,k)-Ustar(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-!        ((Ustar(i,j,k+1)-Ustar(i,j,k))/dzW(k)-(Ustar(i,j,k)-Ustar(i,j,k-1))/dzW(k-1))/dzPr(k))/Re)
-!      enddo
-!     enddo
-!    enddo
-!     do k=1,Vnz
-!     do j=1,Vny
-!      do i=1,Vnx
-!       V3(i,j,k)=Vstar(i,j,k)+Ap*(&
-!       (((Vstar(i+1,j,k)-Vstar(i,j,k))/dxU(i)-(Vstar(i,j,k)-Vstar(i-1,j,k))/dxU(i-1))/dxPr(i)+&     
-!        ((Vstar(i,j+1,k)-Vstar(i,j,k))/dyPr(j+1)-(Vstar(i,j,k)-Vstar(i,j-1,k))/dyPr(j))/dyV(j)+&
-!        ((Vstar(i,j,k+1)-Vstar(i,j,k))/dzW(k)-(Vstar(i,j,k)-Vstar(i,j,k-1))/dzW(k-1))/dzPr(k))/Re)
-!      enddo
-!     enddo
-!    enddo
-!     do k=1,Wnz
-!     do j=1,Wny
-!      do i=1,Wnx
-!       W3(i,j,k)=Wstar(i,j,k)+Ap*(&
-!       (((Wstar(i+1,j,k)-Wstar(i,j,k))/dxU(i)-(Wstar(i,j,k)-Wstar(i-1,j,k))/dxU(i-1))/dxPr(i)+&     
-!        ((Wstar(i,j+1,k)-Wstar(i,j,k))/dyV(j)-(Wstar(i,j,k)-Wstar(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-!        ((Wstar(i,j,k+1)-Wstar(i,j,k))/dzPr(k+1)-(Wstar(i,j,k)-Wstar(i,j,k-1))/dzPr(k))/dzW(k))/Re)
-!      enddo
-!     enddo
-!    enddo
-!      U2=U/2._KND+U3/2._KND
-!      V2=V/2._KND+V3/2._KND
-!      W2=W/2._KND+W3/2._KND
+
     U2=U3
     V2=V3
     W2=W3
@@ -1945,13 +1644,15 @@ contains
   enddo
 
   S=S/(Unx*Uny*Unz)
-!   write(*,*) "Mean friction:", S 
+  if (debuglevel>=2) then
+   write(*,*) "Mean friction:", S 
+  endif
   endsubroutine OTHERTERMS
 
 
   subroutine UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
-  real(KND),DIMENSION(-2:,-2:,-2:),intent(INOUT):: U,V,W,U2,V2,W2,U3,V3,W3
-  real(KND),intent(IN):: coef
+  real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W,U2,V2,W2,U3,V3,W3
+  real(KND),intent(in):: coef
   real(KND) dxmin2,dymin2,dzmin2,Ap,Ap2,Ap3,Ap4,p,S
   integer i,j,k,l,Unyz,Vnyz,Wnyz
 
@@ -2113,13 +1814,13 @@ contains
      !$OMP ENDPARALLEL
 
      S=S/(Prnx*Prny*Prnz)
-     if (Sqrt(S)<=epsCN) EXIT
+     if (Sqrt(S)<=epsCN) exit
      write (*,*) "CN ",l,Sqrt(S)
     enddo
   endsubroutine UNIFREDBLACK
 
   subroutine ATTENUATETOP(U,V,W,Pr)
-  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   integer i,j,k,bufn
   real(KND) p,ze,zs,zb
 
@@ -2193,8 +1894,8 @@ contains
 
 
   subroutine ATTENUATEOUT(U,V,W,Pr,temperature)
-  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),optional,intent(INOUT):: temperature(-1:,-1:,-1:)
+  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),optional,intent(inout):: temperature(-1:,-1:,-1:)
   integer i,j,k,bufn
   real(KND) p,xe,xs,xb
 
@@ -2212,7 +1913,7 @@ contains
      do i=Unx-bufn,Unx+1
       xb=(xU(i)-xs)/(xe-xs) 
       do j=-1,Uny+1
-        U(i,j,k)=p+DampF(xb)*(U(i,j,k)-p)!U(i,j,k)-(U(i,j,k)-p)/5._KND
+        U(i,j,k)=p+DampF(xb)*(U(i,j,k)-p)
       enddo
      enddo
     enddo
@@ -2227,7 +1928,7 @@ contains
      do i=Vnx-bufn,Vnx+1
       xb=(xPr(i)-xs)/(xe-xs) 
       do j=-1,Vny+1
-        V(i,j,k)=p+DampF(xb)*(V(i,j,k)-p)!U(i,j,k)-(U(i,j,k)-p)/5._KND
+        V(i,j,k)=p+DampF(xb)*(V(i,j,k)-p)
       enddo
      enddo
     enddo
@@ -2242,7 +1943,7 @@ contains
      do i=Wnx-bufn,Wnx+1
       xb=(xPr(i)-xs)/(xe-xs) 
       do j=-1,Wny+1
-        W(i,j,k)=p+DampF(xb)*(W(i,j,k)-p)!U(i,j,k)-(U(i,j,k)-p)/5._KND
+        W(i,j,k)=p+DampF(xb)*(W(i,j,k)-p)
       enddo
      enddo
     enddo
@@ -2258,7 +1959,7 @@ contains
      do i=Prnx-bufn,Prnx+1
       xb=(xU(i)-xs)/(xe-xs) 
       do j=-1,Prny+1
-        temperature(i,j,k)=p+DampF(xb)*(temperature(i,j,k)-p)!U(i,j,k)-(U(i,j,k)-p)/5._KND
+        temperature(i,j,k)=p+DampF(xb)*(temperature(i,j,k)-p)
       enddo
      enddo
     enddo
@@ -2268,7 +1969,7 @@ contains
 
   pure function DampF(x)
   real(KND) DampF
-  real(KND),intent(IN)::x
+  real(KND),intent(in)::x
   if (x<=0) then
     DampF=1
   elseif (x>=1) then
@@ -2279,7 +1980,7 @@ contains
   endfunction Dampf
 
   subroutine NULLINTERIOR(U,V,W)
-  real(KND),intent(INOUT):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer i,j,k
 
   

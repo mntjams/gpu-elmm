@@ -11,10 +11,10 @@ implicit none
 contains
 
 subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
-  real(KND),dimension(-2:,-2:,-2:),intent(INOUT):: U,V,W !Phi is computed in Poisson eq. with div of U in RHS
-  real(KND),dimension(1:,1:,1:),intent(INOUT):: Pr       !Depending on active projection method Phi becomes new pressure
-  real(KND),dimension(1:,1:,1:),optional,intent(IN)::Q   !or is added to last pressure
-  real(KND),intent(IN):: coef
+  real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W !Phi is computed in Poisson eq. with div of U in RHS
+  real(KND),dimension(1:,1:,1:),intent(inout):: Pr       !Depending on active projection method Phi becomes new pressure
+  real(KND),dimension(1:,1:,1:),optional,intent(in)::Q   !or is added to last pressure
+  real(KND),intent(in):: coef
   real(KND),allocatable,dimension(:,:,:):: RHS,RHS2      !U,V,W velocity field for correction U(-2:Unx,-2:Uny,-2:Unz)
   real(KND),save,allocatable:: Phi(:,:,:)                !Pr(1:Prnx+1,1:Prny+1,Prnz+1) pressure
   real(KND) Phiref                                       !coef cofficient from Runge Kutta, Q mass sources from immersed boundary
@@ -73,7 +73,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
   S=S/(ly*lz)
   S=S/Uinlet
-  Write (*,*) "Uncompatibility: ",S
+  write (*,*) "Uncompatibility: ",S
 
   if (projectiontype==2) then
    Apr=coef*dt
@@ -355,8 +355,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
   subroutine POISSSOR(Phi,RHS)        !Solves Poisson equation using Successive over-relaxation
 
-  real(KND),dimension(0:,0:,0:),intent(INOUT):: Phi
-  real(KND),dimension(1:,1:,1:),intent(IN)::RHS
+  real(KND),dimension(0:,0:,0:),intent(inout):: Phi
+  real(KND),dimension(1:,1:,1:),intent(in)::RHS
   integer,save:: called=0
   integer nx,ny,nz,i,j,k,l 
   real(KND) S,P,Ap
@@ -540,7 +540,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     if (p>0) S=S/p
     !write (*,*) S
     if (MOD(l,10)==0)  write (*,*) "   Poisson iter: ",l,S!Sqrt(S)
-    if (S<=epsPOISSON) EXIT 
+    if (S<=epsPOISSON) exit 
    enddo          
    
  end subroutine POISSSOR
@@ -549,8 +549,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   
   subroutine POISSFISH(Phi,RHS)         !Calls direct solver from FISHPACK, only for uniform grid
                                         !for some boundary conditions it fails and so does fishpack90
-  real(KND),dimension(0:,0:,0:),intent(OUT):: Phi
-  real(KND),dimension(1:,1:,1:),intent(IN)::RHS
+  real(KND),dimension(0:,0:,0:),intent(out):: Phi
+  real(KND),dimension(1:,1:,1:),intent(in)::RHS
   
   real(KND),dimension(1:Prny,1:Prnz):: XBC1,XBC2
   real(KND),dimension(1:Prnx,1:Prnz):: YBC1,YBC2
@@ -611,7 +611,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
    
    if (ierr/=0) then
      write (*,*) "error ",IERR
-     STOP
+     stop
    endif
    if (pertrb>1e-3) write (*,*) "pertrb",PERTRB
 
@@ -624,8 +624,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
   subroutine  POISSVEL(Phi,RHS)      !Calls Bicgstab solver from LAPACK, does not work
 
-  real(KND),dimension(0:,0:,0:),intent(INOUT):: Phi
-  real(KND),dimension(1:,1:,1:),intent(IN)::RHS
+  real(KND),dimension(0:,0:,0:),intent(inout):: Phi
+  real(KND),dimension(1:,1:,1:),intent(in)::RHS
   real(KND),dimension(1:Prnx+2,1:Prny+2,1:Prnz+2)::RHS2,Phi2
   real(KND),dimension(1:Prnx+2)::x
   real(KND),dimension(1:Prny+2)::y
@@ -652,7 +652,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   Phi2=Phi(0:Prnx+1,0:Prny+1,0:Prnz+1)
   itmax=1000000
   itol=1
-  tol=5.E-5
+  tol=5.e-5
 
   
     !call  poisson2(nx,ny,nz,np,x,y,z,rhs2,dbcx,dbcy,dbcz,i0,j0,k0,phi2,itmax,itol,tol,err)
@@ -664,15 +664,15 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
 
   subroutine POISSADI(Phi,RHS)                      !Alternating direction implicit with tridiag solver from LINPACK
-  real(KND),dimension(0:,0:,0:),intent(INOUT):: Phi !does not converge
-  real(KND),dimension(1:,1:,1:),intent(IN)::RHS
+  real(KND),dimension(0:,0:,0:),intent(inout):: Phi !does not converge
+  real(KND),dimension(1:,1:,1:),intent(in)::RHS
   real(KND) Phi2(0:Prnx+2,0:Prny+2,0:Prnz+2)
   real(KND),parameter:: adirelaxpar=10._KND
   real(KND),allocatable,dimension(:),save:: bx,cx,dx,ex
   real(KND),allocatable,dimension(:),save:: by,cy,dy,ey
   real(KND),allocatable,dimension(:),save:: bz,cz,dz,ez
   integer i,j,k,l,info,nx,ny,nz
-  real(KND),dimension(:),allocatable,SAVE::Apx,Apy,Apz,Aw,Ae,As,An,Ab,At
+  real(KND),dimension(:),allocatable,save::Apx,Apy,Apz,Aw,Ae,As,An,Ab,At
   integer,save:: called=0
   real(KND) S
 
@@ -832,7 +832,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
    enddo
    S=SUM(Abs(Phi(1:Prnx,1:Prny,1:Prnz)-Phi2(1:Prnx,1:Prny,1:Prnz)))/(Prnx*Prny*Prnz)
    write (*,*) l,S
-   if (Abs(S)<epspoisson) EXIT
+   if (Abs(S)<epspoisson) exit
   enddo
 
   endsubroutine POISSADI
@@ -844,15 +844,15 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
 
   subroutine POISSADIGS(Phi,RHS)                    !Alternating direction implicit with Gauss-Seidel
-  real(KND),dimension(0:,0:,0:),intent(INOUT):: Phi !does not converge
-  real(KND),dimension(1:,1:,1:),intent(IN)::RHS
+  real(KND),dimension(0:,0:,0:),intent(inout):: Phi !does not converge
+  real(KND),dimension(1:,1:,1:),intent(in)::RHS
   real(KND) Phi2(0:Prnx+2,0:Prny+2,0:Prnz+2)
   real(KND):: adirelaxpar=0.78_KND
   real(KND),allocatable,dimension(:),save:: bx,cx,dx,ex
   real(KND),allocatable,dimension(:),save:: by,cy,dy,ey
   real(KND),allocatable,dimension(:),save:: bz,cz,dz,ez
   integer i,j,k,l,nx,ny,nz
-  real(KND),dimension(:),allocatable,SAVE::Apx,Apy,Apz,Aw,Ae,As,An,Ab,At
+  real(KND),dimension(:),allocatable,save::Apx,Apy,Apz,Aw,Ae,As,An,Ab,At
   integer,save:: called=0
   real(KND) S
 
@@ -957,11 +957,11 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
   subroutine TRIDAGGS(n,btw,bte,aw,ae,ap,Phi,RHS)  !Solves tridiagonal system using Gauss Seidel
   !tridiagonal system
-  integer,intent(IN):: n,btw,bte
-  real(KND),dimension(1:),intent(IN)::aw,ap,ae,RHS
-  real(KND),dimension(0:),intent(INOUT):: Phi
+  integer,intent(in):: n,btw,bte
+  real(KND),dimension(1:),intent(in)::aw,ap,ae,RHS
+  real(KND),dimension(0:),intent(inout):: Phi
   integer,parameter:: tridagiter=1000
-  real(KND),parameter::eps=1E-5
+  real(KND),parameter::eps=1e-5
   integer i,j
   real(KND) S,p
   do j=1,tridagiter
@@ -983,7 +983,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     p=Phi(i)
    enddo
   ! write (*,*) "tridag",j,S
-   if (S<eps) EXIT
+   if (S<eps) exit
   enddo
   endsubroutine TRIDAGGS
 
@@ -991,8 +991,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
   subroutine POISSMUD(Phi,RHS)         !Calls direct solver from FISHPACK, only for uniform grid
                                         !for some boundary conditions it fails and so does fishpack90
-  real(KND),dimension(0:,0:,0:),intent(OUT):: Phi
-  real(KND),dimension(1:,1:,1:),intent(INOUT)::RHS
+  real(KND),dimension(0:,0:,0:),intent(out):: Phi
+  real(KND),dimension(1:,1:,1:),intent(inout)::RHS
   real(KND),allocatable,save,dimension(:,:,:)::RH,Ph
 
   
@@ -1142,9 +1142,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   end subroutine POISSMUD
 
  subroutine MUDbc(kbdy,y,z,cons,gbdy)
- integer,intent(IN):: kbdy
- real(KND),intent(IN):: y,z
- real(KND),intent(OUT):: cons,gbdy
+ integer,intent(in):: kbdy
+ real(KND),intent(in):: y,z
+ real(KND),intent(out):: cons,gbdy
  
 !   if ((kbdy==1).and.(abs(y-yPr(5))<dymin/2.).and.(abs(z-zPr(5))<dzmin/2.)) then
 !    cons=999999
@@ -1156,8 +1156,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
  endsubroutine MUDbc
 
  subroutine MUDcx(x,cxx,cx,cex)
- real(KND),intent(IN):: x
- real(KND),intent(OUT):: cxx,cx,cex
+ real(KND),intent(in):: x
+ real(KND),intent(out):: cxx,cx,cex
 
  cxx=1
  cx=0
@@ -1165,8 +1165,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
  endsubroutine MUDcx
 
  subroutine MUDcy(x,cxx,cx,cex)
- real(KND),intent(IN):: x
- real(KND),intent(OUT):: cxx,cx,cex
+ real(KND),intent(in):: x
+ real(KND),intent(out):: cxx,cx,cex
 
  cxx=1
  cx=0
@@ -1174,8 +1174,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
  endsubroutine MUDcy
 
  subroutine MUDcz(x,cxx,cx,cex)
- real(KND),intent(IN):: x
- real(KND),intent(OUT):: cxx,cx,cex
+ real(KND),intent(in):: x
+ real(KND),intent(out):: cxx,cx,cex
 
  cxx=1
  cx=0

@@ -1,4 +1,4 @@
-MODULE LAXFRIED
+module LAXFRIED
  use PARAMETERS
  use BOUNDARIES
  implicit none
@@ -7,7 +7,7 @@ MODULE LAXFRIED
    
 
  subroutine LF(U2,V2,W2,U,V,W)
-  real(KND),DIMENSION(-2:,-2:,-2:):: U2,V2,W2,U,V,W
+  real(KND),dimension(-2:,-2:,-2:):: U2,V2,W2,U,V,W
 
   call Bound_CondU(U)
   call Bound_CondV(V)
@@ -19,7 +19,7 @@ MODULE LAXFRIED
  endsubroutine LF
   
  subroutine FLUXESU(U2,U,V,W)
- real(KND),DIMENSION(-2:,-2:,-2:):: U2,U,V,W
+ real(KND),dimension(-2:,-2:,-2:):: U2,U,V,W
  real(KND) Vlocn,Vlocs,Wloct,Wlocb
  integer i,j,k
  
@@ -41,7 +41,7 @@ MODULE LAXFRIED
  endsubroutine FLUXESU
 
  subroutine FLUXESV(V2,U,V,W)
- real(KND),DIMENSION(-2:,-2:,-2:):: V2,U,V,W
+ real(KND),dimension(-2:,-2:,-2:):: V2,U,V,W
  real(KND) Uloce,Ulocw,Wloct,Wlocb
  integer i,j,k
 
@@ -63,7 +63,7 @@ MODULE LAXFRIED
  endsubroutine FLUXESV
  
  subroutine FLUXESW(W2,U,V,W)
- real(KND),DIMENSION(-2:,-2:,-2:):: W2,U,V,W
+ real(KND),dimension(-2:,-2:,-2:):: W2,U,V,W
  real(KND) Uloce,Ulocw,Vlocn,Vlocs
  integer i,j,k
 
@@ -88,4 +88,4 @@ MODULE LAXFRIED
   !!!!Jsou ted spravne indexy hran a objemu????
  
 
-END MODULE LAXFRIED
+end module LAXFRIED

@@ -36,9 +36,9 @@ contains
 
 
 pure subroutine Prolongate(AFine,ACoarse,level)
- integer,intent(IN):: level
- real(KND),dimension(-1:,-1:,-1:),intent(IN):: ACoarse
- real(KND),dimension(-1:,-1:,-1:),intent(INOUT):: AFine
+ integer,intent(in):: level
+ real(KND),dimension(-1:,-1:,-1:),intent(in):: ACoarse
+ real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
  integer:: i,j,k,nx,ny,nz
  
    nx=bnx*2**level !level means from which grid we interpolate
@@ -87,9 +87,9 @@ endsubroutine Prolongate
 
 
  subroutine Restrict(ACoarse,AFine,level)
- integer,intent(IN):: level
- real(KND),dimension(-1:,-1:,-1:),intent(OUT):: ACoarse
- real(KND),dimension(-1:,-1:,-1:),intent(INOUT):: AFine
+ integer,intent(in):: level
+ real(KND),dimension(-1:,-1:,-1:),intent(out):: ACoarse
+ real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
  real(KND) q
  integer:: i,j,k,nx,ny,nz
  
@@ -194,9 +194,9 @@ endsubroutine Restrict
 
 
 pure subroutine Prolongate2(AFine,ACoarse,level)
- integer,intent(IN):: level
- real(KND),dimension(-1:,-1:,-1:),intent(IN):: ACoarse
- real(KND),dimension(-1:,-1:,-1:),intent(INOUT):: AFine
+ integer,intent(in):: level
+ real(KND),dimension(-1:,-1:,-1:),intent(in):: ACoarse
+ real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
  real(KND),dimension(LBOUND(AFine,1):UBOUND(AFine,1),LBOUND(AFine,1):UBOUND(AFine,1),LBOUND(AFine,1):UBOUND(AFine,1)):: Mask
  integer:: i,j,k,nx,ny,nz
  
@@ -273,9 +273,9 @@ endsubroutine Prolongate2
 
 
 pure subroutine Restrict2(ACoarse,AFine,level)
- integer,intent(IN):: level
- real(KND),dimension(-1:,-1:,-1:),intent(OUT):: ACoarse
- real(KND),dimension(-1:,-1:,-1:),intent(INOUT):: AFine
+ integer,intent(in):: level
+ real(KND),dimension(-1:,-1:,-1:),intent(out):: ACoarse
+ real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
  real(KND) q
  integer:: i,j,k,nx,ny,nz
  
@@ -380,8 +380,8 @@ endsubroutine Restrict2
 
 
 pure subroutine BOUND_Phi_MG(Phi,nx,ny,nz)
-  real(KND),intent(INOUT):: Phi(-1:,-1:,-1:)
-  integer,intent(IN):: nx,ny,nz
+  real(KND),intent(inout):: Phi(-1:,-1:,-1:)
+  integer,intent(in):: nx,ny,nz
   integer i,j,k
 
 
@@ -474,7 +474,7 @@ endsubroutine BOUND_Phi_MG
 
 pure function ind(level,nulx,nuly,nulz,i,j,k)
 integer ind
-integer,intent(IN):: level,i,j,k,nulx,nuly,nulz
+integer,intent(in):: level,i,j,k,nulx,nuly,nulz
  ind=(1-nulx)+i+(j-nuly)*(CoefMG(level)%nx+(1-nulx))+(k-nulz)*(CoefMG(level)%nx+1-nulx)*(CoefMG(level)%ny+1-nuly)
 endfunction ind
 
@@ -482,7 +482,7 @@ endfunction ind
 
 
 subroutine MG_GE(level)
-integer,intent(IN)::level
+integer,intent(in)::level
 integer i,j,k,l,info
 integer,allocatable,dimension(:),save:: ige,ipivot,work2
 real(KND),allocatable,dimension(:),save:: xge,bge,work,R,C,ferr,berr
@@ -601,7 +601,7 @@ character(1),save:: equed
 
     write (*,*) "RCOND",rcond
     if (info/=0) then
-     STOP
+     stop
      write (*,*) "info",info
     endif
   else
@@ -626,7 +626,7 @@ character(1),save:: equed
 
      
     if (info/=0) then
-     STOP
+     stop
      write (*,*) "info",info
     endif
   endif
@@ -670,7 +670,7 @@ endsubroutine MG_GE
 
 
 subroutine MG_LU(level)
-integer,intent(IN)::level
+integer,intent(in)::level
 integer i,j,k,l,info
 integer,allocatable,dimension(:),save:: ige,ipivot,work2
 real(KND),allocatable,dimension(:),save:: xge,bge,work,R,C,ferr,berr
@@ -787,7 +787,7 @@ character(1),save:: equed
     endif
 
     if (info/=0) then
-     STOP
+     stop
      write (*,*) "info",info
     endif
  endif
@@ -810,7 +810,7 @@ character(1),save:: equed
     endif
      
     if (info/=0) then
-     STOP
+     stop
      write (*,*) "info",info
     endif
  
@@ -857,7 +857,7 @@ endsubroutine MG_LU
 
 
 subroutine MG_INV(level)
-integer,intent(IN)::level
+integer,intent(in)::level
 integer i,j,k,l,info,ldwork
 integer,allocatable,dimension(:):: ipivot
 real(KND),allocatable,dimension(:),save:: xge,bge,work
@@ -965,7 +965,7 @@ integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
     endif
 
     if (info/=0) then
-     STOP
+     stop
      write (*,*) "info",info
     endif
 
@@ -978,7 +978,7 @@ integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
     endif
      
     if (info/=0) then
-     STOP
+     stop
      write (*,*) "info",info
     endif
 
@@ -993,7 +993,7 @@ integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
     endif
      
     if (info/=0) then
-     STOP
+     stop
      write (*,*) "info",info
     endif
 
@@ -1057,7 +1057,7 @@ endsubroutine MG_INV
 
 
 subroutine MG_GS(level,niter)
-integer,intent(IN)::level,niter
+integer,intent(in)::level,niter
 ! real(KND),intent(OUT):: R
 integer i,j,k,l
 real(KND) p,Ap
@@ -1194,8 +1194,8 @@ real(KND) p,Ap
 endsubroutine MG_GS
 
 subroutine MG_res(level,R)
-integer,intent(IN)::level
-real(KND),intent(OUT)::R
+integer,intent(in)::level
+real(KND),intent(out)::R
 integer i,j,k
 real(KND),save:: p,Ap
 character(70):: str
@@ -1298,7 +1298,7 @@ endsubroutine MG_res
 
 
 subroutine MG_clear(level)
-integer,intent(IN):: level
+integer,intent(in):: level
 integer l
 
   do l=level,minmglevel,-1
@@ -1310,9 +1310,9 @@ endsubroutine
 
 
 subroutine Filter(A,level)
- real(KND),dimension(-1:,-1:,-1:),intent(INOUT):: A
+ real(KND),dimension(-1:,-1:,-1:),intent(inout):: A
  real(KND),dimension(LBOUND(A,1):UBOUND(A,1),LBOUND(A,1):UBOUND(A,1),LBOUND(A,1):UBOUND(A,1)):: B
- integer,intent(IN):: level
+ integer,intent(in):: level
  integer nx,ny,nz,i,j,k,ii,jj,kk
  real(KND) S 
  nx=bnx*2**level
@@ -1341,9 +1341,9 @@ endsubroutine
 
 
 recursive subroutine MG_CGC(level,eps,ncgc,npre,npost,R)
-integer,intent(IN):: level,ncgc,npre,npost
-real(KND),intent(IN):: eps
-real(KND),intent(OUT):: R
+integer,intent(in):: level,ncgc,npre,npost
+real(KND),intent(in):: eps
+real(KND),intent(out):: R
 real(KND) R1
 integer k
 !   write (*,*) "cgc",level
@@ -1358,8 +1358,8 @@ integer k
         call MG_GS(level, 10)
         call MG_res(level,R)
 !         write (*,*) "GSres",sqrt(R)
-        if (R < mgepsinnerGS**2) EXIT
-        if (R1<R*1.05_KND) EXIT
+        if (R < mgepsinnerGS**2) exit
+        if (R1<R*1.05_KND) exit
         R1=R
       enddo
      endif
@@ -1385,8 +1385,8 @@ endsubroutine MG_CGC
 
 
 subroutine POISSMG(Phi,RHS)        !Solves Poisson equation using Successive over-relaxation
-real(KND),dimension(0:,0:,0:),intent(INOUT):: Phi
-real(KND),dimension(1:,1:,1:),intent(IN)::RHS
+real(KND),dimension(0:,0:,0:),intent(inout):: Phi
+real(KND),dimension(1:,1:,1:),intent(in)::RHS
 integer i,j,k,l,nx,ny,nz,sx,sy,sz
 real(KND) mgeps,R,Phiref
 real(KND),save:: called=0
@@ -1459,7 +1459,7 @@ real(KND),save:: called=0
     write (*,*) 0+sx,":",nx,"--",1,":",Prnx
     write (*,*) 0+sy,":",ny,"--",1,":",Prny
     write (*,*) 0+sz,":",nz,"--",1,":",Prnz
-    STOP
+    stop
  endif
 
  PhiMG(LMG)%Arr=0
@@ -1493,7 +1493,7 @@ real(KND),save:: called=0
    call Bound_Phi_MG(PhiMG(LMG)%Arr,CoefMG(LMG)%nx,CoefMG(LMG)%ny,CoefMG(LMG)%nz)
   call MG_CGC(LMG,mgeps,mgncgc,mgnpre,mgnpost,R)
 
-  if (R<mgeps)   EXIT
+  if (R<mgeps)   exit
  write (*,*) "MG residuum",R
  enddo
  write (*,*) "MG residuum",R

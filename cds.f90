@@ -1,10 +1,3 @@
-!
-! File:   CDS.f90
-! Author: lada
-!
-! Created on 15. leden 2006, 12:03
-!
-
 module CDS
     use PARAMETERS
     use BOUNDARIES
@@ -388,12 +381,12 @@ module CDS
             
             
   subroutine KAPPAU(U2,U,V,W,coef)
-  real(KND),intent(INOUT)::U2(-2:,-2:,-2:),U(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(IN):: V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  real(KND),intent(inout)::U2(-2:,-2:,-2:),U(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in):: V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer i,j,k
   real(KND) A,SL,SR,FLUX
   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3):: SLOPE
-  real(KND),parameter::eps=1E-8
+  real(KND),parameter::eps=1e-8
 
   call BOUND_CONDU(U)
 
@@ -497,12 +490,12 @@ module CDS
 
 
   pure subroutine KAPPAV(V2,U,V,W,coef) !Kappa scheme with flux limiter
-  real(KND),intent(INOUT)::V2(-2:,-2:,-2:),V(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(IN):: U(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  real(KND),intent(inout)::V2(-2:,-2:,-2:),V(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in):: U(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer i,j,k
   real(KND) A,SL,SR,FLUX
   real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3):: SLOPE
-  real(KND),parameter::eps=1E-8
+  real(KND),parameter::eps=1e-8
 
   call BOUND_CONDV(V)
   
@@ -604,12 +597,12 @@ module CDS
   endsubroutine KAPPAV
 
   pure subroutine KAPPAW(W2,U,V,W,coef) !Kappa scheme with flux limiter
-  real(KND),intent(INOUT)::W2(-2:,-2:,-2:),W(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(IN):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),coef
+  real(KND),intent(inout)::W2(-2:,-2:,-2:),W(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),coef
   integer i,j,k
   real(KND) A,SL,SR,FLUX
   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3):: SLOPE
-  real(KND),parameter::eps=1E-8
+  real(KND),parameter::eps=1e-8
 
   call BOUND_CONDW(W)
   

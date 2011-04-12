@@ -569,7 +569,7 @@ contains
 
 
   subroutine GETINLETFROMFILE(t)
-  real(DBL),intent(IN):: t
+  real(DBL),intent(in):: t
   integer,save:: called=0
   integer Prny2,Prnz2,Vny2,Wnz2
   real(KND) dx2
@@ -584,7 +584,7 @@ contains
   real(KND) c1,c2
 
   if (called==0) then
-     OPEN(102,file="inletframeinfo.unf",form='unformatted',status='old',action='read',iostat=io)
+     open(102,file="inletframeinfo.unf",form='unformatted',status='old',action='read',iostat=io)
      if (io/=0) then
       write(*,*) 'Error while opening file inletframeinfo.unf'
      endif
@@ -600,7 +600,7 @@ contains
 
      if ((Prny/=Prny2).or.(Prnz/=Prnz2).or.(Vny/=Vny2).or.(Wnz/=Wnz2).or.((dx2-dxPr(0))/dx2>0.1)) then
       write(*,*) "Mismatch of computational grid and inlet file."
-      STOP
+      stop
      endif
      called=1
      inletfnum=1
@@ -609,14 +609,14 @@ contains
      write(fname(6:8),"(I3.3)") inletfnum
      fname(9:12)=".unf"
      
-     OPEN(11,file=fname,form='unformatted',status='old',action='read',iostat=io)
+     open(11,file=fname,form='unformatted',status='old',action='read',iostat=io)
      if (io/=0) then
       write(*,*) "Error while opening file ", fname
-      STOP
+      stop
      endif
      read(102) t1
      call READINLETFROMFILE(11,In1)
-     CLOSE(11)
+     close(11)
 
      inletfnum=inletfnum+1
 
@@ -624,14 +624,14 @@ contains
      write(fname(6:8),"(I3.3)") inletfnum
      fname(9:12)=".unf"
 
-      OPEN(11,file=fname,form='unformatted',status='old',action='read',iostat=io)
+      open(11,file=fname,form='unformatted',status='old',action='read',iostat=io)
      if (io/=0) then
       write(*,*) "Error while opening file ", fname
-      STOP
+      stop
      endif
      read(102) t2
      call READINLETFROMFILE(11,In2)
-     CLOSE(11)
+     close(11)
   endif
 
   io=0
@@ -647,16 +647,16 @@ contains
      write(fname(6:8),"(I3.3)") inletfnum
      fname(9:12)=".unf"
 
-     OPEN(11,file=fname,form='unformatted',status='old',action='read',iostat=io)
+     open(11,file=fname,form='unformatted',status='old',action='read',iostat=io)
      if (io/=0) then
       write(*,*) "Error while opening file ", fname
-      STOP
+      stop
      endif
      Inp=>In1
      In1=>In2
      In2=>Inp
      call READINLETFROMFILE(11,In2)
-     CLOSE(11)
+     close(11)
     endif
   enddo
 
@@ -682,8 +682,8 @@ contains
   endsubroutine GETINLETFROMFILE
 
   subroutine  READINLETFROMFILE(unitnum,In)
-  integer,intent(IN):: unitnum
-  TYPE(TInlet),intent(INOUT)::In
+  integer,intent(in):: unitnum
+  type(TInlet),intent(inout)::In
 
   read(unitnum) In%U
   read(unitnum) In%V

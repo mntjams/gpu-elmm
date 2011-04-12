@@ -16,10 +16,10 @@ module OUTPUTS
                                       profuw,profuwavg,profuwsgs,profuwsgsavg,&
                                       profvw,profvwavg,profvwsgs,profvwsgsavg
  real(KND),allocatable:: Uavg(:,:,:),Vavg(:,:,:),Wavg(:,:,:),Pravg(:,:,:)
- real(DBL),allocatable,DIMENSION(:):: times
- real(KND),allocatable,DIMENSION(:):: Utime,Vtime,Wtime,Prtime,temptime,CDtime,CLtime,deltime,tke,dissip,dissip2
- real(KND),allocatable,DIMENSION(:,:):: scaltime !which scalar, time
- real(KND),allocatable,DIMENSION(:,:,:):: scalptime !which scalar, position, time
+ real(DBL),allocatable,dimension(:):: times
+ real(KND),allocatable,dimension(:):: Utime,Vtime,Wtime,Prtime,temptime,CDtime,CLtime,deltime,tke,dissip,dissip2
+ real(KND),allocatable,dimension(:,:):: scaltime !which scalar, time
+ real(KND),allocatable,dimension(:,:,:):: scalptime !which scalar, position, time
  logical:: outputframePr=.false.
  logical:: outputframeU=.true.
  logical:: outputframevort=.false.
@@ -47,128 +47,128 @@ contains
   call Bound_CondV(V)
   call Bound_CondW(W)
 
-  OPEN(11,file="Uaxis.txt")
+  open(11,file="Uaxis.txt")
   do j=0,Unx
    write (11,*) j,U(j,max(Uny/2,1),max(Unz/2,1))
   enddo
-  CLOSE(11)
-  OPEN(11,file="Praxis.txt")
+  close(11)
+  open(11,file="Praxis.txt")
   do j=1,Prnx
    write (11,*) j,Pr(j,max(Uny/2,1),max(Unz/2,1))
   enddo
-  CLOSE(11)
-  OPEN(11,file="Prtime.txt")
+  close(11)
+  open(11,file="Prtime.txt")
   do j=0,endstep
    write (11,*) times(j),Prtime(j)
   enddo
-  CLOSE(11)  
-  OPEN(11,file="Utime.txt")
+  close(11)  
+  open(11,file="Utime.txt")
   do j=0,endstep
    write (11,*) times(j),Utime(j)
   enddo
-  CLOSE(11)
-  OPEN(11,file="Vtime.txt")
+  close(11)
+  open(11,file="Vtime.txt")
   do j=0,endstep
    write (11,*) times(j),Vtime(j)
   enddo
-  CLOSE(11)
-  OPEN(11,file="Wtime.txt")
+  close(11)
+  open(11,file="Wtime.txt")
   do j=0,endstep
    write (11,*) times(j),Wtime(j)
   enddo
-  CLOSE(11)
-  OPEN(11,file="temptime.txt")
+  close(11)
+  open(11,file="temptime.txt")
   do j=0,endstep
    write (11,*) times(j),temptime(j)
   enddo
-  CLOSE(11)
-  OPEN(11,file="deltime.txt")
+  close(11)
+  open(11,file="deltime.txt")
   do j=1,endstep
    write (11,*) times(j),deltime(j)
   enddo
-  CLOSE(11)
-  OPEN(11,file="tke.txt")
+  close(11)
+  open(11,file="tke.txt")
   do j=0,endstep
    write (11,*) times(j),tke(j)
   enddo
-  CLOSE(11)
-  OPEN(11,file="dissip.txt")
+  close(11)
+  open(11,file="dissip.txt")
   do j=1,endstep
    write (11,*) times(j),dissip(j)
   enddo
-  CLOSE(11)
-  OPEN(11,file="dissip2.txt")
+  close(11)
+  open(11,file="dissip2.txt")
   do j=1,endstep
    write (11,*) times(j),dissip2(j)
   enddo
-  CLOSE(11)
+  close(11)
   
   if (computescalars==1) then
-  OPEN(11,file="scaltottime.txt")
+  open(11,file="scaltottime.txt")
   do j=1,endstep
    write (11,*) times(j),scaltime(1,j)
   enddo
-  CLOSE(11)
+  close(11)
   endif
   if (computescalars>1) then
-  OPEN(11,file="scaltottime.txt")
+  open(11,file="scaltottime.txt")
   do j=1,endstep
    write (11,*) times(j),scaltime(:,j)
   enddo
-  CLOSE(11)
+  close(11)
   endif
 
   if (computescalars==1.and.tasktype==1) then
-  OPEN(11,file="scal1time.txt")
+  open(11,file="scal1time.txt")
   do j=1,endstep
    write (11,*) times(j),scalptime(1,1,j),scalptime(1,2,j),scalptime(1,3,j)
   enddo
-  CLOSE(11)
+  close(11)
   endif
 
   if (computescalars==2.and.tasktype==1) then
-  OPEN(11,file="scal1time.txt")
+  open(11,file="scal1time.txt")
   do j=1,endstep
    write (11,*) times(j),scalptime(1,1,j),scalptime(1,2,j),scalptime(1,3,j)
   enddo
-  CLOSE(11)
-  OPEN(11,file="scal2time.txt")
+  close(11)
+  open(11,file="scal2time.txt")
   do j=1,endstep
    write (11,*) times(j),scalptime(2,1,j),scalptime(2,2,j),scalptime(2,3,j)
   enddo
-  CLOSE(11)
+  close(11)
   endif
 
   if (computescalars>0.and.tasktype==8) then
-  OPEN(11,file="scal1time.txt")
+  open(11,file="scal1time.txt")
   do j=1,endstep
    write (11,*) times(j),sum(scalptime(:,1,j)),sum(scalptime(:,2,j)),sum(scalptime(:,3,j))
   enddo
-  CLOSE(11)
+  close(11)
   endif
 
   if (tasktype==4) then
-  OPEN(11,file="cavmidU.txt")
+  open(11,file="cavmidU.txt")
   write (11,*) 0.,0.
   do j=1,Uny
    write (11,*) yPr(j),U(Unx/2,j,Unz/2)
   enddo
   write (11,*) 1.,1.
-  CLOSE(11)
-  OPEN(11,file="cavmidV.txt")
+  close(11)
+  open(11,file="cavmidV.txt")
   write (11,*) 0.,0.
   do i=1,Vnx
    write (11,*) xPr(i),V(i,Vny/2,Vnz/2)
   enddo
   write (11,*) 1.,0.
-  CLOSE(11)
-  OPEN(11,file="cavmidW.txt")
+  close(11)
+  open(11,file="cavmidW.txt")
   !write (11,*) 0.,0.
   do i=0,Wnz-1
    write (11,*) zPr(i),W(Wnx/2,Wny/2,i)
   enddo
   !write (11,*) 1.,0.
-  CLOSE(11)
+  close(11)
   endif
   
   if ((tasktype==4.or.tasktype==7).and.averaging==1) then
@@ -177,30 +177,30 @@ contains
    do j=1,Uny
     write (11,*) yPr(j),yPr(j)*meanustar*Re , profUavg(j),profUavg(j)/meanustar
    enddo
-   CLOSE(11)
-   OPEN(11,file="proftau.txt")
+   close(11)
+   open(11,file="proftau.txt")
    do j=1,Prny
     write (11,*) yPr(j),yPr(j)*meanustar*Re ,proftauavg(j)/(meanustar*meanustar)
    enddo
-   CLOSE(11)
+   close(11)
    
-   OPEN(11,file="profuu.txt")
+   open(11,file="profuu.txt")
    do j=1,Uny/2
     write (11,*) yPr(j) ,profuuavg(j)!/(1._KND*Unx*Unz*meanustar**2)
    enddo
-   CLOSE(11)
-   OPEN(11,file="profvv.txt")
+   close(11)
+   open(11,file="profvv.txt")
    do j=1,Vny/2
     write (11,*) yV(j) ,profvvavg(j)!/(1._KND*Vnx*Vnz*meanustar**2)
    enddo
-   CLOSE(11)
-   OPEN(11,file="profww.txt")
+   close(11)
+   open(11,file="profww.txt")
    do j=1,Wny/2
     write (11,*) yPr(j) ,profwwavg(j)!/(1._KND*Wnx*Wnz*meanustar**2)
    enddo
-   CLOSE(11)
+   close(11)
 
-   OPEN(11,file="profunres.txt")
+   open(11,file="profunres.txt")
    do j=1,Prny
     Suu=0
     Svv=0
@@ -217,8 +217,8 @@ contains
     Sww=Sww/(Prnx*Prnz)
     write(11,*) yPr(j), Suu,Svv,Sww
    enddo
-   CLOSE(11)
-   OPEN(11,file="profuntau.txt")
+   close(11)
+   open(11,file="profuntau.txt")
    do j=1,Vny
     Suv=0
     do k=1,Prnz
@@ -231,9 +231,9 @@ contains
     write(11,*) yV(j), Suv, Suv+(proftauavg(j)/(meanustar*meanustar)+proftauavg(j+1)/(meanustar*meanustar))/2._KND
     write(*,*) yV(j)
    enddo
-   CLOSE(11)
+   close(11)
    if (computescalars>0.and.tasktype==7) then
-    OPEN(11,file="profscal1.txt")
+    open(11,file="profscal1.txt")
     S2=0
     S=0
     do k=1,Prnz
@@ -252,9 +252,9 @@ contains
      S=S/(Prnx*Prnz)
      write (11,*) yPr(j),yPr(j)*meanustar*Re , abs(S-S2)
     enddo 
-    CLOSE(11)
+    close(11)
     if (computescalars==2) then
-      OPEN(11,file="profscal2.txt")
+      open(11,file="profscal2.txt")
       S2=0
       S=0
       do k=1,Prnz
@@ -273,7 +273,7 @@ contains
        S=S/(Prnx*Prnz)
        write (11,*) yPr(j),yPr(j)*meanustar*Re , abs(S-S2)
       enddo 
-      CLOSE(11)
+      close(11)
     endif
    endif 
   endif
@@ -284,58 +284,58 @@ contains
 !    else
 !     call CBLPROFILES(U,V,W,profU,profV,proftau)
 !    endif   
-   OPEN(11,file="profu.txt")
+   open(11,file="profu.txt")
    do k=1,Unz
     write (11,*) zPr(k),profuavg(k)
    enddo
-   CLOSE(11)
-   OPEN(11,file="profv.txt")
+   close(11)
+   open(11,file="profv.txt")
    do k=1,Vnz
     write (11,*) zPr(k),profvavg(k)
    enddo
-   CLOSE(11)
-   OPEN(11,file="profuu.txt")
+   close(11)
+   open(11,file="profuu.txt")
    do k=1,Unz
     write (11,*) zPr(k),profuuavg(k)
    enddo
-   CLOSE(11)
-   OPEN(11,file="profvv.txt")
+   close(11)
+   open(11,file="profvv.txt")
    do k=1,Vnz
     write (11,*) zPr(k),profvvavg(k)
    enddo
-   CLOSE(11)
-   OPEN(11,file="profww.txt")
+   close(11)
+   open(11,file="profww.txt")
    do k=1,Wnz
     write (11,*) zW(k),profwwavg(k)
    enddo
-   CLOSE(11)
-   OPEN(11,file="profuw.txt")
+   close(11)
+   open(11,file="profuw.txt")
    do k=0,Prnz
     write (11,*) zW(k),profuwavg(k),profuwsgsavg(k)
    enddo
-   CLOSE(11)
-   OPEN(11,file="profvw.txt")
+   close(11)
+   open(11,file="profvw.txt")
    do k=0,Prnz
     write (11,*) zW(k),profvwavg(k),profvwsgsavg(k)
    enddo
-   CLOSE(11)
+   close(11)
    if (buoyancy>0) then
-    OPEN(11,file="proftemp.txt")
+    open(11,file="proftemp.txt")
     do k=1,Prnz
      write (11,*) zPr(k),proftempavg(k)
     enddo
-    CLOSE(11)
-    OPEN(11,file="proftempfl.txt")
+    close(11)
+    open(11,file="proftempfl.txt")
     do k=0,Prnz
      write (11,*) zW(k),proftempflavg(k),proftempflsgsavg(k)
     enddo
-    CLOSE(11)
-    OPEN(11,file="proftt.txt")
+    close(11)
+    open(11,file="proftt.txt")
     do k=1,Prnz
      write (11,*) zPr(k),profttavg(k)
     enddo
-    CLOSE(11)
-    OPEN(11,file="profRig.txt")
+    close(11)
+    open(11,file="profRig.txt")
     do k=1,Prnz
      S=0
      do j=1,Prny
@@ -346,8 +346,8 @@ contains
      S=S/(Prnx*Prny)
      write (11,*) zPr(k),S
     enddo
-    CLOSE(11)
-    OPEN(11,file="profRf.txt")
+    close(11)
+    open(11,file="profRf.txt")
     do k=1,Prnz
      S=0
      S2=0
@@ -367,11 +367,11 @@ contains
      endif
      write (11,*) zPr(k),S
     enddo
-    CLOSE(11)
+    close(11)
    endif
   endif
  
-  OPEN(11,file="out.vtk")
+  open(11,file="out.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
   write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
@@ -401,7 +401,7 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) Pr(i,j,k)
+      write (11,*) Pr(i,j,k)
     enddo
    enddo
   enddo
@@ -413,7 +413,7 @@ contains
    do k=1,Prnz
     do j=1,Prny
      do i=1,Prnx
-       Write (11,*) Temperature(i,j,k)
+       write (11,*) Temperature(i,j,k)
      enddo
     enddo
    enddo 
@@ -447,7 +447,7 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) Lambda2(i,j,k,U,V,W)
+      write (11,*) Lambda2(i,j,k,U,V,W)
     enddo
    enddo
   enddo 
@@ -468,7 +468,7 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
+      write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
     enddo
    enddo
   enddo
@@ -477,7 +477,7 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+      write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                       -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
                    (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
                       -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),&
@@ -493,7 +493,7 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND-(Uavg(i,j,k)+Uavg(i-1,j,k))/2._KND,&
+      write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND-(Uavg(i,j,k)+Uavg(i-1,j,k))/2._KND,&
       (V(i,j,k)+V(i,j-1,k))/2._KND-(Vavg(i,j,k)+Vavg(i,j-1,k))/2._KND,&
       (W(i,j,k)+W(i,j,k-1))/2._KND-(Wavg(i,j,k)+Wavg(i,j,k-1))/2._KND
     enddo
@@ -507,7 +507,7 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) (U(i+1,j,k)-U(i-1,j,k))/(2*dxmin),(U(i,j+1,k)-U(i,j-1,k))/(2*dymin)&
+      write (11,*) (U(i+1,j,k)-U(i-1,j,k))/(2*dxmin),(U(i,j+1,k)-U(i,j-1,k))/(2*dymin)&
        ,(U(i,j,k+1)-U(i,j,k-1))/(2*dzmin)
     enddo
    enddo
@@ -517,17 +517,17 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) (V(i+1,j,k)-V(i-1,j,k))/(2*dxmin),(V(i,j+1,k)-V(i,j-1,k))/(2*dymin)&
+      write (11,*) (V(i+1,j,k)-V(i-1,j,k))/(2*dxmin),(V(i,j+1,k)-V(i,j-1,k))/(2*dymin)&
        ,(V(i,j,k+1)-V(i,j,k-1))/(2*dzmin)
     enddo
    enddo
   enddo
   write (11,*)
   endif 
-  CLOSE(11)
+  close(11)
 
  if (computescalars>0) then
-  OPEN(11,file="scalars.vtk")
+  open(11,file="scalars.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
   write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
@@ -558,13 +558,13 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) SCALAR(i,j,k,l)
+      write (11,*) SCALAR(i,j,k,l)
     enddo
    enddo
   enddo
   write (11,*)
   enddo
-  CLOSE(11)
+  close(11)
 
   if (computedeposition>0) then
    allocate(depos(1:Prnx,1:Prny,computescalars))
@@ -580,12 +580,12 @@ contains
      if (associated(WMP%next)) then
       WMP=>WMP%next
      else
-      EXIT
+      exit
      endif
     enddo
    endif
 
-  OPEN(11,file="deposition.vtk")
+  open(11,file="deposition.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
   write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
@@ -616,13 +616,13 @@ contains
 
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) depos(i,j,l)
+      write (11,*) depos(i,j,l)
     enddo
    enddo
 
   write (11,*)
   enddo
-  CLOSE(11)
+  close(11)
   deallocate(depos)
    
   endif
@@ -631,7 +631,7 @@ contains
 
 
   if (averaging==1) then
-  OPEN(11,file="avg.vtk")
+  open(11,file="avg.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
   write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
@@ -661,7 +661,7 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) Pravg(i,j,k)
+      write (11,*) Pravg(i,j,k)
     enddo
    enddo
   enddo
@@ -672,7 +672,7 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) Prtype(i,j,k)
+      write (11,*) Prtype(i,j,k)
     enddo
    enddo
   enddo
@@ -684,7 +684,7 @@ contains
    do k=1,Prnz
     do j=1,Prny
      do i=1,Prnx
-       Write (11,*) Temperatureavg(i,j,k)
+       write (11,*) Temperatureavg(i,j,k)
      enddo
     enddo
    enddo 
@@ -695,7 +695,7 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) (Wavg(i,j+1,k)-Wavg(i,j-1,k)+Wavg(i,j+1,k-1)-Wavg(i,j-1,k-1))/(4*dxmin)&
+      write (11,*) (Wavg(i,j+1,k)-Wavg(i,j-1,k)+Wavg(i,j+1,k-1)-Wavg(i,j-1,k-1))/(4*dxmin)&
                       -(Vavg(i,j,k+1)-Vavg(i,j,k-1)+Vavg(i,j-1,k+1)-Vavg(i,j-1,k-1))/(4*dymin),&
                    (Uavg(i,j,k+1)-Uavg(i,j,k-1)+Uavg(i-1,j,k+1)-Uavg(i-1,j,k-1))/(4*dxmin)&
                       -(Wavg(i+1,j,k)-Wavg(i-1,j,k)+Wavg(i+1,j,k-1)-Wavg(i-1,j,k-1))/(4*dymin),&
@@ -710,14 +710,14 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) (Uavg(i,j,k)+Uavg(i-1,j,k))/2._KND,(Vavg(i,j,k)+Vavg(i,j-1,k))/2._KND,(Wavg(i,j,k)+Wavg(i,j,k-1))/2._KND
+      write (11,*) (Uavg(i,j,k)+Uavg(i-1,j,k))/2._KND,(Vavg(i,j,k)+Vavg(i,j-1,k))/2._KND,(Wavg(i,j,k)+Wavg(i,j,k-1))/2._KND
     enddo
    enddo
   enddo
-  CLOSE(11)
+  close(11)
 
   if (computescalars>0) then
-  OPEN(11,file="scalarsavg.vtk")
+  open(11,file="scalarsavg.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
   write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
@@ -748,13 +748,13 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-      Write (11,*) SCALARavg(i,j,k,l)
+      write (11,*) SCALARavg(i,j,k,l)
     enddo
    enddo
   enddo
   write (11,*)
   enddo
-  CLOSE(11)
+  close(11)
  endif  
 
   if (tasktype==6) then
@@ -780,7 +780,7 @@ contains
      enddo  
     enddo
    enddo
-  OPEN(11,file="pattern.vtk")
+  open(11,file="pattern.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
   write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
@@ -809,7 +809,7 @@ contains
     do l=1,tilenx*2
       i=1+MOD(l-1,tilenx)
       j=1+MOD(m-1,tileny)
-      Write (11,*) (Upat(i,j,k)+Upat(i-1,j,k))/2._KND,(Vpat(i,j,k)+Vpat(i,j-1,k))/2._KND,(Wpat(i,j,k)+Wpat(i,j,k-1))/2._KND
+      write (11,*) (Upat(i,j,k)+Upat(i-1,j,k))/2._KND,(Vpat(i,j,k)+Vpat(i,j-1,k))/2._KND,(Wpat(i,j,k)+Wpat(i,j,k-1))/2._KND
     enddo
    enddo
   enddo
@@ -820,7 +820,7 @@ contains
     do l=1,tilenx*2
       i=1+MOD(l-1,tilenx)
       j=1+MOD(m-1,tileny)
-      Write (11,*) (Wpat(i,j+1,k)-Wpat(i,j-1,k)+Wpat(i,j+1,k-1)-Wpat(i,j-1,k-1))/(4*dxmin)&
+      write (11,*) (Wpat(i,j+1,k)-Wpat(i,j-1,k)+Wpat(i,j+1,k-1)-Wpat(i,j-1,k-1))/(4*dxmin)&
                       -(Vpat(i,j,k+1)-Vpat(i,j,k-1)+Vpat(i,j-1,k+1)-Vpat(i,j-1,k-1))/(4*dymin),&
                    (Upat(i,j,k+1)-Upat(i,j,k-1)+Upat(i-1,j,k+1)-Upat(i-1,j,k-1))/(4*dxmin)&
                       -(Wpat(i+1,j,k)-Wpat(i-1,j,k)+Wpat(i+1,j,k-1)-Wpat(i-1,j,k-1))/(4*dymin),&
@@ -829,9 +829,9 @@ contains
     enddo
    enddo
   enddo
-  CLOSE(11)
+  close(11)
   !profile
-  OPEN(11,file="profU.txt")
+  open(11,file="profU.txt")
   do k=1,Unz
    S=0
    m=0
@@ -846,8 +846,8 @@ contains
    S=S/m
    write (11,*) zPr(k),S
   enddo
-  CLOSE(11)
-  OPEN(11,file="proftau.txt")
+  close(11)
+  open(11,file="proftau.txt")
   do k=1,Prnz
    S=0
    m=0
@@ -862,8 +862,8 @@ contains
    S=S/m
    write (11,*) zPr(k),S
   enddo
-  CLOSE(11)
-  OPEN(11,file="profuu.txt")
+  close(11)
+  open(11,file="profuu.txt")
   do k=1,Unz
    S=0
    m=0
@@ -879,8 +879,8 @@ contains
    S=sqrt(S)
    write (11,*) zPr(k),S
   enddo
-  CLOSE(11)
-  OPEN(11,file="profww.txt")
+  close(11)
+  open(11,file="profww.txt")
   do k=1,Wnz
    S=0
    m=0
@@ -896,7 +896,7 @@ contains
    S=sqrt(S)
    write (11,*) zW(k),S
   enddo
-  CLOSE(11)
+  close(11)
   
   endif 
 
@@ -930,12 +930,12 @@ endif
     if (associated(IBP%next)) then
      IBP=>IBP%next
     else
-     EXIT
+     exit
     endif
    enddo
   endif
 
-  OPEN(11,file="U.vtk")
+  open(11,file="U.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
   write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
@@ -965,7 +965,7 @@ endif
   do k=1,Unz
    do j=1,Uny
     do i=1,Unx
-      Write (11,*) U(i,j,k)
+      write (11,*) U(i,j,k)
     enddo
    enddo
   enddo
@@ -975,7 +975,7 @@ endif
   do k=1,Unz
    do j=1,Uny
     do i=1,Unx
-      Write (11,*) Uinterp(i,j,k)
+      write (11,*) Uinterp(i,j,k)
     enddo
    enddo
   enddo
@@ -985,15 +985,15 @@ endif
   do k=1,Unz
    do j=1,Uny
     do i=1,Unx
-      Write (11,*) Uinterpdir(i,j,k)
+      write (11,*) Uinterpdir(i,j,k)
     enddo
    enddo
   enddo
   write (11,*)
-  CLOSE(11)
+  close(11)
 
   
-  OPEN(11,file="V.vtk")
+  open(11,file="V.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
   write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
@@ -1023,7 +1023,7 @@ endif
   do k=1,Vnz
    do j=1,Vny
     do i=1,Vnx
-      Write (11,*) V(i,j,k)
+      write (11,*) V(i,j,k)
     enddo
    enddo
   enddo
@@ -1033,7 +1033,7 @@ endif
   do k=1,Vnz
    do j=1,Vny
     do i=1,Vnx
-      Write (11,*) Vinterp(i,j,k)
+      write (11,*) Vinterp(i,j,k)
     enddo
    enddo
   enddo
@@ -1043,16 +1043,16 @@ endif
   do k=1,Vnz
    do j=1,Vny
     do i=1,Vnx
-      Write (11,*) Vinterpdir(i,j,k)
+      write (11,*) Vinterpdir(i,j,k)
     enddo
    enddo
   enddo
   write (11,*)
-  CLOSE(11)
+  close(11)
 
 
   
-  OPEN(11,file="W.vtk")
+  open(11,file="W.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
   write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
@@ -1082,7 +1082,7 @@ endif
   do k=1,Wnz
    do j=1,Wny
     do i=1,Wnx
-      Write (11,*) W(i,j,k)
+      write (11,*) W(i,j,k)
     enddo
    enddo
   enddo
@@ -1092,7 +1092,7 @@ endif
   do k=1,Wnz
    do j=1,Wny
     do i=1,Wnx
-      Write (11,*) Winterp(i,j,k)
+      write (11,*) Winterp(i,j,k)
     enddo
    enddo
   enddo
@@ -1102,12 +1102,12 @@ endif
   do k=1,Wnz
    do j=1,Wny
     do i=1,Wnx
-      Write (11,*) Winterpdir(i,j,k)
+      write (11,*) Winterpdir(i,j,k)
     enddo
    enddo
   enddo
   write (11,*)
-  CLOSE(11)
+  close(11)
 
 !  if (tasktype==3) then
 !   OPEN(11,file="px.vtk")
@@ -1172,7 +1172,7 @@ endif
    fname(10:13)=".vtk"
    write(*,*) "Saving frame:",fname(6:9),"   time:",time
    
-   OPEN(11,file=fname)
+   open(11,file=fname)
    write (11,"(A)") "# vtk DataFile Version 2.0"
    write (11,"(A)") "CLMM output file"
    write (11,"(A)") "ASCII"
@@ -1202,7 +1202,7 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
-        Write (11,*) Pr(i,j,k)
+        write (11,*) Pr(i,j,k)
       enddo
      enddo
     enddo
@@ -1215,7 +1215,7 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
-        Write (11,*) Lambda2(i,j,k,U,V,W)
+        write (11,*) Lambda2(i,j,k,U,V,W)
       enddo
      enddo
     enddo 
@@ -1230,7 +1230,7 @@ endif
      do k=1,Prnz
       do j=1,Prny
        do i=1,Prnx
-         Write (11,*) SCALAR(i,j,k,l)
+         write (11,*) SCALAR(i,j,k,l)
        enddo
       enddo
      enddo
@@ -1242,7 +1242,7 @@ endif
      do k=1,Prnz
       do j=1,Prny
        do i=1,Prnx
-         Write (11,*) SUM(SCALAR(i,j,k,:))
+         write (11,*) SUM(SCALAR(i,j,k,:))
        enddo
       enddo
      enddo
@@ -1256,7 +1256,7 @@ endif
       do k=1,Prnz
        do j=1,Prny
         do i=1,Prnx
-          Write (11,*) Temperature(i,j,k)
+          write (11,*) Temperature(i,j,k)
         enddo
        enddo
       enddo 
@@ -1269,7 +1269,7 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
-        Write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
+        write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
       enddo
      enddo
     enddo
@@ -1281,7 +1281,7 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
-        Write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+        write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                        -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
                      (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
                        -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),&
@@ -1290,7 +1290,7 @@ endif
       enddo
      enddo
     enddo
-    CLOSE(11)
+    close(11)
    endif
 
   
@@ -1323,7 +1323,7 @@ endif
    fname(10:13)=".vtk"
    write(*,*) "Saving frame:",fname(6:9),"   time:",time
    
-   OPEN(11,file=fname)
+   open(11,file=fname)
    write (11,"(A)") "# vtk DataFile Version 2.0"
    write (11,"(A)") "CLMM output file"
    write (11,"(A)") "ASCII"
@@ -1353,7 +1353,7 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
-        Write (11,*) Pr(i,j,k)
+        write (11,*) Pr(i,j,k)
       enddo
      enddo
     enddo
@@ -1366,7 +1366,7 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
-        Write (11,*) Lambda2(i,j,k,U,V,W)
+        write (11,*) Lambda2(i,j,k,U,V,W)
       enddo
      enddo
     enddo 
@@ -1381,7 +1381,7 @@ endif
      do k=mink,maxk
       do j=minj,maxj
        do i=mini,maxi
-         Write (11,*) SCALAR(i,j,k,l)
+         write (11,*) SCALAR(i,j,k,l)
        enddo
       enddo
      enddo
@@ -1393,7 +1393,7 @@ endif
      do k=mink,maxk
       do j=minj,maxj
        do i=mini,maxi
-         Write (11,*) SUM(SCALAR(i,j,k,:))
+         write (11,*) SUM(SCALAR(i,j,k,:))
        enddo
       enddo
      enddo
@@ -1407,7 +1407,7 @@ endif
      do k=mink,maxk
       do j=minj,maxj
        do i=mini,maxi
-         Write (11,*) Temperature(i,j,k)
+         write (11,*) Temperature(i,j,k)
        enddo
       enddo
      enddo 
@@ -1420,7 +1420,7 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
-        Write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
+        write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
       enddo
      enddo
     enddo
@@ -1432,7 +1432,7 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
-        Write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+        write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                         -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
                      (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
                        -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),&
@@ -1442,7 +1442,7 @@ endif
      enddo
     enddo
    endif  
-   CLOSE(11)
+   close(11)
    endif
 
 
@@ -1456,7 +1456,7 @@ endif
    fname(10:13)=".vtk"
    write(*,*) "Saving frame:",fname(6:9),"   time:",time
    
-   OPEN(20,file=fname,access='stream',status='replace',form="unformatted",action="write")
+   open(20,file=fname,access='stream',status='replace',form="unformatted",action="write")
    write (20) "# vtk DataFile Version 2.0",lf
    write (20) "CLMM output file",lf
    write (20) "BINARY",lf
@@ -1493,7 +1493,7 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
-        Write (20) real(Lambda2(i,j,k,U,V,W),SNG)
+        write (20) real(Lambda2(i,j,k,U,V,W),SNG)
       enddo
      enddo
     enddo 
@@ -1508,7 +1508,7 @@ endif
      do k=1,Prnz
       do j=1,Prny
        do i=1,Prnx
-         Write (20) real(SCALAR(i,j,k,l),SNG)
+         write (20) real(SCALAR(i,j,k,l),SNG)
        enddo
       enddo
      enddo
@@ -1520,7 +1520,7 @@ endif
      do k=1,Prnz
       do j=1,Prny
        do i=1,Prnx
-         Write (20) real(SUM(SCALAR(i,j,k,:)),SNG)
+         write (20) real(SUM(SCALAR(i,j,k,:)),SNG)
        enddo
       enddo
      enddo
@@ -1534,7 +1534,7 @@ endif
       do k=1,Prnz
        do j=1,Prny
         do i=1,Prnx
-          Write (20) real(Temperature(i,j,k),SNG)
+          write (20) real(Temperature(i,j,k),SNG)
         enddo
        enddo
       enddo 
@@ -1547,7 +1547,7 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
-        Write (20) real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG),real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG)&
+        write (20) real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG),real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG)&
          ,real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG)
       enddo
      enddo
@@ -1560,7 +1560,7 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
-        Write (20) real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+        write (20) real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                        -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG),&
                      real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
                        -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG),&
@@ -1569,7 +1569,7 @@ endif
       enddo
      enddo
     enddo
-    CLOSE(20)
+    close(20)
    endif
 
   
@@ -1602,7 +1602,7 @@ endif
    fname(10:13)=".vtk"
    write(*,*) "Saving frame:",fname(6:9),"   time:",time
    
-   OPEN(20,file=fname,access='stream',status='replace',form="unformatted",action="write")
+   open(20,file=fname,access='stream',status='replace',form="unformatted",action="write")
    write (20) "# vtk DataFile Version 2.0",lf
    write (20) "CLMM output file",lf
    write (20) "BINARY",lf
@@ -1632,7 +1632,7 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
-        Write (20) real(Pr(i,j,k),SNG)
+        write (20) real(Pr(i,j,k),SNG)
       enddo
      enddo
     enddo
@@ -1645,7 +1645,7 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
-        Write (20) real(Lambda2(i,j,k,U,V,W),SNG)
+        write (20) real(Lambda2(i,j,k,U,V,W),SNG)
       enddo
      enddo
     enddo 
@@ -1660,7 +1660,7 @@ endif
      do k=mink,maxk
       do j=minj,maxj
        do i=mini,maxi
-         Write (20) real(SCALAR(i,j,k,l),SNG)
+         write (20) real(SCALAR(i,j,k,l),SNG)
        enddo
       enddo
      enddo
@@ -1672,7 +1672,7 @@ endif
      do k=mink,maxk
       do j=minj,maxj
        do i=mini,maxi
-         Write (20) real(SUM(SCALAR(i,j,k,:)),SNG)
+         write (20) real(SUM(SCALAR(i,j,k,:)),SNG)
        enddo
       enddo
      enddo
@@ -1686,7 +1686,7 @@ endif
      do k=mink,maxk
       do j=minj,maxj
        do i=mini,maxi
-         Write (20) real(Temperature(i,j,k),SNG)
+         write (20) real(Temperature(i,j,k),SNG)
        enddo
       enddo
      enddo 
@@ -1699,7 +1699,7 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
-        Write (20) real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG),real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG)&
+        write (20) real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG),real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG)&
          ,real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG)
       enddo
      enddo
@@ -1712,7 +1712,7 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
-        Write (20) real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+        write (20) real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                         -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG),&
                      real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
                        -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG),&
@@ -1722,7 +1722,7 @@ endif
      enddo
     enddo
    endif  
-   CLOSE(20)
+   close(20)
    endif
 
   endif
@@ -1994,7 +1994,7 @@ endif
 
   
   real(KND) function TotKE(U,V,W)
-  real(KND),DIMENSION(-2:,-2:,-2:):: U,V,W
+  real(KND),dimension(-2:,-2:,-2:):: U,V,W
   real(KND) Um,Vm,Wm
   integer i,j,k
    TotKE=0
@@ -2015,7 +2015,7 @@ endif
 
    real(KND) function Vorticity(i,j,k,U,V,W)
    integer i,j,k
-   real(KND),DIMENSION(-2:,-2:,-2:):: U,V,W
+   real(KND),dimension(-2:,-2:,-2:):: U,V,W
 
     Vorticity=((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dymin)&
                       -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dzmin))**2+&
@@ -2072,7 +2072,7 @@ endif
  integer i,j,k
  character(70):: str
 
-  OPEN(11,file="U2.vtk")
+  open(11,file="U2.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
   write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
@@ -2102,15 +2102,15 @@ endif
   do k=1,Unz
    do j=1,Uny
     do i=1,Unx
-      Write (11,*) U(i,j,k)
+      write (11,*) U(i,j,k)
     enddo
    enddo
   enddo
   write (11,*)
-  CLOSE(11)
+  close(11)
 
   
-  OPEN(11,file="V2.vtk")
+  open(11,file="V2.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
   write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
@@ -2140,16 +2140,16 @@ endif
   do k=1,Vnz
    do j=1,Vny
     do i=1,Vnx
-      Write (11,*) V(i,j,k)
+      write (11,*) V(i,j,k)
     enddo
    enddo
   enddo
   write (*,*)
-  CLOSE(11)
+  close(11)
 
 
   
-  OPEN(11,file="W2.vtk")
+  open(11,file="W2.vtk")
   write (11,"(A)") "# vtk DataFile Version 2.0"
   write (11,"(A)") "CLMM output file"
   write (11,"(A)") "ASCII"
@@ -2179,12 +2179,12 @@ endif
   do k=1,Wnz
    do j=1,Wny
     do i=1,Wnx
-      Write (11,*) W(i,j,k)
+      write (11,*) W(i,j,k)
     enddo
    enddo
   enddo
   write (11,*)
-  CLOSE(11)
+  close(11)
   endsubroutine OUTPUTU2
 
 
@@ -2198,7 +2198,7 @@ endif
    if ((time>=timefram1).and.(time<=timefram2+(timefram2-timefram1)/(frames-1))&
        .and.(time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
     if (called==0) then
-     OPEN(101,file="inletframeinfo.unf",form='unformatted',status='replace',action='write')
+     open(101,file="inletframeinfo.unf",form='unformatted',status='replace',action='write')
      write(101) Prny,Prnz  !for check of consistency of grids before use
      write(101) Vny
      write(101) Wnz
@@ -2210,7 +2210,7 @@ endif
     write(101) time-timefram1
     call OUTINLETFRAME(U,V,W,fnum)
    elseif (time>timefram2+(timefram2-timefram1)/(frames-1).and.called==1) then
-     CLOSE(101)
+     close(101)
      called=2
    endif
 
@@ -2238,7 +2238,7 @@ endif
   fname(9:12)=".unf"
   write(*,*) "Saving frame:",fname(1:6),"   time:",time
   
-  OPEN(11,file=fname,form='unformatted',access='sequential',status='replace',action='write')
+  open(11,file=fname,form='unformatted',access='sequential',status='replace',action='write')
   
 
   write(11) U(mini,1:Uny,1:Unz)
@@ -2247,14 +2247,14 @@ endif
   if (buoyancy>0) then
        write(11) Temperature(mini,1:Prny,1:Prnz)
   endif
-  CLOSE(11)
+  close(11)
 
   endsubroutine OUTINLETFRAME
 
 
 
    pure real(KND) function TriLinInt(a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111)
-   real(KND),intent(IN):: a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111
+   real(KND),intent(in):: a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111
 
     TriLinInt=   (1-a)*(1-b)*(1-c)*vel000+&
                  a*(1-b)*(1-c)*vel100+&
@@ -2277,7 +2277,7 @@ endif
    do i=1,Unx+1
     if (xPr(i+1)>=x) then
                   xi=i-1
-                  EXIT
+                  exit
                  endif
    enddo
 
@@ -2285,14 +2285,14 @@ endif
    do i=1,Vny
     if (yV(i)>=y) then
                   yj=i
-                  EXIT
+                  exit
                  endif
    enddo
    zk=Wnz
    do i=1,Wnz
     if (zW(i)>=z) then
                   zk=i
-                  EXIT
+                  exit
                  endif
    enddo
    endsubroutine GridCoordsU
@@ -2307,7 +2307,7 @@ endif
    do i=1,Unx
     if (xU(i)>=x) then
                   xi=i
-                  EXIT
+                  exit
                  endif
    enddo
 
@@ -2315,14 +2315,14 @@ endif
    do i=1,Vny+1
     if (yPr(i)>=y) then
                   yj=i-1
-                  EXIT
+                  exit
                  endif
    enddo
    zk=Wnz
    do i=1,Wnz
     if (zW(i)>=z) then
                   zk=i
-                  EXIT
+                  exit
                  endif
    enddo
    endsubroutine GridCoordsV
@@ -2337,7 +2337,7 @@ endif
    do i=1,Unx
     if (xU(i)>=x) then
                   xi=i
-                  EXIT
+                  exit
                  endif
    enddo
 
@@ -2345,14 +2345,14 @@ endif
    do i=1,Vny
     if (yV(i)>=y) then
                   yj=i
-                  EXIT
+                  exit
                  endif
    enddo
    zk=Wnz+1
    do i=1,Wnz+1
     if (zPr(i)>=z) then
                   zk=i-1
-                  EXIT
+                  exit
                  endif
    enddo
    endsubroutine GridCoordsW
@@ -2367,7 +2367,7 @@ endif
    do i=1,Prnx
     if (xU(i)>=x) then
                   xi=i
-                  EXIT
+                  exit
                  endif
    enddo
 
@@ -2375,7 +2375,7 @@ endif
    do i=1,Prny
     if (yV(i)>=y) then
                   yj=i
-                  EXIT
+                  exit
                  endif
    enddo
 
@@ -2383,7 +2383,7 @@ endif
    do i=1,Prnz
     if (zW(i)>=z) then
                   zk=i
-                  EXIT
+                  exit
                  endif
    enddo
    endsubroutine GridCoordsPr

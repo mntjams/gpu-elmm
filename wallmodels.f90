@@ -30,7 +30,7 @@ implicit none
   
 
   subroutine AddWMpoint(WMP)
-  type(WMpoint),intent(IN):: WMP
+  type(WMpoint),intent(in):: WMP
   
   if (.not.associated(LastWMPoint)) then
    allocate(FirstWMPoint)
@@ -46,7 +46,7 @@ implicit none
   endsubroutine AddWMPoint
 
   real(KND) function WM1ustar(vel,dist,ustar0,dp,dptrans)
-  real(KND),parameter:: eps=1E-4
+  real(KND),parameter:: eps=1e-4
   real(KND):: yplcrit=11.225
   real(KND) ustar,vel,dist,ustar0,dp,dptrans,kprime
   integer i
@@ -62,10 +62,10 @@ implicit none
     i=i+1
      ustar0=ustar
      ustar=vel/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
-     if  (abs(ustar-ustar0)/abs(ustar)<eps) EXIT
+     if  (abs(ustar-ustar0)/abs(ustar)<eps) exit
      if (i>=25) then
                  ustar=0
-                 EXIT
+                 exit
      endif
     enddo
    endif
@@ -83,10 +83,10 @@ implicit none
     i=i+1
      ustar0=ustar
      ustar=vel*(1._KND-Re*dp/0.41_KND)/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
-     if  (abs(ustar-ustar0)/abs(ustar)<eps) EXIT
+     if  (abs(ustar-ustar0)/abs(ustar)<eps) exit
      if (i>=25) then
                  ustar=0
-                 EXIT
+                 exit
      endif
     enddo
    endif
@@ -95,8 +95,8 @@ implicit none
   endfunction WM1ustar
 
   real(KND) function WM1Visc(WMP,U,V,W,Pr)
-  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V,W
-  real(KND),dimension(1:,1:,1:),intent(IN):: Pr
+  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+  real(KND),dimension(1:,1:,1:),intent(in):: Pr
   integer i,j,k
   real(KND) ustar,vel,dist,dp,dptrans,dpx,dpy,dpz
   type(WMPoint):: WMP 
@@ -111,9 +111,9 @@ implicit none
    ustar=0
    dp=0
    dptrans=0
-   if (abs(WMP%disty)/dymin<1.E-2.and.abs(WMP%distz)/dzmin<1.E-2) vel=vel+((U(i,j,k)+U(i-1,j,k))/2._KND-WMP%wallu)**2
-   if (abs(WMP%distx)/dxmin<1.E-2.and.abs(WMP%distz)/dzmin<1.E-2) vel=vel+((V(i,j,k)+V(i,j-1,k))/2._KND-WMP%wallv)**2
-   if (abs(WMP%disty)/dymin<1.E-2.and.abs(WMP%distx)/dxmin<1.E-2) vel=vel+((W(i,j,k)+W(i,j,k-1))/2._KND-WMP%wallw)**2
+   if (abs(WMP%disty)/dymin<1.e-2.and.abs(WMP%distz)/dzmin<1.e-2) vel=vel+((U(i,j,k)+U(i-1,j,k))/2._KND-WMP%wallu)**2
+   if (abs(WMP%distx)/dxmin<1.e-2.and.abs(WMP%distz)/dzmin<1.e-2) vel=vel+((V(i,j,k)+V(i,j-1,k))/2._KND-WMP%wallv)**2
+   if (abs(WMP%disty)/dymin<1.e-2.and.abs(WMP%distx)/dxmin<1.e-2) vel=vel+((W(i,j,k)+W(i,j,k-1))/2._KND-WMP%wallw)**2
    vel=sqrt(vel)
    if (vel==0) goto 10
    if (wallmodeltype>1) then
@@ -174,7 +174,7 @@ implicit none
 
 
   real(KND) function WM2ustar(vel,dist,ustar0,dp,dptrans,z0)
-  real(KND),parameter:: eps=1E-4
+  real(KND),parameter:: eps=1e-4
   real(KND):: yplcrit=11.225
   real(KND) vel,dist,ustar0,z0,dp,dptrans,kprime
 
@@ -187,7 +187,7 @@ implicit none
        WM2ustar=vel/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
      endif
     else
-     STOP "The wall model need positive viscosity under roughness length."
+     stop "The wall model need positive viscosity under roughness length."
     endif
    else
      WM2ustar=vel*0.41_KND/log(dist/z0)
@@ -203,7 +203,7 @@ implicit none
        WM2ustar=vel*(1-Re*dp/0.41_KND)/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
      endif
     else
-     STOP "The wall model need positive viscosity under roughness length."
+     stop "The wall model need positive viscosity under roughness length."
     endif
    else
      WM2ustar=vel*(1-Re*dp/0.41_KND)*0.41_KND/log(dist/z0)
@@ -212,7 +212,7 @@ implicit none
   endfunction WM2ustar
 
   pure real(KND) function PsiM_MO(zeta)
-  real(KND),intent(IN):: zeta
+  real(KND),intent(in):: zeta
   real(KND) x
   
   if (zeta<0) then
@@ -224,7 +224,7 @@ implicit none
   endfunction PsiM_MO
 
   pure real(KND) function PsiH_MO(zeta)
-  real(KND),intent(IN):: zeta
+  real(KND),intent(in):: zeta
   real(KND) x
 
   if (zeta<0) then
@@ -236,13 +236,13 @@ implicit none
   endfunction PsiH_MO
 
   pure real(KND) function Obukhov_zL(ustar,tempfl,tempref,g,z)
-  real(KND),intent(IN):: ustar,tempfl,tempref,g,z
+  real(KND),intent(in):: ustar,tempfl,tempref,g,z
 
   Obukhov_zL=z*(0.4_KND*(g/tempref)*tempfl)/(-ustar**3)
   endfunction Obukhov_zL
 
   real(KND) function WM_MO_FLUX_ustar(vel,dist,ustar,z0,tempflux)
-  real(KND),parameter:: eps=1E-5
+  real(KND),parameter:: eps=1e-5
   real(KND):: yplcrit=11.225
   real(KND) vel,dist,ustar0,z0,tempflux,ustar,zL,Psi
   integer i
@@ -255,7 +255,7 @@ implicit none
        ustar=vel/(log(abs(ustar0*dist*Re))/0.4_KND+5.2_KND)
      endif
     else
-     STOP "The wall model need positive viscosity under roughness length."
+     stop "The wall model need positive viscosity under roughness length."
     endif
    else
     i=0
@@ -271,10 +271,10 @@ implicit none
       zL=Obukhov_zL(ustar,tempflux,temperature_ref,grav_acc,dist)
      endif
      Psi=PsiM_MO(zL)
-     if  (abs(ustar-ustar0)/max(abs(ustar),1.e-3_KND)<eps) EXIT
+     if  (abs(ustar-ustar0)/max(abs(ustar),1.e-3_KND)<eps) exit
      if (i>=250) then
                  ustar=0
-                 EXIT
+                 exit
      endif
     enddo
    endif
@@ -283,7 +283,7 @@ implicit none
 
 
   subroutine WM_MO_DIRICHLET_ustar_tfl(vel,dist,z0,ustar,tempflux,tempdif)
-  real(KND),parameter:: eps=1E-5
+  real(KND),parameter:: eps=1e-5
   real(KND):: yplcrit=11.225
   real(KND) vel,dist,ustar,z0,tempflux,tempdif,ustar0,tempflux0,zL,zL0,Rib
   integer i
@@ -298,7 +298,7 @@ implicit none
        ustar=vel/(log(abs(ustar0*dist*Re))/0.4_KND+5.2_KND)
      endif
     else
-     STOP "The wall model needs positive viscosity under roughness length."
+     stop "The wall model needs positive viscosity under roughness length."
     endif
    else
     Rib=-grav_acc*dist*tempdif/(temperature_ref*vel**2)
@@ -307,17 +307,17 @@ implicit none
      if (Rib>0.34_KND) then
                         ustar=0
                         tempflux=0
-                        GOTO 10
+                        goto 10
      endif
      do
       i=i+1
       zL0=zL
       zL=Rib*(log(dist/z0)-PsiM_MO(zl))**2/(log(dist/z0)-PsiH_MO(zl)) 
-      if  (abs(zL-zL0)/max(abs(zL),1.e-3_KND)<eps) EXIT
+      if  (abs(zL-zL0)/max(abs(zL),1.e-3_KND)<eps) exit
       if (i>=250.or.zL>100) then
                   ustar=0
                   tempflux=0
-                  GOTO 10
+                  goto 10
       endif
      enddo
      ustar=vel*0.4_KND/(log(dist/z0)-PsiM_MO(zL))
@@ -335,8 +335,8 @@ implicit none
 
 
   real(KND) function WM2Visc(WMP,U,V,W,Pr)
-  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V,W
-  real(KND),dimension(1:,1:,1:),intent(IN):: Pr
+  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+  real(KND),dimension(1:,1:,1:),intent(in):: Pr
   integer i,j,k
   real(KND) ustar,vel,dist,z0,dp,dptrans,dpx,dpy,dpz
   type(WMPoint):: WMP 
@@ -407,8 +407,8 @@ implicit none
 
 
   real(KND) function WM_MO_FLUX(WMP,U,V,W,Pr)
-  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V,W
-  real(KND),dimension(1:,1:,1:),intent(IN):: Pr
+  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+  real(KND),dimension(1:,1:,1:),intent(in):: Pr
   integer i,j,k
   real(KND) ustar,vel,dist,z0
   type(WMPoint):: WMP 
@@ -445,8 +445,8 @@ implicit none
 
   subroutine WM_MO_DIRICHLET(visc,WMP,U,V,W,Pr)
   real(KND) visc
-  real(KND),dimension(-2:,-2:,-2:),intent(IN):: U,V,W
-  real(KND),dimension(1:,1:,1:),intent(IN):: Pr
+  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+  real(KND),dimension(1:,1:,1:),intent(in):: Pr
   integer i,j,k
   real(KND) ustar,vel,dist,z0,tempflux
   type(WMPoint):: WMP 
@@ -486,7 +486,7 @@ implicit none
 
 
   pure subroutine BOUND_tempfl(Nu)
-  real(KND),intent(INOUT):: Nu(-1:,-1:)
+  real(KND),intent(inout):: Nu(-1:,-1:)
   integer i,j,nx,ny
 
   nx=Prnx
@@ -533,7 +533,7 @@ implicit none
     if (associated(WMP%next)) then
      WMP=>WMP%next
     else
-     EXIT
+     exit
     endif
    enddo
    endif
@@ -571,14 +571,14 @@ implicit none
      endif
    else
      if (Re<=0) then
-      STOP "The wall model requires positive viscosity or roughness length."
+      stop "The wall model requires positive viscosity or roughness length."
      endif
      Visc(WMP%x,WMP%y,WMP%z)=WM1Visc(WMP,U,V,W,Pr)
     endif
     if (associated(WMP%next)) then
      WMP=>WMP%next
     else
-     EXIT
+     exit
     endif
    enddo
    endif
@@ -586,7 +586,7 @@ implicit none
   endsubroutine ComputeViscsWM
 
   real(KND) function SurfTemperature(x,y,t)
-  real(KND),intent(IN):: x,y,t
+  real(KND),intent(in):: x,y,t
   SurfTemperature=265-t*0.25_KND/3600._KND
   endfunction
 

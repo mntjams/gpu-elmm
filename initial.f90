@@ -3,7 +3,6 @@ use PARAMETERS
 use MULTIGRID
 use POISSON
 use BOUNDARIES
-!use BLASIUS
 use SCALARS
 use SMAGORINSKY
 use WALLMODELS
@@ -14,290 +13,290 @@ contains
  subroutine READPARAMS
  integer i
  
-  OPEN(11,FILE="main.conf",status="OLD",action="READ")
-  read (11,FMT='(/)')
+  open(11,file="main.conf",status="OLD",action="READ")
+  read (11,fmt='(/)')
   read (11,*) tempmet
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) CFL
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) Uref
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) poissmet
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) convmet
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) limitertype
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) limparam
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) wallmodeltype
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) sgstype
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) masssourc
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) steady
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) tasktype
   write(*,*) "tasktype=",tasktype
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) initcondsfromfile
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) timeavg1
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) timeavg2
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) Re
   write (*,*) "Re=",Re
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) coriolisparam
   write (*,*) "coriolisparam=",coriolisparam
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) prgradientx
   write (*,*) "prgradientx=",prgradientx
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) prgradienty
   write (*,*) "prgradienty=",prgradienty
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) a
   write (*,*) "a=",a
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) starttime
   write (*,*) "endtime=",starttime
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) endtime
   write (*,*) "endtime=",endtime
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) maxiter
   write (*,*) "maxiter=",maxiter
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) eps
   write (*,*) "eps=",eps
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) maxCNiter
   write (*,*) "maxCNiter=",maxCNiter
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) epsCN
   write (*,*) "epsCN=",epsCN
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) maxPOISSONiter
   write (*,*) "maxPOISSONiter=",maxPOISSONiter
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) epsPOISSON
   write (*,*) "epsPOISSON=",epsPOISSON
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) debugparam
   write (*,*) "debug parameter=",debugparam
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) probex
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) probey
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) probez
-  CLOSE(11)
+  close(11)
 
 
-  OPEN(11,FILE="grid.conf",status="OLD",action="READ")
-  read (11,FMT='(/)')
+  open(11,file="grid.conf",status="OLD",action="READ")
+  read (11,fmt='(/)')
   read (11,*) xgridfromfile
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) ygridfromfile
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) zgridfromfile
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) x0
   write (*,*) "x0=",x0
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) y0
   write (*,*) "y0=",y0
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) z0
   write (*,*) "z0=",z0
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) lx
   write (*,*) "lx=",lx
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) ly
   write (*,*) "ly=",ly
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) lz
   write (*,*) "lz=",lz
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) Prnx
   write (*,*) "nx=",Prnx
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) Prny
   write (*,*) "ny=",Prny
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) Prnz
   write (*,*) "ny=",Prnz
-  CLOSE(11)
+  close(11)
 
-  OPEN(11,FILE="boundconds.conf",status="OLD",action="READ")
-  read (11,FMT='(/)')
+  open(11,file="boundconds.conf",status="OLD",action="READ")
+  read (11,fmt='(/)')
   read (11,*) BtypeW
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) BtypeE
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) BtypeS
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) BtypeN
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) BtypeB
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) BtypeT
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) SsideU
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) SsideV
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) SsideW
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) NsideU
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) NsideV
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) NsideW
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) BsideU
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) BsideV
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) BsideW
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) TsideU
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) TsideV
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) TsideW
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) z0W
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) z0E
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) z0S
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) z0N
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) z0B
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) z0T
-  CLOSE(11)
+  close(11)
 
   
-  OPEN(11,FILE="thermal.conf",status="OLD",action="READ")
-  read (11,FMT='(/)')
+  open(11,file="thermal.conf",status="OLD",action="READ")
+  read (11,fmt='(/)')
   read (11,*) buoyancy
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) Prandtl
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) grav_acc
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) temperature_ref
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) TBtypeW
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) TBtypeE
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) TBtypeS
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) TBtypeN
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) TBtypeB
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) TBtypeT
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) WsideTemp
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) EsideTemp
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) SsideTemp
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) NsideTemp
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) BsideTemp
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) TsideTemp
-  CLOSE(11)
+  close(11)
 
-  OPEN(11,FILE="inlet.conf",status="OLD",action="READ")
-  read (11,FMT='(/)')
+  open(11,file="inlet.conf",status="OLD",action="READ")
+  read (11,fmt='(/)')
   read (11,*) inlettype
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) profiletype
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) SHEARG
   write (*,*) "G=",SHEARG
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) Uinlet
   write (*,*) "Uinlet=",Uinlet
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) ustarsurfin  !-<u'w'>
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) stressgradin !in relative part per 1m
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) z0inlet
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) powerexpin
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) zrefin
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) Urefin
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*)  relativestress(1,1)
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*)  relativestress(2,2)
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) relativestress(3,3)
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) relativestress(1,2)
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) relativestress(1,3)
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) relativestress(2,3)
-  CLOSE(11)
+  close(11)
  
   relativestress(2,1)=relativestress(1,2)
   relativestress(3,1)=relativestress(1,3)
   relativestress(3,2)=relativestress(2,3)
 
-  OPEN(11,FILE="scalars.conf",status="OLD",action="READ")
-  read (11,FMT='(/)')
+  open(11,file="scalars.conf",status="OLD",action="READ")
+  read (11,fmt='(/)')
   read (11,*) computescalars
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) computedeposition
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) computegravsettling
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) partdistrib
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) totalscalsource
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) pointscalsource
 
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) ScalBtypeW
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) ScalBtypeE
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) ScalBtypeS
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) ScalBtypeN
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) ScalBtypeB
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) ScalBtypeT
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) WsideScal
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) EsideScal
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) SsideScal
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) NsideScal
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) BsideScal
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) TsideScal
   
   if (partdistrib>0) then
@@ -305,17 +304,17 @@ contains
      allocate(scalsrcx(partdistrib),scalsrcy(partdistrib),scalsrcz(partdistrib))
      allocate(scalsrci(partdistrib),scalsrcj(partdistrib),scalsrck(partdistrib))
      do i=1,partdistrib
-      read (11,FMT='(/)')
+      read (11,fmt='(/)')
       read (11,*) partdiam(i)
-      read (11,FMT='(/)')
+      read (11,fmt='(/)')
       read (11,*) partrho(i)
-      read (11,FMT='(/)')
+      read (11,fmt='(/)')
       read (11,*) percdistrib(i)
-      read (11,FMT='(/)')
+      read (11,fmt='(/)')
       read (11,*) scalsrcx(i)
-      read (11,FMT='(/)')
+      read (11,fmt='(/)')
       read (11,*) scalsrcy(i)
-      read (11,FMT='(/)')
+      read (11,fmt='(/)')
       read (11,*) scalsrcz(i)
      enddo
    
@@ -324,59 +323,59 @@ contains
      allocate(scalsrcx(computescalars),scalsrcy(computescalars),scalsrcz(computescalars))
      allocate(scalsrci(computescalars),scalsrcj(computescalars),scalsrck(computescalars))
      do i=1,computescalars
-      read (11,FMT='(/)')
+      read (11,fmt='(/)')
       read (11,*) partdiam(i)
-      read (11,FMT='(/)')
+      read (11,fmt='(/)')
       read (11,*) partrho(i)
-      read (11,FMT='(/)')
+      read (11,fmt='(/)')
       read (11,*) percdistrib(i)
-      read (11,FMT='(/)')
+      read (11,fmt='(/)')
       read (11,*) scalsrcx(i)
-      read (11,FMT='(/)')
+      read (11,fmt='(/)')
       read (11,*) scalsrcy(i)
-      read (11,FMT='(/)')
+      read (11,fmt='(/)')
       read (11,*) scalsrcz(i)
      enddo
   endif
-  CLOSE(11)
+  close(11)
 
-  OPEN(11,FILE="mgopts.conf",status="OLD",action="READ")
-  read (11,FMT='(/)')
+  open(11,file="mgopts.conf",status="OLD",action="READ")
+  read (11,fmt='(/)')
   read (11,*) lmg
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) minmglevel
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) bnx
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) bny
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) bnz
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) mgncgc
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) mgnpre
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) mgnpost
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) mgmaxinnnerGSiter
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) mgepsinnerGS
-  CLOSE(11)
+  close(11)
 
-  OPEN(11,FILE="frames.conf",status="OLD",action="READ")
-  read (11,FMT='(/)')
+  open(11,file="frames.conf",status="OLD",action="READ")
+  read (11,fmt='(/)')
   read (11,*) frames
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) timefram1
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) timefram2
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) framedimension
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) slicedir
-  read (11,FMT='(/)')
+  read (11,fmt='(/)')
   read (11,*) slicex
-  CLOSE(11)
+  close(11)
 
 
 
@@ -1035,8 +1034,9 @@ contains
    call Bound_Visc(Visc)
 
   if (buoyancy>0) then
-   forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+   forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
      TDiff(i,j,k)=1.35*(Visc(i,j,k)-1._KND/Re)+(1._KND/(Re*Prt(i,j,k,U,V,temperature)))
+    endforall
      call Bound_Visc(TDiff)
   endif
  endif

@@ -1,4 +1,4 @@
-MODULE LAXWEND
+module LAXWEND
  use PARAMETERS
  use BOUNDARIES
  implicit none
@@ -6,8 +6,8 @@ MODULE LAXWEND
  contains
 
 
- subroutine MC1(U2,V2,W2,U,V,W) !MacCormack for periodic BCs
- real(KND),DIMENSION(-2:,-2:,-2:):: U2,V2,W2,U,V,W
+ subroutine MC1(U2,V2,W2,U,V,W)
+ real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U,V,W  !U,V,W changed only by BC
  real(KND) U1(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),LBOUND(U,3):UBOUND(U,3))
  real(KND) V1(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),LBOUND(V,3):UBOUND(V,3))
  real(KND) W1(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),LBOUND(W,3):UBOUND(W,3))
@@ -120,8 +120,8 @@ MODULE LAXWEND
 
 
 
- subroutine MC2(U2,V2,W2,U,V,W) !MacCormack for periodic BCs
- real(KND),DIMENSION(-2:,-2:,-2:):: U2,V2,W2,U,V,W
+ subroutine MC2(U2,V2,W2,U,V,W)
+ real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U,V,W !U,V,W changed only by BC
  real(KND) U1(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),LBOUND(U,3):UBOUND(U,3))
  real(KND) V1(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),LBOUND(V,3):UBOUND(V,3))
  real(KND) W1(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),LBOUND(W,3):UBOUND(W,3))

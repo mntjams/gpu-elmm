@@ -1,9 +1,9 @@
 module PARAMETERS
 implicit none
-  integer,parameter :: DBL=KIND(1.0D0),SNG=KIND(1.0E0),KND=SNG,SINT=selected_int_kind(2),SLOG=SINT !KND is default real kind for the whole program
+  integer,parameter :: DBL=KIND(1.0D0),SNG=KIND(1.0e0),KND=SNG,SINT=selected_int_kind(2),SLOG=SINT !KND is default real kind for the whole program
   real(KND) :: pi !computed at the first line of main
   real(KND),parameter :: Karman=0.41
-  real(KND),parameter :: BoltzC=1.3806503E-23
+  real(KND),parameter :: BoltzC=1.3806503e-23
   !integer nx,ny,nz
   real(DBL) dt,starttime,endtime        !active time step
   real(KND) dxmin,dymin,dzmin,lx,ly,lz,CFL,Uref  !minimum grid spacing, dimensions of the domain
@@ -74,5 +74,7 @@ implicit none
   integer,parameter:: minmodlim=1,extminmodlim=2,gammalim=3,vanalbadalim=4,vanleerlim=5,superbeelim=6
   integer,parameter:: textvtk=1,binaryvtk=2
   real(KND) probex,probey,probez
+
+  integer:: debuglevel !amount of information to write out
 
 endmodule PARAMETERS

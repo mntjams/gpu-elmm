@@ -1,6 +1,5 @@
 module BOUNDARIES
 use PARAMETERS
-!use BLASIUS
 use WALLMODELS
 use SCALARS
 use TURBINLET
@@ -24,7 +23,7 @@ implicit none
    do i=1,Prnx
     if (xU(i)>=x) then
                   xi=i
-                  EXIT
+                  exit
                  endif
    enddo
 
@@ -32,21 +31,21 @@ implicit none
    do i=1,Prny
     if (yV(i)>=y) then
                   yj=i
-                  EXIT
+                  exit
                  endif
    enddo
    zk=Prnz
    do i=1,Prnz
     if (zW(i)>=z) then
                   zk=i
-                  EXIT
+                  exit
                  endif
    enddo
    endsubroutine GridCoords
 
 
   subroutine BOUND_CONDU(U)
-  real(KND),intent(INOUT):: U(-2:,-2:,-2:)
+  real(KND),intent(inout):: U(-2:,-2:,-2:)
   integer i,j,k,nx,ny,nz
 
   nx=Unx
@@ -504,7 +503,7 @@ implicit none
 
 
   pure subroutine BOUND_CONDV(V)
-  real(KND),intent(INOUT):: V(-2:,-2:,-2:)
+  real(KND),intent(inout):: V(-2:,-2:,-2:)
   integer i,j,k,nx,ny,nz
 
   nx=Vnx
@@ -949,7 +948,7 @@ implicit none
 
 
   pure subroutine BOUND_CONDW(W)
-  real(KND),intent(INOUT):: W(-2:,-2:,-2:)
+  real(KND),intent(inout):: W(-2:,-2:,-2:)
   integer i,j,k,nx,ny,nz
 
   nx=Wnx
@@ -1392,7 +1391,7 @@ implicit none
 
 
   pure subroutine BOUND_CONDU2(U)
-  real(KND),intent(INOUT):: U(-2:,-2:,-2:)
+  real(KND),intent(inout):: U(-2:,-2:,-2:)
   integer i,j,k,nx,ny,nz
 
   nx=Unx
@@ -1810,7 +1809,7 @@ implicit none
 
 
   pure subroutine BOUND_CONDV2(V)
-  real(KND),intent(INOUT):: V(-2:,-2:,-2:)
+  real(KND),intent(inout):: V(-2:,-2:,-2:)
   integer i,j,k,nx,ny,nz
 
   nx=Vnx
@@ -2227,7 +2226,7 @@ implicit none
 
 
   pure subroutine BOUND_CONDW2(W)
-  real(KND),intent(INOUT):: W(-2:,-2:,-2:)
+  real(KND),intent(inout):: W(-2:,-2:,-2:)
   integer i,j,k,nx,ny,nz
 
   nx=Wnx
@@ -2646,7 +2645,7 @@ implicit none
 
 
   pure subroutine BOUND_Phi(Phi)
-  real(KND),intent(INOUT):: Phi(0:,0:,0:)
+  real(KND),intent(inout):: Phi(0:,0:,0:)
   integer i,j,k,nx,ny,nz
    nx=Prnx
    ny=Prny
@@ -2739,7 +2738,7 @@ implicit none
   end subroutine BOUND_Phi
 
   pure subroutine BOUND_Pr(Pr)
-  real(KND),intent(INOUT):: Pr(1:,1:,1:)
+  real(KND),intent(inout):: Pr(1:,1:,1:)
   integer i,j,k,nx,ny,nz
 
   nx=Prnx
@@ -2793,7 +2792,7 @@ implicit none
 
 
   pure subroutine BOUND_Q(Phi)
-  real(KND),intent(INOUT):: Phi(0:,0:,0:)
+  real(KND),intent(inout):: Phi(0:,0:,0:)
   integer i,j,k,nx,ny,nz
    nx=Prnx
    ny=Prny
@@ -2969,14 +2968,14 @@ implicit none
   nz=Prnz-1
   
   if (xgridfromfile) then
-   OPEN(11,file="xgrid.txt")
+   open(11,file="xgrid.txt")
    j=-1
    do
     read (11,*,iostat=io) P
     if (io==0) then
       j=j+1
     else
-      EXIT
+      exit
     endif
    enddo
    nx=j
@@ -2988,18 +2987,18 @@ implicit none
                         else
                          Unx=Prnx-1
    endif
-   CLOSE(11)
+   close(11)
   endif
 
   if (ygridfromfile) then
-   OPEN(11,file="ygrid.txt")
+   open(11,file="ygrid.txt")
    j=-1
    do
     read (11,*,iostat=io) P
     if (io==0) then
       j=j+1
     else
-      EXIT
+      exit
     endif
    enddo
    ny=j
@@ -3011,11 +3010,11 @@ implicit none
                         else
                          Vny=Prny-1
    endif
-   CLOSE(11)
+   close(11)
   endif
 
   if (zgridfromfile) then
-   OPEN(11,file="zgrid.txt")
+   open(11,file="zgrid.txt")
    j=-1
    do
     read (11,*,iostat=io) P
@@ -3023,7 +3022,7 @@ implicit none
       j=j+1
       write(*,*) j
     else
-      EXIT
+      exit
     endif
    enddo
    nz=j
@@ -3035,7 +3034,7 @@ implicit none
                         else
                          Wnz=Prnz-1
    endif
-   CLOSE(11)
+   close(11)
   endif 
 
 
@@ -3049,12 +3048,12 @@ implicit none
 
 
   if (xgridfromfile) then
-   OPEN(11,file="xgrid.txt")
+   open(11,file="xgrid.txt")
    do j=0,nx
     write(*,*) j
     read(11,*) xU2(j)
    enddo
-   CLOSE(11)
+   close(11)
 
    if (BtypeW==PERIODIC) then
     do j=-1,-3,-1
@@ -3085,11 +3084,11 @@ implicit none
 
 
   if (ygridfromfile) then
-   OPEN(11,file="ygrid.txt")
+   open(11,file="ygrid.txt")
    do j=0,ny
     read(11,*) yV2(j)
    enddo
-   CLOSE(11)
+   close(11)
 
    if (BtypeS==PERIODIC) then
     do j=-1,-3,-1
@@ -3120,11 +3119,11 @@ implicit none
 
 
   if (zgridfromfile) then
-   OPEN(11,file="zgrid.txt")
+   open(11,file="zgrid.txt")
    do j=0,nz
     read(11,*) zW2(j)
    enddo
-   CLOSE(11)
+   close(11)
 
    if (BtypeB==PERIODIC) then
     do j=-1,-3,-1

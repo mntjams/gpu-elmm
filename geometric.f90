@@ -5,72 +5,72 @@ use WALLMODELS
 implicit none
 
 
- TYPE TLine
+ type TLine
    real(KND) xc,yc,zc
    real(KND) a,b,c
- ENDTYPE TLine
+ endtype TLine
 
- TYPE TPlane
+ type TPlane
    real(KND) a,b,c,d !ax+by+cz+d/=0 for inner half-space
    logical gl !T > in ineq. above F < in ineq. above
    logical rough !T rough surface, F flat surface
    real(KND) z0 !roughness parameter
-  ENDTYPE TPlane
+  endtype TPlane
 
-  TYPE TPolyhedron
+  type TPolyhedron
    integer nplanes
-   TYPE(TPlane),dimension(:),allocatable:: Planes !intersection of half-spaces
-  ENDTYPE TPolyhedron
+   type(TPlane),dimension(:),allocatable:: Planes !intersection of half-spaces
+  endtype TPolyhedron
 
-  TYPE TBall
+  type TBall
    real(KND) xc,yc,zc,r
    logical rough !T rough surface, F flat surface
    real(KND) z0 !roughness parameter
-  ENDTYPE TBall
+  endtype TBall
 
-  TYPE TCylJacket
+  type TCylJacket
    real(KND) xc,yc,zc
    real(KND) a,b,c
    real(KND) r
    logical rough !T rough surface, F flat surface
    real(KND) z0 !roughness parameter
-  ENDTYPE TCylJacket
+  endtype TCylJacket
 
-  TYPE TCylinder
-   TYPE(TCylJacket) Jacket
-   TYPE(TPlane),pointer:: Plane1 => null() ,Plane2 => null()
-  ENDTYPE TCylinder
+  type TCylinder
+   type(TCylJacket) Jacket
+   type(TPlane),pointer:: Plane1 => null() ,Plane2 => null()
+  endtype TCylinder
 
 
- TYPE TTerrainPoint
+ type TTerrainPoint
   real(KND) elev
   logical:: rough=.false.
   real(KND) z0
- ENDTYPE TTerrainPoint
+ endtype TTerrainPoint
 
 
-  TYPE TTerrain
-   TYPE(TTerrainPoint),DIMENSION(:,:),ALLOCATABLE:: UTerrPoints,VTerrPoints,PrTerrPoints
-  ENDTYPE TTerrain
+  type TTerrain
+   type(TTerrainPoint),dimension(:,:),allocatable:: UTerrPoints,VTerrPoints,PrTerrPoints
+  endtype TTerrain
 
- TYPE TSolidBody
+ type TSolidBody
   integer numofbody
   integer:: typeofbody=0 !0.. none, 1..polyhedron, 2.. ball, 3.. cylinder, 4.. terrain
-  TYPE(TPolyhedron),pointer:: Polyhedron => null() !asociated will be only part writen in typeofbody
-  TYPE(TBall),pointer:: Ball => null()
-  TYPE(TCylinder),pointer:: Cylinder => null()
-  TYPE(TTerrain),pointer:: Terrain => null()
+  type(TPolyhedron),pointer:: Polyhedron => null() !asociated will be only part writen in typeofbody
+  type(TBall),pointer:: Ball => null()
+  type(TCylinder),pointer:: Cylinder => null()
+  type(TTerrain),pointer:: Terrain => null()
   logical:: rough=.false. !T rough surface, F flat surface
   real(KND) z0 !roughness parameter
-  TYPE(TSolidBody),pointer:: next =>null()
- ENDTYPE TSolidbody
+  type(TSolidBody),pointer:: next =>null()
+ endtype TSolidbody
 
- TYPE(TSolidBody),pointer:: FirstSB => null() !First member of the linked list of solid objects
+ type(TSolidBody),pointer:: FirstSB => null() !First member of the linked list of solid objects
   
  
 
 
- TYPE TIBPoint
+ type TIBPoint
   integer component !1..U, 2..V, 3..W
   integer x
   integer y
@@ -84,10 +84,10 @@ implicit none
   integer interp !kind of interp. 0.. none (boundarypint), 1..linear, 2..bilinear, 3..trilinear
   integer interpdir
   real(KND) MSourc
-  TYPE(TIBPoint),pointer:: next => null()
- ENDTYPE TIBPoint
+  type(TIBPoint),pointer:: next => null()
+ endtype TIBPoint
 
- TYPE TScalFlIBPoint
+ type TScalFlIBPoint
   integer x
   integer y
   integer z
@@ -100,7 +100,7 @@ implicit none
   real(KND) ScalSourc !virtual scalar source
   real(KND):: Flux=0 !desired scalar flux
   type(TScalFlIBPoint),pointer::next=>null()
- ENDTYPE TScalFlIBPoint
+ endtype TScalFlIBPoint
 
 
  type(TIBPoint),pointer::FirstIBPoint=>null(), LastIBPoint=>null()
@@ -111,7 +111,7 @@ contains
 
   subroutine SetCurrentSB(SB,n)
   type(TSolidBody),pointer:: SB
-  integer(SINT),intent(IN):: n
+  integer(SINT),intent(in):: n
   integer i
 
    SB=>FirstSB
@@ -120,15 +120,15 @@ contains
      SB=>SB%next
     else
      SB=>null()
-     EXIT
+     exit
     endif
    enddo
   endsubroutine SetCurrentSB
   
   pure logical function PlaneInt(x,y,z,PL,eps)
-   real(KND),intent(IN):: x,y,z
-   TYPE(TPlane),intent(IN):: PL
-   real(KND),optional,intent(IN)::eps
+   real(KND),intent(in):: x,y,z
+   type(TPlane),intent(in):: PL
+   real(KND),optional,intent(in)::eps
    real(KND) eps2
    logical interior
 
@@ -154,9 +154,9 @@ contains
   endfunction PlaneInt
 
   pure logical function PolyhedronInt(x,y,z,PH,eps)
-   real(KND),intent(IN):: x,y,z
-   TYPE(TPolyhedron),intent(IN):: PH
-   real(KND),optional,intent(IN)::eps
+   real(KND),intent(in):: x,y,z
+   type(TPolyhedron),intent(in):: PH
+   real(KND),optional,intent(in)::eps
    logical interior
    integer i
 
@@ -168,7 +168,7 @@ contains
      else
       interior=PlaneInt(x,y,z,PH%Planes(i))
      endif
-     if (.not. INTERIOR) EXIT
+     if (.not. INTERIOR) exit
     enddo
    else
     interior=.false.
@@ -177,8 +177,8 @@ contains
   endfunction PolyhedronInt
 
   pure logical function BallInt(x,y,z,B)
-   real(KND),intent(IN):: x,y,z
-   TYPE(TBall),intent(IN):: B
+   real(KND),intent(in):: x,y,z
+   type(TBall),intent(in):: B
    logical interior
 
    if ((B%xc-x)**2+(B%yc-y)**2+(B%zc-z)**2<=(B%r)**2) then
@@ -190,7 +190,7 @@ contains
   endfunction BallInt
 
   pure real(KND) function LineDist(x,y,z,xl,yl,zl,a,b,c)
-   real(KND),intent(IN):: x,y,z,xl,yl,zl,a,b,c
+   real(KND),intent(in):: x,y,z,xl,yl,zl,a,b,c
    real(KND) t
    if (((a/=0).or.(b/=0)).or.(c/=0)) then
     t=(a*(x-xl)+b*(y-yl)+c*(z-zl))/(a**2+b**2+c**2)
@@ -201,8 +201,8 @@ contains
   endfunction LineDist
 
   pure logical function JacketInt(x,y,z,J)
-   real(KND),intent(IN):: x,y,z
-   TYPE(TCylJacket),intent(IN):: J
+   real(KND),intent(in):: x,y,z
+   type(TCylJacket),intent(in):: J
    real(KND) eps
    logical interior
 ! write (*,*) x
@@ -228,8 +228,8 @@ contains
   endfunction JacketInt
 
   pure logical function CylinderInt(x,y,z,C)
-   real(KND),intent(IN):: x,y,z
-   TYPE(TCylinder),intent(IN):: C
+   real(KND),intent(in):: x,y,z
+   type(TCylinder),intent(in):: C
    logical interior
     interior=.true.
     if (.not.JacketInt(x,y,z,C%Jacket)) interior=.false.
@@ -245,8 +245,8 @@ contains
 
 
   pure subroutine TerrGridCoords(x2,y2,xi,yj,comp)
-  real(KND),intent(IN):: x2,y2
-  integer,intent(OUT):: xi,yj,comp
+  real(KND),intent(in):: x2,y2
+  integer,intent(out):: xi,yj,comp
   real(KND) x,y,distPr,distU,distV
   integer xPri,yPrj,xUi,yVj,i
 
@@ -257,7 +257,7 @@ contains
    do i=1,Prnx
     if (xU(i-1)>=x) then
                   xPri=i
-                  EXIT
+                  exit
                  endif
    enddo
 
@@ -265,7 +265,7 @@ contains
    do i=1,Prny
     if (yV(i-1)>=y) then
                   yPrj=i
-                  EXIT
+                  exit
                  endif
    enddo
 
@@ -273,7 +273,7 @@ contains
    do i=0,Prnx+1
     if (xPr(i)>=x) then
                   xUi=i
-                  EXIT
+                  exit
                  endif
    enddo
 
@@ -281,7 +281,7 @@ contains
    do i=0,Prny+1
     if (yPr(i)>=y) then
                   yVj=i
-                  EXIT
+                  exit
                  endif
    enddo
 
@@ -308,8 +308,8 @@ contains
 
 
   pure logical function TerrainInt(x,y,z,T)
-   real(KND),intent(IN):: x,y,z
-   TYPE(TTerrain),intent(IN):: T
+   real(KND),intent(in):: x,y,z
+   type(TTerrain),intent(in):: T
    logical interior
    integer xi,yj,comp
    interior=.false.
@@ -327,9 +327,9 @@ contains
 
     
   pure logical function SolidBodyInt(x,y,z,SB)
-   real(KND),intent(IN):: x,y,z
+   real(KND),intent(in):: x,y,z
    real(KND) x2,y2,z2
-   TYPE(TSolidBody),intent(IN):: SB
+   type(TSolidBody),intent(in):: SB
 
    x2=x
    y2=y
@@ -381,7 +381,7 @@ contains
 
   subroutine PlaneNearest(xnear,ynear,znear,x,y,z,PL)
    real(KND) xnear,ynear,znear,x,y,z
-   TYPE(TPlane):: PL
+   type(TPlane):: PL
    real(KND) t
    
    if (((PL%a/=0).or.(PL%b/=0)).or.(PL%c/=0)) then
@@ -398,7 +398,7 @@ contains
 
   subroutine JacketNearest(xnear,ynear,znear,x,y,z,J)
    real(KND) xnear,ynear,znear,x,y,z
-   TYPE(TCylJacket):: J
+   type(TCylJacket):: J
    real(KND) t,xl,yl,zl,a,b,c
 
    call LineNearest(xl,yl,zl,x,y,z,J%xc,J%yc,J%zc,J%a,J%b,J%c)
@@ -415,7 +415,7 @@ contains
 
   subroutine CylinderNearest(xnear,ynear,znear,x,y,z,C) !only for planes perpendicular to the axis
    real(KND) xnear,ynear,znear,x,y,z
-   TYPE(TCylinder):: C
+   type(TCylinder):: C
    real(KND) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
   
    !!!Only for Planes perpendicular to jacket!!!!
@@ -467,7 +467,7 @@ contains
 
   subroutine BallNearest(xnear,ynear,znear,x,y,z,Bl)
    real(KND) xnear,ynear,znear,x,y,z
-   TYPE(TBall):: Bl
+   type(TBall):: Bl
    real(KND) t,a,b,c
 
    a=x-Bl%xc
@@ -627,7 +627,7 @@ contains
   subroutine TerrainNearest(xnear,ynear,znear,x,y,z,T)
    real(KND) xnear,ynear,znear
    real(KND) x,y,z
-   TYPE(TTerrain):: T
+   type(TTerrain):: T
    integer xi,yj,comp
 
    xnear=x
@@ -641,9 +641,9 @@ contains
 
 
   subroutine SolidBodyNearest(xnear,ynear,znear,x,y,z,SB)
-   real(KND),INTENT(OUT):: xnear,ynear,znear
+   real(KND),intent(out):: xnear,ynear,znear
    real(KND) x,y,z
-   TYPE(TSolidBody):: SB
+   type(TSolidBody):: SB
    
    select case (SB%typeofbody)
     case (1)
@@ -663,7 +663,7 @@ contains
 
   subroutine CylinderNearestOut(xnear,ynear,znear,x,y,z,C) !only for planes perpendicular to the axis
    real(KND) xnear,ynear,znear,x,y,z
-   TYPE(TCylinder):: C
+   type(TCylinder):: C
    real(KND) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
   
    if (associated(C%Plane1)) then
@@ -732,11 +732,11 @@ contains
 
 
   subroutine SolidBodyNearestOut(xnear,ynear,znear,x,y,z,SB)
-   real(KND),INTENT(OUT):: xnear,ynear,znear
+   real(KND),intent(out):: xnear,ynear,znear
    real(KND) x,y,z
-   TYPE(TSolidBody):: SB
+   type(TSolidBody):: SB
 
-  xnear=-1E+9;ynear=-1E+9;znear=-1E+9
+  xnear=-1e+9;ynear=-1e+9;znear=-1e+9
 
   select case (SB%typeofbody)
     case (1)
@@ -761,8 +761,8 @@ contains
   integer i,j,k,m,n,o
   integer(SINT) nb
   real(KND) dist,nearx,neary,nearz
-  TYPE(TSolidBody),pointer:: CurrentSB => null()
-  TYPE(WMPOINT):: WMP
+  type(TSolidBody),pointer:: CurrentSB => null()
+  type(WMPOINT):: WMP
 
    !find if the gridpoints lie inside a solid body and write it's number
    !do not nullifie the .type arrays, they could have been made nonzero by other unit
@@ -778,7 +778,7 @@ contains
       enddo
      enddo
     else
-      EXIT
+      exit
     endif
     CurrentSB=>CurrentSB%next
    enddo
@@ -794,7 +794,7 @@ contains
       enddo
      enddo
     else
-      EXIT
+      exit
     endif
     CurrentSB=>CurrentSB%next
    enddo
@@ -810,7 +810,7 @@ contains
       enddo
      enddo
     else
-      EXIT
+      exit
     endif
     CurrentSB=>CurrentSB%next
    enddo
@@ -826,7 +826,7 @@ contains
       enddo
      enddo
     else
-      EXIT
+      exit
     endif
     CurrentSB=>CurrentSB%next
    enddo
@@ -901,7 +901,7 @@ contains
   integer i,j,k
   character(70):: str
   character(8):: fname
-  TYPE(TSolidBody),pointer:: CurrentSB => null()
+  type(TSolidBody),pointer:: CurrentSB => null()
   real(KND) a,b,a2,b2,phi
 
      
@@ -1439,7 +1439,7 @@ contains
 
 
   subroutine InitChannelIT1
-  TYPE(TSolidBody),pointer:: CurrentSB => null()
+  type(TSolidBody),pointer:: CurrentSB => null()
   integer i
 
     allocate(CurrentSB)
@@ -1485,7 +1485,7 @@ contains
 
 
   subroutine InitChannelIT2
-  TYPE(TSolidBody),pointer:: CurrentSB => null()
+  type(TSolidBody),pointer:: CurrentSB => null()
   integer i
   real(KND) x, d1, d2
     allocate(CurrentSB)
@@ -1599,7 +1599,7 @@ contains
 
 
   subroutine NearestOnLineOut(x,y,z,x2,y2,z2,t,SB)
-  TYPE(TSolidBody):: SB
+  type(TSolidBody):: SB
   real(KND):: x,y,z,x2,y2,z2,t,t1,t2
   integer i
 
@@ -1608,7 +1608,7 @@ contains
   if (SolidBodyInt(x2,y2,z2,SB)) then
    do
     t2=t2*2
-    if (.not.SolidBodyInt(x+(x2-x)*t2,y+(y2-y)*t2,z+(z2-z)*t2,SB)) EXIT
+    if (.not.SolidBodyInt(x+(x2-x)*t2,y+(y2-y)*t2,z+(z2-z)*t2,SB)) exit
    enddo
   endif
 
@@ -1619,7 +1619,7 @@ contains
    else
     t2=t
    endif
-   if (abs(t1-t2)<MIN(dxmin/1000._KND,dymin/1000._KND,dzmin/1000._KND)) EXIT
+   if (abs(t1-t2)<MIN(dxmin/1000._KND,dymin/1000._KND,dzmin/1000._KND)) exit
   enddo
   t=1
   endsubroutine NearestOnLineOut
@@ -1627,8 +1627,8 @@ contains
 
 
   subroutine GetUIBPoint(IBP,xi,yj,zk)
-  TYPE(TIBPoint) IBP
-  TYPE(TSolidBody),pointer:: SB
+  type(TIBPoint) IBP
+  type(TSolidBody),pointer:: SB
   integer xi,yj,zk,dirx,diry,dirz,n1,n2
   real(KND) x,y,z,xnear,ynear,znear,t
   logical free100,free010,free001
@@ -1830,8 +1830,8 @@ contains
 
 
   subroutine GetVIBPoint(IBP,xi,yj,zk)
-  TYPE(TIBPoint) IBP
-  TYPE(TSolidBody),pointer:: SB
+  type(TIBPoint) IBP
+  type(TSolidBody),pointer:: SB
   integer xi,yj,zk,dirx,diry,dirz,n1,n2
   real(KND) x,y,z,xnear,ynear,znear,t
   logical free100,free010,free001
@@ -2027,8 +2027,8 @@ contains
 
 
   subroutine GetWIBPoint(IBP,xi,yj,zk)
-  TYPE(TIBPoint) IBP
-  TYPE(TSolidBody),pointer:: SB
+  type(TIBPoint) IBP
+  type(TSolidBody),pointer:: SB
   integer xi,yj,zk,dirx,diry,dirz,n1,n2
   real(KND) x,y,z,xnear,ynear,znear,t
   logical free100,free010,free001
@@ -2226,8 +2226,8 @@ contains
 
 
   subroutine GeTScalIFlBPoint(IBP,xi,yj,zk)
-  TYPE(TScalFlIBPoint) IBP
-  TYPE(TSolidBody),pointer:: SB
+  type(TScalFlIBPoint) IBP
+  type(TSolidBody),pointer:: SB
   integer xi,yj,zk,dirx,diry,dirz,dirx2,diry2,dirz2,n1,n2
   real(KND) x,y,z,xnear,ynear,znear,distx,disty,distz,t,tx,ty,tz
   logical freep00,free0p0,free00p,freem00,free0m0,free00m
@@ -2482,8 +2482,8 @@ contains
 
 
   subroutine InitImBoundaries
-  TYPE(TIBPoint) IBP
-  TYPE(TScalFlIBPoint) SIBP
+  type(TIBPoint) IBP
+  type(TScalFlIBPoint) SIBP
   integer i,j,k
 
 
@@ -2614,88 +2614,88 @@ contains
 
 
 !Nahradit vlastni implementaci!!!!!
-SUBROUTINE LEGS (A,N,B,X,INDX)
+subroutine LEGS (A,N,B,X,INDX)
 !
 ! Subroutine to solve the equation A(N,N)*X(N) = B(N) with the
 ! partial-pivoting Gaussian elimination scheme.
 ! Copyright (c) Tao Pang 2001.
 !
-  IMPLICIT NONE
-  INTEGER, INTENT (IN) :: N
-  INTEGER :: I,J
-  INTEGER, INTENT (OUT), DIMENSION (N) :: INDX
-  real(KND), INTENT (INOUT), DIMENSION (N,N) :: A
-  real(KND), INTENT (INOUT), DIMENSION (N) :: B
-  real(KND), INTENT (OUT), DIMENSION (N) :: X
+  implicit none
+  integer, intent (in) :: N
+  integer :: I,J
+  integer, intent (out), dimension (N) :: INDX
+  real(KND), intent (inout), dimension (N,N) :: A
+  real(KND), intent (inout), dimension (N) :: B
+  real(KND), intent (out), dimension (N) :: X
 !
-  CALL ELGS (A,N,INDX)
+  call ELGS (A,N,INDX)
 !
-  DO I = 1, N-1
-    DO J = I+1, N
+  do I = 1, N-1
+    do J = I+1, N
       B(INDX(J)) = B(INDX(J))-A(INDX(J),I)*B(INDX(I))
-    END DO
-  END DO
+    end do
+  end do
 !
   X(N) = B(INDX(N))/A(INDX(N),N)
-  DO I = N-1, 1, -1
+  do I = N-1, 1, -1
     X(I) = B(INDX(I))
-    DO J = I+1, N
+    do J = I+1, N
       X(I) = X(I)-A(INDX(I),J)*X(J)
-    END DO
+    end do
     X(I) =  X(I)/A(INDX(I),I)
-  END DO
+  end do
 !
-END SUBROUTINE LEGS
+end subroutine LEGS
 !
-SUBROUTINE ELGS (A,N,INDX)
+subroutine ELGS (A,N,INDX)
 !
 ! Subroutine to perform the partial-pivoting Gaussian elimination.
 ! A(N,N) is the original matrix in the input and transformed matrix
 ! plus the pivoting element ratios below the diagonal in the output.
 ! INDX(N) records the pivoting order.  Copyright (c) Tao Pang 2001.
 !
-  IMPLICIT NONE
-  INTEGER, INTENT (IN) :: N
-  INTEGER :: I,J,K,ITMP
-  INTEGER, INTENT (OUT), DIMENSION (N) :: INDX
+  implicit none
+  integer, intent (in) :: N
+  integer :: I,J,K,ITMP
+  integer, intent (out), dimension (N) :: INDX
   real(KND) :: C1,PI,PI1,PJ
-  real(KND), INTENT (INOUT), DIMENSION (N,N) :: A
-  real(KND), DIMENSION (N) :: C
+  real(KND), intent (inout), dimension (N,N) :: A
+  real(KND), dimension (N) :: C
 !
 ! Initialize the index
 !
-  DO I = 1, N
+  do I = 1, N
     INDX(I) = I
-  END DO
+  end do
 !
 ! Find the rescaling factors, one from each row
 !
-  DO I = 1, N
+  do I = 1, N
     C1= 0.0
-    DO J = 1, N
+    do J = 1, N
       C1 = MAX(C1,ABS(A(I,J)))
-    END DO
+    end do
     C(I) = C1
-  END DO
+  end do
 !
 ! Search the pivoting (largest) element from each column
 !
-  DO J = 1, N-1
+  do J = 1, N-1
     PI1 = 0.0
-    DO I = J, N
+    do I = J, N
       PI = ABS(A(INDX(I),J))/C(INDX(I))
-      IF (PI.GT.PI1) THEN
+      if (PI.gt.PI1) then
         PI1 = PI
         K   = I
-      ENDIF
-    END DO
+      endif
+    end do
 !
 ! Interchange the rows via INDX(N) to record pivoting order
 !
     ITMP    = INDX(J)
     INDX(J) = INDX(K)
     INDX(K) = ITMP
-    DO I = J+1, N
+    do I = J+1, N
       PJ  = A(INDX(I),J)/A(INDX(J),J)
 !
 ! Record pivoting ratios below the diagonal
@@ -2704,12 +2704,12 @@ SUBROUTINE ELGS (A,N,INDX)
 !
 ! Modify other elements accordingly
 !
-      DO K = J+1, N
+      do K = J+1, N
         A(INDX(I),K) = A(INDX(I),K)-PJ*A(INDX(J),K)
-      END DO
-    END DO
-  END DO
+      end do
+    end do
+  end do
 !
-END SUBROUTINE ELGS
+end subroutine ELGS
 
 endmodule GEOMETRIC

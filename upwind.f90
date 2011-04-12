@@ -6,7 +6,7 @@
 !
 
 
-MODULE UPWIND
+module UPWIND
  use PARAMETERS
  use BOUNDARIES
  implicit none
@@ -350,7 +350,7 @@ MODULE UPWIND
     if (associated(IBP%next)) then
      IBP=>IBP%next
     else
-     EXIT
+     exit
     endif
    enddo
   endif
@@ -530,7 +530,7 @@ MODULE UPWIND
     if (associated(IBP%next)) then
      IBP=>IBP%next
     else
-     EXIT
+     exit
     endif
    enddo
   endif
@@ -709,7 +709,7 @@ MODULE UPWIND
     if (associated(IBP%next)) then
      IBP=>IBP%next
     else
-     EXIT
+     exit
     endif
    enddo
   endif
@@ -2712,4 +2712,4 @@ MODULE UPWIND
  
 
 
-END MODULE upwind
+end module upwind
