@@ -107,15 +107,7 @@ contains
     call ADVSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),U2,V2,W2,2,1._KND)
    enddo
    SCALAR=SCALAR+SCALAR_2
-   if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
-    endforall
-   else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
-    endforall
-   endif
+   call ComputeTDiff(U2,V2,W2)
    call Bound_Visc(TDiff)
    do i=1,computescalars
     call DIFFSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),2,1._KND)
@@ -126,15 +118,7 @@ contains
   endif
     
   if (buoyancy>0) then
-   if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
-    endforall
-   else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
-    endforall
-   endif
+   call ComputeTDiff(U2,V2,W2)
    call Bound_Visc(TDiff)
    temperature2=0
    call Bound_Temp(temperature)
@@ -352,15 +336,7 @@ contains
     call ADVSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),U2,V2,W2,2,1._KND)
    enddo
    SCALAR=SCALAR+SCALAR_2
-   if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
-    endforall
-   else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
-    endforall
-   endif
+   call ComputeTDiff(U2,V2,W2)
    call Bound_Visc(TDiff)
     do i=1,computescalars
      call DIFFSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),2,1._KND)
@@ -371,15 +347,7 @@ contains
   endif
 
   if (buoyancy>0) then
-   if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
-    endforall
-   else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
-    endforall
-   endif
+   call ComputeTDiff(U2,V2,W2)
    call Bound_Visc(TDiff)
    temperature2=0
    call Bound_Temp(temperature)
@@ -431,7 +399,7 @@ contains
                 LBOUND(SCALAR,3):UBOUND(SCALAR,3),LBOUND(SCALAR,4):UBOUND(SCALAR,4))::SCALAR_adv,SCALAR_2
   real(KND),dimension(LBOUND(TEMPERATURE,1):UBOUND(TEMPERATURE,1),LBOUND(TEMPERATURE,2):UBOUND(TEMPERATURE,2),&
    LBOUND(TEMPERATURE,3):UBOUND(TEMPERATURE,3))::TEMPERATURE_adv,TEMPERATURE2
-  real(KND),dimension(1:3),save:: alpha,gamma,rho
+  real(KND),dimension(1:3),save:: alpha,beta,rho
   integer i,j,k,l
   real(KND) p
   integer,save:: called=0
@@ -441,9 +409,9 @@ contains
   alpha(1)=4._KND/15._KND
   alpha(2)=1._KND/15._KND
   alpha(3)=1._KND/6._KND
-  gamma(1)=8._KND/15._KND
-  gamma(2)=5._KND/12._KND
-  gamma(3)=3._KND/4._KND
+  beta(1)=8._KND/15._KND
+  beta(2)=5._KND/12._KND
+  beta(3)=3._KND/4._KND
   rho(1)=0
   rho(2)=-17._KND/60._KND
   rho(3)=-5._KND/12._KND
@@ -501,9 +469,9 @@ contains
    call CoriolisForce(Ustar,Vstar,U,V,1._KND)
    if (buoyancy==1) call BuoyancyForce(Wstar,temperature,1._KND)
 
-   U2=U2+Ustar*gamma(l)
-   V2=V2+Vstar*gamma(l)
-   W2=W2+Wstar*gamma(l)
+   U2=U2+Ustar*beta(l)
+   V2=V2+Vstar*beta(l)
+   W2=W2+Wstar*beta(l)
   endif
 
 
@@ -549,44 +517,28 @@ contains
    do i=1,computescalars
     call KAPPASCALAR(SCALAR_adv(:,:,:,i),SCALAR(:,:,:,i),U2,V2,W2,2,1._KND)
    enddo
-   SCALAR_2=SCALAR_2+SCALAR_adv*gamma(l)
+   SCALAR_2=SCALAR_2+SCALAR_adv*beta(l)
 
    if (pointscalsource==1) then
     do i=1,computescalars
      SCALAR_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)=SCALAR_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
-      percdistrib(i)*(rho(l)+gamma(l))*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
+      percdistrib(i)*(rho(l)+beta(l))*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
     enddo
    endif
 
    SCALAR=SCALAR+SCALAR_2
-   if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
-    endforall
-   else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
-    endforall
-   endif
+   call ComputeTDiff(U2,V2,W2)
    call Bound_Visc(TDiff)
-    do i=1,computescalars
+   do i=1,computescalars
       call DIFFSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),2,2._KND*alpha(l))
-    enddo
-    if (computedeposition>0) call Deposition(SCALAR_2,2._KND*alpha(l))
-    if (computegravsettling>0) call Gravsettling(SCALAR_2,2._KND*alpha(l))
+   enddo
+   if (computedeposition>0) call Deposition(SCALAR_2,2._KND*alpha(l))
+   if (computegravsettling>0) call Gravsettling(SCALAR_2,2._KND*alpha(l))
    SCALAR=SCALAR_2
   endif
 
   if (buoyancy>0) then
-   if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
-    endforall
-   else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
-    endforall
-   endif
+   call ComputeTDiff(U2,V2,W2)
    call Bound_Visc(TDiff)
    temperature2=0
    call Bound_Temp(temperature)
@@ -596,7 +548,7 @@ contains
    endif
    temperature_adv=0
    call KAPPASCALAR(temperature_adv,temperature,U2,V2,W2,1,1._KND)
-   temperature2=temperature2+temperature_adv*gamma(l)
+   temperature2=temperature2+temperature_adv*beta(l)
 
    temperature=temperature+temperature2
    call Bound_Temp(temperature)
@@ -627,8 +579,19 @@ contains
   
 
 
-
-
+  subroutine ComputeTDiff(U,V,W)
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  integer:: i,j,k
+   if (Re>0) then
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
+     TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
+    end forall
+   else
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
+     TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
+    end forall
+   endif
+  end subroutine ComputeTDiff
 
 
 
