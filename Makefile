@@ -19,7 +19,7 @@ FFLAGS = $(BASICOPTS)
 
 
 # Define the target directories.
-TARGETDIR_CLMM=bin/sun/debug
+TARGETDIR_CLMM=../bin/sun/debug
 
 
 all: $(TARGETDIR_CLMM)/CLMM
@@ -61,26 +61,26 @@ $(TARGETDIR_CLMM)/CLMM: $(TARGETDIR_CLMM) $(OBJS_CLMM) $(DEPLIBS_CLMM)
 
 
 # Compile source files into .o files
-$(TARGETDIR_CLMM)/mudcom.o: $(TARGETDIR_CLMM) MUDPACK-5.0.1/mudcom.f
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ MUDPACK-5.0.1/mudcom.f
+$(TARGETDIR_CLMM)/mudcom.o: $(TARGETDIR_CLMM) ../MUDPACK-5.0.1/mudcom.f
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../MUDPACK-5.0.1/mudcom.f
 
-$(TARGETDIR_CLMM)/mud3sp.o: $(TARGETDIR_CLMM) MUDPACK-5.0.1/mud3sp.f
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ MUDPACK-5.0.1/mud3sp.f
+$(TARGETDIR_CLMM)/mud3sp.o: $(TARGETDIR_CLMM) ../MUDPACK-5.0.1/mud3sp.f
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../MUDPACK-5.0.1/mud3sp.f
 
-$(TARGETDIR_CLMM)/dmudcom.o: $(TARGETDIR_CLMM) MUDPACK-dp/mudcom.f
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ MUDPACK-dp/mudcom.f
+$(TARGETDIR_CLMM)/dmudcom.o: $(TARGETDIR_CLMM) ../MUDPACK-dp/mudcom.f
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../MUDPACK-dp/mudcom.f
 
-$(TARGETDIR_CLMM)/dmud3sp.o: $(TARGETDIR_CLMM) MUDPACK-dp/mud3sp.f
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ MUDPACK-dp/mud3sp.f
+$(TARGETDIR_CLMM)/dmud3sp.o: $(TARGETDIR_CLMM) ../MUDPACK-dp/mud3sp.f
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../MUDPACK-dp/mud3sp.f
 
-$(TARGETDIR_CLMM)/fftpack.o: $(TARGETDIR_CLMM) fishpack4/fftpack.f
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ fishpack4/fftpack.f
+$(TARGETDIR_CLMM)/fftpack.o: $(TARGETDIR_CLMM) ../fishpack4/fftpack.f
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../fishpack4/fftpack.f
 
-$(TARGETDIR_CLMM)/pois3d.o: $(TARGETDIR_CLMM) fishpack4/pois3d.f
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ fishpack4/pois3d.f
+$(TARGETDIR_CLMM)/pois3d.o: $(TARGETDIR_CLMM) ../fishpack4/pois3d.f
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../fishpack4/pois3d.f
 
-$(TARGETDIR_CLMM)/hw3crt.o: $(TARGETDIR_CLMM) fishpack4/hw3crt.f
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ fishpack4/hw3crt.f
+$(TARGETDIR_CLMM)/hw3crt.o: $(TARGETDIR_CLMM) ../fishpack4/hw3crt.f
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../fishpack4/hw3crt.f
 
 $(TARGETDIR_CLMM)/parameters.o: $(TARGETDIR_CLMM) parameters.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ parameters.f90
