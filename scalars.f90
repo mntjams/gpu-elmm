@@ -484,7 +484,7 @@ contains
   real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in):: sctype
 
-   if (gridtype==uniformgrid)
+   if (gridtype==uniformgrid) then
     call KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef)
    else
     call KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef)
@@ -736,8 +736,10 @@ contains
   real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
   real(KND),intent(in):: coef
   integer,intent(in):: sctype
+  real(KND) Scal3(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
   integer nx,ny,nz,i,j,k,l
-  real(KND) p,S,A,Ap(-1:Prnx+1,-1:Prny+1,-1:Prnz+1),Scal3(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
+  real(KND) p,S
+  real(KND) A,Ax,Ay,Az,Ap(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
   type(TScalFlIBPoint),pointer::SFlIBP
 
    nx=Prnx
