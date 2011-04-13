@@ -1,10 +1,13 @@
 module PARAMETERS
 implicit none
-  integer,parameter :: DBL=KIND(1.0D0),SNG=KIND(1.0e0),KND=SNG,SINT=selected_int_kind(2),SLOG=SINT !KND is default real kind for the whole program
+  integer,parameter :: DBL=KIND(1.0D0),SNG=KIND(1.0e0)
+  integer,parameter :: KND=SNG                                         !KND is default real kind for the whole program
+  integer,parameter :: SINT=KND !selected_int_kind(2)                  !To save memory a smaller type can be used for some integer and logical arrays
+  integer,parameter :: SLOG=SINT                                       !This can have some negative effect on speed however
   real(KND) :: pi !computed at the first line of main
   real(KND),parameter :: Karman=0.41
   real(KND),parameter :: BoltzC=1.3806503e-23
-  !integer nx,ny,nz
+
   real(DBL) dt,starttime,endtime        !active time step
   real(KND) dxmin,dymin,dzmin,lx,ly,lz,CFL,Uref  !minimum grid spacing, dimensions of the domain
   real(KND) Re,Prandtl !1/molecular viscosity, viscosity/thermal diffusivity

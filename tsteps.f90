@@ -20,9 +20,9 @@ contains
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND),intent(out):: delta
   real(KND),allocatable,dimension(:,:,:),save:: Q
-  real(KND),dimension(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),LBOUND(U,3):UBOUND(U,3)):: U2
-  real(KND),dimension(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),LBOUND(V,3):UBOUND(V,3)):: V2
-  real(KND),dimension(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),LBOUND(W,3):UBOUND(W,3)):: W2
+  real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: U2
+  real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: V2
+  real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: W2
   integer i,j,k
   real(KND),allocatable,dimension(:,:,:,:),save:: SCALAR_2
   real(KND),allocatable,dimension(:,:,:),save:: temperature2
@@ -42,9 +42,9 @@ contains
 
   if ((BtypeW==TURBULENTINLET).or.(BtypeE==TURBULENTINLET)) call GETTURBINLET
  
-  call BOUND_CONDU(U)
-  call BOUND_CONDV(V)
-  call BOUND_CONDW(W)
+  call Bound_CondU(U)
+  call Bound_CondV(V)
+  call Bound_CondW(W)
   if (buoyancy==1)  call Bound_Temp(temperature)
 
  
@@ -87,9 +87,9 @@ contains
   
  
   
-  call BOUND_CONDU(U2)
-  call BOUND_CONDV(V2)
-  call BOUND_CONDW(W2)
+  call Bound_CondU(U2)
+  call Bound_CondV(V2)
+  call Bound_CondW(W2)
 
   if (poissmet>0) then
   if (masssourc==1) then
@@ -148,12 +148,12 @@ contains
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND),intent(out):: delta
   real(KND),allocatable,dimension(:,:,:),save:: Q
-  real(KND),dimension(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),&
-                                              LBOUND(U,3):UBOUND(U,3)):: U2,Ustar
-  real(KND),dimension(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),&
-                                              LBOUND(V,3):UBOUND(V,3)):: V2,Vstar
-  real(KND),dimension(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),&
-                                              LBOUND(W,3):UBOUND(W,3)):: W2,Wstar
+  real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),&
+                                              lbound(U,3):ubound(U,3)):: U2,Ustar
+  real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),&
+                                              lbound(V,3):ubound(V,3)):: V2,Vstar
+  real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),&
+                                              lbound(W,3):ubound(W,3)):: W2,Wstar
   real(KND) p,odey2,odeystar
   integer i,j,k
   real(KND),allocatable,dimension(:,:,:,:),save:: SCALAR_2
@@ -174,9 +174,9 @@ contains
   
   if ((BtypeW==TURBULENTINLET).or.(BtypeE==TURBULENTINLET)) call GETTURBINLET
 
-  call BOUND_CONDU(U)
-  call BOUND_CONDV(V)
-  call BOUND_CONDW(W)
+  call Bound_CondU(U)
+  call Bound_CondV(V)
+  call Bound_CondW(W)
   if (buoyancy==1)  call Bound_Temp(temperature)
 
   
@@ -240,9 +240,9 @@ contains
   endif
    
 
-  call BOUND_CONDU(U2)
-  call BOUND_CONDV(V2)
-  call BOUND_CONDW(W2)
+  call Bound_CondU(U2)
+  call Bound_CondV(V2)
+  call Bound_CondW(W2)
   
 
   if (poissmet>0) then
@@ -254,9 +254,9 @@ contains
   endif
 
   
-  call BOUND_CONDU(U2)
-  call BOUND_CONDV(V2)
-  call BOUND_CONDW(W2)
+  call Bound_CondU(U2)
+  call Bound_CondV(V2)
+  call Bound_CondW(W2)
   
   
 
@@ -389,16 +389,16 @@ contains
   real(KND),intent(out):: delta
 
   real(KND),allocatable,dimension(:,:,:),save:: Q
-  real(KND),dimension(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),&
-                                              LBOUND(U,3):UBOUND(U,3))::U2,Ustar
-  real(KND),dimension(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),&
-                                              LBOUND(V,3):UBOUND(V,3))::V2,Vstar
-  real(KND),dimension(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),&
-                                              LBOUND(W,3):UBOUND(W,3))::W2,Wstar
-  real(KND),dimension(LBOUND(SCALAR,1):UBOUND(SCALAR,1),LBOUND(SCALAR,2):UBOUND(SCALAR,2),&
-                LBOUND(SCALAR,3):UBOUND(SCALAR,3),LBOUND(SCALAR,4):UBOUND(SCALAR,4))::SCALAR_adv,SCALAR_2
-  real(KND),dimension(LBOUND(TEMPERATURE,1):UBOUND(TEMPERATURE,1),LBOUND(TEMPERATURE,2):UBOUND(TEMPERATURE,2),&
-   LBOUND(TEMPERATURE,3):UBOUND(TEMPERATURE,3))::TEMPERATURE_adv,TEMPERATURE2
+  real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),&
+                                              lbound(U,3):ubound(U,3))::U2,Ustar
+  real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),&
+                                              lbound(V,3):ubound(V,3))::V2,Vstar
+  real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),&
+                                              lbound(W,3):ubound(W,3))::W2,Wstar
+  real(KND),dimension(lbound(SCALAR,1):ubound(SCALAR,1),lbound(SCALAR,2):ubound(SCALAR,2),&
+                lbound(SCALAR,3):ubound(SCALAR,3),lbound(SCALAR,4):ubound(SCALAR,4))::SCALAR_adv,SCALAR_2
+  real(KND),dimension(lbound(TEMPERATURE,1):ubound(TEMPERATURE,1),lbound(TEMPERATURE,2):ubound(TEMPERATURE,2),&
+   lbound(TEMPERATURE,3):ubound(TEMPERATURE,3))::TEMPERATURE_adv,TEMPERATURE2
   real(KND),dimension(1:3),save:: alpha,beta,rho
   integer i,j,k,l
   real(KND) p
@@ -420,9 +420,9 @@ contains
   if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
  endif
 
-  call BOUND_CONDU(U)
-  call BOUND_CONDV(V)
-  call BOUND_CONDW(W)
+  call Bound_CondU(U)
+  call Bound_CondV(V)
+  call Bound_CondW(W)
   if (buoyancy==1)  call Bound_Temp(temperature)
 
   if ((BtypeW==TURBULENTINLET).or.(BtypeE==TURBULENTINLET)) call GETTURBINLET
@@ -492,9 +492,9 @@ contains
   endif
    
   
-  call BOUND_CONDU(U2)
-  call BOUND_CONDV(V2)
-  call BOUND_CONDW(W2)
+  call Bound_CondU(U2)
+  call Bound_CondV(V2)
+  call Bound_CondW(W2)
 
 
   if (poissmet>0) then
@@ -1140,10 +1140,10 @@ contains
    real(KND),intent(inout):: U2(-2:,-2:,-2:),V2(-2:,-2:,-2:),W2(-2:,-2:,-2:)
    real(KND),intent(in):: coef
        
-   real(KND),dimension(LBOUND(U,1):UBOUND(U,1),LBOUND(U,2):UBOUND(U,2),LBOUND(U,3):UBOUND(U,3)):: U3, Apu
-   real(KND),dimension(LBOUND(V,1):UBOUND(V,1),LBOUND(V,2):UBOUND(V,2),LBOUND(V,3):UBOUND(V,3)):: V3, ApV
-   real(KND),dimension(LBOUND(W,1):UBOUND(W,1),LBOUND(W,2):UBOUND(W,2),LBOUND(W,3):UBOUND(W,3)):: W3, ApW
-   real(KND) p,S,Su,Sv,Sw,Suavg,Svavg,Swavg,Af,Ap,Apre,Aprn,Aprt,Ap2,Str(3,3)
+   real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: U3
+   real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: V3
+   real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: W3
+   real(KND) p,Af,Ap,Apre,Aprn,Aprt,Ap2,Str(3,3)
 
    integer i,j,k,l,x,y,z
 
@@ -1179,613 +1179,656 @@ contains
    enddo
 
 
-   call BOUND_CONDU2(U2)
-   call BOUND_CONDV2(V2)
-   call BOUND_CONDW2(W2)
+   call Bound_CondU2(U2)
+   call Bound_CondV2(V2)
+   call Bound_CondW2(W2)
 
-  if (Re>0) then
-   !Diffusion using Crank Nicolson 
-   !first approximation using forward Euler
-   !iteration SOR or Gauss-Seidel
-   call BOUND_CONDU(U)
-   call BOUND_CONDV(V)
-   call Bound_CONDW(W)
-   U3=U+U2
-   V3=V+V2
-   W3=W+W2
-   if (sgstype==1) then
-                     call Smag(U,V,W)
-   elseif (sgstype==2) then
-                     call DynSmag(U,V,W)
-   elseif (sgstype==3) then
-                     call VREMAN(U,V,W)
-   else 
-                     Visc=1._KND/Re
-   endif
+Regt0: if (Re>0) then
+     !Diffusion using Crank Nicolson
+     !first approximation using forward Euler
+     !iteration SOR or Gauss-Seidel
 
-   if (debuglevel>0) then               
-    write(*,*) "NUt", SUM(Visc(1:Prnx,1:Prny,1:Prnz))/(Prnx*Prny*Prnz)
-    write(*,*) "maxNUt", MAXVAL(Visc(1:Prnx,1:Prny,1:Prnz))
-    write(*,*) "minNUt", MINVAL(Visc(1:Prnx,1:Prny,1:Prnz))
-   endif
 
-   if (wallmodeltype>0) then
-                   call ComputeViscsWM(U,V,W,Pr)
-   endif
-   call ScalFlSourc(Visc,3)
-
-   Ap=coef*dt
-   if (fullstress==1) then
-    do k=0,Prnz+1
-     do j=0,Prny+1
-      do i=0,Prnx+1
-       call STRAINIJ(i,j,k,U,V,W,Str)
-       tstress(:,:,i,j,k)=-2*Str(:,:)*(Visc(i,j,k)-1./Re)*0.5
-      enddo
-     enddo
-    enddo
-    Visc=1./Re+0.5*(Visc-1./Re)
-    call Bound_Visc(Visc)
-    do k=1,Unz
-     do j=1,Uny
-      do i=1,Unx
-         U2(i,j,k)=U2(i,j,k)+Ap*(tstress(1,1,i+1,j,k)-tstress(1,1,i,j,k))/dxU(i)
-         U2(i,j,k)=U2(i,j,k)+Ap*(tstress(1,2,i+1,j+1,k)+tstress(1,2,i,j+1,k)&
-                                -tstress(1,2,i+1,j-1,k)-tstress(1,2,i,j-1,k))/(2._KND*(dyV(j)+dyV(j-1)))
-         U2(i,j,k)=U2(i,j,k)+Ap*(tstress(1,3,i+1,j,k+1)+tstress(1,3,i,j,k+1)&
-                                -tstress(1,3,i+1,j,k-1)-tstress(1,3,i,j,k-1))/(2._KND*(dzW(k)+dzW(k-1)))
-      enddo
-     enddo
-    enddo
-    do k=1,Vnz
-     do j=1,Vny
-      do i=1,Vnx
-         V2(i,j,k)=V2(i,j,k)+Ap*(tstress(2,2,i,j+1,k)-tstress(2,2,i,j,k))/dyV(j)
-         V2(i,j,k)=V2(i,j,k)+Ap*(tstress(2,1,i+1,j+1,k)+tstress(2,2,i+1,j,k)&
-                                -tstress(2,1,i-1,j+1,k)-tstress(2,2,i-1,j,k))/(2._KND*(dxU(i)+dxU(i-1)))
-         V2(i,j,k)=V2(i,j,k)+Ap*(tstress(2,3,i,j+1,k+1)+tstress(2,3,i,j,k+1)&
-                                -tstress(2,3,i,j+1,k-1)-tstress(2,3,i,j,k-1))/(2._KND*(dzW(k)+dzW(k-1)))
-      enddo
-     enddo
-    enddo
-    do k=1,Wnz
-     do j=1,Wny
-      do i=1,Wnx
-         W2(i,j,k)=W2(i,j,k)+Ap*(tstress(3,3,i,j,k+1)-tstress(3,3,i,j,k))/dzW(k)
-         W2(i,j,k)=W2(i,j,k)+Ap*(tstress(3,2,i,j+1,k+1)+tstress(3,2,i,j+1,k)&
-                                -tstress(3,2,i,j-1,k+1)-tstress(3,2,i,j-1,k))/(2._KND*(dyV(j)+dyV(j-1)))
-         W2(i,j,k)=W2(i,j,k)+Ap*(tstress(3,1,i+1,j,k+1)+tstress(3,1,i+1,j,k)&
-                                -tstress(3,1,i-1,j,k+1)-tstress(3,1,i-1,j,k))/(2._KND*(dxU(i)+dxU(i-1)))
-      enddo
-     enddo
-    enddo
-    call Bound_CondU(U2)
-    call Bound_CondV(V2)
-    call Bound_CondW(W2)
-   endif
-
-   do k=1,Unz
-    do j=1,Uny
-     do i=1,Unx
-      U3(i,j,k)=U(i,j,k)+U2(i,j,k)+Ap*(&
-      ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
-      Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&     
-       0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
-       (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-       ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
-       (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))))
-     enddo
-    enddo
-   enddo
-   do k=1,Vnz
-    do j=1,Vny
-     do i=1,Vnx
-      V3(i,j,k)=V(i,j,k)+V2(i,j,k)+Ap*(&
-      ((Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
-       Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
-       0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
-      (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-       ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
-       (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k))))
-     enddo
-    enddo
-   enddo
-   do k=1,Wnz
-    do j=1,Wny
-     do i=1,Wnx
-      W3(i,j,k)=W(i,j,k)+W2(i,j,k)+Ap*(&
-      ((0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
-      (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-       ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
-       (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j))+&
-       (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))/dzPr(k+1)-&
-       Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k)))
-     enddo
-    enddo
-   enddo
-
-   
-   call Bound_CondU(U3)
-   call Bound_CondV(V3)
-   call Bound_CondW(W3)
-  call MOMSOURC(U3,V3,W3)
-
-   if (associated(FirstIBPoint)) then
-    IBP => FirstIBPoint
-    do
-     x=IBP%x
-     y=IBP%y
-     z=IBP%z
-      if (IBP%component==1) then
-       U3(x,y,z)=U3(x,y,z)+IBP%MSourc*dt
-       U2(x,y,z)=U2(x,y,z)+IBP%MSourc*dt
-      elseif (IBP%component==2) then
-       V3(x,y,z)=V3(x,y,z)+IBP%MSourc*dt
-       V2(x,y,z)=V2(x,y,z)+IBP%MSourc*dt
-      elseif (IBP%component==3) then
-       W3(x,y,z)=W3(x,y,z)+IBP%MSourc*dt
-       W2(x,y,z)=W2(x,y,z)+IBP%MSourc*dt
-      endif
-     if (associated(IBP%next)) then
-      IBP=>IBP%next
+     call Bound_CondU(U)
+     call Bound_CondV(V)
+     call Bound_CONDW(W)
+     U3=U+U2
+     V3=V+V2
+     W3=W+W2
+     if (sgstype==1) then
+                       call Smag(U,V,W)
+     elseif (sgstype==2) then
+                       call DynSmag(U,V,W)
+     elseif (sgstype==3) then
+                       call VREMAN(U,V,W)
      else
-      exit
+                       Visc=1._KND/Re
      endif
-    enddo
-   endif
+
+     if (debuglevel>0) then
+      write(*,*) "NUt", SUM(Visc(1:Prnx,1:Prny,1:Prnz))/(Prnx*Prny*Prnz)
+      write(*,*) "maxNUt", MAXVAL(Visc(1:Prnx,1:Prny,1:Prnz))
+      write(*,*) "minNUt", MINVAL(Visc(1:Prnx,1:Prny,1:Prnz))
+     endif
+
+     if (wallmodeltype>0) then
+                     call ComputeViscsWM(U,V,W,Pr)
+     endif
+
+     call ScalFlSourc(Visc,3)
+
+     Ap=coef*dt
+
+     do k=1,Unz    !Forward Euler for the first approximation
+      do j=1,Uny
+       do i=1,Unx
+        U3(i,j,k)=U(i,j,k)+U2(i,j,k)+Ap*(&
+        ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
+        Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
+         0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
+         (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+         ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
+         (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))))
+       enddo
+      enddo
+     enddo
+     do k=1,Vnz
+      do j=1,Vny
+       do i=1,Vnx
+        V3(i,j,k)=V(i,j,k)+V2(i,j,k)+Ap*(&
+        ((Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
+         Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
+         0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
+        (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+         ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
+         (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k))))
+       enddo
+      enddo
+     enddo
+     do k=1,Wnz
+      do j=1,Wny
+       do i=1,Wnx
+        W3(i,j,k)=W(i,j,k)+W2(i,j,k)+Ap*(&
+        ((0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
+        (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+         ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
+         (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j))+&
+         (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))/dzPr(k+1)-&
+         Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k)))
+       enddo
+      enddo
+     enddo
 
 
-  !now in W3 is first approximation
-  impldiff=1
-  if (impldiff==1) then
+     call Bound_CondU(U3)
+     call Bound_CondV(V3)
+     call Bound_CondW(W3)
+     call MOMSOURC(U3,V3,W3)
 
-   if (gridtype==UNIFORMGRID) then
-    call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
-   else
+     if (associated(FirstIBPoint)) then   !Immersed boundary terms, in the future should be in an array
+      IBP => FirstIBPoint
+      do
+       x=IBP%x
+       y=IBP%y
+       z=IBP%z
+        if (IBP%component==1) then
+         U3(x,y,z)=U3(x,y,z)+IBP%MSourc*dt
+         U2(x,y,z)=U2(x,y,z)+IBP%MSourc*dt
+        elseif (IBP%component==2) then
+         V3(x,y,z)=V3(x,y,z)+IBP%MSourc*dt
+         V2(x,y,z)=V2(x,y,z)+IBP%MSourc*dt
+        elseif (IBP%component==3) then
+         W3(x,y,z)=W3(x,y,z)+IBP%MSourc*dt
+         W2(x,y,z)=W2(x,y,z)+IBP%MSourc*dt
+        endif
+       if (associated(IBP%next)) then
+        IBP=>IBP%next
+       else
+        exit
+       endif
+      enddo
+     endif
 
-    !Gauss-Seidel iteration for Crank-Nicolson result
-    Ap2=coef*dt/(2._KND)
+
+     if (gridtype==UNIFORMGRID) then                  !Performs the diffusion terms
+      call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
+     else
+      call GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
+     endif
+
+     U2=U3
+     V2=V3
+     W2=W3
+  
+  else  Regt0
+
+   U2=U+U2
+   V2=V+V2
+   W2=W+W2
+
+  endif   Regt0
+
+  if (debuglevel>=2) then  !Compute and output the mean friction in the domain.
    S=0
-   l=0
-
-
-
    do k=1,Unz
     do j=1,Uny
      do i=1,Unx
-      U2(i,j,k)=U2(i,j,k)+Ap2*(&
-      ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
+      S=S-((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
       Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&     
-       (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
-       0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-       (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
-       0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k)))
-     enddo
-    enddo
-   enddo
-   do k=1,Vnz
-    do j=1,Vny
-     do i=1,Vnx
-      V2(i,j,k)=V2(i,j,k)+Ap2*(&
-      ((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
-      0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-       (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
-       Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
-       (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
-       0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k)))
-     enddo
-    enddo
-   enddo
-   do k=1,Wnz
-    do j=1,Wny
-     do i=1,Wnx
-      W2(i,j,k)=W2(i,j,k)+Ap2*(&
-      ((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
-      0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-       (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
-       0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-       (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))/dzPr(k+1)-&
-       Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k)))
+        (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
+        0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+         (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
+        0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))
      enddo
     enddo
    enddo
 
-     do k=1,Unz
-      do j=1,Uny
-       do i=1,Unx
-        ApU(i,j,k)=1.+Ap2* ((Visc(i+1,j,k)/dxPr(i+1)+&
-                    Visc(i,j,k)/dxPr(i))/dxU(i)+&
-                    (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))/dyV(j)+&
-                    0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-                    (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))/dzW(k)+&
-                    0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))/dzW(k-1))/dzPr(k))
-       enddo
-      enddo
-     enddo
-     do k=1,Vnz
-      do j=1,Vny
-       do i=1,Vnx
-        ApV(i,j,k)=1.+Ap2* ((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))/dxU(i)+&
-                    0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-                   (Visc(i,j+1,k)/dyPr(j+1)+&
-                   Visc(i,j,k)/dyPr(j))/dyV(j)+&
-                   (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))/dzW(k)+&
-                   0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))/dzW(k-1))/dzPr(k))
-       enddo
-      enddo
-     enddo
-     do k=1,Wnz
-      do j=1,Wny
-       do i=1,Wnx
-        ApW(i,j,k)=1.+Ap2* ((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))/dxU(i)+&
-                    0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-                   (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))/dyV(j)+&
-                   0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-                   (Visc(i,j,k+1)/dzPr(k+1)+&
-                   Visc(i,j,k)/dzPr(k))/dzW(k))
-       enddo
-      enddo
-     enddo
-
-    Suavg=abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))
-    Svavg=abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
-    Swavg=abs(MAXVAL(W3(1:Wnx,1:Wny,1:Wnz)))
-    if (Suavg<=1e-3_KND) Suavg=1
-    if (Svavg<=1e-3_KND) Svavg=1
-    if (Swavg<=1e-3_KND) Swavg=1
-    do l=1,maxCNiter
-      call BOUND_CONDU(U3)
-      call BOUND_CONDV(V3)
-      call BOUND_CONDW(W3)
-     S=0
-     Su=0
-     Sv=0
-     Sw=0
-     !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:Su,Sv,Sw)
-     !$OMP DO
-     do k=1,Unz
-      do j=1,Uny
-       do i=1,Unx
-        if (REDBLACKU(i,j,k)) then
-         p=((Visc(i+1,j,k)*(U3(i+1,j,k))/dxPr(i+1)-&
-          Visc(i,j,k)*(-U3(i-1,j,k))/dxPr(i))/dxU(i)+&
-          (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))/dyV(j)-&
-          0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-          (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))/dzW(k)-&
-          0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
-         p=Ap2*p+U2(i,j,k)+U(i,j,k)
-         p=p/ApU(i,j,k)
-
-        
-         Su=max(Su,abs(p-U3(i,j,k)))
-         U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
-        endif
-       enddo
-      enddo
-     enddo
-     !$OMP ENDDO NOWAIT
-     !$OMP DO
-     do k=1,Vnz
-      do j=1,Vny
-       do i=1,Vnx
-        if (REDBLACKV(i,j,k)) then
-         p=((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))/dxU(i)-&
-          0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k))/dxU(i-1))/dxPr(i)+&     
-          (Visc(i,j+1,k)*(V3(i,j+1,k))/dyPr(j+1)-&
-          Visc(i,j,k)*(-V3(i,j-1,k))/dyPr(j))/dyV(j)+&
-          (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))/dzW(k)-&
-          0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
-         p=Ap2*p+V2(i,j,k)+V(i,j,k)
-         p=p/ApV(i,j,k)
-         Sv=max(Sv,abs(p-V3(i,j,k)))
-         V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
-        endif
-       enddo
-      enddo
-     enddo
-     !$OMP ENDDO NOWAIT
-     !$OMP DO
-     do k=1,Wnz
-      do j=1,Wny
-       do i=1,Wnx
-        if (REDBLACKW(i,j,k)) then
-         p=((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))/dxU(i)-&
-          0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k))/dxU(i-1))/dxPr(i)+&     
-          (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))/dyV(j)-&
-          0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-          (Visc(i,j,k+1)*(W3(i,j,k+1))/dzPr(k+1)-&
-          Visc(i,j,k)*(-W3(i,j,k-1))/dzPr(k))/dzW(k))
-         p=Ap2*p+W2(i,j,k)+W(i,j,k)
-         p=p/ApW(i,j,k)
-         Sw=max(Sw,abs(p-W3(i,j,k)))
-         W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
-        endif
-       enddo
-      enddo
-     enddo
-     !$OMP ENDDO
-
-     !$OMP DO
-     do k=1,Unz
-      do j=1,Uny
-       do i=1,Unx
-        if (.not.REDBLACKU(i,j,k)) then
-         p=((Visc(i+1,j,k)*(U3(i+1,j,k))/dxPr(i+1)-&
-          Visc(i,j,k)*(-U3(i-1,j,k))/dxPr(i))/dxU(i)+&
-          (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))/dyV(j)-&
-          0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-          (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))/dzW(k)-&
-          0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
-         p=Ap2*p+U2(i,j,k)+U(i,j,k)
-         p=p/ApU(i,j,k)
-
-        
-         Su=max(Su,abs(p-U3(i,j,k)))
-         U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
-        endif
-       enddo
-      enddo
-     enddo
-     !$OMP ENDDO NOWAIT
-     !$OMP DO
-     do k=1,Vnz
-      do j=1,Vny
-       do i=1,Vnx
-        if (.not.REDBLACKV(i,j,k)) then
-         p=((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))/dxU(i)-&
-          0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k))/dxU(i-1))/dxPr(i)+&     
-          (Visc(i,j+1,k)*(V3(i,j+1,k))/dyPr(j+1)-&
-          Visc(i,j,k)*(-V3(i,j-1,k))/dyPr(j))/dyV(j)+&
-          (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))/dzW(k)-&
-          0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
-         p=Ap2*p+V2(i,j,k)+V(i,j,k)
-         p=p/ApV(i,j,k)
-         Sv=max(Sv,abs(p-V3(i,j,k)))
-         V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
-        endif
-       enddo
-      enddo
-     enddo
-     !$OMP ENDDO NOWAIT
-     !$OMP DO
-     do k=1,Wnz
-      do j=1,Wny
-       do i=1,Wnx
-        if (.not.REDBLACKW(i,j,k)) then
-         p=((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))/dxU(i)-&
-          0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k))/dxU(i-1))/dxPr(i)+&     
-          (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))/dyV(j)-&
-          0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-          (Visc(i,j,k+1)*(W3(i,j,k+1))/dzPr(k+1)-&
-          Visc(i,j,k)*(-W3(i,j,k-1))/dzPr(k))/dzW(k))
-         p=Ap2*p+W2(i,j,k)+W(i,j,k)
-         p=p/ApW(i,j,k)
-         Sw=max(Sw,abs(p-W3(i,j,k)))
-         W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
-        endif
-       enddo
-      enddo
-     enddo
-     !$OMP ENDDO
-     !$OMP END PARALLEL
-     S=max(Su/Suavg,Sv/Svavg,Sw/Swavg)
-     write (*,*) "CN ",l,S
-     if (S<=epsCN) exit
-    enddo
-   endif
-
-   U2=U3
-   V2=V3
-   W2=W3
-  
-   else
-
-    U2=U3
-    V2=V3
-    W2=W3
-   endif
-
-   else
-
-  U2=U+U2
-  V2=V+V2
-  W2=W+W2
-  endif
-
-  S=0
-  do k=1,Unz
-   do j=1,Uny
-    do i=1,Unx
-     S=S-((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
-      Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&     
-       (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
-       0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-       (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
-       0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))
-    enddo
-   enddo
-  enddo
-
-  S=S/(Unx*Uny*Unz)
-  if (debuglevel>=2) then
+   S=S/(Unx*Uny*Unz)
    write(*,*) "Mean friction:", S 
   endif
   endsubroutine OTHERTERMS
 
 
+
+
   subroutine UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W,U2,V2,W2,U3,V3,W3
   real(KND),intent(in):: coef
-  real(KND) dxmin2,dymin2,dzmin2,Ap,Ap2,Ap3,Ap4,p,S
+  real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: Apu
+  real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: ApV
+  real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: ApW
+  real(KND) dxmin2,dymin2,dzmin2,Ap,Ap2,Ap3,Ap4,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
   integer i,j,k,l,Unyz,Vnyz,Wnyz
 
-   dxmin2=dxmin*dxmin
-   dymin2=dymin*dymin
-   dzmin2=dzmin*dzmin
-   Unyz=Uny*Unz
-   Vnyz=Vny*Vnz
-   Wnyz=Wny*Wnz
-   Ap4=coef*dt/(2._KND)!*Re)
-   Ap3= (2._KND/(dxmin2)+2._KND/(dymin2)+2._KND/(dzmin2))
-   S=0
-   l=0
-    do l=1,maxCNiter
-     call BOUND_CONDU(U3)
-     call BOUND_CONDV(V3)
-     call BOUND_CONDW(W3)
-     S=0
-     !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(+:S)
-     !$OMP DO
-     do k=1,Unz
-      do j=1,Uny
-       do i=1,Unx
-        if (REDBLACKU(i,j,k)) then
-         Ap2=Ap4/Re
-         Ap=1._KND+ Ap2*Ap3
-         p=((U(i+1,j,k)-U(i,j,k))-&
-            (U(i,j,k)-U(i-1,j,k)))/(dxmin2)+&
-          ((U(i,j+1,k)-U(i,j,k))-&
-          (U(i,j,k)-U(i,j-1,k)))/(dymin2)+&
-          ((U(i,j,k+1)-U(i,j,k))-&
-          (U(i,j,k)-U(i,j,k-1)))/(dzmin2)+&
-          (U3(i+1,j,k)+&
-          U3(i-1,j,k))/(dxmin2)+&
-          (U3(i,j+1,k)+&
-          U3(i,j-1,k))/(dymin2)+&
-          (U3(i,j,k+1)+&
-          U3(i,j,k-1))/(dzmin2)
-         p=Ap2*p+U2(i,j,k)+U(i,j,k)
-         p=p/Ap
-         S=S+(p-U3(i,j,k))*(p-U3(i,j,k))
-         U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))
-        endif 
-       enddo
-      enddo
-     enddo
-     !$OMP ENDDO NOWAIT
-     !$OMP DO
-     do k=1,Vnz
-      do j=1,Vny
-       do i=1,Vnx
-        if (REDBLACKV(i,j,k)) then
-         Ap2=Ap4/Re
-         Ap=1._KND+ Ap2*Ap3
-         p=(V(i+1,j,k)-2*V(i,j,k)+V(i-1,j,k))/(dxmin2)+&
-          (V(i,j+1,k)-2*V(i,j,k)+V(i,j-1,k))/(dymin2)+&
-          (V(i,j,k+1)-2*V(i,j,k)+V(i,j,k-1))/(dzmin2)+&
-          (V3(i+1,j,k)+V3(i-1,j,k))/(dxmin2)+&
-          (V3(i,j+1,k)+V3(i,j-1,k))/(dymin2)+&
-          (V3(i,j,k+1)+V3(i,j,k-1))/(dzmin2)
-         p=Ap2*p+V2(i,j,k)+V(i,j,k)
-         p=p/Ap
-         S=S+(p-V3(i,j,k))*(p-V3(i,j,k))
-         V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))
-        endif
-       enddo
-      enddo
-     enddo
-     !$OMP ENDDO NOWAIT
-     !$OMP DO
-     do k=1,Wnz
-      do j=1,Wny
-       do i=1,Wnx
-        if (REDBLACKW(i,j,k)) then
-         Ap2=Ap4/Re
-         Ap=1._KND+ Ap2*Ap3
-         p=(W(i+1,j,k)-2*W(i,j,k)+W(i-1,j,k))/(dxmin2)+&
-          (W(i,j+1,k)-2*W(i,j,k)+W(i,j-1,k))/(dymin2)+&
-          (W(i,j,k+1)-2*W(i,j,k)+W(i,j,k-1))/(dzmin2)+&
-          (W3(i+1,j,k)+W3(i-1,j,k))/(dxmin2)+&
-          (W3(i,j+1,k)+W3(i,j-1,k))/(dymin2)+&
-          (W3(i,j,k+1)+W3(i,j,k-1))/(dzmin2)
-         p=Ap2*p+W2(i,j,k)+W(i,j,k)
-         p=p/Ap
-         S=S+(p-W3(i,j,k))*(p-W3(i,j,k))
-         W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))
-        endif
-       enddo
-      enddo
-     enddo
-     !$OMP ENDDO
+       Ap2=coef*dt/(2._KND)
+       S=0
+       l=0
 
-     !$OMP DO
-     do k=1,Unz
-      do j=1,Uny
-       do i=1,Unx 
-        if (.not.REDBLACKU(i,j,k)) then
-         Ap2=Ap4/Re
-         Ap=1._KND+ Ap2*Ap3
-         p=(U(i+1,j,k)-2*U(i,j,k)+U(i-1,j,k))/(dxmin2)+&
-          (U(i,j+1,k)-2*U(i,j,k)+U(i,j-1,k))/(dymin2)+&
-          (U(i,j,k+1)-2*U(i,j,k)+U(i,j,k-1))/(dzmin2)+&
-          (U3(i+1,j,k)+U3(i-1,j,k))/(dxmin2)+&
-          (U3(i,j+1,k)+U3(i,j-1,k))/(dymin2)+&
-          (U3(i,j,k+1)+U3(i,j,k-1))/(dzmin2)
-         p=Ap2*p+U2(i,j,k)+U(i,j,k)
-         p=p/Ap
-         S=S+(p-U3(i,j,k))*(p-U3(i,j,k))
-         U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))
-        endif 
-       enddo
-      enddo
-     enddo
-     !$OMP ENDDO NOWAIT
-     !$OMP DO
-     do k=1,Vnz
-      do j=1,Vny
-       do i=1,Vnx
-        if (.not.REDBLACKV(i,j,k)) then
-         Ap2=Ap4/Re
-         Ap=1._KND+ Ap2*Ap3
-         p=(V(i+1,j,k)-2*V(i,j,k)+V(i-1,j,k))/(dxmin2)+&
-          (V(i,j+1,k)-2*V(i,j,k)+V(i,j-1,k))/(dymin2)+&
-          (V(i,j,k+1)-2*V(i,j,k)+V(i,j,k-1))/(dzmin2)+&
-          (V3(i+1,j,k)+V3(i-1,j,k))/(dxmin2)+&
-          (V3(i,j+1,k)+V3(i,j-1,k))/(dymin2)+&
-          (V3(i,j,k+1)+V3(i,j,k-1))/(dzmin2)
-         p=Ap2*p+V2(i,j,k)+V(i,j,k)
-         p=p/Ap
-         S=S+(p-V3(i,j,k))*(p-V3(i,j,k))
-         V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))
-        endif
-       enddo
-      enddo
-     enddo
-     !$OMP ENDDO NOWAIT
-     !$OMP DO
-     do k=1,Wnz
-      do j=1,Wny
-       do i=1,Wnx
-        if (.not.REDBLACKW(i,j,k)) then
-         Ap2=Ap4/Re
-         Ap=1._KND+ Ap2*Ap3
-         p=(W(i+1,j,k)-2*W(i,j,k)+W(i-1,j,k))/(dxmin2)+&
-          (W(i,j+1,k)-2*W(i,j,k)+W(i,j-1,k))/(dymin2)+&
-          (W(i,j,k+1)-2*W(i,j,k)+W(i,j,k-1))/(dzmin2)+&
-          (W3(i+1,j,k)+W3(i-1,j,k))/(dxmin2)+&
-          (W3(i,j+1,k)+W3(i,j-1,k))/(dymin2)+&
-          (W3(i,j,k+1)+W3(i,j,k-1))/(dzmin2)
-         p=Ap2*p+W2(i,j,k)+W(i,j,k)
-         p=p/Ap
-         S=S+(p-W3(i,j,k))*(p-W3(i,j,k))
-         W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))
-        endif
-       enddo
-      enddo
-     enddo
-     !$OMP ENDDO
-     !$OMP ENDPARALLEL
 
-     S=S/(Prnx*Prny*Prnz)
-     if (Sqrt(S)<=epsCN) exit
-     write (*,*) "CN ",l,Sqrt(S)
-    enddo
+       do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
+        do j=1,Uny
+         do i=1,Unx
+          U2(i,j,k)=U2(i,j,k)+Ap2*(&
+          ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
+          Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))/dxmin2+0.25_KND*(&
+           ((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
+           (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))/dymin2+&
+           ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
+           (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))/dzmin2)))
+         enddo
+        enddo
+       enddo
+       do k=1,Vnz
+        do j=1,Vny
+         do i=1,Vnx
+          V2(i,j,k)=V2(i,j,k)+Ap2*(&
+          (0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
+          (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))/dxmin2+&
+           (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
+           Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))/dymin2+&
+           0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
+           (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))/dzmin2))
+         enddo
+        enddo
+       enddo
+       do k=1,Wnz
+       do j=1,Wny
+        do i=1,Wnx
+         W2(i,j,k)=W2(i,j,k)+Ap2*(&
+         (0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
+         (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))/dxmin2+&
+          ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
+          (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))/dymin2)+&
+          (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
+          Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))/dzmin2))
+        enddo
+       enddo
+      enddo
+
+       do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
+        do j=1,Uny
+         do i=1,Unx
+          ApU(i,j,k)=1.+Ap2* ((Visc(i+1,j,k)+&
+                      Visc(i,j,k))/dxmin2+&
+                      0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
+                      (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k)))/dymin2+&
+                      ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
+                      (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))/dzmin2))
+         enddo
+        enddo
+       enddo
+       do k=1,Vnz
+        do j=1,Vny
+         do i=1,Vnx
+          ApV(i,j,k)=1.+Ap2* ((Visc(i,j+1,k)+&
+                              Visc(i,j,k))/dymin2+&
+                     0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
+                      (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k)))/dxmin2+&
+                     ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
+                     (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))/dzmin2))
+         enddo
+        enddo
+       enddo
+       do k=1,Wnz
+        do j=1,Wny
+         do i=1,Wnx
+          ApW(i,j,k)=1.+Ap2* (0.25*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
+                      (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k)))/dxmin2+&
+                     ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))+&
+                     (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k)))/dymin2)+&
+                     (Visc(i,j,k+1)+&
+                     Visc(i,j,k))/dzmin2)
+         enddo
+        enddo
+       enddo
+
+       Suavg=abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
+       Svavg=abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
+       Swavg=abs(MAXVAL(W3(1:Wnx,1:Wny,1:Wnz)))
+       if (Suavg<=1e-3_KND) Suavg=1
+       if (Svavg<=1e-3_KND) Svavg=1
+       if (Swavg<=1e-3_KND) Swavg=1
+
+
+
+       do l=1,maxCNiter               !Gauss-Seidel iteration for Crank-Nicolson result
+        call Bound_CondU(U3)
+        call Bound_CondV(V3)
+        call Bound_CondW(W3)
+        S=0
+        Su=0
+        Sv=0
+        Sw=0
+        !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:Su,Sv,Sw)
+        !$OMP DO
+        do k=1,Unz
+         do j=1,Uny
+          do i=1,Unx
+           if (REDBLACKU(i,j,k)) then
+            p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
+             Visc(i,j,k)*(-U3(i-1,j,k)))/dxmin2+&
+             0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
+             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))/dymin2+&
+             ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
+             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))/dzmin2))
+            p=Ap2*p+U2(i,j,k)+U(i,j,k)
+            p=p/ApU(i,j,k)
+
+
+            Su=max(Su,abs(p-U3(i,j,k)))
+            U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+           endif
+          enddo
+         enddo
+        enddo
+        !$OMP ENDDO NOWAIT
+        !$OMP DO
+        do k=1,Vnz
+         do j=1,Vny
+          do i=1,Vnx
+           if (REDBLACKV(i,j,k)) then
+            p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
+             Visc(i,j,k)*(-V3(i,j-1,k)))/dymin2+&
+             0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
+             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))/dxmin2+&
+             ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
+             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))/dzmin2))
+            p=Ap2*p+V2(i,j,k)+V(i,j,k)
+            p=p/ApV(i,j,k)
+            Sv=max(Sv,abs(p-V3(i,j,k)))
+            V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+           endif
+          enddo
+         enddo
+        enddo
+        !$OMP ENDDO NOWAIT
+        !$OMP DO
+        do k=1,Wnz
+         do j=1,Wny
+          do i=1,Wnx
+           if (REDBLACKW(i,j,k)) then
+            p=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
+             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))/dxmin2+&
+             ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
+             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))/dymin2)+&
+             (Visc(i,j,k+1)*(W3(i,j,k+1))-&
+             Visc(i,j,k)*(-W3(i,j,k-1)))/dzmin2)
+            p=Ap2*p+W2(i,j,k)+W(i,j,k)
+            p=p/ApW(i,j,k)
+            Sw=max(Sw,abs(p-W3(i,j,k)))
+            W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+           endif
+          enddo
+         enddo
+        enddo
+        !$OMP ENDDO
+
+        !$OMP DO
+        do k=1,Unz
+         do j=1,Uny
+          do i=1,Unx
+           if (.not.REDBLACKU(i,j,k)) then
+            p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
+             Visc(i,j,k)*(-U3(i-1,j,k)))/dxmin2+&
+             0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
+             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))/dymin2+&
+             ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
+             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))/dzmin2))
+            p=Ap2*p+U2(i,j,k)+U(i,j,k)
+            p=p/ApU(i,j,k)
+
+
+            Su=max(Su,abs(p-U3(i,j,k)))
+            U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+           endif
+          enddo
+         enddo
+        enddo
+        !$OMP ENDDO NOWAIT
+        !$OMP DO
+        do k=1,Vnz
+         do j=1,Vny
+          do i=1,Vnx
+           if (.not.REDBLACKV(i,j,k)) then
+            p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
+             Visc(i,j,k)*(-V3(i,j-1,k)))/dymin2+&
+             0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
+             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))/dxmin2+&
+             ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
+             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))/dzmin2))
+            p=Ap2*p+V2(i,j,k)+V(i,j,k)
+            p=p/ApV(i,j,k)
+            Sv=max(Sv,abs(p-V3(i,j,k)))
+            V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+           endif
+          enddo
+         enddo
+        enddo
+        !$OMP ENDDO NOWAIT
+        !$OMP DO
+        do k=1,Wnz
+         do j=1,Wny
+          do i=1,Wnx
+           if (.not.REDBLACKW(i,j,k)) then
+            p=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
+             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))/dxmin2+&
+             ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
+             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))/dymin2)+&
+             (Visc(i,j,k+1)*(W3(i,j,k+1))-&
+             Visc(i,j,k)*(-W3(i,j,k-1)))/dzmin2)
+            p=Ap2*p+W2(i,j,k)+W(i,j,k)
+            p=p/ApW(i,j,k)
+            Sw=max(Sw,abs(p-W3(i,j,k)))
+            W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+           endif
+          enddo
+         enddo
+        enddo
+        !$OMP ENDDO
+        !$OMP END PARALLEL
+        S=max(Su/Suavg,Sv/Svavg,Sw/Swavg)
+        write (*,*) "CN ",l,S
+        if (S<=epsCN) exit
+       enddo
   endsubroutine UNIFREDBLACK
+
+
+
+
+  subroutine GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
+  real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W,U2,V2,W2,U3,V3,W3
+  real(KND),intent(in):: coef
+  real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: Apu
+  real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: ApV
+  real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: ApW
+  real(KND) dxmin2,dymin2,dzmin2,Ap,Ap2,Ap3,Ap4,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
+  integer i,j,k,l,Unyz,Vnyz,Wnyz
+
+
+
+       Ap2=coef*dt/(2._KND)
+       S=0
+       l=0
+
+
+       do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
+        do j=1,Uny
+         do i=1,Unx
+          U2(i,j,k)=U2(i,j,k)+Ap2*(&
+          ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
+          Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
+           (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
+           0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+           (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
+           0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k)))
+         enddo
+        enddo
+       enddo
+       do k=1,Vnz
+        do j=1,Vny
+         do i=1,Vnx
+          V2(i,j,k)=V2(i,j,k)+Ap2*(&
+          ((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
+          0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+           (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
+           Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
+           (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
+           0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k)))
+         enddo
+        enddo
+       enddo
+       do k=1,Wnz
+       do j=1,Wny
+        do i=1,Wnx
+         W2(i,j,k)=W2(i,j,k)+Ap2*(&
+         ((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
+         0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+          (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
+          0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+          (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))/dzPr(k+1)-&
+          Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k)))
+        enddo
+       enddo
+      enddo
+
+       do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
+        do j=1,Uny
+         do i=1,Unx
+          ApU(i,j,k)=1.+Ap2* ((Visc(i+1,j,k)/dxPr(i+1)+&
+                      Visc(i,j,k)/dxPr(i))/dxU(i)+&
+                      (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))/dyV(j)+&
+                      0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+                      (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))/dzW(k)+&
+                      0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))/dzW(k-1))/dzPr(k))
+         enddo
+        enddo
+       enddo
+       do k=1,Vnz
+        do j=1,Vny
+         do i=1,Vnx
+          ApV(i,j,k)=1.+Ap2* ((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))/dxU(i)+&
+                      0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+                     (Visc(i,j+1,k)/dyPr(j+1)+&
+                     Visc(i,j,k)/dyPr(j))/dyV(j)+&
+                     (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))/dzW(k)+&
+                     0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))/dzW(k-1))/dzPr(k))
+         enddo
+        enddo
+       enddo
+       do k=1,Wnz
+        do j=1,Wny
+         do i=1,Wnx
+          ApW(i,j,k)=1.+Ap2* ((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))/dxU(i)+&
+                      0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+                     (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))/dyV(j)+&
+                     0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+                     (Visc(i,j,k+1)/dzPr(k+1)+&
+                     Visc(i,j,k)/dzPr(k))/dzW(k))
+         enddo
+        enddo
+       enddo
+
+       Suavg=abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
+       Svavg=abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
+       Swavg=abs(MAXVAL(W3(1:Wnx,1:Wny,1:Wnz)))
+       if (Suavg<=1e-3_KND) Suavg=1
+       if (Svavg<=1e-3_KND) Svavg=1
+       if (Swavg<=1e-3_KND) Swavg=1
+
+
+
+       do l=1,maxCNiter               !Gauss-Seidel iteration for Crank-Nicolson result
+        call Bound_CondU(U3)
+        call Bound_CondV(V3)
+        call Bound_CondW(W3)
+        S=0
+        Su=0
+        Sv=0
+        Sw=0
+        !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:Su,Sv,Sw)
+        !$OMP DO
+        do k=1,Unz
+         do j=1,Uny
+          do i=1,Unx
+           if (REDBLACKU(i,j,k)) then
+            p=((Visc(i+1,j,k)*(U3(i+1,j,k))/dxPr(i+1)-&
+             Visc(i,j,k)*(-U3(i-1,j,k))/dxPr(i))/dxU(i)+&
+             (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))/dyV(j)-&
+             0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+             (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))/dzW(k)-&
+             0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
+            p=Ap2*p+U2(i,j,k)+U(i,j,k)
+            p=p/ApU(i,j,k)
+
+
+            Su=max(Su,abs(p-U3(i,j,k)))
+            U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+           endif
+          enddo
+         enddo
+        enddo
+        !$OMP ENDDO NOWAIT
+        !$OMP DO
+        do k=1,Vnz
+         do j=1,Vny
+          do i=1,Vnx
+           if (REDBLACKV(i,j,k)) then
+            p=((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))/dxU(i)-&
+             0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+             (Visc(i,j+1,k)*(V3(i,j+1,k))/dyPr(j+1)-&
+             Visc(i,j,k)*(-V3(i,j-1,k))/dyPr(j))/dyV(j)+&
+             (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))/dzW(k)-&
+             0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
+            p=Ap2*p+V2(i,j,k)+V(i,j,k)
+            p=p/ApV(i,j,k)
+            Sv=max(Sv,abs(p-V3(i,j,k)))
+            V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+           endif
+          enddo
+         enddo
+        enddo
+        !$OMP ENDDO NOWAIT
+        !$OMP DO
+        do k=1,Wnz
+         do j=1,Wny
+          do i=1,Wnx
+           if (REDBLACKW(i,j,k)) then
+            p=((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))/dxU(i)-&
+             0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+             (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))/dyV(j)-&
+             0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+             (Visc(i,j,k+1)*(W3(i,j,k+1))/dzPr(k+1)-&
+             Visc(i,j,k)*(-W3(i,j,k-1))/dzPr(k))/dzW(k))
+            p=Ap2*p+W2(i,j,k)+W(i,j,k)
+            p=p/ApW(i,j,k)
+            Sw=max(Sw,abs(p-W3(i,j,k)))
+            W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+           endif
+          enddo
+         enddo
+        enddo
+        !$OMP ENDDO
+
+        !$OMP DO
+        do k=1,Unz
+         do j=1,Uny
+          do i=1,Unx
+           if (.not.REDBLACKU(i,j,k)) then
+            p=((Visc(i+1,j,k)*(U3(i+1,j,k))/dxPr(i+1)-&
+             Visc(i,j,k)*(-U3(i-1,j,k))/dxPr(i))/dxU(i)+&
+             (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))/dyV(j)-&
+             0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+             (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))/dzW(k)-&
+             0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
+            p=Ap2*p+U2(i,j,k)+U(i,j,k)
+            p=p/ApU(i,j,k)
+
+
+            Su=max(Su,abs(p-U3(i,j,k)))
+            U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+           endif
+          enddo
+         enddo
+        enddo
+        !$OMP ENDDO NOWAIT
+        !$OMP DO
+        do k=1,Vnz
+         do j=1,Vny
+          do i=1,Vnx
+           if (.not.REDBLACKV(i,j,k)) then
+            p=((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))/dxU(i)-&
+             0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+             (Visc(i,j+1,k)*(V3(i,j+1,k))/dyPr(j+1)-&
+             Visc(i,j,k)*(-V3(i,j-1,k))/dyPr(j))/dyV(j)+&
+             (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))/dzW(k)-&
+             0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
+            p=Ap2*p+V2(i,j,k)+V(i,j,k)
+            p=p/ApV(i,j,k)
+            Sv=max(Sv,abs(p-V3(i,j,k)))
+            V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+           endif
+          enddo
+         enddo
+        enddo
+        !$OMP ENDDO NOWAIT
+        !$OMP DO
+        do k=1,Wnz
+         do j=1,Wny
+          do i=1,Wnx
+           if (.not.REDBLACKW(i,j,k)) then
+            p=((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))/dxU(i)-&
+             0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+             (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))/dyV(j)-&
+             0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+             (Visc(i,j,k+1)*(W3(i,j,k+1))/dzPr(k+1)-&
+             Visc(i,j,k)*(-W3(i,j,k-1))/dzPr(k))/dzW(k))
+            p=Ap2*p+W2(i,j,k)+W(i,j,k)
+            p=p/ApW(i,j,k)
+            Sw=max(Sw,abs(p-W3(i,j,k)))
+            W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+           endif
+          enddo
+         enddo
+        enddo
+        !$OMP ENDDO
+        !$OMP END PARALLEL
+        S=max(Su/Suavg,Sv/Svavg,Sw/Swavg)
+        write (*,*) "CN ",l,S
+        if (S<=epsCN) exit
+       enddo
+   endsubroutine GENREDBLACK
+
+
+
+
+
+
+
 
   subroutine ATTENUATETOP(U,V,W,Pr)
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   integer i,j,k,bufn
-  real(KND) p,ze,zs,zb
+  real(KND) p,ze,zs,zb,DF
 
   bufn=max(5,Prnz/4)
   zs=zW(Prnz-bufn)
@@ -1799,10 +1842,11 @@ contains
         enddo
       enddo
       p=p/(Vnx*Vny)
-      zb=(zPr(k)-zs)/(ze-zs) 
+      zb=(zPr(k)-zs)/(ze-zs)
+      DF=DampF(zb)
       do i=-1,Vnx+1
        do j=-1,Vny+1
-        V(i,j,k)=p+DampF(zb)*(V(i,j,k)-p)
+        V(i,j,k)=p+DF*(V(i,j,k)-p)
        enddo
       enddo
     enddo
@@ -1814,10 +1858,11 @@ contains
         enddo
       enddo
       p=p/(Unx*Uny)
-      zb=(zPr(k)-zs)/(ze-zs) 
+      zb=(zPr(k)-zs)/(ze-zs)
+      DF=DampF(zb)
       do i=-1,Unx+1
        do j=-1,Uny+1
-        U(i,j,k)=p+DampF(zb)*(U(i,j,k)-p)
+        U(i,j,k)=p+DF*(U(i,j,k)-p)
        enddo
       enddo
     enddo
@@ -1830,26 +1875,28 @@ contains
         enddo
        enddo
       p=p/(Prnx*Prny)
-      zb=(zPr(k)-zs)/(ze-zs) 
+      zb=(zPr(k)-zs)/(ze-zs)
+      DF=DampF(zb)
       do i=-1,Prnx+1
        do j=-1,Prny+1
-        Temperature(i,j,k)=p+DampF(zb)*(temperature(i,j,k)-p)
+        Temperature(i,j,k)=p+DF*(temperature(i,j,k)-p)
        enddo
       enddo
      enddo
     endif
     do k=Wnz-bufn,Wnz
-      p=0
-      do i=1,Wnx
-       do j=1,Wny
+     p=0
+     do i=1,Wnx
+      do j=1,Wny
         p=p+W(i,j,k)
-       enddo
+      enddo
      enddo
      p=p/(Wnx*Wny)
-     zb=(zW(k)-zs)/(ze-zs) 
+     zb=(zW(k)-zs)/(ze-zs)
+     DF=DampF(zb)
      do i=-1,Wnx+1
       do j=-1,Wny+1
-        W(i,j,k)=p+DampF(zb)*(W(i,j,k)-p)
+        W(i,j,k)=p+DF*(W(i,j,k)-p)
       enddo
      enddo
     enddo
@@ -1860,7 +1907,7 @@ contains
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND),optional,intent(inout):: temperature(-1:,-1:,-1:)
   integer i,j,k,bufn
-  real(KND) p,xe,xs,xb
+  real(KND) p,xe,xs,xb,DF
 
   bufn=max(10,Prnx/8)
   xs=xU(Prnx-bufn)
@@ -1874,9 +1921,10 @@ contains
      enddo
      p=p/((Unx-4-2*Unx/3+1)*Uny)
      do i=Unx-bufn,Unx+1
-      xb=(xU(i)-xs)/(xe-xs) 
+      xb=(xU(i)-xs)/(xe-xs)
+      DF=DampF(xb)
       do j=-1,Uny+1
-        U(i,j,k)=p+DampF(xb)*(U(i,j,k)-p)
+        U(i,j,k)=p+DF*(U(i,j,k)-p)
       enddo
      enddo
     enddo
@@ -1889,9 +1937,10 @@ contains
      enddo
      p=p/((Vnx-4-2*Vnx/3+1)*Vny)
      do i=Vnx-bufn,Vnx+1
-      xb=(xPr(i)-xs)/(xe-xs) 
+      xb=(xPr(i)-xs)/(xe-xs)
+      DF=DampF(xb)
       do j=-1,Vny+1
-        V(i,j,k)=p+DampF(xb)*(V(i,j,k)-p)
+        V(i,j,k)=p+DF*(V(i,j,k)-p)
       enddo
      enddo
     enddo
@@ -1904,9 +1953,10 @@ contains
      enddo
      p=p/((Wnx-4-2*Wnx/3+1)*Wny)
      do i=Wnx-bufn,Wnx+1
-      xb=(xPr(i)-xs)/(xe-xs) 
+      xb=(xPr(i)-xs)/(xe-xs)
+      DF=DampF(xb)
       do j=-1,Wny+1
-        W(i,j,k)=p+DampF(xb)*(W(i,j,k)-p)
+        W(i,j,k)=p+DF*(W(i,j,k)-p)
       enddo
      enddo
     enddo
@@ -1920,14 +1970,16 @@ contains
      enddo
      p=p/((Prnx-4-2*Prnx/3+1)*Prny)
      do i=Prnx-bufn,Prnx+1
-      xb=(xU(i)-xs)/(xe-xs) 
+      xb=(xU(i)-xs)/(xe-xs)
+      DF=DampF(xb)
       do j=-1,Prny+1
-        temperature(i,j,k)=p+DampF(xb)*(temperature(i,j,k)-p)
+        temperature(i,j,k)=p+DF*(temperature(i,j,k)-p)
       enddo
      enddo
     enddo
    endif
   endsubroutine ATTENUATEOUT
+
 
 
   pure function DampF(x)
@@ -1941,6 +1993,7 @@ contains
    DampF=(1-0.1_KND*x**2)*(1-(1-exp(10._KND*x**2))/(1-exp(10._KND)))
   endif
   endfunction Dampf
+
 
   subroutine NULLINTERIOR(U,V,W)
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
