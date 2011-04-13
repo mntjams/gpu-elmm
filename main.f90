@@ -149,7 +149,6 @@ implicit none
  Pr=0
  write (*,*) "Setting up initial conditions..."
  call INITCONDS(U,V,W,Pr)
-! write (*,*) "Saving initial condiions..."
 
  fnum=0
  time=starttime
@@ -299,15 +298,6 @@ implicit none
         temperature(probei+1,probej+1,probek+1))
    tke(step)=totke(U,V,W)
    dissip(step)=(tke(step-1)-tke(step))/(times(step)-times(step-1))
-   !dissip2(step)=0
-   !do k=1,Prnz
-   ! do j=1,Prny
-   !  do i=1,Prnx
-   !   dissip2(step)=dissip2(step)+Vorticity(i,j,k,U,V,W)
-   !  enddo
-   ! enddo
-   !enddo
-   !dissip2(step)=(1._KND/Re)*dissip2(step)/(Prnx*Prny*Prnz)
    deltime(step)=delta/dt
    endstep=step
    write (*,*) "delta: ",delta
@@ -542,6 +532,4 @@ implicit none
  if (associated(FirstSB)) call DeallSB(FirstSB)
  if (associated(FirstIBPoint)) call DeallIBP(FirstIBPoint)
  if (associated(FirstWMPoint)) call DeallWMP(FirstWMPoint)
-
- !if (poissmet==2) call deallfish
 end
