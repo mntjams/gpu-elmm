@@ -7,7 +7,7 @@ implicit none
  
   private minmod,minmod2,minmod3,superbee,limiter,heav,GAMMAL,vanalbada,vanleer
 
- interface MINMOD
+  interface MINMOD
          module procedure MINMOD2, MINMOD3
   end interface
 
@@ -479,13 +479,26 @@ contains
 
 
 
-
   subroutine KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
   real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
   real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in):: sctype
+
+   if (gridtype==uniformgrid)
+    call KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef)
+   else
+    call KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef)
+   endif
+  endsubroutine KAPPASCALAR
+
+
+  subroutine KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
+  real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  integer,intent(in):: sctype
   integer i,j,k
-  real(KND) A,SL,SR,FLUX
+  real(KND) A,Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
+  real(KND) SL,SR,FLUX
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2):: SLOPE
   real(KND),parameter::eps=1e-8
 
@@ -496,28 +509,148 @@ contains
    endif
   
   A=coef*dt
+  Ax=coef*dt/dxmin
+  Ay=coef*dt/dymin
+  Az=coef*dt/dzmin
+
   SLOPE=0
-  do i=0,Prnx
+  do k=1,Prnz
    do j=1,Prny
-    do k=1,Prnz
+    do i=0,Prnx
      if (U(i,j,k)>0) then
-      SR=(SCAL(i+1,j,k)-SCAL(i,j,k))!/dxU(i)
-      SL=(SCAL(i,j,k)-SCAL(i-1,j,k))!/dxU(i-1)
+      SR=(SCAL(i+1,j,k)-SCAL(i,j,k))
+      SL=(SCAL(i,j,k)-SCAL(i-1,j,k))
      else
-      SR=(SCAL(i,j,k)-SCAL(i+1,j,k))!/dxU(i)
-      SL=(SCAL(i+1,j,k)-SCAL(i+2,j,k))!/dxU(i-1)
+      SR=(SCAL(i,j,k)-SCAL(i+1,j,k))
+      SL=(SCAL(i+1,j,k)-SCAL(i+2,j,k))
      endif
-!      if (abs(SR+eps*sign(1._KND,SL))>1E5*abs(SL+eps*sign(1._KND,SL)))&
-!        write(*,*) SR,SL,SR+eps*sign(1._KND,SL),SL+eps*sign(1._KND,SL)
      SLOPE(i,j,k)=FLUXLIMITER((SR+eps*sign(1._KND,SL))/(SL+eps*sign(1._KND,SL)))
     enddo
    enddo
   enddo
 
 
-  do i=0,Prnx
+  do k=1,Prnz
    do j=1,Prny
-    do k=1,Prnz
+    do i=0,Prnx
+     if (U(i,j,k)>0) then
+      FLUX=U(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i-1,j,k))*SLOPE(i,j,k)/2._KND)
+     else
+      FLUX=U(i,j,k)*(SCAL(i+1,j,k)+(SCAL(i+1,j,k)-SCAL(i+2,j,k))*SLOPE(i,j,k)/2._KND)
+     endif
+     SCAL2(i,j,k)=SCAL2(i,j,k)-Ax*FLUX
+     SCAL2(i+1,j,k)=SCAL2(i+1,j,k)+Ax*FLUX
+    enddo
+   enddo
+  enddo    
+
+
+  SLOPE=0
+  do k=1,Prnz
+   do j=0,Prny
+    do i=1,Prnx
+     if (V(i,j,k)>0) then
+      SR=(SCAL(i,j+1,k)-SCAL(i,j,k))
+      SL=(SCAL(i,j,k)-SCAL(i,j-1,k))
+     else
+      SR=(SCAL(i,j,k)-SCAL(i,j+1,k))
+      SL=(SCAL(i,j+1,k)-SCAL(i,j+2,k))
+     endif
+     SLOPE(i,j,k)=FLUXLIMITER((SR+eps*sign(1._KND,SL))/(SL+eps*sign(1._KND,SL)))
+    enddo
+   enddo
+  enddo
+
+
+  do k=1,Prnz
+   do j=0,Prny
+    do i=1,Prnx
+     if (V(i,j,k)>0) then
+      FLUX=V(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j-1,k))*SLOPE(i,j,k)/2._KND)
+     else
+      FLUX=V(i,j,k)*(SCAL(i,j+1,k)+(SCAL(i,j+1,k)-SCAL(i,j+2,k))*SLOPE(i,j,k)/2._KND)
+     endif
+
+     SCAL2(i,j,k)=SCAL2(i,j,k)-Ay*FLUX
+     SCAL2(i,j+1,k)=SCAL2(i,j+1,k)+Ay*FLUX
+    enddo
+   enddo
+  enddo    
+
+
+  SLOPE=0
+  do k=0,Prnz
+   do j=1,Prny
+    do i=1,Prnx
+     if (W(i,j,k)>0) then
+      SR=(SCAL(i,j,k+1)-SCAL(i,j,k))
+      SL=(SCAL(i,j,k)-SCAL(i,j,k-1))
+     else
+      SR=(SCAL(i,j,k)-SCAL(i,j,k+1))
+      SL=(SCAL(i,j,k+1)-SCAL(i,j,k+2))
+     endif
+     SLOPE(i,j,k)=FLUXLIMITER((SR+eps*sign(1._KND,SL))/(SL+eps*sign(1._KND,SL)))
+    enddo
+   enddo
+  enddo
+
+
+  do k=0,Prnz
+   do j=1,Prny
+    do i=1,Prnx
+     if (W(i,j,k)>0) then
+      FLUX=W(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._KND)
+     else
+      FLUX=W(i,j,k)*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
+     endif
+
+     SCAL2(i,j,k)=SCAL2(i,j,k)-Az*FLUX
+     SCAL2(i,j,k+1)=SCAL2(i,j,k+1)+Az*FLUX
+    enddo
+   enddo
+  enddo
+  endsubroutine KAPPASCALARUG
+
+
+
+  subroutine KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
+  real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  integer,intent(in):: sctype
+  integer i,j,k
+  real(KND) A                       !Auxiliary variables to store muliplication constants for efficiency
+  real(KND) SL,SR,FLUX
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2):: SLOPE
+  real(KND),parameter::eps=1e-8
+
+   if (sctype==1) then
+    call BOUND_Temp(SCAL)
+   else 
+    call BOUND_PASSSCALAR(SCAL)
+   endif
+  
+  A=coef*dt
+
+  SLOPE=0
+  do k=1,Prnz
+   do j=1,Prny
+    do i=0,Prnx
+     if (U(i,j,k)>0) then
+      SR=(SCAL(i+1,j,k)-SCAL(i,j,k))/dxU(i)
+      SL=(SCAL(i,j,k)-SCAL(i-1,j,k))/dxU(i-1)
+     else
+      SR=(SCAL(i,j,k)-SCAL(i+1,j,k))/dxU(i)
+      SL=(SCAL(i+1,j,k)-SCAL(i+2,j,k))/dxU(i-1)
+     endif
+     SLOPE(i,j,k)=FLUXLIMITER((SR+eps*sign(1._KND,SL))/(SL+eps*sign(1._KND,SL)))
+    enddo
+   enddo
+  enddo
+
+
+  do k=1,Prnz
+   do j=1,Prny
+    do i=0,Prnx
      if (U(i,j,k)>0) then
       FLUX=U(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i-1,j,k))*SLOPE(i,j,k)/2._KND)
      else
@@ -531,27 +664,25 @@ contains
 
 
   SLOPE=0
-  do i=1,Prnx
+  do k=1,Prnz
    do j=0,Prny
-    do k=1,Prnz
+    do i=1,Prnx
      if (V(i,j,k)>0) then
-      SR=(SCAL(i,j+1,k)-SCAL(i,j,k))!/dxU(i)
-      SL=(SCAL(i,j,k)-SCAL(i,j-1,k))!/dxU(i-1)
+      SR=(SCAL(i,j+1,k)-SCAL(i,j,k))/dyV(j)
+      SL=(SCAL(i,j,k)-SCAL(i,j-1,k))/dyV(j-1)
      else
-      SR=(SCAL(i,j,k)-SCAL(i,j+1,k))!/dxU(i)
-      SL=(SCAL(i,j+1,k)-SCAL(i,j+2,k))!/dxU(i-1)
+      SR=(SCAL(i,j,k)-SCAL(i,j+1,k))/dyV(j)
+      SL=(SCAL(i,j+1,k)-SCAL(i,j+2,k))/dyV(j-1)
      endif
-!      if (abs(SR+eps*sign(1._KND,SL))>1E5*abs(SL+eps*sign(1._KND,SL)))&
-!          write(*,*) SR,SL,SR+eps*sign(1._KND,SL),SL+eps*sign(1._KND,SL)
      SLOPE(i,j,k)=FLUXLIMITER((SR+eps*sign(1._KND,SL))/(SL+eps*sign(1._KND,SL)))
     enddo
    enddo
   enddo
 
 
-  do i=1,Prnx
+  do k=1,Prnz
    do j=0,Prny
-    do k=1,Prnz
+    do i=1,Prnx
      if (V(i,j,k)>0) then
       FLUX=V(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j-1,k))*SLOPE(i,j,k)/2._KND)
      else
@@ -566,27 +697,25 @@ contains
 
 
   SLOPE=0
-  do i=1,Prnx
+  do k=0,Prnz
    do j=1,Prny
-    do k=0,Prnz
-    if (W(i,j,k)>0) then
-      SR=(SCAL(i,j,k+1)-SCAL(i,j,k))!/dxU(i)
-      SL=(SCAL(i,j,k)-SCAL(i,j,k-1))!/dxU(i-1)
+    do i=1,Prnx
+     if (W(i,j,k)>0) then
+      SR=(SCAL(i,j,k+1)-SCAL(i,j,k))/dzW(k)
+      SL=(SCAL(i,j,k)-SCAL(i,j,k-1))/dzW(k-1)
      else
-      SR=(SCAL(i,j,k)-SCAL(i,j,k+1))!/dxU(i)
-      SL=(SCAL(i,j,k+1)-SCAL(i,j,k+2))!/dxU(i-1)
+      SR=(SCAL(i,j,k)-SCAL(i,j,k+1))/dzW(k)
+      SL=(SCAL(i,j,k+1)-SCAL(i,j,k+2))/dzW(k-1)
      endif
-!      if (abs(SR+eps*sign(1._KND,SL))>1E5*abs(SL+eps*sign(1._KND,SL)))&
-!        write(*,*) SR,SL,SR+eps*sign(1._KND,SL),SL+eps*sign(1._KND,SL)
      SLOPE(i,j,k)=FLUXLIMITER((SR+eps*sign(1._KND,SL))/(SL+eps*sign(1._KND,SL)))
     enddo
    enddo
   enddo
 
 
-  do i=1,Prnx
+  do k=0,Prnz
    do j=1,Prny
-    do k=0,Prnz
+    do i=1,Prnx
      if (W(i,j,k)>0) then
       FLUX=W(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._KND)
      else
@@ -598,7 +727,7 @@ contains
     enddo
    enddo
   enddo
-  endsubroutine KAPPASCALAR
+  endsubroutine KAPPASCALARGG
 
 
 
@@ -608,7 +737,7 @@ contains
   real(KND),intent(in):: coef
   integer,intent(in):: sctype
   integer nx,ny,nz,i,j,k,l
-  real(KND) p,S,Ap(-1:Prnx+1,-1:Prny+1,-1:Prnz+1),Scal3(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
+  real(KND) p,S,A,Ap(-1:Prnx+1,-1:Prny+1,-1:Prnz+1),Scal3(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
   type(TScalFlIBPoint),pointer::SFlIBP
 
    nx=Prnx
@@ -636,11 +765,11 @@ contains
     enddo
    enddo
 
-   Ap(1,1,1)=dt*coef
+   A=dt*coef
    do k=1,Prnz
     do j=1,Prny
      do i=1,Prnx
-       SCAL2(i,j,k)=SCAL(i,j,k)+Ap(1,1,1)*SCAL3(i,j,k)
+       SCAL2(i,j,k)=SCAL(i,j,k)+A*SCAL3(i,j,k)
      enddo
     enddo
    enddo
@@ -662,10 +791,28 @@ contains
     enddo
    endif
 
+   Ax=4._KND*dxmin**2
+   Ay=4._KND*dymin**2
+   Az=4._KND*dzmin**2
+
+   if (gridtype==uniformgrid) then
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
-       Ap(i,j,k)=1._KND/(1._KND/(coef*dt)+(((TDiff(i+1,j,k)+TDiff(i,j,k))/dxU(i)+&
+       Ap(i,j,k)=1._KND/(1._KND/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))+&
+                            (TDiff(i,j,k)+TDiff(i-1,j,k)))/Ax+&
+                            ((TDiff(i,j+1,k)+TDiff(i,j,k))+&
+                            (TDiff(i,j,k)+TDiff(i,j-1,k)))/Ay+&
+                            ((TDiff(i,j,k+1)+TDiff(i,j,k))+&
+                            (TDiff(i,j,k)+TDiff(i,j,k-1)))/Az))
+      enddo
+     enddo
+    enddo
+   else
+    do k=1,Prnz
+     do j=1,Prny
+      do i=1,Prnx
+       Ap(i,j,k)=1._KND/(1._KND/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))/dxU(i)+&
                             (TDiff(i,j,k)+TDiff(i-1,j,k))/dxU(i-1))/(4._KND*dxPr(i))+&
                             ((TDiff(i,j+1,k)+TDiff(i,j,k))/dyV(j)+&
                             (TDiff(i,j,k)+TDiff(i,j-1,k))/dyV(j-1))/(4._KND*dyPr(j))+&
@@ -674,60 +821,109 @@ contains
       enddo
      enddo
     enddo
+   endif
 
    do l=1,maxCNiter
-   S=0
-   if (sctype==1) then
-    call BOUND_Temp(SCAL2)
-   else 
-    call BOUND_PASSSCALAR(SCAL2)
-   endif
-    !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
-    !$OMP DO
-    do k=1,Prnz
-     do j=1,Prny
-      do i=1,Prnx
-       if (REDBLACKPr(i,j,k)) then
-        p=(SCAL(i,j,k)/(coef*dt))+(SCAL3(i,j,k)+&
-         ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
-          (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
-         ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))/dyV(j)-&
-          (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
-         ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))/dzW(k)-&
-          (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1))/dzW(k-1))/(dzPr(k))&
-         )/4._KND
-         p=p*Ap(i,j,k)
-         S=max(S,abs(p-SCAL2(i,j,k)))
-         SCAL2(i,j,k)=p
-       endif
+    S=0
+    if (sctype==1) then
+     call BOUND_Temp(SCAL2)
+    else 
+     call BOUND_PASSSCALAR(SCAL2)
+    endif
+   
+    if (gridtype==uniformgrid) then
+     !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
+     !$OMP DO
+     do k=1,Prnz
+      do j=1,Prny
+       do i=1,Prnx
+        if (REDBLACKPr(i,j,k)) then
+         p=(SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
+          ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
+           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))/Ax+&
+          ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
+           (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))/Ay+&
+          ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
+           (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))/Az&
+          )
+          p=p*Ap(i,j,k)
+          S=max(S,abs(p-SCAL2(i,j,k)))
+          SCAL2(i,j,k)=p
+        endif
+       enddo
       enddo
      enddo
-    enddo
-    !$OMP ENDDO
-    !$OMP DO
-    do k=1,Prnz
-     do j=1,Prny
-      do i=1,Prnx
-       if (.not.REDBLACKPr(i,j,k)) then
-        p=(SCAL(i,j,k)/(coef*dt))+(SCAL3(i,j,k)+&
-         ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
-          (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
-         ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))/dyV(j)-&
-          (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
-         ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))/dzW(k)-&
-          (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1))/dzW(k-1))/(dzPr(k))&
-         )/4._KND
-         p=p*Ap(i,j,k)
-         S=max(S,abs(p-SCAL2(i,j,k)))
-         SCAL2(i,j,k)=p
-       endif
+     !$OMP ENDDO
+     !$OMP DO
+     do k=1,Prnz
+      do j=1,Prny
+       do i=1,Prnx
+        if (.not.REDBLACKPr(i,j,k)) then
+         p=(SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
+          ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
+           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))/Ax+&
+          ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
+           (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))/Ay+&
+          ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
+           (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))/Az&
+          )
+          p=p*Ap(i,j,k)
+          S=max(S,abs(p-SCAL2(i,j,k)))
+          SCAL2(i,j,k)=p
+        endif
+       enddo
       enddo
      enddo
-    enddo
-    !$OMP ENDDO
-   !$OMP ENDPARALLEL
-      write (*,*) "CNscalar ",l,S
-     if (S<=epsCN) exit
+     !$OMP ENDDO
+     !$OMP ENDPARALLEL
+    else
+     !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
+     !$OMP DO
+     do k=1,Prnz
+      do j=1,Prny
+       do i=1,Prnx
+        if (REDBLACKPr(i,j,k)) then
+         p=(SCAL(i,j,k)/A)+(SCAL3(i,j,k)+&
+          ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
+           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
+          ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))/dyV(j)-&
+           (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
+          ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))/dzW(k)-&
+           (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1))/dzW(k-1))/(dzPr(k))&
+          )/4._KND
+          p=p*Ap(i,j,k)
+          S=max(S,abs(p-SCAL2(i,j,k)))
+          SCAL2(i,j,k)=p
+        endif
+       enddo
+      enddo
+     enddo
+     !$OMP ENDDO
+     !$OMP DO
+     do k=1,Prnz
+      do j=1,Prny
+       do i=1,Prnx
+        if (.not.REDBLACKPr(i,j,k)) then
+         p=(SCAL(i,j,k)/A)+(SCAL3(i,j,k)+&
+          ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
+           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
+          ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))/dyV(j)-&
+           (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
+          ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))/dzW(k)-&
+           (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1))/dzW(k-1))/(dzPr(k))&
+          )/4._KND
+          p=p*Ap(i,j,k)
+          S=max(S,abs(p-SCAL2(i,j,k)))
+          SCAL2(i,j,k)=p
+        endif
+       enddo
+      enddo
+     enddo
+     !$OMP ENDDO
+     !$OMP ENDPARALLEL
+    endif
+    write (*,*) "CNscalar ",l,S
+    if (S<=epsCN) exit
    enddo
   else
    SCAL2=SCAL
