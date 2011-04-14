@@ -409,15 +409,7 @@ module SMAGORINSKY
   forall(k=-1:Prnz+2,j=-1:Prny+2,i=-1:Prnx+2,abs(a(1,1,i,j,k))>1e-5.and.bb(i,j,k)>0)
        Visc(i,j,k)=c*sqrt(bb(i,j,k)/a(1,1,i,j,k))
   endforall
-!   S=0
-!   do k=1,Prnz
-!    do j=1,Prny
-!     do i=1,Prnx
-!      if (.not.(abs(a(1,1,i,j,k))>1.D-15.and.bb(i,j,k)>0)) S=S+1
-!     enddo
-!    enddo
-!   enddo
-!   write (*,*) S/(1._KND*Prnx*Prny*Prnz)*100,"percent of zeros"
+
   if (Re>0) then 
     Visc=Visc+1._KND/Re
   endif

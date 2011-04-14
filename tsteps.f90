@@ -1143,7 +1143,8 @@ contains
    real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: U3
    real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: V3
    real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: W3
-   real(KND) p,Af,Ap,Apre,Aprn,Aprt,Ap2,Str(3,3)
+   real(KND) p,Af,Ap,Apre,Aprn,Aprt,Ap2,S
+   real(KND) Str(3,3)
 
    integer i,j,k,l,x,y,z
 
@@ -1337,12 +1338,17 @@ Regt0: if (Re>0) then
   real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: Apu
   real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: ApV
   real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: ApW
-  real(KND) dxmin2,dymin2,dzmin2,Ap,Ap2,Ap3,Ap4,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
+  real(KND) recdxmin2,recdymin2,recdzmin2                                                               !reciprocal values of dx**2
+  real(KND) Ap,Ap2,Ap3,Ap4,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw 
   integer i,j,k,l,Unyz,Vnyz,Wnyz
 
        Ap2=coef*dt/(2._KND)
        S=0
        l=0
+
+       recdxmin2=1./dxmin**2
+       recdymin2=1./dymin**2
+       recdzmin2=1./dzmin**2
 
 
        do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
@@ -1350,11 +1356,11 @@ Regt0: if (Re>0) then
          do i=1,Unx
           U2(i,j,k)=U2(i,j,k)+Ap2*(&
           ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
-          Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))/dxmin2+0.25_KND*(&
+          Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*recdxmin2+0.25_KND*(&
            ((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
-           (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))/dymin2+&
+           (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))*recdymin2+&
            ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
-           (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))/dzmin2)))
+           (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))*recdzmin2)))
          enddo
         enddo
        enddo
@@ -1363,11 +1369,11 @@ Regt0: if (Re>0) then
          do i=1,Vnx
           V2(i,j,k)=V2(i,j,k)+Ap2*(&
           (0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
-          (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))/dxmin2+&
+          (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))*recdxmin2+&
            (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
-           Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))/dymin2+&
+           Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*recdymin2+&
            0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
-           (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))/dzmin2))
+           (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))*recdzmin2))
          enddo
         enddo
        enddo
@@ -1376,11 +1382,11 @@ Regt0: if (Re>0) then
         do i=1,Wnx
          W2(i,j,k)=W2(i,j,k)+Ap2*(&
          (0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
-         (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))/dxmin2+&
+         (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))*recdxmin2+&
           ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
-          (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))/dymin2)+&
+          (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))*recdymin2)+&
           (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
-          Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))/dzmin2))
+          Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*recdzmin2))
         enddo
        enddo
       enddo
@@ -1388,39 +1394,45 @@ Regt0: if (Re>0) then
        do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
         do j=1,Uny
          do i=1,Unx
-          ApU(i,j,k)=1.+Ap2* ((Visc(i+1,j,k)+&
-                      Visc(i,j,k))/dxmin2+&
+          ApU(i,j,k)=((Visc(i+1,j,k)+&
+                      Visc(i,j,k))*recdxmin2+&
                       0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
-                      (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k)))/dymin2+&
+                      (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2+&
                       ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
-                      (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))/dzmin2))
+                      (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))*recdzmin2))
          enddo
         enddo
        enddo
+       ApU=1._KND/(1._KND+Ap2*ApU)
+
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
-          ApV(i,j,k)=1.+Ap2* ((Visc(i,j+1,k)+&
-                              Visc(i,j,k))/dymin2+&
+          ApV(i,j,k)=((Visc(i,j+1,k)+&
+                     Visc(i,j,k))*recdymin2+&
                      0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
-                      (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k)))/dxmin2+&
+                      (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k)))*recdxmin2+&
                      ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
-                     (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))/dzmin2))
+                     (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))*recdzmin2))
          enddo
         enddo
        enddo
+       ApV=1._KND/(1._KND+Ap2*ApV)
+
        do k=1,Wnz
         do j=1,Wny
          do i=1,Wnx
-          ApW(i,j,k)=1.+Ap2* (0.25*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
-                      (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k)))/dxmin2+&
+          ApW(i,j,k)=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
+                      (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k)))*recdxmin2+&
                      ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))+&
-                     (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k)))/dymin2)+&
+                     (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2)+&
                      (Visc(i,j,k+1)+&
-                     Visc(i,j,k))/dzmin2)
+                     Visc(i,j,k))*recdzmin2)
          enddo
         enddo
        enddo
+       ApW=1._KND/(1._KND+Ap2*ApW)
+
 
        Suavg=abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
        Svavg=abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
@@ -1446,13 +1458,13 @@ Regt0: if (Re>0) then
           do i=1,Unx
            if (REDBLACKU(i,j,k)) then
             p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
-             Visc(i,j,k)*(-U3(i-1,j,k)))/dxmin2+&
+             Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
              0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
-             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))/dymin2+&
+             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
              ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
-             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))/dzmin2))
+             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
             p=Ap2*p+U2(i,j,k)+U(i,j,k)
-            p=p/ApU(i,j,k)
+            p=p*ApU(i,j,k)
 
 
             Su=max(Su,abs(p-U3(i,j,k)))
@@ -1468,13 +1480,13 @@ Regt0: if (Re>0) then
           do i=1,Vnx
            if (REDBLACKV(i,j,k)) then
             p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
-             Visc(i,j,k)*(-V3(i,j-1,k)))/dymin2+&
+             Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
              0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
-             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))/dxmin2+&
+             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
              ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
-             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))/dzmin2))
+             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
             p=Ap2*p+V2(i,j,k)+V(i,j,k)
-            p=p/ApV(i,j,k)
+            p=p*ApV(i,j,k)
             Sv=max(Sv,abs(p-V3(i,j,k)))
             V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
            endif
@@ -1488,13 +1500,13 @@ Regt0: if (Re>0) then
           do i=1,Wnx
            if (REDBLACKW(i,j,k)) then
             p=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
-             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))/dxmin2+&
+             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
              ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
-             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))/dymin2)+&
+             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
              (Visc(i,j,k+1)*(W3(i,j,k+1))-&
-             Visc(i,j,k)*(-W3(i,j,k-1)))/dzmin2)
+             Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
             p=Ap2*p+W2(i,j,k)+W(i,j,k)
-            p=p/ApW(i,j,k)
+            p=p*ApW(i,j,k)
             Sw=max(Sw,abs(p-W3(i,j,k)))
             W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
            endif
@@ -1509,13 +1521,13 @@ Regt0: if (Re>0) then
           do i=1,Unx
            if (.not.REDBLACKU(i,j,k)) then
             p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
-             Visc(i,j,k)*(-U3(i-1,j,k)))/dxmin2+&
+             Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
              0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
-             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))/dymin2+&
+             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
              ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
-             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))/dzmin2))
+             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
             p=Ap2*p+U2(i,j,k)+U(i,j,k)
-            p=p/ApU(i,j,k)
+            p=p*ApU(i,j,k)
 
 
             Su=max(Su,abs(p-U3(i,j,k)))
@@ -1531,13 +1543,13 @@ Regt0: if (Re>0) then
           do i=1,Vnx
            if (.not.REDBLACKV(i,j,k)) then
             p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
-             Visc(i,j,k)*(-V3(i,j-1,k)))/dymin2+&
+             Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
              0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
-             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))/dxmin2+&
+             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
              ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
-             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))/dzmin2))
+             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
             p=Ap2*p+V2(i,j,k)+V(i,j,k)
-            p=p/ApV(i,j,k)
+            p=p*ApV(i,j,k)
             Sv=max(Sv,abs(p-V3(i,j,k)))
             V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
            endif
@@ -1551,13 +1563,13 @@ Regt0: if (Re>0) then
           do i=1,Wnx
            if (.not.REDBLACKW(i,j,k)) then
             p=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
-             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))/dxmin2+&
+             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
              ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
-             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))/dymin2)+&
+             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
              (Visc(i,j,k+1)*(W3(i,j,k+1))-&
-             Visc(i,j,k)*(-W3(i,j,k-1)))/dzmin2)
+             Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
             p=Ap2*p+W2(i,j,k)+W(i,j,k)
-            p=p/ApW(i,j,k)
+            p=p*ApW(i,j,k)
             Sw=max(Sw,abs(p-W3(i,j,k)))
             W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
            endif
@@ -1574,14 +1586,13 @@ Regt0: if (Re>0) then
 
 
 
-
   subroutine GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W,U2,V2,W2,U3,V3,W3
   real(KND),intent(in):: coef
   real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: Apu
   real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: ApV
   real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: ApW
-  real(KND) dxmin2,dymin2,dzmin2,Ap,Ap2,Ap3,Ap4,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
+  real(KND) recdxmin2,recdymin2,recdzmin2,Ap,Ap2,Ap3,Ap4,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
   integer i,j,k,l,Unyz,Vnyz,Wnyz
 
 
@@ -1634,7 +1645,7 @@ Regt0: if (Re>0) then
        do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
         do j=1,Uny
          do i=1,Unx
-          ApU(i,j,k)=1.+Ap2* ((Visc(i+1,j,k)/dxPr(i+1)+&
+          ApU(i,j,k)=((Visc(i+1,j,k)/dxPr(i+1)+&
                       Visc(i,j,k)/dxPr(i))/dxU(i)+&
                       (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))/dyV(j)+&
                       0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))/dyV(j-1))/dyPr(j)+&
@@ -1643,10 +1654,12 @@ Regt0: if (Re>0) then
          enddo
         enddo
        enddo
+       ApU=1._KND/(1._KND+Ap2*ApU)
+
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
-          ApV(i,j,k)=1.+Ap2* ((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))/dxU(i)+&
+          ApV(i,j,k)= ((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))/dxU(i)+&
                       0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))/dxU(i-1))/dxPr(i)+&
                      (Visc(i,j+1,k)/dyPr(j+1)+&
                      Visc(i,j,k)/dyPr(j))/dyV(j)+&
@@ -1655,10 +1668,12 @@ Regt0: if (Re>0) then
          enddo
         enddo
        enddo
+       ApV=1._KND/(1._KND+Ap2*ApV)
+
        do k=1,Wnz
         do j=1,Wny
          do i=1,Wnx
-          ApW(i,j,k)=1.+Ap2* ((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))/dxU(i)+&
+          ApW(i,j,k)= ((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))/dxU(i)+&
                       0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))/dxU(i-1))/dxPr(i)+&
                      (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))/dyV(j)+&
                      0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))/dyV(j-1))/dyPr(j)+&
@@ -1667,6 +1682,7 @@ Regt0: if (Re>0) then
          enddo
         enddo
        enddo
+       ApW=1._KND/(1._KND+Ap2*ApW)
 
        Suavg=abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
        Svavg=abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
@@ -1698,7 +1714,7 @@ Regt0: if (Re>0) then
              (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))/dzW(k)-&
              0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
             p=Ap2*p+U2(i,j,k)+U(i,j,k)
-            p=p/ApU(i,j,k)
+            p=p*ApU(i,j,k)
 
 
             Su=max(Su,abs(p-U3(i,j,k)))
@@ -1720,7 +1736,7 @@ Regt0: if (Re>0) then
              (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))/dzW(k)-&
              0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
             p=Ap2*p+V2(i,j,k)+V(i,j,k)
-            p=p/ApV(i,j,k)
+            p=p*ApV(i,j,k)
             Sv=max(Sv,abs(p-V3(i,j,k)))
             V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
            endif
@@ -1740,7 +1756,7 @@ Regt0: if (Re>0) then
              (Visc(i,j,k+1)*(W3(i,j,k+1))/dzPr(k+1)-&
              Visc(i,j,k)*(-W3(i,j,k-1))/dzPr(k))/dzW(k))
             p=Ap2*p+W2(i,j,k)+W(i,j,k)
-            p=p/ApW(i,j,k)
+            p=p*ApW(i,j,k)
             Sw=max(Sw,abs(p-W3(i,j,k)))
             W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
            endif
@@ -1761,7 +1777,7 @@ Regt0: if (Re>0) then
              (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))/dzW(k)-&
              0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
             p=Ap2*p+U2(i,j,k)+U(i,j,k)
-            p=p/ApU(i,j,k)
+            p=p*ApU(i,j,k)
 
 
             Su=max(Su,abs(p-U3(i,j,k)))
@@ -1783,7 +1799,7 @@ Regt0: if (Re>0) then
              (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))/dzW(k)-&
              0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
             p=Ap2*p+V2(i,j,k)+V(i,j,k)
-            p=p/ApV(i,j,k)
+            p=p*ApV(i,j,k)
             Sv=max(Sv,abs(p-V3(i,j,k)))
             V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
            endif
@@ -1803,7 +1819,7 @@ Regt0: if (Re>0) then
              (Visc(i,j,k+1)*(W3(i,j,k+1))/dzPr(k+1)-&
              Visc(i,j,k)*(-W3(i,j,k-1))/dzPr(k))/dzW(k))
             p=Ap2*p+W2(i,j,k)+W(i,j,k)
-            p=p/ApW(i,j,k)
+            p=p*ApW(i,j,k)
             Sw=max(Sw,abs(p-W3(i,j,k)))
             W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
            endif
