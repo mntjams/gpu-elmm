@@ -793,20 +793,20 @@ contains
     enddo
    endif
 
-   Ax=4._KND*dxmin**2
-   Ay=4._KND*dymin**2
-   Az=4._KND*dzmin**2
+   Ax=1._KND/(4._KND*dxmin**2)
+   Ay=1._KND/(4._KND*dymin**2)
+   Az=1._KND/(4._KND*dzmin**2)
 
    if (gridtype==uniformgrid) then
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
        Ap(i,j,k)=1._KND/(1._KND/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))+&
-                            (TDiff(i,j,k)+TDiff(i-1,j,k)))/Ax+&
+                            (TDiff(i,j,k)+TDiff(i-1,j,k)))*Ax+&
                             ((TDiff(i,j+1,k)+TDiff(i,j,k))+&
-                            (TDiff(i,j,k)+TDiff(i,j-1,k)))/Ay+&
+                            (TDiff(i,j,k)+TDiff(i,j-1,k)))*Ay+&
                             ((TDiff(i,j,k+1)+TDiff(i,j,k))+&
-                            (TDiff(i,j,k)+TDiff(i,j,k-1)))/Az))
+                            (TDiff(i,j,k)+TDiff(i,j,k-1)))*Az))
       enddo
      enddo
     enddo
@@ -842,11 +842,11 @@ contains
         if (REDBLACKPr(i,j,k)) then
          p=(SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
           ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
-           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))/Ax+&
+           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
           ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
-           (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))/Ay+&
+           (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
           ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
-           (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))/Az&
+           (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
           )
           p=p*Ap(i,j,k)
           S=max(S,abs(p-SCAL2(i,j,k)))
@@ -863,11 +863,11 @@ contains
         if (.not.REDBLACKPr(i,j,k)) then
          p=(SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
           ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
-           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))/Ax+&
+           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
           ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
-           (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))/Ay+&
+           (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
           ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
-           (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))/Az&
+           (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
           )
           p=p*Ap(i,j,k)
           S=max(S,abs(p-SCAL2(i,j,k)))
