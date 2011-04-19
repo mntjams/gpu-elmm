@@ -757,8 +757,6 @@ contains
     case default
      xnear=-huge(znear);ynear=-huge(znear);znear=-huge(znear)
     end select
-    write (*,'(3H***)',advance="no")
-    write(*,*) x,y,z,xnear,ynear,znear
   endsubroutine SolidBodyNearestOut
 
 
