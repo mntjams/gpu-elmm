@@ -361,13 +361,14 @@ contains
 
 
   real(KND) function PointDist(x1,y1,z1,x2,y2,z2)
-  real(KND) x1,y1,z1,x2,y2,z2
+  real(KND),intent(in):: x1,y1,z1,x2,y2,z2
    PointDist=SQRT((x1-x2)**2+(y1-y2)**2+(z1-z2)**2)
   endfunction PointDist
 
 
   subroutine LineNearest(xnear,ynear,znear,x,y,z,xl,yl,zl,a,b,c)
-  real(KND) xnear,ynear,znear,x,y,z,xl,yl,zl,a,b,c
+  real(KND),intent(out):: xnear,ynear,znear
+  real(KND),intent(in):: x,y,z,xl,yl,zl,a,b,c
   real(KND) t
    if (((a/=0).or.(b/=0)).or.(c/=0)) then
     t=(a*(x-xl)+b*(y-yl)+c*(z-zl))/(a**2+b**2+c**2)
@@ -380,8 +381,9 @@ contains
   endsubroutine LineNearest
 
   subroutine PlaneNearest(xnear,ynear,znear,x,y,z,PL)
-   real(KND) xnear,ynear,znear,x,y,z
-   type(TPlane):: PL
+   real(KND),intent(out):: xnear,ynear,znear
+   real(KND),intent(in)::x,y,z
+   type(TPlane),intent(in):: PL
    real(KND) t
    
    if (((PL%a/=0).or.(PL%b/=0)).or.(PL%c/=0)) then
@@ -397,8 +399,9 @@ contains
 
 
   subroutine JacketNearest(xnear,ynear,znear,x,y,z,J)
-   real(KND) xnear,ynear,znear,x,y,z
-   type(TCylJacket):: J
+   real(KND),intent(out):: xnear,ynear,znear
+   real(KND),intent(in):: x,y,z
+   type(TCylJacket),intent(in):: J
    real(KND) t,xl,yl,zl,a,b,c
 
    call LineNearest(xl,yl,zl,x,y,z,J%xc,J%yc,J%zc,J%a,J%b,J%c)
@@ -414,8 +417,9 @@ contains
 
 
   subroutine CylinderNearest(xnear,ynear,znear,x,y,z,C) !only for planes perpendicular to the axis
-   real(KND) xnear,ynear,znear,x,y,z
-   type(TCylinder):: C
+   real(KND),intent(out):: xnear,ynear,znear
+   real(KND),intent(in):: x,y,z
+   type(TCylinder),intent(in):: C
    real(KND) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
   
    !!!Only for Planes perpendicular to jacket!!!!
@@ -466,8 +470,9 @@ contains
   endsubroutine CylinderNearest
 
   subroutine BallNearest(xnear,ynear,znear,x,y,z,Bl)
-   real(KND) xnear,ynear,znear,x,y,z
-   type(TBall):: Bl
+   real(KND),intent(out):: xnear,ynear,znear
+   real(KND),intent(in):: x,y,z
+   type(TBall),intent(in):: Bl
    real(KND) t,a,b,c
 
    a=x-Bl%xc
@@ -481,8 +486,9 @@ contains
 
 
   subroutine PolyhedronNearest(xnear,ynear,znear,x,y,z,PH)
-  real(KND) xnear,ynear,znear,x,y,z
-  type(TPolyhedron) PH
+  real(KND),intent(out):: xnear,ynear,znear
+  real(KND),intent(in):: x,y,z
+  type(TPolyhedron),intent(in):: PH
   real(KND) dists(PH%nplanes),xP(PH%nplanes),yP(PH%nplanes),zP(PH%nplanes),minv
   real(KND) ailine,biline,ciline,x0iline,y0iline,z0iline,ag(3,3),bg(3),xg(3),xln,yln,zln,c
   integer nearest,nearest2,nearest3,i,j,INDX(3)
@@ -500,7 +506,6 @@ contains
     if (PlaneInt(x,y,z,PH%Planes(i))) dists(i)=-ABS(dists(i))
    enddo
    !find nearest plane with
-   write (*,*) "dists",dists(:)
    nearest=0
    minv=huge(minv)
    do i=1,PH%nplanes
@@ -625,9 +630,9 @@ contains
    
 
   subroutine TerrainNearest(xnear,ynear,znear,x,y,z,T)
-   real(KND) xnear,ynear,znear
-   real(KND) x,y,z
-   type(TTerrain):: T
+   real(KND),intent(out):: xnear,ynear,znear
+   real(KND),intent(in):: x,y,z
+   type(TTerrain),intent(in):: T
    integer xi,yj,comp
 
    xnear=x
@@ -642,8 +647,8 @@ contains
 
   subroutine SolidBodyNearest(xnear,ynear,znear,x,y,z,SB)
    real(KND),intent(out):: xnear,ynear,znear
-   real(KND) x,y,z
-   type(TSolidBody):: SB
+   real(KND),intent(in):: x,y,z
+   type(TSolidBody),intent(in):: SB
    
    select case (SB%typeofbody)
     case (1)
@@ -662,8 +667,9 @@ contains
 
 
   subroutine CylinderNearestOut(xnear,ynear,znear,x,y,z,C) !only for planes perpendicular to the axis
-   real(KND) xnear,ynear,znear,x,y,z
-   type(TCylinder):: C
+   real(KND),intent(out):: xnear,ynear,znear
+   real(KND),intent(in):: x,y,z
+   type(TCylinder),intent(in):: C
    real(KND) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
   
    if (associated(C%Plane1)) then
@@ -702,8 +708,9 @@ contains
 
 
   subroutine PolyhedronNearestOut(xnear,ynear,znear,x,y,z,PH)
-  real(KND) xnear,ynear,znear,x,y,z
-  type(TPolyhedron) PH
+  real(KND),intent(out):: xnear,ynear,znear
+  real(KND),intent(in):: x,y,z
+  type(TPolyhedron),intent(in):: PH
   real(KND) dists(PH%nplanes),xP(PH%nplanes),yP(PH%nplanes),zP(PH%nplanes),minv
   integer nearest,i
 
@@ -733,12 +740,12 @@ contains
 
   subroutine SolidBodyNearestOut(xnear,ynear,znear,x,y,z,SB)
    real(KND),intent(out):: xnear,ynear,znear
-   real(KND) x,y,z
-   type(TSolidBody):: SB
+   real(KND),intent(in):: x,y,z
+   type(TSolidBody),intent(in):: SB
 
-  xnear=-1e+9;ynear=-1e+9;znear=-1e+9
+   xnear=-1e+9;ynear=-1e+9;znear=-1e+9
 
-  select case (SB%typeofbody)
+   select case (SB%typeofbody)
     case (1)
      call PolyhedronNearestOut(xnear,ynear,znear,x,y,z,SB%Polyhedron)
     case (2)
@@ -750,6 +757,8 @@ contains
     case default
      xnear=-huge(znear);ynear=-huge(znear);znear=-huge(znear)
     end select
+    write (*,'(3H***)',advance="no")
+    write(*,*) x,y,z,xnear,ynear,znear
   endsubroutine SolidBodyNearestOut
 
 
@@ -902,7 +911,7 @@ contains
 
 
   subroutine AddIBpoint(IBP)
-  type(TIBPoint):: IBP
+  type(TIBPoint),intent(in):: IBP
   
   if (.not.associated(LastIBPoint)) then
    allocate(FirstIBPoint)
@@ -916,7 +925,7 @@ contains
   endsubroutine AddIBPoint
 
   subroutine AddScalIBpoint(SIBP)
-  type(TScalFlIBPoint):: SIBP
+  type(TScalFlIBPoint),intent(in):: SIBP
   
   if (.not.associated(LastScalFlIBPoint)) then
    allocate(FirstScalFlIBPoint)
@@ -930,31 +939,34 @@ contains
   endsubroutine AddScalIBPoint
 
 
-  subroutine NearestOnLineOut(x,y,z,x2,y2,z2,t,SB)
-  type(TSolidBody):: SB
-  real(KND):: x,y,z,x2,y2,z2,t,t1,t2
+  real(KND) function NearestOnLineOut(x,y,z,x2,y2,z2,SB) !Find t, such that x+(x2-x)*t lies on the boundary of the SB
+  type(TSolidBody),intent(in):: SB
+  real(KND),intent(in):: x,y,z,x2,y2,z2
+
+  real(KND) t,t1,t2
   integer i
 
   t1=0
   t2=1
   if (SolidBodyInt(x2,y2,z2,SB)) then
    do
-    t2=t2*2
+    t2=t2*2._KND
     if (.not.SolidBodyInt(x+(x2-x)*t2,y+(y2-y)*t2,z+(z2-z)*t2,SB)) exit
    enddo
   endif
+  t=(t1+t2)/2._KND
 
-  do i=1,20
-   t=(t1+t2)/2._KND
+  do i=1,20         !The bisection method with maximum 20 iterations (should be well enough)
    if (SolidBodyInt(x+(x2-x)*t,y+(y2-y)*t,z+(z2-z)*t,SB)) then
     t1=t
    else
     t2=t
    endif
-   if (abs(t1-t2)<MIN(dxmin/1000._KND,dymin/1000._KND,dzmin/1000._KND)) exit
+   t=(t1+t2)/2._KND
+   if (abs(t1-t2)<MIN(dxmin/1000._KND,dymin/1000._KND,dzmin/1000._KND))   exit
   enddo
-  t=1
-  endsubroutine NearestOnLineOut
+  NearestOnLineOut=t
+  endfunction NearestOnLineOut
 
 
 
@@ -1064,7 +1076,7 @@ contains
    IBP%interp=2
    IBP%interpdir=1
    if (dirx==1) then
-    call NearestOnLineOut(x,y,z,x,y+IBP%disty,z+IBP%distz,t,SB)
+    t=NearestOnLineOut(x,y,z,x,y+IBP%disty,z+IBP%distz,SB)
 
     dirx=0
     IBP%dirx=0
@@ -1076,7 +1088,7 @@ contains
    IBP%interp=2
    IBP%interpdir=2
    if (diry==1) then
-    call NearestOnLineOut(x,y,z,x+IBP%distx,y,z+IBP%distz,t,SB)
+    t=NearestOnLineOut(x,y,z,x+IBP%distx,y,z+IBP%distz,SB)
 
     diry=0
     IBP%diry=0
@@ -1088,7 +1100,7 @@ contains
    IBP%interp=2
    IBP%interpdir=3
    if (dirz==1) then
-    call NearestOnLineOut(x,y,z,x+IBP%distx,y+IBP%disty,z,t,SB)
+    t=NearestOnLineOut(x,y,z,x+IBP%distx,y+IBP%disty,z,SB)
 
     dirz=0
     IBP%dirz=0
@@ -1100,7 +1112,7 @@ contains
    IBP%interp=1
    IBP%interpdir=1
    if (diry==1.or.dirz==1) then
-    call NearestOnLineOut(x,y,z,x+IBP%distx,y,z,t,SB)
+    t=NearestOnLineOut(x,y,z,x+IBP%distx,y,z,SB)
 
     diry=0
     dirz=0
@@ -1114,7 +1126,7 @@ contains
    IBP%interp=1
    IBP%interpdir=2
    if (dirx==1.or.dirz==1) then
-    call NearestOnLineOut(x,y,z,x,y+IBP%disty,z,t,SB)
+    t=NearestOnLineOut(x,y,z,x,y+IBP%disty,z,SB)
 
     dirx=0
     dirz=0
@@ -1128,7 +1140,7 @@ contains
    IBP%interp=1
    IBP%interpdir=3
    if (dirx==1.or.diry==1) then
-    call NearestOnLineOut(x,y,z,x,y,z+IBP%distz,t,SB)
+    t=NearestOnLineOut(x,y,z,x,y,z+IBP%distz,SB)
 
     dirx=0
     diry=0
@@ -1162,9 +1174,11 @@ contains
 
 
   subroutine GetVIBPoint(IBP,xi,yj,zk)
-  type(TIBPoint) IBP
+  type(TIBPoint),intent(out):: IBP
+  integer,intent(in):: xi,yj,zk
+
   type(TSolidBody),pointer:: SB
-  integer xi,yj,zk,dirx,diry,dirz,n1,n2
+  integer dirx,diry,dirz,n1,n2
   real(KND) x,y,z,xnear,ynear,znear,t
   logical free100,free010,free001
 
@@ -1263,7 +1277,7 @@ contains
    IBP%interp=2
    IBP%interpdir=1
    if (dirx==1) then
-    call NearestOnLineOut(x,y,z,x,y+IBP%disty,z+IBP%distz,t,SB)
+    t=NearestOnLineOut(x,y,z,x,y+IBP%disty,z+IBP%distz,SB)
 
     dirx=0
     IBP%dirx=0
@@ -1275,7 +1289,7 @@ contains
    IBP%interp=2
    IBP%interpdir=2
    if (diry==1) then
-    call NearestOnLineOut(x,y,z,x+IBP%distx,y,z+IBP%distz,t,SB)
+    t=NearestOnLineOut(x,y,z,x+IBP%distx,y,z+IBP%distz,SB)
 
     diry=0
     IBP%diry=0
@@ -1287,7 +1301,7 @@ contains
    IBP%interp=2
    IBP%interpdir=3
    if (dirz==1) then
-    call NearestOnLineOut(x,y,z,x+IBP%distx,y+IBP%disty,z,t,SB)
+    t=NearestOnLineOut(x,y,z,x+IBP%distx,y+IBP%disty,z,SB)
 
     dirz=0
     IBP%dirz=0
@@ -1299,7 +1313,7 @@ contains
    IBP%interp=1
    IBP%interpdir=1
    if (diry==1.or.dirz==1) then
-    call NearestOnLineOut(x,y,z,x+IBP%distx,y,z,t,SB)
+    t=NearestOnLineOut(x,y,z,x+IBP%distx,y,z,SB)
 
     diry=0
     dirz=0
@@ -1313,7 +1327,7 @@ contains
    IBP%interp=1
    IBP%interpdir=2
    if (dirx==1.or.dirz==1) then
-    call NearestOnLineOut(x,y,z,x,y+IBP%disty,z,t,SB)
+    t=NearestOnLineOut(x,y,z,x,y+IBP%disty,z,SB)
 
     dirx=0
     dirz=0
@@ -1327,7 +1341,7 @@ contains
    IBP%interp=1
    IBP%interpdir=3
    if (diry==1.or.dirx==1) then
-    call NearestOnLineOut(x,y,z,x,y,z+IBP%distz,t,SB)
+    t=NearestOnLineOut(x,y,z,x,y,z+IBP%distz,SB)
 
     dirx=0
     diry=0
@@ -1359,9 +1373,11 @@ contains
 
 
   subroutine GetWIBPoint(IBP,xi,yj,zk)
-  type(TIBPoint) IBP
+  type(TIBPoint),intent(out):: IBP
+  integer,intent(in):: xi,yj,zk
+
   type(TSolidBody),pointer:: SB
-  integer xi,yj,zk,dirx,diry,dirz,n1,n2
+  integer dirx,diry,dirz,n1,n2
   real(KND) x,y,z,xnear,ynear,znear,t
   logical free100,free010,free001
 
@@ -1463,7 +1479,7 @@ contains
    IBP%interp=2
    IBP%interpdir=1
    if (dirx==1) then
-    call NearestOnLineOut(x,y,z,x,y+IBP%disty,z+IBP%distz,t,SB)
+    t=NearestOnLineOut(x,y,z,x,y+IBP%disty,z+IBP%distz,SB)
 
     dirx=0
     IBP%dirx=0
@@ -1475,7 +1491,7 @@ contains
    IBP%interp=2
    IBP%interpdir=2
    if (diry==1) then
-    call NearestOnLineOut(x,y,z,x+IBP%distx,y,z+IBP%distz,t,SB)
+    t=NearestOnLineOut(x,y,z,x+IBP%distx,y,z+IBP%distz,SB)
 
     diry=0
     IBP%diry=0
@@ -1487,7 +1503,7 @@ contains
    IBP%interp=2
    IBP%interpdir=3
    if (dirz==1) then
-    call NearestOnLineOut(x,y,z,x+IBP%distx,y+IBP%disty,z,t,SB)
+    t=NearestOnLineOut(x,y,z,x+IBP%distx,y+IBP%disty,z,SB)
 
     dirz=0
     IBP%dirz=0
@@ -1499,7 +1515,7 @@ contains
    IBP%interp=1
    IBP%interpdir=1
    if (diry==1.or.dirz==1) then
-    call NearestOnLineOut(x,y,z,x+IBP%distx,y,z,t,SB)
+    t=NearestOnLineOut(x,y,z,x+IBP%distx,y,z,SB)
 
     diry=0
     dirz=0
@@ -1513,7 +1529,7 @@ contains
    IBP%interp=1
    IBP%interpdir=2
    if (dirx==1.or.dirz==1) then
-    call NearestOnLineOut(x,y,z,x,y+IBP%disty,z,t,SB)
+    t=NearestOnLineOut(x,y,z,x,y+IBP%disty,z,SB)
 
     dirx=0
     dirz=0
@@ -1527,7 +1543,7 @@ contains
    IBP%interp=1
    IBP%interpdir=3
    if (dirx==1.or.diry==1) then
-    call NearestOnLineOut(x,y,z,x,y,z+IBP%distz,t,SB)
+    t=NearestOnLineOut(x,y,z,x,y,z+IBP%distz,SB)
 
     dirx=0
     diry=0
@@ -1558,9 +1574,11 @@ contains
 
 
   subroutine GeTScalIFlBPoint(IBP,xi,yj,zk)
-  type(TScalFlIBPoint) IBP
+  type(TScalFlIBPoint),intent(out):: IBP
+  integer,intent(in):: xi,yj,zk
+
   type(TSolidBody),pointer:: SB
-  integer xi,yj,zk,dirx,diry,dirz,dirx2,diry2,dirz2,n1,n2
+  integer dirx,diry,dirz,dirx2,diry2,dirz2,n1,n2
   real(KND) x,y,z,xnear,ynear,znear,distx,disty,distz,t,tx,ty,tz
   logical freep00,free0p0,free00p,freem00,free0m0,free00m
 
@@ -1736,10 +1754,10 @@ contains
 
    IBP%interp=4
    if (tx<=ty.and.tx<=tz) then
-    !coordinatess if interpolation point are therefore
+    !coordinates of interpolation point are therefore
     !xPr(xi+dirx)=x+tx*distx
     !y+tx*disty
-    !z+tz*distz
+    !z+tx*distz
     IBP%dist=sqrt((distx*tx)**2+(disty*tx)**2+(distz*tx)**2)
     IBP%intpointi(1)=IBP%x+dirx
     IBP%intpointj(1)=IBP%y+diry
@@ -1879,8 +1897,10 @@ contains
 
 
 
-  real(KND) function IBLinInt(h0,h1,h2,vel1,vel2)
-  real(KND) h0,h1,h2,vel1,vel2
+  pure function IBLinInt(h0,h1,h2,vel1,vel2)
+  real(KND):: IBLinInt
+  real(KND),intent(in):: h0,h1,h2,vel1,vel2
+
   if (h0<=h1-h0) then
    IBLinInt=-(h0/(h1-h0))*vel1
   elseif  (h1-h0<h1/10._KND) then
@@ -1890,21 +1910,32 @@ contains
   endif
   endfunction IBLinInt
 
-  real(KND) function IBBiLinInt(x0,y0,x1,y1,velx,vely,velxy)
-  real(KND) x0,y0,x1,y1,velx,vely,velxy,a,b
+  pure function IBBiLinInt(x0,y0,x1,y1,velx,vely,velxy)
+  real(KND):: IBBiLinInt
+  real(KND),intent(in):: x0,y0,x1,y1
+  real(KND),intent(in):: velx,vely,velxy
+
+  real(KND):: a,b
 
   a=(x1-x0)/x1
   b=(y1-y0)/y1
-   IBBiLinInt=-(a*(1-b)*vely+(1-a)*(1-b)*velxy+(1-a)*b*velx)/(a*b)
+
+  IBBiLinInt=-(a*(1-b)*vely+(1-a)*(1-b)*velxy+(1-a)*b*velx)/(a*b)
+
   endfunction IBBiLinInt
 
-  real(KND) function IBTriLinInt(x0,y0,z0,x1,y1,z1,velx,vely,velxy,velz,velxz,velyz,velxyz)
-  real(KND) x0,y0,z0,x1,y1,z1,velx,vely,velxy,velz,velxz,velyz,velxyz,a,b,c
+
+  pure function IBTriLinInt(x0,y0,z0,x1,y1,z1,velx,vely,velxy,velz,velxz,velyz,velxyz)
+  real(KND):: IBTriLinInt
+  real(KND),intent(in):: x0,y0,z0,x1,y1,z1
+  real(KND),intent(in):: velx,vely,velxy,velz,velxz,velyz,velxyz
+  real(KND):: a,b,c
 
   a=x0/x1
   b=y0/y1
   c=z0/z1
-    IBTriLinInt=- (a*(1-b)*(1-c)*velx+&
+
+  IBTriLinInt=- (a*(1-b)*(1-c)*velx+&
                  (1-a)*b*(1-c)*vely+&
                  (1-a)*(1-b)*c*velz+&
                  a*b*(1-c)*velxy+&
@@ -1917,7 +1948,7 @@ contains
 
 
   recursive subroutine DeallIBP(IBP)
-  type(TIBPoint),pointer:: IBP
+  type(TIBPoint),pointer,intent(inout):: IBP
 
   if (associated(IBP%next)) call DeallIBP(IBP%next)
   deallocate(IBP)
@@ -1926,7 +1957,7 @@ contains
 
 
   recursive subroutine DeallSB(SB)
-  type(TSolidbody),pointer:: SB
+  type(TSolidbody),pointer,intent(inout):: SB
 
   if (associated(SB%next)) call DeallSB(SB%next)
   if (associated(SB%Ball)) deallocate(SB%Ball)
