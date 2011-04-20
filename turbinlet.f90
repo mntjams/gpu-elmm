@@ -14,7 +14,7 @@ implicit none
   endtype
 
  interface GETTURBINLET
-  module procedure GETTURBINLETKLEIN
+  module procedure GETTURBINLETXIE
  endinterface
 
 contains
