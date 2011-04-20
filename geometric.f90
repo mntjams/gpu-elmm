@@ -1260,6 +1260,7 @@ contains
 
   if ((dirx==0.and.diry==0.and.dirz==0).or.((.not.free001).and.(.not.free010).and.(.not.free100))) then
    IBP%interp=0
+   IBP%interpdir=0
    IBP%distx=0
    IBP%disty=0
    IBP%distz=0
@@ -1271,6 +1272,7 @@ contains
    IBP%dirz=0
   elseif ((free100.and.dirx==1).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then
    IBP%interp=3
+   IBP%interpdir=0
   elseif ((.not.free100).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then
    IBP%interp=2
    IBP%interpdir=1
@@ -1462,6 +1464,7 @@ contains
   
   if ((dirx==0.and.diry==0.and.dirz==0).or.((.not.free001).and.(.not.free010).and.(.not.free100))) then
    IBP%interp=0
+   IBP%interpdir=0
    IBP%distx=0
    IBP%disty=0
    IBP%distz=0
@@ -1473,6 +1476,7 @@ contains
    IBP%dirz=0
   elseif ((free100.and.dirx==1).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then
    IBP%interp=3
+   IBP%interpdir=0
   elseif ((.not.free100).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then
    IBP%interp=2
    IBP%interpdir=1
