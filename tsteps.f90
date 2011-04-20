@@ -761,206 +761,206 @@ contains
     dirx=IBP%dirx
     diry=IBP%diry
     dirz=IBP%dirz
-!     if (IBP%interp<=0) then
-!      intvel=0
-!     elseif (IBP%interp==1) then
-!       n=0
-!       if (dirx/=0)  n=n+1
-!       if (diry/=0)  n=n+1
-!       if (dirz/=0)  n=n+1
-!       if (n/=1) then
-!                  write (*,*) dirx,diry,dirz
-!                  stop
-!        endif
-! 
-!      if (IBP%component==1) then
-!       vel1=U(x+dirx,y+diry,z+dirz)
-!       vel2=U(x+2*dirx,y+2*diry,z+2*dirz)
-!       if (IBP%interpdir==1) then
-!        p0=abs(IBP%distx)
-!        p1=abs(xU(x+dirx)-xU(x))
-!        p2=abs(xU(x+2*dirx)-xU(x))
-!       elseif (IBP%interpdir==2) then
-!        p0=abs(IBP%disty)
-!        p1=abs(yPr(y+diry)-yPr(y))
-!        p2=abs(yPr(y+2*diry)-yPr(y))
-!       else
-!        p0=abs(IBP%distz)
-!        p1=abs(zPr(z+dirz)-zPr(z))
-!        p2=abs(zPr(z+2*dirz)-zPr(z))
-!       endif 
-!     elseif (IBP%component==2) then
-!       vel1=V(x+dirx,y+diry,z+dirz)
-!       vel2=V(x+2*dirx,y+2*diry,z+2*dirz)
-!       if (IBP%interpdir==1) then
-!        p0=abs(IBP%distx)
-!        p1=abs(xPr(x+dirx)-xPr(x))
-!        p2=abs(xPr(x+2*dirx)-xPr(x))
-!       elseif (IBP%interpdir==2) then
-!        p0=abs(IBP%disty)
-!        p1=abs(yV(y+diry)-yV(y))
-!        p2=abs(yV(y+2*diry)-yV(y))
-!       else
-!        p0=abs(IBP%distz)
-!        p1=abs(zPr(z+dirz)-zPr(z))
-!        p2=abs(zPr(z+2*dirz)-zPr(z))
-!      endif 
-!      else
-!       vel1=W(x+dirx,y+diry,z+dirz)
-!       vel2=W(x+2*dirx,y+2*diry,z+2*dirz)
-!       if (IBP%interpdir==1) then
-!        p0=abs(IBP%distx)
-!        p1=abs(xPr(x+dirx)-xPr(x))
-!        p2=abs(xPr(x+2*dirx)-xPr(x))
-!       elseif (IBP%interpdir==2) then
-!        p0=abs(IBP%disty)
-!        p1=abs(yPr(y+diry)-yPr(y))
-!        p2=abs(yPr(y+2*diry)-yPr(y))
-!       else
-!        p0=abs(IBP%distz)
-!        p1=abs(zW(z+dirz)-zW(z))
-!        p2=abs(zW(z+2*dirz)-zW(z))
-!       endif
-!      endif
-! 
-!      intvel=IBLinInt(p0,p1,p2,vel1,vel2)*.5
-! 
-! 
-!     elseif (IBP%interp==2) then
-!      if (IBP%component==1) then
-!       if (IBP%interpdir==1) then
-!        vel1=U(x,y+diry,z)
-!        vel2=U(x,y,z+dirz)
-!        vel3=U(x,y+diry,z+dirz)
-!        p0=abs(IBP%disty)
-!        p1=abs(IBP%distz)
-!        p2=abs(yPr(y+diry)-yPr(y))
-!        p3=abs(zPr(z+dirz)-zPr(z))
-!       elseif (IBP%interpdir==2) then
-!        vel1=U(x,y,z+dirz)
-!        vel2=U(x+dirx,y,z)
-!        vel3=U(x+dirx,y,z+dirz)
-!        p0=abs(IBP%distz)
-!        p1=abs(IBP%distx)
-!        p2=abs(zPr(z+dirz)-zPr(z))
-!        p3=abs(xU(x+dirx)-xU(x))
-!       else
-!        vel1=U(x+dirx,y,z)
-!        vel2=U(x,y+diry,z)
-!        vel3=U(x+dirx,y+diry,z)
-!        p0=abs(IBP%distx)
-!        p1=abs(IBP%disty)
-!        p2=abs(xU(x+dirx)-xU(x))
-!        p3=abs(yPr(y+diry)-yPr(y))
-!       endif
-!      elseif (IBP%component==2) then
-!       if (IBP%interpdir==1) then
-!        vel1=V(x,y+diry,z)
-!        vel2=V(x,y,z+dirz)
-!        vel3=V(x,y+diry,z+dirz)
-!        p0=abs(IBP%disty)
-!        p1=abs(IBP%distz)
-!        p2=abs(yV(y+diry)-yV(y))
-!        p3=abs(zPr(z+dirz)-zPr(z))
-!       elseif (IBP%interpdir==2) then
-!        vel1=V(x,y,z+dirz)
-!        vel2=V(x+dirx,y,z)
-!        vel3=V(x+dirx,y,z+dirz)
-!        p0=abs(IBP%distz)
-!        p1=abs(IBP%distx)
-!        p2=abs(zPr(z+dirz)-zPr(z))
-!        p3=abs(xPr(x+dirx)-xPr(x))
-!       else
-!        vel1=V(x+dirx,y,z)
-!        vel2=V(x,y+diry,z)
-!        vel3=V(x+dirx,y+diry,z)
-!        p0=abs(IBP%distx)
-!        p1=abs(IBP%disty)
-!        p2=abs(xPr(x+dirx)-xPr(x))
-!        p3=abs(yV(y+diry)-yV(y))
-!       endif
-!      else
-!       if (IBP%interpdir==1) then
-!        vel1=W(x,y+diry,z)
-!        vel2=W(x,y,z+dirz)
-!        vel3=W(x,y+diry,z+dirz)
-!        p0=abs(IBP%disty)
-!        p1=abs(IBP%distz)
-!        p2=abs(yPr(y+diry)-yPr(y))
-!        p3=abs(zW(z+dirz)-zW(z))
-!       elseif (IBP%interpdir==2) then
-!        vel1=W(x,y,z+dirz)
-!        vel2=W(x+dirx,y,z)
-!        vel3=W(x+dirx,y,z+dirz)
-!        p0=abs(IBP%distz)
-!        p1=abs(IBP%distx)
-!        p2=abs(zW(z+dirz)-zW(z))
-!        p3=abs(xPr(x+dirx)-xPr(x))
-!       else
-!        vel1=W(x+dirx,y,z)
-!        vel2=W(x,y+diry,z)
-!        vel3=W(x+dirx,y+diry,z)
-!        p0=abs(IBP%distx)
-!        p1=abs(IBP%disty)
-!        p2=abs(xPr(x+dirx)-xPr(x))
-!        p3=abs(yPr(y+diry)-yPr(y))
-!       endif
-!      endif
-! 
-!      intvel=IBBiLinInt(p0,p1,p2,p3,vel1,vel2,vel3)*.5
-! 
-! 
-!     elseif (IBP%interp==3) then
-!      if (IBP%component==1) then
-!        vel1=U(x+dirx,y,z)
-!        vel2=U(x,y+diry,z)
-!        vel3=U(x+dirx,y+diry,z)
-!        vel4=U(x,y,z+dirz)
-!        vel5=U(x+dirx,y,z+dirz)
-!        vel6=U(x,y+diry,z+dirz)
-!        vel7=U(x+dirx,y+diry,z+dirz)
-!        p0=abs(IBP%distx)
-!        p1=abs(IBP%disty)
-!        p2=abs(IBP%distz)
-!        p3=abs(xU(x+dirx)-xU(x))
-!        p4=abs(yPr(y+diry)-yPr(y))
-!        p5=abs(zPr(z+dirz)-zPr(z))
-!      elseif (IBP%component==2) then
-!        vel1=V(x+dirx,y,z)
-!        vel2=V(x,y+diry,z)
-!        vel3=V(x+dirx,y+diry,z)
-!        vel4=V(x,y,z+dirz)
-!        vel5=V(x+dirx,y,z+dirz)
-!        vel6=V(x,y+diry,z+dirz)
-!        vel7=V(x+dirx,y+diry,z+dirz)
-!        p0=abs(IBP%distx)
-!        p1=abs(IBP%disty)
-!        p2=abs(IBP%distz)
-!        p3=abs(xPr(x+dirx)-xPr(x))
-!        p4=abs(yV(y+diry)-yV(y))
-!        p5=abs(zPr(z+dirz)-zPr(z))
-!      else      
-!        vel1=W(x+dirx,y,z)
-!        vel2=W(x,y+diry,z)
-!        vel3=W(x+dirx,y+diry,z)
-!        vel4=W(x,y,z+dirz)
-!        vel5=W(x+dirx,y,z+dirz)
-!        vel6=W(x,y+diry,z+dirz)
-!        vel7=W(x+dirx,y+diry,z+dirz)
-!        p0=abs(IBP%distx)
-!        p1=abs(IBP%disty)
-!        p2=abs(IBP%distz)
-!        p3=abs(xPr(x+dirx)-xPr(x))
-!        p4=abs(yPr(y+diry)-yPr(y))
-!        p5=abs(zW(z+dirz)-zW(z))
-!      endif
-! 
-!      intvel=IBTriLinInt(p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7)
-! 
-!     else
-!      intvel=0
-!     endif
- intvel=0
+    if (IBP%interp<=0) then
+     intvel=0
+    elseif (IBP%interp==1) then
+      n=0
+      if (dirx/=0)  n=n+1
+      if (diry/=0)  n=n+1
+      if (dirz/=0)  n=n+1
+      if (n/=1) then
+                 write (*,*) dirx,diry,dirz
+                 stop
+       endif
+
+     if (IBP%component==1) then
+      vel1=U(x+dirx,y+diry,z+dirz)
+      vel2=U(x+2*dirx,y+2*diry,z+2*dirz)
+      if (IBP%interpdir==1) then
+       p0=abs(IBP%distx)
+       p1=abs(xU(x+dirx)-xU(x))
+       p2=abs(xU(x+2*dirx)-xU(x))
+      elseif (IBP%interpdir==2) then
+       p0=abs(IBP%disty)
+       p1=abs(yPr(y+diry)-yPr(y))
+       p2=abs(yPr(y+2*diry)-yPr(y))
+      else
+       p0=abs(IBP%distz)
+       p1=abs(zPr(z+dirz)-zPr(z))
+       p2=abs(zPr(z+2*dirz)-zPr(z))
+      endif
+    elseif (IBP%component==2) then
+      vel1=V(x+dirx,y+diry,z+dirz)
+      vel2=V(x+2*dirx,y+2*diry,z+2*dirz)
+      if (IBP%interpdir==1) then
+       p0=abs(IBP%distx)
+       p1=abs(xPr(x+dirx)-xPr(x))
+       p2=abs(xPr(x+2*dirx)-xPr(x))
+      elseif (IBP%interpdir==2) then
+       p0=abs(IBP%disty)
+       p1=abs(yV(y+diry)-yV(y))
+       p2=abs(yV(y+2*diry)-yV(y))
+      else
+       p0=abs(IBP%distz)
+       p1=abs(zPr(z+dirz)-zPr(z))
+       p2=abs(zPr(z+2*dirz)-zPr(z))
+     endif
+     else
+      vel1=W(x+dirx,y+diry,z+dirz)
+      vel2=W(x+2*dirx,y+2*diry,z+2*dirz)
+      if (IBP%interpdir==1) then
+       p0=abs(IBP%distx)
+       p1=abs(xPr(x+dirx)-xPr(x))
+       p2=abs(xPr(x+2*dirx)-xPr(x))
+      elseif (IBP%interpdir==2) then
+       p0=abs(IBP%disty)
+       p1=abs(yPr(y+diry)-yPr(y))
+       p2=abs(yPr(y+2*diry)-yPr(y))
+      else
+       p0=abs(IBP%distz)
+       p1=abs(zW(z+dirz)-zW(z))
+       p2=abs(zW(z+2*dirz)-zW(z))
+      endif
+     endif
+
+     intvel=IBLinInt(p0,p1,p2,vel1,vel2)
+
+
+    elseif (IBP%interp==2) then
+     if (IBP%component==1) then
+      if (IBP%interpdir==1) then
+       vel1=U(x,y+diry,z)
+       vel2=U(x,y,z+dirz)
+       vel3=U(x,y+diry,z+dirz)
+       p0=abs(IBP%disty)
+       p1=abs(IBP%distz)
+       p2=abs(yPr(y+diry)-yPr(y))
+       p3=abs(zPr(z+dirz)-zPr(z))
+      elseif (IBP%interpdir==2) then
+       vel1=U(x,y,z+dirz)
+       vel2=U(x+dirx,y,z)
+       vel3=U(x+dirx,y,z+dirz)
+       p0=abs(IBP%distz)
+       p1=abs(IBP%distx)
+       p2=abs(zPr(z+dirz)-zPr(z))
+       p3=abs(xU(x+dirx)-xU(x))
+      else
+       vel1=U(x+dirx,y,z)
+       vel2=U(x,y+diry,z)
+       vel3=U(x+dirx,y+diry,z)
+       p0=abs(IBP%distx)
+       p1=abs(IBP%disty)
+       p2=abs(xU(x+dirx)-xU(x))
+       p3=abs(yPr(y+diry)-yPr(y))
+      endif
+     elseif (IBP%component==2) then
+      if (IBP%interpdir==1) then
+       vel1=V(x,y+diry,z)
+       vel2=V(x,y,z+dirz)
+       vel3=V(x,y+diry,z+dirz)
+       p0=abs(IBP%disty)
+       p1=abs(IBP%distz)
+       p2=abs(yV(y+diry)-yV(y))
+       p3=abs(zPr(z+dirz)-zPr(z))
+      elseif (IBP%interpdir==2) then
+       vel1=V(x,y,z+dirz)
+       vel2=V(x+dirx,y,z)
+       vel3=V(x+dirx,y,z+dirz)
+       p0=abs(IBP%distz)
+       p1=abs(IBP%distx)
+       p2=abs(zPr(z+dirz)-zPr(z))
+       p3=abs(xPr(x+dirx)-xPr(x))
+      else
+       vel1=V(x+dirx,y,z)
+       vel2=V(x,y+diry,z)
+       vel3=V(x+dirx,y+diry,z)
+       p0=abs(IBP%distx)
+       p1=abs(IBP%disty)
+       p2=abs(xPr(x+dirx)-xPr(x))
+       p3=abs(yV(y+diry)-yV(y))
+      endif
+     else
+      if (IBP%interpdir==1) then
+       vel1=W(x,y+diry,z)
+       vel2=W(x,y,z+dirz)
+       vel3=W(x,y+diry,z+dirz)
+       p0=abs(IBP%disty)
+       p1=abs(IBP%distz)
+       p2=abs(yPr(y+diry)-yPr(y))
+       p3=abs(zW(z+dirz)-zW(z))
+      elseif (IBP%interpdir==2) then
+       vel1=W(x,y,z+dirz)
+       vel2=W(x+dirx,y,z)
+       vel3=W(x+dirx,y,z+dirz)
+       p0=abs(IBP%distz)
+       p1=abs(IBP%distx)
+       p2=abs(zW(z+dirz)-zW(z))
+       p3=abs(xPr(x+dirx)-xPr(x))
+      else
+       vel1=W(x+dirx,y,z)
+       vel2=W(x,y+diry,z)
+       vel3=W(x+dirx,y+diry,z)
+       p0=abs(IBP%distx)
+       p1=abs(IBP%disty)
+       p2=abs(xPr(x+dirx)-xPr(x))
+       p3=abs(yPr(y+diry)-yPr(y))
+      endif
+     endif
+
+     intvel=IBBiLinInt(p0,p1,p2,p3,vel1,vel2,vel3)
+
+
+    elseif (IBP%interp==3) then
+     if (IBP%component==1) then
+       vel1=U(x+dirx,y,z)
+       vel2=U(x,y+diry,z)
+       vel3=U(x+dirx,y+diry,z)
+       vel4=U(x,y,z+dirz)
+       vel5=U(x+dirx,y,z+dirz)
+       vel6=U(x,y+diry,z+dirz)
+       vel7=U(x+dirx,y+diry,z+dirz)
+       p0=abs(IBP%distx)
+       p1=abs(IBP%disty)
+       p2=abs(IBP%distz)
+       p3=abs(xU(x+dirx)-xU(x))
+       p4=abs(yPr(y+diry)-yPr(y))
+       p5=abs(zPr(z+dirz)-zPr(z))
+     elseif (IBP%component==2) then
+       vel1=V(x+dirx,y,z)
+       vel2=V(x,y+diry,z)
+       vel3=V(x+dirx,y+diry,z)
+       vel4=V(x,y,z+dirz)
+       vel5=V(x+dirx,y,z+dirz)
+       vel6=V(x,y+diry,z+dirz)
+       vel7=V(x+dirx,y+diry,z+dirz)
+       p0=abs(IBP%distx)
+       p1=abs(IBP%disty)
+       p2=abs(IBP%distz)
+       p3=abs(xPr(x+dirx)-xPr(x))
+       p4=abs(yV(y+diry)-yV(y))
+       p5=abs(zPr(z+dirz)-zPr(z))
+     else
+       vel1=W(x+dirx,y,z)
+       vel2=W(x,y+diry,z)
+       vel3=W(x+dirx,y+diry,z)
+       vel4=W(x,y,z+dirz)
+       vel5=W(x+dirx,y,z+dirz)
+       vel6=W(x,y+diry,z+dirz)
+       vel7=W(x+dirx,y+diry,z+dirz)
+       p0=abs(IBP%distx)
+       p1=abs(IBP%disty)
+       p2=abs(IBP%distz)
+       p3=abs(xPr(x+dirx)-xPr(x))
+       p4=abs(yPr(y+diry)-yPr(y))
+       p5=abs(zW(z+dirz)-zW(z))
+     endif
+
+     intvel=IBTriLinInt(p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7)
+
+    else
+     intvel=0
+    endif
+
     if (IBP%component==1) then
      IBP%MSourc=(intvel-U(x,y,z))/dt
     elseif (IBP%component==2) then

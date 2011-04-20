@@ -920,6 +920,7 @@ endif
     elseif (IBP%component==3) then
      Winterp(i,j,k)=IBP%interp
     endif
+    write(*,*) IBP%interp
     if (IBP%component==1) then
      Uinterpdir(i,j,k)=IBP%interpdir
     elseif (IBP%component==2) then
@@ -927,6 +928,7 @@ endif
     elseif (IBP%component==3) then
      Winterpdir(i,j,k)=IBP%interpdir
     endif
+    write(*,*) IBP%interpdir
     if (associated(IBP%next)) then
      IBP=>IBP%next
     else
