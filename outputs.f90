@@ -229,7 +229,6 @@ contains
     enddo
     Suv=abs(Suv/(Prnx*Prnz*meanustar*meanustar))
     write(11,*) yV(j), Suv, Suv+(proftauavg(j)/(meanustar*meanustar)+proftauavg(j+1)/(meanustar*meanustar))/2._KND
-    write(*,*) yV(j)
    enddo
    close(11)
    if (computescalars>0.and.tasktype==7) then
@@ -920,7 +919,6 @@ endif
     elseif (IBP%component==3) then
      Winterp(i,j,k)=IBP%interp
     endif
-    write(*,*) IBP%interp
     if (IBP%component==1) then
      Uinterpdir(i,j,k)=IBP%interpdir
     elseif (IBP%component==2) then
@@ -928,7 +926,6 @@ endif
     elseif (IBP%component==3) then
      Winterpdir(i,j,k)=IBP%interpdir
     endif
-    write(*,*) IBP%interpdir
     if (associated(IBP%next)) then
      IBP=>IBP%next
     else
@@ -2146,7 +2143,7 @@ endif
     enddo
    enddo
   enddo
-  write (*,*)
+  write (11,*)
   close(11)
 
 

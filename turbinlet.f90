@@ -287,8 +287,8 @@ contains
  logical,save:: called=.false.
  integer i,j,k
  integer,save:: filtny,filtnz,bigNy,bigNz
- real(KND) Ui,Vi,Wi,bysum,bzsum
- real(KND),save:: TLag
+ real(KND) Ui,Vi,Wi,bysum,bzsum,p
+ real(KND),save:: TLag,compat
  real(KND),allocatable,dimension(:):: expsy,expsz
 
  if (.not. called) then
@@ -299,8 +299,8 @@ contains
  write(*,*) "GETTURBINLET-cont"
 
 
-    filtnz=min(NINT(lz/dzmin/10._KND),2)
-    filtny=min(NINT(lz/dymin/10._KND),2)
+    filtnz=min(max(NINT(lz/dzmin/5._KND),1),Prnz/10)
+    filtny=min(max(NINT(lz/dymin/5._KND),1),Prny/10)
 
 
 
@@ -390,9 +390,10 @@ contains
          Psiw(j,k,1)=SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rw(j-bigNy:j+bigNy,k-bigNz:k+bigNz,1))
     endforall
 
+    compat=SUM(Uinavg(1:Prny,1:Prnz))
+
     called=.true.
- else
- write(*,*) "."
+
  endif
 
 
@@ -418,6 +419,12 @@ contains
                             +transformtensor(6,j,k)*Wi
      enddo
     enddo
+
+    p=compat/SUM(Uin(1:Prny,1:Prnz))                  !To ensure the compatibility condition.
+
+    Uin=Uin*p
+    Vin=Vin*p
+    Win=Win*p
 
     Psiu(:,:,1)=Psiu(:,:,2)
     Psiv(:,:,1)=Psiv(:,:,2)

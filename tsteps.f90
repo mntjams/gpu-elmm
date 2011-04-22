@@ -769,7 +769,7 @@ contains
       if (diry/=0)  n=n+1
       if (dirz/=0)  n=n+1
       if (n/=1) then
-                 write (*,*) dirx,diry,dirz
+                 write (*,*) "Assert error, more directions.", dirx,diry,dirz
                  stop
        endif
 
@@ -1004,7 +1004,6 @@ contains
        Q(x,y,z)=Q(x,y,z)+W(x,y,z)/(dzPr(z))
        Q(x,y,z+1)=Q(x,y,z+1)-W(x,y,z)/(dzPr(z+1))
       endif
-     Q(x,y,z)=0
      if (associated(IBP%next)) then
       IBP=>IBP%next
      else
@@ -1335,9 +1334,9 @@ Regt0: if (Re>0) then
   subroutine UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W,U2,V2,W2,U3,V3,W3
   real(KND),intent(in):: coef
-  real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: Apu
-  real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: ApV
-  real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: ApW
+  real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
+  real(KND),dimension(1:Vnx,1:Vny,1:Vnz):: ApV
+  real(KND),dimension(1:Wnx,1:Wny,1:Wnz):: ApW
   real(KND) recdxmin2,recdymin2,recdzmin2                                                               !reciprocal values of dx**2
   real(KND) Ap,Ap2,Ap3,Ap4,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw 
   integer i,j,k,l,Unyz,Vnyz,Wnyz
@@ -1349,7 +1348,6 @@ Regt0: if (Re>0) then
        recdxmin2=1./dxmin**2
        recdymin2=1./dymin**2
        recdzmin2=1./dzmin**2
-
 
        do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
         do j=1,Uny
@@ -1403,6 +1401,7 @@ Regt0: if (Re>0) then
          enddo
         enddo
        enddo
+
        ApU=1._KND/(1._KND+Ap2*ApU)
 
        do k=1,Vnz
@@ -1417,6 +1416,7 @@ Regt0: if (Re>0) then
          enddo
         enddo
        enddo
+
        ApV=1._KND/(1._KND+Ap2*ApV)
 
        do k=1,Wnz
@@ -1431,6 +1431,7 @@ Regt0: if (Re>0) then
          enddo
         enddo
        enddo
+
        ApW=1._KND/(1._KND+Ap2*ApW)
 
 
@@ -1589,12 +1590,12 @@ Regt0: if (Re>0) then
   subroutine GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W,U2,V2,W2,U3,V3,W3
   real(KND),intent(in):: coef
-  real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: Apu
-  real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: ApV
-  real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: ApW
+  real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
+  real(KND),dimension(1:Vnx,1:Vny,1:Vnz):: ApV
+  real(KND),dimension(1:Wnx,1:Wny,1:Wnz):: ApW
   real(KND) recdxmin2,recdymin2,recdzmin2,Ap,Ap2,Ap3,Ap4,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
   integer i,j,k,l,Unyz,Vnyz,Wnyz
-
+  integer ind(3)
 
 
        Ap2=coef*dt/(2._KND)
@@ -1654,7 +1655,9 @@ Regt0: if (Re>0) then
          enddo
         enddo
        enddo
-       ApU=1._KND/(1._KND+Ap2*ApU)
+
+      ApU=1._KND/(1._KND+Ap2*ApU)
+
 
        do k=1,Vnz
         do j=1,Vny
@@ -1668,7 +1671,9 @@ Regt0: if (Re>0) then
          enddo
         enddo
        enddo
+
        ApV=1._KND/(1._KND+Ap2*ApV)
+
 
        do k=1,Wnz
         do j=1,Wny
@@ -1682,6 +1687,7 @@ Regt0: if (Re>0) then
          enddo
         enddo
        enddo
+
        ApW=1._KND/(1._KND+Ap2*ApW)
 
        Suavg=abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
