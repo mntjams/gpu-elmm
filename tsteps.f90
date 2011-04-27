@@ -232,7 +232,7 @@ contains
 
 
   if (BtypeT==FREESLIPBUFF)  call ATTENUATETOP(U2,V2,W2,Pr)
-  if (BtypeE==NEUMANN) call ATTENUATEOUT(U2,V2,W2,Pr)
+  if (BtypeE==OUTLETBUFF) call ATTENUATEOUT(U2,V2,W2,Pr)
 
   
   if (masssourc==1) then
@@ -478,8 +478,8 @@ contains
 
   call OTHERTERMS(U,V,W,U2,V2,W2,Pr,2.*alpha(l))
 
-  if (BtypeT==FREESLIP)  call ATTENUATETOP(U2,V2,W2,Pr)
-  if (BtypeE==NEUMANN) then
+  if (BtypeT==FREESLIPBUFF)  call ATTENUATETOP(U2,V2,W2,Pr)
+  if (BtypeE==OUTLETBUFF) then
     if (buoyancy==1) then
       call ATTENUATEOUT(U2,V2,W2,Pr,temperature)
     else

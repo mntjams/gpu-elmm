@@ -52,7 +52,7 @@ implicit none
   ny=Uny
   nz=Unz   
  
-  !!! oblasti nepokryte predchozim pri periodickych podminkach
+  !!! corners and edges for periodic conditions
   if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
    do k=nz+1,nz+3
     do j=ny+1,ny+3
@@ -291,7 +291,7 @@ implicit none
      U(nx+3,j,k)=-U(nx-1,j,k)
     enddo
    enddo
-  elseif (BtypeE==NEUMANN) then   !Neumann outlet
+  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF) then   !Neumann outlet
    do k=-2,nz+3
     do j=-2,ny+3
      U(nx+1,j,k)=U(nx,j,k)
@@ -477,7 +477,7 @@ implicit none
      U(i,j,nz+3)=U(i,j,nz)
     enddo
    enddo
-  elseif (BtypeT==FREESLIP) then  !FREESLIP
+  elseif (BtypeT==FREESLIPBUFF.or.BtypeT==FREESLIP) then  !FREESLIP
    do j=-2,ny+3
     do i=-2,nx+3
      U(i,j,nz+1)=U(i,j,nz)
@@ -510,7 +510,7 @@ implicit none
   ny=Vny
   nz=Vnz
 
-  !!! oblasti nepokryte predchozim pri periodickych podminkach
+  !!! corners and edges for periodic conditions
   if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
    do k=nz+1,nz+3
     do j=ny+1,ny+3
@@ -738,7 +738,7 @@ implicit none
      V(nx+3,j,k)=-V(nx-2,j,k)
     enddo
    enddo
-  elseif (BtypeE==NEUMANN) then
+  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Neumann inlet
      V(nx+1,j,k)=V(nx,j,k)
@@ -922,7 +922,7 @@ implicit none
      V(i,j,nz+3)=V(i,j,nz)
     enddo
    enddo
-  elseif (BtypeT==FREESLIP) then  !FREESLIP
+  elseif (BtypeT==FREESLIPBUFF.or.BtypeT==FREESLIP) then  !FREESLIP
    do j=-2,ny+3
     do i=-2,nx+3
      V(i,j,nz+1)=V(i,j,nz)
@@ -955,7 +955,7 @@ implicit none
   ny=Wny
   nz=Wnz
     
-  !!! oblasti nepokryte predchozim pri periodickych podminkach
+  !!! corners and edges for periodic conditions
   if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
    do k=nz+1,nz+3
     do j=ny+1,ny+3
@@ -1183,7 +1183,7 @@ implicit none
      W(nx+3,j,k)=-W(nx-2,j,k)
     enddo
    enddo
-  elseif (BtypeE==NEUMANN) then
+  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Neumann inlet
      W(nx+1,j,k)=W(nx,j,k)
@@ -1367,7 +1367,7 @@ implicit none
      W(i,j,nz+3)=W(i,j,nz)
     enddo
    enddo
-  elseif (BtypeT==FREESLIP) then  !FREESLIP
+  elseif (BtypeT==FREESLIPBUFF.or.BtypeT==FREESLIP) then  !FREESLIP
    do j=-2,ny+3
     do i=-2,nx+3
      W(i,j,nz+1)=0
@@ -1398,7 +1398,7 @@ implicit none
   ny=Uny
   nz=Unz
 
-  !!! oblasti nepokryte predchozim pri periodickych podminkach
+  !!! corners and edges for periodic conditions
   if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
    do k=nz+1,nz+3
     do j=ny+1,ny+3
@@ -1702,7 +1702,7 @@ implicit none
      U(i,j,nz+3)=U(i,j,nz)
     enddo
    enddo
-  elseif (BtypeT==FREESLIP) then  !FREESLIP
+  elseif (BtypeT==FREESLIPBUFF.or.BtypeT==FREESLIP) then  !FREESLIP
    do j=-2,ny+3
     do i=-2,nx+3
      U(i,j,nz+1)=U(i,j,nz)
@@ -1778,7 +1778,7 @@ implicit none
      U(nx+3,j,k)=-U(nx-1,j,k)
     enddo
    enddo
-  elseif (BtypeE==NEUMANN) then   !Neumann outlet
+  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF) then   !Neumann outlet
 
    do k=-2,nz+3
     do j=-2,ny+3
@@ -1816,7 +1816,7 @@ implicit none
   ny=Vny
   nz=Vnz
 
-  !!! oblasti nepokryte predchozim pri periodickych podminkach
+  !!! corners and edges for periodic conditions
   if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
    do k=nz+1,nz+3
     do j=ny+1,ny+3
@@ -2028,7 +2028,7 @@ implicit none
      V(nx+3,j,k)=-V(nx-2,j,k)
     enddo
    enddo
-  elseif (BtypeE==NEUMANN) then
+  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Neumann inlet
      V(nx+1,j,k)=V(nx,j,k)
@@ -2204,7 +2204,7 @@ implicit none
      V(i,j,nz+3)=V(i,j,nz)
     enddo
    enddo
-  elseif (BtypeT==FREESLIP) then  !FREESLIP
+  elseif (BtypeT==FREESLIPBUFF.or.BtypeT==FREESLIP) then  !FREESLIP
    do j=-2,ny+3
     do i=-2,nx+3
      V(i,j,nz+1)=V(i,j,nz)
@@ -2233,7 +2233,7 @@ implicit none
   ny=Wny
   nz=Wnz
 
-  !!! oblasti nepokryte predchozim pri periodickych podminkach
+  !!! corners and edges for periodic conditions
   if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
    do k=nz+1,nz+3
     do j=ny+1,ny+3
@@ -2445,7 +2445,7 @@ implicit none
      W(nx+3,j,k)=-W(nx-2,j,k)
     enddo
    enddo
-  elseif (BtypeE==NEUMANN) then
+  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Neumann inlet
      W(nx+1,j,k)=W(nx,j,k)
@@ -2621,7 +2621,7 @@ implicit none
      W(i,j,nz+3)=W(i,j,nz)
     enddo
    enddo
-  elseif (BtypeT==FREESLIP) then  !FREESLIP
+  elseif (BtypeT==FREESLIPBUFF.or.BtypeT==FREESLIP) then  !FREESLIP
    do j=-2,ny+3
     do i=-2,nx+3
      W(i,j,nz+1)=0
