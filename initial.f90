@@ -562,7 +562,6 @@ contains
    gridtype=GENERALGRID
    write (*,*) "General grid"
   endif
-   gridtype=GENERALGRID
 
   if (probex<x0) then
    probex=x0

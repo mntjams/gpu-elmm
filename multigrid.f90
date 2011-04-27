@@ -30,8 +30,6 @@ implicit none
   real(KND) mgepsinnerGS
 
 
-!type (fishworkspace) :: WFISH
-!real(KND),allocatable::WFISH(:)
 contains 
 
 
@@ -78,9 +76,7 @@ pure subroutine Prolongate(AFine,ACoarse,level)
      enddo
     enddo
    enddo
-!    if (BtypeE==PERIODIC) Afine(0,:,:)=Afine(2*nx,:,:)
-!    if (BtypeN==PERIODIC) Afine(:,0,:)=Afine(:,2*ny,:)
-!    if (BtypeT==PERIODIC) Afine(:,:,0)=Afine(:,:,2*nz)
+
    call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
 endsubroutine Prolongate
 
@@ -191,190 +187,6 @@ endsubroutine Restrict
 
 
 
-
-
-pure subroutine Prolongate2(AFine,ACoarse,level)
- integer,intent(in):: level
- real(KND),dimension(-1:,-1:,-1:),intent(in):: ACoarse
- real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
- real(KND),dimension(LBOUND(AFine,1):UBOUND(AFine,1),LBOUND(AFine,1):UBOUND(AFine,1),LBOUND(AFine,1):UBOUND(AFine,1)):: Mask
- integer:: i,j,k,nx,ny,nz
- 
-   nx=bnx*2**level !level means from which grid we interpolate
-   ny=bny*2**level
-   nz=bnz*2**level
-
-   do k=0,nz
-    do j=0,ny
-     do i=0,nx
-                     AFine(2*i,2*j,2*k)=AFine(2*i,2*j,2*k)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i+1,2*j,2*k)=AFine(2*i+1,2*j,2*k)+ACoarse(i,j,k)
-                     Mask(2*i+1,2*j,2*k)=Mask(2*i+1,2*j,2*k)+1
-                     AFine(2*i-1,2*j,2*k)=AFine(2*i-1,2*j,2*k)+ACoarse(i,j,k)
-                     Mask(2*i-1,2*j,2*k)=Mask(2*i-1,2*j,2*k)+1
-                     AFine(2*i,2*j+1,2*k)=AFine(2*i,2*j+1,2*k)+ACoarse(i,j,k)
-                     Mask(2*i,2*j+1,2*k)=Mask(2*i,2*j+1,2*k)+1
-                     AFine(2*i,2*j-1,2*k)=AFine(2*i,2*j-1,2*k)+ACoarse(i,j,k)
-                     Mask(2*i,2*j-1,2*k)=Mask(2*i,2*j-1,2*k)+1
-                     AFine(2*i,2*j,2*k+1)=AFine(2*i,2*j,2*k+1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k+1)=Mask(2*i,2*j,2*k+1)+1
-                     AFine(2*i,2*j,2*k-1)=AFine(2*i,2*j,2*k-1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k-1)=Mask(2*i,2*j,2*k-1)+1
-                     AFine(2*i+1,2*j+1,2*k)=AFine(2*i+1,2*j+1,2*k)+ACoarse(i,j,k)
-                     Mask(2*i+1,2*j+1,2*k)=Mask(2*i+1,2*j+1,2*k)+1
-                     AFine(2*i+1,2*j,2*k+1)=AFine(2*i+1,2*j,2*k+1)+ACoarse(i,j,k)
-                     Mask(2*i+1,2*j,2*k+1)=Mask(2*i+1,2*j,2*k+1)+1
-                     AFine(2*i,2*j+1,2*k+1)=AFine(2*i,2*j+1,2*k+1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j+1,2*k+1)=Mask(2*i,2*j+1,2*k+1)+1
-                     AFine(2*i,2*j+1,2*k+1)=AFine(2*i,2*j+1,2*k+1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j+1,2*k+1)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i,2*j+1,2*k+1)=AFine(2*i,2*j+1,2*k+1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i,2*j-1,2*k-1)=AFine(2*i,2*j-1,2*k-1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i-1,2*j+1,2*k)=AFine(2*i-1,2*j+1,2*k)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i-1,2*j,2*k+1)=AFine(2*i-1,2*j,2*k+1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i+1,2*j-1,2*k)=AFine(2*i+1,2*j-1,2*k)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i,2*j-1,2*k+1)=AFine(2*i,2*j-1,2*k+1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i+1,2*j,2*k-1)=AFine(2*i+1,2*j,2*k-1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i,2*j+1,2*k-1)=AFine(2*i,2*j+1,2*k-1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i+1,2*j+1,2*k+1)=AFine(2*i+1,2*j+1,2*k+1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i-1,2*j+1,2*k+1)=AFine(2*i-1,2*j+1,2*k+1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i+1,2*j-1,2*k+1)=AFine(2*i+1,2*j-1,2*k+1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i+1,2*j+1,2*k-1)=AFine(2*i+1,2*j+1,2*k-1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i-1,2*j-1,2*k+1)=AFine(2*i-1,2*j-1,2*k+1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i-1,2*j+1,2*k-1)=AFine(2*i-1,2*j+1,2*k-1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i+1,2*j-1,2*k-1)=AFine(2*i+1,2*j-1,2*k-1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-                     AFine(2*i-1,2*j-1,2*k-1)=AFine(2*i-1,2*j-1,2*k-1)+ACoarse(i,j,k)
-                     Mask(2*i,2*j,2*k)=Mask(2*i,2*j,2*k)+1
-     enddo
-    enddo
-   enddo
-!    if (BtypeE==PERIODIC) Afine(0,:,:)=Afine(2*nx,:,:)
-!    if (BtypeN==PERIODIC) Afine(:,0,:)=Afine(:,2*ny,:)
-!    if (BtypeT==PERIODIC) Afine(:,:,0)=Afine(:,:,2*nz)
-   call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
-endsubroutine Prolongate2
-
-
-
-pure subroutine Restrict2(ACoarse,AFine,level)
- integer,intent(in):: level
- real(KND),dimension(-1:,-1:,-1:),intent(out):: ACoarse
- real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
- real(KND) q
- integer:: i,j,k,nx,ny,nz
- 
-   nx=bnx*2**level !level means on which grid we restrict
-   ny=bny*2**level
-   nz=bnz*2**level
-
-   call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
-
-   do k=0,nz
-    do j=0,ny
-     do i=0,nx
-        ACoarse(i,j,k)=AFine(2*i,2*j,2*k); q=1
-!         if (i<nx) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i+1,2*j,2*k); q=q+1
-! endif
-!         if (i>0) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i-1,2*j,2*k); q=q+1
-! endif
-!         if (j<ny) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i,2*j+1,2*k); q=q+1
-! endif
-!         if (j>0) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i,2*j-1,2*k); q=q+1
-! endif
-!         if (k<nz) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i,2*j,2*k+1); q=q+1
-! endif
-!         if (k>0) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i,2*j,2*k-1); q=q+1
-! endif
-!         if ((i<nx).and.(j<ny)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i+1,2*j+1,2*k); q=q+1
-! endif
-!         if ((i<nx).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i+1,2*j,2*k+1); q=q+1
-! endif
-!         if ((j<ny).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i,2*j+1,2*k+1); q=q+1
-! endif
-!         if ((i>0).and.(j>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i-1,2*j-1,2*k); q=q+1
-! endif
-!         if ((i>0).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i-1,2*j,2*k-1); q=q+1
-! endif
-!         if ((j>0).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i,2*j-1,2*k-1); q=q+1
-! endif
-!         if ((i>0).and.(j<ny)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i-1,2*j+1,2*k); q=q+1
-! endif
-!         if ((i>0).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i-1,2*j,2*k+1); q=q+1
-! endif
-!         if ((i<nx).and.(j>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i+1,2*j-1,2*k); q=q+1
-! endif
-!         if ((j>0).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i,2*j-1,2*k+1); q=q+1
-! endif
-!         if ((i<nx).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i+1,2*j,2*k-1); q=q+1
-! endif
-!         if ((j<ny).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i,2*j+1,2*k-1); q=q+1
-! endif
-!         if ((i<nx).and.(j<ny).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i+1,2*j+1,2*k+1); q=q+1
-! endif
-!         if ((i>0).and.(j<ny).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i-1,2*j+1,2*k+1); q=q+1
-! endif
-!         if ((i<nx).and.(j>0).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i+1,2*j-1,2*k+1); q=q+1
-! endif
-!         if ((i<nx).and.(j<ny).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i+1,2*j+1,2*k-1); q=q+1
-! endif
-!         if ((i>0).and.(j>0).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i-1,2*j-1,2*k+1); q=q+1
-! endif
-!         if ((i>0).and.(j<ny).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i-1,2*j+1,2*k-1); q=q+1
-! endif
-!         if ((i<nx).and.(j>0).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i+1,2*j-1,2*k-1); q=q+1
-! endif
-!         if ((i>0).and.(j>0).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+AFine(2*i-1,2*j-1,2*k-1); q=q+1
-! endif
-        ACoarse(i,j,k)=ACoarse(i,j,k)/q             
-     enddo
-    enddo
-   enddo
-!    if (BtypeE==PERIODIC) ACoarse(0,:,:)=ACoarse(nx,:,:)
-!    if (BtypeN==PERIODIC) ACoarse(:,0,:)=ACoarse(:,ny,:)
-!    if (BtypeT==PERIODIC) ACoarse(:,:,0)=ACoarse(:,:,nz)
-endsubroutine Restrict2
 
 
 
@@ -1115,8 +927,7 @@ real(KND) p,Ap
                        Ap=Ap+CoefMG(level)%At
              endif
              p=p-RHSMG(level)%Arr(i,j,k)
-!              S=S+(p-Ap*PhiMG(level)%Arr(i,j,k))**2
-!              if (l==niter) ResMG(level)%Arr(i,j,k)=-p +Ap*PhiMG(level)%Arr(i,j,k)
+
              p=p/Ap
              PhiMG(level)%Arr(i,j,k)=p
              endif
@@ -1174,9 +985,8 @@ real(KND) p,Ap
                        Ap=Ap+CoefMG(level)%At
              endif
              p=p-RHSMG(level)%Arr(i,j,k)
-!              S=S+(p-Ap*PhiMG(level)%Arr(i,j,k))**2
-!              if (l==niter) ResMG(level)%Arr(i,j,k)=-p +Ap*PhiMG(level)%Arr(i,j,k)
              p=p/Ap
+
              PhiMG(level)%Arr(i,j,k)=p
              endif
             enddo
@@ -1184,13 +994,8 @@ real(KND) p,Ap
     enddo
     !$OMP ENDDO
     !$OMP END PARALLEL
-!     write(*,*) "GS residuum",S
-!     call BOUND_Phi_MG(PhiMG(level)%Arr,nx-1,ny-1,nz-1)
-   enddo  
-!    R=MAXVAL(ResMG(level)%Arr(0:CoefMG(level)%nx,0:CoefMG(level)%ny,0:CoefMG(level)%nz))
 
-!     write(*,*) "GS residuum",sqrt(S)
-!      call BOUND_Phi_MG(PhiMG(level)%Arr,nx-1,ny-1,nz-1)
+   enddo
 endsubroutine MG_GS
 
 subroutine MG_res(level,R)
@@ -1255,45 +1060,6 @@ character(70):: str
         enddo
     enddo
     R=MAXVAL(ResMG(level)%Arr(0:CoefMG(level)%nx,0:CoefMG(level)%ny,0:CoefMG(level)%nz))
-!      write (*,*) "residuum",Sqrt(R)
-!  if (level<LMG) goto 50
-!   OPEN(11,file="Res.vtk")
-!   write (11,"(A)") "# vtk DataFile Version 2.0"
-!   write (11,"(A)") "diplomka output file"
-!   write (11,"(A)") "ASCII"
-!   write (11,"(A)") "DATASET RECTILINEAR_GRID"
-!   str="DIMENSIONS"
-!   write (str(12:),*) Prnx,Prny,Prnz
-!   write (11,"(A)") str
-!   str="X_COORDINATES"
-!   write (str(15:),*) Prnx,"float"
-!   write (11,"(A)") str
-!   write (11,*) xPr(1:Prnx)
-!   str="Y_COORDINATES"
-!   write (str(15:),*) Prny,"float"
-!   write (11,"(A)") str
-!   write (11,*) yPr(1:Prny)
-!   str="Z_COORDINATES"
-!   write (str(15:),*) Prnz,"float"
-!   write (11,"(A)") str
-!   write (11,*) zPr(1:Prnz)
-!   str="POINT_DATA"
-!   write (str(12:),*) Prnx*Prny*Prnz
-!   write (11,"(A)") str
-! 
-!   
-!   write (11,"(A)") "SCALARS RHS float"
-!   write (11,"(A)") "LOOKUP_TABLE default"
-!   do k=1,Prnz
-!    do j=1,Prny
-!     do i=1,Prnx
-!       Write (11,*) ResMG(level)%Arr(i,j,k)
-!     enddo
-!    enddo
-!   enddo 
-!   write (11,*)
-!   CLOSE(11)
-!   50 i=1
 endsubroutine MG_res
 
 
@@ -1308,36 +1074,6 @@ integer l
   enddo
 endsubroutine
 
-
-subroutine Filter(A,level)
- real(KND),dimension(-1:,-1:,-1:),intent(inout):: A
- real(KND),dimension(LBOUND(A,1):UBOUND(A,1),LBOUND(A,1):UBOUND(A,1),LBOUND(A,1):UBOUND(A,1)):: B
- integer,intent(in):: level
- integer nx,ny,nz,i,j,k,ii,jj,kk
- real(KND) S 
- nx=bnx*2**level
- ny=bny*2**level
- nz=bnz*2**level
-
- do k=0,nz
-  do j=0,ny
-   do i=0,nx
-    S=0
-    do kk=-1,1
-     do jj=-1,1
-      do ii=-1,1
-       if ((i/=0).or.(j/=0).or.(k/=0))  S=S+A(i+ii,j+jj,k+kk)
-      enddo
-     enddo
-    enddo
-    S=S/26._KND
-    B(i,j,k)=A(i,j,k)/.8_KND+.2_KND*S
-   enddo
-  enddo
- enddo
- A=B
- call Bound_Phi_MG(A,nx,ny,nz)
-endsubroutine
 
 
 recursive subroutine MG_CGC(level,eps,ncgc,npre,npost,R)
@@ -1391,11 +1127,6 @@ integer i,j,k,l,nx,ny,nz,sx,sy,sz
 real(KND) mgeps,R,Phiref
 real(KND),save:: called=0
 
-!  if (KND==SNG) then
-!     mgeps=1E-7
-!  else
-!     mgeps=1E-14
-!  endif
  mgeps=epsPoisson
  Phi=0
 
@@ -1456,6 +1187,7 @@ real(KND),save:: called=0
  nz=bnz*2**LMG
 
  if (nx-sx/=Prnx-1.or.ny-sy/=Prny-1.or.nz-sz/=Prnz-1) then
+    write (*,*) "Incorrect dimensions, multigrid, vs. grig defined in grid.conf:"
     write (*,*) 0+sx,":",nx,"--",1,":",Prnx
     write (*,*) 0+sy,":",ny,"--",1,":",Prny
     write (*,*) 0+sz,":",nz,"--",1,":",Prnz

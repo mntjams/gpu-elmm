@@ -559,10 +559,10 @@ contains
 
 
    if (l==1) delta=0
+
    delta=delta+SUM(ABS(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
    delta=delta+SUM(ABS(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
    delta=delta+SUM(ABS(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
-
 
 
    where(Utype>0) U2=0
