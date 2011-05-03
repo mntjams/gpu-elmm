@@ -403,6 +403,7 @@ contains
   integer i,j,k,l
   real(KND) p
   integer,save:: called=0
+  real time1,time2
 
 
  if (called==0) then
@@ -439,7 +440,8 @@ contains
   Wstar=0
 
   do l=1,3
-  
+   if (debugparam>1) call cpu_time(time1)
+
    U2=0
    V2=0
    W2=0
@@ -474,9 +476,19 @@ contains
    W2=W2+Wstar*beta(l)
   endif
 
-
+  if (debugparam>1) then
+   call cpu_time(time2)
+   write (*,*) "ET of part 1", (time2-time1)
+   time1=time2
+  endif
 
   call OTHERTERMS(U,V,W,U2,V2,W2,Pr,2.*alpha(l))
+
+  if (debugparam>1) then
+   call cpu_time(time2)
+   write (*,*) "ET of part 2", (time2-time1)
+   time1=time2
+  endif
 
   if (BtypeT==FREESLIPBUFF)  call ATTENUATETOP(U2,V2,W2,Pr)
   if (BtypeE==OUTLETBUFF) then
@@ -569,7 +581,6 @@ contains
    where(Vtype>0) V2=0
    where(Wtype>0) W2=0
 
-   call NULLINTERIOR(U2,V2,W2)
    U=U2
    V=V2
    W=W2
