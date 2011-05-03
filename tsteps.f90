@@ -12,7 +12,7 @@ use SCALARS
 
 implicit none
 
-real(KND):: odey=1._KND !for debugging
+
 logical:: released=.false.
 
 contains
@@ -154,7 +154,7 @@ contains
                                               lbound(V,3):ubound(V,3)):: V2,Vstar
   real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),&
                                               lbound(W,3):ubound(W,3)):: W2,Wstar
-  real(KND) p,odey2,odeystar
+  real(KND) p
   integer i,j,k
   real(KND),allocatable,dimension(:,:,:,:),save:: SCALAR_2
   real(KND),allocatable,dimension(:,:,:),save:: temperature2
