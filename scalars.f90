@@ -838,8 +838,7 @@ contains
      !$OMP DO
      do k=1,Prnz
       do j=1,Prny
-       do i=1,Prnx
-        if (REDBLACKPr(i,j,k)) then
+       do i=1+mod(j+k,2),Prnx,2
          p=(SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
           ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
            (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
@@ -851,7 +850,6 @@ contains
           p=p*Ap(i,j,k)
           S=max(S,abs(p-SCAL2(i,j,k)))
           SCAL2(i,j,k)=p
-        endif
        enddo
       enddo
      enddo
@@ -859,8 +857,7 @@ contains
      !$OMP DO
      do k=1,Prnz
       do j=1,Prny
-       do i=1,Prnx
-        if (.not.REDBLACKPr(i,j,k)) then
+       do i=1+mod(j+k+1,2),Prnx,2
          p=(SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
           ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
            (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
@@ -872,7 +869,6 @@ contains
           p=p*Ap(i,j,k)
           S=max(S,abs(p-SCAL2(i,j,k)))
           SCAL2(i,j,k)=p
-        endif
        enddo
       enddo
      enddo
@@ -883,8 +879,7 @@ contains
      !$OMP DO
      do k=1,Prnz
       do j=1,Prny
-       do i=1,Prnx
-        if (REDBLACKPr(i,j,k)) then
+       do i=1+mod(j+k,2),Prnx,2
          p=(SCAL(i,j,k)/A)+(SCAL3(i,j,k)+&
           ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
            (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
@@ -896,7 +891,6 @@ contains
           p=p*Ap(i,j,k)
           S=max(S,abs(p-SCAL2(i,j,k)))
           SCAL2(i,j,k)=p
-        endif
        enddo
       enddo
      enddo
@@ -904,8 +898,7 @@ contains
      !$OMP DO
      do k=1,Prnz
       do j=1,Prny
-       do i=1,Prnx
-        if (.not.REDBLACKPr(i,j,k)) then
+       do i=1+mod(j+k+1,2),Prnx,2
          p=(SCAL(i,j,k)/A)+(SCAL3(i,j,k)+&
           ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
            (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
@@ -917,7 +910,6 @@ contains
           p=p*Ap(i,j,k)
           S=max(S,abs(p-SCAL2(i,j,k)))
           SCAL2(i,j,k)=p
-        endif
        enddo
       enddo
      enddo

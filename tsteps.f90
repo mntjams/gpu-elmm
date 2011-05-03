@@ -1467,8 +1467,7 @@ Regt0: if (Re>0) then
         !$OMP DO
         do k=1,Unz
          do j=1,Uny
-          do i=1,Unx
-           if (REDBLACKU(i,j,k)) then
+          do i=1+mod(j+k,2),Unx,2
             p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
              Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
              0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
@@ -1481,7 +1480,6 @@ Regt0: if (Re>0) then
 
             Su=max(Su,abs(p-U3(i,j,k)))
             U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
-           endif
           enddo
          enddo
         enddo
@@ -1489,8 +1487,7 @@ Regt0: if (Re>0) then
         !$OMP DO
         do k=1,Vnz
          do j=1,Vny
-          do i=1,Vnx
-           if (REDBLACKV(i,j,k)) then
+          do i=1+mod(j+k,2),Vnx,2
             p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
              Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
              0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
@@ -1501,7 +1498,6 @@ Regt0: if (Re>0) then
             p=p*ApV(i,j,k)
             Sv=max(Sv,abs(p-V3(i,j,k)))
             V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
-           endif
           enddo
          enddo
         enddo
@@ -1509,8 +1505,7 @@ Regt0: if (Re>0) then
         !$OMP DO
         do k=1,Wnz
          do j=1,Wny
-          do i=1,Wnx
-           if (REDBLACKW(i,j,k)) then
+          do i=1+mod(j+k,2),Wnx,2
             p=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
              (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
              ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
@@ -1521,7 +1516,6 @@ Regt0: if (Re>0) then
             p=p*ApW(i,j,k)
             Sw=max(Sw,abs(p-W3(i,j,k)))
             W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
-           endif
           enddo
          enddo
         enddo
@@ -1530,8 +1524,7 @@ Regt0: if (Re>0) then
         !$OMP DO
         do k=1,Unz
          do j=1,Uny
-          do i=1,Unx
-           if (.not.REDBLACKU(i,j,k)) then
+          do i=1+mod(j+k+1,2),Unx,2
             p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
              Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
              0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
@@ -1544,7 +1537,6 @@ Regt0: if (Re>0) then
 
             Su=max(Su,abs(p-U3(i,j,k)))
             U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
-           endif
           enddo
          enddo
         enddo
@@ -1552,8 +1544,7 @@ Regt0: if (Re>0) then
         !$OMP DO
         do k=1,Vnz
          do j=1,Vny
-          do i=1,Vnx
-           if (.not.REDBLACKV(i,j,k)) then
+          do i=1+mod(j+k+1,2),Vnx,2
             p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
              Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
              0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
@@ -1564,7 +1555,6 @@ Regt0: if (Re>0) then
             p=p*ApV(i,j,k)
             Sv=max(Sv,abs(p-V3(i,j,k)))
             V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
-           endif
           enddo
          enddo
         enddo
@@ -1572,8 +1562,7 @@ Regt0: if (Re>0) then
         !$OMP DO
         do k=1,Wnz
          do j=1,Wny
-          do i=1,Wnx
-           if (.not.REDBLACKW(i,j,k)) then
+          do i=1+mod(j+k+1,2),Wnx,2
             p=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
              (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
              ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
@@ -1584,7 +1573,6 @@ Regt0: if (Re>0) then
             p=p*ApW(i,j,k)
             Sw=max(Sw,abs(p-W3(i,j,k)))
             W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
-           endif
           enddo
          enddo
         enddo
@@ -1722,8 +1710,7 @@ Regt0: if (Re>0) then
         !$OMP DO
         do k=1,Unz
          do j=1,Uny
-          do i=1,Unx
-           if (REDBLACKU(i,j,k)) then
+          do i=1+mod(j+k,2),Unx,2
             p=((Visc(i+1,j,k)*(U3(i+1,j,k))/dxPr(i+1)-&
              Visc(i,j,k)*(-U3(i-1,j,k))/dxPr(i))/dxU(i)+&
              (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))/dyV(j)-&
@@ -1736,7 +1723,6 @@ Regt0: if (Re>0) then
 
             Su=max(Su,abs(p-U3(i,j,k)))
             U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
-           endif
           enddo
          enddo
         enddo
@@ -1744,8 +1730,7 @@ Regt0: if (Re>0) then
         !$OMP DO
         do k=1,Vnz
          do j=1,Vny
-          do i=1,Vnx
-           if (REDBLACKV(i,j,k)) then
+          do i=1+mod(j+k,2),Vnx,2
             p=((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))/dxU(i)-&
              0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k))/dxU(i-1))/dxPr(i)+&
              (Visc(i,j+1,k)*(V3(i,j+1,k))/dyPr(j+1)-&
@@ -1756,7 +1741,6 @@ Regt0: if (Re>0) then
             p=p*ApV(i,j,k)
             Sv=max(Sv,abs(p-V3(i,j,k)))
             V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
-           endif
           enddo
          enddo
         enddo
@@ -1764,8 +1748,7 @@ Regt0: if (Re>0) then
         !$OMP DO
         do k=1,Wnz
          do j=1,Wny
-          do i=1,Wnx
-           if (REDBLACKW(i,j,k)) then
+          do i=1+mod(j+k,2),Wnx,2
             p=((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))/dxU(i)-&
              0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k))/dxU(i-1))/dxPr(i)+&
              (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))/dyV(j)-&
@@ -1776,7 +1759,6 @@ Regt0: if (Re>0) then
             p=p*ApW(i,j,k)
             Sw=max(Sw,abs(p-W3(i,j,k)))
             W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
-           endif
           enddo
          enddo
         enddo
@@ -1785,8 +1767,7 @@ Regt0: if (Re>0) then
         !$OMP DO
         do k=1,Unz
          do j=1,Uny
-          do i=1,Unx
-           if (.not.REDBLACKU(i,j,k)) then
+          do i=1+mod(j+k+1,2),Unx,2
             p=((Visc(i+1,j,k)*(U3(i+1,j,k))/dxPr(i+1)-&
              Visc(i,j,k)*(-U3(i-1,j,k))/dxPr(i))/dxU(i)+&
              (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))/dyV(j)-&
@@ -1799,7 +1780,6 @@ Regt0: if (Re>0) then
 
             Su=max(Su,abs(p-U3(i,j,k)))
             U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
-           endif
           enddo
          enddo
         enddo
@@ -1807,8 +1787,7 @@ Regt0: if (Re>0) then
         !$OMP DO
         do k=1,Vnz
          do j=1,Vny
-          do i=1,Vnx
-           if (.not.REDBLACKV(i,j,k)) then
+          do i=1+mod(j+k+1,2),Vnx,2
             p=((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))/dxU(i)-&
              0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k))/dxU(i-1))/dxPr(i)+&
              (Visc(i,j+1,k)*(V3(i,j+1,k))/dyPr(j+1)-&
@@ -1819,7 +1798,6 @@ Regt0: if (Re>0) then
             p=p*ApV(i,j,k)
             Sv=max(Sv,abs(p-V3(i,j,k)))
             V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
-           endif
           enddo
          enddo
         enddo
@@ -1827,8 +1805,7 @@ Regt0: if (Re>0) then
         !$OMP DO
         do k=1,Wnz
          do j=1,Wny
-          do i=1,Wnx
-           if (.not.REDBLACKW(i,j,k)) then
+          do i=1+mod(j+k+1,2),Wnx,2
             p=((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))/dxU(i)-&
              0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k))/dxU(i-1))/dxPr(i)+&
              (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))/dyV(j)-&
@@ -1839,7 +1816,6 @@ Regt0: if (Re>0) then
             p=p*ApW(i,j,k)
             Sw=max(Sw,abs(p-W3(i,j,k)))
             W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
-           endif
           enddo
          enddo
         enddo

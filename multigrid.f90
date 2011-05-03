@@ -12,13 +12,9 @@ implicit none
    integer nx,ny,nz
   endtype
 
-  type TRedBlack
-   logical,allocatable,dimension(:,:,:):: Arr
-  endtype
 
   type(TMGArr),allocatable,dimension(:):: PhiMG,RHSMG,ResMG
   type(TCoefs),allocatable,dimension(:):: CoefMg
-  type(TRedBlack),allocatable,dimension(:):: RedBlackMG
 
   integer bnx,bny,bnz !Base cube dimensions for Multigrid, Prnx=bnx*2**level
   integer LMG !depth of multigrid
@@ -880,8 +876,7 @@ real(KND) p,Ap
     !$OMP DO
     do k=0,CoefMG(level)%nz
         do j=0,CoefMG(level)%ny
-            do i=0,CoefMG(level)%nx
-             if (RedBlackMG(level)%Arr(i,j,k)) then
+            do i=0+mod(j+k,2),CoefMG(level)%nx,2
              p=0
              Ap=0
              if (i>0) then
@@ -930,7 +925,6 @@ real(KND) p,Ap
 
              p=p/Ap
              PhiMG(level)%Arr(i,j,k)=p
-             endif
             enddo
         enddo
     enddo
@@ -938,8 +932,7 @@ real(KND) p,Ap
     !$OMP DO
     do k=0,CoefMG(level)%nz
         do j=0,CoefMG(level)%ny
-            do i=0,CoefMG(level)%nx
-             if (.not.RedBlackMG(level)%Arr(i,j,k)) then
+            do i=0+mod(j+k+1,2),CoefMG(level)%nx,2
              p=0
              Ap=0
              if (i>0) then
@@ -988,7 +981,6 @@ real(KND) p,Ap
              p=p/Ap
 
              PhiMG(level)%Arr(i,j,k)=p
-             endif
             enddo
         enddo
     enddo
@@ -1148,7 +1140,7 @@ real(KND),save:: called=0
 
 
  if (called==0) then
-  allocate(PhiMG(minmglevel:LMG),RHSMG(minmglevel:LMG),ResMG(minmglevel:LMG),CoefMG(minmglevel:LMG),RedBlackMG(minmglevel:LMG))
+  allocate(PhiMG(minmglevel:LMG),RHSMG(minmglevel:LMG),ResMG(minmglevel:LMG),CoefMG(minmglevel:LMG))
   do l=LMG,minmglevel,-1
    CoefMG(l)%nx=bnx*2**l
    CoefMG(l)%ny=bny*2**l
@@ -1159,25 +1151,12 @@ real(KND),save:: called=0
    allocate(PhiMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%ny+1,-1:CoefMG(l)%nz+1))
    allocate(RHSMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%ny+1,-1:CoefMG(l)%nz+1))
    allocate(ResMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%ny+1,-1:CoefMG(l)%nz+1))
-   allocate(RedBlackMG(l)%Arr(-1:CoefMG(l)%nx,-1:CoefMG(l)%ny,-1:CoefMG(l)%nz))
    CoefMG(l)%Ae=1._KND/(CoefMG(l)%dx*CoefMG(l)%dx)
    CoefMG(l)%Aw=1._KND/(CoefMG(l)%dx*CoefMG(l)%dx)
    CoefMG(l)%An=1._KND/(CoefMG(l)%dy*CoefMG(l)%dy)
    CoefMG(l)%As=1._KND/(CoefMG(l)%dy*CoefMG(l)%dy)
    CoefMG(l)%At=1._KND/(CoefMG(l)%dz*CoefMG(l)%dz)
    CoefMG(l)%Ab=1._KND/(CoefMG(l)%dz*CoefMG(l)%dz)
-
-   RedBlackMG(l)%Arr(-1,-1,-1)=.true.
-   do k=0,CoefMG(l)%nz
-    RedBlackMG(l)%Arr(-1,-1,k)=.not.RedBlackMG(l)%Arr(-1,-1,k-1)
-    do j=0,CoefMG(l)%ny
-     RedBlackMG(l)%Arr(-1,j,k)=.not.RedBlackMG(l)%Arr(-1,j-1,k)
-     do i=0,CoefMG(l)%nx
-      RedBlackMG(l)%Arr(i,j,k)=.not.RedBlackMG(l)%Arr(i-1,j,k)
-     enddo
-    enddo
-   enddo
-
   enddo
   called=1
  endif

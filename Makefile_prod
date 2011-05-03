@@ -14,7 +14,7 @@
 
 #### Compiler and tool definitions shared by all build targets #####
 FC = f90
-BASICOPTS = -fast -xautopar -xopenmp=parallel -xreduction -m64 -g -xprofile=collect
+BASICOPTS = -fast -xautopar -xopenmp=parallel -xreduction -m64 -g
 FFLAGS = $(BASICOPTS)
 
 

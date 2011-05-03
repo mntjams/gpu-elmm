@@ -46,8 +46,6 @@ implicit none
   real(KND),allocatable:: Visc(:,:,:),TDiff(:,:,:),tstress(:,:,:,:,:)  !(turbulent) vicosity, (turbulent) thermal diffusivity
   integer(sint),allocatable,dimension(:,:,:):: Utype,Vtype,Wtype,Prtype !number of solid body inside the point is or 0
 
-  logical(slog),allocatable,dimension(:,:,:):: REDBLACKU,REDBLACKV,REDBLACKW,REDBLACKPR !Fs and Ts for red-black iteration
-
   real(KND) x0,y0,z0
   integer step,deb !for debugging purposes
   real(KND) meanustar

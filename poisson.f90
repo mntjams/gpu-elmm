@@ -386,27 +386,13 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
        endforall
        called=1
    endif
-   do l=1,maxPoissoniter          !OPENMP because automatic paralelization does not work with red-black
+   do l=1,maxPoissoniter
     S=0
      !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
-     !nthreads=omp_get_num_threads()
-     !write(*,*) "Threads:",nthreads
      !$OMP DO
      do k=1,nz
-     ! nthreads=omp_get_thread_num()
-     ! write(*,*) nthreads,k
         do j=1,ny
-            do i=1,nx
-!               if (REDBLACKPr(i,j,k)) then
-!                 p=Phi(i+1,j,k)*Ae(i)+Phi(i-1,j,k)*Aw(i)+Phi(i,j+1,k)*An(j)+Phi(i,j-1,k)*As(j)+&
-!                       Phi(i,j,k+1)*At(k)+Phi(i,j,k-1)*Ab(k)-RHS(i,j,k)
-!                p=p/(Apx(i)+Apy(j)+Apz(k))
-!                 S=S+(Phi(i,j,k)-p)*(Phi(i,j,k)-p)
-!                 Phi(i,j,k)=Phi(i,j,k)+(p-Phi(i,j,k))*1.5_KND
-!               endif
- 
-           if (REDBLACKPr(i,j,k)) then
-
+            do i=1+mod(j+k,2),nx,2
              p=0
              Ap=0
              if (i>1) then
@@ -452,15 +438,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
                        Ap=Ap+1._KND/(dzmin*dzmin)
              endif
              p=p-RHS(i,j,k)
-! if (i==1.and.j==1.and.k==1) write (*,*) p,Ap,Phi(i,j,k)
              p=p/Ap
-!              S=S+(p-Phi(i,j,k))**2
              S=max(abs(p-Phi(i,j,k)),S)
              Phi(i,j,k)=p
-            endif
-
-
-
            enddo
         enddo
     enddo
@@ -468,17 +448,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     !$OMP DO
     do k=1,nz
        do j=1,ny
-           do i=1,nx
-!              if (.not.REDBLACKPr(i,j,k)) then
-!                p=Phi(i+1,j,k)*Ae(i)+Phi(i-1,j,k)*Aw(i)+Phi(i,j+1,k)*An(j)+Phi(i,j-1,k)*As(j)+&
-!                      Phi(i,j,k+1)*At(k)+Phi(i,j,k-1)*Ab(k)-RHS(i,j,k)
-!                p=p/(Apx(i)+Apy(j)+Apz(k))
-!                S=S+(Phi(i,j,k)-p)*(Phi(i,j,k)-p)
-!                Phi(i,j,k)=Phi(i,j,k)+(p-Phi(i,j,k))*1.5_KND
-!              endif
-
-           if (.not.REDBLACKPr(i,j,k)) then
-
+										do i=1+mod(j+k+1,2),nx,2
              p=0
              Ap=0
              if (i>1) then
@@ -525,11 +495,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
              endif
              p=p-RHS(i,j,k)
              p=p/Ap
-!              S=S+(p-Phi(i,j,k))**2
              S=max(abs(p-Phi(i,j,k)),S)
              Phi(i,j,k)=p
-            endif
-
            enddo
        enddo
     enddo
@@ -538,8 +505,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     call BOUND_Phi(Phi)
     p=abs(maxval(Phi(1:nx,1:ny,1:nz)))
     if (p>0) S=S/p
-    !write (*,*) S
-    if (MOD(l,10)==0)  write (*,*) "   Poisson iter: ",l,S!Sqrt(S)
+    if (MOD(l,10)==0)  write (*,*) "   Poisson iter: ",l,S
     if (S<=epsPOISSON) exit 
    enddo          
    
