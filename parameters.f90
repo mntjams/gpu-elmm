@@ -1,6 +1,6 @@
 module PARAMETERS
 implicit none
-  integer,parameter :: DBL=KIND(1.0D0),SNG=KIND(1.0e0)
+  integer,parameter :: DBL=SELECTED_REAL_KIND(p=15,r=200),SNG=SELECTED_REAL_KIND(p=6,r=37)
   integer,parameter :: KND=SNG                                         !KND is default real kind for the whole program
   integer,parameter :: SINT=KND !selected_int_kind(2)                  !To save memory a smaller type can be used for some integer and logical arrays
   integer,parameter :: SLOG=SINT                                       !This can have some negative effect on speed however
@@ -43,8 +43,8 @@ implicit none
   real(KND),allocatable,dimension(:,:,:):: temperature,temperatureavg
 
 
-  real(KND),allocatable:: Visc(:,:,:),TDiff(:,:,:),tstress(:,:,:,:,:)  !(turbulent) vicosity, (turbulent) thermal diffusivity
-  integer(sint),allocatable,dimension(:,:,:):: Utype,Vtype,Wtype,Prtype !number of solid body inside the point is or 0
+  real(KND),allocatable:: Visc(:,:,:),TDiff(:,:,:),tstress(:,:,:,:,:)  !(turbulent) viscosity, (turbulent) thermal diffusivity
+  integer(sint),allocatable,dimension(:,:,:):: Utype,Vtype,Wtype,Prtype !number of solid body inside which the point is or 0
 
   real(KND) x0,y0,z0
   integer step,deb !for debugging purposes
