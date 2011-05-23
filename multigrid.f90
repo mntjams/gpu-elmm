@@ -1076,7 +1076,7 @@ real(KND) R1
 integer k
 !   write (*,*) "cgc",level
   if (level == minmglevel) then !1
-        call MG_INV(level)
+        call MG_GE(level)
         call MG_res(level,R)
 !        write (*,*) "GEres",sqrt(R)
 
