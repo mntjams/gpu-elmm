@@ -5,16 +5,16 @@ use WALLMODELS
 implicit none
 
 
- type TLine
-   real(KND) xc,yc,zc
+ type TLine                            !These object could be implemented using Fortran's 2003 inheritance, or at least using
+   real(KND) xc,yc,zc                  !allocatable components. This approach using pointers is more portable and less safe.
    real(KND) a,b,c
  endtype TLine
 
  type TPlane
-   real(KND) a,b,c,d !ax+by+cz+d/=0 for inner half-space
-   logical gl !T > in ineq. above F < in ineq. above
-   logical rough !T rough surface, F flat surface
-   real(KND) z0 !roughness parameter
+   real(KND) a,b,c,d    !ax+by+cz+d/=0 for inner half-space
+   logical gl           !T > in ineq. above F < in ineq. above
+   logical rough        !T rough surface, F flat surface
+   real(KND) z0         !roughness parameter
   endtype TPlane
 
   type TPolyhedron
@@ -24,16 +24,16 @@ implicit none
 
   type TBall
    real(KND) xc,yc,zc,r
-   logical rough !T rough surface, F flat surface
-   real(KND) z0 !roughness parameter
+   logical rough           !T rough surface, F flat surface
+   real(KND) z0            !roughness parameter
   endtype TBall
 
   type TCylJacket
    real(KND) xc,yc,zc
    real(KND) a,b,c
    real(KND) r
-   logical rough !T rough surface, F flat surface
-   real(KND) z0 !roughness parameter
+   logical rough            !T rough surface, F flat surface
+   real(KND) z0             !roughness parameter
   endtype TCylJacket
 
   type TCylinder
@@ -55,33 +55,33 @@ implicit none
 
  type TSolidBody
   integer numofbody
-  integer:: typeofbody=0 !0.. none, 1..polyhedron, 2.. ball, 3.. cylinder, 4.. terrain
-  type(TPolyhedron),pointer:: Polyhedron => null() !asociated will be only part writen in typeofbody
+  integer:: typeofbody=0                              !0.. none, 1..polyhedron, 2.. ball, 3.. cylinder, 4.. terrain
+  type(TPolyhedron),pointer:: Polyhedron => null()    !asociated will be only part writen in typeofbody
   type(TBall),pointer:: Ball => null()
   type(TCylinder),pointer:: Cylinder => null()
   type(TTerrain),pointer:: Terrain => null()
-  logical:: rough=.false. !T rough surface, F flat surface
-  real(KND) z0 !roughness parameter
+  logical:: rough=.false.                             !T rough surface, F flat surface
+  real(KND) z0                                        !roughness parameter
   type(TSolidBody),pointer:: next =>null()
  endtype TSolidbody
 
- type(TSolidBody),pointer:: FirstSB => null() !First member of the linked list of solid objects
+ type(TSolidBody),pointer:: FirstSB => null()         !First member of the linked list of solid objects
   
  
 
 
  type TIBPoint
-  integer component !1..U, 2..V, 3..W
+  integer component      !1..U, 2..V, 3..W
   integer x
   integer y
   integer z
-  real(KND) distx !coords of nearest boundary point (in the mesh units!)
+  real(KND) distx        !coords of nearest boundary point (in the mesh units!)
   real(KND) disty
   real(KND) distz
   integer dirx
   integer diry
   integer dirz
-  integer interp !kind of interp. 0.. none (boundarypint), 1..linear, 2..bilinear, 3..trilinear
+  integer interp         !kind of interp. 0.. none (boundarypint), 1..linear, 2..bilinear, 3..trilinear
   integer interpdir
   real(KND) MSourc
   type(TIBPoint),pointer:: next => null()
@@ -96,9 +96,9 @@ implicit none
   integer,dimension(4):: intpointj
   integer,dimension(4):: intpointk
   real(KND),dimension(4):: intcoef
-  integer interp !kind of interp. 1.. none (1 point outside), 2..linear, 4..bilinear  other values not allowed
-  real(KND) ScalSourc !virtual scalar source
-  real(KND):: Flux=0 !desired scalar flux
+  integer interp                        !kind of interp. 1.. none (1 point outside), 2..linear, 4..bilinear  other values not allowed
+  real(KND) ScalSourc                   !virtual scalar source
+  real(KND):: Flux=0                    !desired scalar flux
   type(TScalFlIBPoint),pointer::next=>null()
  endtype TScalFlIBPoint
 
@@ -1950,7 +1950,7 @@ contains
 
 
   recursive subroutine DeallIBP(IBP)
-  type(TIBPoint),pointer,intent(inout):: IBP
+  type(TIBPoint),pointer:: IBP
 
   if (associated(IBP%next)) call DeallIBP(IBP%next)
   deallocate(IBP)
@@ -1959,7 +1959,7 @@ contains
 
 
   recursive subroutine DeallSB(SB)
-  type(TSolidbody),pointer,intent(inout):: SB
+  type(TSolidbody),pointer:: SB
 
   if (associated(SB%next)) call DeallSB(SB%next)
   if (associated(SB%Ball)) deallocate(SB%Ball)
