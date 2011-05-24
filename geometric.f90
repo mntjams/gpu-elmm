@@ -486,13 +486,25 @@ contains
 
 
   subroutine PolyhedronNearest(xnear,ynear,znear,x,y,z,PH)
-  real(KND),intent(out):: xnear,ynear,znear
-  real(KND),intent(in):: x,y,z
-  type(TPolyhedron),intent(in):: PH
-  real(KND) dists(PH%nplanes),xP(PH%nplanes),yP(PH%nplanes),zP(PH%nplanes),minv
-  real(KND) ailine,biline,ciline,x0iline,y0iline,z0iline,ag(3,3),bg(3),xg(3),xln,yln,zln,c
-  integer nearest,nearest2,nearest3,i,j,INDX(3)
-  !Vzdalenesti od rovin, pokud je nejbl. bod roviny uvnitr jine, nebo puv. bod na vnitrni strane -> vzd. *-1
+   real(KND),intent(out):: xnear,ynear,znear
+   real(KND),intent(in):: x,y,z
+   type(TPolyhedron),intent(in):: PH
+
+   real(KND) :: dists(PH%nplanes),xP(PH%nplanes),yP(PH%nplanes),zP(PH%nplanes)
+   real(KND) :: minv
+   real(KND) :: ailine,biline,ciline
+   real(KND) :: x0iline,y0iline,z0iline,xln,yln,zln,p
+   integer   :: nearest,nearest2,nearest3
+   integer   :: i,j
+
+   integer,dimension(3)    :: ig,ipivot,work2          !input varieables to LAPACK
+   real(KND),dimension(3)  :: xg,bg,work,R,C,ferr,berr !routine xGESVX
+   real(KND),dimension(3,3):: ag,af                    !
+   integer   :: info                                   !
+   real(KND) :: rcond                                  !
+   character :: equed                                  !
+   
+  !Vzdalenosti od rovin, pokud je nejbl. bod roviny uvnitr jine, nebo puv. bod na vnitrni strane -> vzd. *-1
   !Pokud je nejbl. body +- eps. (norm. vektor!,dxmin/100) uvnitr a vne polyh -> hotovo
   !Jinak 2. nejbl. rovina v abs. hodnote -> prusecnice a nejbl bod na ni
   !Nejbl. bod na prusecnici. Pokud +-eps. uvnitr, (najit vekt. v rovine  kolme na prusecnic)-:hotovo
@@ -558,10 +570,10 @@ contains
     write(*,*) "pl2",PH%Planes(nearest2)%a,PH%Planes(nearest2)%b,PH%Planes(nearest2)%c,PH%Planes(nearest2)%d
    endif
 
-   c=SQRT(ailine**2+biline**2+ciline**2)
-   ailine=ailine/c
-   biline=biline/c
-   ciline=ciline/c
+   p=SQRT(ailine**2+biline**2+ciline**2)
+   ailine=ailine/p
+   biline=biline/p
+   ciline=ciline/p
 
    if (abs(ciline)>=0.1_KND) then
       ag=reshape(source=(/ PH%Planes(nearest)%a,PH%Planes(nearest2)%a,0._KND,&
@@ -570,7 +582,11 @@ contains
                 shape=(/ 3,3 /))
       bg=(/ -PH%Planes(nearest)%d,-PH%Planes(nearest2)%d,(zW(Wnz+1)+zW(0))/2._KND /)
 
-      call LEGS(ag,3,bg,xg,INDX)
+      if (KND==DBL) then
+       call DGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
+      else
+       call SGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
+      endif
 
       x0iline=xg(1)
       y0iline=xg(2)
@@ -582,7 +598,11 @@ contains
                 shape=(/ 3,3 /))
       bg=(/ -PH%Planes(nearest)%d,-PH%Planes(nearest2)%d,(yV(Vny+1)+yV(0))/2._KND /)
 
-      call LEGS(ag,3,bg,xg,INDX)
+      if (KND==DBL) then
+       call DGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
+      else
+       call SGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
+      endif
 
       x0iline=xg(1)
       y0iline=xg(2)
@@ -595,11 +615,15 @@ contains
                  shape=(/ 3,3 /))
       bg=(/ -PH%Planes(nearest)%d,-PH%Planes(nearest2)%d,(xU(Unx+1)+xU(0))/2._KND /)
 
-      call LEGS(ag,3,bg,xg,INDX)
+      if (KND==DBL) then
+       call DGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
+      else
+       call SGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
+      endif
 
-       x0iline=xg(1)
-       y0iline=xg(2)
-       z0iline=xg(3)
+      x0iline=xg(1)
+      y0iline=xg(2)
+      z0iline=xg(3)
    endif
    call LineNearest(xln,yln,zln,x,y,z,x0iline,y0iline,z0iline,ailine,biline,ciline)
    if (PolyhedronInt(xln,yln,zln,PH,min(dxmin/1000._KND,dymin/10000._KND,dzmin/10000._KND))) then
@@ -611,16 +635,21 @@ contains
   
 
 
-     ag=reshape(source=(/ PH%Planes(nearest)%a,PH%Planes(nearest2)%a,PH%Planes(nearest3)%a,&
-                         PH%Planes(nearest)%b,PH%Planes(nearest2)%b,PH%Planes(nearest3)%b,&
-                         PH%Planes(nearest)%c,PH%Planes(nearest2)%c,PH%Planes(nearest3)%c /),&
-                shape=(/ 3,3 /))
-     bg=(/ -PH%Planes(nearest)%d,-PH%Planes(nearest2)%d,-PH%Planes(nearest3)%d /)
+   ag=reshape(source=(/ PH%Planes(nearest)%a,PH%Planes(nearest2)%a,PH%Planes(nearest3)%a,&
+                       PH%Planes(nearest)%b,PH%Planes(nearest2)%b,PH%Planes(nearest3)%b,&
+                       PH%Planes(nearest)%c,PH%Planes(nearest2)%c,PH%Planes(nearest3)%c /),&
+              shape=(/ 3,3 /))
+   bg=(/ -PH%Planes(nearest)%d,-PH%Planes(nearest2)%d,-PH%Planes(nearest3)%d /)
 
-     call LEGS(ag,3,bg,xg,INDX)
-       xnear=xg(1)
-       ynear=xg(2)
-       znear=xg(3)
+   if (KND==DBL) then
+    call DGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
+   else
+    call SGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
+   endif
+      
+  xnear=xg(1)
+  ynear=xg(2)
+  znear=xg(3)
 
 
    10 i=1
@@ -1975,106 +2004,5 @@ contains
   deallocate(SB)
 
   endsubroutine DeallSB
-
-
-
-!Nahradit vlastni implementaci!!!!!
-subroutine LEGS (A,N,B,X,INDX)
-!
-! Subroutine to solve the equation A(N,N)*X(N) = B(N) with the
-! partial-pivoting Gaussian elimination scheme.
-! Copyright (c) Tao Pang 2001.
-!
-  implicit none
-  integer, intent (in) :: N
-  integer :: I,J
-  integer, intent (out), dimension (N) :: INDX
-  real(KND), intent (inout), dimension (N,N) :: A
-  real(KND), intent (inout), dimension (N) :: B
-  real(KND), intent (out), dimension (N) :: X
-!
-  call ELGS (A,N,INDX)
-!
-  do I = 1, N-1
-    do J = I+1, N
-      B(INDX(J)) = B(INDX(J))-A(INDX(J),I)*B(INDX(I))
-    end do
-  end do
-!
-  X(N) = B(INDX(N))/A(INDX(N),N)
-  do I = N-1, 1, -1
-    X(I) = B(INDX(I))
-    do J = I+1, N
-      X(I) = X(I)-A(INDX(I),J)*X(J)
-    end do
-    X(I) =  X(I)/A(INDX(I),I)
-  end do
-!
-end subroutine LEGS
-!
-subroutine ELGS (A,N,INDX)
-!
-! Subroutine to perform the partial-pivoting Gaussian elimination.
-! A(N,N) is the original matrix in the input and transformed matrix
-! plus the pivoting element ratios below the diagonal in the output.
-! INDX(N) records the pivoting order.  Copyright (c) Tao Pang 2001.
-!
-  implicit none
-  integer, intent (in) :: N
-  integer :: I,J,K,ITMP
-  integer, intent (out), dimension (N) :: INDX
-  real(KND) :: C1,PI,PI1,PJ
-  real(KND), intent (inout), dimension (N,N) :: A
-  real(KND), dimension (N) :: C
-!
-! Initialize the index
-!
-  do I = 1, N
-    INDX(I) = I
-  end do
-!
-! Find the rescaling factors, one from each row
-!
-  do I = 1, N
-    C1= 0.0
-    do J = 1, N
-      C1 = MAX(C1,ABS(A(I,J)))
-    end do
-    C(I) = C1
-  end do
-!
-! Search the pivoting (largest) element from each column
-!
-  do J = 1, N-1
-    PI1 = 0.0
-    do I = J, N
-      PI = ABS(A(INDX(I),J))/C(INDX(I))
-      if (PI.gt.PI1) then
-        PI1 = PI
-        K   = I
-      endif
-    end do
-!
-! Interchange the rows via INDX(N) to record pivoting order
-!
-    ITMP    = INDX(J)
-    INDX(J) = INDX(K)
-    INDX(K) = ITMP
-    do I = J+1, N
-      PJ  = A(INDX(I),J)/A(INDX(J),J)
-!
-! Record pivoting ratios below the diagonal
-!
-      A(INDX(I),J) = PJ
-!
-! Modify other elements accordingly
-!
-      do K = J+1, N
-        A(INDX(I),K) = A(INDX(I),K)-PJ*A(INDX(J),K)
-      end do
-    end do
-  end do
-!
-end subroutine ELGS
 
 endmodule GEOMETRIC
