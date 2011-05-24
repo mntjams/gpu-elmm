@@ -62,7 +62,7 @@ contains
   write (*,*) "a=",a
   read (11,fmt='(/)')
   read (11,*) starttime
-  write (*,*) "endtime=",starttime
+  write (*,*) "starttime=",starttime
   read (11,fmt='(/)')
   read (11,*) endtime
   write (*,*) "endtime=",endtime
