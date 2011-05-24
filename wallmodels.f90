@@ -546,7 +546,7 @@ implicit none
   real(KND),dimension(1:,1:,1:):: Pr
   type(WMPoint),pointer:: WMP
   integer i,j
-  real(KND) t
+  real(DBL) t
 
    if (buoyancy==1.and.TBtypeB==DIRICHLET) then
     do j=1,Prnz
@@ -586,8 +586,9 @@ implicit none
   endsubroutine ComputeViscsWM
 
   real(KND) function SurfTemperature(x,y,t)
-  real(KND),intent(in):: x,y,t
-  SurfTemperature=265-t*0.25_KND/3600._KND
+  real(KND),intent(in):: x,y
+  real(DBL),intent(in):: t
+  SurfTemperature=265-t*0.25_KND/3600._KND  !GABLS prescribed (Beare et al, BLM 2004)
   endfunction
 
   recursive subroutine DeallWMP(WMP)
