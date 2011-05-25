@@ -1,4 +1,4 @@
-program DIPLOMKA
+program CLMM
 use TSTEPS
 use PARAMETERS
 use BOUNDARIES
@@ -474,15 +474,6 @@ implicit none
  if (allocated(ustarinlet))  deallocate(ustarinlet)
  if (allocated(transformtensor))  deallocate(transformtensor)
  if (allocated(bfilt)) deallocate(bfilt)
- if (allocated(Apx)) deallocate(Apx)
- if (allocated(Apy)) deallocate(Apy)
- if (allocated(Apz)) deallocate(Apz)
- if (allocated(Aw)) deallocate(Aw)
- if (allocated(Ae)) deallocate(Ae)
- if (allocated(As)) deallocate(As)
- if (allocated(An)) deallocate(An)
- if (allocated(Ab)) deallocate(Ab)
- if (allocated(At)) deallocate(At)
  if (allocated(Ru)) deallocate(Ru)
  if (allocated(Rv)) deallocate(Rv)
  if (allocated(Rw)) deallocate(Rw)
@@ -528,4 +519,4 @@ implicit none
  if (associated(FirstSB)) call DeallSB(FirstSB)
  if (associated(FirstIBPoint)) call DeallIBP(FirstIBPoint)
  if (associated(FirstWMPoint)) call DeallWMP(FirstWMPoint)
-end
+end program CLMM

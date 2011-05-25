@@ -42,6 +42,7 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/boundaries.o \
 	$(TARGETDIR_CLMM)/smagorinsky.o \
 	$(TARGETDIR_CLMM)/outputs.o \
+	$(TARGETDIR_CLMM)/fishpoisson.o \
 	$(TARGETDIR_CLMM)/poisson.o \
 	$(TARGETDIR_CLMM)/initial.o \
 	$(TARGETDIR_CLMM)/cds.o \
@@ -49,9 +50,9 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/laxfried.o \
 	$(TARGETDIR_CLMM)/laxwend.o \
 	$(TARGETDIR_CLMM)/tsteps.o \
-	$(TARGETDIR_CLMM)/main.o 
+	$(TARGETDIR_CLMM)/main.o
 USERLIBS_CLMM = $(SYSLIBS_CLMM)
-DEPLIBS_CLMM = 
+DEPLIBS_CLMM =
 LDLIBS_CLMM = $(USERLIBS_CLMM) -llapack
 
 
@@ -96,6 +97,9 @@ $(TARGETDIR_CLMM)/boundaries.o: $(TARGETDIR_CLMM) boundaries.f90
 
 $(TARGETDIR_CLMM)/outputs.o: $(TARGETDIR_CLMM) outputs.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ outputs.f90
+
+$(TARGETDIR_CLMM)/fishpoisson.o: $(TARGETDIR_CLMM) fishpoisson.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ fishpoisson.f90
 
 $(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ poisson.f90
@@ -153,6 +157,7 @@ clean:
 		$(TARGETDIR_CLMM)/multigrid.o \
 		$(TARGETDIR_CLMM)/boundaries.o \
 		$(TARGETDIR_CLMM)/outputs.o \
+		$(TARGETDIR_CLMM)/fishpoisson.o \
 		$(TARGETDIR_CLMM)/poisson.o \
 		$(TARGETDIR_CLMM)/initial.o \
 		$(TARGETDIR_CLMM)/cds.o \
@@ -176,5 +181,5 @@ $(TARGETDIR_CLMM):
 
 # Enable dependency checking
 .KEEP_STATE:
-.KEEP_STATE_FILE:.make.state.bin.gccprod
+.KEEP_STATE_FILE:.make.state.bin.gccserial
 
