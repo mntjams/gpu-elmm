@@ -16,9 +16,9 @@ implicit none
   real(KND):: ustar=1
   real(KND):: temp=0
   real(KND):: tempfl=0
-  integer:: wallu=0
-  integer:: wallv=0
-  integer:: wallw=0
+  real(KND):: wallu=0
+  real(KND):: wallv=0
+  real(KND):: wallw=0
   real(KND),allocatable:: depscalar(:)
   type(WMpoint),pointer:: next=>null()
  endtype WMpoint
