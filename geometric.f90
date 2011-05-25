@@ -497,8 +497,9 @@ contains
    integer   :: nearest,nearest2,nearest3
    integer   :: i,j
 
-   integer,dimension(3)    :: ig,ipivot,work2          !input varieables to LAPACK
-   real(KND),dimension(3)  :: xg,bg,work,R,C,ferr,berr !routine xGESVX
+   integer,dimension(3)    :: ipivot,work2             !arguments of the LAPACK
+   real(KND),dimension(3)  :: xg,bg,R,C,ferr,berr      !  routine xGESVX
+   real(KND),dimension(12) :: work
    real(KND),dimension(3,3):: ag,af                    !
    integer   :: info                                   !
    real(KND) :: rcond                                  !
@@ -509,8 +510,6 @@ contains
   !Jinak 2. nejbl. rovina v abs. hodnote -> prusecnice a nejbl bod na ni
   !Nejbl. bod na prusecnici. Pokud +-eps. uvnitr, (najit vekt. v rovine  kolme na prusecnic)-:hotovo
   !Jinak iterativne najit bod na prusecnici uvnitr
-
-
 
    do i=1,PH%nplanes
     call PlaneNearest(xP(i),yP(i),zP(i),x,y,z,PH%Planes(i))
@@ -529,14 +528,14 @@ contains
 
    if (nearest==0) then
      write(*,*) "no nearest"
-     goto 10
+     return
    endif
 
    if (PolyhedronInt(xP(nearest),yP(nearest),zP(nearest),PH,MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND))) then
     xnear=xP(nearest)
     ynear=yP(nearest)
     znear=zP(nearest)
-    goto 10
+    return
    endif
 
    dists=abs(dists)
@@ -576,10 +575,15 @@ contains
    ciline=ciline/p
 
    if (abs(ciline)>=0.1_KND) then
+
       ag=reshape(source=(/ PH%Planes(nearest)%a,PH%Planes(nearest2)%a,0._KND,&
                           PH%Planes(nearest)%b,PH%Planes(nearest2)%b,0._KND,&
                           PH%Planes(nearest)%c,PH%Planes(nearest2)%c,1._KND /),&
                 shape=(/ 3,3 /))
+!       ag=reshape(source=(/ PH%Planes(nearest)%a,PH%Planes(nearest)%b,PH%Planes(nearest)%c,&
+!                           PH%Planes(nearest2)%a,PH%Planes(nearest2)%b,PH%Planes(nearest2)%c,&
+!                           0._KND,0._KND,1._KND /),&
+!                 shape=(/ 3,3 /))
       bg=(/ -PH%Planes(nearest)%d,-PH%Planes(nearest2)%d,(zW(Wnz+1)+zW(0))/2._KND /)
 
       if (KND==DBL) then
@@ -591,7 +595,9 @@ contains
       x0iline=xg(1)
       y0iline=xg(2)
       z0iline=xg(3)
+
    elseif (abs(biline)>=0.1_KND) then
+
       ag=reshape(source=(/ PH%Planes(nearest)%a,PH%Planes(nearest2)%a,0._KND,&
                           PH%Planes(nearest)%b,PH%Planes(nearest2)%b,1._KND,&
                           PH%Planes(nearest)%c,PH%Planes(nearest2)%c,0._KND /),&
@@ -609,6 +615,7 @@ contains
       z0iline=xg(3)
 
    else
+
       ag=reshape(source=(/ PH%Planes(nearest)%a,PH%Planes(nearest2)%a,1._KND,&
                           PH%Planes(nearest)%b,PH%Planes(nearest2)%b,0._KND,&
                           PH%Planes(nearest)%c,PH%Planes(nearest2)%c,0._KND /),&
@@ -624,13 +631,16 @@ contains
       x0iline=xg(1)
       y0iline=xg(2)
       z0iline=xg(3)
+
    endif
+
    call LineNearest(xln,yln,zln,x,y,z,x0iline,y0iline,z0iline,ailine,biline,ciline)
+
    if (PolyhedronInt(xln,yln,zln,PH,min(dxmin/1000._KND,dymin/10000._KND,dzmin/10000._KND))) then
     xnear=xln
     ynear=yln
     znear=zln
-    goto 10
+    return
    endif
   
 
@@ -647,12 +657,10 @@ contains
     call SGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
    endif
       
-  xnear=xg(1)
-  ynear=xg(2)
-  znear=xg(3)
+			xnear=xg(1)
+			ynear=xg(2)
+			znear=xg(3)
 
-
-   10 i=1
   endsubroutine PolyhedronNearest
 
 
@@ -881,13 +889,14 @@ contains
        do o=-1,1
         do n=-1,1
          do m=-1,1
-          if ((m/=0.or.n/=0.or.o/=0).and.(Prtype(i+m,j+n,k+o)>0)) then
+          if ((m/=0.or.n/=0.or.o/=0).and.i+m>0.and.j+n>0.and.k+o>0.and.i+m<=Prnx.and.j+n<=Prny.and.k+o<=Prnz.and.&
+           (Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb) then
             call SetCurrentSB(CurrentSB,Prtype(i+m,j+n,k+o))
             call SolidBodyNearest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k),CurrentSB)
             if (SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
              dist=SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
              nb=Prtype(i+m,j+n,k+o)            
-            endif
+            endif												
           endif
          enddo
         enddo
@@ -921,7 +930,6 @@ contains
      enddo
     enddo
    enddo
-
  
   endsubroutine GetSolidBodiesBC
 
