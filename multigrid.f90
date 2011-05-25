@@ -790,7 +790,8 @@ integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
      write (*,*) "info",info
     endif
 
-    ldwork=work(1)
+    ldwork=nint(work(1))
+
     deallocate(work)
     allocate(work(ldwork))
 
