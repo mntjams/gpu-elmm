@@ -58,9 +58,6 @@ contains
   read (11,*) prgradienty
   write (*,*) "prgradienty=",prgradienty
   read (11,fmt='(/)')
-  read (11,*) a
-  write (*,*) "a=",a
-  read (11,fmt='(/)')
   read (11,*) starttime
   write (*,*) "starttime=",starttime
   read (11,fmt='(/)')
@@ -659,14 +656,16 @@ contains
  subroutine INITCONDS(U,V,W,Pr)
  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
  integer i,j,k
- real(KND) p,S,x,y,z,x1,x2,y1,y2,z1,z2
- !PR=100000
+ real(KND) p,x,y,z,x1,x2,y1,y2,z1,z2
 
  call init_random_seed
+
  Pr(1:Prnx,1:Prny,1:Prnz)=0
+
  U=100000
  V=100000
  W=100000
+
  V(1:Vnx,1:Vny,1:Vnz)=0
  W(1:Wnx,1:Wny,1:Wnz)=0
 

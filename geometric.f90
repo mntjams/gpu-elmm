@@ -657,9 +657,9 @@ contains
     call SGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
    endif
       
-			xnear=xg(1)
-			ynear=xg(2)
-			znear=xg(3)
+   xnear=xg(1)
+   ynear=xg(2)
+   znear=xg(3)
 
   endsubroutine PolyhedronNearest
 
@@ -896,7 +896,7 @@ contains
             if (SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
              dist=SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
              nb=Prtype(i+m,j+n,k+o)            
-            endif												
+            endif            
           endif
          enddo
         enddo

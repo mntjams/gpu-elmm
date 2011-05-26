@@ -8,31 +8,34 @@ use PARAMETERS
 use BOUNDARIES
 use POISSON
 use SMAGORINSKY
-use SCALARS
+use ScalarS
 
 implicit none
 
 
+private
+public TMarchEul,TMarchRK2,TMarchRK3,TMarchShiftInlet
+
 logical:: released=.false.
 
 contains
-  subroutine TMARCHEUL(U,V,W,Pr,delta)
+ subroutine TMarchEul(U,V,W,Pr,delta)
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND),intent(out):: delta
   real(KND),allocatable,dimension(:,:,:),save:: Q
   real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: U2
   real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: V2
   real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: W2
-  integer i,j,k
-  real(KND),allocatable,dimension(:,:,:,:),save:: SCALAR_2
+  real(KND),allocatable,dimension(:,:,:,:),save:: Scalar_2
   real(KND),allocatable,dimension(:,:,:),save:: temperature2
   integer,save:: called=0
+  integer i
 
   
  if (called==0) then
    called=1
    if (computescalars>0) then
-    allocate(SCALAR_2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
+    allocate(Scalar_2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
    endif
    if (buoyancy>0) then
     allocate(temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
@@ -40,7 +43,7 @@ contains
    if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
   endif 
 
-  if ((BtypeW==TURBULENTINLET).or.(BtypeE==TURBULENTINLET)) call GETTURBINLET
+  if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
  
   call Bound_CondU(U)
   call Bound_CondV(V)
@@ -53,7 +56,7 @@ contains
   V2=1e19
   W2=1e19
 
-      call timestepEUL(U,V,W)
+  call timestepEUL(U,V,W)
 
   if (steady==0.and.dt+time>endtime)  dt=endtime-time
   write (*,*) "time:",time,"dt: ",dt
@@ -75,10 +78,10 @@ contains
   if (buoyancy==1) call BuoyancyForce(W2,temperature,1._KND)
 
 
-  call OTHERTERMS(U,V,W,U2,V2,W2,Pr,1._KND)
+  call OtherTerms(U,V,W,U2,V2,W2,Pr,1._KND)
 
 
-  if (BtypeT==FREESLIPBUFF)  call ATTENUATETOP(U2,V2,W2,Pr)
+  if (BtypeT==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
 
 
   if (masssourc==1) then
@@ -93,58 +96,58 @@ contains
 
   if (poissmet>0) then
   if (masssourc==1) then
-    call PR_CORRECT(U2,V2,W2,Pr,1._KND,Q)
+    call Pr_Correct(U2,V2,W2,Pr,1._KND,Q)
   else
-    call PR_CORRECT(U2,V2,W2,Pr,1._KND)
+    call Pr_Correct(U2,V2,W2,Pr,1._KND)
   endif
   endif
 
 
   
   if (computescalars>0) then
-   SCALAR_2=0
+   Scalar_2=0
    do i=1,computescalars
-    call ADVSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),U2,V2,W2,2,1._KND)
+    call AdvScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),U2,V2,W2,2,1._KND)
    enddo
-   SCALAR=SCALAR+SCALAR_2
-   call ComputeTDiff(U2,V2,W2)
+   Scalar=Scalar+Scalar_2
+   if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
    call Bound_Visc(TDiff)
    do i=1,computescalars
-    call DIFFSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),2,1._KND)
+    call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,1._KND)
    enddo
-   if (computedeposition>0) call Deposition(SCALAR_2,1._KND)
-   if (computegravsettling>0) call Gravsettling(SCALAR_2,1._KND)
-   SCALAR=SCALAR_2
+   if (computedeposition>0) call Deposition(Scalar_2,1._KND)
+   if (computegravsettling>0) call GravSettling(Scalar_2,1._KND)
+   Scalar=Scalar_2
   endif
     
   if (buoyancy>0) then
-   call ComputeTDiff(U2,V2,W2)
+   if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
    call Bound_Visc(TDiff)
    temperature2=0
    call Bound_Temp(temperature)
-   call CDSSCALAR(temperature2,temperature,U2,V2,W2,1,1._KND)
+   call CDSScalar(temperature2,temperature,U2,V2,W2,1,1._KND)
    temperature=temperature+temperature2
    call Bound_Temp(temperature2)
-   call DIFFSCALAR(temperature2,temperature,1,1._KND)
+   call DiffScalar(temperature2,temperature,1,1._KND)
 !    temperature2=temperature+temperature2
    temperature=temperature2
   endif
 
 
-  delta=SUM(ABS(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-  delta=delta+SUM(ABS(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
-  delta=delta+SUM(ABS(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
+  delta=sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
+  delta=delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
+  delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
   delta=delta/dt
 
 
   U=U2
   V=V2
   W=W2
-  end subroutine TMARCHEUL
+ end subroutine TMarchEul
   
 
   
-  subroutine TMARCHRK2(U,V,W,Pr,delta)
+ subroutine TMarchRK2(U,V,W,Pr,delta)
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND),intent(out):: delta
   real(KND),allocatable,dimension(:,:,:),save:: Q
@@ -156,15 +159,15 @@ contains
                                               lbound(W,3):ubound(W,3)):: W2,Wstar
   real(KND) p
   integer i,j,k
-  real(KND),allocatable,dimension(:,:,:,:),save:: SCALAR_2
+  real(KND),allocatable,dimension(:,:,:,:),save:: Scalar_2
   real(KND),allocatable,dimension(:,:,:),save:: temperature2
   integer,save:: called=0
 
 
- if (called==0) then
+  if (called==0) then
    called=1
    if (computescalars>0) then
-    allocate(SCALAR_2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
+    allocate(Scalar_2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
    endif
    if (buoyancy>0) then
     allocate(temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
@@ -172,7 +175,7 @@ contains
    if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
   endif 
   
-  if ((BtypeW==TURBULENTINLET).or.(BtypeE==TURBULENTINLET)) call GETTURBINLET
+  if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
 
   call Bound_CondU(U)
   call Bound_CondV(V)
@@ -228,11 +231,11 @@ contains
   endif 
  
 
-   call OTHERTERMS(U,V,W,U2,V2,W2,Pr,1._KND)
+   call OtherTerms(U,V,W,U2,V2,W2,Pr,1._KND)
 
 
-  if (BtypeT==FREESLIPBUFF)  call ATTENUATETOP(U2,V2,W2,Pr)
-  if (BtypeE==OUTLETBUFF) call ATTENUATEOUT(U2,V2,W2,Pr)
+  if (BtypeT==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
+  if (BtypeE==OutletBuff) call AttenuateOut(U2,V2,W2,Pr)
 
   
   if (masssourc==1) then
@@ -247,9 +250,9 @@ contains
 
   if (poissmet>0) then
   if (masssourc==1) then
-    call PR_CORRECT(U2,V2,W2,Pr,1._KND,Q)
+    call Pr_Correct(U2,V2,W2,Pr,1._KND,Q)
   else
-    call PR_CORRECT(U2,V2,W2,Pr,1._KND)
+    call Pr_Correct(U2,V2,W2,Pr,1._KND)
   endif  
   endif
 
@@ -269,7 +272,7 @@ contains
        if (((xPr(i)>-3.5.and.xPr(i)<3.5).or.(xPr(i)>3.5.and.xPr(i-1)<-3.5)).and.&
            ((yPr(j)>-3.5.and.yPr(j)<3.5).or.(yPr(j)>3.5.and.yPr(j-1)<-3.5)).and.&
            (zPr(k)<12.or.(zPr(k)>12.and.zPr(k-1)<0))) then
-        SCALAR(i,j,k,1)=0.10
+        Scalar(i,j,k,1)=0.10
         p=p+dxPr(i)*dyPr(j)*dzPr(k)
        endif
       enddo
@@ -281,7 +284,7 @@ contains
        if (((xPr(i)>-3.5.and.xPr(i)<3.5).or.(xPr(i)>3.5.and.xPr(i-1)<-3.5)).and.&
            ((yPr(j)>-3.5.and.yPr(j)<3.5).or.(yPr(j)>3.5.and.yPr(j-1)<-3.5)).and.&
            (zPr(k)<12.or.(zPr(k)>12.and.zPr(k-1)<0))) then
-        SCALAR(i,j,k,2)=0.13
+        Scalar(i,j,k,2)=0.13
        endif
       enddo
      enddo
@@ -292,7 +295,7 @@ contains
        if (((xPr(i)>-3.5.and.xPr(i)<3.5).or.(xPr(i)>3.5.and.xPr(i-1)<-3.5)).and.&
            ((yPr(j)>-3.5.and.yPr(j)<3.5).or.(yPr(j)>3.5.and.yPr(j-1)<-3.5)).and.&
            (zPr(k)<12.or.(zPr(k)>12.and.zPr(k-1)<0))) then
-        SCALAR(i,j,k,3)=0.64
+        Scalar(i,j,k,3)=0.64
        endif
       enddo
      enddo
@@ -303,12 +306,12 @@ contains
        if (((xPr(i)>-3.5.and.xPr(i)<3.5).or.(xPr(i)>3.5.and.xPr(i-1)<-3.5)).and.&
            ((yPr(j)>-3.5.and.yPr(j)<3.5).or.(yPr(j)>3.5.and.yPr(j-1)<-3.5)).and.&
            (zPr(k)<12.or.(zPr(k)>12.and.zPr(k-1)<0))) then
-        SCALAR(i,j,k,4)=0.13
+        Scalar(i,j,k,4)=0.13
        endif
       enddo
      enddo
     enddo
-    SCALAR=SCALAR/p
+    Scalar=Scalar/p
    endif
 
   elseif (computescalars>0.and.partdistrib>0) then
@@ -320,53 +323,53 @@ contains
        if (((xPr(i)>-3.5.and.xPr(i)<3.5).or.(xPr(i)>3.5.and.xPr(i-1)<-3.5)).and.&
            ((yPr(j)>-3.5.and.yPr(j)<3.5).or.(yPr(j)>3.5.and.yPr(j-1)<-3.5)).and.&
            (zPr(k)<12.or.(zPr(k)>12.and.zPr(k-1)<0))) then
-        SCALAR(i,j,k,1)=1._KND
+        Scalar(i,j,k,1)=1._KND
         p=p+dxPr(i)*dyPr(j)*dzPr(k)
        endif
       enddo
      enddo
     enddo
-    SCALAR=SCALAR/p
+    Scalar=Scalar/p
    endif
   endif
   
   if (computescalars>0) then
-   SCALAR_2=0
+   Scalar_2=0
    do i=1,computescalars
-    call ADVSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),U2,V2,W2,2,1._KND)
+    call AdvScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),U2,V2,W2,2,1._KND)
    enddo
-   SCALAR=SCALAR+SCALAR_2
-   call ComputeTDiff(U2,V2,W2)
+   Scalar=Scalar+Scalar_2
+   if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
    call Bound_Visc(TDiff)
     do i=1,computescalars
-     call DIFFSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),2,1._KND)
+     call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,1._KND)
     enddo
-    if (computedeposition>0) call Deposition(SCALAR_2,1._KND)
-    if (computegravsettling>0) call Gravsettling(SCALAR_2,1._KND)
-   SCALAR=SCALAR_2
+    if (computedeposition>0) call Deposition(Scalar_2,1._KND)
+    if (computegravsettling>0) call GravSettling(Scalar_2,1._KND)
+   Scalar=Scalar_2
   endif
 
   if (buoyancy>0) then
-   call ComputeTDiff(U2,V2,W2)
+   if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
    call Bound_Visc(TDiff)
    temperature2=0
    call Bound_Temp(temperature)
-   call CDSSCALAR(temperature2,temperature,U2,V2,W2,1,1._KND)
+   call CDSScalar(temperature2,temperature,U2,V2,W2,1,1._KND)
    temperature=temperature+temperature2
    call Bound_Temp(temperature)
-   call DIFFSCALAR(temperature2,temperature,1,1._KND)
+   call DiffScalar(temperature2,temperature,1,1._KND)
    temperature=temperature2
   endif
   
   
-  delta=SUM(ABS(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-  delta=delta+SUM(ABS(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
-  delta=delta+SUM(ABS(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
+  delta=sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
+  delta=delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
+  delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
   U=U2
   V=V2
   W=W2
     
-  endsubroutine TMARCHRK2
+ endsubroutine TMarchRK2
   
   
   
@@ -384,7 +387,7 @@ contains
 
 
   
-  subroutine TMARCHRK3(U,V,W,Pr,delta)
+ subroutine TMarchRK3(U,V,W,Pr,delta)
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND),intent(out):: delta
 
@@ -395,10 +398,10 @@ contains
                                               lbound(V,3):ubound(V,3))::V2,Vstar
   real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),&
                                               lbound(W,3):ubound(W,3))::W2,Wstar
-  real(KND),dimension(lbound(SCALAR,1):ubound(SCALAR,1),lbound(SCALAR,2):ubound(SCALAR,2),&
-                lbound(SCALAR,3):ubound(SCALAR,3),lbound(SCALAR,4):ubound(SCALAR,4))::SCALAR_adv,SCALAR_2
-  real(KND),dimension(lbound(TEMPERATURE,1):ubound(TEMPERATURE,1),lbound(TEMPERATURE,2):ubound(TEMPERATURE,2),&
-   lbound(TEMPERATURE,3):ubound(TEMPERATURE,3))::TEMPERATURE_adv,TEMPERATURE2
+  real(KND),dimension(lbound(Scalar,1):ubound(Scalar,1),lbound(Scalar,2):ubound(Scalar,2),&
+                lbound(Scalar,3):ubound(Scalar,3),lbound(Scalar,4):ubound(Scalar,4))::Scalar_adv,Scalar_2
+  real(KND),dimension(lbound(Temperature,1):ubound(Temperature,1),lbound(Temperature,2):ubound(Temperature,2),&
+   lbound(Temperature,3):ubound(Temperature,3))::Temperature_adv,Temperature2
   real(KND),dimension(1:3),save:: alpha,beta,rho
   integer i,j,k,l
   real(KND) p
@@ -406,32 +409,34 @@ contains
   real time1,time2
 
 
- if (called==0) then
-  alpha(1)=4._KND/15._KND
-  alpha(2)=1._KND/15._KND
-  alpha(3)=1._KND/6._KND
-  beta(1)=8._KND/15._KND
-  beta(2)=5._KND/12._KND
-  beta(3)=3._KND/4._KND
-  rho(1)=0
-  rho(2)=-17._KND/60._KND
-  rho(3)=-5._KND/12._KND
+  if (called==0) then
+   alpha(1)=4._KND/15._KND
+   alpha(2)=1._KND/15._KND
+   alpha(3)=1._KND/6._KND
+   beta(1)=8._KND/15._KND
+   beta(2)=5._KND/12._KND
+   beta(3)=3._KND/4._KND
+   rho(1)=0
+   rho(2)=-17._KND/60._KND
+   rho(3)=-5._KND/12._KND
 
-  called=1
-  if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
- endif
+   called=1
+   if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
+  endif
 
   call Bound_CondU(U)
   call Bound_CondV(V)
   call Bound_CondW(W)
+
   if (buoyancy==1)  call Bound_Temp(temperature)
 
-  if ((BtypeW==TURBULENTINLET).or.(BtypeE==TURBULENTINLET)) call GETTURBINLET
-  if (BtypeW==INLETFROMFILE) call GETINLETFROMFILE(time)
+  if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
+  if (BtypeW==InletFromFile) call GetInletFromFile(time)
 
-      call timestepEUL(U,V,W)
+  call timestepEUL(U,V,W)
+
   if (steady==0.and.dt+time>endtime)  dt=endtime-time
- 
+
   write (*,*) "time:",time,"dt: ",dt
 
   temperature_adv=0
@@ -440,152 +445,153 @@ contains
   Wstar=0
 
   do l=1,3
-   if (debugparam>1) call cpu_time(time1)
+    if (debugparam>1) call cpu_time(time1)
 
-   U2=0
-   V2=0
-   W2=0
+    U2=0
+    V2=0
+    W2=0
 
-  if (convmet>0) then
-   if (l>1) then
-     U2=U2+Ustar*rho(l)
-     V2=V2+Vstar*rho(l)
-     W2=W2+Wstar*rho(l)
-   endif
+    if (convmet>0) then
+      if (l>1) then
+        U2=U2+Ustar*rho(l)
+        V2=V2+Vstar*rho(l)
+        W2=W2+Wstar*rho(l)
+      endif
 
-   Ustar=0
-   Vstar=0
-   Wstar=0
+      Ustar=0
+      Vstar=0
+      Wstar=0
 
-   if (convmet==1) then
-    call LF(Ustar,Vstar,Wstar,U,V,W)
-   elseif (convmet==3) then
-    call KAPPAU(Ustar,U,V,W,1._KND)
-    call KAPPAV(Vstar,U,V,W,1._KND)
-    call KAPPAW(Wstar,U,V,W,1._KND)
-   else
-    call CDU2(Ustar,U,V,W,1._KND)
-    call CDV2(Vstar,U,V,W,1._KND)
-    call CDW2(Wstar,U,V,W,1._KND)
-   endif
-   call CoriolisForce(Ustar,Vstar,U,V,1._KND)
-   if (buoyancy==1) call BuoyancyForce(Wstar,temperature,1._KND)
+      if (convmet==1) then
+       call LF(Ustar,Vstar,Wstar,U,V,W)
+      elseif (convmet==3) then
+       call KAPPAU(Ustar,U,V,W,1._KND)
+       call KAPPAV(Vstar,U,V,W,1._KND)
+       call KAPPAW(Wstar,U,V,W,1._KND)
+      else
+       call CDU2(Ustar,U,V,W,1._KND)
+       call CDV2(Vstar,U,V,W,1._KND)
+       call CDW2(Wstar,U,V,W,1._KND)
+      endif
 
-   U2=U2+Ustar*beta(l)
-   V2=V2+Vstar*beta(l)
-   W2=W2+Wstar*beta(l)
-  endif
+      call CoriolisForce(Ustar,Vstar,U,V,1._KND)
+      if (buoyancy==1) call BuoyancyForce(Wstar,temperature,1._KND)
 
-  if (debugparam>1) then
-   call cpu_time(time2)
-   write (*,*) "ET of part 1", (time2-time1)
-   time1=time2
-  endif
-
-  call OTHERTERMS(U,V,W,U2,V2,W2,Pr,2.*alpha(l))
-
-  if (debugparam>1) then
-   call cpu_time(time2)
-   write (*,*) "ET of part 2", (time2-time1)
-   time1=time2
-  endif
-
-  if (BtypeT==FREESLIPBUFF)  call ATTENUATETOP(U2,V2,W2,Pr)
-  if (BtypeE==OUTLETBUFF) then
-    if (buoyancy==1) then
-      call ATTENUATEOUT(U2,V2,W2,Pr,temperature)
-    else
-      call ATTENUATEOUT(U2,V2,W2,Pr)
+      U2=U2+Ustar*beta(l)
+      V2=V2+Vstar*beta(l)
+      W2=W2+Wstar*beta(l)
     endif
-  endif
 
-  if (masssourc==1) then
-      call MASS_SOURC(Q,U2,V2,W2)
-  endif
-   
-  
-  call Bound_CondU(U2)
-  call Bound_CondV(V2)
-  call Bound_CondW(W2)
+    if (debugparam>1) then
+     call cpu_time(time2)
+     write (*,*) "ET of part 1", (time2-time1)
+     time1=time2
+    endif
+
+    call OtherTerms(U,V,W,U2,V2,W2,Pr,2.*alpha(l))
+
+    if (debugparam>1) then
+     call cpu_time(time2)
+     write (*,*) "ET of part 2", (time2-time1)
+     time1=time2
+    endif
+
+    if (BtypeT==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
+    if (BtypeE==OutletBuff) then
+      if (buoyancy==1) then
+        call AttenuateOut(U2,V2,W2,Pr,temperature)
+      else
+        call AttenuateOut(U2,V2,W2,Pr)
+      endif
+    endif
+
+    if (masssourc==1) then
+        call MASS_SOURC(Q,U2,V2,W2)
+    endif
 
 
-  if (poissmet>0) then
-   if (masssourc==1) then
-     call PR_CORRECT(U2,V2,W2,Pr,2.*alpha(l),Q)
-   else
-     call PR_CORRECT(U2,V2,W2,Pr,2.*alpha(l))
-   endif  
-  endif
+    call Bound_CondU(U2)
+    call Bound_CondV(V2)
+    call Bound_CondW(W2)
 
 
-  if (computescalars>0.and..not.released) call EXPLOSION
+    if (poissmet>0) then
+     if (masssourc==1) then
+       call Pr_Correct(U2,V2,W2,Pr,2.*alpha(l),Q)
+     else
+       call Pr_Correct(U2,V2,W2,Pr,2.*alpha(l))
+     endif
+    endif
 
-  if (computescalars>0) then
-   SCALAR_2=0
-   if (l>1) then
-    SCALAR_2=SCALAR_2+SCALAR_adv*rho(l)
-   endif
-   SCALAR_adv=0
-   do i=1,computescalars
-    call KAPPASCALAR(SCALAR_adv(:,:,:,i),SCALAR(:,:,:,i),U2,V2,W2,2,1._KND)
+
+    if (computescalars>0.and..not.released) call Explosion
+
+    if (computescalars>0) then
+      Scalar_2=0
+      if (l>1) then
+       Scalar_2=Scalar_2+Scalar_adv*rho(l)
+      endif
+      Scalar_adv=0
+      do i=1,computescalars
+       call KAPPAScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U2,V2,W2,2,1._KND)
+      enddo
+      Scalar_2=Scalar_2+Scalar_adv*beta(l)
+
+      if (pointscalsource==1) then
+       do i=1,computescalars
+        Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)=Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
+         percdistrib(i)*(rho(l)+beta(l))*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
+       enddo
+      endif
+
+      Scalar=Scalar+Scalar_2
+      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
+      call Bound_Visc(TDiff)
+      do i=1,computescalars
+         call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,2._KND*alpha(l))
+      enddo
+      if (computedeposition>0) call Deposition(Scalar_2,2._KND*alpha(l))
+      if (computegravsettling>0) call GravSettling(Scalar_2,2._KND*alpha(l))
+      Scalar=Scalar_2
+    endif
+
+    if (buoyancy>0) then
+      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
+      call Bound_Visc(TDiff)
+      temperature2=0
+      call Bound_Temp(temperature)
+
+      if (l>1) then
+       temperature2=temperature2+temperature_adv*rho(l)
+      endif
+      temperature_adv=0
+      call KAPPAScalar(temperature_adv,temperature,U2,V2,W2,1,1._KND)
+      temperature2=temperature2+temperature_adv*beta(l)
+
+      temperature=temperature+temperature2
+      call Bound_Temp(temperature)
+       call DiffScalar(temperature2,temperature,1,2._KND*alpha(l))
+      temperature=temperature2
+    endif
+
+
+
+    if (l==1) delta=0
+
+    delta=delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
+    delta=delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
+    delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
+
+
+    where(Utype>0) U2=0
+    where(Vtype>0) V2=0
+    where(Wtype>0) W2=0
+
+    U=U2
+    V=V2
+    W=W2
    enddo
-   SCALAR_2=SCALAR_2+SCALAR_adv*beta(l)
-
-   if (pointscalsource==1) then
-    do i=1,computescalars
-     SCALAR_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)=SCALAR_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
-      percdistrib(i)*(rho(l)+beta(l))*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
-    enddo
-   endif
-
-   SCALAR=SCALAR+SCALAR_2
-   call ComputeTDiff(U2,V2,W2)
-   call Bound_Visc(TDiff)
-   do i=1,computescalars
-      call DIFFSCALAR(SCALAR_2(:,:,:,i),SCALAR(:,:,:,i),2,2._KND*alpha(l))
-   enddo
-   if (computedeposition>0) call Deposition(SCALAR_2,2._KND*alpha(l))
-   if (computegravsettling>0) call Gravsettling(SCALAR_2,2._KND*alpha(l))
-   SCALAR=SCALAR_2
-  endif
-
-  if (buoyancy>0) then
-   call ComputeTDiff(U2,V2,W2)
-   call Bound_Visc(TDiff)
-   temperature2=0
-   call Bound_Temp(temperature)
-
-   if (l>1) then
-    temperature2=temperature2+temperature_adv*rho(l)
-   endif
-   temperature_adv=0
-   call KAPPASCALAR(temperature_adv,temperature,U2,V2,W2,1,1._KND)
-   temperature2=temperature2+temperature_adv*beta(l)
-
-   temperature=temperature+temperature2
-   call Bound_Temp(temperature)
-    call DIFFSCALAR(temperature2,temperature,1,2._KND*alpha(l))
-   temperature=temperature2
-   endif
-
-
-
-   if (l==1) delta=0
-
-   delta=delta+SUM(ABS(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-   delta=delta+SUM(ABS(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
-   delta=delta+SUM(ABS(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
-
-
-   where(Utype>0) U2=0
-   where(Vtype>0) V2=0
-   where(Wtype>0) W2=0
-
-   U=U2
-   V=V2
-   W=W2
-  enddo
-  end subroutine TMARCHRK3   
+ end subroutine TMarchRK3
     
   
 
@@ -593,32 +599,34 @@ contains
 
   
    
-  subroutine TMARCHSHIFTINLET(U,V,W,Pr,delta) !Only shifts inlet in the x direction, for debugging purposes
+ subroutine TMarchShiftInlet(U,V,W,Pr,delta) !Only shifts inlet in the x direction, for debugging purposes
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND),intent(out):: delta
   integer i,j,k
-  real(KND),allocatable,dimension(:,:,:,:),save:: SCALAR_2
+  real(KND),allocatable,dimension(:,:,:,:),save:: Scalar_2
   real(KND),allocatable,dimension(:,:,:),save:: temperature2
   integer,save:: called=0
 
 
- if (called==0) then
-   called=1
-   if (computescalars>0) then
-    allocate(SCALAR_2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
-   endif
-   if (buoyancy>0) then
-    allocate(temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-   endif 
+  if (called==0) then
+    called=1
+    if (computescalars>0) then
+     allocate(Scalar_2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
+    endif
+    if (buoyancy>0) then
+     allocate(temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+    endif 
   endif 
  
-  if ((BtypeW==TURBULENTINLET).or.(BtypeE==TURBULENTINLET)) call GETTURBINLET
-  if (BtypeW==INLETFROMFILE) call GETINLETFROMFILE(time)
+  if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
+  if (BtypeW==InletFromFile) call GetInletFromFile(time)
+
   write (*,*) "time:",time,"dt: ",dt
  
   call Bound_CondU(U)
   call Bound_CondV(V)
   call Bound_CondW(W)
+
   do k=1,Unz
    do j=1,Uny
     do i=Unx,1,-1
@@ -640,40 +648,41 @@ contains
     enddo
    enddo
   enddo
+
   if (buoyancy==1) then
-  call Bound_Temp(temperature)
-  do k=1,Prnz
-   do j=1,Prny
-    do i=Prnx,1,-1
-     temperature(i,j,k)=temperature(i-1,j,k)
+    call Bound_Temp(temperature)
+    do k=1,Prnz
+     do j=1,Prny
+      do i=Prnx,1,-1
+       temperature(i,j,k)=temperature(i-1,j,k)
+      enddo
+     enddo
     enddo
-   enddo
-  enddo
   endif
 
   if (poissmet>0) then
-    call PR_CORRECT(U,V,W,Pr,1._KND)
+    call Pr_Correct(U,V,W,Pr,1._KND)
   endif
 
   if (computescalars>0)then
    if (time>5.and.maxval(scalar(:,:,:,1))==0) then
     call GridCoords(i,j,k,0._KND,0._KND,0.5_KND)
-    SCALAR(i,j,k,1)=1._KND/(dxPr(i)*dyPr(j)*dzPr(k))
+    Scalar(i,j,k,1)=1._KND/(dxPr(i)*dyPr(j)*dzPr(k))
    endif
   endif
   
 
 
-   if (wallmodeltype>0) then
+  if (wallmodeltype>0) then
                    call ComputeViscsWM(U,V,W,Pr)
-   endif
+  endif
 
   delta=1
-  endsubroutine TMARCHSHIFTINLET
+ endsubroutine TMarchShiftInlet
   
   
   
-  subroutine EXPLOSION
+ subroutine Explosion
   real(KND) xc,yc,xs,xf,ys,yf,zs,zf,dxp,dyp,dzp,ct,cr,xp,yp,zp,p
   integer i,j,k,xi,yj,zk,nprobx,nproby,nprobz
   ct=7
@@ -694,7 +703,7 @@ contains
   dzp=(zf-zs)/nprobz
   if (computescalars>=4) then
    if (time>(endtime-starttime)/3._KND) then
-    SCALAR=0
+    Scalar=0
     p=0
     do k=0,nprobz
      zp=zs+k*dzp
@@ -705,40 +714,40 @@ contains
         call GridCoords(xi,yj,zk,xp,yp,zp)
         if ((xp-xc)**2+(yp-yc)**2<cr**2) then
         if   (zp<ct*0.2) then
-         SCALAR(xi,yj,zk,:)=SCALAR(xi,yj,zk,:)+percdistrib(:)*0.2
+         Scalar(xi,yj,zk,:)=Scalar(xi,yj,zk,:)+percdistrib(:)*0.2
          p=p+1
         elseif (zp<ct*0.4) then
-         SCALAR(xi,yj,zk,:)=SCALAR(xi,yj,zk,:)+percdistrib(:)*0.8
+         Scalar(xi,yj,zk,:)=Scalar(xi,yj,zk,:)+percdistrib(:)*0.8
          p=p+1
         elseif (zp<ct*0.6) then
-         SCALAR(xi,yj,zk,:)=SCALAR(xi,yj,zk,:)+percdistrib(:)*1.25
+         Scalar(xi,yj,zk,:)=Scalar(xi,yj,zk,:)+percdistrib(:)*1.25
          p=p+1
         elseif (zp<ct*0.8) then
-         SCALAR(xi,yj,zk,:)=SCALAR(xi,yj,zk,:)+percdistrib(:)*1.75
+         Scalar(xi,yj,zk,:)=Scalar(xi,yj,zk,:)+percdistrib(:)*1.75
          p=p+1
         elseif (zp<=ct) then
-         SCALAR(xi,yj,zk,:)=SCALAR(xi,yj,zk,:)+percdistrib(:)*1.1
+         Scalar(xi,yj,zk,:)=Scalar(xi,yj,zk,:)+percdistrib(:)*1.1
          p=p+1
         endif
        endif
       enddo
      enddo
     enddo
-    SCALAR=totalscalsource*SCALAR/p
-    SCALAR=SCALAR/(dxmin*dymin*dzmin)
+    Scalar=totalscalsource*Scalar/p
+    Scalar=Scalar/(dxmin*dymin*dzmin)
     released=.true.
    endif
   endif
 
   
-  endsubroutine EXPLOSION
+ endsubroutine Explosion
   
   
   
   
 
 
-  subroutine MOMSOURC(U,V,W)
+  subroutine MomSourc(U,V,W)
    real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
    real(KND) intvel,p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7
    type(TIBPoint),pointer:: IBP
@@ -974,7 +983,7 @@ contains
    enddo
   endif
 
-  end subroutine MOMSOURC
+  end subroutine MomSourc
    
 
   subroutine MASS_SOURC(Q,U,V,W)
@@ -1025,9 +1034,9 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-     p=MAX(ABS(U(i,j,k)/dxU(i)),ABS(U(i-1,j,k)/dxU(i-1)))+&
-        MAX(ABS(V(i,j,k)/dyV(j)),ABS(V(i,j-1,k)/dyV(j-1)))+&
-        MAX(ABS(W(i,j,k)/dzW(k)),ABS(W(i,j,k-1)/dzW(k-1)))
+     p=MAX(abs(U(i,j,k)/dxU(i)),abs(U(i-1,j,k)/dxU(i-1)))+&
+        MAX(abs(V(i,j,k)/dyV(j)),abs(V(i,j-1,k)/dyV(j-1)))+&
+        MAX(abs(W(i,j,k)/dzW(k)),abs(W(i,j,k-1)/dzW(k-1)))
      if (p>m) m=p
     enddo
    enddo
@@ -1054,8 +1063,8 @@ contains
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
-     p=MAX(MAX(ABS(U(i,j,k)/dxU(i)),ABS(U(i-1,j,k)/dxU(i-1))),MAX(ABS(V(i,j,k)/dyV(j)),ABS(V(i,j-1,k)/dyV(j-1))))&
-         +MAX(ABS(W(i,j,k)/dzW(k)),ABS(W(i,j,k-1)/dzW(k-1)))
+     p=MAX(MAX(abs(U(i,j,k)/dxU(i)),abs(U(i-1,j,k)/dxU(i-1))),MAX(abs(V(i,j,k)/dyV(j)),abs(V(i,j-1,k)/dyV(j-1))))&
+         +MAX(abs(W(i,j,k)/dzW(k)),abs(W(i,j,k-1)/dzW(k-1)))
      if (p>m) then
                m=p
                maxI=i
@@ -1080,7 +1089,7 @@ contains
 
 
 
-  subroutine BUOYANCYFORCE(W2,theta,coef)
+  subroutine BuoyancyForce(W2,theta,coef)
   real(KND),dimension(-2:,-2:,-2:),intent(inout):: W2
   real(KND),dimension(-1:,-1:,-1:),intent(in):: theta
   real(KND),intent(in):: coef
@@ -1095,13 +1104,13 @@ contains
       enddo
      enddo
     enddo
-  endsubroutine BUOYANCYFORCE
+  endsubroutine BuoyancyForce
 
 
 
 
 
-  subroutine CORIOLISFORCE(U2,V2,U,V,coef)
+  subroutine CoriolisForce(U2,V2,U,V,coef)
   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V
   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2
   real(KND),intent(in):: coef
@@ -1125,7 +1134,7 @@ contains
      enddo
     enddo
    endif
-  endsubroutine CORIOLISFORCE
+  endsubroutine CoriolisForce
 
 
 
@@ -1133,7 +1142,7 @@ contains
 
 
 
-  subroutine OTHERTERMS(U,V,W,U2,V2,W2,Pr,coef)
+  subroutine OtherTerms(U,V,W,U2,V2,W2,Pr,coef)
    real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
    real(KND),intent(inout):: Pr(1:,1:,1:)
    real(KND),intent(inout):: U2(-2:,-2:,-2:),V2(-2:,-2:,-2:),W2(-2:,-2:,-2:)
@@ -1142,10 +1151,9 @@ contains
    real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: U3
    real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: V3
    real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: W3
-   real(KND) p,Af,Ap,Apre,Aprn,Aprt,Ap2,S
-   real(KND) Str(3,3)
+   real(KND) Af,Ap,Apre,Aprn,Aprt,S
 
-   integer i,j,k,l,x,y,z
+   integer i,j,k,x,y,z
 
    type(TIBPoint),pointer:: IBP
    
@@ -1183,7 +1191,8 @@ contains
    call Bound_CondV2(V2)
    call Bound_CondW2(W2)
 
-Regt0: if (Re>0) then
+   Re_gt_0: if (Re>0) then
+
      !Diffusion using Crank Nicolson
      !first approximation using forward Euler
      !iteration SOR or Gauss-Seidel
@@ -1195,18 +1204,20 @@ Regt0: if (Re>0) then
      U3=U+U2
      V3=V+V2
      W3=W+W2
-     if (sgstype==1) then
+     if (sgstype==SmagorinskyModel) then
                        call Smag(U,V,W)
-     elseif (sgstype==2) then
+     elseif (sgstype==DynSmagorinskyModel) then
                        call DynSmag(U,V,W)
-     elseif (sgstype==3) then
-                       call VREMAN(U,V,W)
+     elseif (sgstype==VremanModel) then
+                       call Vreman(U,V,W)
+     elseif (sgstype==StabSmagorinskyModel) then
+                       call StabSmag(U,V,W)
      else
                        Visc=1._KND/Re
      endif
 
      if (debuglevel>0) then
-      write(*,*) "NUt", SUM(Visc(1:Prnx,1:Prny,1:Prnz))/(Prnx*Prny*Prnz)
+      write(*,*) "NUt", sum(Visc(1:Prnx,1:Prny,1:Prnz))/(Prnx*Prny*Prnz)
       write(*,*) "maxNUt", MAXVAL(Visc(1:Prnx,1:Prny,1:Prnz))
       write(*,*) "minNUt", MINVAL(Visc(1:Prnx,1:Prny,1:Prnz))
      endif
@@ -1263,7 +1274,7 @@ Regt0: if (Re>0) then
      call Bound_CondU(U3)
      call Bound_CondV(V3)
      call Bound_CondW(W3)
-     call MOMSOURC(U3,V3,W3)
+     call MomSourc(U3,V3,W3)
 
      if (associated(FirstIBPoint)) then   !Immersed boundary terms, in the future should be in an array
       IBP => FirstIBPoint
@@ -1300,48 +1311,48 @@ Regt0: if (Re>0) then
      V2=V3
      W2=W3
   
-  else  Regt0
+   else  Re_gt_0  !Re<=0
 
-   U2=U+U2
-   V2=V+V2
-   W2=W+W2
+    U2=U+U2
+    V2=V+V2
+    W2=W+W2
 
-  endif   Regt0
+   endif   Re_gt_0
 
-  if (debuglevel>=2) then  !Compute and output the mean friction in the domain.
-   S=0
-   do k=1,Unz
-    do j=1,Uny
-     do i=1,Unx
-      S=S-((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
-      Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&     
-        (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
-        0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-         (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
-        0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))
+   if (debuglevel>=2) then  !Compute and output the mean friction in the domain.
+    S=0
+    do k=1,Unz
+     do j=1,Uny
+      do i=1,Unx
+       S=S-((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
+       Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
+         (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
+         0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+          (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
+         0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))
+      enddo
      enddo
     enddo
-   enddo
 
-   S=S/(Unx*Uny*Unz)
-   write(*,*) "Mean friction:", S 
-  endif
-  endsubroutine OTHERTERMS
+    S=S/(Unx*Uny*Unz)
+    write(*,*) "Mean friction:", S
+   endif
+  endsubroutine OtherTerms
 
 
 
 
   subroutine UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
-  real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W,U2,V2,W2,U3,V3,W3
-  real(KND),intent(in):: coef
-  real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
-  real(KND),dimension(1:Vnx,1:Vny,1:Vnz):: ApV
-  real(KND),dimension(1:Wnx,1:Wny,1:Wnz):: ApW
-  real(KND) recdxmin2,recdymin2,recdzmin2                                                               !reciprocal values of dx**2
-  real(KND) Ap,Ap2,Ap3,Ap4,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw 
-  integer i,j,k,l,Unyz,Vnyz,Wnyz
+   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W,U2,V2,W2,U3,V3,W3
+   real(KND),intent(in):: coef
+   real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
+   real(KND),dimension(1:Vnx,1:Vny,1:Vnz):: ApV
+   real(KND),dimension(1:Wnx,1:Wny,1:Wnz):: ApW
+   real(KND) recdxmin2,recdymin2,recdzmin2                                                               !reciprocal values of dx**2
+   real(KND) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
+   integer i,j,k,l
 
-       Ap2=coef*dt/(2._KND)
+       Ap=coef*dt/(2._KND)
        S=0
        l=0
 
@@ -1352,7 +1363,7 @@ Regt0: if (Re>0) then
        do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
         do j=1,Uny
          do i=1,Unx
-          U2(i,j,k)=U2(i,j,k)+Ap2*(&
+          U2(i,j,k)=U2(i,j,k)+Ap*(&
           ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
           Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*recdxmin2+0.25_KND*(&
            ((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
@@ -1365,7 +1376,7 @@ Regt0: if (Re>0) then
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
-          V2(i,j,k)=V2(i,j,k)+Ap2*(&
+          V2(i,j,k)=V2(i,j,k)+Ap*(&
           (0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
           (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))*recdxmin2+&
            (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
@@ -1378,7 +1389,7 @@ Regt0: if (Re>0) then
        do k=1,Wnz
        do j=1,Wny
         do i=1,Wnx
-         W2(i,j,k)=W2(i,j,k)+Ap2*(&
+         W2(i,j,k)=W2(i,j,k)+Ap*(&
          (0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
          (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))*recdxmin2+&
           ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
@@ -1402,7 +1413,7 @@ Regt0: if (Re>0) then
         enddo
        enddo
 
-       ApU=1._KND/(1._KND+Ap2*ApU)
+       ApU=1._KND/(1._KND+Ap*ApU)
 
        do k=1,Vnz
         do j=1,Vny
@@ -1417,7 +1428,7 @@ Regt0: if (Re>0) then
         enddo
        enddo
 
-       ApV=1._KND/(1._KND+Ap2*ApV)
+       ApV=1._KND/(1._KND+Ap*ApV)
 
        do k=1,Wnz
         do j=1,Wny
@@ -1432,7 +1443,7 @@ Regt0: if (Re>0) then
         enddo
        enddo
 
-       ApW=1._KND/(1._KND+Ap2*ApW)
+       ApW=1._KND/(1._KND+Ap*ApW)
 
 
        Suavg=abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
@@ -1463,7 +1474,7 @@ Regt0: if (Re>0) then
              (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
              ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
              (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
-            p=Ap2*p+U2(i,j,k)+U(i,j,k)
+            p=Ap*p+U2(i,j,k)+U(i,j,k)
             p=p*ApU(i,j,k)
 
 
@@ -1483,7 +1494,7 @@ Regt0: if (Re>0) then
              (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
              ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
              (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
-            p=Ap2*p+V2(i,j,k)+V(i,j,k)
+            p=Ap*p+V2(i,j,k)+V(i,j,k)
             p=p*ApV(i,j,k)
             Sv=max(Sv,abs(p-V3(i,j,k)))
             V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
@@ -1501,7 +1512,7 @@ Regt0: if (Re>0) then
              (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
              (Visc(i,j,k+1)*(W3(i,j,k+1))-&
              Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
-            p=Ap2*p+W2(i,j,k)+W(i,j,k)
+            p=Ap*p+W2(i,j,k)+W(i,j,k)
             p=p*ApW(i,j,k)
             Sw=max(Sw,abs(p-W3(i,j,k)))
             W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
@@ -1520,7 +1531,7 @@ Regt0: if (Re>0) then
              (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
              ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
              (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
-            p=Ap2*p+U2(i,j,k)+U(i,j,k)
+            p=Ap*p+U2(i,j,k)+U(i,j,k)
             p=p*ApU(i,j,k)
 
 
@@ -1540,7 +1551,7 @@ Regt0: if (Re>0) then
              (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
              ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
              (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
-            p=Ap2*p+V2(i,j,k)+V(i,j,k)
+            p=Ap*p+V2(i,j,k)+V(i,j,k)
             p=p*ApV(i,j,k)
             Sv=max(Sv,abs(p-V3(i,j,k)))
             V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
@@ -1558,7 +1569,7 @@ Regt0: if (Re>0) then
              (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
              (Visc(i,j,k+1)*(W3(i,j,k+1))-&
              Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
-            p=Ap2*p+W2(i,j,k)+W(i,j,k)
+            p=Ap*p+W2(i,j,k)+W(i,j,k)
             p=p*ApW(i,j,k)
             Sw=max(Sw,abs(p-W3(i,j,k)))
             W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
@@ -1576,17 +1587,17 @@ Regt0: if (Re>0) then
 
 
   subroutine GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
-  real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W,U2,V2,W2,U3,V3,W3
-  real(KND),intent(in):: coef
-  real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
-  real(KND),dimension(1:Vnx,1:Vny,1:Vnz):: ApV
-  real(KND),dimension(1:Wnx,1:Wny,1:Wnz):: ApW
-  real(KND) recdxmin2,recdymin2,recdzmin2,Ap,Ap2,Ap3,Ap4,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
-  integer i,j,k,l,Unyz,Vnyz,Wnyz
-  integer ind(3)
+   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W,U2,V2,W2,U3,V3,W3
+   real(KND),intent(in):: coef
+   real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
+   real(KND),dimension(1:Vnx,1:Vny,1:Vnz):: ApV
+   real(KND),dimension(1:Wnx,1:Wny,1:Wnz):: ApW
+   real(KND) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
+   integer i,j,k,l
+   integer ind(3)
 
 
-       Ap2=coef*dt/(2._KND)
+       Ap=coef*dt/(2._KND)
        S=0
        l=0
 
@@ -1594,7 +1605,7 @@ Regt0: if (Re>0) then
        do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
         do j=1,Uny
          do i=1,Unx
-          U2(i,j,k)=U2(i,j,k)+Ap2*(&
+          U2(i,j,k)=U2(i,j,k)+Ap*(&
           ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
           Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
            (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
@@ -1607,7 +1618,7 @@ Regt0: if (Re>0) then
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
-          V2(i,j,k)=V2(i,j,k)+Ap2*(&
+          V2(i,j,k)=V2(i,j,k)+Ap*(&
           ((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
           0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
            (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
@@ -1620,7 +1631,7 @@ Regt0: if (Re>0) then
        do k=1,Wnz
        do j=1,Wny
         do i=1,Wnx
-         W2(i,j,k)=W2(i,j,k)+Ap2*(&
+         W2(i,j,k)=W2(i,j,k)+Ap*(&
          ((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
          0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
           (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
@@ -1644,7 +1655,7 @@ Regt0: if (Re>0) then
         enddo
        enddo
 
-      ApU=1._KND/(1._KND+Ap2*ApU)
+      ApU=1._KND/(1._KND+Ap*ApU)
 
 
        do k=1,Vnz
@@ -1660,7 +1671,7 @@ Regt0: if (Re>0) then
         enddo
        enddo
 
-       ApV=1._KND/(1._KND+Ap2*ApV)
+       ApV=1._KND/(1._KND+Ap*ApV)
 
 
        do k=1,Wnz
@@ -1676,7 +1687,7 @@ Regt0: if (Re>0) then
         enddo
        enddo
 
-       ApW=1._KND/(1._KND+Ap2*ApW)
+       ApW=1._KND/(1._KND+Ap*ApW)
 
        Suavg=abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
        Svavg=abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
@@ -1706,7 +1717,7 @@ Regt0: if (Re>0) then
              0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
              (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))/dzW(k)-&
              0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
-            p=Ap2*p+U2(i,j,k)+U(i,j,k)
+            p=Ap*p+U2(i,j,k)+U(i,j,k)
             p=p*ApU(i,j,k)
 
 
@@ -1726,7 +1737,7 @@ Regt0: if (Re>0) then
              Visc(i,j,k)*(-V3(i,j-1,k))/dyPr(j))/dyV(j)+&
              (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))/dzW(k)-&
              0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
-            p=Ap2*p+V2(i,j,k)+V(i,j,k)
+            p=Ap*p+V2(i,j,k)+V(i,j,k)
             p=p*ApV(i,j,k)
             Sv=max(Sv,abs(p-V3(i,j,k)))
             V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
@@ -1744,7 +1755,7 @@ Regt0: if (Re>0) then
              0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
              (Visc(i,j,k+1)*(W3(i,j,k+1))/dzPr(k+1)-&
              Visc(i,j,k)*(-W3(i,j,k-1))/dzPr(k))/dzW(k))
-            p=Ap2*p+W2(i,j,k)+W(i,j,k)
+            p=Ap*p+W2(i,j,k)+W(i,j,k)
             p=p*ApW(i,j,k)
             Sw=max(Sw,abs(p-W3(i,j,k)))
             W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
@@ -1763,7 +1774,7 @@ Regt0: if (Re>0) then
              0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
              (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))/dzW(k)-&
              0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
-            p=Ap2*p+U2(i,j,k)+U(i,j,k)
+            p=Ap*p+U2(i,j,k)+U(i,j,k)
             p=p*ApU(i,j,k)
 
 
@@ -1783,7 +1794,7 @@ Regt0: if (Re>0) then
              Visc(i,j,k)*(-V3(i,j-1,k))/dyPr(j))/dyV(j)+&
              (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))/dzW(k)-&
              0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
-            p=Ap2*p+V2(i,j,k)+V(i,j,k)
+            p=Ap*p+V2(i,j,k)+V(i,j,k)
             p=p*ApV(i,j,k)
             Sv=max(Sv,abs(p-V3(i,j,k)))
             V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
@@ -1801,7 +1812,7 @@ Regt0: if (Re>0) then
              0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
              (Visc(i,j,k+1)*(W3(i,j,k+1))/dzPr(k+1)-&
              Visc(i,j,k)*(-W3(i,j,k-1))/dzPr(k))/dzW(k))
-            p=Ap2*p+W2(i,j,k)+W(i,j,k)
+            p=Ap*p+W2(i,j,k)+W(i,j,k)
             p=p*ApW(i,j,k)
             Sw=max(Sw,abs(p-W3(i,j,k)))
             W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
@@ -1823,7 +1834,7 @@ Regt0: if (Re>0) then
 
 
 
-  subroutine ATTENUATETOP(U,V,W,Pr)
+  subroutine AttenuateTop(U,V,W,Pr)
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   integer i,j,k,bufn
   real(KND) p,ze,zs,zb,DF
@@ -1898,10 +1909,10 @@ Regt0: if (Re>0) then
       enddo
      enddo
     enddo
-  endsubroutine ATTENUATETOP
+  endsubroutine AttenuateTop
 
 
-  subroutine ATTENUATEOUT(U,V,W,Pr,temperature)
+  subroutine AttenuateOut(U,V,W,Pr,temperature)
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND),optional,intent(inout):: temperature(-1:,-1:,-1:)
   integer i,j,k,bufn
@@ -1976,7 +1987,7 @@ Regt0: if (Re>0) then
      enddo
     enddo
    endif
-  endsubroutine ATTENUATEOUT
+  endsubroutine AttenuateOut
 
 
 
@@ -1993,7 +2004,7 @@ Regt0: if (Re>0) then
   endfunction Dampf
 
 
-  subroutine NULLINTERIOR(U,V,W)
+  subroutine NullInterior(U,V,W)
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer i,j,k
 
@@ -2027,7 +2038,7 @@ Regt0: if (Re>0) then
      enddo
     enddo
    enddo
-  endsubroutine NULLINTERIOR
+  endsubroutine NullInterior
 
 
 end module TSTEPS

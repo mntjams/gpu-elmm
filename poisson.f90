@@ -451,7 +451,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     !$OMP DO
     do k=1,nz
        do j=1,ny
-										do i=1+mod(j+k+1,2),nx,2
+          do i=1+mod(j+k+1,2),nx,2
              p=0
              Ap=0
              if (i>1) then

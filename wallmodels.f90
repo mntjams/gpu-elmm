@@ -38,245 +38,245 @@ implicit none
   subroutine AddWMpoint(WMP)
   type(WMpoint),intent(in):: WMP
   
-			if (.not.associated(LastWMPoint)) then
-				allocate(FirstWMPoint)
-				if (computedeposition>0) allocate(FirstWMPoint%depscalar(SIZE(WMP%depscalar,1)))
-				FirstWMPoint=WMP
-				LastWMPoint=>FirstWMPoint
-			else
-				allocate(LastWMPoint%next)
-				if (computedeposition>0) allocate(LastWMPoint%next%depscalar(SIZE(WMP%depscalar,1)))
-				LastWMPoint%next=WMP
-				LastWMPoint=>LastWMPoint%next
-			endif
+   if (.not.associated(LastWMPoint)) then
+    allocate(FirstWMPoint)
+    if (computedeposition>0) allocate(FirstWMPoint%depscalar(SIZE(WMP%depscalar,1)))
+    FirstWMPoint=WMP
+    LastWMPoint=>FirstWMPoint
+   else
+    allocate(LastWMPoint%next)
+    if (computedeposition>0) allocate(LastWMPoint%next%depscalar(SIZE(WMP%depscalar,1)))
+    LastWMPoint%next=WMP
+    LastWMPoint=>LastWMPoint%next
+   endif
   endsubroutine AddWMPoint
 
   real(KND) function WM1ustar(vel,dist,ustar0,dp,dptrans)
-			real(KND),parameter:: eps=1e-4_KND
-			real(KND):: yplcrit=11.225_KND
-			real(KND) ustar,vel,dist,ustar0,dp,dptrans,kprime
-			integer i
+   real(KND),parameter:: eps=1e-4_KND
+   real(KND):: yplcrit=11.225_KND
+   real(KND) ustar,vel,dist,ustar0,dp,dptrans,kprime
+   integer i
 
 
-			if (wallmodeltype==1) then
+   if (wallmodeltype==1) then
 
-				if ((dist*ustar0*Re)<yplcrit) then
-						ustar=sqrt(vel/(dist*Re))
-				else
-						ustar=vel/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
-				endif
+    if ((dist*ustar0*Re)<yplcrit) then
+      ustar=sqrt(vel/(dist*Re))
+    else
+      ustar=vel/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
+    endif
 
-				i=1
+    i=1
 
-				if ((dist*ustar*Re)>yplcrit) then
-					do
-					i=i+1
-						ustar0=ustar
-						ustar=vel/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
-						if  (abs(ustar-ustar0)/abs(ustar)<eps) exit
-						if (i>=25) then
-																		ustar=0
-																		exit
-						endif
-					enddo
-				endif
+    if ((dist*ustar*Re)>yplcrit) then
+     do
+     i=i+1
+      ustar0=ustar
+      ustar=vel/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
+      if  (abs(ustar-ustar0)/abs(ustar)<eps) exit
+      if (i>=25) then
+                  ustar=0
+                  exit
+      endif
+     enddo
+    endif
 
-			else
+   else
 
-				kprime=0.41_KND*(1-dptrans*(1./(0.41_KND*ustar0**2)-1./(2*ustar0**2)))
-				yplcrit=-LambertW(-kprime*0.119_KND)/kprime
+    kprime=0.41_KND*(1-dptrans*(1./(0.41_KND*ustar0**2)-1./(2*ustar0**2)))
+    yplcrit=-LambertW(-kprime*0.119_KND)/kprime
 
-				if ((dist*ustar0*Re)<yplcrit) then
-						ustar=sqrt(vel/(dist*Re)-dp/2)
-				else
-						ustar=vel*(1-Re*dp/0.41_KND)/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
-				endif
+    if ((dist*ustar0*Re)<yplcrit) then
+      ustar=sqrt(vel/(dist*Re)-dp/2)
+    else
+      ustar=vel*(1-Re*dp/0.41_KND)/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
+    endif
 
-				i=1
+    i=1
 
-				if ((dist*ustar*Re)>yplcrit) then
+    if ((dist*ustar*Re)>yplcrit) then
 
-					do
-					i=i+1
-						ustar0=ustar
-						ustar=vel*(1._KND-Re*dp/0.41_KND)/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
-						if  (abs(ustar-ustar0)/abs(ustar)<eps) exit
-						if (i>=25) then
-																		ustar=0
-																		exit
-						endif
-					enddo
+     do
+     i=i+1
+      ustar0=ustar
+      ustar=vel*(1._KND-Re*dp/0.41_KND)/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
+      if  (abs(ustar-ustar0)/abs(ustar)<eps) exit
+      if (i>=25) then
+                  ustar=0
+                  exit
+      endif
+     enddo
 
-				endif
+    endif
 
-			endif
+   endif
 
-			WM1ustar=ustar
+   WM1ustar=ustar
   endfunction WM1ustar
 
   real(KND) function WM1Visc(WMP,U,V,W,Pr)
-			real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
-			real(KND),dimension(1:,1:,1:),intent(in):: Pr
-			integer i,j,k
-			real(KND) ustar,vel,dist,dp,dptrans,dpx,dpy,dpz
-			type(WMPoint):: WMP
+   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+   real(KND),dimension(1:,1:,1:),intent(in):: Pr
+   integer i,j,k
+   real(KND) ustar,vel,dist,dp,dptrans,dpx,dpy,dpz
+   type(WMPoint):: WMP
 
-				i=WMP%x
-				j=WMP%y
-				k=WMP%z
-				
-				dist=sqrt(WMP%distx**2+WMP%disty**2+WMP%distz**2)
+    i=WMP%x
+    j=WMP%y
+    k=WMP%z
+    
+    dist=sqrt(WMP%distx**2+WMP%disty**2+WMP%distz**2)
 
-				vel=0
-				ustar=0
-				dp=0
-				dptrans=0
+    vel=0
+    ustar=0
+    dp=0
+    dptrans=0
 
-				if (abs(WMP%disty)/dymin<1.e-2.and.abs(WMP%distz)/dzmin<1.e-2) vel=vel+((U(i,j,k)+U(i-1,j,k))/2._KND-WMP%wallu)**2
-				if (abs(WMP%distx)/dxmin<1.e-2.and.abs(WMP%distz)/dzmin<1.e-2) vel=vel+((V(i,j,k)+V(i,j-1,k))/2._KND-WMP%wallv)**2
-				if (abs(WMP%disty)/dymin<1.e-2.and.abs(WMP%distx)/dxmin<1.e-2) vel=vel+((W(i,j,k)+W(i,j,k-1))/2._KND-WMP%wallw)**2
+    if (abs(WMP%disty)/dymin<1.e-2.and.abs(WMP%distz)/dzmin<1.e-2) vel=vel+((U(i,j,k)+U(i-1,j,k))/2._KND-WMP%wallu)**2
+    if (abs(WMP%distx)/dxmin<1.e-2.and.abs(WMP%distz)/dzmin<1.e-2) vel=vel+((V(i,j,k)+V(i,j-1,k))/2._KND-WMP%wallv)**2
+    if (abs(WMP%disty)/dymin<1.e-2.and.abs(WMP%distx)/dxmin<1.e-2) vel=vel+((W(i,j,k)+W(i,j,k-1))/2._KND-WMP%wallw)**2
 
-				vel=sqrt(vel)
+    vel=sqrt(vel)
 
-				if (vel/=0) then
-						if (wallmodeltype>1) then
-							dpx=0
-							if (i>1) dpx=dpx+(Pr(i,j,k)-Pr(i-1,j,k))/(xPr(i)-xPr(i-1))
-							if (i<Unx) dpx=dpx+(Pr(i+1,j,k)-Pr(i,j,k))/(xPr(i+1)-xPr(i))
-							if (i==1.and.BtypeW==PERIODIC) dpx=dpx+(Pr(1,j,k)-Pr(Prnx,j,k))/(xPr(1)-xPr(0))
-							dpx=dpx/2
+    if (vel/=0) then
+      if (wallmodeltype>1) then
+       dpx=0
+       if (i>1) dpx=dpx+(Pr(i,j,k)-Pr(i-1,j,k))/(xPr(i)-xPr(i-1))
+       if (i<Unx) dpx=dpx+(Pr(i+1,j,k)-Pr(i,j,k))/(xPr(i+1)-xPr(i))
+       if (i==1.and.BtypeW==PERIODIC) dpx=dpx+(Pr(1,j,k)-Pr(Prnx,j,k))/(xPr(1)-xPr(0))
+       dpx=dpx/2
 
-							dpy=0
-							if (j>1) dpy=dpy+(Pr(i,j,k)-Pr(i,j-1,k))/(yPr(j)-yPr(j-1))
-							if (j<Vny) dpy=dpy+(Pr(i,j+1,k)-Pr(i,j,k))/(yPr(j+1)-yPr(j))
-							if (j==1.and.BtypeS==PERIODIC) dpy=dpy+(Pr(i,1,k)-Pr(i,Prny,k))/(yPr(1)-yPr(0))
-							dpy=dpy/2
+       dpy=0
+       if (j>1) dpy=dpy+(Pr(i,j,k)-Pr(i,j-1,k))/(yPr(j)-yPr(j-1))
+       if (j<Vny) dpy=dpy+(Pr(i,j+1,k)-Pr(i,j,k))/(yPr(j+1)-yPr(j))
+       if (j==1.and.BtypeS==PERIODIC) dpy=dpy+(Pr(i,1,k)-Pr(i,Prny,k))/(yPr(1)-yPr(0))
+       dpy=dpy/2
 
-							dpz=0
-							if (k>1) dpz=dpz+(Pr(i,j,k)-Pr(i,j,k-1))/(zPr(k)-zPr(k-1))
-							if (k<Wnz) dpz=dpz+(Pr(i,j,k+1)-Pr(i,j,k))/(zPr(k+1)-zPr(k))
-							if (k==1.and.BtypeB==PERIODIC) dpz=dpz+(Pr(i,j,1)-Pr(i,j,Prnz))/(zPr(1)-zPr(0))
-							dpz=dpz/2
+       dpz=0
+       if (k>1) dpz=dpz+(Pr(i,j,k)-Pr(i,j,k-1))/(zPr(k)-zPr(k-1))
+       if (k<Wnz) dpz=dpz+(Pr(i,j,k+1)-Pr(i,j,k))/(zPr(k+1)-zPr(k))
+       if (k==1.and.BtypeB==PERIODIC) dpz=dpz+(Pr(i,j,1)-Pr(i,j,Prnz))/(zPr(1)-zPr(0))
+       dpz=dpz/2
 
-							if (abs(WMP%distx)*1.1>dist)&
-										dp=dp+((U(i,j,k)+U(i-1,j,k))/(2._KND*vel))*dpx
-							if (abs(WMP%disty)*1.1<dist)&
-										dp=dp+((V(i,j,k)+V(i,j-1,k))/(2._KND*vel))*dpy
-							if (abs(WMP%distz)*1.1<dist)&
-										dp=dp+((W(i,j,k)+W(i,j,k-1))/(2._KND*vel))*dpz
-							dptrans=dptrans+WMP%distx/dist*dpx
-							dptrans=dptrans+WMP%disty/dist*dpy
-							dptrans=dptrans+WMP%distz/dist*dpz
-						else
-							dp=0
-							dptrans=0
-						endif
-						ustar=WMP%ustar
-						ustar=WM1ustar(vel,dist,ustar,dp,dptrans)
-						WMP%ustar=ustar
-				endif
+       if (abs(WMP%distx)*1.1>dist)&
+          dp=dp+((U(i,j,k)+U(i-1,j,k))/(2._KND*vel))*dpx
+       if (abs(WMP%disty)*1.1<dist)&
+          dp=dp+((V(i,j,k)+V(i,j-1,k))/(2._KND*vel))*dpy
+       if (abs(WMP%distz)*1.1<dist)&
+          dp=dp+((W(i,j,k)+W(i,j,k-1))/(2._KND*vel))*dpz
+       dptrans=dptrans+WMP%distx/dist*dpx
+       dptrans=dptrans+WMP%disty/dist*dpy
+       dptrans=dptrans+WMP%distz/dist*dpz
+      else
+       dp=0
+       dptrans=0
+      endif
+      ustar=WMP%ustar
+      ustar=WM1ustar(vel,dist,ustar,dp,dptrans)
+      WMP%ustar=ustar
+    endif
 
-				if (ustar<0) ustar=0
+    if (ustar<0) ustar=0
 
-				if (vel>0) then
-					if (dist*ustar*Re>1) then
-						WM1Visc=ustar*ustar*dist/vel
-					elseif (Re>0) then
-						WM1Visc=1._KND/Re
-					else
-						WM1Visc=0
-					endif
-				elseif (Re>0) then
-						WM1Visc=1._KND/Re
-				else
-						WM1Visc=0
-				endif
+    if (vel>0) then
+     if (dist*ustar*Re>1) then
+      WM1Visc=ustar*ustar*dist/vel
+     elseif (Re>0) then
+      WM1Visc=1._KND/Re
+     else
+      WM1Visc=0
+     endif
+    elseif (Re>0) then
+      WM1Visc=1._KND/Re
+    else
+      WM1Visc=0
+    endif
   endfunction WM1Visc
 
 
 
 
   real(KND) function WM2ustar(vel,dist,ustar0,dp,dptrans,z0)
-			real(KND),parameter:: eps=1e-4_KND
-			real(KND):: yplcrit=11.225_KND
-			real(KND) vel,dist,ustar0,z0,dp,dptrans,kprime
+   real(KND),parameter:: eps=1e-4_KND
+   real(KND):: yplcrit=11.225_KND
+   real(KND) vel,dist,ustar0,z0,dp,dptrans,kprime
 
-			if (wallmodeltype==1) then
+   if (wallmodeltype==1) then
 
-				if (dist<=z0) then
-					if (Re>0) then
-						if ((dist*ustar0*Re)<yplcrit) then
-								WM2ustar=sqrt(vel/(dist*Re))
-						else
-								WM2ustar=vel/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
-						endif
-					else
-						stop "The wall model need positive viscosity under roughness length."
-					endif
-				else
-						WM2ustar=vel*0.41_KND/log(dist/z0)
-				endif
+    if (dist<=z0) then
+     if (Re>0) then
+      if ((dist*ustar0*Re)<yplcrit) then
+        WM2ustar=sqrt(vel/(dist*Re))
+      else
+        WM2ustar=vel/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
+      endif
+     else
+      stop "The wall model need positive viscosity under roughness length."
+     endif
+    else
+      WM2ustar=vel*0.41_KND/log(dist/z0)
+    endif
 
-			else
+   else
 
-				kprime=0.41_KND*(1-dptrans*(1./(0.41*ustar0**2)-1./(2*ustar0**2)))
-				yplcrit=-LambertW(-kprime*0.119_KND)/kprime
+    kprime=0.41_KND*(1-dptrans*(1./(0.41*ustar0**2)-1./(2*ustar0**2)))
+    yplcrit=-LambertW(-kprime*0.119_KND)/kprime
 
-				if (dist<=z0) then
-					if (Re>0) then
-						if ((dist*ustar0*Re)<yplcrit) then
-								WM2ustar=sqrt(vel/(dist*Re)-dp/2)
-						else
-								WM2ustar=vel*(1-Re*dp/0.41_KND)/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
-						endif
-					else
-						stop "The wall model need positive viscosity under roughness length."
-					endif
-				else
-						WM2ustar=vel*(1-Re*dp/0.41_KND)*0.41_KND/log(dist/z0)
-				endif
+    if (dist<=z0) then
+     if (Re>0) then
+      if ((dist*ustar0*Re)<yplcrit) then
+        WM2ustar=sqrt(vel/(dist*Re)-dp/2)
+      else
+        WM2ustar=vel*(1-Re*dp/0.41_KND)/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
+      endif
+     else
+      stop "The wall model need positive viscosity under roughness length."
+     endif
+    else
+      WM2ustar=vel*(1-Re*dp/0.41_KND)*0.41_KND/log(dist/z0)
+    endif
 
-			endif
+   endif
   endfunction WM2ustar
 
 
   pure real(KND) function PsiM_MO(zeta)
-			real(KND),intent(in):: zeta
-			real(KND) x
+   real(KND),intent(in):: zeta
+   real(KND) x
 
-			if (zeta<0) then
-				x=(1-15._KND*zeta)**(1/4._KND)
-				PsiM_MO=log(((1+x**2)/2._KND)*((1+x)/2._KND)**2)-2._KND*atan(x)+pi/2
-			else
-				PsiM_MO=-4.8_KND*zeta !GABLS recommendation
-			endif
+   if (zeta<0) then
+    x=(1-15._KND*zeta)**(1/4._KND)
+    PsiM_MO=log(((1+x**2)/2._KND)*((1+x)/2._KND)**2)-2._KND*atan(x)+pi/2
+   else
+    PsiM_MO=-4.8_KND*zeta !GABLS recommendation
+   endif
   endfunction PsiM_MO
 
 
   pure real(KND) function PsiH_MO(zeta)
-			real(KND),intent(in):: zeta
-			real(KND) x
+   real(KND),intent(in):: zeta
+   real(KND) x
 
-			if (zeta<0) then
-				x=(1-15._KND*zeta)**(1/4._KND)
-				PsiH_MO=2._KND*log((1+x**2)/2._KND)
-			else
-				PsiH_MO=-7.8_KND*zeta !GABLS recommendation
-			endif
+   if (zeta<0) then
+    x=(1-15._KND*zeta)**(1/4._KND)
+    PsiH_MO=2._KND*log((1+x**2)/2._KND)
+   else
+    PsiH_MO=-7.8_KND*zeta !GABLS recommendation
+   endif
   endfunction PsiH_MO
 
 
   pure real(KND) function Obukhov_zL(ustar,tempfl,tempref,g,z)
-			real(KND),intent(in):: ustar,tempfl,tempref,g,z
+   real(KND),intent(in):: ustar,tempfl,tempref,g,z
 
-			Obukhov_zL=z*(0.4_KND*(g/tempref)*tempfl)/(-ustar**3)
+   Obukhov_zL=z*(0.4_KND*(g/tempref)*tempfl)/(-ustar**3)
   endfunction Obukhov_zL
 
   real(KND) function WM_MO_FLUX_ustar(vel,dist,ustar,z0,tempflux)
-			real(KND),parameter:: eps=1e-5
-			real(KND):: yplcrit=11.225_KND
-			real(KND) vel,dist,ustar0,z0,tempflux,ustar,zL,Psi
-			integer i
+   real(KND),parameter:: eps=1e-5
+   real(KND):: yplcrit=11.225_KND
+   real(KND) vel,dist,ustar0,z0,tempflux,ustar,zL,Psi
+   integer i
 
    if (dist<=z0) then
 
@@ -319,50 +319,50 @@ implicit none
 
 
   subroutine WM_MO_DIRICHLET_ustar_tfl(vel,dist,z0,ustar,tempflux,tempdif)
-			real(KND),parameter:: eps=1e-5
-			real(KND):: yplcrit=11.225
-			real(KND) vel,dist,ustar,z0,tempflux,tempdif,ustar0,tempflux0,zL,zL0,Rib
-			integer i
+   real(KND),parameter:: eps=1e-5
+   real(KND):: yplcrit=11.225
+   real(KND) vel,dist,ustar,z0,tempflux,tempdif,ustar0,tempflux0,zL,zL0,Rib
+   integer i
 
-			ustar0=WM2ustar(vel,dist,ustar0,0._KND,0._KND,z0)
-			tempflux0=tempflux
+   ustar0=WM2ustar(vel,dist,ustar0,0._KND,0._KND,z0)
+   tempflux0=tempflux
 
-			if (dist<=z0) then
+   if (dist<=z0) then
 
-					if (Re>0) then
-						if ((dist*ustar0*Re)<yplcrit) then
-								ustar=sqrt(vel/(dist*Re))
-						else
-								ustar=vel/(log(abs(ustar0*dist*Re))/0.4_KND+5.2_KND)
-						endif
-					else
-						stop "The wall model needs positive viscosity under roughness length."
-					endif
+     if (Re>0) then
+      if ((dist*ustar0*Re)<yplcrit) then
+        ustar=sqrt(vel/(dist*Re))
+      else
+        ustar=vel/(log(abs(ustar0*dist*Re))/0.4_KND+5.2_KND)
+      endif
+     else
+      stop "The wall model needs positive viscosity under roughness length."
+     endif
 
-				else
+    else
 
-					Rib=-grav_acc*dist*tempdif/(temperature_ref*vel**2)
-					zL=0
-					i=0
-					if (Rib>0.34_KND) then
-																									ustar=0
-																									tempflux=0
-																									return
-					endif
-					do
-							i=i+1
-							zL0=zL
-							zL=Rib*(log(dist/z0)-PsiM_MO(zl))**2/(log(dist/z0)-PsiH_MO(zl))
-							if  (abs(zL-zL0)/max(abs(zL),1.e-3_KND)<eps) exit
-							if (i>=250.or.zL>100) then
-																			ustar=0
-																			tempflux=0
-																			return
-							endif
-					enddo
-					ustar=vel*0.4_KND/(log(dist/z0)-PsiM_MO(zL))
-					tempflux=0.4_KND*ustar*tempdif/(log(dist/z0)-PsiH_MO(zL))
-			endif
+     Rib=-grav_acc*dist*tempdif/(temperature_ref*vel**2)
+     zL=0
+     i=0
+     if (Rib>0.34_KND) then
+                         ustar=0
+                         tempflux=0
+                         return
+     endif
+     do
+       i=i+1
+       zL0=zL
+       zL=Rib*(log(dist/z0)-PsiM_MO(zl))**2/(log(dist/z0)-PsiH_MO(zl))
+       if  (abs(zL-zL0)/max(abs(zL),1.e-3_KND)<eps) exit
+       if (i>=250.or.zL>100) then
+                   ustar=0
+                   tempflux=0
+                   return
+       endif
+     enddo
+     ustar=vel*0.4_KND/(log(dist/z0)-PsiM_MO(zL))
+     tempflux=0.4_KND*ustar*tempdif/(log(dist/z0)-PsiH_MO(zL))
+   endif
   endsubroutine WM_MO_DIRICHLET_ustar_tfl
 
 
@@ -374,11 +374,11 @@ implicit none
 
 
   real(KND) function WM2Visc(WMP,U,V,W,Pr)
-			real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
-			real(KND),dimension(1:,1:,1:),intent(in):: Pr
-			integer i,j,k
-			real(KND) ustar,vel,dist,z0,dp,dptrans,dpx,dpy,dpz
-			type(WMPoint):: WMP
+   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+   real(KND),dimension(1:,1:,1:),intent(in):: Pr
+   integer i,j,k
+   real(KND) ustar,vel,dist,z0,dp,dptrans,dpx,dpy,dpz
+   type(WMPoint):: WMP
 
    i=WMP%x
    j=WMP%y
@@ -396,44 +396,44 @@ implicit none
    vel=sqrt(vel)
 
    if (vel/=0) then
-					if (wallmodeltype>1) then
-						dpx=0
-						if (i>1) dpx=dpx+(Pr(i,j,k)-Pr(i-1,j,k))/(xPr(i)-xPr(i-1))
-						if (i<Unx) dpx=dpx+(Pr(i+1,j,k)-Pr(i,j,k))/(xPr(i+1)-xPr(i))
-						if (i==1.and.BtypeW==PERIODIC) dpx=dpx+(Pr(1,j,k)-Pr(Prnx,j,k))/(xPr(1)-xPr(0))
-						dpx=dpx/2
+     if (wallmodeltype>1) then
+      dpx=0
+      if (i>1) dpx=dpx+(Pr(i,j,k)-Pr(i-1,j,k))/(xPr(i)-xPr(i-1))
+      if (i<Unx) dpx=dpx+(Pr(i+1,j,k)-Pr(i,j,k))/(xPr(i+1)-xPr(i))
+      if (i==1.and.BtypeW==PERIODIC) dpx=dpx+(Pr(1,j,k)-Pr(Prnx,j,k))/(xPr(1)-xPr(0))
+      dpx=dpx/2
 
-						dpy=0
-						if (j>1) dpy=dpy+(Pr(i,j,k)-Pr(i,j-1,k))/(yPr(j)-yPr(j-1))
-						if (j<Vny) dpy=dpy+(Pr(i,j+1,k)-Pr(i,j,k))/(yPr(j+1)-yPr(j))
-						if (j==1.and.BtypeS==PERIODIC) dpy=dpy+(Pr(i,1,k)-Pr(i,Prny,k))/(yPr(1)-yPr(0))
-						dpy=dpy/2
+      dpy=0
+      if (j>1) dpy=dpy+(Pr(i,j,k)-Pr(i,j-1,k))/(yPr(j)-yPr(j-1))
+      if (j<Vny) dpy=dpy+(Pr(i,j+1,k)-Pr(i,j,k))/(yPr(j+1)-yPr(j))
+      if (j==1.and.BtypeS==PERIODIC) dpy=dpy+(Pr(i,1,k)-Pr(i,Prny,k))/(yPr(1)-yPr(0))
+      dpy=dpy/2
 
-						dpz=0
-						if (k>1) dpz=dpz+(Pr(i,j,k)-Pr(i,j,k-1))/(zPr(k)-zPr(k-1))
-						if (k<Wnz) dpz=dpz+(Pr(i,j,k+1)-Pr(i,j,k))/(zPr(k+1)-zPr(k))
-						if (k==1.and.BtypeB==PERIODIC) dpz=dpz+(Pr(i,j,1)-Pr(i,j,Prnz))/(zPr(1)-zPr(0))
-						dpz=dpz/2
+      dpz=0
+      if (k>1) dpz=dpz+(Pr(i,j,k)-Pr(i,j,k-1))/(zPr(k)-zPr(k-1))
+      if (k<Wnz) dpz=dpz+(Pr(i,j,k+1)-Pr(i,j,k))/(zPr(k+1)-zPr(k))
+      if (k==1.and.BtypeB==PERIODIC) dpz=dpz+(Pr(i,j,1)-Pr(i,j,Prnz))/(zPr(1)-zPr(0))
+      dpz=dpz/2
 
-						if (abs(WMP%distx)*1.1>dist)&
-									dp=dp+((U(i,j,k)+U(i-1,j,k))/(2._KND*vel))*dpx
-						if (abs(WMP%disty)*1.1<dist)&
-									dp=dp+((V(i,j,k)+V(i,j-1,k))/(2._KND*vel))*dpy
-						if (abs(WMP%distz)*1.1<dist)&
-									dp=dp+((W(i,j,k)+W(i,j,k-1))/(2._KND*vel))*dpz
-						dptrans=dptrans+WMP%distx/dist*dpx
-						dptrans=dptrans+WMP%disty/dist*dpy
-						dptrans=dptrans+WMP%distz/dist*dpz
-					else
-						dp=0
-						dptrans=0
-					endif
+      if (abs(WMP%distx)*1.1>dist)&
+         dp=dp+((U(i,j,k)+U(i-1,j,k))/(2._KND*vel))*dpx
+      if (abs(WMP%disty)*1.1<dist)&
+         dp=dp+((V(i,j,k)+V(i,j-1,k))/(2._KND*vel))*dpy
+      if (abs(WMP%distz)*1.1<dist)&
+         dp=dp+((W(i,j,k)+W(i,j,k-1))/(2._KND*vel))*dpz
+      dptrans=dptrans+WMP%distx/dist*dpx
+      dptrans=dptrans+WMP%disty/dist*dpy
+      dptrans=dptrans+WMP%distz/dist*dpz
+     else
+      dp=0
+      dptrans=0
+     endif
 
-					ustar=WMP%ustar
-					z0=WMP%z0
-					ustar=WM2ustar(vel,dist,ustar,dp,dptrans,z0)
-					if (ustar<0) ustar=0
-					WMP%ustar=ustar
+     ustar=WMP%ustar
+     z0=WMP%z0
+     ustar=WM2ustar(vel,dist,ustar,dp,dptrans,z0)
+     if (ustar<0) ustar=0
+     WMP%ustar=ustar
    endif
 
    if (vel>0.and.ustar*ustar*dist/vel>1._KND/Re) then
@@ -450,11 +450,11 @@ implicit none
 
 
   real(KND) function WM_MO_FLUX(WMP,U,V,W,Pr)
-			real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
-			real(KND),dimension(1:,1:,1:),intent(in):: Pr
-			integer i,j,k
-			real(KND) ustar,vel,dist,z0
-			type(WMPoint):: WMP
+   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+   real(KND),dimension(1:,1:,1:),intent(in):: Pr
+   integer i,j,k
+   real(KND) ustar,vel,dist,z0
+   type(WMPoint):: WMP
 
    i=WMP%x
    j=WMP%y
@@ -470,11 +470,11 @@ implicit none
    vel=sqrt(vel)
 
    if (vel/=0) then
-					ustar=WMP%ustar
-					z0=WMP%z0
-					ustar=WM_MO_FLUX_ustar(vel,dist,ustar,z0,WMP%tempfl)
-					if (ustar<0) ustar=0
-					WMP%ustar=ustar
+     ustar=WMP%ustar
+     z0=WMP%z0
+     ustar=WM_MO_FLUX_ustar(vel,dist,ustar,z0,WMP%tempfl)
+     if (ustar<0) ustar=0
+     WMP%ustar=ustar
    endif
 
    if (vel>0.and.ustar*ustar*dist/vel>1._KND/Re) then
@@ -490,12 +490,12 @@ implicit none
 
 
   subroutine WM_MO_DIRICHLET(visc,WMP,U,V,W,Pr)
-			real(KND) visc
-			real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
-			real(KND),dimension(1:,1:,1:),intent(in):: Pr
-			integer i,j,k
-			real(KND) ustar,vel,dist,z0,tempflux
-			type(WMPoint):: WMP
+   real(KND) visc
+   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+   real(KND),dimension(1:,1:,1:),intent(in):: Pr
+   integer i,j,k
+   real(KND) ustar,vel,dist,z0,tempflux
+   type(WMPoint):: WMP
 
    i=WMP%x
    j=WMP%y
@@ -536,35 +536,35 @@ implicit none
 
 
   pure subroutine BOUND_tempfl(Nu)
-			real(KND),intent(inout):: Nu(-1:,-1:)
-			integer i,j,nx,ny
+   real(KND),intent(inout):: Nu(-1:,-1:)
+   integer i,j,nx,ny
 
-			nx=Prnx
-			ny=Prny
+   nx=Prnx
+   ny=Prny
 
-			if (BtypeE==PERIODIC) then
-					do j=1,ny
-							Nu(0,j)=Nu(nx,j)
-							Nu(nx+1,j)=Nu(1,j)
-					enddo
-			else
-					do j=1,ny
-							Nu(0,j)=Nu(1,j)
-							Nu(nx+1,j)=Nu(nx,j)
-					enddo
-			endif
+   if (BtypeE==PERIODIC) then
+     do j=1,ny
+       Nu(0,j)=Nu(nx,j)
+       Nu(nx+1,j)=Nu(1,j)
+     enddo
+   else
+     do j=1,ny
+       Nu(0,j)=Nu(1,j)
+       Nu(nx+1,j)=Nu(nx,j)
+     enddo
+   endif
 
-			if (BtypeN==PERIODIC) then
-					do i=1,nx
-							Nu(i,0)=Nu(i,ny)
-							Nu(i,ny+1)=Nu(i,1)
-					enddo
-			else
-					do i=1,nx
-							Nu(i,0)=Nu(i,1)
-							Nu(i,ny+1)=Nu(i,ny)
-					enddo
-			endif
+   if (BtypeN==PERIODIC) then
+     do i=1,nx
+       Nu(i,0)=Nu(i,ny)
+       Nu(i,ny+1)=Nu(i,1)
+     enddo
+   else
+     do i=1,nx
+       Nu(i,0)=Nu(i,1)
+       Nu(i,ny+1)=Nu(i,ny)
+     enddo
+   endif
   endsubroutine BOUND_tempfl
 
 
@@ -572,31 +572,31 @@ implicit none
 
 
   subroutine InitTempFL
-			type(WMPoint),pointer:: WMP
+   type(WMPoint),pointer:: WMP
 
-			if (buoyancy==1.and.TBtypeB==DIRICHLET) then
-				if (associated(FirstWMPoint)) then
-				WMP => FirstWMPoint
-				do
-					if (WMP%z==1) WMP%tempfl=-TDiff(WMP%x,WMP%y,1)*&
-																				(temperature(WMP%x,WMP%y,1)-temperature(WMP%x,WMP%y,0))
-					if (associated(WMP%next)) then
-						WMP=>WMP%next
-					else
-						exit
-					endif
-				enddo
-				endif
-			endif
+   if (buoyancy==1.and.TBtypeB==DIRICHLET) then
+    if (associated(FirstWMPoint)) then
+    WMP => FirstWMPoint
+    do
+     if (WMP%z==1) WMP%tempfl=-TDiff(WMP%x,WMP%y,1)*&
+                    (temperature(WMP%x,WMP%y,1)-temperature(WMP%x,WMP%y,0))
+     if (associated(WMP%next)) then
+      WMP=>WMP%next
+     else
+      exit
+     endif
+    enddo
+    endif
+   endif
   endsubroutine InitTempFL
 
 
   subroutine ComputeViscsWM(U,V,W,Pr)
-			real(KND),dimension(-2:,-2:,-2:):: U,V,W
-			real(KND),dimension(1:,1:,1:):: Pr
-			type(WMPoint),pointer:: WMP
-			integer i,j
-			real(DBL) t
+   real(KND),dimension(-2:,-2:,-2:):: U,V,W
+   real(KND),dimension(1:,1:,1:):: Pr
+   type(WMPoint),pointer:: WMP
+   integer i,j
+   real(DBL) t
 
    if (buoyancy==1.and.TBtypeB==DIRICHLET) then
     do j=1,Prnz
@@ -609,35 +609,35 @@ implicit none
 
    if (associated(FirstWMPoint)) then
 
-					WMP => FirstWMPoint
-					do
+     WMP => FirstWMPoint
+     do
 
-						if (WMP%z0>0) then
+      if (WMP%z0>0) then
 
-								if (buoyancy==1.and.TBtypeB==CONSTFLUX) then
-										Visc(WMP%x,WMP%y,WMP%z)=WM2Visc(WMP,U,V,W,Pr)!WM_MO_FLUX(WMP,U,V,W,Pr)
-								else if (buoyancy==1.and.TBtypeB==DIRICHLET) then
-									if (WMP%z==1) WMP%temp=BsideTArr(WMP%x,WMP%y)
-									call WM_MO_DIRICHLET(Visc(WMP%x,WMP%y,WMP%z),WMP,U,V,W,Pr)
-								else
-										Visc(WMP%x,WMP%y,WMP%z)=WM2Visc(WMP,U,V,W,Pr)
-								endif
+        if (buoyancy==1.and.TBtypeB==CONSTFLUX) then
+          Visc(WMP%x,WMP%y,WMP%z)=WM2Visc(WMP,U,V,W,Pr)!WM_MO_FLUX(WMP,U,V,W,Pr)
+        else if (buoyancy==1.and.TBtypeB==DIRICHLET) then
+         if (WMP%z==1) WMP%temp=BsideTArr(WMP%x,WMP%y)
+         call WM_MO_DIRICHLET(Visc(WMP%x,WMP%y,WMP%z),WMP,U,V,W,Pr)
+        else
+          Visc(WMP%x,WMP%y,WMP%z)=WM2Visc(WMP,U,V,W,Pr)
+        endif
 
-					 else
+      else
 
-								if (Re<=0) then
-									stop "The wall model requires positive viscosity or roughness length."
-								endif
-								Visc(WMP%x,WMP%y,WMP%z)=WM1Visc(WMP,U,V,W,Pr)
-						endif
+        if (Re<=0) then
+         stop "The wall model requires positive viscosity or roughness length."
+        endif
+        Visc(WMP%x,WMP%y,WMP%z)=WM1Visc(WMP,U,V,W,Pr)
+      endif
 
-						if (associated(WMP%next)) then
-								WMP=>WMP%next
-						else
-								EXIT
-						endif
+      if (associated(WMP%next)) then
+        WMP=>WMP%next
+      else
+        EXIT
+      endif
 
-					enddo
+     enddo
 
    endif
 
@@ -647,25 +647,25 @@ implicit none
 
 
   real(KND) function SurfTemperature(x,y,t)
-			real(KND),intent(in):: x,y
-			real(DBL),intent(in):: t
+   real(KND),intent(in):: x,y
+   real(DBL),intent(in):: t
 
-			SurfTemperature=265-t*0.25_KND/3600._KND  !GABLS prescribed (Beare et al, BLM 2004)
+   SurfTemperature=265-t*0.25_KND/3600._KND  !GABLS prescribed (Beare et al, BLM 2004)
   endfunction
 
   recursive subroutine DeallWMP(WMP)
-			type(WMPoint),pointer:: WMP
+   type(WMPoint),pointer:: WMP
 
-			if (associated(WMP%next)) call DeallWMP(WMP%next)
-			if (allocated(WMP%depscalar)) deallocate(WMP%depscalar)
-			deallocate(WMP)
+   if (associated(WMP%next)) call DeallWMP(WMP%next)
+   if (allocated(WMP%depscalar)) deallocate(WMP%depscalar)
+   deallocate(WMP)
   endsubroutine DeallWMP
 
   real(KND) function LambertW(x)
-			real(KND) x
+   real(KND) x
 
-			LambertW=11 !PREDELAT!!!
-			write(*,*) "Warning, Lambert function not defined!"
+   LambertW=11 !PREDELAT!!!
+   write(*,*) "Warning, Lambert function not defined!"
   endfunction LambertW
 
  endmodule Wallmodels

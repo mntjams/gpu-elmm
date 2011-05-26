@@ -1,18 +1,28 @@
 module PARAMETERS
 implicit none
-  integer,parameter :: DBL=SELECTED_REAL_KIND(p=15,r=200),SNG=SELECTED_REAL_KIND(p=6,r=37)
+  integer,parameter :: DBL=selected_real_kind(p=15,r=200),SNG=selected_real_kind(p=6,r=37)
   integer,parameter :: KND=SNG                                         !KND is default real kind for the whole program
-  integer,parameter :: SINT=KND !selected_int_kind(2)                  !To save memory a smaller type can be used for some integer and logical arrays
-  integer,parameter :: SLOG=SINT                                       !This can have some negative effect on speed however
+  integer,parameter :: SINT=kind(1)!selected_int_kind(2)               !To save memory a smaller type can be used for some integer
+  integer,parameter :: SLOG=SINT                                       ! and logical arrays. Note the same KIND value is guaranteed
+                                                                       ! the default intrinsic types.
+                                                                       !This can have some negative effect on speed however
   real(KND) :: pi !computed at the first line of main
-  real(KND),parameter :: Karman=0.41
-  real(KND),parameter :: BoltzC=1.3806503e-23
+  real(KND),parameter :: Karman=0.41_KND
+  real(KND),parameter :: BoltzC=1.3806503e-23_KND
 
   real(DBL) dt,starttime,endtime        !active time step
   real(KND) dxmin,dymin,dzmin,lx,ly,lz,CFL,Uref  !minimum grid spacing, dimensions of the domain
   real(KND) Re,Prandtl !1/molecular viscosity, viscosity/thermal diffusivity
   real(KND) prgradientx,prgradienty,temperature_ref,grav_acc,freetempgradient,coriolisparam
-  real(KND) SHEARG,Uinlet,ustarsurfin,z0inlet,z0W,z0E,z0S,z0N,z0B,z0T,stressgradin,urefin,zrefin,powerexpin,windangle
+
+  real(KND) SHEARG,Uinlet,ustarsurfin
+
+  real(KND) z0inlet,z0W,z0E,z0S,z0N,z0B,z0T
+
+  real(KND) stressgradin,urefin,zrefin,powerexpin
+
+  real(KND) windangle
+
   real(KND),dimension(:),allocatable:: scalsrcx,scalsrcy,scalsrcz
   real(KND) totalscalsource
 
@@ -30,7 +40,11 @@ implicit none
   integer tasktype,averaging,projectiontype,limitertype,impldiff,wallmodeltype,sgstype,fullstress
   integer buoyancy,computescalars,partdistrib,computedeposition,computegravsettling
   integer maxCNiter,maxPOISSONiter,maxiter,endstep
-  integer Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,nt,Xup,a,Xd,Yh,Yd,Yu,Zu,Zd
+
+
+  integer Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,nt
+
+
   integer inlettype,gridtype,profiletype
 
 
@@ -74,6 +88,8 @@ implicit none
   integer,parameter:: GENERALGRID=1,UNIFORMGRID=2
   integer,parameter:: minmodlim=1,extminmodlim=2,gammalim=3,vanalbadalim=4,vanleerlim=5,superbeelim=6
   integer,parameter:: textvtk=1,binaryvtk=2
+  integer,parameter:: SmagorinskyModel=1,DynSmagorinskyModel=2,VremanModel=3,StabSmagorinskyModel=4
+
   real(KND) probex,probey,probez
 
   integer:: debuglevel !amount of information to write out
