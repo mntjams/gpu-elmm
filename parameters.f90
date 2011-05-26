@@ -10,9 +10,27 @@ implicit none
   real(KND),parameter :: Karman=0.41_KND
   real(KND),parameter :: BoltzC=1.3806503e-23_KND
 
+
+
+  integer Unx,Uny,Unz     !dimensions of grid for velocity component U
+
+  integer Vnx,Vny,Vnz     !dimensions of grid for velocity component V
+
+  integer Wnx,Wny,Wnz     !dimensions of grid for velocity component W
+
+  integer Prnx,Prny,Prnz  !dimensions of grid for pressure
+
+
+  integer nt              !maximum number of time steps
+
   real(DBL) dt,starttime,endtime        !active time step
+
   real(KND) dxmin,dymin,dzmin,lx,ly,lz,CFL,Uref  !minimum grid spacing, dimensions of the domain
+
+
   real(KND) Re,Prandtl !1/molecular viscosity, viscosity/thermal diffusivity
+
+
   real(KND) prgradientx,prgradienty,temperature_ref,grav_acc,freetempgradient,coriolisparam
 
   real(KND) SHEARG,Uinlet,ustarsurfin
@@ -40,9 +58,6 @@ implicit none
   integer tasktype,averaging,projectiontype,limitertype,impldiff,wallmodeltype,sgstype,fullstress
   integer buoyancy,computescalars,partdistrib,computedeposition,computegravsettling
   integer maxCNiter,maxPOISSONiter,maxiter,endstep
-
-
-  integer Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,nt
 
 
   integer inlettype,gridtype,profiletype

@@ -98,9 +98,9 @@ module SMAGORINSKY
    call Bound_CondV(V)
    call Bound_CondW(W)
 
-   do k=-1,Prnz+2
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
+   do k=0,Prnz+1
+    do j=0,Prny+1
+     do i=0,Prnx+1
        width=(dxPr(i)*dyPr(j)*dzPr(k))**(1._KND/3._KND)
 
        call StrainIJ(i,j,k,U,V,W,S)
@@ -119,6 +119,7 @@ module SMAGORINSKY
    enddo
    if (Re>0) then
      Visc=Visc+1._KND/Re
+     TDiff=TDiff+1._KND/(Re*Prandtl)
    endif
   endsubroutine StabSmag
 
@@ -127,7 +128,9 @@ module SMAGORINSKY
    real(KND),intent(in):: Ri           !Pointwise Richarson number
    real(KND),parameter :: Ric=0.25_KND
 
-   if (Ri>0) then
+   if (Ri>=Ric) then
+    Fm  =  0
+   elseif (Ri>0) then
     Fm  =  (1._KND-Ri/Ric)**4
    else
     Fm  =  sqrt(1._KND - 16._KND*Ri)
@@ -138,7 +141,9 @@ module SMAGORINSKY
    real(KND),intent(in):: Ri           !Pointwise Richarson number
    real(KND),parameter :: Ric=0.25_KND
 
-   if (Ri>0) then
+   if (Ri>=Ric) then
+    Fh  =  0
+   elseif (Ri>0) then
     Fh  =  (1./0.7_KND)  *  (1._KND - Ri/Ric)**4  *  (1._KND - 1.2_KND*Ri)
    else
     Fh  =  sqrt(1._KND - 40._KND*Ri) / 0.7_KND
