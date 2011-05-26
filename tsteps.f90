@@ -590,32 +590,6 @@ contains
   
 
 
-  subroutine ComputeTDiff(U,V,W)
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-  integer:: i,j,k
-   if (Re>0) then
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=(Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
-    end forall
-   else
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-     TDiff(i,j,k)=Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
-    end forall
-   endif
-  end subroutine ComputeTDiff
-
-
-  pure real(KND) function Prt(i,j,k,U,V,temperature)
-  integer,intent(in):: i,j,k
-  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V
-  real(KND),dimension(-1:,-1:,-1:),intent(in):: temperature
-
-!   if (buoyancy>0) then
-!    Prt=0.8_KND+min(max(3._KND*Rig(i,j,k,U,V,temperature),0._KND),sqrt(huge(1._KND)))
-!   else
-   Prt=debugparam!0.6_KND
-!   endif
-  endfunction Prt
 
   
    
