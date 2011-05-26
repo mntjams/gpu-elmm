@@ -1727,19 +1727,6 @@ contains
   endsubroutine Gravsettling  
 
 
-  pure real(KND) function Prt(i,j,k,U,V,temperature)
-  integer,intent(in):: i,j,k
-  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V
-  real(KND),dimension(-1:,-1:,-1:),intent(in):: temperature
-  
-!   if (buoyancy>0) then
-!    Prt=0.8_KND+min(max(3._KND*Rig(i,j,k,U,V,temperature),0._KND),sqrt(huge(1._KND)))
-!   else
-   Prt=debugparam!0.6_KND
-!   endif
-  endfunction Prt
-
-
   pure real(KND) function Rig(i,j,k,U,V,temperature)
   integer,intent(in):: i,j,k
   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V
