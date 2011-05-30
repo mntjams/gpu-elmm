@@ -951,21 +951,8 @@ contains
         else
          Tempin(j,k)=265!temperature_ref
         endif
-       Tempin(j,k)=temperature_ref
-      !temperature(i,j,k)=((zPr(k)-zW(0))/(zW(Wnz+1)-zW(0)))*(TsideTemp-BsideTemp)+BsideTemp
-      !call RANDOM_NUMBER(p)
-      !if (k>Prnz/2+MOD(i+j,2)) then
-      !  temperature(i,j,k)=TsideTemp+(TsideTemp-temperature_ref)*0.1_KND*(p-0.5_KND)
-      !else
-      !  temperature(i,j,k)=BsideTemp+(BsideTemp-temperature_ref)*0.1_KND*(p-0.5_KND)
-      !endif
-!        if ((xPr(i)-(xU(Unx+1)+xU(0))/2._KND)**2+(yPr(j)-(yV(Vny+1)+yV(0))/2._KND)**2+&
-!                (zPr(k)-(zW(Wnz+1)-(zW(Wnz+1)+zW(0))/2._KND))**2<(lx/9._KND)**2) then
-!         temperature(i,j,k)=temperature_ref+temperature_ref*(0.001_KND*(p-0.5_KND))!*0.9
-!        else
-!         temperature(i,j,k)=temperature_ref+temperature_ref*(0.001_KND*(p-0.5_KND))
-!        endif
-    
+!        Tempin(j,k)=temperature_ref
+!     
     enddo
    enddo
 !    Tempin(j,1)=temperature_ref*1.01

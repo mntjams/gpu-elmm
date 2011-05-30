@@ -965,7 +965,7 @@ contains
     else
      intvel=0
     endif
-
+intvel=intvel*.9
     if (IBP%component==1) then
      IBP%MSourc=(intvel-U(x,y,z))/dt
     elseif (IBP%component==2) then

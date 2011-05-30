@@ -299,8 +299,8 @@ contains
  write(*,*) "GETTURBINLET-cont"
 
 
-    filtnz=min(max(NINT(lz/dzmin/5._KND),1),Prnz/10)
-    filtny=min(max(NINT(lz/dymin/5._KND),1),Prny/10)
+    filtnz=min(max(NINT(lz/dzmin/5._KND),1),ceiling(1._KND*Prnz/10))
+    filtny=min(max(NINT(lz/dymin/5._KND),1),ceiling(1._KND*Prny/10))
 
 
 
