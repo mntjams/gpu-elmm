@@ -946,11 +946,11 @@ contains
    !inversionTjump=2 !K
    do k=-2,Prnz+3
     do j=-2,Prny+3
-        if (zPr(k)>(zW(Wnz+1)+zW(0))/4) then
+         if (zPr(k)>(zW(Wnz+1)+zW(0))/4) then
         Tempin(j,k)=(zPr(k)-(zW(Wnz+1)+zW(0))/4)*freetempgradient+265!(zPr(k)-zW(0))*freetempgradient+temperature_ref
-        else
-         Tempin(j,k)=265!temperature_ref
-        endif
+         else
+          Tempin(j,k)=265!temperature_ref
+         endif
 !        Tempin(j,k)=temperature_ref
 !     
     enddo
@@ -964,7 +964,7 @@ contains
       else
        p=0.5_KND
       endif
-       temperature(i,j,k)=Tempin(j,k)!+0.2_KND*(p-0.5_KND)
+       temperature(i,j,k)=Tempin(j,k)+0.2_KND*(p-0.5_KND)
 !      if (yPr(j)<=yPr(Uny/2)) then
 !        temperature(i,j,k)=0
 !      else

@@ -14,7 +14,6 @@ implicit none
 
   
   real(KND),allocatable:: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)
-  real(KND),allocatable:: Ulat(:,:,:),Vlat(:,:,:),Wlat(:,:,:)
   integer:: l,fnum,i,j,k,nWM
   integer:: probei,probej,probek
   integer:: pUi,pUj,pUk,pVi,pVj,pVk,pWi,pWj,pWk
@@ -40,6 +39,30 @@ implicit none
   V=100000
   W=100000
   Pr=0000
+
+
+   if (buoyancy==1) then
+    allocate(temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+    temperature=huge(1.0_KND)
+   else
+    allocate(temperature(0,0,0))
+   endif
+
+   if (computescalars>0) then
+    allocate(Scalar(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
+    Scalar=huge(1.0_KND)
+    if (averaging==1) then
+     allocate(Scalaravg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
+     Scalaravg=0
+    endif
+   else
+    allocate(Scalar(0,0,0,0))
+    if (averaging==1) then
+     allocate(Scalaravg(0,0,0,0))
+    endif
+   endif
+
+
   if (averaging==1) then
    allocate(Uavg(-2:Unx+3,-2:Uny+3,-2:Unz+3))
    allocate(Vavg(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
@@ -73,14 +96,6 @@ implicit none
     scalptime=huge(1.0_KND)
   endif
 
-  if (tempmet==2) then
-      allocate(Ulat(-2:Unx+3,-2:Uny+3,-2:Unz+3))
-      allocate(Vlat(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
-      allocate(Wlat(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-      Ulat=huge(1.0_KND)
-      Vlat=huge(1.0_KND)
-      Wlat=huge(1.0_KND)
-  endif
   allocate(Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
   if (buoyancy>0.or.computescalars>0) then
     allocate(TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
@@ -221,6 +236,8 @@ implicit none
 
    if (tempmet==1) then
        call TMARCHEUL(U,V,W,Pr,delta)
+    elseif (tempmet==2) then
+       call TMARCHAB2(U,V,W,Pr,delta)
     elseif (tempmet==3) then
        call TMARCHRK2(U,V,W,Pr,delta)
     elseif (tempmet==4) then
@@ -453,8 +470,6 @@ implicit none
  if (allocated(temperatureavg))  deallocate(temperatureavg)
  if (allocated(Scalar))  deallocate(Scalar)
  if (allocated(Scalaravg))  deallocate(Scalaravg)
- if (allocated(Ulat))  deallocate(Ulat)
- if (allocated(Vlat))  deallocate(Vlat)
  if (allocated(times)) deallocate(times)
  if (allocated(Utime)) deallocate(Utime)
  if (allocated(Vtime)) deallocate(Vtime)

@@ -3250,11 +3250,8 @@ implicit none
   nBoundWz=0
   
   
-
-   if (buoyancy==1) then
-    allocate(temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-    temperature=huge(1.0_KND)
-      if (TBtypeB==CONSTFLUX.or.TBtypeB==DIRICHLET) then
+  if (buoyancy==1) then
+     if (TBtypeB==CONSTFLUX.or.TBtypeB==DIRICHLET) then
        allocate(BsideTFLArr(-1:Prnx+2,-1:Prny+2))
        if (TBtypeB==CONSTFLUX) then
         BsideTFLArr=BsideTemp
@@ -3266,23 +3263,7 @@ implicit none
         BsideTArr=BsideTemp
        endif
       endif
-   else
-    allocate(temperature(0,0,0))
-   endif
-   
-   if (computescalars>0) then
-    allocate(Scalar(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
-    Scalar=huge(1.0_KND)
-    if (averaging==1) then
-     allocate(Scalaravg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
-     Scalaravg=0
-    endif
-   else
-    allocate(Scalar(0,0,0,0))
-    if (averaging==1) then
-     allocate(Scalaravg(0,0,0,0))
-    endif
-   endif
+  endif
 
 
 

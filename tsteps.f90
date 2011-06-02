@@ -14,7 +14,7 @@ implicit none
 
 
 private
-public TMarchEul,TMarchRK2,TMarchRK3,TMarchShiftInlet
+public TMarchEul,TMarchAB2,TMarchRK2,TMarchRK3,TMarchShiftInlet
 
 logical:: released=.false.
 
@@ -145,6 +145,243 @@ contains
   W=W2
  end subroutine TMarchEul
   
+
+
+
+ subroutine TMarchAB2(U,V,W,Pr,delta)
+  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(out):: delta
+
+  real(KND),save:: dtlast
+  real(KND),save:: rho,beta
+
+  real(KND),allocatable,dimension(:,:,:),save:: Q,U2,V2,W2,Ustar,Vstar,Wstar
+
+  real(KND),allocatable,dimension(:,:,:),save:: Temperature_adv,Temperature2
+  real(KND),allocatable,dimension(:,:,:,:),save:: Scalar_adv,Scalar_2
+
+  integer i,j,k
+  real(KND) p
+  integer,save:: called=0
+  real time1,time2
+
+
+  if (called==0) then
+
+   called=1
+   if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
+
+   allocate(Ustar(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+   allocate(Vstar(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+   allocate(Wstar(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+
+   allocate(U2(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+   allocate(V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+   allocate(W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+
+   if (buoyancy==1) then
+    allocate(temperature_adv(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+    allocate(temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+   endif
+
+   if (computescalars>0) then
+    allocate(Scalar_adv(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
+    allocate(Scalar_2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
+   endif
+
+   rho=0
+   beta=1._KND
+
+   Ustar=0
+   Vstar=0
+   Wstar=0
+   Scalar_adv=0
+   Temperature_adv=0
+
+  else
+   rho=-(dt/dtlast)/2._KND
+   beta=1._KND+(dt/dtlast)/2._KND
+
+  endif
+
+  call Bound_CondU(U)
+  call Bound_CondV(V)
+  call Bound_CondW(W)
+
+  if (buoyancy==1)  call Bound_Temp(temperature)
+
+  if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
+  if (BtypeW==InletFromFile) call GetInletFromFile(time)
+
+  call timestepEUL(U,V,W)
+
+  if (steady==0.and.dt+time>endtime)  dt=endtime-time
+
+  write (*,*) "time:",time,"dt: ",dt
+
+  temperature_adv=0
+
+
+    if (debugparam>1) call cpu_time(time1)
+
+    U2=0
+    V2=0
+    W2=0
+
+
+    if (convmet>0) then
+
+      U2=U2+Ustar*rho
+      V2=V2+Vstar*rho
+      W2=W2+Wstar*rho
+
+
+      Ustar=0
+      Vstar=0
+      Wstar=0
+
+      if (convmet==1) then
+       call LF(Ustar,Vstar,Wstar,U,V,W)
+      elseif (convmet==3) then
+       call KAPPAU(Ustar,U,V,W,1._KND)
+       call KAPPAV(Vstar,U,V,W,1._KND)
+       call KAPPAW(Wstar,U,V,W,1._KND)
+      else
+       call CDU2(Ustar,U,V,W,1._KND)
+       call CDV2(Vstar,U,V,W,1._KND)
+       call CDW2(Wstar,U,V,W,1._KND)
+      endif
+
+      call CoriolisForce(Ustar,Vstar,U,V,1._KND)
+      if (buoyancy==1) call BuoyancyForce(Wstar,temperature,1._KND)
+
+      U2=U2+Ustar*beta
+      V2=V2+Vstar*beta
+      W2=W2+Wstar*beta
+    endif
+
+    if (debugparam>1) then
+     call cpu_time(time2)
+     write (*,*) "ET of part 1", (time2-time1)
+     time1=time2
+    endif
+
+    call OtherTerms(U,V,W,U2,V2,W2,Pr,1._KND)
+
+    if (debugparam>1) then
+     call cpu_time(time2)
+     write (*,*) "ET of part 2", (time2-time1)
+     time1=time2
+    endif
+
+    if (BtypeT==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
+    if (BtypeE==OutletBuff) then
+      if (buoyancy==1) then
+        call AttenuateOut(U2,V2,W2,Pr,temperature)
+      else
+        call AttenuateOut(U2,V2,W2,Pr)
+      endif
+    endif
+
+    if (masssourc==1) then
+        call MASS_SOURC(Q,U2,V2,W2)
+    endif
+
+
+    call Bound_CondU(U2)
+    call Bound_CondV(V2)
+    call Bound_CondW(W2)
+
+
+    if (poissmet>0) then
+     if (masssourc==1) then
+       call Pr_Correct(U2,V2,W2,Pr,1._KND,Q)
+     else
+       call Pr_Correct(U2,V2,W2,Pr,1._KND)
+     endif
+    endif
+
+
+    if (computescalars>0.and..not.released) call Explosion
+
+    if (computescalars>0) then
+      Scalar_2=0
+ 
+      Scalar_2=Scalar_2+Scalar_adv*rho
+
+      Scalar_adv=0
+      do i=1,computescalars
+       call KAPPAScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U2,V2,W2,2,1._KND)
+      enddo
+      Scalar_2=Scalar_2+Scalar_adv*beta
+
+      if (pointscalsource==1) then
+       do i=1,computescalars
+        Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)=Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
+         percdistrib(i)*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
+       enddo
+      endif
+
+      Scalar=Scalar+Scalar_2
+      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
+      call Bound_Visc(TDiff)
+      do i=1,computescalars
+         call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,1._KND)
+      enddo
+      if (computedeposition>0) call Deposition(Scalar_2,1._KND)
+      if (computegravsettling>0) call GravSettling(Scalar_2,1._KND)
+      Scalar=Scalar_2
+    endif
+
+    if (buoyancy>0) then
+      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
+      call Bound_Visc(TDiff)
+      temperature2=0
+      call Bound_Temp(temperature)
+
+
+      temperature2=temperature2+temperature_adv*rho
+
+      temperature_adv=0
+      call KAPPAScalar(temperature_adv,temperature,U2,V2,W2,1,1._KND)
+      temperature2=temperature2+temperature_adv*beta
+
+      temperature=temperature+temperature2
+      call Bound_Temp(temperature)
+       call DiffScalar(temperature2,temperature,1,1._KND)
+      temperature=temperature2
+    endif
+
+    if (BtypeE==OutletBuff) then
+      if (buoyancy==1) then
+        call AttenuateOut(U2,V2,W2,Pr,temperature)
+      else
+        call AttenuateOut(U2,V2,W2,Pr)
+      endif
+    endif
+
+
+    delta=sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
+    delta=delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
+    delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
+
+
+    where(Utype>0) U2=0
+    where(Vtype>0) V2=0
+    where(Wtype>0) W2=0
+
+    U=U2
+    V=V2
+    W=W2
+
+    dtlast=dt
+
+ end subroutine TMarchAB2
+
+
+
+
+
 
   
  subroutine TMarchRK2(U,V,W,Pr,delta)
@@ -437,8 +674,6 @@ contains
 
   if (steady==0.and.dt+time>endtime)  dt=endtime-time
 
-  write (*,*) "time:",time,"dt: ",dt
-
   temperature_adv=0
   Ustar=0
   Vstar=0
@@ -488,7 +723,7 @@ contains
      time1=time2
     endif
 
-    call OtherTerms(U,V,W,U2,V2,W2,Pr,2.*alpha(l))
+    call OtherTerms(U,V,W,U2,V2,W2,Pr,2._KND*alpha(l))
 
     if (debugparam>1) then
      call cpu_time(time2)
@@ -517,9 +752,9 @@ contains
 
     if (poissmet>0) then
      if (masssourc==1) then
-       call Pr_Correct(U2,V2,W2,Pr,2.*alpha(l),Q)
+       call Pr_Correct(U2,V2,W2,Pr,2._KND*alpha(l),Q)
      else
-       call Pr_Correct(U2,V2,W2,Pr,2.*alpha(l))
+       call Pr_Correct(U2,V2,W2,Pr,2._KND*alpha(l))
      endif
     endif
 
@@ -574,7 +809,13 @@ contains
       temperature=temperature2
     endif
 
-
+    if (BtypeE==OutletBuff) then
+      if (buoyancy==1) then
+        call AttenuateOut(U2,V2,W2,Pr,temperature)
+      else
+        call AttenuateOut(U2,V2,W2,Pr)
+      endif
+    endif
 
     if (l==1) delta=0
 
