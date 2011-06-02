@@ -64,16 +64,6 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
  if (poissmet==3)  allocate(RHS2(1:nx,1:ny,1:nz))
 
-  S=0
-    do k=1,Unz
-      do j=1,Uny
-          S=S+dyPr(j)*dzPr(k)*(U(Unx,j,k)-U(1,j,k))
-      enddo
-    enddo
-
-  S=S/(ly*lz)
-  S=S/Uinlet
-  write (*,*) "Uncompatibility: ",S
 
   if (projectiontype==2) then
    Apr=coef*dt
@@ -109,6 +99,22 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     dt3=0
    endif
 
+   call Bound_CondU(U)
+   call Bound_CondV(V)
+   call Bound_CondW(W)
+
+   S=0
+   do k=1,Prnz
+    do j=1,Prny
+     do i=1,Prnx
+      S=S-((U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k)))*dxPr(i)*dyPr(j)*dzPr(k)
+     enddo
+    enddo
+   enddo
+
+   S=S/(ly*lz)
+   write(*,*) "Compatibility correction",S
+   U(Unx+1,:,:)=U(Unx+1,:,:)+S
 
    S=0
    S2=0
@@ -116,9 +122,6 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
    maxJ=-5
    maxK=-5
 
-   call Bound_CondU(U)
-   call Bound_CondV(V)
-   call Bound_CondW(W)
    
    do k=1,Prnz            !divergence of U -> RHS
     do j=1,Prny
@@ -131,50 +134,55 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
           RHS(i,j,k)=(U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k))
           S2=S2+abs(RHS(i,j,k)*dxPr(i)*dyPr(j)*dzPr(k))
           RHS(i,j,k)=RHS(i,j,k)/(dt2)
-        endif
-      enddo
-     enddo
-    enddo
-  write (*,*) "avgRHS",S2/(lx*ly*lz)
-
-!   if (BtypeT==DIRICHLET.and.TsideW/=0) then
-!    do k=1,nz
-!     do j=1,ny
-!      do i=1,nx
-!       RHS(i,j,k)=RHS(i,j,k)+0.01/lz
-!      enddo
-!     enddo
-!    enddo
-!   endif
-
-   
-  if (poissmet==1) then
-      call POISSSOR(Phi,RHS)
-  elseif (poissmet==2) then
-      call POISSFISH(Phi,RHS)
-  elseif (poissmet==3) then
-      RHS2=RHS
-      call POISSFISH(Phi,RHS)
-      RHS=RHS2
-      call POISSSOR(Phi,RHS)
-  elseif (poissmet==4) then
-      call POISSMG(Phi,RHS)
-  elseif (poissmet==5) then
-      call POISSMUD(Phi,RHS)
-   Phiref=Phi(Prnx/2,Prny/2,Prnz/2)
-   do k=1,Prnz
-    do j=1,Prny
-     do i=1,Prnx
-      Phi(i,j,k)=Phi(i,j,k)-Phiref
+       endif
      enddo
     enddo
    enddo
-   call Bound_Phi(Phi)
-   maxiterbackup=maxPoissoniter
-   maxPoissoniter=100
-      call POISSSOR(Phi,RHS)
-   maxPoissoniter=maxiterbackup
-  endif
+   write (*,*) "avgRHS",S2/(lx*ly*lz)
+
+
+   if (poissmet==1) then
+
+       call POISSSOR(Phi,RHS)
+
+   elseif (poissmet==2) then
+
+       call POISSFISH(Phi,RHS)
+
+   elseif (poissmet==3) then
+
+       RHS2=RHS
+       call POISSFISH(Phi,RHS)
+
+       RHS=RHS2
+       call POISSSOR(Phi,RHS)
+
+   elseif (poissmet==4) then
+
+       call POISSMG(Phi,RHS)
+
+   elseif (poissmet==5) then
+
+       call POISSMUD(Phi,RHS)
+
+       Phiref=Phi(Prnx/2,Prny/2,Prnz/2)
+       do k=1,Prnz
+        do j=1,Prny
+         do i=1,Prnx
+          Phi(i,j,k)=Phi(i,j,k)-Phiref
+         enddo
+        enddo
+       enddo
+
+       call Bound_Phi(Phi)
+
+       maxiterbackup=maxPoissoniter
+       maxPoissoniter=100
+
+       call POISSSOR(Phi,RHS)
+
+       maxPoissoniter=maxiterbackup
+   endif
    
 
   
@@ -186,8 +194,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      enddo
     enddo
    enddo
+
+
    call Bound_Phi(Phi)
-   
 
    
   
