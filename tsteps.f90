@@ -673,6 +673,7 @@ contains
   call timestepEUL(U,V,W)
 
   if (steady==0.and.dt+time>endtime)  dt=endtime-time
+  write (*,*) "time:",time,"dt: ",dt
 
   temperature_adv=0
   Ustar=0
