@@ -103,7 +103,7 @@ $(TARGETDIR_CLMM)/outputs.o: $(TARGETDIR_CLMM) outputs.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ outputs.f90
 
 $(TARGETDIR_CLMM)/fishpoisson.o: $(TARGETDIR_CLMM) fishpoisson.f90
-	f90 -c -O2 -g -dalign  -o $@ fishpoisson.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ fishpoisson.f90
 
 $(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ poisson.f90
