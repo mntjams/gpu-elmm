@@ -1,6 +1,7 @@
 module INITIAL
 use PARAMETERS
 use MULTIGRID
+use MULTIGRID2d
 use POISSON
 use BOUNDARIES
 use SCALARS
@@ -8,6 +9,10 @@ use SMAGORINSKY
 use WALLMODELS
 
 implicit none
+
+integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
+real(KND) mgepsinnerGS
+
 
 contains
  subroutine READPARAMS
@@ -336,28 +341,47 @@ contains
   endif
   close(11)
 
-  open(11,file="mgopts.conf",status="OLD",action="READ")
-  read (11,fmt='(/)')
-  read (11,*) lmg
-  read (11,fmt='(/)')
-  read (11,*) minmglevel
-  read (11,fmt='(/)')
-  read (11,*) bnx
-  read (11,fmt='(/)')
-  read (11,*) bny
-  read (11,fmt='(/)')
-  read (11,*) bnz
-  read (11,fmt='(/)')
-  read (11,*) mgncgc
-  read (11,fmt='(/)')
-  read (11,*) mgnpre
-  read (11,fmt='(/)')
-  read (11,*) mgnpost
-  read (11,fmt='(/)')
-  read (11,*) mgmaxinnnerGSiter
-  read (11,fmt='(/)')
-  read (11,*) mgepsinnerGS
-  close(11)
+  if (poissmet==4.or.poissmet==5) then
+    open(11,file="mgopts.conf",status="OLD",action="READ")
+    read (11,fmt='(/)')
+    read (11,*) lmg
+    read (11,fmt='(/)')
+    read (11,*) minmglevel
+    read (11,fmt='(/)')
+    read (11,*) bnx
+    read (11,fmt='(/)')
+    read (11,*) bny
+    read (11,fmt='(/)')
+    read (11,*) bnz
+    read (11,fmt='(/)')
+    read (11,*) mgncgc
+    read (11,fmt='(/)')
+    read (11,*) mgnpre
+    read (11,fmt='(/)')
+    read (11,*) mgnpost
+    read (11,fmt='(/)')
+    read (11,*) mgmaxinnerGSiter
+    read (11,fmt='(/)')
+    read (11,*) mgepsinnerGS
+    close(11)
+
+    if (poissmet==4) then
+      if (Prny==1) then
+       call SetMGParams2d(llmg=lmg,lminmglevel=minmglevel,lbnx=bnx,lbnz=bnz,&
+                          lmgncgc=mgncgc,lmgnpre=mgnpre,lmgnpost=mgnpost,&
+                          lmgmaxinnerGSiter=mgmaxinnerGSiter,lmgepsinnerGS=mgepsinnerGS)
+      else
+       call SetMGParams(llmg=lmg,lminmglevel=minmglevel,lbnx=bnx,lbny=bny,lbnz=bnz,&
+                          lmgncgc=mgncgc,lmgnpre=mgnpre,lmgnpost=mgnpost,&
+                          lmgmaxinnerGSiter=mgmaxinnerGSiter,lmgepsinnerGS=mgepsinnerGS)
+      endif
+    elseif (poissmet==5) then
+     MUDbnx=bnx
+     MUDbny=bny
+     MUDbnz=bnz
+     MUDlmg=MUDlmg
+    endif
+  endif
 
   open(11,file="frames.conf",status="OLD",action="READ")
   read (11,fmt='(/)')
@@ -946,11 +970,11 @@ contains
    !inversionTjump=2 !K
    do k=-2,Prnz+3
     do j=-2,Prny+3
-         if (zPr(k)>(zW(Wnz+1)+zW(0))/4) then
-        Tempin(j,k)=(zPr(k)-(zW(Wnz+1)+zW(0))/4)*freetempgradient+265!(zPr(k)-zW(0))*freetempgradient+temperature_ref
-         else
-          Tempin(j,k)=265!temperature_ref
-         endif
+!         if (zPr(k)>(zW(Wnz+1)+zW(0))/4) then
+        Tempin(j,k)=(zPr(k)-zW(0))*freetempgradient+temperature_ref!(zPr(k)-(zW(Wnz+1)+zW(0))/4)*freetempgradient+265!
+!         else
+!          Tempin(j,k)=265!temperature_ref
+!         endif
 !        Tempin(j,k)=temperature_ref
 !     
     enddo
@@ -964,7 +988,7 @@ contains
       else
        p=0.5_KND
       endif
-       temperature(i,j,k)=Tempin(j,k)+0.2_KND*(p-0.5_KND)
+       temperature(i,j,k)=Tempin(j,k)!+0.2_KND*(p-0.5_KND)
 !      if (yPr(j)<=yPr(Uny/2)) then
 !        temperature(i,j,k)=0
 !      else

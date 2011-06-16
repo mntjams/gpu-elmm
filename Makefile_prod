@@ -35,6 +35,7 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/parameters.o \
 	$(TARGETDIR_CLMM)/wallmodels.o \
 	$(TARGETDIR_CLMM)/multigrid.o \
+	$(TARGETDIR_CLMM)/multigrid2d.o \
 	$(TARGETDIR_CLMM)/geometric.o \
 	$(TARGETDIR_CLMM)/scalars.o \
 	$(TARGETDIR_CLMM)/turbinlet.o \
@@ -49,9 +50,9 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/laxfried.o \
 	$(TARGETDIR_CLMM)/laxwend.o \
 	$(TARGETDIR_CLMM)/tsteps.o \
-	$(TARGETDIR_CLMM)/main.o 
+	$(TARGETDIR_CLMM)/main.o
 USERLIBS_CLMM = $(SYSLIBS_CLMM)
-DEPLIBS_CLMM = 
+DEPLIBS_CLMM =
 LDLIBS_CLMM = $(USERLIBS_CLMM) -xlic_lib=sunperf
 
 
@@ -90,6 +91,9 @@ $(TARGETDIR_CLMM)/scalars.o: $(TARGETDIR_CLMM) scalars.f90
 
 $(TARGETDIR_CLMM)/multigrid.o: $(TARGETDIR_CLMM) multigrid.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid.f90
+
+$(TARGETDIR_CLMM)/multigrid2d.o: $(TARGETDIR_CLMM) multigrid2d.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid2d.f90
 
 $(TARGETDIR_CLMM)/boundaries.o: $(TARGETDIR_CLMM) boundaries.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ boundaries.f90
@@ -154,6 +158,7 @@ clean:
 		$(TARGETDIR_CLMM)/parameters.o \
 		$(TARGETDIR_CLMM)/scalars.o \
 		$(TARGETDIR_CLMM)/multigrid.o \
+		$(TARGETDIR_CLMM)/multigrid2d.o \
 		$(TARGETDIR_CLMM)/boundaries.o \
 		$(TARGETDIR_CLMM)/outputs.o \
 		$(TARGETDIR_CLMM)/fishpoisson.o \
@@ -172,6 +177,7 @@ clean:
 	rm -f *.mod
 	#rm -f -r $(TARGETDIR_CLMM)
 
+
 # Create the target directory (if needed)
 $(TARGETDIR_CLMM):
 	mkdir -p $(TARGETDIR_CLMM)
@@ -179,5 +185,5 @@ $(TARGETDIR_CLMM):
 
 # Enable dependency checking
 .KEEP_STATE:
-.KEEP_STATE_FILE:.make.state.bin.sunprod
+.KEEP_STATE_FILE:.make.state.bin.sun
 

@@ -3,12 +3,15 @@ module POISSON
  use PARAMETERS
  use BOUNDARIES
  use MULTIGRID
+ use MULTIGRID2d
  use FISHPOISSON 
 
 implicit none
 
+ integer MUDbnx,MUDbny,MUDbnz,MUDlmg
 
 contains
+
 
 subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W !Phi is computed in Poisson eq. with div of U in RHS
@@ -159,7 +162,11 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
    elseif (poissmet==4) then
 
-       call POISSMG(Phi,RHS)
+       if (Prny==1) then
+        call POISSMG2d(Phi,RHS)
+       else
+        call POISSMG(Phi,RHS)
+       endif
 
    elseif (poissmet==5) then
 
@@ -906,18 +913,18 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   real(KND),allocatable,save,dimension(:,:,:)::RH,Ph
 
   
-  integer nx,ny,nz,ierror,lmgx,lmgy,lmgz,sx,sy,sz
+  integer nx,ny,nz,ierror,MUDlmgx,MUDlmgy,MUDlmgz,sx,sy,sz
   integer,save:: iparm(22),mgopt(4)
   real(KND),save:: fparm(8)
   real(KND),allocatable,save:: work(:)
   integer,save:: called=0
 
-  bnx=2
-  bny=2
-  bnz=2
-  lmgx=4
-  lmgy=4
-  lmgz=4
+  MUDbnx=2
+  MUDbny=2
+  MUDbnz=2
+  MUDlmgx=4
+  MUDlmgy=4
+  MUDlmgz=4
   
    !RHS of equation
    write (*,*) "Computing poisson equation"
@@ -979,13 +986,13 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     iparm(6)=2
     iparm(7)=2
    endif
-   iparm(8)=bnx
-   iparm(9)=bny
-   iparm(10)=bnz
-   iparm(11)=lmgx
-   iparm(12)=lmgy
-   iparm(13)=lmgz
-   iparm(14)=nx   !nx=bnx*(lmgx-1)**2+1
+   iparm(8)=MUDbnx
+   iparm(9)=MUDbny
+   iparm(10)=MUDbnz
+   iparm(11)=MUDlmgx
+   iparm(12)=MUDlmgy
+   iparm(13)=MUDlmgz
+   iparm(14)=nx   !nx=MUDbnx*(MUDlmgx-1)**2+1
    iparm(15)=ny
    iparm(16)=nz
    iparm(17)=0 !no initial guess for the moment

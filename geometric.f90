@@ -11,20 +11,20 @@ implicit none
  endtype TLine
 
  type TPlane
-   real(KND) a,b,c,d    !ax+by+cz+d/=0 for inner half-space
-   logical gl           !T > in ineq. above F < in ineq. above
-   logical rough        !T rough surface, F flat surface
-   real(KND) z0         !roughness parameter
+   real(KND) a,b,c,d      !ax+by+cz+d/=0 for inner half-space
+   logical gl             !T > in ineq. above F < in ineq. above
+   logical:: rough=.false.!T rough surface, F flat surface
+   real(KND) z0           !roughness parameter
   endtype TPlane
 
   type TPolyhedron
-   integer nplanes
+   integer:: nplanes=0
    type(TPlane),dimension(:),allocatable:: Planes !intersection of half-spaces
   endtype TPolyhedron
 
   type TBall
    real(KND) xc,yc,zc,r
-   logical rough           !T rough surface, F flat surface
+   logical:: rough=.false. !T rough surface, F flat surface
    real(KND) z0            !roughness parameter
   endtype TBall
 
@@ -32,8 +32,8 @@ implicit none
    real(KND) xc,yc,zc
    real(KND) a,b,c
    real(KND) r
-   logical rough            !T rough surface, F flat surface
-   real(KND) z0             !roughness parameter
+   logical:: rough=.false. !T rough surface, F flat surface
+   real(KND) z0            !roughness parameter
   endtype TCylJacket
 
   type TCylinder
@@ -43,7 +43,7 @@ implicit none
 
 
  type TTerrainPoint
-  real(KND) elev
+  real(KND):: elev=0
   logical:: rough=.false.
   real(KND) z0
  endtype TTerrainPoint

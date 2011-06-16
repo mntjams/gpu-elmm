@@ -3,6 +3,10 @@ module MULTIGRID
 use PARAMETERS
 implicit none
 
+ private
+
+ public POISSMG, SetMGParams
+
   type TMGArr
     real(KND),allocatable,dimension(:,:,:):: Arr
   endtype
@@ -22,18 +26,37 @@ implicit none
   integer mgncgc !type of cycling 1..V cycle, 2..W cycle
   integer mgnpre
   integer mgnpost
-  integer mgmaxinnnerGSiter
+  integer mgmaxinnerGSiter
   real(KND) mgepsinnerGS
 
 
 contains 
 
 
-pure subroutine Prolongate(AFine,ACoarse,level)
- integer,intent(in):: level
- real(KND),dimension(-1:,-1:,-1:),intent(in):: ACoarse
- real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
- integer:: i,j,k,nx,ny,nz
+ subroutine SetMGParams(llmg, lminmglevel, lbnx, lbny, lbnz,&
+                          lmgncgc, lmgnpre, lmgnpost, lmgmaxinnerGSiter, lmgepsinnerGS)
+
+  integer,intent(in)::   llmg, lminmglevel, lbnx, lbny, lbnz, lmgncgc, lmgnpre, lmgnpost, lmgmaxinnerGSiter
+  real(KND),intent(in):: lmgepsinnerGS
+
+  lmg=llmg
+  minmglevel=lminmglevel
+  bnx=lbnx
+  bny=lbny
+  bnz=lbnz
+  mgncgc=lmgncgc
+  mgnpre=lmgnpre
+  mgnpost=lmgnpost
+  mgmaxinnerGSiter=lmgmaxinnerGSiter
+  mgepsinnerGS=lmgepsinnerGS
+ endsubroutine SetMGParams
+
+
+ pure subroutine Prolongate(AFine,ACoarse,level)
+  integer,intent(in):: level
+  real(KND),dimension(-1:,-1:,-1:),intent(in):: ACoarse
+  real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
+  integer:: i,j,k,nx,ny,nz
  
    nx=bnx*2**level !level means from which grid we interpolate
    ny=bny*2**level
@@ -74,7 +97,7 @@ pure subroutine Prolongate(AFine,ACoarse,level)
    enddo
 
    call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
-endsubroutine Prolongate
+ endsubroutine Prolongate
 
 
 
@@ -93,86 +116,113 @@ endsubroutine Prolongate
    do k=0,nz
     do j=0,ny
      do i=0,nx
-        ACoarse(i,j,k)=AFine(2*i,2*j,2*k); q=1.0
+         ACoarse(i,j,k)=AFine(2*i,2*j,2*k); q=1.0
+
          if (i<nx) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i+1,2*j,2*k); q=q+0.5
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i+1,2*j,2*k); q=q+0.5
+         endif
+
          if (i>0) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i-1,2*j,2*k); q=q+0.5
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i-1,2*j,2*k); q=q+0.5
+         endif
+
          if (j<ny) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j+1,2*k); q=q+0.5
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j+1,2*k); q=q+0.5
+         endif
+
          if (j>0) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j-1,2*k); q=q+0.5
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j-1,2*k); q=q+0.5
+         endif
+
          if (k<nz) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k+1); q=q+0.5
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k+1); q=q+0.5
+         endif
+
          if (k>0) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k-1); q=q+0.5
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k-1); q=q+0.5
+         endif
+
          if ((i<nx).and.(j<ny)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j+1,2*k); q=q+0.25
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j+1,2*k); q=q+0.25
+         endif
+
          if ((i<nx).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k+1); q=q+0.25
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k+1); q=q+0.25
+         endif
+
          if ((j<ny).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k+1); q=q+0.25
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k+1); q=q+0.25
+         endif
+
          if ((i>0).and.(j>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j-1,2*k); q=q+0.25
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j-1,2*k); q=q+0.25
+         endif
+
          if ((i>0).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k-1); q=q+0.25
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k-1); q=q+0.25
+         endif
+
          if ((j>0).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k-1); q=q+0.25
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k-1); q=q+0.25
+         endif
+
          if ((i>0).and.(j<ny)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j+1,2*k); q=q+0.25
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j+1,2*k); q=q+0.25
+         endif
+
          if ((i>0).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k+1); q=q+0.25
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k+1); q=q+0.25
+         endif
+
          if ((i<nx).and.(j>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j-1,2*k); q=q+0.25
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j-1,2*k); q=q+0.25
+         endif
+
          if ((j>0).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k+1); q=q+0.25
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k+1); q=q+0.25
+         endif
+
          if ((i<nx).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k-1); q=q+0.25
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k-1); q=q+0.25
+         endif
+
          if ((j<ny).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k-1); q=q+0.25
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k-1); q=q+0.25
+         endif
+
          if ((i<nx).and.(j<ny).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k+1); q=q+0.125
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k+1); q=q+0.125
+         endif
+
          if ((i>0).and.(j<ny).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k+1); q=q+0.125
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k+1); q=q+0.125
+         endif
+
          if ((i<nx).and.(j>0).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k+1); q=q+0.125
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k+1); q=q+0.125
+         endif
+
          if ((i<nx).and.(j<ny).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k-1); q=q+0.125
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k-1); q=q+0.125
+         endif
+
          if ((i>0).and.(j>0).and.(k<nz)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k+1); q=q+0.125
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k+1); q=q+0.125
+         endif
+
          if ((i>0).and.(j<ny).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k-1); q=q+0.125
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k-1); q=q+0.125
+         endif
+
          if ((i<nx).and.(j>0).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k-1); q=q+0.125
- endif
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k-1); q=q+0.125
+         endif
+
          if ((i>0).and.(j>0).and.(k>0)) then
- ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k-1); q=q+0.125
- endif
-        ACoarse(i,j,k)=ACoarse(i,j,k)/q       
+          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k-1); q=q+0.125
+         endif
+
+         ACoarse(i,j,k)=ACoarse(i,j,k)/q       
      enddo
     enddo
    enddo
@@ -1083,7 +1133,7 @@ integer k
 
      if (R>mgepsinnerGS**2) then
       R1=R
-      do k=1,mgmaxinnnerGSiter
+      do k=1,mgmaxinnerGSiter
         call MG_GS(level, 10)
         call MG_res(level,R)
 !         write (*,*) "GSres",sqrt(R)
@@ -1167,7 +1217,7 @@ real(KND),save:: called=0
  nz=bnz*2**LMG
 
  if (nx-sx/=Prnx-1.or.ny-sy/=Prny-1.or.nz-sz/=Prnz-1) then
-    write (*,*) "Incorrect dimensions, multigrid, vs. grig defined in grid.conf:"
+    write (*,*) "Incorrect dimensions, multigrid, vs. grid defined in grid.conf:"
     write (*,*) 0+sx,":",nx,"--",1,":",Prnx
     write (*,*) 0+sy,":",ny,"--",1,":",Prny
     write (*,*) 0+sz,":",nz,"--",1,":",Prnz
@@ -1194,7 +1244,7 @@ real(KND),save:: called=0
  do l=1,maxPoissoniter
   write (*,*) "MG iteration:",l
    Phiref=SUM(PhiMG(LMG)%Arr(0:CoefMG(LMG)%nx,0:CoefMG(LMG)%ny,0:CoefMG(LMG)%nz))/&
-          ((CoefMG(LMG)%nx+1)*(CoefMG(LMG)%ny+1)*(CoefMG(LMG)%ny+1))
+          ((CoefMG(LMG)%nx+1)*(CoefMG(LMG)%ny+1)*(CoefMG(LMG)%nz+1))
    do k=0,CoefMG(LMG)%nz
     do j=0,CoefMG(LMG)%ny
      do i=0,CoefMG(LMG)%nx
@@ -1209,6 +1259,7 @@ real(KND),save:: called=0
  write (*,*) "MG residuum",R
  enddo
  write (*,*) "MG residuum",R
+
  Phi(1:Prnx,1:Prny,1:Prnz)=PhiMG(LMG)%Arr(0+sx:nx,0+sy:ny,0+sz:nz)
 
 endsubroutine POISSMG
