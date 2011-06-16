@@ -670,15 +670,56 @@ contains
    real(KND),intent(out):: xnear,ynear,znear
    real(KND),intent(in):: x,y,z
    type(TTerrain),intent(in):: T
-   integer xi,yj,comp
-
+   integer     :: xi,yj,comp
+   type(TPlane):: Pl
+   real(KND)   :: a,b,zloc
    xnear=x
    ynear=y
    znear=z0
+
    call TerrGridCoords(x,y,xi,yj,comp)
-   if (comp==1) znear=T%UTerrPoints(xi,yj)%elev
-   if (comp==2) znear=T%VTerrPoints(xi,yj)%elev
-   if (comp==3) znear=T%PrTerrPoints(xi,yj)%elev
+
+   if (comp==1) then  !Construct a tangent plane using first derivatives
+
+    zloc=T%UTerrPoints(xi,yj)%elev
+    a=(T%PrTerrPoints(xi+1,yj)%elev - T%PrTerrPoints(xi,yj)%elev) / dxU(xi)
+    b=(T%UTerrPoints(xi,yj+1)%elev - T%UTerrPoints(xi,yj-1)%elev) / (yPr(yj+1)-yPr(yj-1))
+
+    Pl%a=a
+    Pl%b=b
+    Pl%c=-1._KND
+    Pl%d=-a*x-b*y+zloc
+    
+    call PlaneNearest(xnear,ynear,znear,x,y,z,Pl)
+
+   elseif (comp==2) then
+
+    zloc=T%VTerrPoints(xi,yj)%elev
+    a=(T%VTerrPoints(xi+1,yj)%elev - T%VTerrPoints(xi-1,yj)%elev) / (xPr(xi+1)-xPr(xi-1))
+    b=(T%PrTerrPoints(xi,yj+1)%elev - T%PrTerrPoints(xi,yj)%elev) / dyV(yj)
+
+    Pl%a=a
+    Pl%b=b
+    Pl%c=-1._KND
+    Pl%d=-a*x-b*y+zloc
+
+    call PlaneNearest(xnear,ynear,znear,x,y,z,Pl)
+
+   elseif (comp==3) then
+
+    zloc=T%PrTerrPoints(xi,yj)%elev
+    a=(T%UTerrPoints(xi,yj)%elev - T%UTerrPoints(xi-1,yj)%elev) / dxPr(xi)
+    b=(T%VTerrPoints(xi,yj)%elev - T%VTerrPoints(xi,yj-1)%elev) / dyPr(yj)
+
+    Pl%a=a
+    Pl%b=b
+    Pl%c=-1._KND
+    Pl%d=-a*x-b*y+zloc
+
+    call PlaneNearest(xnear,ynear,znear,x,y,z,Pl)
+
+   endif
+
   endsubroutine TerrainNearest
 
 
