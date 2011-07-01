@@ -50,7 +50,7 @@ implicit none
 
 
   type TTerrain
-   type(TTerrainPoint),dimension(:,:),allocatable:: UTerrPoints,VTerrPoints,PrTerrPoints
+   type(TTerrainPoint),dimension(:,:),allocatable:: UTerrPoints,VTerrPoints,PrTerrPoints !allocate with a buffer of width 1 (i.e. 0:Xnx)
   endtype TTerrain
 
  type TSolidBody
@@ -81,7 +81,7 @@ implicit none
   integer dirx
   integer diry
   integer dirz
-  integer interp         !kind of interp. 0.. none (boundarypint), 1..linear, 2..bilinear, 3..trilinear
+  integer interp         !kind of interp. 0.. none (boundarypoint), 1..linear, 2..bilinear, 3..trilinear
   integer interpdir
   real(KND) MSourc
   type(TIBPoint),pointer:: next => null()
@@ -132,11 +132,12 @@ contains
    real(KND) eps2
    logical interior
 
-   if (PRESENT(eps)) then
-    eps2=ABS(eps)
+   if (present(eps)) then
+    eps2=eps
    else
-    eps2=0
+    eps2=MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND)
    endif
+
    if (PL%GL) then
      if (PL%a*x+PL%b*y+PL%c*z+PL%d>=-eps2) then
       interior=.true.
@@ -163,12 +164,12 @@ contains
    if (PH%nplanes>0) then
     interior=.true.
     do i=1,PH%nplanes
-     if (PRESENT(eps)) then
+     if (present(eps)) then
       interior=PlaneInt(x,y,z,PH%Planes(i),eps)
      else
       interior=PlaneInt(x,y,z,PH%Planes(i))
      endif
-     if (.not. INTERIOR) exit
+     if (.not. interior) exit
     enddo
    else
     interior=.false.
@@ -176,12 +177,20 @@ contains
    PolyhedronInt=interior
   endfunction PolyhedronInt
 
-  pure logical function BallInt(x,y,z,B)
+  pure logical function BallInt(x,y,z,B,eps)
    real(KND),intent(in):: x,y,z
    type(TBall),intent(in):: B
+   real(KND),intent(in),optional::eps
+   real(KND):: eps2
    logical interior
 
-   if ((B%xc-x)**2+(B%yc-y)**2+(B%zc-z)**2<=(B%r)**2) then
+   if (present(eps)) then
+    eps2=eps
+   else
+    eps2=MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND)
+   endif
+
+   if ((B%xc-x)**2+(B%yc-y)**2+(B%zc-z)**2<=(B%r+eps2)**2) then
     interior=.true.
    else
     interior=.false.
@@ -200,26 +209,21 @@ contains
    LineDist=SQRT((xl+a*t-x)**2+(yl+b*t-y)**2+(zl+c*t-z)**2)
   endfunction LineDist
 
-  pure logical function JacketInt(x,y,z,J)
+  pure logical function JacketInt(x,y,z,J,eps)
    real(KND),intent(in):: x,y,z
    type(TCylJacket),intent(in):: J
-   real(KND) eps
+   real(KND),intent(in),optional::eps
+   real(KND) eps2
    logical interior
-! write (*,*) x
-! write (*,*)y
-! write (*,*)z
-! write (*,*)j%xc
-! write (*,*)j%yc
-! write (*,*)j%zc
-! write (*,*)J%a
-! write (*,*)J%b
-! write (*,*)J%c
-! write (*,*)j%r
 
 
-   eps=MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND)
-! write (*,*)eps
-   if (LineDist(x,y,z,j%xc,j%yc,j%zc,J%a,J%b,J%c)<=j%r+eps) then
+   if (present(eps)) then
+    eps2=eps
+   else
+    eps2=MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND)
+   endif
+
+   if (LineDist(x,y,z,j%xc,j%yc,j%zc,J%a,J%b,J%c)<=j%r+eps2) then
     interior=.true.
    else
     interior=.false.
@@ -227,17 +231,19 @@ contains
    JacketInt=interior
   endfunction JacketInt
 
-  pure logical function CylinderInt(x,y,z,C)
+  pure logical function CylinderInt(x,y,z,C,eps)
    real(KND),intent(in):: x,y,z
    type(TCylinder),intent(in):: C
+   real(KND),intent(in),optional::eps
    logical interior
+
     interior=.true.
-    if (.not.JacketInt(x,y,z,C%Jacket)) interior=.false.
+    if (.not.JacketInt(x,y,z,C%Jacket,eps)) interior=.false.
     if (interior.and.associated(C%Plane1)) then
-           if (.not.PlaneInt(x,y,z,C%Plane1)) interior=.false.
+           if (.not.PlaneInt(x,y,z,C%Plane1,eps)) interior=.false.
     endif
     if (interior.and.associated(C%Plane2)) then
-          if (.not.PlaneInt(x,y,z,C%Plane2)) interior=.false.
+          if (.not.PlaneInt(x,y,z,C%Plane2,eps)) interior=.false.
     endif
     CylinderInt=interior
   endfunction CylinderInt
@@ -253,17 +259,17 @@ contains
    x=x2
    y=y2
 
-   xPri=Prnx
-   do i=1,Prnx
-    if (xU(i-1)>=x) then
+   xPri=Prnx+1
+   do i=0,Prnx+1
+    if (xU(i)>=x) then
                   xPri=i
                   exit
                  endif
    enddo
 
-   yPrj=Prny
-   do i=1,Prny
-    if (yV(i-1)>=y) then
+   yPrj=Prny+1
+   do i=0,Prny+1
+    if (yV(i)>=y) then
                   yPrj=i
                   exit
                  endif
@@ -271,7 +277,7 @@ contains
 
    xUi=Prnx+1
    do i=0,Prnx+1
-    if (xPr(i)>=x) then
+    if (xPr(i+1)>=x) then
                   xUi=i
                   exit
                  endif
@@ -279,7 +285,7 @@ contains
 
    yVj=Prny+1
    do i=0,Prny+1
-    if (yPr(i)>=y) then
+    if (yPr(i+1)>=y) then
                   yVj=i
                   exit
                  endif
@@ -307,29 +313,39 @@ contains
 
 
 
-  pure logical function TerrainInt(x,y,z,T)
+  pure logical function TerrainInt(x,y,z,T,eps)
    real(KND),intent(in):: x,y,z
    type(TTerrain),intent(in):: T
+   real(KND),intent(in),optional::eps
+   real(KND) eps2
    logical interior
    integer xi,yj,comp
+
+   if (present(eps)) then
+    eps2=eps
+   else
+    eps2=MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND)
+   endif
+
    interior=.false.
    call TerrGridCoords(x,y,xi,yj,comp)
    if (comp==1) then
-    if (z<=T%UTerrPoints(xi,yj)%elev) interior=.true.
+    if (z<=T%UTerrPoints(xi,yj)%elev+eps2) interior=.true.
    elseif (comp==2) then
-    if (z<=T%VTerrPoints(xi,yj)%elev) interior=.true.
+    if (z<=T%VTerrPoints(xi,yj)%elev+eps2) interior=.true.
    elseif (comp==3) then
-    if (z<=T%PrTerrPoints(xi,yj)%elev) interior=.true.
+    if (z<=T%PrTerrPoints(xi,yj)%elev+eps2) interior=.true.
    endif
 
    TerrainInt=interior
   endfunction TerrainInt
 
     
-  pure logical function SolidBodyInt(x,y,z,SB)
+  pure logical function SolidBodyInt(x,y,z,SB,eps)
    real(KND),intent(in):: x,y,z
-   real(KND) x2,y2,z2
    type(TSolidBody),intent(in):: SB
+   real(KND),intent(in),optional:: eps
+   real(KND) x2,y2,z2
 
    x2=x
    y2=y
@@ -343,16 +359,37 @@ contains
    if (BtypeB==PERIODIC.and.z2<zW(0)) z2=z2+lz
 
    select case (SB%typeofbody)
+
     case (1)
-     SolidBodyInt=PolyhedronInt(x2,y2,z2,SB%Polyhedron)
+     if (present(eps)) then
+      SolidBodyInt=PolyhedronInt(x2,y2,z2,SB%Polyhedron,eps)
+     else
+      SolidBodyInt=PolyhedronInt(x2,y2,z2,SB%Polyhedron)
+     endif
+
     case (2)
-     SolidBodyInt=BallInt(x2,y2,z2,SB%Ball)
+     if (present(eps)) then
+      SolidBodyInt=BallInt(x2,y2,z2,SB%Ball,eps)
+     else
+      SolidBodyInt=BallInt(x2,y2,z2,SB%Ball)
+     endif
+
     case (3)
-     SolidBodyInt=CylinderInt(x2,y2,z2,SB%Cylinder)
+     if (present(eps)) then
+      SolidBodyInt=CylinderInt(x2,y2,z2,SB%Cylinder,eps)
+     else
+      SolidBodyInt=CylinderInt(x2,y2,z2,SB%Cylinder)
+     endif
+
     case (4)
-     SolidBodyInt=TerrainInt(x2,y2,z2,SB%Terrain)
+     if (present(eps)) then
+      SolidBodyInt=TerrainInt(x2,y2,z2,SB%Terrain,eps)
+     else
+      SolidBodyInt=TerrainInt(x2,y2,z2,SB%Terrain)
+     endif
+
     case default
-     SolidBodyInt=.false.
+      SolidBodyInt=.false.
     end select
   endfunction SolidBodyInt
 
@@ -719,7 +756,6 @@ contains
     call PlaneNearest(xnear,ynear,znear,x,y,z,Pl)
 
    endif
-
   endsubroutine TerrainNearest
 
 
@@ -871,10 +907,10 @@ contains
    CurrentSB=>FirstSB
    do
     if (associated(CurrentSB)) then
-    do k=-1,Unz+2
-     do j=-1,Uny+2
-       do i=-1,Unx+2
-          if (SolidBodyInt(xU(i),yPr(j),zPr(k),CurrentSB)) Utype(i,j,k)=CurrentSB%numofbody
+    do k=0,Unz+1
+     do j=0,Uny+1
+       do i=0,Unx+1
+          if (SolidBodyInt(xU(i),yPr(j),zPr(k),CurrentSB,max(dxU(i),dyPr(j),dzPr(k))/10._KND)) Utype(i,j,k)=CurrentSB%numofbody
        enddo
       enddo
      enddo
@@ -887,10 +923,10 @@ contains
    CurrentSB=>FirstSB
    do
     if (associated(CurrentSB)) then
-     do k=-1,Vnz+2
-      do j=-1,Vny+2
-       do i=-1,Vnx+2
-          if (SolidBodyInt(xPr(i),yV(j),zPr(k),CurrentSB)) Vtype(i,j,k)=CurrentSB%numofbody
+     do k=0,Vnz+1
+      do j=0,Vny+1
+       do i=0,Vnx+1
+          if (SolidBodyInt(xPr(i),yV(j),zPr(k),CurrentSB,max(dxPr(i),dyV(j),dzPr(k))/10._KND)) Vtype(i,j,k)=CurrentSB%numofbody
        enddo
       enddo
      enddo
@@ -903,10 +939,10 @@ contains
    CurrentSB=>FirstSB
    do
     if (associated(CurrentSB)) then
-     do k=-1,Wnz+2
-      do j=-1,Wny+2
-       do i=-1,Wnx+2
-          if (SolidBodyInt(xPr(i),yPr(j),zW(k),CurrentSB)) Wtype(i,j,k)=CurrentSB%numofbody
+     do k=0,Wnz+1
+      do j=0,Wny+1
+       do i=0,Wnx+1
+          if (SolidBodyInt(xPr(i),yPr(j),zW(k),CurrentSB,max(dxPr(i),dyPr(j),dzW(k))/10._KND)) Wtype(i,j,k)=CurrentSB%numofbody
        enddo
       enddo
      enddo
@@ -1049,76 +1085,122 @@ contains
   subroutine GetUIBPoint(IBP,xi,yj,zk)
   type(TIBPoint) IBP
   type(TSolidBody),pointer:: SB
-  integer xi,yj,zk,dirx,diry,dirz,n1,n2
+  integer xi,yj,zk,dirx,diry,dirz,n1,n2,nx,ny,nz
   real(KND) x,y,z,xnear,ynear,znear,t
   logical free100,free010,free001
 
-  x=xU(xi)
+  x=xU(xi)                                !real coordinates of the IB forcing point
   y=yPr(yj)
   z=zPr(zk)
   call SetCurrentSB(SB,Utype(xi,yj,zk))
   call SolidBodyNearestOut(xnear,ynear,znear,x,y,z,SB)
   IBP%component=1
-  IBP%x=xi
+  IBP%x=xi                                !integer grid coordinates
   IBP%y=yj
   IBP%z=zk
-  IBP%distx=xnear-x
+  IBP%distx=xnear-x                       !real distance to the boundary in the x,y,z direction
   IBP%disty=ynear-y
   IBP%distz=znear-z
-  IBP%dirx=nint(sign(1.0_KND,IBP%distx))
+  IBP%dirx=nint(sign(1.0_KND,IBP%distx))  !integer value denoting direction to the boundary
   IBP%diry=nint(sign(1.0_KND,IBP%disty))
   IBP%dirz=nint(sign(1.0_KND,IBP%distz))
-  dirx=abs(IBP%dirx)
+
+  dirx=abs(IBP%dirx)                      !local temporary variable with abs(dir)
   diry=abs(IBP%diry)
   dirz=abs(IBP%dirz)
 
+  if (.not.SolidBodyInt(xU(xi),yPr(yj),zPr(zk),SB))  then  !For now, if actually outside the body, set an artificial boundary
+   IBP%interp=0                                            !point here. In future we can use another interpolation.
+   IBP%interpdir=0
+   return
+  endif
 
-  if (abs(IBP%distx)<(xU(xi+1)-xU(xi-1))/20._KND) then
+
+  if (abs(IBP%distx)<(xU(xi+1)-xU(xi-1))/100._KND) then      !if too close to the boundary, set the distance to 0
    IBP%distx=0
    dirx=0
    IBP%dirx=0
   endif
-  if (abs(IBP%disty)<(yPr(yj+1)-yPr(yj-1))/20._KND) then
+  if (abs(IBP%disty)<(yPr(yj+1)-yPr(yj-1))/100._KND) then
    IBP%disty=0
    diry=0
    IBP%diry=0
   endif
-  if (abs(IBP%distz)<(zPr(zk+1)-zPr(zk-1))/20._KND) then
+  if (abs(IBP%distz)<(zPr(zk+1)-zPr(zk-1))/100._KND) then
    IBP%distz=0
    dirz=0
    IBP%dirz=0
   endif
 
-  if (dirx==0) then
+  if (dirx==0) then                                               !If there is a cell free of solid bodies in the direction
    free100=.false.
   else
-   free100=.not.SolidBodyInt(xU(xi+IBP%dirx),yPr(yj),zPr(zk),SB)
+   free100=(Utype(xi+IBP%dirx,yj,zk)==0)
   endif
   if (diry==0) then
    free010=.false.
   else
-   free010=.not.SolidBodyInt(xU(xi),yPr(yj+IBP%diry),zPr(zk),SB)
+   free010=(Utype(xi,yj+IBP%diry,zk)==0)
   endif
   if (dirz==0) then
    free001=.false.
   else
-   free001=.not.SolidBodyInt(xU(xi),yPr(yj),zPr(zk+IBP%dirz),SB)
+   free001=(Utype(xi,yj,zk+IBP%dirz)==0)
   endif
 
+  nx=0
+  ny=0
+  nz=0
+  n1=0                                                          ! n1 number of neighbouring cells free of solid bodies
+  n2=0                                                          ! n2 number of nonzero coordinate directions to boundary
+  if (Utype(xi+1,yj,zk)==0) then
+   n1=n1+1
+   nx=nx+1
+  endif
+  if (Utype(xi-1,yj,zk)==0) then
+   n1=n1+1
+   nx=nx+1
+  endif
+  if (Utype(xi,yj+1,zk)==0) then
+   n1=n1+1
+   ny=ny+1
+  endif
+  if (Utype(xi,yj-1,zk)==0) then
+   n1=n1+1
+   ny=ny+1
+  endif
+  if (Utype(xi,yj,zk+1)==0) then
+   n1=n1+1
+   nz=nz+1
+  endif
+  if (Utype(xi,yj,zk-1)==0) then
+   n1=n1+1
+   nz=nz+1
+  endif
 
-  n1=0
-  n2=0
-  if (.not.SolidBodyInt(xU(xi+1),yPr(yj),zPr(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xU(xi-1),yPr(yj),zPr(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xU(xi),yPr(yj+1),zPr(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xU(xi),yPr(yj-1),zPr(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xU(xi),yPr(yj),zPr(zk+1),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xU(xi),yPr(yj),zPr(zk-1),SB)) n1=n1+1
   if (dirx/=0) n2=n2+1
   if (diry/=0) n2=n2+1
   if (dirz/=0) n2=n2+1
-  if (n1>n2) then
+
+
+  if (n1>n2) then   ! If too many free directions, treat as directly on the boundary,
+   IBP%interp=0     !because we are probably at some edge.
+   IBP%distx=0
+   IBP%disty=0
+   IBP%distz=0
+   dirx=0
+   diry=0
+   dirz=0
+   IBP%dirx=0
+   IBP%diry=0
+   IBP%dirz=0
+  endif
+
+    !At least in one direction free  cells on both sides.
+    !Unresolvably small object or a thin wall -> treat as directly on the boundary.
+  if (nx>1.or.ny>1.or.nz>1) then
    IBP%interp=0
+   IBP%interpdir=0
    IBP%distx=0
    IBP%disty=0
    IBP%distz=0
@@ -1131,9 +1213,8 @@ contains
   endif
 
 
-  
   if ((dirx==0.and.diry==0.and.dirz==0).or.((.not.free001).and.(.not.free010).and.(.not.free100))) then
-   IBP%interp=0
+   IBP%interp=0          !If no free direction, the boundary is here.
    IBP%interpdir=0
    IBP%distx=0
    IBP%disty=0
@@ -1145,14 +1226,14 @@ contains
    IBP%diry=0
    IBP%dirz=0
    
-  elseif ((free100.and.dirx==1).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then
-   IBP%interp=3
+  elseif ((free100.and.dirx==1).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then !Three free directions,
+   IBP%interp=3                                                                           !use trilinear interpolation.
    IBP%interpdir=0
-  elseif ((.not.free100).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then
-   IBP%interp=2
+  elseif ((.not.free100).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then !Two free directions y and z,
+   IBP%interp=2                                                                    !use bilinear interpolation normal to x.
    IBP%interpdir=1
-   if (dirx==1) then
-    t=NearestOnLineOut(x,y,z,x,y+IBP%disty,z+IBP%distz,SB)
+   if (dirx==1) then                                       !If dirx /= 0 then forget the x component of dist vector
+    t=NearestOnLineOut(x,y,z,x,y+IBP%disty,z+IBP%distz,SB) ! and find an intersection of the new vector with the boundary
 
     dirx=0
     IBP%dirx=0
@@ -1160,7 +1241,7 @@ contains
     IBP%disty=IBP%disty*t
     IBP%distz=IBP%distz*t
    endif
-  elseif ((.not.free010).and.(free100.and.dirx==1).and.(free001.and.dirz==1)) then
+  elseif ((.not.free010).and.(free100.and.dirx==1).and.(free001.and.dirz==1)) then  !the same normal to y
    IBP%interp=2
    IBP%interpdir=2
    if (diry==1) then
@@ -1172,7 +1253,7 @@ contains
     IBP%disty=0
     IBP%distz=IBP%distz*t
    endif
-  elseif ((.not.free001).and.(free100.and.dirx==1).and.(free010.and.diry==1)) then
+  elseif ((.not.free001).and.(free100.and.dirx==1).and.(free010.and.diry==1)) then  !the same normal to z
    IBP%interp=2
    IBP%interpdir=3
    if (dirz==1) then
@@ -1184,11 +1265,11 @@ contains
     IBP%disty=IBP%disty*t
     IBP%distz=0
    endif
-  elseif (free100.and.dirx==1) then
+  elseif (free100.and.dirx==1) then  !Only one free direction, use linear interpolation in direction x.
    IBP%interp=1
    IBP%interpdir=1
-   if (diry==1.or.dirz==1) then
-    t=NearestOnLineOut(x,y,z,x+IBP%distx,y,z,SB)
+   if (diry==1.or.dirz==1) then                   !If other dir components nonzero, delete them and 
+    t=NearestOnLineOut(x,y,z,x+IBP%distx,y,z,SB)  !find an intersection of the new vector with the boundary
 
     diry=0
     dirz=0
@@ -1198,7 +1279,7 @@ contains
     IBP%disty=0
     IBP%distz=0
    endif
-  elseif (free010.and.diry==1) then
+  elseif (free010.and.diry==1) then               !the same in y
    IBP%interp=1
    IBP%interpdir=2
    if (dirx==1.or.dirz==1) then
@@ -1212,7 +1293,7 @@ contains
     IBP%disty=t*IBP%disty
     IBP%distz=0
    endif
-  elseif (free001.and.dirz==1) then
+  elseif (free001.and.dirz==1) then               !the same in z
    IBP%interp=1
    IBP%interpdir=3
    if (dirx==1.or.diry==1) then
@@ -1226,7 +1307,7 @@ contains
     IBP%disty=0
     IBP%distz=t*IBP%distz
    endif
-  else
+  else                                           ! We should have find some interpolation and not come here!
    write(*,*) "Assertion error"
    write(*,*) "free100",free100
    write(*,*) "free010",free010
@@ -1254,7 +1335,7 @@ contains
   integer,intent(in):: xi,yj,zk
 
   type(TSolidBody),pointer:: SB
-  integer dirx,diry,dirz,n1,n2
+  integer dirx,diry,dirz,n1,n2,nx,ny,nz
   real(KND) x,y,z,xnear,ynear,znear,t
   logical free100,free010,free001
 
@@ -1275,21 +1356,29 @@ contains
   IBP%dirx=nint(sign(1.0_KND,IBP%distx))
   IBP%diry=nint(sign(1.0_KND,IBP%disty))
   IBP%dirz=nint(sign(1.0_KND,IBP%distz))
+
   dirx=abs(IBP%dirx)
   diry=abs(IBP%diry)
   dirz=abs(IBP%dirz)
     
-  if (abs(IBP%distx)<(xPr(xi+1)-xPr(xi-1))/20._KND) then
+  if (.not.SolidBodyInt(xPr(xi),yV(yj),zPr(zk),SB))  then  !For now, if actually outside the body, set an artificial boundary
+   IBP%interp=0                                            !point here. In future we can use another interpolation.
+   IBP%interpdir=0
+   return
+  endif
+
+
+  if (abs(IBP%distx)<(xPr(xi+1)-xPr(xi-1))/100._KND) then
    IBP%distx=0
    dirx=0
    IBP%dirx=0
   endif
-  if (abs(IBP%disty)<(yV(yj+1)-yV(yj-1))/20._KND) then
+  if (abs(IBP%disty)<(yV(yj+1)-yV(yj-1))/100._KND) then
    IBP%disty=0
    diry=0
    IBP%diry=0
   endif
-  if (abs(IBP%distz)<(zPr(zk+1)-zPr(zk-1))/20._KND) then
+  if (abs(IBP%distz)<(zPr(zk+1)-zPr(zk-1))/100._KND) then
    IBP%distz=0
    dirz=0
    IBP%dirz=0
@@ -1298,32 +1387,69 @@ contains
   if (dirx==0) then
    free100=.false.
   else
-   free100=.not.SolidBodyInt(xPr(xi+IBP%dirx),yV(yj),zPr(zk),SB)
+   free100=(Vtype(xi+IBP%dirx,yj,zk)==0)
   endif
   if (diry==0) then
    free010=.false.
   else
-   free010=.not.SolidBodyInt(xPr(xi),yV(yj+IBP%diry),zPr(zk),SB)
+   free010=(Vtype(xi,yj+IBP%diry,zk)==0)
   endif
   if (dirz==0) then
    free001=.false.
   else
-   free001=.not.SolidBodyInt(xPr(xi),yV(yj),zPr(zk+IBP%dirz),SB)
+   free001=(Vtype(xi,yj,zk+IBP%dirz)==0)
   endif
 
 
-  n1=0
-  n2=0
-  if (.not.SolidBodyInt(xPr(xi+1),yV(yj),zPr(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi-1),yV(yj),zPr(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi),yV(yj+1),zPr(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi),yV(yj-1),zPr(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi),yV(yj),zPr(zk+1),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi),yV(yj),zPr(zk-1),SB)) n1=n1+1
+  nx=0
+  ny=0
+  nz=0
+  n1=0                                                          ! n1 number of neighbouring cells free of solid bodies
+  n2=0                                                          ! n2 number of nonzero coordinate directions to boundary
+  if (Vtype(xi+1,yj,zk)==0) then
+   n1=n1+1
+   nx=nx+1
+  endif
+  if (Vtype(xi-1,yj,zk)==0) then
+   n1=n1+1
+   nx=nx+1
+  endif
+  if (Vtype(xi,yj+1,zk)==0) then
+   n1=n1+1
+   ny=ny+1
+  endif
+  if (Vtype(xi,yj-1,zk)==0) then
+   n1=n1+1
+   ny=ny+1
+  endif
+  if (Vtype(xi,yj,zk+1)==0) then
+   n1=n1+1
+   nz=nz+1
+  endif
+  if (Vtype(xi,yj,zk-1)==0) then
+   n1=n1+1
+   nz=nz+1
+  endif
+
   if (dirx/=0) n2=n2+1
   if (diry/=0) n2=n2+1
   if (dirz/=0) n2=n2+1
+
   if (n1>n2) then
+   IBP%interp=0
+   IBP%interpdir=0
+   IBP%distx=0
+   IBP%disty=0
+   IBP%distz=0
+   dirx=0
+   diry=0
+   dirz=0
+   IBP%dirx=0
+   IBP%diry=0
+   IBP%dirz=0
+  endif
+
+  if (nx>1.or.ny>1.or.nz>1) then
    IBP%interp=0
    IBP%distx=0
    IBP%disty=0
@@ -1335,6 +1461,7 @@ contains
    IBP%diry=0
    IBP%dirz=0
   endif
+
 
   if ((dirx==0.and.diry==0.and.dirz==0).or.((.not.free001).and.(.not.free010).and.(.not.free100))) then
    IBP%interp=0
@@ -1455,7 +1582,7 @@ contains
   integer,intent(in):: xi,yj,zk
 
   type(TSolidBody),pointer:: SB
-  integer dirx,diry,dirz,n1,n2
+  integer dirx,diry,dirz,n1,n2,nx,ny,nz
   real(KND) x,y,z,xnear,ynear,znear,t
   logical free100,free010,free001
 
@@ -1476,21 +1603,29 @@ contains
   IBP%dirx=nint(sign(1.0_KND,IBP%distx))
   IBP%diry=nint(sign(1.0_KND,IBP%disty))
   IBP%dirz=nint(sign(1.0_KND,IBP%distz))
+
   dirx=abs(IBP%dirx)
   diry=abs(IBP%diry)
   dirz=abs(IBP%dirz)
   
-  if (abs(IBP%distx)<(xPr(xi+1)-xPr(xi-1))/20._KND) then
+  if (.not.SolidBodyInt(xPr(xi),yPr(yj),zW(zk),SB))  then  !For now, if actually outside the body, set an artificial boundary
+   IBP%interp=0                                            !point here. In future we can use another interpolation.
+   IBP%interpdir=0
+   return
+  endif
+
+
+  if (abs(IBP%distx)<(xPr(xi+1)-xPr(xi-1))/100._KND) then
    IBP%distx=0
    dirx=0
    IBP%dirx=0
   endif
-  if (abs(IBP%disty)<(yPr(yj+1)-yPr(yj-1))/20._KND) then
+  if (abs(IBP%disty)<(yPr(yj+1)-yPr(yj-1))/100._KND) then
    IBP%disty=0
    diry=0
    IBP%diry=0
   endif
-  if (abs(IBP%distz)<(zW(zk+1)-zW(zk-1))/20._KND) then
+  if (abs(IBP%distz)<(zW(zk+1)-zW(zk-1))/100._KND) then
    IBP%distz=0
    dirz=0
    IBP%dirz=0
@@ -1500,31 +1635,54 @@ contains
   if (dirx==0) then
    free100=.false.
   else
-   free100=.not.SolidBodyInt(xPr(xi+IBP%dirx),yPr(yj),zW(zk),SB)
+   free100=(Wtype(xi+IBP%dirx,yj,zk)==0)
   endif
   if (diry==0) then
    free010=.false.
   else
-   free010=.not.SolidBodyInt(xPr(xi),yPr(yj+IBP%diry),zW(zk),SB)
+   free010=(Wtype(xi,yj+IBP%diry,zk)==0)
   endif
   if (dirz==0) then
    free001=.false.
   else
-   free001=.not.SolidBodyInt(xPr(xi),yPr(yj),zW(zk+IBP%dirz),SB)
+   free001=(Wtype(xi,yj,zk+IBP%dirz)==0)
   endif
 
 
-  n1=0
-  n2=0
-  if (.not.SolidBodyInt(xPr(xi+1),yPr(yj),zW(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi-1),yPr(yj),zW(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi),yPr(yj+1),zW(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi),yPr(yj-1),zW(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi),yPr(yj),zW(zk+1),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi),yPr(yj),zW(zk-1),SB)) n1=n1+1
+  nx=0
+  ny=0
+  nz=0
+  n1=0                                                          ! n1 number of neighbouring cells free of solid bodies
+  n2=0                                                          ! n2 number of nonzero coordinate directions to boundary
+  if (Wtype(xi+1,yj,zk)==0) then
+   n1=n1+1
+   nx=nx+1
+  endif
+  if (Wtype(xi-1,yj,zk)==0) then
+   n1=n1+1
+   nx=nx+1
+  endif
+  if (Wtype(xi,yj+1,zk)==0) then
+   n1=n1+1
+   ny=ny+1
+  endif
+  if (Wtype(xi,yj-1,zk)==0) then
+   n1=n1+1
+   ny=ny+1
+  endif
+  if (Wtype(xi,yj,zk+1)==0) then
+   n1=n1+1
+   nz=nz+1
+  endif
+  if (Wtype(xi,yj,zk-1)==0) then
+   n1=n1+1
+   nz=nz+1
+  endif
+
   if (dirx/=0) n2=n2+1
   if (diry/=0) n2=n2+1
   if (dirz/=0) n2=n2+1
+
   if (n1>n2) then
    IBP%interp=0
    IBP%distx=0
@@ -1538,6 +1696,19 @@ contains
    IBP%dirz=0
   endif
 
+  if (nx>1.or.ny>1.or.nz>1) then
+   IBP%interp=0
+   IBP%interpdir=0
+   IBP%distx=0
+   IBP%disty=0
+   IBP%distz=0
+   dirx=0
+   diry=0
+   dirz=0
+   IBP%dirx=0
+   IBP%diry=0
+   IBP%dirz=0
+  endif
 
   
   if ((dirx==0.and.diry==0.and.dirz==0).or.((.not.free001).and.(.not.free010).and.(.not.free100))) then
@@ -1655,7 +1826,7 @@ contains
 
   subroutine GeTScalIFlBPoint(IBP,xi,yj,zk)
   type(TScalFlIBPoint),intent(out):: IBP
-  integer,intent(in):: xi,yj,zk
+  integer,intent(in):: xi,yj,zk               !grid coordinates of the forcing point
 
   type(TSolidBody),pointer:: SB
   integer dirx,diry,dirz,dirx2,diry2,dirz2,n1,n2
@@ -1663,7 +1834,7 @@ contains
   logical freep00,free0p0,free00p,freem00,free0m0,free00m
 
 
-  x=xPr(xi)
+  x=xPr(xi)                                   !physical coordinates of the forcing point
   y=yPr(yj)
   z=zPr(zk)
   call SetCurrentSB(SB,Prtype(xi,yj,zk))
@@ -1672,47 +1843,51 @@ contains
   IBP%x=xi
   IBP%y=yj
   IBP%z=zk
-  distx=xnear-x
+
+  distx=xnear-x                               !distance to the nearest point on the boundary
   disty=ynear-y
   distz=znear-z
-  dirx=nint(sign(1.0_KND,distx))
+  dirx=nint(sign(1.0_KND,distx))              !direction to the boundary point
   diry=nint(sign(1.0_KND,disty))
   dirz=nint(sign(1.0_KND,distz))
 
-  if (abs(distx)<(xPr(xi+1)-xPr(xi-1))/20._KND) then
+
+  if (abs(distx)<(xPr(xi+1)-xPr(xi-1))/100._KND) then  !If very close to the boundary, set the boundary here
    distx=0
    dirx=0
   endif
-  if (abs(disty)<(yPr(yj+1)-yPr(yj-1))/20._KND) then
+  if (abs(disty)<(yPr(yj+1)-yPr(yj-1))/100._KND) then
    disty=0
    diry=0
   endif
-  if (abs(distz)<(zW(zk+1)-zW(zk-1))/20._KND) then
+  if (abs(distz)<(zW(zk+1)-zW(zk-1))/100._KND) then
    distz=0
    dirz=0
   endif
 
-  freep00=.not.SolidBodyInt(xPr(xi+1),yPr(yj),zPr(zk),SB)
-  free0p0=.not.SolidBodyInt(xPr(xi),yPr(yj+1),zPr(zk),SB)
-  free00p=.not.SolidBodyInt(xPr(xi),yPr(yj),zPr(zk+1),SB)
-  freem00=.not.SolidBodyInt(xPr(xi-1),yPr(yj),zPr(zk),SB)
-  free0m0=.not.SolidBodyInt(xPr(xi),yPr(yj-1),zPr(zk),SB)
-  free00m=.not.SolidBodyInt(xPr(xi),yPr(yj),zPr(zk-1),SB)
+  freep00=(Prtype(xi+1,yj,zk)==0)   !logicals denoting if the cell in plus x direction is free of SB
+  freem00=(Prtype(xi-1,yj,zk)==0)
+  free0p0=(Prtype(xi,yj+1,zk)==0)
+  free0m0=(Prtype(xi,yj-1,zk)==0)
+  free00p=(Prtype(xi,yj,zk+1)==0)
+  free00m=(Prtype(xi,yj,zk-1)==0)
 
   n1=0
   n2=0
-  if (.not.SolidBodyInt(xPr(xi+1),yPr(yj),zPr(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi-1),yPr(yj),zPr(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi),yPr(yj+1),zPr(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi),yPr(yj-1),zPr(zk),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi),yPr(yj),zPr(zk+1),SB)) n1=n1+1
-  if (.not.SolidBodyInt(xPr(xi),yPr(yj),zPr(zk-1),SB)) n1=n1+1
+  if (freep00) n1=n1+1
+  if (free0p0) n1=n1+1
+  if (free00p) n1=n1+1
+  if (freem00) n1=n1+1
+  if (free0m0) n1=n1+1
+  if (free00m) n1=n1+1
+
   if (dirx/=0) n2=n2+1
   if (diry/=0) n2=n2+1
   if (dirz/=0) n2=n2+1
-  if (n1>n2) then
-   IBP%interp=0
-   distx=0
+
+  if (n1>n2.or.(freep00.and.freem00).or.(free0p0.and.free0m0).or.(free00p.and.free00m)) then
+   IBP%interp=0    !If moore free spaces than directions, or free space in both oposite directions,
+   distx=0         !Assume is an unresolvably small feature and treat as on the boundary.
    disty=0
    distz=0
    dirx=0
@@ -1724,34 +1899,40 @@ contains
   endif
 
 
-  if (dirx==0.and.diry==0.and.dirz==0) then
+  if (dirx==0.and.diry==0.and.dirz==0) then   !If dir>0 treat as on the boundary.
+
     dirx2=0
     diry2=0
     dirz2=0
-    if (freep00) dirx2=1
-    if (freem00) dirx2=-1
-    if (free0p0) diry2=1
-    if (free0m0) diry2=-1
-    if (free00p) dirz2=1
-    if (free00m) dirz2=-1
+    if (freep00) dirx2=dirx2+1     !Find a free neighbouring cell and interpolate from there.
+    if (freem00) dirx2=dirx2-1
+    if (free0p0) diry2=diry2+1
+    if (free0m0) diry2=diry2-1
+    if (free00p) dirz2=dirz2+1
+    if (free00m) dirz2=dirz2-1
     IBP%intpointi(1)=IBP%x+dirx2
     IBP%intpointj(1)=IBP%y+diry2
     IBP%intpointk(1)=IBP%z+dirz2
     IBP%intcoef=1._KND
     IBP%interp=1
     IBP%dist=sqrt((x-xPr(IBP%x+dirx2))**2+(y-yPr(IBP%y+diry2))**2+(z-zPr(IBP%z+dirz2))**2)
-  elseif (n2==1) then
+
+  elseif (n2==1) then     !Only one free point outside, interpolate from there.
+
     IBP%intpointi(1)=IBP%x+dirx
     IBP%intpointj(1)=IBP%y+diry
     IBP%intpointk(1)=IBP%z+dirz
     IBP%intcoef=1._KND
     IBP%interp=1
     IBP%dist=sqrt((x-xPr(IBP%x+dirx))**2+(y-yPr(IBP%y+diry))**2+(z-zPr(IBP%z+dirz))**2)
-  elseif (n2==2) then
-   if (dirx==0) then
-    if (abs(disty/distz)>abs(yPr(yj+diry)-y)/abs(zPr(zk+dirz)-z)) then
-     t=(zPr(zk+dirz)-z)/distz
-     IBP%intpointi(1)=IBP%x
+
+  elseif (n2==2) then    !Two free directions, use bilinear interpolation in the plane contaning these two neigbours.
+
+   if (dirx==0) then     !plane yz
+
+    if (abs(disty/distz)>abs(yPr(yj+diry)-y)/abs(zPr(zk+dirz)-z)) then  !Which gridline dous the line from this point
+     t=(zPr(zk+dirz)-z)/distz                                           !to the boundary intersect? Then use the points
+     IBP%intpointi(1)=IBP%x                                             !on both ends of the grid line.
      IBP%intpointj(1)=IBP%y+diry
      IBP%intpointk(1)=IBP%z+dirz
      IBP%intcoef(1)=abs(disty*t)/abs(yPr(IBP%y+diry)-yPr(IBP%y))
@@ -1774,7 +1955,9 @@ contains
      IBP%interp=2
      IBP%dist=sqrt((disty*t)**2+(distz*t)**2)
     endif
-   elseif (diry==0) then
+
+   elseif (diry==0) then     !plane xz
+
     if (abs(distx/distz)>abs(xPr(xi+dirx)-x)/abs(zPr(zk+dirz)-z)) then
      t=(zPr(zk+dirz)-z)/distz
      IBP%intpointi(1)=IBP%x+dirx
@@ -1800,7 +1983,9 @@ contains
      IBP%interp=2
      IBP%dist=sqrt((distx*t)**2+(distz*t)**2)
     endif
-   else
+
+   else                 !plane xy
+
     if (abs(distx/disty)>abs(xPr(xi+dirx)-x)/abs(yPr(yj+diry)-y)) then
      t=(yPr(yj+diry)-y)/disty
      IBP%intpointi(1)=IBP%x+dirx
@@ -1827,8 +2012,10 @@ contains
      IBP%dist=sqrt((distx*t)**2+(disty*t)**2)
     endif
    endif
-  else
-   tx=(xPr(xi+dirx)-x)/distx
+
+  else                         !more than two free directions
+
+   tx=(xPr(xi+dirx)-x)/distx   !a vector pointing from a free point to this forcing point.
    ty=(yPr(yj+diry)-y)/disty
    tz=(zPr(zk+dirz)-z)/distz
 
@@ -1906,6 +2093,7 @@ contains
     IBP%intcoef(4)=(1-abs(distx*tz)/abs(xPr(xi+dirx)-x))*&
                               (1-abs(disty*tz)/abs(yPr(yj+diry)-y))
    endif
+
   endif
   endsubroutine GeTScalIFlBPoint
 
@@ -1983,8 +2171,8 @@ contains
 
   if (h0<=h1-h0) then
    IBLinInt=-(h0/(h1-h0))*vel1
-  elseif  (h1-h0<h1/10._KND) then
-   IBLinInt= 0
+!   elseif  (h1-h0<h1/10._KND) then
+!    IBLinInt= 0
   else   
    IBLinInt=-((h2-2*h0)*vel1+(2*h0-h1)*vel2)/(h2-h1)
   endif

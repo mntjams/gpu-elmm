@@ -825,9 +825,11 @@ contains
     delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
 
 
-    where(Utype>0) U2=0
-    where(Vtype>0) V2=0
-    where(Wtype>0) W2=0
+!     where(Utype>0) U2=0
+!     where(Vtype>0) V2=0
+!     where(Wtype>0) W2=0
+
+    call NullInterior(U2,V2,W2)
 
     U=U2
     V=V2
@@ -1207,7 +1209,7 @@ contains
     else
      intvel=0
     endif
-intvel=intvel*.9
+
     if (IBP%component==1) then
      IBP%MSourc=(intvel-U(x,y,z))/dt
     elseif (IBP%component==2) then
@@ -2254,9 +2256,9 @@ intvel=intvel*.9
    do k=1,Unz
     do j=1,Uny
      do i=1,Unx
-      if (Utype(i,j,k)>0.and.Utype(i,j,k+1)==Utype(i,j,k).and.Utype(i,j,k-1)==Utype(i,j,k)&
-          .and.Utype(i,j-1,k)==Utype(i,j,k).and.Utype(i,j+1,k)==Utype(i,j,k)&
-          .and.Utype(i-1,j,k)==Utype(i,j,k).and.Utype(i+1,j,k)==Utype(i,j,k).and.Utype(i,j,k+1)==Utype(i,j,k))  U(i,j,k)=0
+      if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
+          .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
+          .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  U(i,j,k)=0
      enddo
     enddo
    enddo
@@ -2264,9 +2266,9 @@ intvel=intvel*.9
    do k=1,Vnz
     do j=1,Vny
      do i=1,Vnx
-      if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)==Vtype(i,j,k).and.Vtype(i,j,k-1)==Vtype(i,j,k)&
-          .and.Vtype(i,j-1,k)==Vtype(i,j,k).and.Vtype(i,j+1,k)==Vtype(i,j,k)&
-          .and.Vtype(i-1,j,k)==Vtype(i,j,k).and.Vtype(i+1,j,k)==Vtype(i,j,k).and.Vtype(i,j,k+1)==Vtype(i,j,k))  V(i,j,k)=0
+      if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
+          .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
+          .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  V(i,j,k)=0
      enddo
     enddo
    enddo
@@ -2274,9 +2276,9 @@ intvel=intvel*.9
    do k=1,Wnz
     do j=1,Wny
      do i=1,Wnx
-      if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)==Wtype(i,j,k).and.Wtype(i,j,k-1)==Wtype(i,j,k)&
-          .and.Wtype(i,j-1,k)==Wtype(i,j,k).and.Wtype(i,j+1,k)==Wtype(i,j,k)&
-          .and.Wtype(i-1,j,k)==Wtype(i,j,k).and.Wtype(i+1,j,k)==Wtype(i,j,k).and.Wtype(i,j,k+1)==Wtype(i,j,k))  W(i,j,k)=0
+      if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
+          .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
+          .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  W(i,j,k)=0
      enddo
     enddo
    enddo
