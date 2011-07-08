@@ -910,7 +910,7 @@ contains
     do k=0,Unz+1
      do j=0,Uny+1
        do i=0,Unx+1
-          if (SolidBodyInt(xU(i),yPr(j),zPr(k),CurrentSB,max(dxU(i),dyPr(j),dzPr(k))/10._KND)) Utype(i,j,k)=CurrentSB%numofbody
+          if (SolidBodyInt(xU(i),yPr(j),zPr(k),CurrentSB,max(dxU(i),dyPr(j),dzPr(k))/5._KND)) Utype(i,j,k)=CurrentSB%numofbody
        enddo
       enddo
      enddo
@@ -926,7 +926,7 @@ contains
      do k=0,Vnz+1
       do j=0,Vny+1
        do i=0,Vnx+1
-          if (SolidBodyInt(xPr(i),yV(j),zPr(k),CurrentSB,max(dxPr(i),dyV(j),dzPr(k))/10._KND)) Vtype(i,j,k)=CurrentSB%numofbody
+          if (SolidBodyInt(xPr(i),yV(j),zPr(k),CurrentSB,max(dxPr(i),dyV(j),dzPr(k))/5._KND)) Vtype(i,j,k)=CurrentSB%numofbody
        enddo
       enddo
      enddo
@@ -942,7 +942,7 @@ contains
      do k=0,Wnz+1
       do j=0,Wny+1
        do i=0,Wnx+1
-          if (SolidBodyInt(xPr(i),yPr(j),zW(k),CurrentSB,max(dxPr(i),dyPr(j),dzW(k))/10._KND)) Wtype(i,j,k)=CurrentSB%numofbody
+          if (SolidBodyInt(xPr(i),yPr(j),zW(k),CurrentSB,max(dxPr(i),dyPr(j),dzW(k))/5._KND)) Wtype(i,j,k)=CurrentSB%numofbody
        enddo
       enddo
      enddo

@@ -436,7 +436,7 @@ implicit none
       exit
     endif
 
-    if (dt<abs(CFL*dxmin/Uinlet/100._KND)) then
+    if (dt<abs(CFL*dxmin/Uinlet/30._KND)) then
       write (*,*) "Solution diverged."
       exit
     endif  

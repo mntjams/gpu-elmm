@@ -366,9 +366,7 @@ contains
     delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
 
 
-    where(Utype>0) U2=0
-    where(Vtype>0) V2=0
-    where(Wtype>0) W2=0
+    call NullInterior(U2,V2,W2)
 
     U=U2
     V=V2
@@ -598,6 +596,7 @@ contains
    temperature=temperature2
   endif
   
+  call NullInterior(U2,V2,W2)
   
   delta=sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
   delta=delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
@@ -825,11 +824,10 @@ contains
     delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
 
 
-!     where(Utype>0) U2=0
-!     where(Vtype>0) V2=0
-!     where(Wtype>0) W2=0
-
     call NullInterior(U2,V2,W2)
+    where(Utype>0) U2=0
+    where(Vtype>0) V2=0
+    where(Wtype>0) W2=0
 
     U=U2
     V=V2
@@ -1073,7 +1071,6 @@ contains
      endif
 
      intvel=IBLinInt(p0,p1,p2,vel1,vel2)
-
 
     elseif (IBP%interp==2) then
      if (IBP%component==1) then

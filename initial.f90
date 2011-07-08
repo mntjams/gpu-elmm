@@ -341,7 +341,7 @@ contains
   endif
   close(11)
 
-  if (poissmet==4.or.poissmet==5) then
+  if (poissmet==3.or.poissmet==4.or.poissmet==5) then
     open(11,file="mgopts.conf",status="OLD",action="READ")
     read (11,fmt='(/)')
     read (11,*) lmg
@@ -365,7 +365,7 @@ contains
     read (11,*) mgepsinnerGS
     close(11)
 
-    if (poissmet==4) then
+    if (poissmet==3.or.poissmet==4) then
       if (Prny==1) then
        call SetMGParams2d(llmg=lmg,lminmglevel=minmglevel,lbnx=bnx,lbnz=bnz,&
                           lmgncgc=mgncgc,lmgnpre=mgnpre,lmgnpost=mgnpost,&

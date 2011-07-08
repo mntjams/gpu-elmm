@@ -157,8 +157,21 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
        RHS2=RHS
        call POISSFISH(Phi,RHS)
 
+       Phiref=Phi(Prnx/2,Prny/2,Prnz/2)
+       do k=1,Prnz
+        do j=1,Prny
+         do i=1,Prnx
+          Phi(i,j,k)=Phi(i,j,k)-Phiref
+         enddo
+        enddo
+       enddo
+
        RHS=RHS2
-       call POISSSOR(Phi,RHS)
+       if (Prny==1) then
+        call POISSMG2d(Phi,RHS)
+       else
+        call POISSMG(Phi,RHS)
+       endif
 
    elseif (poissmet==4) then
 
