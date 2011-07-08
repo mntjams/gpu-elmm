@@ -1201,7 +1201,11 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
+       if (Prtype(i,j,k)==0) then
         write (11,*) Pr(i,j,k)
+       else
+        write (11,*) 0.
+       endif
       enddo
      enddo
     enddo
@@ -1214,7 +1218,11 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
+       if (Prtype(i,j,k)==0) then
         write (11,*) Lambda2(i,j,k,U,V,W)
+       else
+        write (11,*) 0.
+       endif
       enddo
      enddo
     enddo 
@@ -1229,7 +1237,11 @@ endif
      do k=1,Prnz
       do j=1,Prny
        do i=1,Prnx
+        if (Prtype(i,j,k)==0) then
          write (11,*) SCALAR(i,j,k,l)
+        else
+         write (11,*) 0.
+        endif
        enddo
       enddo
      enddo
@@ -1241,7 +1253,11 @@ endif
      do k=1,Prnz
       do j=1,Prny
        do i=1,Prnx
+        if (Prtype(i,j,k)==0) then
          write (11,*) SUM(SCALAR(i,j,k,:))
+        else
+         write (11,*) 0.
+        endif
        enddo
       enddo
      enddo
@@ -1255,7 +1271,11 @@ endif
       do k=1,Prnz
        do j=1,Prny
         do i=1,Prnx
+         if (Prtype(i,j,k)==0) then
           write (11,*) Temperature(i,j,k)
+         else
+          write (11,*) 0.
+         endif
         enddo
        enddo
       enddo 
@@ -1268,7 +1288,11 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
+       if (Prtype(i,j,k)==0) then
         write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
+       else
+        write (11,*) 0.,0.,0.
+       endif
       enddo
      enddo
     enddo
@@ -1280,12 +1304,16 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
+       if (Prtype(i,j,k)==0) then
         write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                        -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
                      (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
                        -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),&
                      (V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
                         -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin)
+       else
+        write (11,*) 0.,0.,0.
+       endif
       enddo
      enddo
     enddo
@@ -1352,7 +1380,11 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
+       if (Prtype(i,j,k)==0) then
         write (11,*) Pr(i,j,k)
+       else
+        write (11,*) 0.
+       endif
       enddo
      enddo
     enddo
@@ -1365,7 +1397,11 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
+       if (Prtype(i,j,k)==0) then
         write (11,*) Lambda2(i,j,k,U,V,W)
+       else
+        write (11,*) 0.
+       endif
       enddo
      enddo
     enddo 
@@ -1380,7 +1416,11 @@ endif
      do k=mink,maxk
       do j=minj,maxj
        do i=mini,maxi
+        if (Prtype(i,j,k)==0) then
          write (11,*) SCALAR(i,j,k,l)
+        else
+         write (11,*) 0.
+        endif
        enddo
       enddo
      enddo
@@ -1392,7 +1432,11 @@ endif
      do k=mink,maxk
       do j=minj,maxj
        do i=mini,maxi
+        if (Prtype(i,j,k)==0) then
          write (11,*) SUM(SCALAR(i,j,k,:))
+        else
+         write (11,*) 0.
+        endif
        enddo
       enddo
      enddo
@@ -1406,7 +1450,11 @@ endif
      do k=mink,maxk
       do j=minj,maxj
        do i=mini,maxi
+        if (Prtype(i,j,k)==0) then
          write (11,*) Temperature(i,j,k)
+        else
+         write (11,*) 0.
+        endif
        enddo
       enddo
      enddo 
@@ -1419,7 +1467,11 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
+       if (Prtype(i,j,k)==0) then
         write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
+       else
+        write (11,*) 0.,0.,0.
+       endif
       enddo
      enddo
     enddo
@@ -1431,12 +1483,16 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
+       if (Prtype(i,j,k)==0) then
         write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                         -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
                      (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
                        -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),&
                      (V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
                        -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin)
+       else
+        write (11,*) 0.,0.,0.
+       endif
       enddo
      enddo
     enddo
@@ -1482,7 +1538,17 @@ endif
    if (outputframePr) then
     write (20) "SCALARS p float",lf
     write (20) "LOOKUP_TABLE default",lf
-    write (20) (((real(Pr(1:Prnx,1:Prny,1:Prnz),SNG),i=1,Prnx),j=1,Prny),k=1,Prnz)
+    do k=1,Prnz
+     do j=1,Prny
+      do i=1,Prnx
+       if (Prtype(i,j,k)==0) then
+        write (20) real(Pr(1:Prnx,1:Prny,1:Prnz),SNG)
+       else
+        write (20) 0._SNG
+       endif
+      enddo
+     enddo
+    enddo
     write (20) lf
    endif
   
@@ -1492,7 +1558,11 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
+       if (Prtype(i,j,k)==0) then
         write (20) real(Lambda2(i,j,k,U,V,W),SNG)
+       else
+        write (20) 0._SNG
+       endif
       enddo
      enddo
     enddo 
@@ -1507,7 +1577,11 @@ endif
      do k=1,Prnz
       do j=1,Prny
        do i=1,Prnx
+        if (Prtype(i,j,k)==0) then
          write (20) real(SCALAR(i,j,k,l),SNG)
+        else
+         write (20) 0._SNG
+        endif
        enddo
       enddo
      enddo
@@ -1519,7 +1593,11 @@ endif
      do k=1,Prnz
       do j=1,Prny
        do i=1,Prnx
+        if (Prtype(i,j,k)==0) then
          write (20) real(SUM(SCALAR(i,j,k,:)),SNG)
+        else
+         write (20) 0._SNG
+        endif
        enddo
       enddo
      enddo
@@ -1533,7 +1611,11 @@ endif
       do k=1,Prnz
        do j=1,Prny
         do i=1,Prnx
+         if (Prtype(i,j,k)==0) then
           write (20) real(Temperature(i,j,k),SNG)
+         else
+          write (20) 0._SNG
+         endif
         enddo
        enddo
       enddo 
@@ -1546,8 +1628,12 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
+       if (Prtype(i,j,k)==0) then
         write (20) real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG),real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG)&
          ,real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG)
+       else
+        write (20) 0._SNG,0._SNG,0._SNG
+       endif
       enddo
      enddo
     enddo
@@ -1559,12 +1645,16 @@ endif
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
+       if (Prtype(i,j,k)==0) then
         write (20) real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                        -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG),&
                      real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
                        -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG),&
                      real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
                         -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin),SNG)
+       else
+        write (20) 0._SNG,0._SNG,0._SNG
+       endif
       enddo
      enddo
     enddo
@@ -1631,7 +1721,11 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
+       if (Prtype(i,j,k)==0) then
         write (20) real(Pr(i,j,k),SNG)
+       else
+        write (20) 0._SNG
+       endif
       enddo
      enddo
     enddo
@@ -1644,7 +1738,11 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
+       if (Prtype(i,j,k)==0) then
         write (20) real(Lambda2(i,j,k,U,V,W),SNG)
+       else
+        write (20) 0._SNG
+       endif
       enddo
      enddo
     enddo 
@@ -1659,7 +1757,11 @@ endif
      do k=mink,maxk
       do j=minj,maxj
        do i=mini,maxi
+        if (Prtype(i,j,k)==0) then
          write (20) real(SCALAR(i,j,k,l),SNG)
+        else
+         write (20) 0._SNG
+        endif
        enddo
       enddo
      enddo
@@ -1671,7 +1773,11 @@ endif
      do k=mink,maxk
       do j=minj,maxj
        do i=mini,maxi
+        if (Prtype(i,j,k)==0) then
          write (20) real(SUM(SCALAR(i,j,k,:)),SNG)
+        else
+         write (20) 0._SNG
+        endif
        enddo
       enddo
      enddo
@@ -1685,7 +1791,11 @@ endif
      do k=mink,maxk
       do j=minj,maxj
        do i=mini,maxi
+        if (Prtype(i,j,k)==0) then
          write (20) real(Temperature(i,j,k),SNG)
+        else
+         write (20) 0._SNG
+        endif
        enddo
       enddo
      enddo 
@@ -1698,8 +1808,12 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
+       if (Prtype(i,j,k)==0) then
         write (20) real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG),real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG)&
          ,real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG)
+       else
+        write (20) 0._SNG,0._SNG,0._SNG
+       endif
       enddo
      enddo
     enddo
@@ -1711,12 +1825,16 @@ endif
     do k=mink,maxk
      do j=minj,maxj
       do i=mini,maxi
+       if (Prtype(i,j,k)==0) then
         write (20) real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                         -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG),&
                      real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
                        -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG),&
                      real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
                        -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin),SNG)
+       else
+        write (20) 0._SNG,0._SNG,0._SNG
+       endif
       enddo
      enddo
     enddo

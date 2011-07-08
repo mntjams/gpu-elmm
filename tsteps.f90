@@ -825,9 +825,6 @@ contains
 
 
     call NullInterior(U2,V2,W2)
-    where(Utype>0) U2=0
-    where(Vtype>0) V2=0
-    where(Wtype>0) W2=0
 
     U=U2
     V=V2
