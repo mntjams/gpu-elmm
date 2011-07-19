@@ -1950,38 +1950,50 @@ endif
   real(KND):: S, S2
   real(KND) Str(1:3,1:3)
   real(KND),allocatable,save::fp(:),ht(:),gp(:)
-  integer i,j,k
+  integer i,j,k,n
   integer,save:: called=0
 
    do k=0,Unz+1
     S=0
+    n=0
     do j=1,Uny
      do i=1,Unx
-      S=S+U(i,j,k)
+      if (Utype(i,j,k)==0) then
+       S=S+U(i,j,k)
+       n=n+1
+      endif
      enddo
     enddo
-    profU(k)=S/(Unx*Uny)
+    profU(k)=S/n
    enddo
   
    do k=1,Vnz+1
     S=0
+    n=0
     do j=1,Vny
      do i=1,Vnx
-      S=S+V(i,j,k)
+      if (Vtype(i,j,k)==0) then
+       S=S+V(i,j,k)
+       n=n+1
+      endif
      enddo
     enddo
-    profV(k)=S/(Vnx*Vny)
+    profV(k)=S/n
    enddo
   
   if (present(temperature)) then
    do k=1,Prnz
     S=0
+    n=0
     do j=1,Prny
      do i=1,Prnx
-      S=S+temperature(i,j,k)
+      if (Prtype(i,j,k)==0) then
+       S=S+temperature(i,j,k)
+       n=n+1
+      endif
      enddo
     enddo
-    profTemp(k)=S/(Prnx*Prny)
+    profTemp(k)=S/n
    enddo
   endif
    
@@ -1995,115 +2007,149 @@ endif
    do k=0,Prnz
     S=0
     S2=0
+    n=0
     do j=1,Uny
      do i=1,Unx
-      S=S+((ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))-((1-ht(k))*profU(k)+ht(k)*profU(k+1)))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))
-!(((U(i,j,k)+U(i-1,j,k))/2._KND)-profU(k))*(W(i,j,k)+W(i,j,k-1))/2._KND
+      if ((Utype(i,j,k+1)==0.or.Utype(i,j,k)==0).and.(Wtype(i+1,j,k)==0.or.Wtype(i,j,k)==0)) then
+       S=S+((ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))-((1-ht(k))*profU(k)+ht(k)*profU(k+1)))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))
+       n=n+1
+      endif
      enddo
     enddo
-    profuw(k)=S/(Unx*Uny)
+    profuw(k)=S/n
    enddo
    
    do k=0,Prnz
     S=0
+    n=0
     do j=1,Vny
      do i=1,Vnx
-      S=S+(ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)-(ht(k)*profV(k+1)+(1-ht(k))*profV(k)))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))
-!(((V(i,j,k)+V(i,j-1,k))/2._KND)-profV(k))*(W(i,j,k)+W(i,j,k-1))/2._KND
+      if ((Vtype(i,j,k+1)==0.or.Vtype(i,j,k)==0).and.(Wtype(i,j+1,k)==0.or.Wtype(i,j,k)==0)) then
+       S=S+(ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)-(ht(k)*profV(k+1)+(1-ht(k))*profV(k)))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))
+       n=n+1
+      endif
      enddo
     enddo
-    profvw(k)=S/(Vnx*Vny)
+    profvw(k)=S/n
    enddo
    
    do k=0,Prnz
     S=0
+    n=0
     do j=1,Uny
      do i=1,Unx
-      !call STRAINIJ(i,j,k,U,V,W,Str)
-      S=S-0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)!2*Str(1,3)*Visc(i,j,k)
-      !2*Str(2,3)*Visc(i,j,k)
+      if (Utype(i,j,k+1)==0.or.Utype(i,j,k)==0) then
+       S=S-0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)
+       n=n+1
+      endif
      enddo
     enddo
-    profuwsgs(k)=S/(Unx*Uny)
+    profuwsgs(k)=S/n
    enddo
    
    do k=0,Prnz
     S=0
+    n=0
     do j=1,Vny
      do i=1,Vnx
-      !call STRAINIJ(i,j,k,U,V,W,Str)
-      !2*Str(1,3)*Visc(i,j,k)
-      S=S-0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)!2*Str(2,3)*Visc(i,j,k)
+      if (Vtype(i,j,k+1)==0.or.Vtype(i,j,k)==0) then
+       S=S-0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)
+       n=n+1
+      endif
      enddo
     enddo
-    profvwsgs(k)=S/(Vnx*Vny)
+    profvwsgs(k)=S/n
    enddo
       
    do k=1,Unz
     S=0
     S2=0
+    n=0
     do j=1,Uny
      do i=1,Unx
-      S=S+(U(i,j,k)-profU(k))**2
+      if (Utype(i,j,k)==0) then
+       S=S+(U(i,j,k)-profU(k))**2
+       n=n+1
+      endif
      enddo
     enddo
-    profuu(k)=S/((Unx)*Uny)!(Unx*Uny)
+    profuu(k)=S/n
    enddo
 
    do k=1,Vnz
     S=0
     S2=0
+    n=0
     do j=1,Vny
      do i=1,Vnx
-      S=S+(V(i,j,k)-profV(k))**2
+      if (Vtype(i,j,k)==0) then
+       S=S+(V(i,j,k)-profV(k))**2
+       n=n+1
+      endif
      enddo
     enddo
-    profvv(k)=S/((Vnx)*Vny)!(Vnx*Vny)
+    profvv(k)=S/n
    enddo
 
    do k=0,Wnz
     S=0
     S2=0
+    n=0
     do j=1,Wny
      do i=1,Wnx
-      S=S+(W(i,j,k))**2
+      if (Wtype(i,j,k)==0) then
+       S=S+(W(i,j,k))**2
+       n=n+1
+      endif
      enddo
     enddo
-    profww(k)=S/((Wnx)*Wny)!(Wnx*Wny)
+    profww(k)=S/n
    enddo
 
   if (present(temperature)) then
    do k=0,Prnz
     S=0
     S2=0
+    n=0
     do j=1,Prny
      do i=1,Prnx
-      S=S+0.5_KND*(temperature(i,j,k+1)+temperature(i,j,k))*(W(i,j,k))
+      if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
+       S=S+0.5_KND*(temperature(i,j,k+1)+temperature(i,j,k))*(W(i,j,k))
+       n=n+1
+      endif
      enddo
     enddo
-    proftempfl(k)=S/((Prnx)*Prny)!(Prny*Prnx)
+    proftempfl(k)=S/n
    enddo
+
    do k=1,Prnz
     S=0
     S2=0
+    n=0
     do j=1,Prny
      do i=1,Prnx
-      S=S+(temperature(i,j,k)-profTemp(k))**2
+      if (Prtype(i,j,k)==0) then
+       S=S+(temperature(i,j,k)-profTemp(k))**2
+       n=n+1
+      endif
      enddo
     enddo
-    proftt(k)=S/((Prnx)*Prny)!(Prny*Prnx)
+    proftt(k)=S/n
    enddo
+
    do k=0,Prnz
     S=0
     S2=0
+    n=0
     do j=1,Prny
      do i=1,Prnx
-!       S=S-(temperature(i,j,k+1)-temperature(i,j,k-1))/((zPr(k+1)-zPr(k-1)))*Tdiff(i,j,k) ZKONTR FACTOR 2
-!         predelat vypocet subgrid clenu aby adpovidaly tomu, jak je vidi model
+      if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
         S=S-(0.5_KND*(TDiff(i,j,k+1)+TDiff(i,j,k))*(temperature(i,j,k+1)-temperature(i,j,k)))/dzW(k)
+        n=n+1
+      endif
      enddo
     enddo
-    proftempflsgs(k)=S/((Prnx)*Prny)!(Prny*Prnx)
+    proftempflsgs(k)=S/n
    enddo
   endif
   called=1

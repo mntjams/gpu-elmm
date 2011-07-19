@@ -944,146 +944,253 @@ contains
   pure subroutine BOUND_PASSSCALAR(SCAL)
   real(KND),intent(inout):: SCAL(-1:,-1:,-1:)
   integer i,j,k,nx,ny,nz
+
    nx=Prnx
    ny=Prny
    nz=Prnz
-
-
-   if (tasktype==7) then
-     do k=1,nz
-      do j=1,ny                      !Periodic BC
-       SCAL(0,j,k)=SCAL(nx,j,k)
+    if (ScalBtypeW==DIRICHLET) then
+      do k=1,nz
+       do j=1,ny
+        SCAL(0,j,k)=WsideScal-(SCAL(1,j,k)-WsideScal)
+        SCAL(-1,j,k)=WsideScal-(SCAL(2,j,k)-WsideScal)
+       enddo
       enddo
-     enddo
-   elseif (BtypeW==NOSLIP) then
+!   if (ScalBtypeW==DIRICHLET) then
+!     do k=1,nz
+!      do j=1,ny
+!       SCAL(0,j,k)=Scalin(j,k)!-(SCAL(1,j,k)-WsideScal)
+!       SCAL(-1,j,k)=Scalin(j,k)!-(SCAL(2,j,k)-WsideScal)
+!      enddo
+!     enddo
+   else if (ScalBtypeW==PERIODIC) then
     do k=1,nz
-     do j=1,ny                      !No flux on noslip
-      SCAL(0,j,k)=SCAL(1,j,k)
-      SCAL(-1,j,k)=SCAL(1,j,k)
+     do j=1,ny
+      SCAL(0,j,k)=SCAL(nx,j,k)
+      SCAL(-1,j,k)=SCAL(nx-1,j,k)
+     enddo
+    enddo
+   else if (ScalBtypeW==NEUMANN) then
+    do k=1,nz
+     do j=1,ny
+      SCAL(0,j,k)=SCAL(1,j,k)-WsideScal*dxU(0)
+      SCAL(-1,j,k)=SCAL(1,j,k)-WsideScal*(dxU(0)+dxU(-1))
+     enddo
+    enddo
+   else if (ScalBtypeW==CONSTFLUX) then
+    do k=1,nz
+     do j=1,ny
+!       SCAL(0,j,k)=(SCAL(1,j,k)*(U(0,j,k)/2._KND-(TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))+WsideScal)/&
+!                                   (U(0,j,k)/2._KND+(TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))
+      SCAL(0,j,k)=(SCAL(1,j,k)*((TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))+WsideScal)/&
+                                  ((TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))
+      SCAL(-1,j,k)=SCAL(0,j,k)-(SCAL(1,j,k)-SCAL(0,j,k))
      enddo
     enddo
    else
     do k=1,nz
-     do j=1,ny                      !Other BCs
-      SCAL(0,j,k)=0
-      SCAL(-1,j,k)=0
+     do j=1,ny
+      SCAL(0,j,k)=SCAL(1,j,k)-WsideScal*dxU(0)
+      SCAL(-1,j,k)=SCAL(1,j,k)-WsideScal*(dxU(0)+dxU(-1))
      enddo
     enddo
    endif
 
-   if (tasktype==7) then
-     do k=1,nz
-      do j=1,ny                      !Periodic BC
-       SCAL(nx+1,j,k)=SCAL(1,j,k)
-      enddo
-     enddo
-   elseif (BtypeE==NOSLIP) then
+   if (ScalBtypeE==DIRICHLET) then
     do k=1,nz
-     do j=1,ny                      !No flux on noslip
-      SCAL(nx+1,j,k)=SCAL(nx,j,k)
-      SCAL(nx+2,j,k)=SCAL(nx,j,k)
+     do j=1,ny
+      SCAL(nx+1,j,k)=EsideScal-(SCAL(nx,j,k)-EsideScal)
+      SCAL(nx+2,j,k)=EsideScal-(SCAL(nx-1,j,k)-EsideScal)
+     enddo
+    enddo
+   else if (ScalBtypeE==PERIODIC) then
+    do k=1,nz
+     do j=1,ny
+      SCAL(nx+1,j,k)=SCAL(1,j,k)
+      SCAL(nx+2,j,k)=SCAL(2,j,k)
+     enddo
+    enddo
+   else if (ScalBtypeE==NEUMANN) then
+    do k=1,nz
+     do j=1,ny
+      SCAL(nx+1,j,k)=SCAL(nx,j,k)+EsideScal*dxU(nx+1)
+      SCAL(nx+2,j,k)=SCAL(nx,j,k)+EsideScal*(dxU(nx+1)+dxU(nx+2))
+     enddo
+    enddo
+   else if (ScalBtypeE==CONSTFLUX) then
+    do k=1,nz
+     do j=1,ny
+!       SCAL(nx+1,j,k)=(SCAL(nx,j,k)*(U(nx,j,k)/2._KND+(TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))+EsideScal)/&
+!        (-U(nx,j,k)/2._KND+(TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))
+      SCAL(nx+1,j,k)=(SCAL(nx,j,k)*((TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))+EsideScal)/&
+       ((TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))
+      SCAL(nx+2,j,k)=SCAL(nx+1,j,k)-(SCAL(nx,j,k)-SCAL(nx+1,j,k))
      enddo
     enddo
    else
     do k=1,nz
-     do j=1,ny                      !Other BCs
-      SCAL(nx+1,j,k)=SCAL(nx,j,k)
-      SCAL(nx+2,j,k)=SCAL(nx,j,k)
+     do j=1,ny
+      SCAL(nx+1,j,k)=SCAL(nx,j,k)+EsideScal*dxU(nx+1)
+      SCAL(nx+2,j,k)=SCAL(nx,j,k)+EsideScal*(dxU(nx+1)+dxU(nx+2))
      enddo
     enddo
    endif
 
-   if (BtypeS==PERIODIC) then
+
+   if (ScalBtypeS==DIRICHLET) then
     do k=1,nz
-     do i=-1,nx+2                      !Periodic BC
+     do i=-1,nx+2
+      SCAL(i,0,k)=SsideScal-(SCAL(i,1,k)-SsideScal)
+      SCAL(i,-1,k)=SsideScal-(SCAL(i,2,k)-SsideScal)
+     enddo
+    enddo
+   else if (ScalBtypeS==PERIODIC) then
+    do k=1,nz
+     do i=-1,nx+2
       SCAL(i,0,k)=SCAL(i,ny,k)
       SCAL(i,-1,k)=SCAL(i,ny-1,k)
      enddo
     enddo
-   elseif (BtypeS==NOSLIP) then
+   else if (ScalBtypeS==NEUMANN) then
     do k=1,nz
-     do i=-1,nx+2                      !No flux on noslip
-      SCAL(i,0,k)=SCAL(i,1,k)
-      SCAL(i,-1,k)=SCAL(i,1,k)
+     do i=-1,nx+2
+      SCAL(i,0,k)=SCAL(i,1,k)-SsideScal*dyV(0)
+      SCAL(i,-1,k)=SCAL(i,1,k)-SsideScal*(dyV(0)+dyV(-1))
+     enddo
+    enddo
+   else if (ScalBtypeS==CONSTFLUX) then
+    do k=1,nz
+     do i=-1,nx+2
+!       SCAL(i,0,k)=(SCAL(i,1,k)*(V(i,0,k)/2._KND-(TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))+SsideScal)/&
+!                                   (V(i,0,k)/2._KND+(TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))
+      SCAL(i,0,k)=(SCAL(i,1,k)*((TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))+SsideScal)/&
+                                  ((TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))
+      SCAL(i,-1,k)=SCAL(i,0,k)-(SCAL(i,1,k)-SCAL(i,0,k))
      enddo
     enddo
    else
     do k=1,nz
-     do i=-1,nx+2                      !Other BCs
-      SCAL(i,0,k)=SCAL(i,1,k)
-      SCAL(i,-1,k)=SCAL(i,1,k)
+     do i=-1,nx+2
+      SCAL(i,0,k)=SCAL(i,1,k)-SsideScal*dyV(0)
+      SCAL(i,-1,k)=SCAL(i,1,k)-SsideScal*(dyV(0)+dyV(-1))
      enddo
     enddo
-   endif 
+   endif
 
-   if (BtypeN==PERIODIC) then
+   if (ScalBtypeN==DIRICHLET) then
     do k=1,nz
-     do i=-1,nx+2                      !Periodic BC
+     do i=-1,nx+2
+       SCAL(i,ny+1,k)=NsideScal-(SCAL(i,ny,k)-NsideScal)
+       SCAL(i,ny+2,k)=NsideScal-(SCAL(i,ny-1,k)-NsideScal)
+      enddo
+     enddo
+   else if (ScalBtypeN==PERIODIC) then
+    do k=1,nz
+     do i=-1,nx+2
       SCAL(i,ny+1,k)=SCAL(i,1,k)
       SCAL(i,ny+2,k)=SCAL(i,2,k)
      enddo
     enddo
-   elseif (BtypeN==NOSLIP) then
+   else if (ScalBtypeN==NEUMANN) then
     do k=1,nz
-     do i=-1,nx+2                      !No flux on noslip
-      SCAL(i,ny+1,k)=SCAL(i,ny,k)
-      SCAL(i,ny+2,k)=SCAL(i,ny,k)
+     do i=-1,nx+2
+      SCAL(i,ny+1,k)=SCAL(i,ny,k)+NsideScal*dyV(ny+1)
+      SCAL(i,ny+2,k)=SCAL(i,ny,k)+NsideScal*(dyV(ny+1)+dyV(ny+2))
+     enddo
+    enddo
+   else if (ScalBtypeN==CONSTFLUX) then
+    do k=1,nz
+     do i=-1,nx+2
+!       SCAL(i,ny+1,k)=(SCAL(i,ny,k)*(V(i,ny,k)/2._KND+(TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))+NsideScal)/&
+!        (-V(i,ny,k)/2._KND+(TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))
+      SCAL(i,ny+1,k)=(SCAL(i,ny,k)*((TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))+NsideScal)/&
+       ((TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))
+      SCAL(i,ny+2,k)=SCAL(i,ny+1,k)-(SCAL(i,ny,k)-SCAL(i,ny+1,k))
      enddo
     enddo
    else
     do k=1,nz
-     do i=-1,nx+2                      !Other BCs
-      SCAL(i,ny+1,k)=SCAL(i,ny,k)
-      SCAL(i,ny+2,k)=SCAL(i,ny,k)
+     do i=-1,ny+2
+      SCAL(i,ny+1,k)=SCAL(i,ny,k)+NsideScal*dyV(ny+1)
+      SCAL(i,ny+2,k)=SCAL(i,ny,k)+NsideScal*(dyV(ny+1)+dyV(ny+2))
      enddo
     enddo
-   endif 
+   endif
 
-   if (BtypeB==PERIODIC) then
+
+
+    if (ScalBtypeB==DIRICHLET)  then
+     do j=-1,ny+2
+      do i=-1,nx+2
+       SCAL(i,j,0)=BsideScal-(SCAL(i,j,1)-BsideScal)
+       SCAL(i,j,-1)=BsideScal-(SCAL(i,j,2)-BsideScal)
+      enddo
+     enddo
+   else if (ScalBtypeB==PERIODIC) then
     do j=-1,ny+2
-     do i=-1,nx+2                      !Periodic BC
+     do i=-1,nx+2
       SCAL(i,j,0)=SCAL(i,j,nz)
       SCAL(i,j,-1)=SCAL(i,j,nz-1)
      enddo
     enddo
-   elseif (BtypeB==NOSLIP) then
+   else if (ScalBtypeB==NEUMANN) then
     do j=-1,ny+2
-     do i=-1,nx+2                      !No flux on noslip
-      SCAL(i,j,0)=SCAL(i,j,1)
-      SCAL(i,j,-1)=SCAL(i,j,1)
+     do i=-1,nx+2
+      SCAL(i,j,0)=SCAL(i,j,1)-BsideScal*dzW(0)
+      SCAL(i,j,-1)=SCAL(i,j,1)-BsideScal*(dzW(0)+dzW(-1))
+     enddo
+    enddo
+   else if (ScalBtypeB==CONSTFLUX.or.ScalBtypeB==DIRICHLET) then
+    do j=-1,ny+2
+     do i=-1,nx+2
+      SCAL(i,j,0)=SCAL(i,j,1)+BsideScal*dzW(0)/((TDiff(i,j,1)+TDiff(i,j,0))/(2._KND))
+      SCAL(i,j,-1)=SCAL(i,j,0)-(SCAL(i,j,1)-SCAL(i,j,0))
      enddo
     enddo
    else
     do j=-1,ny+2
-     do i=-1,nx+2                      !Other BCs
-      SCAL(i,j,0)=SCAL(i,j,1)
-      SCAL(i,j,-1)=SCAL(i,j,1)
+     do i=-1,nx+2
+      SCAL(i,j,0)=SCAL(i,j,1)-BsideScal*dzW(0)
+      SCAL(i,j,-1)=SCAL(i,j,1)-BsideScal*(dzW(0)+dzW(-1))
      enddo
     enddo
-   endif 
+   endif
 
-   if (BtypeT==PERIODIC) then
+   if (ScalBtypeT==DIRICHLET) then
     do j=-1,ny+2
-     do i=-1,nx+2                      !Periodic BC
+     do i=-1,nx+2
+       SCAL(i,j,nz+1)=TsideScal-(SCAL(i,j,nz)-TsideScal)
+       SCAL(i,j,nz+2)=TsideScal-(SCAL(i,j,nz-1)-TsideScal)
+      enddo
+     enddo
+   else if (ScalBtypeT==PERIODIC) then
+    do j=-1,ny+2
+     do i=-1,nx+2
       SCAL(i,j,nz+1)=SCAL(i,j,1)
       SCAL(i,j,nz+2)=SCAL(i,j,2)
      enddo
     enddo
-   elseif (BtypeT==NOSLIP) then
+   else if (ScalBtypeT==NEUMANN) then
     do j=-1,ny+2
-     do i=-1,nx+2                      !No flux on noslip
-      SCAL(i,j,nz+1)=SCAL(i,j,nz)
-      SCAL(i,j,nz+2)=SCAL(i,j,nz)
+     do i=-1,nx+2
+      SCAL(i,j,nz+1)=SCAL(i,j,nz)+TsideScal*dzW(nz+1)
+      SCAL(i,j,nz+2)=SCAL(i,j,nz)+TsideScal*(dzW(nz+1)+dzW(nz+2))
+     enddo
+    enddo
+   else if (ScalBtypeT==CONSTFLUX) then
+    do j=-1,ny+2
+     do i=-1,nx+2
+      SCAL(i,j,nz+1)=SCAL(i,j,nz)-TsideScal*dzW(nz)/((TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2._KND))
+      SCAL(i,j,nz+2)=SCAL(i,j,nz+1)-(SCAL(i,j,nz)-SCAL(i,j,nz+1))
      enddo
     enddo
    else
     do j=-1,ny+2
-     do i=-1,nx+2                      !Other BCs
-      SCAL(i,j,nz+1)=SCAL(i,j,nz)
-      SCAL(i,j,nz+2)=SCAL(i,j,nz)
+     do i=-1,nx+2
+      SCAL(i,j,nz+1)=SCAL(i,j,nz)+TsideScal*dzW(nz+1)
+      SCAL(i,j,nz+2)=SCAL(i,j,nz)+TsideScal*(dzW(nz+1)+dzW(nz+2))
      enddo
     enddo
-   endif 
+   endif
   end subroutine BOUND_PASSSCALAR
 
 
