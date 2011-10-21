@@ -522,10 +522,18 @@ contains
   endif
   
   dxmin=lx/(Prnx)
-  write (*,*) "dxmin ",dxmin
   dymin=ly/(Prny)
-  write (*,*) "dymin ",dymin
   dzmin=lz/(Prnz)
+
+  if (Prnx==1) then
+   dxmin=sqrt(dymin*dzmin)
+  elseif (Prny==1) then
+   dymin=sqrt(dxmin*dzmin)
+  elseif (Prnz==1) then
+   dzmin=sqrt(dxmin*dymin)
+  endif
+  write (*,*) "dxmin ",dxmin
+  write (*,*) "dymin ",dymin
   write (*,*) "dzmin ",dzmin
 
   write(*,*) "lx:",lx
