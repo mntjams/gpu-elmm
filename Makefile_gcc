@@ -27,10 +27,6 @@ all: $(TARGETDIR_CLMM)/CLMM
 
 ## Target: CLMM
 OBJS_CLMM =  \
-	$(TARGETDIR_CLMM)/mudcom.o \
-	$(TARGETDIR_CLMM)/mud3sp.o \
-	$(TARGETDIR_CLMM)/dmudcom.o \
-	$(TARGETDIR_CLMM)/dmud3sp.o \
 	$(TARGETDIR_CLMM)/fftpack.o \
 	$(TARGETDIR_CLMM)/pois3d.o \
 	$(TARGETDIR_CLMM)/hw3crt.o \
@@ -64,18 +60,6 @@ $(TARGETDIR_CLMM)/CLMM: $(TARGETDIR_CLMM) $(OBJS_CLMM) $(DEPLIBS_CLMM)
 
 
 # Compile source files into .o files
-$(TARGETDIR_CLMM)/mudcom.o: $(TARGETDIR_CLMM) ../MUDPACK-5.0.1/mudcom.f
-	$(COMPILE.f)   $(FFLAGS_CLMM)$(CPPFLAGS_CLMM)  -o $@ ../MUDPACK-5.0.1/mudcom.f
-
-$(TARGETDIR_CLMM)/mud3sp.o: $(TARGETDIR_CLMM) ../MUDPACK-5.0.1/mud3sp.f
-	$(COMPILE.f)  $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../MUDPACK-5.0.1/mud3sp.f
-
-$(TARGETDIR_CLMM)/dmudcom.o: $(TARGETDIR_CLMM) ../MUDPACK-dp/mudcom.f
-	$(COMPILE.f)  $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../MUDPACK-dp/mudcom.f
-
-$(TARGETDIR_CLMM)/dmud3sp.o: $(TARGETDIR_CLMM) ../MUDPACK-dp/mud3sp.f
-	$(COMPILE.f)  $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../MUDPACK-dp/mud3sp.f
-
 $(TARGETDIR_CLMM)/fftpack.o: $(TARGETDIR_CLMM) ../fishpack4/fftpack.f
 	$(COMPILE.f)  $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../fishpack4/fftpack.f
 
@@ -148,12 +132,6 @@ $(TARGETDIR_CLMM)/main.o: $(TARGETDIR_CLMM) main.f90
 clean:
 	rm -f \
 		$(TARGETDIR_CLMM)/CLMM \
-		$(TARGETDIR_CLMM)/mudcom.o \
-		$(TARGETDIR_CLMM)/mud3sp.o \
-		$(TARGETDIR_CLMM)/dmudcom.o \
-		$(TARGETDIR_CLMM)/dmud3sp.o \
-		$(TARGETDIR_CLMM)/fish.o \
-		$(TARGETDIR_CLMM)/comf.o \
 		$(TARGETDIR_CLMM)/fftpack.o \
 		$(TARGETDIR_CLMM)/pois3d.o \
 		$(TARGETDIR_CLMM)/hw3crt.o \
