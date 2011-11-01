@@ -5,6 +5,9 @@ use PARAMETERS
 
 implicit none
 
+ private
+ public WMPoint, AddWMPoint, FirstWMPoint, ComputeViscsWM, DeallWMP, InitTempFl
+
  type WMpoint   !points in which we apply wall model
 
   integer   :: x
@@ -287,7 +290,7 @@ implicit none
        ustar=vel/(log(abs(ustar0*dist*Re))/0.4_KND+5.2_KND)
      endif
     else
-     stop "The wall model need positive viscosity under roughness length."
+     stop "The wall model needs positive viscosity under roughness length."
     endif
 
    else

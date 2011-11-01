@@ -21,7 +21,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   real(KND),allocatable,dimension(:,:,:):: RHS,RHS2      !U,V,W velocity field for correction U(-2:Unx,-2:Uny,-2:Unz)
   real(KND),save,allocatable:: Phi(:,:,:)                !Pr(1:Prnx+1,1:Prny+1,Prnz+1) pressure
   real(KND) Phiref                                       !coef cofficient from Runge Kutta, Q mass sources from immersed boundary
-  real(DBL) dt2,dt3                                      !RHS right hand side of eq. with divergence of U
+  real(TIM) dt2,dt3                                      !RHS right hand side of eq. with divergence of U
   integer i,j,k                                          !Phi computed pseudopressure, saved as first guess for next time
   integer nx,ny,nz
   real(KND) S,S2,Apr
@@ -97,7 +97,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
    dt2=coef*dt
    if (Re>0)  then
-    dt3=coef*dt/(2._DBL*Re)
+    dt3=coef*dt/(2._TIM*Re)
    else
     dt3=0
    endif

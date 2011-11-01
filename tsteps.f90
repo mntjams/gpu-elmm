@@ -1,22 +1,23 @@
 module TSTEPS
 
-use UPWIND
-use CDS
-use LAXFRIED
-use LAXWEND
-use PARAMETERS
-use BOUNDARIES
-use POISSON
-use SMAGORINSKY
-use ScalarS
+  use UPWIND
+  use CDS
+  use LAXFRIED
+  use LAXWEND
+  use PARAMETERS
+  use BOUNDARIES
+  use POISSON
+  use SMAGORINSKY
+  use SCALARS
+  use TURBINLET, only: GetTurbInlet, GetInletFromFile
 
-implicit none
+  implicit none
 
 
-private
-public TMarchEul,TMarchAB2,TMarchRK2,TMarchRK3,TMarchShiftInlet
+  private
+  public TMarchEul,TMarchAB2,TMarchRK2,TMarchRK3,TMarchShiftInlet
 
-logical:: released=.false.
+  logical:: released=.false.
 
 contains
  subroutine TMarchEul(U,V,W,Pr,delta)
@@ -247,9 +248,9 @@ contains
        call KAPPAV(Vstar,U,V,W,1._KND)
        call KAPPAW(Wstar,U,V,W,1._KND)
       else
-       call CDU2(Ustar,U,V,W,1._KND)
-       call CDV2(Vstar,U,V,W,1._KND)
-       call CDW2(Wstar,U,V,W,1._KND)
+       call CDU(Ustar,U,V,W,1._KND)
+       call CDV(Vstar,U,V,W,1._KND)
+       call CDW(Wstar,U,V,W,1._KND)
       endif
 
       call CoriolisForce(Ustar,Vstar,U,V,1._KND)
@@ -435,9 +436,9 @@ contains
    U2(1:Unx,1:Uny,1:Unz)=0
    V2(1:Vnx,1:Vny,1:Vnz)=0
    W2(1:Wnx,1:Wny,1:Wnz)=0
-   call CDU2(U2,U,V,W,1._KND)
-   call CDV2(V2,U,V,W,1._KND)
-   call CDW2(W2,U,V,W,1._KND)
+   call CDU(U2,U,V,W,1._KND)
+   call CDV(V2,U,V,W,1._KND)
+   call CDW(W2,U,V,W,1._KND)
    call CoriolisForce(Ustar,Vstar,U,V,1._KND)
    if (buoyancy==1) call BuoyancyForce(Wstar,temperature,1._KND)
 
@@ -449,9 +450,9 @@ contains
    V2=0
    W2=0
 
-   call CDU2(U2,Ustar,Vstar,Wstar,0.5_KND)
-   call CDV2(V2,Ustar,Vstar,Wstar,0.5_KND)
-   call CDW2(W2,Ustar,Vstar,Wstar,0.5_KND)
+   call CDU(U2,Ustar,Vstar,Wstar,0.5_KND)
+   call CDV(V2,Ustar,Vstar,Wstar,0.5_KND)
+   call CDW(W2,Ustar,Vstar,Wstar,0.5_KND)
    call CoriolisForce(U2,V2,Ustar,Vstar,1._KND)
      if (buoyancy==1) call BuoyancyForce(W2,temperature,1._KND)
 
@@ -704,9 +705,9 @@ contains
        call KAPPAV(Vstar,U,V,W,1._KND)
        call KAPPAW(Wstar,U,V,W,1._KND)
       else
-       call CDU2(Ustar,U,V,W,1._KND)
-       call CDV2(Vstar,U,V,W,1._KND)
-       call CDW2(Wstar,U,V,W,1._KND)
+       call CDU(Ustar,U,V,W,1._KND)
+       call CDV(Vstar,U,V,W,1._KND)
+       call CDW(Wstar,U,V,W,1._KND)
       endif
 
       call CoriolisForce(Ustar,Vstar,U,V,1._KND)

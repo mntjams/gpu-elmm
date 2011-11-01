@@ -7,15 +7,14 @@
 
 
 module UPWIND
+
  use PARAMETERS
- use BOUNDARIES
+ use BOUNDARIES,only: Bound_CondU,Bound_CondV, Bound_CondW, Bound_Pr
+ use GEOMETRIC, only: TIBPoint,FirstIBPoint
+ use LIMITERS,  only: Limiter
+
  implicit none
 
- private minmod,minmod2,minmod3,superbee,limiter,heav,gamma,vanalbada,vanleer
-
- interface MINMOD
-         module procedure MINMOD2, MINMOD3
-  end interface
   real(KND),dimension(:,:,:),allocatable:: Uco,Vco,Wco,Ux,Uy,Uz,Vx,Vy,Vz,Wx,Wy,Wz,Ut,Vt,Wt
  contains
 
@@ -2492,90 +2491,7 @@ module UPWIND
   endsubroutine Bound_CondWco
 
 
-  elemental real(KND) function LIMITER(a,b,c)
-  real(KND),intent(in):: a,b,c
-  real(KND) R
-  real(KND),parameter:: epsil=0.00001_KND
-  
-  if (limitertype==minmodlim) then
-   LIMITER=MINMOD(a,b)
-  elseif (limitertype==extminmodlim) then
-   LIMITER=MINMOD(limparam*a,limparam*b,c)
-  elseif (limitertype==gammalim) then
-   if (abs(b)>epsil.and.abs(a)>epsil) then
-    R=a/b
-    LIMITER=b*GAMMA(R)
-   else
-    LIMITER=MINMOD(a,b)
-   endif
-  elseif (limitertype==vanalbadalim) then
-   if (abs(b)>epsil) then
-    R=a/b
-    LIMITER=b*VANALBADA(R)
-   else
-    LIMITER=MINMOD(a,b)
-   endif
-  elseif (limitertype==vanleerlim) then
-   if (abs(b)>epsil) then
-    R=a/b
-    LIMITER=b*VANLEER(R)
-   else
-    LIMITER=MINMOD(a,b)
-   endif
-  elseif (limitertype==superbeelim) then
-   if (abs(b)>epsil) then
-    R=a/b
-    LIMITER=b*SUPERBEE(R)
-   else
-    LIMITER=MINMOD(a,b)
-   endif
-  elseif (limitertype==0) then
-   LIMITER=0
-  else
-   LIMITER=(a+b)/2._KND
-  endif
-  endfunction LIMITER
 
-  elemental real(KND) function HEAV(x)
-  real(KND),intent(in):: x
-  HEAV=(1._KND+SIGN(1._KND,x))/2._KND
-  endfunction HEAV
-
-  elemental real(KND) function GAMMA(R)
-  real(KND),intent(in):: R
-  GAMMA=((1-limparam)/limparam)*R*(HEAV(R) - HEAV(r-(limparam/(1-limparam)))) + HEAV(r-(limparam/(1-limparam)))
-  endfunction GAMMA
-
-  elemental real(KND) function VANALBADA(R)
-  real(KND),intent(in):: R
-  VANALBADA=(R+R*R)/(1+R*R)
-  endfunction VANALBADA
-
-  elemental real(KND) function VANLEER(R)
-  real(KND),intent(in):: R
-  VANLEER=(R+abs(R))/(1+abs(R))
-  endfunction VANLEER
-
-  elemental real(KND) function SUPERBEE(R)
-  real(KND),intent(in):: R
-  SUPERBEE=MAX(0._KND,MAX(MIN(2*R,1._KND),MIN(R,2._KND)))
-  endfunction SUPERBEE
-
-  elemental real(KND) function MINMOD2(a,b)
-  real(KND),intent(in):: a,b
-      MINMOD2=(SIGN(1._KND,a)+SIGN(1._KND,b))*MIN(ABS(a),ABS(b))/2._KND
-  endfunction MINMOD2
-
-  elemental real(KND) function MINMOD3(a,b,c)
-  real(KND),intent(in):: a,b,c
-    if ((a>0).and.(b>0).and.(c>0)) then  
-        MINMOD3=MIN(a,b,c)
-    elseif ((a<0).and.(b<0).and.(c<0)) then
-        MINMOD3=MAX(a,b,c)
-    else
-        MINMOD3=0
-    endif
-  endfunction MINMOD3
 
 
 

@@ -1,7 +1,8 @@
 module MULTIGRID
 
-use PARAMETERS
-implicit none
+ use PARAMETERS
+
+ implicit none
 
  private
 

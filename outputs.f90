@@ -16,7 +16,7 @@ module OUTPUTS
                                       profuw,profuwavg,profuwsgs,profuwsgsavg,&
                                       profvw,profvwavg,profvwsgs,profvwsgsavg
  real(KND),allocatable:: Uavg(:,:,:),Vavg(:,:,:),Wavg(:,:,:),Pravg(:,:,:)
- real(DBL),allocatable,dimension(:):: times
+ real(TIM),allocatable,dimension(:):: times
  real(KND),allocatable,dimension(:):: Utime,Vtime,Wtime,Prtime,temptime,CDtime,CLtime,deltime,tke,dissip,dissip2
  real(KND),allocatable,dimension(:,:):: scaltime !which scalar, time
  real(KND),allocatable,dimension(:,:,:):: scalptime !which scalar, position, time

@@ -1,15 +1,11 @@
 module SCALARS
-use PARAMETERS
-use WALLMODELS
-use GEOMETRIC
+ use PARAMETERS
+ use WALLMODELS
+ use GEOMETRIC
+ use LIMITERS
 
 implicit none
  
-  private minmod,minmod2,minmod3,superbee,limiter,heav,GAMMAL,vanalbada,vanleer
-
-  interface MINMOD
-         module procedure MINMOD2, MINMOD3
-  end interface
 
   real(KND),allocatable,dimension(:,:,:,:):: SCALAR,SCALARavg  !last index is number of scalar (because of paging)
   real(KND),dimension(:),allocatable:: partdiam,partrho,percdistrib !diameter of particles <=0 for gas
@@ -1878,107 +1874,5 @@ contains
    Prt=debugparam!0.6_KND
 !   endif
   endfunction Prt
-
-
-
-  elemental real(KND) function FLUXLIMITER(r)
-  real(KND),intent(in):: r
-  real(KND) K
-
-  K=(1+2._KND*r)/3._KND  !assuming kappa=1/3 scheme (Koren, 1993; Hundsdorfer, 1994)
-  if (limparam>0) then
-   FLUXLIMITER=max(0._KND,min(2._KND*r,min(limparam,K)))
-  elseif (limparam<0) then
-   FLUXLIMITER=K
-  else
-   FLUXLIMITER=0
-  endif
-  endfunction FLUXLIMITER
-  
-
-  elemental real(KND) function LIMITER(a,b)
-  real(KND),intent(in):: a,b
-  real(KND) R
-  real(KND),parameter:: epsil=0.00001_KND
-  
-  if (limitertype==minmodlim) then
-   LIMITER=MINMOD(a,b)
-  elseif (limitertype==extminmodlim) then
-   LIMITER=MINMOD(limparam*a,limparam*b,(a+b)/2._KND)
-  elseif (limitertype==gammalim) then
-   if (abs(b)>epsil.and.abs(a)>epsil) then
-    R=a/b
-    LIMITER=b*GAMMAL(R)
-   else
-    LIMITER=MINMOD(a,b)
-   endif
-  elseif (limitertype==vanalbadalim) then
-   if (abs(b)>epsil) then
-    R=a/b
-    LIMITER=b*VANALBADA(R)
-   else
-    LIMITER=MINMOD(a,b)
-   endif
-  elseif (limitertype==vanleerlim) then
-   if (abs(b)>epsil) then
-    R=a/b
-    LIMITER=b*VANLEER(R)
-   else
-    LIMITER=MINMOD(a,b)
-   endif
-  elseif (limitertype==superbeelim) then
-   if (abs(b)>epsil) then
-    R=a/b
-    LIMITER=b*SUPERBEE(R)
-   else
-    LIMITER=MINMOD(a,b)
-   endif
-  elseif (limitertype==0) then
-   LIMITER=0
-  else
-   LIMITER=(a+b)/2._KND
-  endif
-  endfunction LIMITER
-
-  elemental real(KND) function HEAV(x)
-  real(KND),intent(in):: x
-  HEAV=(1._KND+SIGN(1._KND,x))/2._KND
-  endfunction HEAV
-
-  elemental real(KND) function GAMMAL(R)
-  real(KND),intent(in):: R
-  GAMMAL=((1-limparam)/limparam)*R*(HEAV(R) - HEAV(r-(limparam/(1-limparam)))) + HEAV(r-(limparam/(1-limparam)))
-  endfunction GAMMAL
-
-  elemental real(KND) function VANALBADA(R)
-  real(KND),intent(in):: R
-  VANALBADA=(R+R*R)/(1+R*R)
-  endfunction VANALBADA
-
-  elemental real(KND) function VANLEER(R)
-  real(KND),intent(in):: R
-  VANLEER=(R+abs(R))/(1+abs(R))
-  endfunction VANLEER
-
-  elemental real(KND) function SUPERBEE(R)
-  real(KND),intent(in):: R
-  SUPERBEE=MAX(0._KND,MAX(MIN(2*R,1._KND),MIN(R,2._KND)))
-  endfunction SUPERBEE
-
-  elemental real(KND) function MINMOD2(a,b)
-  real(KND),intent(in):: a,b
-      MINMOD2=(SIGN(1._KND,a)+SIGN(1._KND,b))*MIN(ABS(a),ABS(b))/2._KND
-  endfunction MINMOD2
-
-  elemental real(KND) function MINMOD3(a,b,c)
-  real(KND),intent(in):: a,b,c
-    if ((a>0).and.(b>0).and.(c>0)) then  
-        MINMOD3=MIN(a,b,c)
-    elseif ((a<0).and.(b<0).and.(c<0)) then
-        MINMOD3=MAX(a,b,c)
-    else
-        MINMOD3=0
-    endif
-  endfunction MINMOD3
 
 end module SCALARS

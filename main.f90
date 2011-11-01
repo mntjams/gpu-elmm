@@ -1,14 +1,16 @@
 program CLMM
-use TSTEPS
-use PARAMETERS
-use BOUNDARIES
-use INITIAL
-use OUTPUTS
-use SCALARS
-use GEOMETRIC
-use WALLMODELS
 
-implicit none
+ use TSTEPS
+ use PARAMETERS
+ use BOUNDARIES
+ use INITIAL
+ use OUTPUTS
+ use SCALARS
+ use GEOMETRIC
+ use WALLMODELS
+ use TURBINLET, only: ustarinlet
+
+ implicit none
 
 
 
@@ -452,86 +454,4 @@ implicit none
  call OUTPUT(U,V,W,Pr)
 
 
-
- deallocate(U,V,W,Pr,xU,yV,zW,xPr,yPr,zPr,dxU,dyV,dzW,dxPr,dyPr,dzPr)
- if (allocated(Utype))  deallocate(Utype)
- if (allocated(Vtype))  deallocate(Vtype)
- if (allocated(Wtype))  deallocate(Wtype)
- if (allocated(Prtype))  deallocate(Prtype)
- if (allocated(U))  deallocate(U)
- if (allocated(V))  deallocate(V)
- if (allocated(W))  deallocate(W)
- if (allocated(Pr))  deallocate(Pr)
- if (allocated(Uavg))  deallocate(Uavg)
- if (allocated(Vavg))  deallocate(Vavg)
- if (allocated(Wavg))  deallocate(Wavg)
- if (allocated(Pravg))  deallocate(Pravg)
- if (allocated(temperature))  deallocate(temperature)
- if (allocated(temperatureavg))  deallocate(temperatureavg)
- if (allocated(Scalar))  deallocate(Scalar)
- if (allocated(Scalaravg))  deallocate(Scalaravg)
- if (allocated(times)) deallocate(times)
- if (allocated(Utime)) deallocate(Utime)
- if (allocated(Vtime)) deallocate(Vtime)
- if (allocated(Wtime)) deallocate(Wtime)
- if (allocated(Prtime)) deallocate(Prtime)
- if (allocated(temptime)) deallocate(temptime)
- !if (allocated(Wtime)) deallocate(Wtime)
- if (allocated(CDtime)) deallocate(CDtime)
- if (allocated(CLtime)) deallocate(CLtime)
- if (allocated(deltime)) deallocate(deltime)
- if (allocated(tke)) deallocate(tke)
- if (allocated(dissip)) deallocate(dissip)
- if (allocated(dissip2)) deallocate(dissip2)
- if (allocated(Uin)) deallocate(Uin)
- if (allocated(Vin)) deallocate(Vin)
- if (allocated(Win)) deallocate(Win)
- if (allocated(ustarinlet))  deallocate(ustarinlet)
- if (allocated(transformtensor))  deallocate(transformtensor)
- if (allocated(bfilt)) deallocate(bfilt)
- if (allocated(Ru)) deallocate(Ru)
- if (allocated(Rv)) deallocate(Rv)
- if (allocated(Rw)) deallocate(Rw)
- if (allocated(Uinavg))  deallocate(Uinavg)
- if (allocated(Vinavg))  deallocate(Vinavg)
- if (allocated(Winavg))  deallocate(Winavg)
- if (allocated(Visc))  deallocate(Visc)
- if (allocated(TDiff))  deallocate(TDiff)
- if (allocated(partrho))  deallocate(partrho)
- if (allocated(partdiam))  deallocate(partdiam)
- if (allocated(percdistrib))  deallocate(percdistrib)
- if (allocated(profU))  deallocate(profU)
- if (allocated(profV))  deallocate(profV)
- if (allocated(profUavg))  deallocate(profUavg)
- if (allocated(profVavg))  deallocate(profVavg)
- if (allocated(profUavg2))  deallocate(profUavg2)
- if (allocated(profVavg2))  deallocate(profVavg2)
- if (allocated(profuuavg))  deallocate(profuuavg)
- if (allocated(profvvavg))  deallocate(profvvavg)
- if (allocated(profwwavg))  deallocate(profwwavg)
- if (allocated(proftauavg))  deallocate(proftauavg)
- if (allocated(profuu))  deallocate(profuu)
- if (allocated(profvv))  deallocate(profvv)
- if (allocated(profww))  deallocate(profww)
- if (allocated(proftau))  deallocate(proftau)
- if (allocated(proftausgs))  deallocate(proftausgs)
- if (allocated(proftausgsavg))  deallocate(proftausgsavg)
-
- if (allocated(proftemp))  deallocate(proftemp)
- if (allocated(proftempavg))  deallocate(proftempavg)
- if (allocated(proftempavg2))  deallocate(proftempavg2)
- if (allocated(proftemp))  deallocate(proftempfl)
- if (allocated(proftempflavg))  deallocate(proftempflavg)
- if (allocated(proftempflsgs))  deallocate(proftempflsgs)
- if (allocated(proftempflsgsavg))  deallocate(proftempflsgsavg)
- if (allocated(proftt))  deallocate(proftt)
- if (allocated(profttavg))  deallocate(profttavg)
-
- if (allocated(scaltime))  deallocate(scaltime)
- if (allocated(scalptime))  deallocate(scalptime)
-
-
- if (associated(FirstSB)) call DeallSB(FirstSB)
- if (associated(FirstIBPoint)) call DeallIBP(FirstIBPoint)
- if (associated(FirstWMPoint)) call DeallWMP(FirstWMPoint)
 end program CLMM

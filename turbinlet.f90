@@ -1,21 +1,26 @@
 module TURBINLET
-use PARAMETERS
-implicit none
 
- real(KND),allocatable,dimension(:,:,:):: Ru,Rv,Rw !arrays of randoms
- real(KND),allocatable,dimension(:,:,:):: Psiu,Psiv,Psiw
- real(KND),allocatable,dimension(:,:,:):: bfilt !filter coefficients (ii,jj,kk,kz)
- real(KND),allocatable,dimension(:):: ustarinlet !friction velocity profile at inlet
- real(KND),allocatable,dimension(:,:):: Uinavg,Vinavg,Winavg !mean values of U,V,W at inflow
- real(KND),allocatable,dimension(:,:,:):: transformtensor
+  use PARAMETERS
 
-  type TInlet
-   real(KND),allocatable,dimension(:,:):: U,V,W,temperature
-  endtype
+  implicit none
 
- interface GETTURBINLET
-  module procedure GETTURBINLETXIE
- endinterface
+  private
+  public GetTurbInlet, GetInletFromFile, ustarinlet
+
+  real(KND),allocatable,dimension(:,:,:):: Ru,Rv,Rw !arrays of randoms
+  real(KND),allocatable,dimension(:,:,:):: Psiu,Psiv,Psiw
+  real(KND),allocatable,dimension(:,:,:):: bfilt !filter coefficients (ii,jj,kk,kz)
+  real(KND),allocatable,dimension(:):: ustarinlet !friction velocity profile at inlet
+  real(KND),allocatable,dimension(:,:):: Uinavg,Vinavg,Winavg !mean values of U,V,W at inflow
+  real(KND),allocatable,dimension(:,:,:):: transformtensor
+
+   type TInlet
+    real(KND),allocatable,dimension(:,:):: U,V,W,temperature
+   endtype
+
+  interface GETTURBINLET
+   module procedure GETTURBINLETXIE
+  endinterface
 
 contains
 
@@ -576,7 +581,7 @@ contains
 
 
   subroutine GETINLETFROMFILE(t)
-  real(DBL),intent(in):: t
+  real(TIM),intent(in):: t
   integer,save:: called=0
   integer Prny2,Prnz2,Vny2,Wnz2
   real(KND) dx2
@@ -584,8 +589,8 @@ contains
   integer,save:: inletfnum
 
   type(TInlet),pointer,save:: In1=>null(),In2=>null(),Inp=>null() !pointer to inlets to avoid transfers, time(In1)<time(In2)
-  real(DBL),save:: t1,t2 !time if file1, file 2
-  real(DBL) tp
+  real(TIM),save:: t1,t2 !time if file1, file 2
+  real(TIM) tp
   integer,save:: io
 
   real(KND) c1,c2

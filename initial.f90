@@ -1,17 +1,22 @@
 module INITIAL
-use PARAMETERS
-use MULTIGRID
-use MULTIGRID2d
-use POISSON
-use BOUNDARIES
-use SCALARS
-use SMAGORINSKY
-use WALLMODELS
 
-implicit none
+  use PARAMETERS
+  use LIMITERS, only: limparam, limitertype
+  use MULTIGRID, only: SetMGParams
+  use MULTIGRID2d, only: SetMGParams2d
+  use POISSON
+  use BOUNDARIES
+  use SCALARS
+  use SMAGORINSKY
+  use WALLMODELS
 
-integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
-real(KND) mgepsinnerGS
+  implicit none
+
+  private
+  public  Readparams, Initconds
+
+  integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
+  real(KND) mgepsinnerGS
 
 
 contains

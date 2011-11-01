@@ -3,6 +3,9 @@ module LAXFRIED
  use BOUNDARIES
  implicit none
 
+ private
+ public LF
+
  contains
    
 

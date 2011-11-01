@@ -30,6 +30,7 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/pois3d.o \
 	$(TARGETDIR_CLMM)/hw3crt.o \
 	$(TARGETDIR_CLMM)/parameters.o \
+	$(TARGETDIR_CLMM)/limiters.o \
 	$(TARGETDIR_CLMM)/wallmodels.o \
 	$(TARGETDIR_CLMM)/multigrid.o \
 	$(TARGETDIR_CLMM)/multigrid2d.o \
@@ -70,6 +71,9 @@ $(TARGETDIR_CLMM)/hw3crt.o: $(TARGETDIR_CLMM) ../fishpack4/hw3crt.f
 
 $(TARGETDIR_CLMM)/parameters.o: $(TARGETDIR_CLMM) parameters.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ parameters.f90
+
+$(TARGETDIR_CLMM)/limiters.o: $(TARGETDIR_CLMM) limiters.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ limiters.f90
 
 $(TARGETDIR_CLMM)/scalars.o: $(TARGETDIR_CLMM) scalars.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ scalars.f90
@@ -135,6 +139,7 @@ clean:
 		$(TARGETDIR_CLMM)/pois3d.o \
 		$(TARGETDIR_CLMM)/hw3crt.o \
 		$(TARGETDIR_CLMM)/parameters.o \
+		$(TARGETDIR_CLMM)/limiters.o \
 		$(TARGETDIR_CLMM)/scalars.o \
 		$(TARGETDIR_CLMM)/multigrid.o \
 		$(TARGETDIR_CLMM)/multigrid2d.o \

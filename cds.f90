@@ -1,201 +1,20 @@
 module CDS
     use PARAMETERS
     use BOUNDARIES
+    use LIMITERS, only: FluxLimiter
+
     implicit none
+
+    private
+    public CDU, CDV, CDW, KAPPAU, KAPPAV, KAPPAW
     
     contains
     
     
-    subroutine CDU(U2,U,V,W,coef)        
-    real(KND) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(KND) coef
-    integer nx,ny,nz,i,j,k
-    real(KND) Ax,Ay,Az,Utmp
-    real(KND),allocatable,dimension(:),save:: fe,fp,gn,ht
-    integer,save:: called=0
 
-     nx=Unx
-     ny=Uny
-     nz=Unz
-     call BOUND_CONDU(U)
-     call BOUND_CONDV(V)
-     call BOUND_CONDW(W)
-
-     if (gridtype==UNIFORMGRID) then
-        Ax=0.25*coef*dt/dxmin
-        Ay=0.25*coef*dt/dymin
-        Az=0.25*coef*dt/dzmin
-        
-        do k=1,nz
-            do j=1,ny
-                do i=1,nx
-                    U2(i,j,k)=U2(i,j,k) - coef*((Ax*((U(i+1,j,k)*U(i+1,j,k))+(U(i,j,k)*U(i,j,k)))&
-                    -Ax*((U(i,j,k)*U(i,j,k))+(U(i-1,j,k)*U(i-1,j,k))))&
-                    +(Ay*(U(i,j+1,k)+U(i,j,k))*(V(i+1,j,k)+V(i,j,k))&
-                    -Ay*(U(i,j,k)+U(i,j-1,k))*(V(i+1,j-1,k)+V(i,j-1,k)))&
-                    +(Az*(U(i,j,k+1)+U(i,j,k))*(W(i+1,j,k)+W(i,j,k))&
-                    -Az*(U(i,j,k)+U(i,j,k-1))*(W(i+1,j,k-1)+W(i,j,k-1))))
-                enddo
-            enddo
-        enddo
-     else
-        if (called==0) then
-         allocate(fe(0:nx),fp(1:nx),gn(0:ny),ht(0:nz))
-         called=1
-         forall (i=0:nx)      fe(i)=(xPr(i+1)-xU(i-1))/(xU(i)-xU(i-1))
-         forall (i=1:nx)      fp(i)=(xU(i)-xPr(i))/(xPr(i+1)-xPr(i))        
-         forall (j=0:ny)      gn(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
-         forall (k=0:nz)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
-        endif
-
-        do k=1,nz
-         do j=1,ny
-          do i=1,nx
-           Utmp=Utmp+( (fe(i)*U(i+1,j,k)*U(i+1,j,k) + (1-fe(i))*U(i,j,k)*U(i,j,k))&
-                      -(fe(i-1)*U(i,j,k)*U(i,j,k) + (1-fe(i-1))*U(i-1,j,k)*U(i-1,j,k)))/dxU(i)
-           Utmp=Utmp+( (gn(j)*U(i,j+1,k)+(1-gn(j))*U(i,j,k))*(fp(i)*V(i+1,j,k)+(1-fp(i))*V(i,j,k))&
-                      -(gn(j-1)*U(i,j,k)+(1-gn(j-1))*U(i,j-1,k))*(fp(i)*V(i+1,j-1,k)+(1-fp(i))*V(i,j-1,k)))/dyPr(j)
-           Utmp=Utmp+( (ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))&
-                      -(ht(k-1)*U(i,j,k)+(1-ht(k-1))*U(i,j,k-1))*(fp(i)*W(i+1,j,k-1)+(1-fp(i))*W(i,j,k-1)))/dzPr(k)
-           U2(i,j,k)=U2(i,j,k)-dt*coef*Utmp
-          enddo
-         enddo
-        enddo
-     endif
-    end subroutine CDU
-        
-    subroutine CDV(V2,U,V,W,coef)
-    real(KND) :: V2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(KND) coef
-    integer nx,ny,nz,i,j,k
-    real(KND) Ax,Ay,Az,Vtmp
-    real(KND),allocatable,dimension(:),save:: gn,gp,fe,ht
-    integer,save:: called=0
-
-
-     nx=Vnx
-     ny=Vny
-     nz=Vnz
-     call BOUND_CONDU(U)
-     call BOUND_CONDV(V)
-     call BOUND_CONDW(W)
-
-     if (gridtype==UNIFORMGRID) then
-        Ax=0.25*coef*dt/dxmin
-        Ay=0.25*coef*dt/dymin
-        Az=0.25*coef*dt/dzmin
-        
-        do k=1,nz
-            do j=1,ny
-                do i=1,nx
-                    V2(i,j,k)=V2(i,j,k) - coef*((Ay*((V(i,j+1,k)*V(i,j+1,k))+(V(i,j,k)*V(i,j,k)))&
-                    -Ay*((V(i,j,k)*V(i,j,k))+(V(i,j-1,k)*V(i,j-1,k))))&
-                    +(Ax*(V(i+1,j,k)+V(i,j,k))*(U(i,j+1,k)+U(i,j,k))&
-                    -Ax*(V(i,j,k)+V(i-1,j,k))*(U(i-1,j+1,k)+U(i-1,j,k)))&
-                    +(Az*(V(i,j,k+1)+V(i,j,k))*(W(i,j+1,k)+W(i,j,k))&
-                    -Az*(V(i,j,k)+V(i,j,k-1))*(W(i,j+1,k-1)+W(i,j,k-1))))
-                enddo
-            enddo
-        enddo
-     else
-        if (called==0) then
-         allocate(gn(0:ny),gp(1:ny),fe(0:nx),ht(0:nz))
-         called=1
-         forall (j=0:ny)      gn(j)=(yPr(j+1)-yV(j-1))/(yV(j)-yV(j-1))
-         forall (j=1:ny)      gp(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))        
-         forall (i=0:nx)      fe(i)=(xU(i)-xPr(i))/(xPr(i+1)-xPr(i))
-         forall (k=0:nz)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
-        endif
-
-        do k=1,nz
-         do j=1,ny
-          do i=1,nx
-           Vtmp=Vtmp+( (gn(j)*V(i,j+1,k)*V(i,j+1,k) + (1-gn(j))*V(i,j,k)*V(i,j,k))&
-                      -(gn(j-1)*V(i,j,k)*V(i,j,k) + (1-gn(j-1))*V(i,j-1,k)*V(i,j-1,k)))/dyV(j)
-           Vtmp=Vtmp+( (fe(i)*V(i+1,j,k)+(1-fe(i))*V(i,j,k))*(gp(j)*U(i,j+1,k)+(1-gp(j))*U(i,j,k))&
-                      -(fe(i-1)*V(i,j,k)+(1-fe(i-1))*V(i-1,j,k))*(gp(j)*U(i-1,j+1,k)+(1-gp(j))*U(i-1,j,k)))/dxPr(i)
-           Vtmp=Vtmp+( (ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))&
-                      -(ht(k-1)*V(i,j,k)+(1-ht(k-1))*V(i,j,k-1))*(gp(j)*W(i,j+1,k-1)+(1-gp(j))*W(i,j,k-1)))/dzPr(k)
-           V2(i,j,k)=V2(i,j,k)-dt*coef*Vtmp
-          enddo
-         enddo
-        enddo
-     endif
-    end subroutine CDV            
-    
-    subroutine CDW(W2,U,V,W,coef)
-    real(KND) :: W2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(KND) coef
-    integer nx,ny,nz,i,j,k
-    real(KND) Ax,Ay,Az,Wtmp
-    real(KND),allocatable,dimension(:),save:: ht,hp,fe,gn
-    integer,save:: called=0
-
-     nx=Wnx
-     ny=Wny
-     nz=Wnz
-     call BOUND_CONDU(U)
-     call BOUND_CONDV(V)
-     call BOUND_CONDW(W)
-
-     if (gridtype==UNIFORMGRID) then
-        Ax=0.25*coef*dt/dxmin
-        Ay=0.25*coef*dt/dymin
-        Az=0.25*coef*dt/dzmin
-        
-        do k=1,nz
-            do j=1,ny
-                do i=1,nx
-                    W2(i,j,k)=W2(i,j,k) - coef*((Az*((W(i,j,k+1)*W(i,j,k+1))+(W(i,j,k)*W(i,j,k)))&
-                    -Az*((W(i,j,k)*W(i,j,k))+(W(i,j,k-1)*W(i,j,k-1))))&
-                    +(Ay*(W(i,j+1,k)+W(i,j,k))*(V(i,j,k+1)+V(i,j,k))&
-                    -Ay*(W(i,j,k)+W(i,j-1,k))*(V(i,j-1,k)+V(i,j-1,k+1)))&
-                    +(Ax*(W(i+1,j,k)+W(i,j,k))*(U(i,j,k+1)+U(i,j,k))&
-                    -Ax*(W(i,j,k)+W(i-1,j,k))*(U(i-1,j,k+1)+U(i-1,j,k))))
-                enddo
-            enddo
-        enddo
-     else
-        if (called==0) then
-         allocate(ht(0:nz),hp(1:nz),fe(0:nx),gn(0:ny))
-         called=1
-         forall (k=0:nz)      ht(k)=(zPr(k+1)-zW(k-1))/(zW(k)-zW(k-1))
-         forall (k=1:nz)      hp(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))        
-         forall (i=0:nx)      fe(i)=(xU(i)-xPr(i))/(xPr(i+1)-xPr(i))
-         forall (j=0:ny)      gn(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
-        endif
-
-        do k=1,nz
-         do j=1,ny
-          do i=1,nx
-           Wtmp=Wtmp+( (ht(k)*W(i,j,k+1)*W(i,j,k+1) + (1-ht(k))*W(i,j,k)*W(i,j,k))&
-                      -(ht(k-1)*W(i,j,k)*W(i,j,k) + (1-ht(k-1))*W(i,j,k-1)*W(i,j,k-1)))/dzW(k)
-           Wtmp=Wtmp+( (fe(i)*W(i+1,j,k)+(1-fe(i))*W(i,j,k))*(hp(k)*U(i,j,k+1)+(1-hp(k))*U(i,j,k))&
-                      -(fe(i-1)*W(i,j,k)+(1-fe(i-1))*W(i-1,j,k))*(hp(k)*U(i-1,j,k+1)+(1-hp(k))*U(i-1,j,k)))/dxPr(i)
-           Wtmp=Wtmp+( (gn(k)*V(i,j+1,k)+(1-gn(k))*V(i,j,k))*(hp(k)*V(i,j,k+1)+(1-hp(k))*V(i,j,k))&
-                      -(gn(k-1)*V(i,j,k)+(1-gn(k-1))*V(i,j-1,k))*(hp(j)*V(i,j-1,k+1)+(1-hp(k))*V(i,j-1,k)))/dzPr(k)
-           W2(i,j,k)=W2(i,j,k)-dt*coef*Wtmp
-          enddo
-         enddo
-        enddo
-     endif
-    end subroutine CDW            
-            
           
 
-
-
-
-
-
-
-
-
-
-
-
-  
-    subroutine CDU2(U2,U,V,W,coef)
+    subroutine CDU(U2,U,V,W,coef)
     real(KND) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(KND) coef
     integer nx,ny,nz,i,j,k
@@ -251,14 +70,14 @@ module CDS
          enddo
         enddo
      endif
-    end subroutine CDU2
+    end subroutine CDU
         
 
 
 
 
 
-    subroutine CDV2(V2,U,V,W,coef)
+    subroutine CDV(V2,U,V,W,coef)
     real(KND) :: V2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(KND) coef
     integer nx,ny,nz,i,j,k
@@ -315,13 +134,13 @@ module CDS
          enddo
         enddo
      endif
-    end subroutine CDV2     
+    end subroutine CDV
     
 
 
 
 
-    subroutine CDW2(W2,U,V,W,coef)
+    subroutine CDW(W2,U,V,W,coef)
     real(KND) :: W2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(KND) coef
     integer nx,ny,nz,i,j,k
@@ -377,7 +196,7 @@ module CDS
          enddo
         enddo
      endif
-    end subroutine CDW2            
+    end subroutine CDW
             
             
   subroutine KAPPAU(U2,U,V,W,coef)

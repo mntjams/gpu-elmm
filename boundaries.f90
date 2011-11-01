@@ -7,6 +7,11 @@ use GEOMETRIC
 
 implicit none
 
+
+  private
+  public GridCoords, Bound_CondU, Bound_CondV, Bound_CondW, Bound_CondU2, Bound_CondV2, Bound_CondW2,&
+         Bound_Phi, Bound_Pr, Bound_Q, ReadBounds
+
   integer nBoundUx,nBoundUy,nBoundUz,nBoundVx,nBoundVy,nBoundVz,nBoundWx,nBoundWy,nBoundWz
   integer iXupa,iXup,jYha,jYh
 
