@@ -55,9 +55,10 @@ implicit none
   endsubroutine AddWMPoint
 
   real(KND) function WM1ustar(vel,dist,ustar0,dp,dptrans)
-   real(KND),parameter:: eps=1e-4_KND
-   real(KND):: yplcrit=11.225_KND
-   real(KND) ustar,vel,dist,ustar0,dp,dptrans,kprime
+   real(KND),parameter :: eps=1e-4_KND
+   real(KND) :: yplcrit=11.225_KND
+   real(KND),intent(in) :: vel,dist,ustar0,dp,dptrans
+   real(KND) :: ustar,ustar2,kprime
    integer i
 
 
@@ -72,11 +73,12 @@ implicit none
     i=1
 
     if ((dist*ustar*Re)>yplcrit) then
+     ustar=ustar0
      do
      i=i+1
-      ustar0=ustar
-      ustar=vel/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
-      if  (abs(ustar-ustar0)/abs(ustar)<eps) exit
+      ustar2=ustar
+      ustar=vel/(log(abs(ustar2*dist*Re))/0.41_KND+5.2_KND)
+      if  (abs(ustar-ustar2)/abs(ustar)<eps) exit
       if (i>=25) then
                   ustar=0
                   exit
@@ -85,7 +87,7 @@ implicit none
     endif
 
    else
-
+    ustar=ustar0
     kprime=0.41_KND*(1-dptrans*(1./(0.41_KND*ustar0**2)-1./(2*ustar0**2)))
     yplcrit=-LambertW(-kprime*0.119_KND)/kprime
 
@@ -98,12 +100,11 @@ implicit none
     i=1
 
     if ((dist*ustar*Re)>yplcrit) then
-
      do
      i=i+1
-      ustar0=ustar
-      ustar=vel*(1._KND-Re*dp/0.41_KND)/(log(abs(ustar0*dist*Re))/0.41_KND+5.2_KND)
-      if  (abs(ustar-ustar0)/abs(ustar)<eps) exit
+      ustar2=ustar
+      ustar=vel*(1._KND-Re*dp/0.41_KND)/(log(abs(ustar2*dist*Re))/0.41_KND+5.2_KND)
+      if  (abs(ustar-ustar2)/abs(ustar)<eps) exit
       if (i>=25) then
                   ustar=0
                   exit
@@ -202,7 +203,8 @@ implicit none
   real(KND) function WM2ustar(vel,dist,ustar0,dp,dptrans,z0)
    real(KND),parameter:: eps=1e-4_KND
    real(KND):: yplcrit=11.225_KND
-   real(KND) vel,dist,ustar0,z0,dp,dptrans,kprime
+   real(KND),intent(in):: vel,dist,ustar0,z0,dp,dptrans
+   real(KND) :: kprime
 
    if (wallmodeltype==1) then
 
@@ -275,10 +277,11 @@ implicit none
    Obukhov_zL=z*(0.4_KND*(g/tempref)*tempfl)/(-ustar**3)
   endfunction Obukhov_zL
 
-  real(KND) function WM_MO_FLUX_ustar(vel,dist,ustar,z0,tempflux)
+  real(KND) function WM_MO_FLUX_ustar(vel,dist,ustar0,z0,tempflux)
    real(KND),parameter:: eps=1e-5
-   real(KND):: yplcrit=11.225_KND
-   real(KND) vel,dist,ustar0,z0,tempflux,ustar,zL,Psi
+   real(KND),parameter:: yplcrit=11.225_KND
+   real(KND),intent(in):: vel,dist,ustar0,z0,tempflux
+   real(KND) ustar,ustar2,zL,Psi
    integer i
 
    if (dist<=z0) then
@@ -290,17 +293,17 @@ implicit none
        ustar=vel/(log(abs(ustar0*dist*Re))/0.4_KND+5.2_KND)
      endif
     else
-     stop "The wall model needs positive viscosity under roughness length."
+     stop "ERROR: The wall model needs positive viscosity under roughness length."
     endif
 
    else
-
+    ustar=ustar0
     i=0
     zL=0
     Psi=0
     do
     i=i+1
-     ustar0=ustar
+     ustar2=ustar
      ustar=max(vel*0.4_KND/(log(dist/z0)-Psi),0._KND)
      if (ustar<tiny(1._KND)*1000) then
       zL=-10000
@@ -308,7 +311,7 @@ implicit none
       zL=Obukhov_zL(ustar,tempflux,temperature_ref,grav_acc,dist)
      endif
      Psi=PsiM_MO(zL)
-     if  (abs(ustar-ustar0)/max(abs(ustar),1.e-3_KND)<eps) exit
+     if  (abs(ustar-ustar2)/max(abs(ustar),1.e-3_KND)<eps) exit
      if (i>=250) then
                  ustar=0
                  exit
