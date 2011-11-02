@@ -52,8 +52,8 @@ contains
   mgepsinnerGS=lmgepsinnerGS
  endsubroutine SetMGParams
 
-
  pure subroutine Prolongate(AFine,ACoarse,level)
+  implicit none
   integer,intent(in):: level
   real(KND),dimension(-1:,-1:,-1:),intent(in):: ACoarse
   real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
@@ -101,8 +101,8 @@ contains
  endsubroutine Prolongate
 
 
-
  subroutine Restrict(ACoarse,AFine,level)
+ implicit none
  integer,intent(in):: level
  real(KND),dimension(-1:,-1:,-1:),intent(out):: ACoarse
  real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
@@ -915,12 +915,21 @@ endsubroutine MG_INV
 
 
 
-
 subroutine MG_GS(level,niter)
 integer,intent(in)::level,niter
-! real(KND),intent(OUT):: R
 integer i,j,k,l
 real(KND) p,Ap
+logical GPU
+  GPU=.true.
+
+  if (GPU) then
+   write (*,*) "GPU is .true."
+   !$hmpp MG_GS_GPU callsite
+   call MG_GS_GPU(CoefMG(level)%nx,CoefMG(level)%ny,CoefMG(level)%nz,niter,&
+                  PhiMG(level)%Arr,RHSMG(level)%Arr,&
+                  CoefMG(level)%Aw,CoefMG(level)%Ae,CoefMG(level)%As,CoefMG(level)%An,CoefMG(level)%Ab,CoefMG(level)%At,&
+                  BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+  else
 
    do l=1,niter
 !     S=0
@@ -1040,6 +1049,7 @@ real(KND) p,Ap
     !$OMP END PARALLEL
 
    enddo
+  endif
 endsubroutine MG_GS
 
 subroutine MG_res(level,R)
@@ -1126,7 +1136,7 @@ real(KND),intent(in):: eps
 real(KND),intent(out):: R
 real(KND) R1
 integer k
-!   write (*,*) "cgc",level
+
   if (level == minmglevel) then !1
         call MG_GE(level)
         call MG_res(level,R)
@@ -1160,6 +1170,7 @@ integer k
     call MG_res(level,R)
    enddo
   endif
+
 !   write (*,*) "cgc res",level,R
 endsubroutine MG_CGC
 
@@ -1254,6 +1265,7 @@ real(KND),save:: called=0
     enddo
    enddo
    call Bound_Phi_MG(PhiMG(LMG)%Arr,CoefMG(LMG)%nx,CoefMG(LMG)%ny,CoefMG(LMG)%nz)
+
   call MG_CGC(LMG,mgeps,mgncgc,mgnpre,mgnpost,R)
 
   if (R<mgeps)   exit
@@ -1269,4 +1281,152 @@ endsubroutine POISSMG
 
 
 
+
+
+
+
+!GPU Codelets. More or less like externals. Inside the module only because of KND.
+
+!$hmpp MG_GS_GPU codelet, target=CUDA
+subroutine MG_GS_GPU(nx,ny,nz,nit,Phi,RHS,&
+                     Aw,Ae,As,An,Ab,At,&
+                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+   implicit none
+   integer,intent(in)   :: nx,ny,nz,nit
+   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::Phi
+   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
+   real(KND),intent(in) :: Aw,Ae,As,An,Ab,At
+   integer(KND),intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+   integer i,j,k,l
+   real(KND) :: p,Ap
+
+  do l=1,nit
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+     do k=0,nz
+        do i=0,nx
+            do j=0+mod(i+k,2),ny,2
+             p=0
+             Ap=0
+             if (i>0) then
+                       p=p+Phi(i-1,j,k)*Aw
+                       Ap=Ap+Aw
+             elseif (BtypeW==PERIODIC) then
+                       p=p+Phi(nx-1,j,k)*Aw
+                       Ap=Ap+Aw
+             endif
+             if (i<nx) then
+                       p=p+Phi(i+1,j,k)*Ae
+                       Ap=Ap+Ae
+             elseif (BtypeE==PERIODIC) then
+                       p=p+Phi(1,j,k)*Ae
+                       Ap=Ap+Ae
+             endif
+             if (j>0) then
+                       p=p+Phi(i,j-1,k)*As
+                       Ap=Ap+As
+             elseif (BtypeS==PERIODIC) then
+                       p=p+Phi(i,ny-1,k)*As
+                       Ap=Ap+As
+             endif
+             if (j<ny) then
+                       p=p+Phi(i,j+1,k)*An
+                       Ap=Ap+An
+             elseif (BtypeN==PERIODIC) then
+                       p=p+Phi(i,1,k)*An
+                       Ap=Ap+An
+             endif
+             if (k>0) then
+                       p=p+Phi(i,j,k-1)*Ab
+                       Ap=Ap+Ab
+             elseif (BtypeB==PERIODIC) then
+                       p=p+Phi(i,j,nz-1)*Ab
+                       Ap=Ap+Ab
+             endif
+             if (k<nz) then
+                       p=p+Phi(i,j,k+1)*At
+                       Ap=Ap+At
+             elseif (BtypeT==PERIODIC) then
+                       p=p+Phi(i,j,1)*At
+                       Ap=Ap+At
+             endif
+             p=p-RHS(i,j,k)
+
+             p=p/Ap
+             Phi(i,j,k)=p
+            enddo
+        enddo
+    enddo
+  !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+     do k=0,nz
+        do i=0,nx
+            do j=0+mod(i+k+1,2),ny,2
+             p=0
+             Ap=0
+             if (i>0) then
+                       p=p+Phi(i-1,j,k)*Aw
+                       Ap=Ap+Aw
+             elseif (BtypeW==PERIODIC) then
+                       p=p+Phi(nx-1,j,k)*Aw
+                       Ap=Ap+Aw
+             endif
+             if (i<nx) then
+                       p=p+Phi(i+1,j,k)*Ae
+                       Ap=Ap+Ae
+             elseif (BtypeE==PERIODIC) then
+                       p=p+Phi(1,j,k)*Ae
+                       Ap=Ap+Ae
+             endif
+             if (j>0) then
+                       p=p+Phi(i,j-1,k)*As
+                       Ap=Ap+As
+             elseif (BtypeS==PERIODIC) then
+                       p=p+Phi(i,ny-1,k)*As
+                       Ap=Ap+As
+             endif
+             if (j<ny) then
+                       p=p+Phi(i,j+1,k)*An
+                       Ap=Ap+An
+             elseif (BtypeN==PERIODIC) then
+                       p=p+Phi(i,1,k)*An
+                       Ap=Ap+An
+             endif
+             if (k>0) then
+                       p=p+Phi(i,j,k-1)*Ab
+                       Ap=Ap+Ab
+             elseif (BtypeB==PERIODIC) then
+                       p=p+Phi(i,j,nz-1)*Ab
+                       Ap=Ap+Ab
+             endif
+             if (k<nz) then
+                       p=p+Phi(i,j,k+1)*At
+                       Ap=Ap+At
+             elseif (BtypeT==PERIODIC) then
+                       p=p+Phi(i,j,1)*At
+                       Ap=Ap+At
+             endif
+             p=p-RHS(i,j,k)
+
+             p=p/Ap
+             Phi(i,j,k)=p
+            enddo
+        enddo
+    enddo
+  enddo
+endsubroutine MG_GS_GPU
+
+
+
+
+
+
+
+
 endmodule MULTIGRID
+
+
+
+
+
+
