@@ -1,0 +1,172 @@
+## -*- Makefile -*-
+##
+## User: lada
+## Time: 29.3.2006 11:32:57
+## Makefile created by Sun Studio.
+##
+## This file is generated automatically.
+##
+
+# Remove the conflicting .mod extension. Make thinks .mod is a Modula2
+# extension but the f90 compiler uses it for a module file.SUFFIXES
+.SUFFIXES: .o .c .c~ .cc .cc~ .y .y~ .l .l~ .s .s~ .sh .sh~ .S .S~ .ln .h .h~ .f .f~ .F .F~ .p .p~ .r .r~ .f90 .f90~ .ftn .ftn~ .cps .cps~ .C .C~ .Y .Y~ .L .L~ .java .java~ .class
+
+
+#### Compiler and tool definitions shared by all build targets #####
+FC = f90
+BASICOPTS = -fast   -g -dalign -m64
+FFLAGS = $(BASICOPTS)
+
+# Define the target directories.
+TARGETDIR_CLMM=../bin/sun/serial
+
+
+all: $(TARGETDIR_CLMM)/CLMM
+
+## Target: CLMM
+OBJS_CLMM =  \
+	$(TARGETDIR_CLMM)/fftpack.o \
+	$(TARGETDIR_CLMM)/pois3d.o \
+	$(TARGETDIR_CLMM)/hw3crt.o \
+	$(TARGETDIR_CLMM)/parameters.o \
+	$(TARGETDIR_CLMM)/limiters.o \
+	$(TARGETDIR_CLMM)/wallmodels.o \
+	$(TARGETDIR_CLMM)/multigrid.o \
+	$(TARGETDIR_CLMM)/multigrid2d.o \
+	$(TARGETDIR_CLMM)/geometric.o \
+	$(TARGETDIR_CLMM)/scalars.o \
+	$(TARGETDIR_CLMM)/turbinlet.o \
+	$(TARGETDIR_CLMM)/boundaries.o \
+	$(TARGETDIR_CLMM)/smagorinsky.o \
+	$(TARGETDIR_CLMM)/outputs.o \
+	$(TARGETDIR_CLMM)/fishpoisson.o \
+	$(TARGETDIR_CLMM)/poisson.o \
+	$(TARGETDIR_CLMM)/initial.o \
+	$(TARGETDIR_CLMM)/cds.o \
+	$(TARGETDIR_CLMM)/upwind.o \
+	$(TARGETDIR_CLMM)/laxfried.o \
+	$(TARGETDIR_CLMM)/laxwend.o \
+	$(TARGETDIR_CLMM)/tsteps.o \
+	$(TARGETDIR_CLMM)/main.o
+USERLIBS_CLMM = $(SYSLIBS_CLMM)
+DEPLIBS_CLMM =
+LDLIBS_CLMM = $(USERLIBS_CLMM) -xlic_lib=sunperf
+
+
+# Link or archive
+$(TARGETDIR_CLMM)/CLMM: $(TARGETDIR_CLMM) $(OBJS_CLMM) $(DEPLIBS_CLMM)
+	hmpp $(LINK.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ $(OBJS_CLMM) $(LDLIBS_CLMM)
+
+
+# Compile source files into .o files
+$(TARGETDIR_CLMM)/fftpack.o: $(TARGETDIR_CLMM) ../fishpack4/fftpack.f
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../fishpack4/fftpack.f
+
+$(TARGETDIR_CLMM)/pois3d.o: $(TARGETDIR_CLMM) ../fishpack4/pois3d.f
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../fishpack4/pois3d.f
+
+$(TARGETDIR_CLMM)/hw3crt.o: $(TARGETDIR_CLMM) ../fishpack4/hw3crt.f
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ ../fishpack4/hw3crt.f
+
+$(TARGETDIR_CLMM)/parameters.o: $(TARGETDIR_CLMM) parameters.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ parameters.f90
+
+$(TARGETDIR_CLMM)/limiters.o: $(TARGETDIR_CLMM) limiters.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ limiters.f90
+
+$(TARGETDIR_CLMM)/scalars.o: $(TARGETDIR_CLMM) scalars.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ scalars.f90
+
+$(TARGETDIR_CLMM)/multigrid.o: $(TARGETDIR_CLMM) multigrid.f90
+	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid.f90
+
+$(TARGETDIR_CLMM)/multigrid2d.o: $(TARGETDIR_CLMM) multigrid2d.f90
+	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid2d.f90
+
+$(TARGETDIR_CLMM)/boundaries.o: $(TARGETDIR_CLMM) boundaries.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ boundaries.f90
+
+$(TARGETDIR_CLMM)/outputs.o: $(TARGETDIR_CLMM) outputs.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ outputs.f90
+
+$(TARGETDIR_CLMM)/fishpoisson.o: $(TARGETDIR_CLMM) fishpoisson.f90
+	f90 -c -O2 -g -dalign  -o $@ fishpoisson.f90
+
+$(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ poisson.f90
+
+$(TARGETDIR_CLMM)/initial.o: $(TARGETDIR_CLMM) initial.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ initial.f90
+
+$(TARGETDIR_CLMM)/cds.o: $(TARGETDIR_CLMM) cds.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ cds.f90
+
+$(TARGETDIR_CLMM)/upwind.o: $(TARGETDIR_CLMM) upwind.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ upwind.f90
+
+$(TARGETDIR_CLMM)/laxfried.o: $(TARGETDIR_CLMM) laxfried.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ laxfried.f90
+
+$(TARGETDIR_CLMM)/laxwend.o: $(TARGETDIR_CLMM) laxwend.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ laxwend.f90
+
+$(TARGETDIR_CLMM)/wallmodels.o: $(TARGETDIR_CLMM) wallmodels.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ wallmodels.f90
+
+$(TARGETDIR_CLMM)/turbinlet.o: $(TARGETDIR_CLMM) turbinlet.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ turbinlet.f90
+
+$(TARGETDIR_CLMM)/geometric.o: $(TARGETDIR_CLMM) geometric.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ geometric.f90
+
+$(TARGETDIR_CLMM)/smagorinsky.o: $(TARGETDIR_CLMM) smagorinsky.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ smagorinsky.f90
+
+$(TARGETDIR_CLMM)/tsteps.o: $(TARGETDIR_CLMM) tsteps.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ tsteps.f90
+
+$(TARGETDIR_CLMM)/main.o: $(TARGETDIR_CLMM) main.f90
+	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -xfilebyteorder=big4:%all -o $@ main.f90
+
+
+
+#### Clean target deletes all generated files ####
+clean:
+	rm -f \
+		$(TARGETDIR_CLMM)/CLMM \
+		$(TARGETDIR_CLMM)/fftpack.o \
+		$(TARGETDIR_CLMM)/pois3d.o \
+		$(TARGETDIR_CLMM)/hw3crt.o \
+		$(TARGETDIR_CLMM)/parameters.o \
+		$(TARGETDIR_CLMM)/limiters.o \
+		$(TARGETDIR_CLMM)/scalars.o \
+		$(TARGETDIR_CLMM)/multigrid.o \
+		$(TARGETDIR_CLMM)/multigrid2d.o \
+		$(TARGETDIR_CLMM)/boundaries.o \
+		$(TARGETDIR_CLMM)/outputs.o \
+		$(TARGETDIR_CLMM)/fishpoisson.o \
+		$(TARGETDIR_CLMM)/poisson.o \
+		$(TARGETDIR_CLMM)/initial.o \
+		$(TARGETDIR_CLMM)/cds.o \
+		$(TARGETDIR_CLMM)/upwind.o \
+		$(TARGETDIR_CLMM)/laxfried.o \
+		$(TARGETDIR_CLMM)/laxwend.o \
+		$(TARGETDIR_CLMM)/wallmodels.o \
+		$(TARGETDIR_CLMM)/turbinlet.o \
+		$(TARGETDIR_CLMM)/geometric.o \
+		$(TARGETDIR_CLMM)/smagorinsky.o \
+		$(TARGETDIR_CLMM)/tsteps.o \
+		$(TARGETDIR_CLMM)/main.o
+	rm -f *.mod
+	#rm -f -r $(TARGETDIR_CLMM)
+
+
+# Create the target directory (if needed)
+$(TARGETDIR_CLMM):
+	mkdir -p $(TARGETDIR_CLMM)
+
+
+# Enable dependency checking
+.KEEP_STATE:
+.KEEP_STATE_FILE:.make.state.bin.sun
+
