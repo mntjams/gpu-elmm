@@ -922,13 +922,16 @@ real(KND) p,Ap
 logical GPU
   GPU=.true.
 
-  if (GPU) then
+  if (GPU.and.level>3) then
    write (*,*) "GPU is .true."
-   !$hmpp MG_GS_GPU callsite
+   !$hmpp <GSKernels> allocate
+   !$hmpp <GsKernels> advancedload, args[MG_GS_GPU::Phi,MG_GS_GPU::RHS]
+   !$hmpp  <GSKernels> MG_GS_GPU callsite
    call MG_GS_GPU(CoefMG(level)%nx,CoefMG(level)%ny,CoefMG(level)%nz,niter,&
                   PhiMG(level)%Arr,RHSMG(level)%Arr,&
                   CoefMG(level)%Aw,CoefMG(level)%Ae,CoefMG(level)%As,CoefMG(level)%An,CoefMG(level)%Ab,CoefMG(level)%At,&
                   BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+   !$hmpp <GSKernels> delegatedStore,Args[MG_GS_GPU::Phi]
   else
 
    do l=1,niter
@@ -1057,7 +1060,20 @@ integer,intent(in)::level
 real(KND),intent(out)::R
 integer i,j,k
 real(KND),save:: p,Ap
-character(70):: str
+logical GPU
+
+  GPU=.true.
+
+  if (GPU.and.level>3) then
+   write (*,*) "GPU is .true."
+   !$hmpp  <GSKernels> MG_Res_GPU callsite
+   call MG_Res_GPU(CoefMG(level)%nx,CoefMG(level)%ny,CoefMG(level)%nz,&
+                  PhiMG(level)%Arr,RHSMG(level)%Arr,ResMG(level)%Arr,&
+                  CoefMG(level)%Aw,CoefMG(level)%Ae,CoefMG(level)%As,CoefMG(level)%An,CoefMG(level)%Ab,CoefMG(level)%At,&
+                  BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+   !$hmpp <GSKernels> delegatedStore,Args[MG_Res_GPU::Res]
+   !$hmpp <GSKernels> release
+  else
 
      call BOUND_Phi_MG(PhiMG(level)%Arr,CoefMG(level)%nx,CoefMG(level)%ny,CoefMG(level)%nz)
      do k=0,CoefMG(level)%nz
@@ -1114,6 +1130,7 @@ character(70):: str
         enddo
     enddo
     R=MAXVAL(ResMG(level)%Arr(0:CoefMG(level)%nx,0:CoefMG(level)%ny,0:CoefMG(level)%nz))
+   endif
 endsubroutine MG_res
 
 
@@ -1287,7 +1304,10 @@ endsubroutine POISSMG
 
 !GPU Codelets. More or less like externals. Inside the module only because of KND.
 
-!$hmpp MG_GS_GPU codelet, target=CUDA
+  !$hmpp <GSKernels> group, target=CUDA
+  !$hmpp <GSKernels> mapbyname, nx,ny,nz,Phi,RHS,Aw,Ae,As,An,Ab,At,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+
+!$hmpp <GSKernels> MG_GS_GPU codelet
 subroutine MG_GS_GPU(nx,ny,nz,nit,Phi,RHS,&
                      Aw,Ae,As,An,Ab,At,&
                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
@@ -1415,6 +1435,93 @@ subroutine MG_GS_GPU(nx,ny,nz,nit,Phi,RHS,&
     enddo
   enddo
 endsubroutine MG_GS_GPU
+
+
+
+
+
+!$hmpp <GSKernels> MG_Res_GPU codelet
+subroutine MG_Res_GPU(nx,ny,nz,Phi,Res,RHS,&
+                     Aw,Ae,As,An,Ab,At,&
+                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+   implicit none
+   integer,intent(in)   :: nx,ny,nz
+   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::Phi
+   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
+   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
+   real(KND),intent(in) :: Aw,Ae,As,An,Ab,At
+   integer(KND),intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+   real(KND),intent(out) :: R
+   integer i,j,k,l
+   real(KND) :: p,Ap
+
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+     do k=0,nz
+        do i=0,nx
+            do j=0,ny
+             p=0
+             Ap=0
+             if (i>0) then
+                       p=p+Phi(i-1,j,k)*Aw
+                       Ap=Ap+Aw
+             elseif (BtypeW==PERIODIC) then
+                       p=p+Phi(nx-1,j,k)*Aw
+                       Ap=Ap+Aw
+             endif
+             if (i<nx) then
+                       p=p+Phi(i+1,j,k)*Ae
+                       Ap=Ap+Ae
+             elseif (BtypeE==PERIODIC) then
+                       p=p+Phi(1,j,k)*Ae
+                       Ap=Ap+Ae
+             endif
+             if (j>0) then
+                       p=p+Phi(i,j-1,k)*As
+                       Ap=Ap+As
+             elseif (BtypeS==PERIODIC) then
+                       p=p+Phi(i,ny-1,k)*As
+                       Ap=Ap+As
+             endif
+             if (j<ny) then
+                       p=p+Phi(i,j+1,k)*An
+                       Ap=Ap+An
+             elseif (BtypeN==PERIODIC) then
+                       p=p+Phi(i,1,k)*An
+                       Ap=Ap+An
+             endif
+             if (k>0) then
+                       p=p+Phi(i,j,k-1)*Ab
+                       Ap=Ap+Ab
+             elseif (BtypeB==PERIODIC) then
+                       p=p+Phi(i,j,nz-1)*Ab
+                       Ap=Ap+Ab
+             endif
+             if (k<nz) then
+                       p=p+Phi(i,j,k+1)*At
+                       Ap=Ap+At
+             elseif (BtypeT==PERIODIC) then
+                       p=p+Phi(i,j,1)*At
+                       Ap=Ap+At
+             endif
+             p=p-RHS(i,j,k)
+             p=-p +Ap*Phi(i,j,k)
+             Res(i,j,k)=p
+            enddo
+        enddo
+     enddo
+
+     R=0
+    !$hmppcg grid blocksize 512x1
+    !$hmppcg gridify(k,i), reduce(max:R)
+     do k=0,nz
+        do i=0,nx
+            do j=0,ny
+             R=max(R,abs(Res(i,j,k)))
+            enddo
+        enddo
+    enddo    
+endsubroutine MG_Res_GPU
 
 
 
