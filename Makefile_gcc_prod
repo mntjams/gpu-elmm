@@ -14,7 +14,7 @@
 
 #### Compiler and tool definitions shared by all build targets #####
 FC = gfortran-4.6
-BASICOPTS = -O5 -fopenmp -ftree-parallelize-loops=2 -floop-parallelize-all -fprefetch-loop-arrays -finline-functions -funroll-all-loops -pg  -fconvert=big-endian -ffpe-trap=zero,overflow
+BASICOPTS = -O5 -fopenmp -ftree-parallelize-loops=8 -floop-parallelize-all -fprefetch-loop-arrays -finline-functions -funroll-all-loops -pg  -fconvert=big-endian -ffpe-trap=zero,overflow
 FFLAGS = $(BASICOPTS)
 
 

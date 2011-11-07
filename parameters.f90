@@ -14,6 +14,7 @@ implicit none
   real(KND),parameter :: Karman=0.41_KND
   real(KND),parameter :: BoltzC=1.3806503e-23_KND
 
+  integer :: GPU = 0   !HMPP support
 
 
   integer Unx,Uny,Unz     !dimensions of grid for velocity component U

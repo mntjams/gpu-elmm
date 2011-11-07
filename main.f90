@@ -24,6 +24,10 @@ program CLMM
 
   pi=2.0_KND*acos(0.0_KND)
 
+  !$hmpp enableGPU callsite
+  call enableGPU(GPU)
+
+
 
   write (*,*) "Reading parameters..."
   call readparams
@@ -451,7 +455,15 @@ program CLMM
 
  write (*,*) "Saving results..."
 
- call OUTPUT(U,V,W,Pr)
+!  call OUTPUT(U,V,W,Pr)
 
 
 end program CLMM
+
+  !$hmpp enableGPU codelet, target=CUDA
+  subroutine enableGPU(GPU)
+  implicit none
+  integer,intent(out):: GPU
+   GPU = 0
+   !$hmppcg(CUDA) set GPU = 1
+  end subroutine enableGPU

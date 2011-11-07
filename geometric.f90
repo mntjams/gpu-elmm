@@ -1,13 +1,9 @@
 module GEOMETRIC
 
  use PARAMETERS
- use WALLMODELS
 
  implicit none
 
- private
- public TIBPoint, FirstIBPoint, LastIBPoint, TScalFLIBPoint, FirstScalFlIBPoint, LastScalFlIBPoint,&
-        TSolidBody, FirstSB, InitSolidBodies, GetSolidBodiesBC, DeallSB, DeallIBP, IBLinInt, IBBiLinInt, IBTriLinInt
 
  type TLine                            !These object could be implemented using Fortran's 2003 inheritance, or at least using
    real(KND) xc,yc,zc                  !allocatable components. This approach using pointers is more portable and less safe.
@@ -883,6 +879,7 @@ contains
 
 
   subroutine GetSolidBodiesBC
+  use WallModels
   integer i,j,k,m,n,o
   integer(SINT) nb
   real(KND) dist,nearx,neary,nearz

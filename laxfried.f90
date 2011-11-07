@@ -7,7 +7,7 @@ module LAXFRIED
  public LF
 
  contains
-   
+
 
  subroutine LF(U2,V2,W2,U,V,W)
   real(KND),dimension(-2:,-2:,-2:):: U2,V2,W2,U,V,W

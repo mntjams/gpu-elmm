@@ -919,11 +919,9 @@ subroutine MG_GS(level,niter)
 integer,intent(in)::level,niter
 integer i,j,k,l
 real(KND) p,Ap
-logical GPU
-  GPU=.true.
-
-  if (GPU.and.level>3) then
-   write (*,*) "GPU is .true."
+!GPU>0.and.
+  if (level>4) then
+   write (*,*) "Gauss-Seidel GPU call level", level
    !$hmpp <GSKernels> allocate
    !$hmpp <GsKernels> advancedload, args[MG_GS_GPU::Phi,MG_GS_GPU::RHS]
    !$hmpp  <GSKernels> MG_GS_GPU callsite
@@ -932,6 +930,7 @@ logical GPU
                   CoefMG(level)%Aw,CoefMG(level)%Ae,CoefMG(level)%As,CoefMG(level)%An,CoefMG(level)%Ab,CoefMG(level)%At,&
                   BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
    !$hmpp <GSKernels> delegatedStore,Args[MG_GS_GPU::Phi]
+
   else
 
    do l=1,niter
@@ -1060,22 +1059,17 @@ integer,intent(in)::level
 real(KND),intent(out)::R
 integer i,j,k
 real(KND),save:: p,Ap
-logical GPU
-
-  GPU=.true.
-
-  if (GPU.and.level>3) then
-   write (*,*) "GPU is .true."
+!GPU>0.and.
+  if (level>4) then
    !$hmpp  <GSKernels> MG_Res_GPU callsite
    call MG_Res_GPU(CoefMG(level)%nx,CoefMG(level)%ny,CoefMG(level)%nz,&
-                  PhiMG(level)%Arr,RHSMG(level)%Arr,ResMG(level)%Arr,&
+                  PhiMG(level)%Arr,ResMG(level)%Arr,RHSMG(level)%Arr,&
                   CoefMG(level)%Aw,CoefMG(level)%Ae,CoefMG(level)%As,CoefMG(level)%An,CoefMG(level)%Ab,CoefMG(level)%At,&
                   BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
    !$hmpp <GSKernels> delegatedStore,Args[MG_Res_GPU::Res]
    !$hmpp <GSKernels> release
   else
 
-     call BOUND_Phi_MG(PhiMG(level)%Arr,CoefMG(level)%nx,CoefMG(level)%ny,CoefMG(level)%nz)
      do k=0,CoefMG(level)%nz
         do j=0,CoefMG(level)%ny
             do i=0,CoefMG(level)%nx
@@ -1172,6 +1166,7 @@ integer k
      endif
   else
    do k = 1, ncgc !number of recurrent calls
+
     call MG_GS(level,npre)
     call MG_res(level,R)
 
@@ -1185,6 +1180,7 @@ integer k
 
     call MG_GS(level,npost)
     call MG_res(level,R)
+
    enddo
   endif
 
@@ -1302,6 +1298,14 @@ endsubroutine POISSMG
 
 
 
+
+
+
+
+
+endmodule MULTIGRID
+
+
 !GPU Codelets. More or less like externals. Inside the module only because of KND.
 
   !$hmpp <GSKernels> group, target=CUDA
@@ -1312,13 +1316,16 @@ subroutine MG_GS_GPU(nx,ny,nz,nit,Phi,RHS,&
                      Aw,Ae,As,An,Ab,At,&
                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
    implicit none
+
+   integer,parameter:: PERIODIC=3
+
    integer,intent(in)   :: nx,ny,nz,nit
-   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::Phi
-   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
-   real(KND),intent(in) :: Aw,Ae,As,An,Ab,At
-   integer(KND),intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+   real(4),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::Phi
+   real(4),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
+   real(4),intent(in) :: Aw,Ae,As,An,Ab,At
+   integer(4),intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
    integer i,j,k,l
-   real(KND) :: p,Ap
+   real(4) :: p,Ap
 
   do l=1,nit
    !$hmppcg grid blocksize 512x1
@@ -1437,23 +1444,25 @@ subroutine MG_GS_GPU(nx,ny,nz,nit,Phi,RHS,&
 endsubroutine MG_GS_GPU
 
 
-
-
-
 !$hmpp <GSKernels> MG_Res_GPU codelet
 subroutine MG_Res_GPU(nx,ny,nz,Phi,Res,RHS,&
                      Aw,Ae,As,An,Ab,At,&
                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+
    implicit none
+
+
+   integer,parameter:: PERIODIC=3
+
    integer,intent(in)   :: nx,ny,nz
-   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::Phi
-   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
-   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
-   real(KND),intent(in) :: Aw,Ae,As,An,Ab,At
-   integer(KND),intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
-   real(KND),intent(out) :: R
+   real(4),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::Phi
+   real(4),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
+   real(4),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
+   real(4),intent(in) :: Aw,Ae,As,An,Ab,At
+   integer(4),intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+   real(4),intent(out) :: R
    integer i,j,k,l
-   real(KND) :: p,Ap
+   real(4) :: p,Ap
 
    !$hmppcg grid blocksize 512x1
    !$hmppcg gridify(k,i)
@@ -1522,17 +1531,6 @@ subroutine MG_Res_GPU(nx,ny,nz,Phi,Res,RHS,&
         enddo
     enddo    
 endsubroutine MG_Res_GPU
-
-
-
-
-
-
-
-
-endmodule MULTIGRID
-
-
 
 
 

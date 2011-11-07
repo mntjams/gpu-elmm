@@ -4,8 +4,6 @@ module TURBINLET
 
   implicit none
 
-  private
-  public GetTurbInlet, GetInletFromFile, ustarinlet
 
   real(KND),allocatable,dimension(:,:,:):: Ru,Rv,Rw !arrays of randoms
   real(KND),allocatable,dimension(:,:,:):: Psiu,Psiv,Psiw

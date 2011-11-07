@@ -1,15 +1,18 @@
 module TSTEPS
 
   use UPWIND
-  use CDS
+  use CDS, only: CDU, CDV, CDW, KappaU, KappaV, KappaW
   use LAXFRIED
   use LAXWEND
   use PARAMETERS
-  use BOUNDARIES
-  use POISSON
-  use SMAGORINSKY
-  use SCALARS
+  use BOUNDARIES, only: Bound_CondU,Bound_CondV,Bound_CondW,Bound_Q
+  use POISSON, only: Pr_Correct
+  use SMAGORINSKY, only: Smag, Dynsmag, StabSmag, Vreman
+  use SCALARS, only:  Bound_Temp, Bound_Visc, Scalar, percdistrib, AdvScalar,&
+     DiffScalar, ComputeTDiff, Deposition, GravSettling, ScalFlSourc
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
+  use GEOMETRIC, only: IBLinInt,IBBiLinInt,IBTriLinInt
+  use Wallmodels, only: ComputeViscsWM
 
   implicit none
 
@@ -126,7 +129,7 @@ contains
    call Bound_Visc(TDiff)
    temperature2=0
    call Bound_Temp(temperature)
-   call CDSScalar(temperature2,temperature,U2,V2,W2,1,1._KND)
+   call AdvScalar(temperature2,temperature,U2,V2,W2,1,1._KND)
    temperature=temperature+temperature2
    call Bound_Temp(temperature2)
    call DiffScalar(temperature2,temperature,1,1._KND)
@@ -312,7 +315,7 @@ contains
 
       Scalar_adv=0
       do i=1,computescalars
-       call KAPPAScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U2,V2,W2,2,1._KND)
+       call AdvScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U2,V2,W2,2,1._KND)
       enddo
       Scalar_2=Scalar_2+Scalar_adv*beta
 
@@ -344,7 +347,7 @@ contains
       temperature2=temperature2+temperature_adv*rho
 
       temperature_adv=0
-      call KAPPAScalar(temperature_adv,temperature,U2,V2,W2,1,1._KND)
+      call AdvScalar(temperature_adv,temperature,U2,V2,W2,1,1._KND)
       temperature2=temperature2+temperature_adv*beta
 
       temperature=temperature+temperature2
@@ -590,7 +593,7 @@ contains
    call Bound_Visc(TDiff)
    temperature2=0
    call Bound_Temp(temperature)
-   call CDSScalar(temperature2,temperature,U2,V2,W2,1,1._KND)
+   call AdvScalar(temperature2,temperature,U2,V2,W2,1,1._KND)
    temperature=temperature+temperature2
    call Bound_Temp(temperature)
    call DiffScalar(temperature2,temperature,1,1._KND)
@@ -645,7 +648,9 @@ contains
   integer,save:: called=0
   real time1,time2
 
+i=0
 
+write(*,*) "Test codelet:", i
   if (called==0) then
    alpha(1)=4._KND/15._KND
    alpha(2)=1._KND/15._KND
@@ -704,6 +709,14 @@ contains
        call KAPPAU(Ustar,U,V,W,1._KND)
        call KAPPAV(Vstar,U,V,W,1._KND)
        call KAPPAW(Wstar,U,V,W,1._KND)
+      else if (GPU>0) then
+       write(*,*) "Call GPU CDS"
+       call BOUND_CONDU(U)
+       call BOUND_CONDV(V)
+       call BOUND_CONDW(W)
+       !$hmpp CDS_GPU callsite
+       call CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Ustar,Vstar,Wstar,U,V,W)
+       write(*,*) "Back from  GPU CDS"
       else
        call CDU(Ustar,U,V,W,1._KND)
        call CDV(Vstar,U,V,W,1._KND)
@@ -769,7 +782,7 @@ contains
       endif
       Scalar_adv=0
       do i=1,computescalars
-       call KAPPAScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U2,V2,W2,2,1._KND)
+       call AdvScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U2,V2,W2,2,1._KND)
       enddo
       Scalar_2=Scalar_2+Scalar_adv*beta(l)
 
@@ -801,7 +814,7 @@ contains
        temperature2=temperature2+temperature_adv*rho(l)
       endif
       temperature_adv=0
-      call KAPPAScalar(temperature_adv,temperature,U2,V2,W2,1,1._KND)
+      call AdvScalar(temperature_adv,temperature,U2,V2,W2,1,1._KND)
       temperature2=temperature2+temperature_adv*beta(l)
 
       temperature=temperature+temperature2
@@ -1395,7 +1408,7 @@ contains
    integer i,j,k,x,y,z
 
    type(TIBPoint),pointer:: IBP
-   
+write(*,*) "Otherterms:"   
    Apre=-coef*dt
    Aprn=-coef*dt
    Aprt=-coef*dt
@@ -1539,8 +1552,13 @@ contains
       enddo
      endif
 
-
-     if (gridtype==UNIFORMGRID) then                  !Performs the diffusion terms
+     if (gridtype==UNIFORMGRID.and.GPU>0) then                  !Performs the diffusion terms
+      write (*,*) "GPU CN call"
+      !$hmpp UNIFREDBLACK_GPU callsite
+      call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,dt,dxmin,dymin,dzmin,&
+                            U,V,W,U2,V2,W2,U3,V3,W3,Visc,coef,maxCNiter,epsCN)
+      write(*,*) "back from GPU CN"
+     else if (gridtype==UNIFORMGRID) then
       call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
      else
       call GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
@@ -2278,6 +2296,389 @@ contains
     enddo
    enddo
   endsubroutine NullInterior
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ !GPU codelets
+
+  !$hmpp UNIFREDBLACK_GPU codelet, target=CUDA
+  subroutine UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,dt,dxmin,dymin,dzmin,&
+          U,V,W,U2,V2,W2,U3,V3,W3,Visc,coef,maxCNiter,epsCN)
+  implicit none
+
+   integer, parameter:: KND=4,TIM=4
+
+   integer,intent(in):: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz
+   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout):: U,U2,U3
+   real(KND),dimension(-2:Vny+3,-2:Vny+3,-2:Vnz+3),intent(inout):: V,V2,V3
+   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout):: W,W2,W3
+   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in):: Visc
+   real(TIM),intent(in):: dt
+   real(KND),intent(in):: dxmin,dymin,dzmin,coef,epsCN
+   integer(KND),intent(in):: maxCNiter
+   real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
+   real(KND),dimension(1:Vnx,1:Vny,1:Vnz):: ApV
+   real(KND),dimension(1:Wnx,1:Wny,1:Wnz):: ApW
+   real(KND) recdxmin2,recdymin2,recdzmin2                                                               !reciprocal values of dx**2
+   real(KND) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
+   integer i,j,k,l
+   intrinsic mod,abs,max
+
+       Ap=coef*dt/(2._KND)
+       S=0
+       l=0
+
+       recdxmin2=1./dxmin**2
+       recdymin2=1./dymin**2
+       recdzmin2=1./dzmin**2
+
+       !$hmppcg permute (k,i,j)
+       do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
+        do j=1,Uny
+         do i=1,Unx
+          U2(i,j,k)=U2(i,j,k)+Ap*(&
+          ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
+          Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*recdxmin2+0.25_KND*(&
+           ((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
+           (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))*recdymin2+&
+           ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
+           (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))*recdzmin2)))
+         enddo
+        enddo
+       enddo
+       !$hmppcg permute (k,i,j)
+       do k=1,Vnz
+        do j=1,Vny
+         do i=1,Vnx
+          V2(i,j,k)=V2(i,j,k)+Ap*(&
+          (0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
+          (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))*recdxmin2+&
+           (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
+           Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*recdymin2+&
+           0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
+           (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))*recdzmin2))
+         enddo
+        enddo
+       enddo
+       !$hmppcg permute (k,i,j)
+       do k=1,Wnz
+       do j=1,Wny
+        do i=1,Wnx
+         W2(i,j,k)=W2(i,j,k)+Ap*(&
+         (0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
+         (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))*recdxmin2+&
+          ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
+          (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))*recdymin2)+&
+          (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
+          Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*recdzmin2))
+        enddo
+       enddo
+      enddo
+
+       !$hmppcg permute (k,i,j)
+       do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
+        do j=1,Uny
+         do i=1,Unx
+          ApU(i,j,k)=((Visc(i+1,j,k)+&
+                      Visc(i,j,k))*recdxmin2+&
+                      0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
+                      (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2+&
+                      ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
+                      (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))*recdzmin2))
+          ApU(i,j,k)=1._KND/(1._KND+Ap*ApU(i,j,k))
+         enddo
+        enddo
+       enddo
+
+
+       !$hmppcg permute (k,i,j)
+       do k=1,Vnz
+        do j=1,Vny
+         do i=1,Vnx
+          ApV(i,j,k)=((Visc(i,j+1,k)+&
+                     Visc(i,j,k))*recdymin2+&
+                     0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
+                      (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k)))*recdxmin2+&
+                     ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
+                     (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))*recdzmin2))
+          ApV(i,j,k)=1._KND/(1._KND+Ap*ApV(i,j,k))
+         enddo
+        enddo
+       enddo
+
+
+       !$hmppcg permute (k,i,j)
+       do k=1,Wnz
+        do j=1,Wny
+         do i=1,Wnx
+          ApW(i,j,k)=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
+                      (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k)))*recdxmin2+&
+                     ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))+&
+                     (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2)+&
+                     (Visc(i,j,k+1)+&
+                     Visc(i,j,k))*recdzmin2)
+          ApW(i,j,k)=1._KND/(1._KND+Ap*ApW(i,j,k))
+         enddo
+        enddo
+       enddo
+
+
+       Suavg=0    !maximum values of velocities to norm the residues.
+       !$hmppcg gridify (k,i), reduce (max:Suavg)
+       do k=1,Unz
+        do i=1,Unx
+         do j=1,Uny
+          Suavg=max(Suavg,abs(U3(i,j,k)))
+         enddo
+        enddo
+       enddo
+       Svavg=0
+       !$hmppcg gridify (k,i), reduce (max:Svavg)
+       do k=1,Vnz
+        do i=1,Vnx
+         do j=1,Vny
+          Svavg=max(Svavg,abs(V3(i,j,k)))
+         enddo
+        enddo
+       enddo
+       Swavg=0
+       !$hmppcg gridify (k,i), reduce (max:Swavg)
+       do k=1,Wnz
+        do i=1,Wnx
+         do j=1,Wny
+          Swavg=max(Swavg,abs(W3(i,j,k)))
+         enddo
+        enddo
+       enddo
+       if (Suavg<=1e-3_KND) Suavg=1
+       if (Svavg<=1e-3_KND) Svavg=1
+       if (Swavg<=1e-3_KND) Swavg=1
+
+
+       l=1
+       S=epsCN+1.
+       do while (S>epsCN.and.l<=maxCNiter)          !Gauss-Seidel iteration for Crank-Nicolson result
+        !call Bound_CondU(U3)
+        !call Bound_CondV(V3)
+        !call Bound_CondW(W3)
+        S=0
+        Su=0
+        Sv=0
+        Sw=0
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify(k,i), reduce(max:Su)
+        do k=1,Unz
+         do i=1,Unx
+          do j=1+mod(i+k,2),Uny,2
+            p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
+             Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
+             0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
+             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
+             ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
+             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
+            p=Ap*p+U2(i,j,k)+U(i,j,k)
+            p=p*ApU(i,j,k)
+
+
+            Su=max(Su,abs(p-U3(i,j,k)))
+            U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+          enddo
+         enddo
+        enddo
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify(k,i), reduce(max:Sv)
+        do k=1,Vnz
+         do i=1,Vnx
+          do j=1+mod(i+k,2),Vny,2
+            p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
+             Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
+             0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
+             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
+             ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
+             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
+            p=Ap*p+V2(i,j,k)+V(i,j,k)
+            p=p*ApV(i,j,k)
+            Sv=max(Sv,abs(p-V3(i,j,k)))
+            V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+          enddo
+         enddo
+        enddo
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify(k,i), reduce(max:Sw)
+        do k=1,Wnz
+         do i=1,Wnx
+          do j=1+mod(i+k,2),Wny,2
+            p=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
+             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
+             ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
+             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
+             (Visc(i,j,k+1)*(W3(i,j,k+1))-&
+             Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
+            p=Ap*p+W2(i,j,k)+W(i,j,k)
+            p=p*ApW(i,j,k)
+            Sw=max(Sw,abs(p-W3(i,j,k)))
+            W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+          enddo
+         enddo
+        enddo
+
+
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify(k,i), reduce(max:Su)
+        do k=1,Unz
+         do i=1,Unx
+          do j=1+mod(i+k+1,2),Uny,2
+            p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
+             Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
+             0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
+             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
+             ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
+             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
+            p=Ap*p+U2(i,j,k)+U(i,j,k)
+            p=p*ApU(i,j,k)
+
+
+            Su=max(Su,abs(p-U3(i,j,k)))
+            U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+          enddo
+         enddo
+        enddo
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify(k,i), reduce(max:Sv)
+        do k=1,Vnz
+         do i=1,Vnx
+          do j=1+mod(i+k+1,2),Vny,2
+            p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
+             Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
+             0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
+             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
+             ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
+             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
+            p=Ap*p+V2(i,j,k)+V(i,j,k)
+            p=p*ApV(i,j,k)
+            Sv=max(Sv,abs(p-V3(i,j,k)))
+            V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+          enddo
+         enddo
+        enddo
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify(k,i), reduce(max:Sw)
+        do k=1,Wnz
+         do i=1,Wnx
+          do j=1+mod(i+k+1,2),Wny,2
+            p=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
+             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
+             ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
+             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
+             (Visc(i,j,k+1)*(W3(i,j,k+1))-&
+             Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
+            p=Ap*p+W2(i,j,k)+W(i,j,k)
+            p=p*ApW(i,j,k)
+            Sw=max(Sw,abs(p-W3(i,j,k)))
+            W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+          enddo
+         enddo
+        enddo
+        S=max(Su/Suavg,Sv/Svavg,Sw/Swavg)
+        l=l+1
+       enddo
+  endsubroutine UNIFREDBLACK_GPU
+
+
+    !$hmpp CDS_GPU codelet, target=CUDA
+    subroutine CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dx,dy,dz,dt,U2,V2,W2,U,V,W)
+    implicit none
+    integer, parameter:: KND=4
+
+    integer,intent(in)    :: Unx, Uny, Unz, Vnx, Vny, Vnz, Wnx, Wny, Wnz
+    real(KND),intent(in)  :: dx, dy, dz, dt
+    real(KND),intent(out) :: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+    real(KND),intent(in)  :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+    real(KND),intent(out) :: V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+    real(KND),intent(in)  :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+    real(KND),intent(out) :: W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+    real(KND),intent(in)  :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+    integer i,j,k
+    real(KND) Ax,Ay,Az
+
+
+        Ax=0.25_KND*dt/dx
+        Ay=0.25_KND*dt/dy
+        Az=0.25_KND*dt/dz
+       !$hmppcg grid blocksize 512x1        
+       !$hmppcg permute (k,i,j)
+        do k=1,Unz
+            do j=1,Uny
+                do i=1,Unx
+                    U2(i,j,k)= - ((Ax*(U(i+1,j,k)+U(i,j,k))*(U(i+1,j,k)+U(i,j,k))&
+                    -Ax*(U(i,j,k)+U(i-1,j,k))*(U(i,j,k)+U(i-1,j,k)))&
+                    +(Ay*(U(i,j+1,k)+U(i,j,k))*(V(i+1,j,k)+V(i,j,k))&
+                    -Ay*(U(i,j,k)+U(i,j-1,k))*(V(i+1,j-1,k)+V(i,j-1,k)))&
+                    +(Az*(U(i,j,k+1)+U(i,j,k))*(W(i+1,j,k)+W(i,j,k))&
+                    -Az*(U(i,j,k)+U(i,j,k-1))*(W(i+1,j,k-1)+W(i,j,k-1))))
+                enddo
+            enddo
+        enddo
+
+       !$hmppcg grid blocksize 512x1        
+       !$hmppcg permute (k,i,j)
+        do k=1,Vnz
+            do j=1,Vny
+                do i=1,Vnx
+                    V2(i,j,k)= - ((Ay*(V(i,j+1,k)+V(i,j,k))*(V(i,j+1,k)+V(i,j,k))&
+                    -Ay*(V(i,j,k)+V(i,j-1,k))*(V(i,j,k)+V(i,j-1,k)))&
+                    +(Ax*(V(i+1,j,k)+V(i,j,k))*(U(i,j+1,k)+U(i,j,k))&
+                    -Ax*(V(i,j,k)+V(i-1,j,k))*(U(i-1,j+1,k)+U(i-1,j,k)))&
+                    +(Az*(V(i,j,k+1)+V(i,j,k))*(W(i,j+1,k)+W(i,j,k))&
+                    -Az*(V(i,j,k)+V(i,j,k-1))*(W(i,j+1,k-1)+W(i,j,k-1))))
+                enddo
+            enddo
+        enddo
+
+       !$hmppcg grid blocksize 512x1        
+       !$hmppcg permute (k,i,j)
+        do k=1,Wnz
+            do j=1,Wny
+                do i=1,Wnx
+                    W2(i,j,k)= - ((Az*(W(i,j,k+1)+W(i,j,k))*(W(i,j,k+1)+W(i,j,k))&
+                    -Az*(W(i,j,k)+W(i,j,k-1))*(W(i,j,k)+W(i,j,k-1)))&
+                    +(Ay*(W(i,j+1,k)+W(i,j,k))*(V(i,j,k+1)+V(i,j,k))&
+                    -Ay*(W(i,j,k)+W(i,j-1,k))*(V(i,j-1,k)+V(i,j-1,k+1)))&
+                    +(Ax*(W(i+1,j,k)+W(i,j,k))*(U(i,j,k+1)+U(i,j,k))&
+                    -Ax*(W(i,j,k)+W(i-1,j,k))*(U(i-1,j,k+1)+U(i-1,j,k))))
+                enddo
+            enddo
+        enddo
+
+    end subroutine CDS_GPU
+
 
 
 end module TSTEPS

@@ -5,7 +5,10 @@ module SCALARS
  use LIMITERS
 
 implicit none
- 
+  private
+  public Bound_Temp, Bound_Visc, Scalar, ScalarAvg, partdiam,partrho,percdistrib, AdvScalar,&
+     DiffScalar, Deposition, GravSettling, ComputeTDiff, Prt, Rig, ScalFlSourc
+
 
   real(KND),allocatable,dimension(:,:,:,:):: SCALAR,SCALARavg  !last index is number of scalar (because of paging)
   real(KND),dimension(:),allocatable:: partdiam,partrho,percdistrib !diameter of particles <=0 for gas
@@ -18,7 +21,7 @@ contains
   real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in):: sctype
   
-   call PLMSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
+   call KappaSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
 
   endsubroutine ADVSCALAR
 
