@@ -919,22 +919,98 @@ subroutine MG_GS(level,niter)
 integer,intent(in)::level,niter
 integer i,j,k,l
 real(KND) p,Ap
-!GPU>0.and.
-  if (level>4) then
+
+  if (GPU>0.and.level>4) then
    write (*,*) "Gauss-Seidel GPU call level", level
-   !$hmpp <GSKernels> allocate
-   !$hmpp <GsKernels> advancedload, args[MG_GS_GPU::Phi,MG_GS_GPU::RHS]
-   !$hmpp  <GSKernels> MG_GS_GPU callsite
-   call MG_GS_GPU(CoefMG(level)%nx,CoefMG(level)%ny,CoefMG(level)%nz,niter,&
-                  PhiMG(level)%Arr,RHSMG(level)%Arr,&
-                  CoefMG(level)%Aw,CoefMG(level)%Ae,CoefMG(level)%As,CoefMG(level)%An,CoefMG(level)%Ab,CoefMG(level)%At,&
-                  BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
-   !$hmpp <GSKernels> delegatedStore,Args[MG_GS_GPU::Phi]
+
+   if (level==0) then
+      !$hmpp <GsKernels> advancedload, args[GS0::Phi,GS0::RHS]
+      !$hmpp  <GSKernels> GS0 callsite
+      call MG_GS_GPU(CoefMG(0)%nx,CoefMG(0)%ny,CoefMG(0)%nz,niter,&
+                    PhiMG(0)%Arr,RHSMG(0)%Arr,&
+                    CoefMG(0)%Aw,CoefMG(0)%Ae,CoefMG(0)%As,CoefMG(0)%An,CoefMG(0)%Ab,CoefMG(0)%At,&
+                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+      !$hmpp <GSKernels> delegatedStore,Args[GS0::Phi]
+
+   elseif (level==1) then
+      !$hmpp <GsKernels> advancedload, args[GS1::Phi,GS1::RHS]
+      !$hmpp  <GSKernels> GS1 callsite
+      call MG_GS_GPU(CoefMG(1)%nx,CoefMG(1)%ny,CoefMG(1)%nz,niter,&
+                    PhiMG(1)%Arr,RHSMG(1)%Arr,&
+                    CoefMG(1)%Aw,CoefMG(1)%Ae,CoefMG(1)%As,CoefMG(1)%An,CoefMG(1)%Ab,CoefMG(1)%At,&
+                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+      !$hmpp <GSKernels> delegatedStore,Args[GS1::Phi]
+
+   elseif (level==2) then
+      !$hmpp <GsKernels> advancedload, args[GS2::Phi,GS2::RHS]
+      !$hmpp  <GSKernels> GS2 callsite
+      call MG_GS_GPU(CoefMG(2)%nx,CoefMG(2)%ny,CoefMG(2)%nz,niter,&
+                    PhiMG(2)%Arr,RHSMG(2)%Arr,&
+                    CoefMG(2)%Aw,CoefMG(2)%Ae,CoefMG(2)%As,CoefMG(2)%An,CoefMG(2)%Ab,CoefMG(2)%At,&
+                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+      !$hmpp <GSKernels> delegatedStore,Args[GS5::Phi]
+
+   elseif (level==3) then
+      !$hmpp <GsKernels> advancedload, args[GS3::Phi,GS3::RHS]
+      !$hmpp  <GSKernels> GS3 callsite
+      call MG_GS_GPU(CoefMG(3)%nx,CoefMG(3)%ny,CoefMG(3)%nz,niter,&
+                    PhiMG(3)%Arr,RHSMG(3)%Arr,&
+                    CoefMG(3)%Aw,CoefMG(3)%Ae,CoefMG(3)%As,CoefMG(3)%An,CoefMG(3)%Ab,CoefMG(3)%At,&
+                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+      !$hmpp <GSKernels> delegatedStore,Args[GS3::Phi]
+
+   elseif (level==4) then
+      !$hmpp <GsKernels> advancedload, args[GS4::Phi,GS4::RHS]
+      !$hmpp  <GSKernels> GS4 callsite
+      call MG_GS_GPU(CoefMG(4)%nx,CoefMG(4)%ny,CoefMG(4)%nz,niter,&
+                    PhiMG(4)%Arr,RHSMG(4)%Arr,&
+                    CoefMG(4)%Aw,CoefMG(4)%Ae,CoefMG(4)%As,CoefMG(4)%An,CoefMG(4)%Ab,CoefMG(4)%At,&
+                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+      !$hmpp <GSKernels> delegatedStore,Args[GS4::Phi]
+
+   elseif (level==5) then
+      !$hmpp <GsKernels> advancedload, args[GS5::Phi,GS5::RHS]
+      !$hmpp  <GSKernels> GS5 callsite
+      call MG_GS_GPU(CoefMG(5)%nx,CoefMG(5)%ny,CoefMG(5)%nz,niter,&
+                    PhiMG(5)%Arr,RHSMG(5)%Arr,&
+                    CoefMG(5)%Aw,CoefMG(5)%Ae,CoefMG(5)%As,CoefMG(5)%An,CoefMG(5)%Ab,CoefMG(5)%At,&
+                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+      !$hmpp <GSKernels> delegatedStore,Args[GS5::Phi]
+
+   elseif (level==6) then
+      !$hmpp <GsKernels> advancedload, args[GS6::Phi,GS6::RHS]
+      !$hmpp  <GSKernels> GS6 callsite
+      call MG_GS_GPU(CoefMG(6)%nx,CoefMG(6)%ny,CoefMG(6)%nz,niter,&
+                    PhiMG(6)%Arr,RHSMG(6)%Arr,&
+                    CoefMG(6)%Aw,CoefMG(6)%Ae,CoefMG(6)%As,CoefMG(6)%An,CoefMG(6)%Ab,CoefMG(6)%At,&
+                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+      !$hmpp <GSKernels> delegatedStore,Args[GS6::Phi]
+
+
+   elseif (level==7) then
+      !$hmpp <GsKernels> advancedload, args[GS7::Phi,GS7::RHS]
+      !$hmpp  <GSKernels> GS7 callsite
+      call MG_GS_GPU(CoefMG(7)%nx,CoefMG(7)%ny,CoefMG(7)%nz,niter,&
+                    PhiMG(7)%Arr,RHSMG(7)%Arr,&
+                    CoefMG(7)%Aw,CoefMG(7)%Ae,CoefMG(7)%As,CoefMG(7)%An,CoefMG(7)%Ab,CoefMG(7)%At,&
+                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+      !$hmpp <GSKernels> delegatedStore,Args[GS7::Phi]
+
+   elseif (level==8) then
+      !$hmpp <GsKernels> advancedload, args[GS8::Phi,GS8::RHS]
+      !$hmpp  <GSKernels> GS8 callsite
+      call MG_GS_GPU(CoefMG(8)%nx,CoefMG(8)%ny,CoefMG(8)%nz,niter,&
+                    PhiMG(8)%Arr,RHSMG(8)%Arr,&
+                    CoefMG(8)%Aw,CoefMG(8)%Ae,CoefMG(8)%As,CoefMG(8)%An,CoefMG(8)%Ab,CoefMG(8)%At,&
+                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+      !$hmpp <GSKernels> delegatedStore,Args[GS8::Phi]
+
+   endif
+
 
   else
 
    do l=1,niter
-!     S=0
     !$OMP PARALLEL PRIVATE(i,j,k,p,Ap)
     !$OMP DO
     do k=0,CoefMG(level)%nz
@@ -1059,15 +1135,72 @@ integer,intent(in)::level
 real(KND),intent(out)::R
 integer i,j,k
 real(KND),save:: p,Ap
-!GPU>0.and.
-  if (level>4) then
-   !$hmpp  <GSKernels> MG_Res_GPU callsite
-   call MG_Res_GPU(CoefMG(level)%nx,CoefMG(level)%ny,CoefMG(level)%nz,&
-                  PhiMG(level)%Arr,ResMG(level)%Arr,RHSMG(level)%Arr,&
-                  CoefMG(level)%Aw,CoefMG(level)%Ae,CoefMG(level)%As,CoefMG(level)%An,CoefMG(level)%Ab,CoefMG(level)%At,&
-                  BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
-   !$hmpp <GSKernels> delegatedStore,Args[MG_Res_GPU::Res]
-   !$hmpp <GSKernels> release
+
+  if (GPU>0.and.level>4) then
+   if (level==0) then
+      !$hmpp  <GSKernels> Res0 callsite
+      call MG_Res_GPU(CoefMG(0)%nx,CoefMG(0)%ny,CoefMG(0)%nz,&
+                      PhiMG(0)%Arr,ResMG(0)%Arr,RHSMG(0)%Arr,&
+                      CoefMG(0)%Aw,CoefMG(0)%Ae,CoefMG(0)%As,CoefMG(0)%An,CoefMG(0)%Ab,CoefMG(0)%At,&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+      !$hmpp <GSKernels> delegatedStore,Args[Res0::Res]
+   elseif (level==1) then
+      !$hmpp  <GSKernels> Res1 callsite
+      call MG_Res_GPU(CoefMG(1)%nx,CoefMG(1)%ny,CoefMG(1)%nz,&
+                      PhiMG(1)%Arr,ResMG(1)%Arr,RHSMG(1)%Arr,&
+                      CoefMG(1)%Aw,CoefMG(1)%Ae,CoefMG(1)%As,CoefMG(1)%An,CoefMG(1)%Ab,CoefMG(1)%At,&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+      !$hmpp <GSKernels> delegatedStore,Args[Res1::Res]
+   elseif (level==2) then
+      !$hmpp  <GSKernels> Res2 callsite
+      call MG_Res_GPU(CoefMG(2)%nx,CoefMG(2)%ny,CoefMG(2)%nz,&
+                      PhiMG(2)%Arr,ResMG(2)%Arr,RHSMG(2)%Arr,&
+                      CoefMG(2)%Aw,CoefMG(2)%Ae,CoefMG(2)%As,CoefMG(2)%An,CoefMG(2)%Ab,CoefMG(2)%At,&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+      !$hmpp <GSKernels> delegatedStore,Args[Res2::Res]
+   elseif (level==3) then
+      !$hmpp  <GSKernels> Res3 callsite
+      call MG_Res_GPU(CoefMG(3)%nx,CoefMG(3)%ny,CoefMG(3)%nz,&
+                      PhiMG(3)%Arr,ResMG(3)%Arr,RHSMG(3)%Arr,&
+                      CoefMG(3)%Aw,CoefMG(3)%Ae,CoefMG(3)%As,CoefMG(3)%An,CoefMG(3)%Ab,CoefMG(3)%At,&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+      !$hmpp <GSKernels> delegatedStore,Args[Res3::Res]
+   elseif (level==4) then
+      !$hmpp  <GSKernels> Res4 callsite
+      call MG_Res_GPU(CoefMG(4)%nx,CoefMG(4)%ny,CoefMG(4)%nz,&
+                      PhiMG(4)%Arr,ResMG(4)%Arr,RHSMG(4)%Arr,&
+                      CoefMG(4)%Aw,CoefMG(4)%Ae,CoefMG(4)%As,CoefMG(4)%An,CoefMG(4)%Ab,CoefMG(4)%At,&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+      !$hmpp <GSKernels> delegatedStore,Args[Res4::Res]
+   elseif (level==5) then
+      !$hmpp  <GSKernels> Res5 callsite
+      call MG_Res_GPU(CoefMG(5)%nx,CoefMG(5)%ny,CoefMG(5)%nz,&
+                      PhiMG(5)%Arr,ResMG(5)%Arr,RHSMG(5)%Arr,&
+                      CoefMG(5)%Aw,CoefMG(5)%Ae,CoefMG(5)%As,CoefMG(5)%An,CoefMG(5)%Ab,CoefMG(5)%At,&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+      !$hmpp <GSKernels> delegatedStore,Args[Res5::Res]
+   elseif (level==6) then
+      !$hmpp  <GSKernels> Res6 callsite
+      call MG_Res_GPU(CoefMG(6)%nx,CoefMG(6)%ny,CoefMG(6)%nz,&
+                      PhiMG(6)%Arr,ResMG(6)%Arr,RHSMG(6)%Arr,&
+                      CoefMG(6)%Aw,CoefMG(6)%Ae,CoefMG(6)%As,CoefMG(6)%An,CoefMG(6)%Ab,CoefMG(6)%At,&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+      !$hmpp <GSKernels> delegatedStore,Args[Res6::Res]
+   elseif (level==7) then
+      !$hmpp  <GSKernels> Res7 callsite
+      call MG_Res_GPU(CoefMG(7)%nx,CoefMG(7)%ny,CoefMG(7)%nz,&
+                      PhiMG(7)%Arr,ResMG(7)%Arr,RHSMG(7)%Arr,&
+                      CoefMG(7)%Aw,CoefMG(7)%Ae,CoefMG(7)%As,CoefMG(7)%An,CoefMG(7)%Ab,CoefMG(7)%At,&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+      !$hmpp <GSKernels> delegatedStore,Args[Res7::Res]
+   elseif (level==8) then
+      !$hmpp  <GSKernels> Res8 callsite
+      call MG_Res_GPU(CoefMG(8)%nx,CoefMG(8)%ny,CoefMG(8)%nz,&
+                      PhiMG(8)%Arr,ResMG(8)%Arr,RHSMG(8)%Arr,&
+                      CoefMG(8)%Aw,CoefMG(8)%Ae,CoefMG(8)%As,CoefMG(8)%An,CoefMG(8)%Ab,CoefMG(8)%At,&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+      !$hmpp <GSKernels> delegatedStore,Args[Res8::Res]
+   endif
   else
 
      do k=0,CoefMG(level)%nz
@@ -1216,23 +1349,32 @@ real(KND),save:: called=0
 
 
  if (called==0) then
-  allocate(PhiMG(minmglevel:LMG),RHSMG(minmglevel:LMG),ResMG(minmglevel:LMG),CoefMG(minmglevel:LMG))
-  do l=LMG,minmglevel,-1
-   CoefMG(l)%nx=bnx*2**l
-   CoefMG(l)%ny=bny*2**l
-   CoefMG(l)%nz=bnz*2**l
-   CoefMG(l)%dx=dxmin*2**(LMG-l)
-   CoefMG(l)%dy=dymin*2**(LMG-l)
-   CoefMG(l)%dz=dzmin*2**(LMG-l)
-   allocate(PhiMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%ny+1,-1:CoefMG(l)%nz+1))
-   allocate(RHSMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%ny+1,-1:CoefMG(l)%nz+1))
-   allocate(ResMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%ny+1,-1:CoefMG(l)%nz+1))
-   CoefMG(l)%Ae=1._KND/(CoefMG(l)%dx*CoefMG(l)%dx)
-   CoefMG(l)%Aw=1._KND/(CoefMG(l)%dx*CoefMG(l)%dx)
-   CoefMG(l)%An=1._KND/(CoefMG(l)%dy*CoefMG(l)%dy)
-   CoefMG(l)%As=1._KND/(CoefMG(l)%dy*CoefMG(l)%dy)
-   CoefMG(l)%At=1._KND/(CoefMG(l)%dz*CoefMG(l)%dz)
-   CoefMG(l)%Ab=1._KND/(CoefMG(l)%dz*CoefMG(l)%dz)
+  allocate(PhiMG(0:8),RHSMG(0:8),ResMG(0:8),CoefMG(0:8))
+  do l=8,0,-1
+   if (l>LMG.or.l<minmglevel) then
+    CoefMG(l)%nx=0
+    CoefMG(l)%ny=0
+    CoefMG(l)%nz=0
+    allocate(PhiMG(l)%Arr(0,0,0))
+    allocate(RHSMG(l)%Arr(0,0,0))
+    allocate(ResMG(l)%Arr(0,0,0))
+   else
+    CoefMG(l)%nx=bnx*2**l
+    CoefMG(l)%ny=bny*2**l
+    CoefMG(l)%nz=bnz*2**l
+    CoefMG(l)%dx=dxmin*2**(LMG-l)
+    CoefMG(l)%dy=dymin*2**(LMG-l)
+    CoefMG(l)%dz=dzmin*2**(LMG-l)
+    allocate(PhiMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%ny+1,-1:CoefMG(l)%nz+1))
+    allocate(RHSMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%ny+1,-1:CoefMG(l)%nz+1))
+    allocate(ResMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%ny+1,-1:CoefMG(l)%nz+1))
+    CoefMG(l)%Ae=1._KND/(CoefMG(l)%dx*CoefMG(l)%dx)
+    CoefMG(l)%Aw=1._KND/(CoefMG(l)%dx*CoefMG(l)%dx)
+    CoefMG(l)%An=1._KND/(CoefMG(l)%dy*CoefMG(l)%dy)
+    CoefMG(l)%As=1._KND/(CoefMG(l)%dy*CoefMG(l)%dy)
+    CoefMG(l)%At=1._KND/(CoefMG(l)%dz*CoefMG(l)%dz)
+    CoefMG(l)%Ab=1._KND/(CoefMG(l)%dz*CoefMG(l)%dz)
+   endif
   enddo
   called=1
  endif
@@ -1279,7 +1421,9 @@ real(KND),save:: called=0
    enddo
    call Bound_Phi_MG(PhiMG(LMG)%Arr,CoefMG(LMG)%nx,CoefMG(LMG)%ny,CoefMG(LMG)%nz)
 
+  !$hmpp <GSKernels> allocate
   call MG_CGC(LMG,mgeps,mgncgc,mgnpre,mgnpost,R)
+  !$hmpp <GSKernels> release
 
   if (R<mgeps)   exit
  write (*,*) "MG residuum",R
@@ -1309,9 +1453,44 @@ endmodule MULTIGRID
 !GPU Codelets. More or less like externals. Inside the module only because of KND.
 
   !$hmpp <GSKernels> group, target=CUDA
-  !$hmpp <GSKernels> mapbyname, nx,ny,nz,Phi,RHS,Aw,Ae,As,An,Ab,At,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+  !$hmpp <GSKernels> map args[GS0::Phi;Res0::Phi]
+  !$hmpp <GSKernels> map args[GS0::RHS;Res0::RHS]
 
-!$hmpp <GSKernels> MG_GS_GPU codelet
+  !$hmpp <GSKernels> map args[GS1::Phi;Res1::Phi]
+  !$hmpp <GSKernels> map args[GS1::RHS;Res1::RHS]
+ 
+  !$hmpp <GSKernels> map args[GS2::Phi;Res2::Phi]
+  !$hmpp <GSKernels> map args[GS2::RHS;Res2::RHS]
+
+  !$hmpp <GSKernels> map args[GS3::Phi;Res3::Phi]
+  !$hmpp <GSKernels> map args[GS3::RHS;Res3::RHS]
+
+  !$hmpp <GSKernels> map args[GS4::Phi;Res4::Phi]
+  !$hmpp <GSKernels> map args[GS4::RHS;Res4::RHS]
+
+  !$hmpp <GSKernels> map args[GS5::Phi;Res5::Phi]
+  !$hmpp <GSKernels> map args[GS5::RHS;Res5::RHS]
+
+  !$hmpp <GSKernels> map args[GS6::Phi;Res6::Phi]
+  !$hmpp <GSKernels> map args[GS6::RHS;Res6::RHS]
+
+  !$hmpp <GSKernels> map args[GS7::Phi;Res7::Phi]
+  !$hmpp <GSKernels> map args[GS7::RHS;Res7::RHS]
+
+  !$hmpp <GSKernels> map args[GS8::Phi;Res8::Phi]
+  !$hmpp <GSKernels> map args[GS8::RHS;Res8::RHS]
+
+  !$hmpp <GSKernels> mapbyname, BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+
+!$hmpp <GSKernels> GS0 codelet
+!$hmpp <GSKernels> GS1 codelet
+!$hmpp <GSKernels> GS2 codelet
+!$hmpp <GSKernels> GS3 codelet
+!$hmpp <GSKernels> GS4 codelet
+!$hmpp <GSKernels> GS5 codelet
+!$hmpp <GSKernels> GS6 codelet
+!$hmpp <GSKernels> GS7 codelet
+!$hmpp <GSKernels> GS8 codelet
 subroutine MG_GS_GPU(nx,ny,nz,nit,Phi,RHS,&
                      Aw,Ae,As,An,Ab,At,&
                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
@@ -1444,7 +1623,15 @@ subroutine MG_GS_GPU(nx,ny,nz,nit,Phi,RHS,&
 endsubroutine MG_GS_GPU
 
 
-!$hmpp <GSKernels> MG_Res_GPU codelet
+!$hmpp <GSKernels> Res0 codelet
+!$hmpp <GSKernels> Res1 codelet
+!$hmpp <GSKernels> Res2 codelet
+!$hmpp <GSKernels> Res3 codelet
+!$hmpp <GSKernels> Res4 codelet
+!$hmpp <GSKernels> Res5 codelet
+!$hmpp <GSKernels> Res6 codelet
+!$hmpp <GSKernels> Res7 codelet
+!$hmpp <GSKernels> Res8 codelet
 subroutine MG_Res_GPU(nx,ny,nz,Phi,Res,RHS,&
                      Aw,Ae,As,An,Ab,At,&
                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)

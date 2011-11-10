@@ -1405,7 +1405,7 @@ write(*,*) "Test codelet:", i
    real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: W3
    real(KND) Af,Ap,Apre,Aprn,Aprt,S
 
-   integer i,j,k,x,y,z
+   integer i,j,k,it,x,y,z
 
    type(TIBPoint),pointer:: IBP
 write(*,*) "Otherterms:"   
@@ -1556,8 +1556,8 @@ write(*,*) "Otherterms:"
       write (*,*) "GPU CN call"
       !$hmpp UNIFREDBLACK_GPU callsite
       call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,dt,dxmin,dymin,dzmin,&
-                            U,V,W,U2,V2,W2,U3,V3,W3,Visc,coef,maxCNiter,epsCN)
-      write(*,*) "back from GPU CN"
+                            U,V,W,U2,V2,W2,U3,V3,W3,Visc,coef,maxCNiter,epsCN,it,S)
+      write(*,*) "back from GPU CN", it,S
      else if (gridtype==UNIFORMGRID) then
       call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
      else
@@ -1713,9 +1713,9 @@ write(*,*) "Otherterms:"
 
 
        do l=1,maxCNiter               !Gauss-Seidel iteration for Crank-Nicolson result
-        call Bound_CondU(U3)
-        call Bound_CondV(V3)
-        call Bound_CondW(W3)
+!         call Bound_CondU(U3)
+!         call Bound_CondV(V3)
+!         call Bound_CondW(W3)
         S=0
         Su=0
         Sv=0
@@ -2330,19 +2330,21 @@ write(*,*) "Otherterms:"
 
   !$hmpp UNIFREDBLACK_GPU codelet, target=CUDA
   subroutine UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,dt,dxmin,dymin,dzmin,&
-          U,V,W,U2,V2,W2,U3,V3,W3,Visc,coef,maxCNiter,epsCN)
+          U,V,W,U2,V2,W2,U3,V3,W3,Visc,coef,maxCNiter,epsCN,iters,residuum)
   implicit none
 
    integer, parameter:: KND=4,TIM=4
 
    integer,intent(in):: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz
    real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout):: U,U2,U3
-   real(KND),dimension(-2:Vny+3,-2:Vny+3,-2:Vnz+3),intent(inout):: V,V2,V3
+   real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout):: V,V2,V3
    real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout):: W,W2,W3
    real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in):: Visc
    real(TIM),intent(in):: dt
    real(KND),intent(in):: dxmin,dymin,dzmin,coef,epsCN
    integer(KND),intent(in):: maxCNiter
+   integer(KND),intent(out):: iters
+   real(KND),intent(out):: residuum
    real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
    real(KND),dimension(1:Vnx,1:Vny,1:Vnz):: ApV
    real(KND),dimension(1:Wnx,1:Wny,1:Wnz):: ApW
@@ -2350,7 +2352,6 @@ write(*,*) "Otherterms:"
    real(KND) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
    integer i,j,k,l
    intrinsic mod,abs,max
-
        Ap=coef*dt/(2._KND)
        S=0
        l=0
@@ -2609,6 +2610,8 @@ write(*,*) "Otherterms:"
         S=max(Su/Suavg,Sv/Svavg,Sw/Swavg)
         l=l+1
        enddo
+    iters=l-1
+    residuum=S
   endsubroutine UNIFREDBLACK_GPU
 
 
@@ -2620,11 +2623,11 @@ write(*,*) "Otherterms:"
     integer,intent(in)    :: Unx, Uny, Unz, Vnx, Vny, Vnz, Wnx, Wny, Wnz
     real(KND),intent(in)  :: dx, dy, dz, dt
     real(KND),intent(out) :: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3)
-    real(KND),intent(in)  :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+    real(KND),intent(in)  :: U( -2:Unx+3,-2:Uny+3,-2:Unz+3)
     real(KND),intent(out) :: V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
-    real(KND),intent(in)  :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+    real(KND),intent(in)  :: V( -2:Vnx+3,-2:Vny+3,-2:Vnz+3)
     real(KND),intent(out) :: W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-    real(KND),intent(in)  :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+    real(KND),intent(in)  :: W( -2:Wnx+3,-2:Wny+3,-2:Wnz+3)
     integer i,j,k
     real(KND) Ax,Ay,Az
 

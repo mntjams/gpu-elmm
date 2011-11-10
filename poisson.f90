@@ -2,8 +2,8 @@ module POISSON
 
  use PARAMETERS
  use BOUNDARIES
- use MULTIGRID
- use MULTIGRID2d
+ use MULTIGRID,   only: POISSMG
+ use MULTIGRID2d, only: POISSMG2d
  use FISHPOISSON 
 
 implicit none
@@ -32,7 +32,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   integer maxiterbackup
 
   if (called==0) then
-    allocate(Phi(0:Prnx+2,0:Prny+2,0:Prnz+2))
+    allocate(Phi(0:Prnx+1,0:Prny+1,0:Prnz+1))
     Phi=0
     called=1
     lastcoef=coef
@@ -369,9 +369,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   real(KND),dimension(0:,0:,0:),intent(inout):: Phi
   real(KND),dimension(1:,1:,1:),intent(in)::RHS
   integer,save:: called=0
-  integer nx,ny,nz,i,j,k,l 
+  integer nx,ny,nz,i,j,k,l,blockit
   real(KND) S,P,Ap
-  real(KND),dimension(:),allocatable,save::Apx,Apy,Apz,Aw,Ae,As,An,Ab,At
+  real(KND),dimension(:),allocatable,save::Aw,Ae,As,An,Ab,At
 
 
    write (*,*) "Computing poisson equation"
@@ -380,149 +380,174 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
    ny=Prny
    nz=Prnz
    if (called==0) then                             !coefficients based on grid spacing computed only once
-       allocate(Aw(1:nx),Ae(1:nx),Apx(1:nx))
-       allocate(As(1:ny),An(1:ny),Apy(1:ny))
-       allocate(Ab(1:nz),At(1:nz),Apz(1:nz))
+       allocate(Aw(1:nx),Ae(1:nx))
+       allocate(As(1:ny),An(1:ny))
+       allocate(Ab(1:nz),At(1:nz))
        forall(i=1:nx)
         Ae(i)=1._KND/(dxU(i)*dxPr(i))
         Aw(i)=1._KND/(dxU(i-1)*dxPr(i))
-        Apx(i)=(1._KND/dxU(i)+1._KND/dxU(i-1))/dxPr(i)
        endforall
        forall(j=1:ny)
         An(j)=1._KND/(dyV(j)*dyPr(j))
         As(j)=1._KND/(dyV(j-1)*dyPr(j))
-        Apy(j)=(1._KND/dyV(j)+1._KND/dyV(j-1))/dyPr(j)
        endforall
        forall(k=1:nz)
         At(k)=1._KND/(dzW(k)*dzPr(k))
         Ab(k)=1._KND/(dzW(k-1)*dzPr(k))
-        Apz(k)=(1._KND/dzW(k)+1._KND/dzW(k-1))/dzPr(k)
        endforall
        called=1
    endif
-   do l=1,maxPoissoniter
-    S=0
-     !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
-     !$OMP DO
-     do k=1,nz
-        do j=1,ny
-            do i=1+mod(j+k,2),nx,2
-             p=0
-             Ap=0
-             if (i>1) then
-                       p=p+Phi(i-1,j,k)*Aw(i)
-                       Ap=Ap+1._KND/(dxmin*dxmin)
-             elseif (BtypeW==PERIODIC) then
-                       p=p+Phi(nx,j,k)*Aw(i)
-                       Ap=Ap+1._KND/(dxmin*dxmin)
-             endif
-             if (i<nx) then
-                       p=p+Phi(i+1,j,k)*Ae(i)
-                       Ap=Ap+1._KND/(dxmin*dxmin)
-             elseif (BtypeW==PERIODIC) then
-                       p=p+Phi(1,j,k)*Ae(i)
-                       Ap=Ap+1._KND/(dxmin*dxmin)
-             endif
-             if (j>1) then
-                       p=p+Phi(i,j-1,k)*As(j)
-                       Ap=Ap+1._KND/(dymin*dymin)
-             elseif (BtypeN==PERIODIC) then
-                       p=p+Phi(i,ny,k)*As(j)
-                       Ap=Ap+1._KND/(dymin*dymin)
-             endif
-             if (j<ny) then
-                       p=p+Phi(i,j+1,k)*An(j)
-                       Ap=Ap+1._KND/(dymin*dymin)
-             elseif (BtypeN==PERIODIC) then
-                       p=p+Phi(i,1,k)*An(j)
-                       Ap=Ap+1._KND/(dymin*dymin)
-             endif
-             if (k>1) then
-                       p=p+Phi(i,j,k-1)*Ab(k)
-                       Ap=Ap+1._KND/(dzmin*dzmin)
-             elseif (BtypeT==PERIODIC) then
-                       p=p+Phi(i,j,nz)*Ab(k)
-                       Ap=Ap+1._KND/(dzmin*dzmin)
-             endif
-             if (k<nz) then
-                       p=p+Phi(i,j,k+1)*At(k)
-                       Ap=Ap+1._KND/(dzmin*dzmin)
-             elseif (BtypeT==PERIODIC) then
-                       p=p+Phi(i,j,1)*At(k)
-                       Ap=Ap+1._KND/(dzmin*dzmin)
-             endif
-             p=p-RHS(i,j,k)
-             p=p/Ap
-             S=max(abs(p-Phi(i,j,k)),S)
-             Phi(i,j,k)=p
-           enddo
-        enddo
-    enddo
-    !$OMP ENDDO
-    !$OMP DO
-    do k=1,nz
-       do j=1,ny
-          do i=1+mod(j+k+1,2),nx,2
-             p=0
-             Ap=0
-             if (i>1) then
-                       p=p+Phi(i-1,j,k)*Aw(i)
-                       Ap=Ap+1._KND/(dxmin*dxmin)
-             elseif (BtypeW==PERIODIC) then
-                       p=p+Phi(nx,j,k)*Aw(i)
-                       Ap=Ap+1._KND/(dxmin*dxmin)
-             endif
-             if (i<nx) then
-                       p=p+Phi(i+1,j,k)*Ae(i)
-                       Ap=Ap+1._KND/(dxmin*dxmin)
-             elseif (BtypeW==PERIODIC) then
-                       p=p+Phi(1,j,k)*Ae(i)
-                       Ap=Ap+1._KND/(dxmin*dxmin)
-             endif
-             if (j>1) then
-                       p=p+Phi(i,j-1,k)*As(j)
-                       Ap=Ap+1._KND/(dymin*dymin)
-             elseif (BtypeN==PERIODIC) then
-                       p=p+Phi(i,ny,k)*As(j)
-                       Ap=Ap+1._KND/(dymin*dymin)
-             endif
-             if (j<ny) then
-                       p=p+Phi(i,j+1,k)*An(j)
-                       Ap=Ap+1._KND/(dymin*dymin)
-             elseif (BtypeN==PERIODIC) then
-                       p=p+Phi(i,1,k)*An(j)
-                       Ap=Ap+1._KND/(dymin*dymin)
-             endif
-             if (k>1) then
-                       p=p+Phi(i,j,k-1)*Ab(k)
-                       Ap=Ap+1._KND/(dzmin*dzmin)
-             elseif (BtypeT==PERIODIC) then
-                       p=p+Phi(i,j,nz)*Ab(k)
-                       Ap=Ap+1._KND/(dzmin*dzmin)
-             endif
-             if (k<nz) then
-                       p=p+Phi(i,j,k+1)*At(k)
-                       Ap=Ap+1._KND/(dzmin*dzmin)
-             elseif (BtypeT==PERIODIC) then
-                       p=p+Phi(i,j,1)*At(k)
-                       Ap=Ap+1._KND/(dzmin*dzmin)
-             endif
-             p=p-RHS(i,j,k)
-             p=p/Ap
-             S=max(abs(p-Phi(i,j,k)),S)
-             Phi(i,j,k)=p
-           enddo
-       enddo
-    enddo
-    !$OMP ENDDO
-   !$OMP ENDPARALLEL
-    call BOUND_Phi(Phi)
-    p=abs(maxval(Phi(1:nx,1:ny,1:nz)))
-    if (p>0) S=S/p
-    if (MOD(l,10)==0)  write (*,*) "   Poisson iter: ",l,S
-    if (S<=epsPOISSON) exit 
-   enddo          
-   
+
+   if (GPU>0) then
+     l=1
+     blockit=200
+     S=huge(1.0)
+     if (blockit>maxPoissoniter) blockit=maxPoissoniter
+     !$hmpp <SOR> allocate
+     !$hmpp <SOR> advancedload, args[GS_GPU::Phi,GS_GPU::RHS,GS_GPU::nx,GS_GPU::ny,GS_GPU::nz,GS_GPU::nit,&
+     !$hmpp <SOR>    GS_GPU::Aw,GS_GPU::Ae,GS_GPU::As,GS_GPU::An,GS_GPU::Ab,GS_GPU::At,&
+     !$hmpp <SOR>    GS_GPU::BtypeW,GS_GPU::BtypeE,GS_GPU::BtypeS,GS_GPU::BtypeN,GS_GPU::BtypeB,GS_GPU::BtypeT]
+     do while (l<=maxPoissoniter.and.S>epsPoisson)
+      !$hmpp  <SOR> GS_GPU callsite
+      call GS_GPU(nx,ny,nz,blockit,&
+                      Phi,RHS,&
+                      Aw,Ae,As,An,Ab,At,&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+      !$hmpp  <SOR> Res_GPU callsite
+      call Res_GPU(nx,ny,nz,&
+                      Phi,RHS,&
+                      Aw,Ae,As,An,Ab,At,&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,S)
+      !$hmpp <SOR> delegatedStore,Args[Res_GPU::R]
+      l=l+blockit
+      write (*,*) "GPU Poisson iter: ",l,S
+     enddo
+      !$hmpp <SOR> delegatedStore,Args[Res_GPU::Phi]
+      !$hmpp <SOR> release      
+   else
+    l=1
+    S=huge(1.0_KND)
+        do while (l<=maxPoissoniter.and.S>maxPoissoniter)
+          S=0
+          !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
+          !$OMP DO
+          do k=1,nz
+             do j=1,ny
+                do i=1+mod(j+k,2),nx,2
+                  p=0
+                  Ap=0
+                  if (i>1) then
+                            p=p+Phi(i-1,j,k)*Aw(i)
+                            Ap=Ap+Aw(i)
+                  elseif (BtypeW==PERIODIC) then
+                            p=p+Phi(nx,j,k)*Aw(i)
+                            Ap=Ap+Aw(i)
+                  endif
+                  if (i<nx) then
+                            p=p+Phi(i+1,j,k)*Ae(i)
+                            Ap=Ap+Ae(i)
+                  elseif (BtypeW==PERIODIC) then
+                            p=p+Phi(1,j,k)*Ae(i)
+                            Ap=Ap+Ae(i)
+                  endif
+                  if (j>1) then
+                            p=p+Phi(i,j-1,k)*As(j)
+                            Ap=Ap+As(j)
+                  elseif (BtypeN==PERIODIC) then
+                            p=p+Phi(i,ny,k)*As(j)
+                            Ap=Ap+As(j)
+                  endif
+                  if (j<ny) then
+                            p=p+Phi(i,j+1,k)*An(j)
+                            Ap=Ap+An(j)
+                  elseif (BtypeN==PERIODIC) then
+                            p=p+Phi(i,1,k)*An(j)
+                            Ap=Ap+An(j)
+                  endif
+                  if (k>1) then
+                            p=p+Phi(i,j,k-1)*Ab(k)
+                            Ap=Ap+Ab(k)
+                  elseif (BtypeT==PERIODIC) then
+                            p=p+Phi(i,j,nz)*Ab(k)
+                            Ap=Ap+Ab(k)
+                  endif
+                  if (k<nz) then
+                            p=p+Phi(i,j,k+1)*At(k)
+                            Ap=Ap+At(k)
+                  elseif (BtypeT==PERIODIC) then
+                            p=p+Phi(i,j,1)*At(k)
+                            Ap=Ap+At(k)
+                  endif
+                  p=p-RHS(i,j,k)
+                  p=p/Ap
+                  S=max(abs(p-Phi(i,j,k)),S)
+                  Phi(i,j,k)=p
+                enddo
+             enddo
+          enddo
+          !$OMP ENDDO
+          !$OMP DO
+          do k=1,nz
+             do j=1,ny
+                do i=1+mod(j+k+1,2),nx,2
+                  p=0
+                  Ap=0
+                  if (i>1) then
+                            p=p+Phi(i-1,j,k)*Aw(i)
+                            Ap=Ap+Aw(i)
+                  elseif (BtypeW==PERIODIC) then
+                            p=p+Phi(nx,j,k)*Aw(i)
+                            Ap=Ap+Aw(i)
+                  endif
+                  if (i<nx) then
+                            p=p+Phi(i+1,j,k)*Ae(i)
+                            Ap=Ap+Ae(i)
+                  elseif (BtypeW==PERIODIC) then
+                            p=p+Phi(1,j,k)*Ae(i)
+                            Ap=Ap+Ae(i)
+                  endif
+                  if (j>1) then
+                            p=p+Phi(i,j-1,k)*As(j)
+                            Ap=Ap+As(j)
+                  elseif (BtypeN==PERIODIC) then
+                            p=p+Phi(i,ny,k)*As(j)
+                            Ap=Ap+As(j)
+                  endif
+                  if (j<ny) then
+                            p=p+Phi(i,j+1,k)*An(j)
+                            Ap=Ap+An(j)
+                  elseif (BtypeN==PERIODIC) then
+                            p=p+Phi(i,1,k)*An(j)
+                            Ap=Ap+An(j)
+                  endif
+                  if (k>1) then
+                            p=p+Phi(i,j,k-1)*Ab(k)
+                            Ap=Ap+Ab(k)
+                  elseif (BtypeT==PERIODIC) then
+                            p=p+Phi(i,j,nz)*Ab(k)
+                            Ap=Ap+Ab(k)
+                  endif
+                  if (k<nz) then
+                            p=p+Phi(i,j,k+1)*At(k)
+                            Ap=Ap+At(k)
+                  elseif (BtypeT==PERIODIC) then
+                            p=p+Phi(i,j,1)*At(k)
+                            Ap=Ap+At(k)
+                  endif
+                  p=p-RHS(i,j,k)
+                  p=p/Ap
+                  S=max(abs(p-Phi(i,j,k)),S)
+                  Phi(i,j,k)=p
+                enddo
+             enddo
+          enddo
+          !$OMP ENDDO
+        !$OMP ENDPARALLEL
+          p=abs(maxval(Phi(1:nx,1:ny,1:nz)))
+          if (p>0) S=S/p
+          if (MOD(l,10)==0)  write (*,*) "   Poisson iter: ",l,S
+        enddo          
+   endif
  end subroutine POISSSOR
   
   
@@ -898,6 +923,242 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
    if (S<eps) exit
   enddo
   endsubroutine TRIDAGGS
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+!GPU Codelets. More or less like externals. Inside the module only because of KND.
+
+  !$hmpp <SOR> group, target=CUDA
+  !$hmpp <SOR> mapbyname, nx,ny,nz,Phi,RHS,Aw,Ae,As,An,Ab,At,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+
+!$hmpp <SOR> GS_GPU codelet
+subroutine GS_GPU(nx,ny,nz,nit,Phi,RHS,&
+                     Aw,Ae,As,An,Ab,At,&
+                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+   implicit none
+
+   integer,parameter:: KND=4,PERIODIC=3
+
+   integer,intent(in)   :: nx,ny,nz,nit
+   real(KND),dimension(0:nx+1,0:ny+1,0:nz+1),intent(inout)::Phi
+   real(KND),dimension(1:nx,1:ny,1:nz),intent(in)::RHS
+   real(KND),dimension(1:nx),intent(in) :: Aw,Ae
+   real(KND),dimension(1:ny),intent(in) :: As,An
+   real(KND),dimension(1:nz),intent(in) :: Ab,At
+   integer(KND),intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+   integer i,j,k,l
+   real(KND) :: p,Ap
+   intrinsic mod
+
+  do l=1,nit
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+     do k=1,nz
+        do i=1,nx
+            do j=1+mod(i+k,2),ny,2
+             p=0
+             Ap=0
+             if (i>1) then
+                       p=p+Phi(i-1,j,k)*Aw(i)
+                       Ap=Ap+Aw(i)
+             elseif (BtypeW==PERIODIC) then
+                       p=p+Phi(nx-1,j,k)*Aw(i)
+                       Ap=Ap+Aw(i)
+             endif
+             if (i<nx) then
+                       p=p+Phi(i+1,j,k)*Ae(i)
+                       Ap=Ap+Ae(i)
+             elseif (BtypeE==PERIODIC) then
+                       p=p+Phi(1,j,k)*Ae(i)
+                       Ap=Ap+Ae(i)
+             endif
+             if (j>1) then
+                       p=p+Phi(i,j-1,k)*As(j)
+                       Ap=Ap+As(j)
+             elseif (BtypeS==PERIODIC) then
+                       p=p+Phi(i,ny-1,k)*As(j)
+                       Ap=Ap+As(j)
+             endif
+             if (j<ny) then
+                       p=p+Phi(i,j+1,k)*An(j)
+                       Ap=Ap+An(j)
+             elseif (BtypeN==PERIODIC) then
+                       p=p+Phi(i,1,k)*An(j)
+                       Ap=Ap+An(j)
+             endif
+             if (k>1) then
+                       p=p+Phi(i,j,k-1)*Ab(k)
+                       Ap=Ap+Ab(k)
+             elseif (BtypeB==PERIODIC) then
+                       p=p+Phi(i,j,nz-1)*Ab(k)
+                       Ap=Ap+Ab(k)
+             endif
+             if (k<nz) then
+                       p=p+Phi(i,j,k+1)*At(k)
+                       Ap=Ap+At(k)
+             elseif (BtypeT==PERIODIC) then
+                       p=p+Phi(i,j,1)*At(k)
+                       Ap=Ap+At(k)
+             endif
+             p=p-RHS(i,j,k)
+
+             p=p/Ap
+             Phi(i,j,k)=p
+            enddo
+        enddo
+    enddo
+  !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+     do k=1,nz
+        do i=1,nx
+            do j=1+mod(i+k+1,2),ny,2
+             p=0
+             Ap=0
+             if (i>1) then
+                       p=p+Phi(i-1,j,k)*Aw(i)
+                       Ap=Ap+Aw(i)
+             elseif (BtypeW==PERIODIC) then
+                       p=p+Phi(nx-1,j,k)*Aw(i)
+                       Ap=Ap+Aw(i)
+             endif
+             if (i<nx) then
+                       p=p+Phi(i+1,j,k)*Ae(i)
+                       Ap=Ap+Ae(i)
+             elseif (BtypeE==PERIODIC) then
+                       p=p+Phi(1,j,k)*Ae(i)
+                       Ap=Ap+Ae(i)
+             endif
+             if (j>1) then
+                       p=p+Phi(i,j-1,k)*As(j)
+                       Ap=Ap+As(j)
+             elseif (BtypeS==PERIODIC) then
+                       p=p+Phi(i,ny-1,k)*As(j)
+                       Ap=Ap+As(j)
+             endif
+             if (j<ny) then
+                       p=p+Phi(i,j+1,k)*An(j)
+                       Ap=Ap+An(j)
+             elseif (BtypeN==PERIODIC) then
+                       p=p+Phi(i,1,k)*An(j)
+                       Ap=Ap+An(j)
+             endif
+             if (k>1) then
+                       p=p+Phi(i,j,k-1)*Ab(k)
+                       Ap=Ap+Ab(k)
+             elseif (BtypeB==PERIODIC) then
+                       p=p+Phi(i,j,nz-1)*Ab(k)
+                       Ap=Ap+Ab(k)
+             endif
+             if (k<nz) then
+                       p=p+Phi(i,j,k+1)*At(k)
+                       Ap=Ap+At(k)
+             elseif (BtypeT==PERIODIC) then
+                       p=p+Phi(i,j,1)*At(k)
+                       Ap=Ap+At(k)
+             endif
+             p=p-RHS(i,j,k)
+
+             p=p/Ap
+             Phi(i,j,k)=p
+            enddo
+        enddo
+    enddo
+  enddo
+endsubroutine GS_GPU
+
+
+!$hmpp <SOR> Res_GPU codelet
+subroutine Res_GPU(nx,ny,nz,Phi,RHS,&
+                     Aw,Ae,As,An,Ab,At,&
+                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+
+   implicit none
+   intrinsic mod, abs, max
+
+
+   integer,parameter:: KND=4,PERIODIC=3
+
+   integer,intent(in)   :: nx,ny,nz
+   real(KND),dimension(0:nx+1,0:ny+1,0:nz+1),intent(inout)::Phi
+   real(KND),dimension(1:nx,1:ny,1:nz),intent(in)::RHS
+   real(KND),dimension(1:nx),intent(in) :: Aw,Ae
+   real(KND),dimension(1:ny),intent(in) :: As,An
+   real(KND),dimension(1:nz),intent(in) :: Ab,At
+   integer(KND),intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+   real(KND),intent(out) :: R
+   integer i,j,k,l
+   real(KND) :: p,Ap
+
+   R=0
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i), reduce(max:R)
+     do k=1,nz
+        do i=1,nx
+            do j=1,ny
+             p=0
+             Ap=0
+             if (i>1) then
+                       p=p+Phi(i-1,j,k)*Aw(i)
+                       Ap=Ap+Aw(i)
+             elseif (BtypeW==PERIODIC) then
+                       p=p+Phi(nx-1,j,k)*Aw(i)
+                       Ap=Ap+Aw(i)
+             endif
+             if (i<nx) then
+                       p=p+Phi(i+1,j,k)*Ae(i)
+                       Ap=Ap+Ae(i)
+             elseif (BtypeE==PERIODIC) then
+                       p=p+Phi(1,j,k)*Ae(i)
+                       Ap=Ap+Ae(i)
+             endif
+             if (j>1) then
+                       p=p+Phi(i,j-1,k)*As(j)
+                       Ap=Ap+As(j)
+             elseif (BtypeS==PERIODIC) then
+                       p=p+Phi(i,ny-1,k)*As(j)
+                       Ap=Ap+As(j)
+             endif
+             if (j<ny) then
+                       p=p+Phi(i,j+1,k)*An(j)
+                       Ap=Ap+An(j)
+             elseif (BtypeN==PERIODIC) then
+                       p=p+Phi(i,1,k)*An(j)
+                       Ap=Ap+An(j)
+             endif
+             if (k>1) then
+                       p=p+Phi(i,j,k-1)*Ab(k)
+                       Ap=Ap+Ab(k)
+             elseif (BtypeB==PERIODIC) then
+                       p=p+Phi(i,j,nz-1)*Ab(k)
+                       Ap=Ap+Ab(k)
+             endif
+             if (k<nz) then
+                       p=p+Phi(i,j,k+1)*At(k)
+                       Ap=Ap+At(k)
+             elseif (BtypeT==PERIODIC) then
+                       p=p+Phi(i,j,1)*At(k)
+                       Ap=Ap+At(k)
+             endif
+             p=p-RHS(i,j,k)
+             p=abs(-p +Ap*Phi(i,j,k))
+             R=max(R,abs(p))
+            enddo
+        enddo
+     enddo
+endsubroutine Res_GPU
+
 
 
 

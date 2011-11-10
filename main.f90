@@ -455,7 +455,7 @@ program CLMM
 
  write (*,*) "Saving results..."
 
-!  call OUTPUT(U,V,W,Pr)
+ call OUTPUT(U,V,W,Pr)
 
 
 end program CLMM
