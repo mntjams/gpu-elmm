@@ -15,13 +15,13 @@ module INITIAL
   private
   public  Readparams, Initconds
 
-  integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
-  real(KND) mgepsinnerGS
 
 
 contains
  subroutine READPARAMS
- integer i
+  integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter,minGPUlevel
+  real(KND) mgepsinnerGS
+  integer i,io
  
   open(11,file="main.conf",status="OLD",action="READ")
   read (11,fmt='(/)')
@@ -368,6 +368,8 @@ contains
     read (11,*) mgmaxinnerGSiter
     read (11,fmt='(/)')
     read (11,*) mgepsinnerGS
+    read (11,fmt='(/)',iostat=io)
+    read (11,*,iostat=io) minGPUlevel
     close(11)
 
     if (poissmet==3.or.poissmet==4) then
@@ -376,7 +378,8 @@ contains
                           lmgncgc=mgncgc,lmgnpre=mgnpre,lmgnpost=mgnpost,&
                           lmgmaxinnerGSiter=mgmaxinnerGSiter,lmgepsinnerGS=mgepsinnerGS)
       else
-       call SetMGParams(llmg=lmg,lminmglevel=minmglevel,lbnx=bnx,lbny=bny,lbnz=bnz,&
+       call SetMGParams(llmg=lmg,lminmglevel=minmglevel,lminGPUlevel=minGPUlevel,&
+                          lbnx=bnx,lbny=bny,lbnz=bnz,&
                           lmgncgc=mgncgc,lmgnpre=mgnpre,lmgnpost=mgnpost,&
                           lmgmaxinnerGSiter=mgmaxinnerGSiter,lmgepsinnerGS=mgepsinnerGS)
       endif

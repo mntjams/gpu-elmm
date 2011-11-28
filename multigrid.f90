@@ -24,24 +24,28 @@ module MULTIGRID
   integer bnx,bny,bnz !Base cube dimensions for Multigrid, Prnx=bnx*2**level
   integer LMG !depth of multigrid
   integer minmglevel !innermost MG level
+  integer,save :: minGPUlevel=5
   integer mgncgc !type of cycling 1..V cycle, 2..W cycle
   integer mgnpre
   integer mgnpost
   integer mgmaxinnerGSiter
   real(KND) mgepsinnerGS
 
+  integer,dimension(0:8) :: nxa,nya,nza
+  real(KND),dimension(0:8) :: Aw,Ae,As,An,Ab,At
 
 contains 
 
 
- subroutine SetMGParams(llmg, lminmglevel, lbnx, lbny, lbnz,&
+ subroutine SetMGParams(llmg, lminmglevel, lmingpulevel, lbnx, lbny, lbnz,&
                           lmgncgc, lmgnpre, lmgnpost, lmgmaxinnerGSiter, lmgepsinnerGS)
 
-  integer,intent(in)::   llmg, lminmglevel, lbnx, lbny, lbnz, lmgncgc, lmgnpre, lmgnpost, lmgmaxinnerGSiter
+  integer,intent(in)::   llmg, lminmglevel, lmingpulevel, lbnx, lbny, lbnz, lmgncgc, lmgnpre, lmgnpost, lmgmaxinnerGSiter
   real(KND),intent(in):: lmgepsinnerGS
 
   lmg=llmg
   minmglevel=lminmglevel
+  minGPUlevel=lminGPUlevel
   bnx=lbnx
   bny=lbny
   bnz=lbnz
@@ -52,57 +56,71 @@ contains
   mgepsinnerGS=lmgepsinnerGS
  endsubroutine SetMGParams
 
- pure subroutine Prolongate(AFine,ACoarse,level)
-  implicit none
+ subroutine Prolongate(AFine,ACoarse,level)
   integer,intent(in):: level
   real(KND),dimension(-1:,-1:,-1:),intent(in):: ACoarse
   real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
   integer:: i,j,k,nx,ny,nz
+  real(KND):: A1,A2,A4,A8
+
  
    nx=bnx*2**level !level means from which grid we interpolate
    ny=bny*2**level
    nz=bnz*2**level
 
-   do k=0,nz
-    do j=0,ny
-     do i=0,nx
-                     AFine(2*i,2*j,2*k)=AFine(2*i,2*j,2*k)+ACoarse(i,j,k)
-                     AFine(2*i+1,2*j,2*k)=AFine(2*i+1,2*j,2*k)+0.5*ACoarse(i,j,k)
-                     AFine(2*i-1,2*j,2*k)=AFine(2*i-1,2*j,2*k)+0.5*ACoarse(i,j,k)
-                     AFine(2*i,2*j+1,2*k)=AFine(2*i,2*j+1,2*k)+0.5*ACoarse(i,j,k)
-                     AFine(2*i,2*j-1,2*k)=AFine(2*i,2*j-1,2*k)+0.5*ACoarse(i,j,k)
-                     AFine(2*i,2*j,2*k+1)=AFine(2*i,2*j,2*k+1)+0.5*ACoarse(i,j,k)
-                     AFine(2*i,2*j,2*k-1)=AFine(2*i,2*j,2*k-1)+0.5*ACoarse(i,j,k)
-                     AFine(2*i+1,2*j+1,2*k)=AFine(2*i+1,2*j+1,2*k)+0.25*ACoarse(i,j,k)
-                     AFine(2*i+1,2*j,2*k+1)=AFine(2*i+1,2*j,2*k+1)+0.25*ACoarse(i,j,k)
-                     AFine(2*i,2*j+1,2*k+1)=AFine(2*i,2*j+1,2*k+1)+0.25*ACoarse(i,j,k)
-                     AFine(2*i-1,2*j-1,2*k)=AFine(2*i-1,2*j-1,2*k)+0.25*ACoarse(i,j,k)
-                     AFine(2*i-1,2*j,2*k-1)=AFine(2*i-1,2*j,2*k-1)+0.25*ACoarse(i,j,k)
-                     AFine(2*i,2*j-1,2*k-1)=AFine(2*i,2*j-1,2*k-1)+0.25*ACoarse(i,j,k)
-                     AFine(2*i-1,2*j+1,2*k)=AFine(2*i-1,2*j+1,2*k)+0.25*ACoarse(i,j,k)
-                     AFine(2*i-1,2*j,2*k+1)=AFine(2*i-1,2*j,2*k+1)+0.25*ACoarse(i,j,k)
-                     AFine(2*i+1,2*j-1,2*k)=AFine(2*i+1,2*j-1,2*k)+0.25*ACoarse(i,j,k)
-                     AFine(2*i,2*j-1,2*k+1)=AFine(2*i,2*j-1,2*k+1)+0.25*ACoarse(i,j,k)
-                     AFine(2*i+1,2*j,2*k-1)=AFine(2*i+1,2*j,2*k-1)+0.25*ACoarse(i,j,k)
-                     AFine(2*i,2*j+1,2*k-1)=AFine(2*i,2*j+1,2*k-1)+0.25*ACoarse(i,j,k)
-                     AFine(2*i+1,2*j+1,2*k+1)=AFine(2*i+1,2*j+1,2*k+1)+0.125*ACoarse(i,j,k)
-                     AFine(2*i-1,2*j+1,2*k+1)=AFine(2*i-1,2*j+1,2*k+1)+0.125*ACoarse(i,j,k)
-                     AFine(2*i+1,2*j-1,2*k+1)=AFine(2*i+1,2*j-1,2*k+1)+0.125*ACoarse(i,j,k)
-                     AFine(2*i+1,2*j+1,2*k-1)=AFine(2*i+1,2*j+1,2*k-1)+0.125*ACoarse(i,j,k)
-                     AFine(2*i-1,2*j-1,2*k+1)=AFine(2*i-1,2*j-1,2*k+1)+0.125*ACoarse(i,j,k)
-                     AFine(2*i-1,2*j+1,2*k-1)=AFine(2*i-1,2*j+1,2*k-1)+0.125*ACoarse(i,j,k)
-                     AFine(2*i+1,2*j-1,2*k-1)=AFine(2*i+1,2*j-1,2*k-1)+0.125*ACoarse(i,j,k)
-                     AFine(2*i-1,2*j-1,2*k-1)=AFine(2*i-1,2*j-1,2*k-1)+0.125*ACoarse(i,j,k)
-     enddo
-    enddo
-   enddo
+   if (GPU>0.and.level>=minGPUlevel-1) then!.and.level>3
 
+      
+      !$hmpp <GSKernels> advancedload, args[Pr::level]
+      !$hmpp <GSKernels> Pr callsite,args[*].noupdate=true
+      call Pr_GPU(nxa,nya,nza,PhiMG(0)%Arr,PhiMG(1)%Arr,PhiMG(2)%Arr,PhiMG(3)%Arr,PhiMG(4)%Arr,&
+                             PhiMG(5)%Arr,PhiMG(6)%Arr,PhiMG(7)%Arr,PhiMG(8)%Arr,&
+                                 BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level)
+
+   else
+    do k=0,nz
+     do j=0,ny
+      do i=0,nx
+                      A1=ACoarse(i,j,k)
+                      A2=0.5_KND*A1
+                      A4=0.25_KND*A1
+                      A8=0.125*A1
+                      AFine(2*i,2*j,2*k)=AFine(2*i,2*j,2*k)+A1
+                      AFine(2*i+1,2*j,2*k)=AFine(2*i+1,2*j,2*k)+A2
+                      AFine(2*i-1,2*j,2*k)=AFine(2*i-1,2*j,2*k)+A2
+                      AFine(2*i,2*j+1,2*k)=AFine(2*i,2*j+1,2*k)+A2
+                      AFine(2*i,2*j-1,2*k)=AFine(2*i,2*j-1,2*k)+A2
+                      AFine(2*i,2*j,2*k+1)=AFine(2*i,2*j,2*k+1)+A2
+                      AFine(2*i,2*j,2*k-1)=AFine(2*i,2*j,2*k-1)+A2
+                      AFine(2*i+1,2*j+1,2*k)=AFine(2*i+1,2*j+1,2*k)+A4
+                      AFine(2*i+1,2*j,2*k+1)=AFine(2*i+1,2*j,2*k+1)+A4
+                      AFine(2*i,2*j+1,2*k+1)=AFine(2*i,2*j+1,2*k+1)+A4
+                      AFine(2*i-1,2*j-1,2*k)=AFine(2*i-1,2*j-1,2*k)+A4
+                      AFine(2*i-1,2*j,2*k-1)=AFine(2*i-1,2*j,2*k-1)+A4
+                      AFine(2*i,2*j-1,2*k-1)=AFine(2*i,2*j-1,2*k-1)+A4
+                      AFine(2*i-1,2*j+1,2*k)=AFine(2*i-1,2*j+1,2*k)+A4
+                      AFine(2*i-1,2*j,2*k+1)=AFine(2*i-1,2*j,2*k+1)+A4
+                      AFine(2*i+1,2*j-1,2*k)=AFine(2*i+1,2*j-1,2*k)+A4
+                      AFine(2*i,2*j-1,2*k+1)=AFine(2*i,2*j-1,2*k+1)+A4
+                      AFine(2*i+1,2*j,2*k-1)=AFine(2*i+1,2*j,2*k-1)+A4
+                      AFine(2*i,2*j+1,2*k-1)=AFine(2*i,2*j+1,2*k-1)+A4
+                      AFine(2*i+1,2*j+1,2*k+1)=AFine(2*i+1,2*j+1,2*k+1)+A8
+                      AFine(2*i-1,2*j+1,2*k+1)=AFine(2*i-1,2*j+1,2*k+1)+A8
+                      AFine(2*i+1,2*j-1,2*k+1)=AFine(2*i+1,2*j-1,2*k+1)+A8
+                      AFine(2*i+1,2*j+1,2*k-1)=AFine(2*i+1,2*j+1,2*k-1)+A8
+                      AFine(2*i-1,2*j-1,2*k+1)=AFine(2*i-1,2*j-1,2*k+1)+A8
+                      AFine(2*i-1,2*j+1,2*k-1)=AFine(2*i-1,2*j+1,2*k-1)+A8
+                      AFine(2*i+1,2*j-1,2*k-1)=AFine(2*i+1,2*j-1,2*k-1)+A8
+                      AFine(2*i-1,2*j-1,2*k-1)=AFine(2*i-1,2*j-1,2*k-1)+A8
+      enddo
+      enddo
+    enddo
+   endif
    call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
  endsubroutine Prolongate
 
 
  subroutine Restrict(ACoarse,AFine,level)
- implicit none
  integer,intent(in):: level
  real(KND),dimension(-1:,-1:,-1:),intent(out):: ACoarse
  real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
@@ -112,124 +130,137 @@ contains
    nx=bnx*2**level !level means on which grid we restrict
    ny=bny*2**level
    nz=bnz*2**level
-   call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
 
-   do k=0,nz
-    do j=0,ny
-     do i=0,nx
-         ACoarse(i,j,k)=AFine(2*i,2*j,2*k); q=1.0
+   if (GPU>0.and.level>=minGPUlevel-1) then
+      !$hmpp <GSKernels> advancedload, args[Re::level]
+      !$hmpp <GSKernels> Re callsite,args[*].noupdate=true
+          call Re_GPU(nxa,nya,nza,RHSMG(0)%Arr,RHSMG(1)%Arr,RHSMG(2)%Arr,RHSMG(3)%Arr,RHSMG(4)%Arr,&
+                             RHSMG(5)%Arr,RHSMG(6)%Arr,RHSMG(7)%Arr,RHSMG(8)%Arr,&
+                             ResMG(0)%Arr,ResMG(1)%Arr,ResMG(2)%Arr,ResMG(3)%Arr,ResMG(4)%Arr,&
+                             ResMG(5)%Arr,ResMG(6)%Arr,ResMG(7)%Arr,ResMG(8)%Arr,&
+                                 BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level)
+   else
 
-         if (i<nx) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i+1,2*j,2*k); q=q+0.5
-         endif
 
-         if (i>0) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i-1,2*j,2*k); q=q+0.5
-         endif
+      call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
 
-         if (j<ny) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j+1,2*k); q=q+0.5
-         endif
+      do k=0,nz
+       do j=0,ny
+        do i=0,nx
+            ACoarse(i,j,k)=AFine(2*i,2*j,2*k); q=1.0
 
-         if (j>0) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j-1,2*k); q=q+0.5
-         endif
+            if (i<nx) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i+1,2*j,2*k); q=q+0.5
+            endif
 
-         if (k<nz) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k+1); q=q+0.5
-         endif
+            if (i>0) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i-1,2*j,2*k); q=q+0.5
+            endif
 
-         if (k>0) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k-1); q=q+0.5
-         endif
+            if (j<ny) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j+1,2*k); q=q+0.5
+            endif
 
-         if ((i<nx).and.(j<ny)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j+1,2*k); q=q+0.25
-         endif
+            if (j>0) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j-1,2*k); q=q+0.5
+            endif
 
-         if ((i<nx).and.(k<nz)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k+1); q=q+0.25
-         endif
+            if (k<nz) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k+1); q=q+0.5
+            endif
 
-         if ((j<ny).and.(k<nz)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k+1); q=q+0.25
-         endif
+            if (k>0) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k-1); q=q+0.5
+            endif
 
-         if ((i>0).and.(j>0)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j-1,2*k); q=q+0.25
-         endif
+            if ((i<nx).and.(j<ny)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j+1,2*k); q=q+0.25
+            endif
 
-         if ((i>0).and.(k>0)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k-1); q=q+0.25
-         endif
+            if ((i<nx).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k+1); q=q+0.25
+            endif
 
-         if ((j>0).and.(k>0)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k-1); q=q+0.25
-         endif
+            if ((j<ny).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k+1); q=q+0.25
+            endif
 
-         if ((i>0).and.(j<ny)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j+1,2*k); q=q+0.25
-         endif
+            if ((i>0).and.(j>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j-1,2*k); q=q+0.25
+            endif
 
-         if ((i>0).and.(k<nz)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k+1); q=q+0.25
-         endif
+            if ((i>0).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k-1); q=q+0.25
+            endif
 
-         if ((i<nx).and.(j>0)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j-1,2*k); q=q+0.25
-         endif
+            if ((j>0).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k-1); q=q+0.25
+            endif
 
-         if ((j>0).and.(k<nz)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k+1); q=q+0.25
-         endif
+            if ((i>0).and.(j<ny)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j+1,2*k); q=q+0.25
+            endif
 
-         if ((i<nx).and.(k>0)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k-1); q=q+0.25
-         endif
+            if ((i>0).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k+1); q=q+0.25
+            endif
 
-         if ((j<ny).and.(k>0)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k-1); q=q+0.25
-         endif
+            if ((i<nx).and.(j>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j-1,2*k); q=q+0.25
+            endif
 
-         if ((i<nx).and.(j<ny).and.(k<nz)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k+1); q=q+0.125
-         endif
+            if ((j>0).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k+1); q=q+0.25
+            endif
 
-         if ((i>0).and.(j<ny).and.(k<nz)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k+1); q=q+0.125
-         endif
+            if ((i<nx).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k-1); q=q+0.25
+            endif
 
-         if ((i<nx).and.(j>0).and.(k<nz)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k+1); q=q+0.125
-         endif
+            if ((j<ny).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k-1); q=q+0.25
+            endif
 
-         if ((i<nx).and.(j<ny).and.(k>0)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k-1); q=q+0.125
-         endif
+            if ((i<nx).and.(j<ny).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k+1); q=q+0.125
+            endif
 
-         if ((i>0).and.(j>0).and.(k<nz)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k+1); q=q+0.125
-         endif
+            if ((i>0).and.(j<ny).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k+1); q=q+0.125
+            endif
 
-         if ((i>0).and.(j<ny).and.(k>0)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k-1); q=q+0.125
-         endif
+            if ((i<nx).and.(j>0).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k+1); q=q+0.125
+            endif
 
-         if ((i<nx).and.(j>0).and.(k>0)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k-1); q=q+0.125
-         endif
+            if ((i<nx).and.(j<ny).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k-1); q=q+0.125
+            endif
 
-         if ((i>0).and.(j>0).and.(k>0)) then
-          ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k-1); q=q+0.125
-         endif
+            if ((i>0).and.(j>0).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k+1); q=q+0.125
+            endif
 
-         ACoarse(i,j,k)=ACoarse(i,j,k)/q       
-     enddo
-    enddo
-   enddo
-    if (BtypeE==PERIODIC) ACoarse(0,:,:)=ACoarse(nx,:,:)
-    if (BtypeN==PERIODIC) ACoarse(:,0,:)=ACoarse(:,ny,:)
-    if (BtypeT==PERIODIC) ACoarse(:,:,0)=ACoarse(:,:,nz)
+            if ((i>0).and.(j<ny).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k-1); q=q+0.125
+            endif
+
+            if ((i<nx).and.(j>0).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k-1); q=q+0.125
+            endif
+
+            if ((i>0).and.(j>0).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k-1); q=q+0.125
+            endif
+
+            ACoarse(i,j,k)=ACoarse(i,j,k)/q       
+        enddo
+        enddo
+      enddo
+        if (BtypeE==PERIODIC) ACoarse(0,:,:)=ACoarse(nx,:,:)
+        if (BtypeN==PERIODIC) ACoarse(:,0,:)=ACoarse(:,ny,:)
+        if (BtypeT==PERIODIC) ACoarse(:,:,0)=ACoarse(:,:,nz)
+   endif
 endsubroutine Restrict
 
 
@@ -920,93 +951,16 @@ integer,intent(in)::level,niter
 integer i,j,k,l
 real(KND) p,Ap
 
-  if (GPU>0.and.level>4) then
-   write (*,*) "Gauss-Seidel GPU call level", level
-
-   if (level==0) then
-      !$hmpp <GsKernels> advancedload, args[GS0::Phi,GS0::RHS]
-      !$hmpp  <GSKernels> GS0 callsite
-      call MG_GS_GPU(CoefMG(0)%nx,CoefMG(0)%ny,CoefMG(0)%nz,niter,&
-                    PhiMG(0)%Arr,RHSMG(0)%Arr,&
-                    CoefMG(0)%Aw,CoefMG(0)%Ae,CoefMG(0)%As,CoefMG(0)%An,CoefMG(0)%Ab,CoefMG(0)%At,&
-                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
-      !$hmpp <GSKernels> delegatedStore,Args[GS0::Phi]
-
-   elseif (level==1) then
-      !$hmpp <GsKernels> advancedload, args[GS1::Phi,GS1::RHS]
-      !$hmpp  <GSKernels> GS1 callsite
-      call MG_GS_GPU(CoefMG(1)%nx,CoefMG(1)%ny,CoefMG(1)%nz,niter,&
-                    PhiMG(1)%Arr,RHSMG(1)%Arr,&
-                    CoefMG(1)%Aw,CoefMG(1)%Ae,CoefMG(1)%As,CoefMG(1)%An,CoefMG(1)%Ab,CoefMG(1)%At,&
-                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
-      !$hmpp <GSKernels> delegatedStore,Args[GS1::Phi]
-
-   elseif (level==2) then
-      !$hmpp <GsKernels> advancedload, args[GS2::Phi,GS2::RHS]
-      !$hmpp  <GSKernels> GS2 callsite
-      call MG_GS_GPU(CoefMG(2)%nx,CoefMG(2)%ny,CoefMG(2)%nz,niter,&
-                    PhiMG(2)%Arr,RHSMG(2)%Arr,&
-                    CoefMG(2)%Aw,CoefMG(2)%Ae,CoefMG(2)%As,CoefMG(2)%An,CoefMG(2)%Ab,CoefMG(2)%At,&
-                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
-      !$hmpp <GSKernels> delegatedStore,Args[GS5::Phi]
-
-   elseif (level==3) then
-      !$hmpp <GsKernels> advancedload, args[GS3::Phi,GS3::RHS]
-      !$hmpp  <GSKernels> GS3 callsite
-      call MG_GS_GPU(CoefMG(3)%nx,CoefMG(3)%ny,CoefMG(3)%nz,niter,&
-                    PhiMG(3)%Arr,RHSMG(3)%Arr,&
-                    CoefMG(3)%Aw,CoefMG(3)%Ae,CoefMG(3)%As,CoefMG(3)%An,CoefMG(3)%Ab,CoefMG(3)%At,&
-                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
-      !$hmpp <GSKernels> delegatedStore,Args[GS3::Phi]
-
-   elseif (level==4) then
-      !$hmpp <GsKernels> advancedload, args[GS4::Phi,GS4::RHS]
-      !$hmpp  <GSKernels> GS4 callsite
-      call MG_GS_GPU(CoefMG(4)%nx,CoefMG(4)%ny,CoefMG(4)%nz,niter,&
-                    PhiMG(4)%Arr,RHSMG(4)%Arr,&
-                    CoefMG(4)%Aw,CoefMG(4)%Ae,CoefMG(4)%As,CoefMG(4)%An,CoefMG(4)%Ab,CoefMG(4)%At,&
-                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
-      !$hmpp <GSKernels> delegatedStore,Args[GS4::Phi]
-
-   elseif (level==5) then
-      !$hmpp <GsKernels> advancedload, args[GS5::Phi,GS5::RHS]
-      !$hmpp  <GSKernels> GS5 callsite
-      call MG_GS_GPU(CoefMG(5)%nx,CoefMG(5)%ny,CoefMG(5)%nz,niter,&
-                    PhiMG(5)%Arr,RHSMG(5)%Arr,&
-                    CoefMG(5)%Aw,CoefMG(5)%Ae,CoefMG(5)%As,CoefMG(5)%An,CoefMG(5)%Ab,CoefMG(5)%At,&
-                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
-      !$hmpp <GSKernels> delegatedStore,Args[GS5::Phi]
-
-   elseif (level==6) then
-      !$hmpp <GsKernels> advancedload, args[GS6::Phi,GS6::RHS]
-      !$hmpp  <GSKernels> GS6 callsite
-      call MG_GS_GPU(CoefMG(6)%nx,CoefMG(6)%ny,CoefMG(6)%nz,niter,&
-                    PhiMG(6)%Arr,RHSMG(6)%Arr,&
-                    CoefMG(6)%Aw,CoefMG(6)%Ae,CoefMG(6)%As,CoefMG(6)%An,CoefMG(6)%Ab,CoefMG(6)%At,&
-                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
-      !$hmpp <GSKernels> delegatedStore,Args[GS6::Phi]
-
-
-   elseif (level==7) then
-      !$hmpp <GsKernels> advancedload, args[GS7::Phi,GS7::RHS]
-      !$hmpp  <GSKernels> GS7 callsite
-      call MG_GS_GPU(CoefMG(7)%nx,CoefMG(7)%ny,CoefMG(7)%nz,niter,&
-                    PhiMG(7)%Arr,RHSMG(7)%Arr,&
-                    CoefMG(7)%Aw,CoefMG(7)%Ae,CoefMG(7)%As,CoefMG(7)%An,CoefMG(7)%Ab,CoefMG(7)%At,&
-                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
-      !$hmpp <GSKernels> delegatedStore,Args[GS7::Phi]
-
-   elseif (level==8) then
-      !$hmpp <GsKernels> advancedload, args[GS8::Phi,GS8::RHS]
-      !$hmpp  <GSKernels> GS8 callsite
-      call MG_GS_GPU(CoefMG(8)%nx,CoefMG(8)%ny,CoefMG(8)%nz,niter,&
-                    PhiMG(8)%Arr,RHSMG(8)%Arr,&
-                    CoefMG(8)%Aw,CoefMG(8)%Ae,CoefMG(8)%As,CoefMG(8)%An,CoefMG(8)%Ab,CoefMG(8)%At,&
-                    BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
-      !$hmpp <GSKernels> delegatedStore,Args[GS8::Phi]
-
-   endif
-
+  if (GPU>0.and.level>=minGPUlevel) then!.and.level>3
+!    write (*,*) "Gauss-Seidel GPU call level", level
+   !$hmpp  <GSKernels> advancedload, args[GS::nit,GS::level]
+   !$hmpp  <GSKernels> Gs callsite,args[*].noupdate=true   
+   call Gs_GPU(nxa,nya,nza,niter,PhiMG(0)%Arr,PhiMG(1)%Arr,PhiMG(2)%Arr,PhiMG(3)%Arr,PhiMG(4)%Arr,&
+                             PhiMG(5)%Arr,PhiMG(6)%Arr,PhiMG(7)%Arr,PhiMG(8)%Arr,&
+                             RHSMG(0)%Arr,RHSMG(1)%Arr,RHSMG(2)%Arr,RHSMG(3)%Arr,RHSMG(4)%Arr,&
+                             RHSMG(5)%Arr,RHSMG(6)%Arr,RHSMG(7)%Arr,RHSMG(8)%Arr,&
+                     Aw,Ae,As,An,Ab,At,&
+                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level)
 
   else
 
@@ -1136,71 +1090,17 @@ real(KND),intent(out)::R
 integer i,j,k
 real(KND),save:: p,Ap
 
-  if (GPU>0.and.level>4) then
-   if (level==0) then
-      !$hmpp  <GSKernels> Res0 callsite
-      call MG_Res_GPU(CoefMG(0)%nx,CoefMG(0)%ny,CoefMG(0)%nz,&
-                      PhiMG(0)%Arr,ResMG(0)%Arr,RHSMG(0)%Arr,&
-                      CoefMG(0)%Aw,CoefMG(0)%Ae,CoefMG(0)%As,CoefMG(0)%An,CoefMG(0)%Ab,CoefMG(0)%At,&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
-      !$hmpp <GSKernels> delegatedStore,Args[Res0::Res]
-   elseif (level==1) then
-      !$hmpp  <GSKernels> Res1 callsite
-      call MG_Res_GPU(CoefMG(1)%nx,CoefMG(1)%ny,CoefMG(1)%nz,&
-                      PhiMG(1)%Arr,ResMG(1)%Arr,RHSMG(1)%Arr,&
-                      CoefMG(1)%Aw,CoefMG(1)%Ae,CoefMG(1)%As,CoefMG(1)%An,CoefMG(1)%Ab,CoefMG(1)%At,&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
-      !$hmpp <GSKernels> delegatedStore,Args[Res1::Res]
-   elseif (level==2) then
-      !$hmpp  <GSKernels> Res2 callsite
-      call MG_Res_GPU(CoefMG(2)%nx,CoefMG(2)%ny,CoefMG(2)%nz,&
-                      PhiMG(2)%Arr,ResMG(2)%Arr,RHSMG(2)%Arr,&
-                      CoefMG(2)%Aw,CoefMG(2)%Ae,CoefMG(2)%As,CoefMG(2)%An,CoefMG(2)%Ab,CoefMG(2)%At,&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
-      !$hmpp <GSKernels> delegatedStore,Args[Res2::Res]
-   elseif (level==3) then
-      !$hmpp  <GSKernels> Res3 callsite
-      call MG_Res_GPU(CoefMG(3)%nx,CoefMG(3)%ny,CoefMG(3)%nz,&
-                      PhiMG(3)%Arr,ResMG(3)%Arr,RHSMG(3)%Arr,&
-                      CoefMG(3)%Aw,CoefMG(3)%Ae,CoefMG(3)%As,CoefMG(3)%An,CoefMG(3)%Ab,CoefMG(3)%At,&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
-      !$hmpp <GSKernels> delegatedStore,Args[Res3::Res]
-   elseif (level==4) then
-      !$hmpp  <GSKernels> Res4 callsite
-      call MG_Res_GPU(CoefMG(4)%nx,CoefMG(4)%ny,CoefMG(4)%nz,&
-                      PhiMG(4)%Arr,ResMG(4)%Arr,RHSMG(4)%Arr,&
-                      CoefMG(4)%Aw,CoefMG(4)%Ae,CoefMG(4)%As,CoefMG(4)%An,CoefMG(4)%Ab,CoefMG(4)%At,&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
-      !$hmpp <GSKernels> delegatedStore,Args[Res4::Res]
-   elseif (level==5) then
-      !$hmpp  <GSKernels> Res5 callsite
-      call MG_Res_GPU(CoefMG(5)%nx,CoefMG(5)%ny,CoefMG(5)%nz,&
-                      PhiMG(5)%Arr,ResMG(5)%Arr,RHSMG(5)%Arr,&
-                      CoefMG(5)%Aw,CoefMG(5)%Ae,CoefMG(5)%As,CoefMG(5)%An,CoefMG(5)%Ab,CoefMG(5)%At,&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
-      !$hmpp <GSKernels> delegatedStore,Args[Res5::Res]
-   elseif (level==6) then
-      !$hmpp  <GSKernels> Res6 callsite
-      call MG_Res_GPU(CoefMG(6)%nx,CoefMG(6)%ny,CoefMG(6)%nz,&
-                      PhiMG(6)%Arr,ResMG(6)%Arr,RHSMG(6)%Arr,&
-                      CoefMG(6)%Aw,CoefMG(6)%Ae,CoefMG(6)%As,CoefMG(6)%An,CoefMG(6)%Ab,CoefMG(6)%At,&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
-      !$hmpp <GSKernels> delegatedStore,Args[Res6::Res]
-   elseif (level==7) then
-      !$hmpp  <GSKernels> Res7 callsite
-      call MG_Res_GPU(CoefMG(7)%nx,CoefMG(7)%ny,CoefMG(7)%nz,&
-                      PhiMG(7)%Arr,ResMG(7)%Arr,RHSMG(7)%Arr,&
-                      CoefMG(7)%Aw,CoefMG(7)%Ae,CoefMG(7)%As,CoefMG(7)%An,CoefMG(7)%Ab,CoefMG(7)%At,&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
-      !$hmpp <GSKernels> delegatedStore,Args[Res7::Res]
-   elseif (level==8) then
-      !$hmpp  <GSKernels> Res8 callsite
-      call MG_Res_GPU(CoefMG(8)%nx,CoefMG(8)%ny,CoefMG(8)%nz,&
-                      PhiMG(8)%Arr,ResMG(8)%Arr,RHSMG(8)%Arr,&
-                      CoefMG(8)%Aw,CoefMG(8)%Ae,CoefMG(8)%As,CoefMG(8)%An,CoefMG(8)%Ab,CoefMG(8)%At,&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
-      !$hmpp <GSKernels> delegatedStore,Args[Res8::Res]
-   endif
+  if (GPU>0.and.level>=minGPUlevel) then!.and.level>3
+    !$hmpp <GSKernels> advancedload, args[Res::level]
+   !$hmpp  <GSKernels> Res callsite,args[*].noupdate=true   
+   call Res_GPU(nxa,nya,nza,PhiMG(0)%Arr,PhiMG(1)%Arr,PhiMG(2)%Arr,PhiMG(3)%Arr,PhiMG(4)%Arr,&
+                             PhiMG(5)%Arr,PhiMG(6)%Arr,PhiMG(7)%Arr,PhiMG(8)%Arr,&
+                             RHSMG(0)%Arr,RHSMG(1)%Arr,RHSMG(2)%Arr,RHSMG(3)%Arr,RHSMG(4)%Arr,&
+                             RHSMG(5)%Arr,RHSMG(6)%Arr,RHSMG(7)%Arr,RHSMG(8)%Arr,&
+                             ResMG(0)%Arr,ResMG(1)%Arr,ResMG(2)%Arr,ResMG(3)%Arr,ResMG(4)%Arr,&
+                             ResMG(5)%Arr,ResMG(6)%Arr,ResMG(7)%Arr,ResMG(8)%Arr,&
+                     Aw,Ae,As,An,Ab,At,&
+                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R,level)
   else
 
      do k=0,CoefMG(level)%nz
@@ -1265,11 +1165,22 @@ subroutine MG_clear(level)
 integer,intent(in):: level
 integer l
 
+ if (GPU>0.and.level>=minGPUlevel) then!.and.level>2
+  !$hmpp <GSKernels> advancedload, args[Cl::level]
+  !$hmpp <GSKernels> Cl callsite,args[*].noupdate=true
+  call Cl_GPU(nxa,nya,nza,PhiMG(0)%Arr,PhiMG(1)%Arr,PhiMG(2)%Arr,PhiMG(3)%Arr,PhiMG(4)%Arr,&
+                             PhiMG(5)%Arr,PhiMG(6)%Arr,PhiMG(7)%Arr,&
+                             RHSMG(0)%Arr,RHSMG(1)%Arr,RHSMG(2)%Arr,RHSMG(3)%Arr,RHSMG(4)%Arr,&
+                             RHSMG(5)%Arr,RHSMG(6)%Arr,RHSMG(7)%Arr,&
+                             ResMG(0)%Arr,ResMG(1)%Arr,ResMG(2)%Arr,ResMG(3)%Arr,ResMG(4)%Arr,&
+                             ResMG(5)%Arr,ResMG(6)%Arr,ResMG(7)%Arr,level,minmglevel)  
+ else
   do l=level,minmglevel,-1
    PhiMG(l)%Arr=0
    RHSMG(l)%Arr=0
    ResMG(l)%Arr=0
   enddo
+ endif
 endsubroutine
 
 
@@ -1281,18 +1192,46 @@ real(KND),intent(out):: R
 real(KND) R1
 integer k
 
+  if (level==minGPUlevel-1) then
+    if (level==0) then
+    !$hmpp <GSKernels> delegatedstore, args[GS::Phi0,GS::RHS0]
+    elseif (level==1) then
+    !$hmpp <GSKernels> delegatedstore, args[GS::Phi1,GS::RHS1]
+    elseif (level==2) then
+    !$hmpp <GSKernels> delegatedstore, args[GS::Phi2,GS::RHS2]
+    elseif (level==3) then
+    !$hmpp <GSKernels> delegatedstore, args[GS::Phi3,GS::RHS3]
+    elseif (level==4) then
+    !$hmpp <GSKernels> delegatedstore, args[GS::Phi4,GS::RHS4]
+    elseif (level==5) then
+    !$hmpp <GSKernels> delegatedstore, args[GS::Phi5,GS::RHS5]
+    elseif (level==6) then
+    !$hmpp <GSKernels> delegatedstore, args[GS::Phi6,GS::RHS6]
+    elseif (level==7) then
+    !$hmpp <GSKernels> delegatedstore, args[GS::Phi7,GS::RHS7]
+    elseif (level==8) then
+    !$hmpp <GSKernels> delegatedstore, args[GS::Phi8,GS::RHS8]
+    endif
+  endif
+
   if (level == minmglevel) then !1
-        call MG_GE(level)
-        call MG_res(level,R)
+   R=huge(mgepsinnerGS)/2.
+          call MG_GE(level)
+          call MG_res(level,R)
 !        write (*,*) "GEres",sqrt(R)
 
      if (R>mgepsinnerGS**2) then
       R1=R
       do k=1,mgmaxinnerGSiter
+
         call MG_GS(level, 10)
-        call MG_res(level,R)
-!         write (*,*) "GSres",sqrt(R)
-        if (R < mgepsinnerGS**2) exit
+        call MG_Res(level, R)
+
+         !$hmpp <GSKernels> delegatedStore,Args[Res::R]
+
+
+ !        write (*,*) "GSres",R
+        if (R < mgepsinnerGS) exit
         if (R1<R*1.05_KND) exit
         R1=R
       enddo
@@ -1307,9 +1246,11 @@ integer k
 
     call Restrict(RHSMG(level-1)%Arr,ResMG(level)%Arr,level-1)
 
+
     call MG_CGC(level-1,eps,ncgc,npre,npost,R)
 
     call Prolongate(PhiMG(level)%Arr,PhiMG(level-1)%Arr,level-1)
+
 
     call MG_GS(level,npost)
     call MG_res(level,R)
@@ -1317,7 +1258,27 @@ integer k
    enddo
   endif
 
-!   write (*,*) "cgc res",level,R
+  if (level==minGPUlevel-1) then
+    if (level==0) then
+    !$hmpp <GSKernels> advancedload, args[GS::Phi0]
+    elseif (level==1) then
+    !$hmpp <GSKernels> advancedload, args[GS::Phi1]
+    elseif (level==2) then
+    !$hmpp <GSKernels> advancedload, args[GS::Phi2]
+    elseif (level==3) then
+    !$hmpp <GSKernels> advancedload, args[GS::Phi3]
+    elseif (level==4) then
+    !$hmpp <GSKernels> advancedload, args[GS::Phi4]
+    elseif (level==5) then
+    !$hmpp <GSKernels> advancedload, args[GS::Phi5]
+    elseif (level==6) then
+    !$hmpp <GSKernels> advancedload, args[GS::Phi6]
+    elseif (level==7) then
+    !$hmpp <GSKernels> advancedload, args[GS::Phi7]
+    elseif (level==8) then
+    !$hmpp <GSKernels> advancedload, args[GS::Phi8]
+    endif
+  endif
 endsubroutine MG_CGC
 
 
@@ -1355,9 +1316,9 @@ real(KND),save:: called=0
     CoefMG(l)%nx=0
     CoefMG(l)%ny=0
     CoefMG(l)%nz=0
-    allocate(PhiMG(l)%Arr(0,0,0))
-    allocate(RHSMG(l)%Arr(0,0,0))
-    allocate(ResMG(l)%Arr(0,0,0))
+    allocate(PhiMG(l)%Arr(1,1,1))
+    allocate(RHSMG(l)%Arr(1,1,1))
+    allocate(ResMG(l)%Arr(1,1,1))
    else
     CoefMG(l)%nx=bnx*2**l
     CoefMG(l)%ny=bny*2**l
@@ -1391,6 +1352,7 @@ real(KND),save:: called=0
     stop
  endif
 
+
  PhiMG(LMG)%Arr=0
  PhiMG(LMG)%Arr(0+sx:nx,0+sy:ny,0+sz:nz)=Phi(1:Prnx,1:Prny,1:Prnz)
  RHSMG(LMG)%Arr(0+sx:nx,0+sy:ny,0+sz:nz)=RHS(1:Prnx,1:Prny,1:Prnz)
@@ -1408,27 +1370,122 @@ real(KND),save:: called=0
   PhiMG(LMG)%Arr(:,:,0)=PhiMG(LMG)%Arr(:,:,Prnz)
  endif
 
- do l=1,maxPoissoniter
-  write (*,*) "MG iteration:",l
-   Phiref=SUM(PhiMG(LMG)%Arr(0:CoefMG(LMG)%nx,0:CoefMG(LMG)%ny,0:CoefMG(LMG)%nz))/&
-          ((CoefMG(LMG)%nx+1)*(CoefMG(LMG)%ny+1)*(CoefMG(LMG)%nz+1))
-   do k=0,CoefMG(LMG)%nz
-    do j=0,CoefMG(LMG)%ny
-     do i=0,CoefMG(LMG)%nx
-      PhiMG(LMG)%Arr(i,j,k)=PhiMG(LMG)%Arr(i,j,k)-Phiref
-     enddo
-    enddo
-   enddo
-   call Bound_Phi_MG(PhiMG(LMG)%Arr,CoefMG(LMG)%nx,CoefMG(LMG)%ny,CoefMG(LMG)%nz)
+
+
+
+
+  nxa=(/ CoefMG(0)%nx, CoefMG(1)%nx, CoefMG(2)%nx, CoefMG(3)%nx, CoefMG(4)%nx,&
+         CoefMG(5)%nx, CoefMG(6)%nx, CoefMG(7)%nx, CoefMG(8)%nx /)
+  nya=(/ CoefMG(0)%ny, CoefMG(1)%ny, CoefMG(2)%ny, CoefMG(3)%ny, CoefMG(4)%ny,&
+         CoefMG(5)%ny, CoefMG(6)%ny, CoefMG(7)%ny, CoefMG(8)%ny /)
+  nza=(/ CoefMG(0)%nz, CoefMG(1)%nz, CoefMG(2)%nz, CoefMG(3)%nz, CoefMG(4)%nz,&
+         CoefMG(5)%nz, CoefMG(6)%nz, CoefMG(7)%nz, CoefMG(8)%nz /)
+
+  Aw=(/ CoefMG(0)%Aw, CoefMG(1)%Aw, CoefMG(2)%Aw, CoefMG(3)%Aw, CoefMG(4)%Aw,&
+         CoefMG(5)%Aw, CoefMG(6)%Aw, CoefMG(7)%Aw, CoefMG(8)%Aw /)
+  Ae=(/ CoefMG(0)%Ae, CoefMG(1)%Ae, CoefMG(2)%Ae, CoefMG(3)%Ae, CoefMG(4)%Ae,&
+         CoefMG(5)%Ae, CoefMG(6)%Ae, CoefMG(7)%Ae, CoefMG(8)%Ae /)
+  As=(/ CoefMG(0)%As, CoefMG(1)%As, CoefMG(2)%As, CoefMG(3)%As, CoefMG(4)%As,&
+         CoefMG(5)%As, CoefMG(6)%As, CoefMG(7)%As, CoefMG(8)%As /)
+  An=(/ CoefMG(0)%An, CoefMG(1)%An, CoefMG(2)%An, CoefMG(3)%An, CoefMG(4)%An,&
+         CoefMG(5)%An, CoefMG(6)%An, CoefMG(7)%An, CoefMG(8)%An /)
+  Ab=(/ CoefMG(0)%Ab, CoefMG(1)%Ab, CoefMG(2)%Ab, CoefMG(3)%Ab, CoefMG(4)%Ab,&
+         CoefMG(5)%Ab, CoefMG(6)%Ab, CoefMG(7)%Ab, CoefMG(8)%Ab /)
+  At=(/ CoefMG(0)%At, CoefMG(1)%At, CoefMG(2)%At, CoefMG(3)%At, CoefMG(4)%At,&
+         CoefMG(5)%At, CoefMG(6)%At, CoefMG(7)%At, CoefMG(8)%At /)
 
   !$hmpp <GSKernels> allocate
-  call MG_CGC(LMG,mgeps,mgncgc,mgnpre,mgnpost,R)
-  !$hmpp <GSKernels> release
+  !$hmpp <GSkernels> advancedload, args[GS::nx,GS::ny,GS::nz,GS::Aw,GS::Ae,GS::As,GS::An,GS::Ab,GS::At,&
+  !$hmpp <GSkernels>  GS::BtypeW,GS::BtypeE,GS::BtypeS,GS::BtypeN,GS::BtypeB,GS::BtypeT]
 
+
+
+
+  if (LMG==0) then
+   !$hmpp <GSKernels> advancedload, args[GS::Phi0,GS::RHS0]
+  elseif (LMG==1) then
+   !$hmpp <GSKernels> advancedload, args[GS::Phi1,GS::RHS1]
+  elseif (LMG==2) then
+   !$hmpp <GSKernels> advancedload, args[GS::Phi2,GS::RHS2]
+  elseif (LMG==3) then
+   !$hmpp <GSKernels> advancedload, args[GS::Phi3,GS::RHS3]
+  elseif (LMG==4) then
+   !$hmpp <GSKernels> advancedload, args[GS::Phi4,GS::RHS4]
+  elseif (LMG==5) then
+   !$hmpp <GSKernels> advancedload, args[GS::Phi5,GS::RHS5]
+  elseif (LMG==6) then
+   !$hmpp <GSKernels> advancedload, args[GS::Phi6,GS::RHS6]
+  elseif (LMG==7) then
+   !$hmpp <GSKernels> advancedload, args[GS::Phi7,GS::RHS7]
+  elseif (LMG==8) then
+   !$hmpp <GSKernels> advancedload, args[GS::Phi8,GS::RHS8]
+  endif
+
+ do l=1,maxPoissoniter
+  write (*,*) "MG iteration:",l
+!    Phiref=SUM(PhiMG(LMG)%Arr(0:CoefMG(LMG)%nx,0:CoefMG(LMG)%ny,0:CoefMG(LMG)%nz))/&
+!           ((CoefMG(LMG)%nx+1)*(CoefMG(LMG)%ny+1)*(CoefMG(LMG)%nz+1))
+!    do k=0,CoefMG(LMG)%nz
+!     do j=0,CoefMG(LMG)%ny
+!      do i=0,CoefMG(LMG)%nx
+!       PhiMG(LMG)%Arr(i,j,k)=PhiMG(LMG)%Arr(i,j,k)-Phiref
+!      enddo
+!     enddo
+!    enddo
+!    call Bound_Phi_MG(PhiMG(LMG)%Arr,CoefMG(LMG)%nx,CoefMG(LMG)%ny,CoefMG(LMG)%nz)
+
+
+
+
+  call MG_CGC(LMG,mgeps,mgncgc,mgnpre,mgnpost,R)
+
+
+  if (LMG==0) then
+   !$hmpp <GSKernels> delegatedstore, args[Res::R]
+  elseif (LMG==1) then
+   !$hmpp <GSKernels> delegatedstore, args[Res::R]
+  elseif (LMG==2) then
+   !$hmpp <GSKernels> delegatedstore, args[Res::R]
+  elseif (LMG==3) then
+   !$hmpp <GSKernels> delegatedstore, args[Res::R]
+  elseif (LMG==4) then
+   !$hmpp <GSKernels> delegatedstore, args[Res::R]
+  elseif (LMG==5) then
+   !$hmpp <GSKernels> delegatedstore, args[Res::R]
+  elseif (LMG==6) then
+   !$hmpp <GSKernels> delegatedstore, args[Res::R]
+  elseif (LMG==7) then
+   !$hmpp <GSKernels> delegatedstore, args[Res::R]
+  elseif (LMG==8) then
+   !$hmpp <GSKernels> delegatedstore, args[Res::R]
+  endif
+
+
+  write (*,*) "MG residuum",R
   if (R<mgeps)   exit
- write (*,*) "MG residuum",R
  enddo
- write (*,*) "MG residuum",R
+
+  if (LMG==0) then
+   !$hmpp <GSKernels> delegatedstore, args[GS::Phi0,Res::R]
+  elseif (LMG==1) then
+   !$hmpp <GSKernels> delegatedstore, args[GS::Phi1,Res::R]
+  elseif (LMG==2) then
+   !$hmpp <GSKernels> delegatedstore, args[GS::Phi2,Res::R]
+  elseif (LMG==3) then
+   !$hmpp <GSKernels> delegatedstore, args[GS::Phi3,Res::R]
+  elseif (LMG==4) then
+   !$hmpp <GSKernels> delegatedstore, args[GS::Phi4,Res::R]
+  elseif (LMG==5) then
+   !$hmpp <GSKernels> delegatedstore, args[GS::Phi5,Res::R]
+  elseif (LMG==6) then
+   !$hmpp <GSKernels> delegatedstore, args[GS::Phi6,Res::R]
+  elseif (LMG==7) then
+   !$hmpp <GSKernels> delegatedstore, args[GS::Phi7,Res::R]
+  elseif (LMG==8) then
+   !$hmpp <GSKernels> delegatedstore, args[GS::Phi8,Res::R]
+  endif
+
+  !$hmpp <GSKernels> release
 
  Phi(1:Prnx,1:Prny,1:Prnz)=PhiMG(LMG)%Arr(0+sx:nx,0+sy:ny,0+sz:nz)
 
@@ -1447,64 +1504,566 @@ endsubroutine POISSMG
 
 
 
-endmodule MULTIGRID
 
 
-!GPU Codelets. More or less like externals. Inside the module only because of KND.
+!GPU Codelets.
 
   !$hmpp <GSKernels> group, target=CUDA
-  !$hmpp <GSKernels> map args[GS0::Phi;Res0::Phi]
-  !$hmpp <GSKernels> map args[GS0::RHS;Res0::RHS]
 
-  !$hmpp <GSKernels> map args[GS1::Phi;Res1::Phi]
-  !$hmpp <GSKernels> map args[GS1::RHS;Res1::RHS]
+
+  !$hmpp <GSKernels> mapbyname, nx,ny,nz,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+  !$hmpp <GSKernels> mapbyname, Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,Phi8
+  !$hmpp <GSKernels> mapbyname, RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,RHS8
+  !$hmpp <GSKernels> mapbyname, Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,Res8
+  !$hmpp <GSKernels> mapbyname, Aw,Ae,As,An,Ab,At
+
+
+ !$hmpp <GSKernels> Pr codelet
+ subroutine Pr_GPU(nx,ny,nz,Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,Phi8,&
+                                 BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level)
+ implicit none
+ integer,parameter:: KND=4,PERIODIC=3
+  integer,intent(in),dimension(0:8) :: nx,ny,nz
+  real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0
+  real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1
+  real(KND),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Phi2
+  real(KND),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Phi3
+  real(KND),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Phi4
+  real(KND),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Phi5
+  real(KND),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6
+  real(KND),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7
+  real(KND),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Phi8
+  integer,intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level
+  integer :: nxl, nyl, nzl
+
+  nxl=nx(level)
+  nyl=ny(level)
+  nzl=nz(level)
+
+    if (level==0) then
+     call Prolongate_GPU(nxl,nyl,nzl,Phi1,Phi0,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==1) then
+     call Prolongate_GPU(nxl,nyl,nzl,Phi2,Phi1,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==2) then
+     call Prolongate_GPU(nxl,nyl,nzl,Phi3,Phi2,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==3) then
+     call Prolongate_GPU(nxl,nyl,nzl,Phi4,Phi3,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==4) then
+     call Prolongate_GPU(nxl,nyl,nzl,Phi5,Phi4,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==5) then
+     call Prolongate_GPU(nxl,nyl,nzl,Phi6,Phi5,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==6) then
+     call Prolongate_GPU(nxl,nyl,nzl,Phi7,Phi6,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==7) then
+     call Prolongate_GPU(nxl,nyl,nzl,Phi8,Phi7,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    endif
+ endsubroutine Pr_GPU
+
+
+ subroutine Prolongate_GPU(nx,ny,nz,AFine,ACoarse,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+
+ implicit none
+ integer,parameter:: KND=4,PERIODIC=3
+ integer,intent(in):: nx,ny,nz,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+ real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in):: ACoarse
+ real(KND),dimension(-1:2*nx+1,-1:2*ny+1,-1:2*nz+1),intent(inout):: AFine
+ real(KND),dimension(-1:1,-1:1,-1:1):: Cf
+ integer:: i,j,k,ii,jj,kk
+ intrinsic abs
+
+ do kk=-1,1
+  do jj=-1,1
+   do ii=-1,1
+    if (ii==0.and.jj==0.and.kk==0) then
+        Cf(ii,jj,kk)=1._KND
+    else if (abs(ii)+abs(jj)+abs(kk)==1) then
+        Cf(ii,jj,kk)=1/2._KND
+    else if (abs(ii)+abs(jj)+abs(kk)==2) then
+        Cf(ii,jj,kk)=1/4._KND
+    else
+        Cf(ii,jj,kk)=1/8._KND
+    end if
+   enddo
+  enddo
+ enddo 
+
+ do kk=-1,1
+  do jj=-1,1
+   do ii=-1,1
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg permute (k,i,j)
+   !$hmppcg gridify(k,i)
+    do k=0,nz
+     do j=0,ny
+      do i=0,nx
+                      AFine(2*i+ii,2*j+jj,2*k+kk)=AFine(2*i+ii,2*j+jj,2*k+kk)+Cf(ii,jj,kk)*ACoarse(i,j,k)
+      enddo
+     enddo
+    enddo
+
+   enddo
+  enddo
+ enddo
+
+   if (BtypeW==PERIODIC) then
+    do k=0,2*nz
+     do j=0,2*ny                      !Periodic BC
+      Afine(-1,j,k)=Afine(2*nx-1,j,k)
+     enddo
+    enddo
+  else
+    do k=0,2*nz
+     do j=0,2*ny                      !Other BCs
+      Afine(-1,j,k)=Afine(0,j,k)
+     enddo
+    enddo
+   endif
+
+   if (BtypeE==PERIODIC) then
+    do k=0,2*nz
+     do j=0,2*ny                      !Periodic BC
+      Afine(2*nx+1,j,k)=Afine(1,j,k)
+     enddo
+    enddo
+   else 
+    do k=0,2*nz
+     do j=0,2*ny                      !Other BCs
+      Afine(2*nx+1,j,k)=Afine(2*nx,j,k)
+     enddo
+    enddo
+   endif
+
+   if (BtypeS==PERIODIC) then
+   do k=0,2*nz
+     do i=-1,2*nx+1                      !Periodic BC
+      Afine(i,-1,k)=Afine(i,2*ny-1,k)
+     enddo
+    enddo
+   else
+    do k=0,2*nz
+     do i=-1,2*nx+1                      !Other BCs
+      Afine(i,-1,k)=Afine(i,0,k)
+     enddo
+    enddo
+   endif
+
+   if (BtypeN==PERIODIC) then
+   do k=0,2*nz
+     do i=-1,2*nx+1                      !Periodic BC
+      Afine(i,2*ny+1,k)=Afine(i,1,k)
+     enddo
+    enddo
+   else
+    do k=0,2*nz
+     do i=-1,2*nx+1                      !Other BCs
+      Afine(i,2*ny+1,k)=Afine(i,2*ny,k)
+     enddo
+    enddo
+   endif
+
+   if (BtypeB==PERIODIC) then
+    do j=-1,2*ny+1
+     do i=-1,2*nx+1                      !Periodic BC
+      Afine(i,j,-1)=Afine(i,j,2*nz-1)
+     enddo
+    enddo
+   else
+    do j=-1,2*ny+1
+     do i=-1,2*nx+1                      !Other BCs
+      Afine(i,j,-1)=Afine(i,j,0)
+     enddo
+    enddo
+   endif
+
+   if (BtypeT==PERIODIC) then
+    do j=-1,2*ny+1
+     do i=-1,2*nx+1                      !Periodic BC
+      Afine(i,j,2*nz+1)=Afine(i,j,1)
+     enddo
+    enddo
+   else
+    do j=-1,2*ny+1
+     do i=-1,2*nx+1                      !Other BCs
+      Afine(i,j,2*nz+1)=Afine(i,j,2*nz)
+     enddo
+    enddo
+   endif
+ endsubroutine Prolongate_GPU
+
+
+
+
+
+ !$hmpp <GSKernels> Re codelet
+ subroutine Re_GPU(nx,ny,nz,RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,RHS8,&
+                            Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,Res8,&
+                                 BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level)
+ implicit none
+ integer,parameter:: KND=4,PERIODIC=3
+  integer,intent(in),dimension(0:8) :: nx,ny,nz
+  real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Res0,RHS0
+  real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Res1,RHS1
+  real(KND),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Res2,RHS2
+  real(KND),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Res3,RHS3
+  real(KND),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Res4,RHS4
+  real(KND),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Res5,RHS5
+  real(KND),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Res6,RHS6
+  real(KND),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Res7,RHS7
+  real(KND),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Res8,RHS8
+  integer,intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level
+  integer :: nxl, nyl, nzl
+
+  nxl=nx(level)
+  nyl=ny(level)
+  nzl=nz(level)
+
+    if (level==0) then
+     call Restrict_GPU(nxl,nyl,nzl,RHS0,Res1,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==1) then
+     call Restrict_GPU(nxl,nyl,nzl,RHS1,Res2,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==2) then
+     call Restrict_GPU(nxl,nyl,nzl,RHS2,Res3,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==3) then
+     call Restrict_GPU(nxl,nyl,nzl,RHS3,Res4,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==4) then
+     call Restrict_GPU(nxl,nyl,nzl,RHS4,Res5,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==5) then
+     call Restrict_GPU(nxl,nyl,nzl,RHS5,Res6,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==6) then
+     call Restrict_GPU(nxl,nyl,nzl,RHS6,Res7,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    elseif (level==7) then
+     call Restrict_GPU(nxl,nyl,nzl,RHS6,Res7,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+    endif
+ endsubroutine Re_GPU
+
+
+
+
+ subroutine Restrict_GPU(nx,ny,nz,ACoarse,AFine,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+ implicit none
+ integer,parameter:: KND=4,PERIODIC=3
+ integer,intent(in):: nx,ny,nz,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+ real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out):: ACoarse
+ real(KND),dimension(-1:2*nx+1,-1:2*ny+1,-1:2*nz+1),intent(inout):: AFine
+ real(KND) q
+ integer:: i,j,k
  
-  !$hmpp <GSKernels> map args[GS2::Phi;Res2::Phi]
-  !$hmpp <GSKernels> map args[GS2::RHS;Res2::RHS]
 
-  !$hmpp <GSKernels> map args[GS3::Phi;Res3::Phi]
-  !$hmpp <GSKernels> map args[GS3::RHS;Res3::RHS]
+   if (BtypeW==PERIODIC) then
+    do k=0,2*nz
+     do j=0,2*ny                      !Periodic BC
+      Afine(-1,j,k)=Afine(2*nx-1,j,k)
+     enddo
+    enddo
+  else
+    do k=0,2*nz
+     do j=0,2*ny                      !Other BCs
+      Afine(-1,j,k)=Afine(0,j,k)
+     enddo
+    enddo
+   endif
 
-  !$hmpp <GSKernels> map args[GS4::Phi;Res4::Phi]
-  !$hmpp <GSKernels> map args[GS4::RHS;Res4::RHS]
+   if (BtypeE==PERIODIC) then
+    do k=0,2*nz
+     do j=0,2*ny                      !Periodic BC
+      Afine(2*nx+1,j,k)=Afine(1,j,k)
+     enddo
+    enddo
+   else 
+    do k=0,2*nz
+     do j=0,2*ny                      !Other BCs
+      Afine(2*nx+1,j,k)=Afine(2*nx,j,k)
+     enddo
+    enddo
+   endif
 
-  !$hmpp <GSKernels> map args[GS5::Phi;Res5::Phi]
-  !$hmpp <GSKernels> map args[GS5::RHS;Res5::RHS]
+   if (BtypeS==PERIODIC) then
+   do k=0,2*nz
+     do i=-1,2*nx+1                      !Periodic BC
+      Afine(i,-1,k)=Afine(i,2*ny-1,k)
+     enddo
+    enddo
+   else
+    do k=0,2*nz
+     do i=-1,2*nx+1                      !Other BCs
+      Afine(i,-1,k)=Afine(i,0,k)
+     enddo
+    enddo
+   endif
 
-  !$hmpp <GSKernels> map args[GS6::Phi;Res6::Phi]
-  !$hmpp <GSKernels> map args[GS6::RHS;Res6::RHS]
+   if (BtypeN==PERIODIC) then
+   do k=0,2*nz
+     do i=-1,2*nx+1                      !Periodic BC
+      Afine(i,2*ny+1,k)=Afine(i,1,k)
+     enddo
+    enddo
+   else
+    do k=0,2*nz
+     do i=-1,2*nx+1                      !Other BCs
+      Afine(i,2*ny+1,k)=Afine(i,2*ny,k)
+     enddo
+    enddo
+   endif
 
-  !$hmpp <GSKernels> map args[GS7::Phi;Res7::Phi]
-  !$hmpp <GSKernels> map args[GS7::RHS;Res7::RHS]
+   if (BtypeB==PERIODIC) then
+    do j=-1,2*ny+1
+     do i=-1,2*nx+1                      !Periodic BC
+      Afine(i,j,-1)=Afine(i,j,2*nz-1)
+     enddo
+    enddo
+   else
+    do j=-1,2*ny+1
+     do i=-1,2*nx+1                      !Other BCs
+      Afine(i,j,-1)=Afine(i,j,0)
+     enddo
+    enddo
+   endif
 
-  !$hmpp <GSKernels> map args[GS8::Phi;Res8::Phi]
-  !$hmpp <GSKernels> map args[GS8::RHS;Res8::RHS]
+   if (BtypeT==PERIODIC) then
+    do j=-1,2*ny+1
+     do i=-1,2*nx+1                      !Periodic BC
+      Afine(i,j,2*nz+1)=Afine(i,j,1)
+     enddo
+    enddo
+   else
+    do j=-1,2*ny+1
+     do i=-1,2*nx+1                      !Other BCs
+      Afine(i,j,2*nz+1)=Afine(i,j,2*nz)
+     enddo
+    enddo
+   endif
+ 
 
-  !$hmpp <GSKernels> mapbyname, BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+   !$hmppcg permute (k,i,j)
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+      do k=0,nz
+       do j=0,ny
+        do i=0,nx
+            ACoarse(i,j,k)=AFine(2*i,2*j,2*k); q=1.0
 
-!$hmpp <GSKernels> GS0 codelet
-!$hmpp <GSKernels> GS1 codelet
-!$hmpp <GSKernels> GS2 codelet
-!$hmpp <GSKernels> GS3 codelet
-!$hmpp <GSKernels> GS4 codelet
-!$hmpp <GSKernels> GS5 codelet
-!$hmpp <GSKernels> GS6 codelet
-!$hmpp <GSKernels> GS7 codelet
-!$hmpp <GSKernels> GS8 codelet
-subroutine MG_GS_GPU(nx,ny,nz,nit,Phi,RHS,&
+            if (i<nx) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i+1,2*j,2*k); q=q+0.5
+            endif
+
+            if (i>0) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i-1,2*j,2*k); q=q+0.5
+            endif
+
+            if (j<ny) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j+1,2*k); q=q+0.5
+            endif
+
+            if (j>0) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j-1,2*k); q=q+0.5
+            endif
+
+            if (k<nz) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k+1); q=q+0.5
+            endif
+
+            if (k>0) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k-1); q=q+0.5
+            endif
+
+            if ((i<nx).and.(j<ny)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j+1,2*k); q=q+0.25
+            endif
+
+            if ((i<nx).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k+1); q=q+0.25
+            endif
+
+            if ((j<ny).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k+1); q=q+0.25
+            endif
+
+            if ((i>0).and.(j>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j-1,2*k); q=q+0.25
+            endif
+
+            if ((i>0).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k-1); q=q+0.25
+            endif
+
+            if ((j>0).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k-1); q=q+0.25
+            endif
+
+            if ((i>0).and.(j<ny)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j+1,2*k); q=q+0.25
+            endif
+
+            if ((i>0).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k+1); q=q+0.25
+            endif
+
+            if ((i<nx).and.(j>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j-1,2*k); q=q+0.25
+            endif
+
+            if ((j>0).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k+1); q=q+0.25
+            endif
+
+            if ((i<nx).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k-1); q=q+0.25
+            endif
+
+            if ((j<ny).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k-1); q=q+0.25
+            endif
+
+            if ((i<nx).and.(j<ny).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k+1); q=q+0.125
+            endif
+
+            if ((i>0).and.(j<ny).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k+1); q=q+0.125
+            endif
+
+            if ((i<nx).and.(j>0).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k+1); q=q+0.125
+            endif
+
+            if ((i<nx).and.(j<ny).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k-1); q=q+0.125
+            endif
+
+            if ((i>0).and.(j>0).and.(k<nz)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k+1); q=q+0.125
+            endif
+
+            if ((i>0).and.(j<ny).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k-1); q=q+0.125
+            endif
+
+            if ((i<nx).and.(j>0).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k-1); q=q+0.125
+            endif
+
+            if ((i>0).and.(j>0).and.(k>0)) then
+              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k-1); q=q+0.125
+            endif
+
+            ACoarse(i,j,k)=ACoarse(i,j,k)/q       
+        enddo
+       enddo
+      enddo
+      
+      do k=-1,nz+1
+       do j=-1,ny+1
+        if (BtypeE==PERIODIC) ACoarse(0,j,k)=ACoarse(nx,j,k)
+       enddo
+      enddo
+      do k=-1,nz+1
+       do i=-1,nx+1
+        if (BtypeN==PERIODIC) ACoarse(i,0,k)=ACoarse(i,ny,k)
+       enddo
+      enddo
+      do j=-1,ny+1
+       do i=-1,nx+1
+        if (BtypeT==PERIODIC) ACoarse(i,j,0)=ACoarse(i,j,nz)
+       enddo
+      enddo
+endsubroutine Restrict_GPU
+
+
+
+
+
+  !$hmpp <GSKernels> GS codelet
+  subroutine GS_GPU(nx,ny,nz,nit,Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,Phi8,&
+                              RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,RHS8,&
+                     Aw,Ae,As,An,Ab,At,&
+                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level)
+  implicit none
+  integer,parameter:: KND=4
+  integer,intent(in),dimension(0:8) :: nx,ny,nz
+  integer,intent(in) :: nit
+  real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,RHS0
+  real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1,RHS1
+  real(KND),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Phi2,RHS2
+  real(KND),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Phi3,RHS3
+  real(KND),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Phi4,RHS4
+  real(KND),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Phi5,RHS5
+  real(KND),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6,RHS6
+  real(KND),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7,RHS7
+  real(KND),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Phi8,RHS8
+  integer,intent(in) :: level
+  real(KND),dimension(0:8),intent(in) :: Aw,Ae,As,An,Ab,At
+  integer,intent(in)   :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+  integer :: nxl, nyl, nzl
+
+  nxl=nx(level)
+  nyl=ny(level)
+  nzl=nz(level)
+
+   if (level==0) then
+      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                      Phi0,RHS0,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+   elseif (level==1) then
+      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                      Phi1,RHS1,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+   elseif (level==2) then
+      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                      Phi2,RHS2,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+   elseif (level==3) then
+      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                      Phi3,RHS3,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+   elseif (level==4) then
+      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                      Phi4,RHS4,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+   elseif (level==5) then
+      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                      Phi5,RHS5,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+   elseif (level==6) then
+      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                      Phi6,RHS6,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+   elseif (level==7) then
+      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                      Phi7,RHS7,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+   elseif (level==8) then
+      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                      Phi8,RHS8,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+   endif
+
+  endsubroutine GS_GPU
+
+
+
+  subroutine MG_GS_GPU(nx,ny,nz,nit,Phi,RHS,&
                      Aw,Ae,As,An,Ab,At,&
                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
-   implicit none
+  implicit none
 
-   integer,parameter:: PERIODIC=3
+  integer,parameter:: KND=4,PERIODIC=3
 
-   integer,intent(in)   :: nx,ny,nz,nit
-   real(4),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::Phi
-   real(4),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
-   real(4),intent(in) :: Aw,Ae,As,An,Ab,At
-   integer(4),intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
-   integer i,j,k,l
-   real(4) :: p,Ap
+  integer,intent(in)   :: nx,ny,nz,nit,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::Phi
+  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::RHS
+  real(KND),intent(in) :: Aw,Ae,As,An,Ab,At 
+  integer i,j,k,l
+  real(KND) :: p,Ap
+  intrinsic mod
 
   do l=1,nit
    !$hmppcg grid blocksize 512x1
@@ -1620,39 +2179,112 @@ subroutine MG_GS_GPU(nx,ny,nz,nit,Phi,RHS,&
         enddo
     enddo
   enddo
-endsubroutine MG_GS_GPU
+  endsubroutine MG_GS_GPU
 
 
-!$hmpp <GSKernels> Res0 codelet
-!$hmpp <GSKernels> Res1 codelet
-!$hmpp <GSKernels> Res2 codelet
-!$hmpp <GSKernels> Res3 codelet
-!$hmpp <GSKernels> Res4 codelet
-!$hmpp <GSKernels> Res5 codelet
-!$hmpp <GSKernels> Res6 codelet
-!$hmpp <GSKernels> Res7 codelet
-!$hmpp <GSKernels> Res8 codelet
-subroutine MG_Res_GPU(nx,ny,nz,Phi,Res,RHS,&
+!$hmpp <GSKernels> Res codelet
+  subroutine Res_GPU(nx,ny,nz,Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,Phi8,&
+                              RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,RHS8,&
+                              Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,Res8,&
                      Aw,Ae,As,An,Ab,At,&
-                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R,level)
+  implicit none
+  integer,parameter:: KND=4
+  integer,intent(in),dimension(0:8) :: nx,ny,nz
+  real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,Res0,RHS0
+  real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1,Res1,RHS1
+  real(KND),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Phi2,Res2,RHS2
+  real(KND),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Phi3,Res3,RHS3
+  real(KND),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Phi4,Res4,RHS4
+  real(KND),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Phi5,Res5,RHS5
+  real(KND),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6,Res6,RHS6
+  real(KND),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7,Res7,RHS7
+  real(KND),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Phi8,Res8,RHS8
+  integer,intent(in) :: level
+  real(KND),dimension(0:8),intent(in) :: Aw,Ae,As,An,Ab,At
+  integer,intent(in)   :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+  real(KND),intent(out) :: R
+  integer :: nxl, nyl, nzl
+
+  nxl=nx(level)
+  nyl=ny(level)
+  nzl=nz(level)
+
+
+   if (level==0) then
+      call MG_Res_GPU(nxl,nyl,nzl,&
+                      Phi0,Res0,RHS0,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+   elseif (level==1) then
+      call MG_Res_GPU(nxl,nyl,nzl,&
+                      Phi1,Res1,RHS1,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+   elseif (level==2) then
+      call MG_Res_GPU(nxl,nyl,nzl,&
+                      Phi2,Res2,RHS2,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+   elseif (level==3) then
+      call MG_Res_GPU(nxl,nyl,nzl,&
+                      Phi3,Res3,RHS3,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+   elseif (level==4) then
+      call MG_Res_GPU(nxl,nyl,nzl,&
+                      Phi4,Res4,RHS4,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+   elseif (level==5) then
+      call MG_Res_GPU(nxl,nyl,nzl,&
+                      Phi5,Res5,RHS5,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+   elseif (level==6) then
+      call MG_Res_GPU(nxl,nyl,nzl,&
+                      Phi6,Res6,RHS6,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+   elseif (level==7) then
+      call MG_Res_GPU(nxl,nyl,nzl,&
+                      Phi7,Res7,RHS7,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+   elseif (level==8) then
+      call MG_Res_GPU(nxl,nyl,nzl,&
+                      Phi8,Res8,RHS8,&
+                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+   endif
+
+  end subroutine Res_GPU
+
+
+
+
+
+  subroutine MG_Res_GPU(nx,ny,nz,Phi,Res,RHS,&
+                             Aw,Ae,As,An,Ab,At,&
+                             BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
 
    implicit none
 
 
-   integer,parameter:: PERIODIC=3
+   integer,parameter:: KND=4,PERIODIC=3
 
-   integer,intent(in)   :: nx,ny,nz
-   real(4),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::Phi
-   real(4),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
-   real(4),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
-   real(4),intent(in) :: Aw,Ae,As,An,Ab,At
-   integer(4),intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
-   real(4),intent(out) :: R
+   integer,intent(in)   :: nx,ny,nz,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::Phi
+   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
+   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
+   real(KND),intent(in) :: Aw,Ae,As,An,Ab,At
+   real(KND),intent(out) :: R
    integer i,j,k,l
-   real(4) :: p,Ap
+   real(KND) :: p,Ap
+   intrinsic max, abs
 
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i)
+    !$hmppcg grid blocksize 512x1
+    !$hmppcg gridify(k,i)
      do k=0,nz
         do i=0,nx
             do j=0,ny
@@ -1708,8 +2340,8 @@ subroutine MG_Res_GPU(nx,ny,nz,Phi,Res,RHS,&
      enddo
 
      R=0
-    !$hmppcg grid blocksize 512x1
-    !$hmppcg gridify(k,i), reduce(max:R)
+     !$hmppcg grid blocksize 512x1
+     !$hmppcg gridify(k,i), reduce(max:R)
      do k=0,nz
         do i=0,nx
             do j=0,ny
@@ -1717,8 +2349,107 @@ subroutine MG_Res_GPU(nx,ny,nz,Phi,Res,RHS,&
             enddo
         enddo
     enddo    
-endsubroutine MG_Res_GPU
+  endsubroutine MG_Res_GPU
 
 
 
 
+
+  
+  !$hmpp <GSKernels> Cl codelet
+  subroutine Cl_GPU(nx,ny,nz,Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,&
+                             RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,&
+                             Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,level,minmglevel)
+  implicit none
+  integer,parameter:: KND=4
+  integer,intent(in),dimension(0:8) :: nx,ny,nz
+  real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,Res0,RHS0
+  real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1,Res1,RHS1
+  real(KND),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Phi2,Res2,RHS2
+  real(KND),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Phi3,Res3,RHS3
+  real(KND),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Phi4,Res4,RHS4
+  real(KND),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Phi5,Res5,RHS5
+  real(KND),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6,Res6,RHS6
+  real(KND),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7,Res7,RHS7
+  integer,intent(in) :: level,minmglevel
+  integer :: l
+  integer :: nxl, nyl, nzl
+
+  nxl=nx(level)
+  nyl=ny(level)
+  nzl=nz(level)
+  
+  do l=level,minmglevel,-1
+   if (l==0) then
+    call Clear_GPU(nx(l),ny(l),nz(l),Phi0,RHS0,Res0)
+   elseif (l==1) then
+    call Clear_GPU(nx(l),ny(l),nz(l),Phi1,RHS1,Res1)
+   elseif (l==2) then
+    call Clear_GPU(nx(l),ny(l),nz(l),Phi2,RHS2,Res2)
+   elseif (l==3) then
+    call Clear_GPU(nx(l),ny(l),nz(l),Phi3,RHS3,Res3)
+   elseif (l==4) then
+    call Clear_GPU(nx(l),ny(l),nz(l),Phi4,RHS4,Res4)
+   elseif (l==5) then
+    call Clear_GPU(nx(l),ny(l),nz(l),Phi5,RHS5,Res5)
+   elseif (l==6) then
+    call Clear_GPU(nx(l),ny(l),nz(l),Phi6,RHS6,Res6)
+   elseif (l==7) then
+    call Clear_GPU(nx(l),ny(l),nz(l),Phi7,RHS7,Res7)
+   endif
+  enddo
+  end subroutine Cl_GPU
+
+
+
+
+
+
+
+
+  subroutine Clear_GPU(nx,ny,nz,Phi,RHS,Res)
+  implicit none
+  integer,parameter:: KND=4
+  integer,intent(in) :: nx,ny,nz
+  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Phi
+  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
+  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::RHS
+  integer :: i,j,k
+   !$hmppcg permute (k,i,j)
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+  do k=-1,nz+1
+   do j=-1,ny+1
+    do i=-1,nx+1
+     Phi(i,j,k)=0
+    enddo
+   enddo
+  enddo
+
+   !$hmppcg permute (k,i,j)
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+  do k=-1,nz+1
+   do j=-1,ny+1
+    do i=-1,nx+1
+     Res(i,j,k)=0
+    enddo
+   enddo
+  enddo
+
+   !$hmppcg permute (k,i,j)
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+  do k=-1,nz+1
+   do j=-1,ny+1
+    do i=-1,nx+1
+     RHS(i,j,k)=0
+    enddo
+   enddo
+  enddo
+
+  endsubroutine Clear_GPU
+
+
+
+endmodule MULTIGRID

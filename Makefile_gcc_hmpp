@@ -13,12 +13,13 @@
 
 
 #### Compiler and tool definitions shared by all build targets #####
-FC = f90
-BASICOPTS = -fast -g -dalign -m64
+FC = gfortran
+BASICOPTS =   -O5 -fprefetch-loop-arrays -fno-inline-functions -funroll-loops -pg -fconvert=big-endian -ffpe-trap=zero,overflow -ffast-math
 FFLAGS = $(BASICOPTS)
 
+
 # Define the target directories.
-TARGETDIR_CLMM=../bin/sun/hmpp
+TARGETDIR_CLMM=../bin/gcc/hmpp
 
 
 all: $(TARGETDIR_CLMM)/CLMM
@@ -50,7 +51,7 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/main.o
 USERLIBS_CLMM = $(SYSLIBS_CLMM)
 DEPLIBS_CLMM =
-LDLIBS_CLMM = $(USERLIBS_CLMM) -xlic_lib=sunperf
+LDLIBS_CLMM = $(USERLIBS_CLMM) -llapack
 
 
 # Link or archive
@@ -78,7 +79,7 @@ $(TARGETDIR_CLMM)/scalars.o: $(TARGETDIR_CLMM) scalars.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ scalars.f90
 
 $(TARGETDIR_CLMM)/multigrid.o: $(TARGETDIR_CLMM) multigrid.f90
-	hmpp -d3 -k --codelet-off  $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid.f90
+	hmpp -k --codelet-off $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid.f90
 
 $(TARGETDIR_CLMM)/multigrid2d.o: $(TARGETDIR_CLMM) multigrid2d.f90
 	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid2d.f90
@@ -90,7 +91,7 @@ $(TARGETDIR_CLMM)/outputs.o: $(TARGETDIR_CLMM) outputs.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ outputs.f90
 
 $(TARGETDIR_CLMM)/fishpoisson.o: $(TARGETDIR_CLMM) fishpoisson.f90
-	f90 -c -O2 -g -dalign  -o $@ fishpoisson.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ fishpoisson.f90
 
 $(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.f90
 	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ poisson.f90
@@ -105,7 +106,7 @@ $(TARGETDIR_CLMM)/upwind.o: $(TARGETDIR_CLMM) upwind.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ upwind.f90
 
 $(TARGETDIR_CLMM)/laxfried.o: $(TARGETDIR_CLMM) laxfried.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ laxfried.f90
+	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ laxfried.f90
 
 $(TARGETDIR_CLMM)/laxwend.o: $(TARGETDIR_CLMM) laxwend.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ laxwend.f90
@@ -126,7 +127,7 @@ $(TARGETDIR_CLMM)/tsteps.o: $(TARGETDIR_CLMM) tsteps.f90
 	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ tsteps.f90
 
 $(TARGETDIR_CLMM)/main.o: $(TARGETDIR_CLMM) main.f90
-	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -xfilebyteorder=big4:%all -o $@ main.f90
+	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ main.f90
 
 
 
@@ -168,5 +169,5 @@ $(TARGETDIR_CLMM):
 
 # Enable dependency checking
 .KEEP_STATE:
-.KEEP_STATE_FILE:.make.state.bin.sun
+.KEEP_STATE_FILE:.make.state.bin.gccprod
 
