@@ -16,13 +16,13 @@ module INITIAL
   private
   public  ReadParams, Initconds
 
-  integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
-  real(KND) mgepsinnerGS
 
 
 contains
  subroutine ReadParams
- integer i,io
+  integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
+  real(KND) mgepsinnerGS
+  integer i,io
 
   open(11,file="main.conf",status="old",action="read")
   read(11,fmt='(/)')
