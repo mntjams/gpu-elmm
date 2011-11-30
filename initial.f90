@@ -6,6 +6,7 @@ module INITIAL
   use MULTIGRID2d, only: SetMGParams2d
   use POISSON
   use BOUNDARIES
+  use OUTPUTS, only: store, display, probes, NumProbes
   use SCALARS
   use SMAGORINSKY
   use WALLMODELS
@@ -13,363 +14,357 @@ module INITIAL
   implicit none
 
   private
-  public  Readparams, Initconds
+  public  ReadParams, Initconds
 
 
 
 contains
- subroutine READPARAMS
+ subroutine ReadParams
   integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter,minGPUlevel
   real(KND) mgepsinnerGS
   integer i,io
- 
-  open(11,file="main.conf",status="OLD",action="READ")
-  read (11,fmt='(/)')
-  read (11,*) tempmet
-  read (11,fmt='(/)')
-  read (11,*) CFL
-  read (11,fmt='(/)')
-  read (11,*) Uref
-  read (11,fmt='(/)')
-  read (11,*) poissmet
-  read (11,fmt='(/)')
-  read (11,*) convmet
-  read (11,fmt='(/)')
-  read (11,*) limitertype
-  read (11,fmt='(/)')
-  read (11,*) limparam
-  read (11,fmt='(/)')
-  read (11,*) wallmodeltype
-  read (11,fmt='(/)')
-  read (11,*) sgstype
-  read (11,fmt='(/)')
-  read (11,*) masssourc
-  read (11,fmt='(/)')
-  read (11,*) steady
-  read (11,fmt='(/)')
-  read (11,*) tasktype
+
+  open(11,file="main.conf",status="old",action="read")
+  read(11,fmt='(/)')
+  read(11,*) tempmet
+  read(11,fmt='(/)')
+  read(11,*) CFL
+  read(11,fmt='(/)')
+  read(11,*) Uref
+  read(11,fmt='(/)')
+  read(11,*) poissmet
+  read(11,fmt='(/)')
+  read(11,*) convmet
+  read(11,fmt='(/)')
+  read(11,*) limitertype
+  read(11,fmt='(/)')
+  read(11,*) limparam
+  read(11,fmt='(/)')
+  read(11,*) wallmodeltype
+  read(11,fmt='(/)')
+  read(11,*) sgstype
+  read(11,fmt='(/)')
+  read(11,*) masssourc
+  read(11,fmt='(/)')
+  read(11,*) steady
+  read(11,fmt='(/)')
+  read(11,*) tasktype
   write(*,*) "tasktype=",tasktype
-  read (11,fmt='(/)')
-  read (11,*) initcondsfromfile
-  read (11,fmt='(/)')
-  read (11,*) timeavg1
-  read (11,fmt='(/)')
-  read (11,*) timeavg2
-  read (11,fmt='(/)')
-  read (11,*) Re
-  write (*,*) "Re=",Re
-  read (11,fmt='(/)')
-  read (11,*) coriolisparam
-  write (*,*) "coriolisparam=",coriolisparam
-  read (11,fmt='(/)')
-  read (11,*) prgradientx
-  write (*,*) "prgradientx=",prgradientx
-  read (11,fmt='(/)')
-  read (11,*) prgradienty
-  write (*,*) "prgradienty=",prgradienty
-  read (11,fmt='(/)')
-  read (11,*) starttime
-  write (*,*) "starttime=",starttime
-  read (11,fmt='(/)')
-  read (11,*) endtime
-  write (*,*) "endtime=",endtime
-  read (11,fmt='(/)')
-  read (11,*) maxiter
-  write (*,*) "maxiter=",maxiter
-  read (11,fmt='(/)')
-  read (11,*) eps
-  write (*,*) "eps=",eps
-  read (11,fmt='(/)')
-  read (11,*) maxCNiter
-  write (*,*) "maxCNiter=",maxCNiter
-  read (11,fmt='(/)')
-  read (11,*) epsCN
-  write (*,*) "epsCN=",epsCN
-  read (11,fmt='(/)')
-  read (11,*) maxPOISSONiter
-  write (*,*) "maxPOISSONiter=",maxPOISSONiter
-  read (11,fmt='(/)')
-  read (11,*) epsPOISSON
-  write (*,*) "epsPOISSON=",epsPOISSON
-  read (11,fmt='(/)')
-  read (11,*) debugparam
-  write (*,*) "debug parameter=",debugparam
-  read (11,fmt='(/)')
-  read (11,*) probex
-  read (11,fmt='(/)')
-  read (11,*) probey
-  read (11,fmt='(/)')
-  read (11,*) probez
+  read(11,fmt='(/)')
+  read(11,*) initcondsfromfile
+  read(11,fmt='(/)')
+  read(11,*) timeavg1
+  read(11,fmt='(/)')
+  read(11,*) timeavg2
+  read(11,fmt='(/)')
+  read(11,*) Re
+  write(*,*) "Re=",Re
+  read(11,fmt='(/)')
+  read(11,*) coriolisparam
+  write(*,*) "coriolisparam=",coriolisparam
+  read(11,fmt='(/)')
+  read(11,*) prgradientx
+  write(*,*) "prgradientx=",prgradientx
+  read(11,fmt='(/)')
+  read(11,*) prgradienty
+  write(*,*) "prgradienty=",prgradienty
+  read(11,fmt='(/)')
+  read(11,*) starttime
+  write(*,*) "starttime=",starttime
+  read(11,fmt='(/)')
+  read(11,*) endtime
+  write(*,*) "endtime=",endtime
+  read(11,fmt='(/)')
+  read(11,*) maxiter
+  write(*,*) "maxiter=",maxiter
+  read(11,fmt='(/)')
+  read(11,*) eps
+  write(*,*) "eps=",eps
+  read(11,fmt='(/)')
+  read(11,*) maxCNiter
+  write(*,*) "maxCNiter=",maxCNiter
+  read(11,fmt='(/)')
+  read(11,*) epsCN
+  write(*,*) "epsCN=",epsCN
+  read(11,fmt='(/)')
+  read(11,*) maxPOISSONiter
+  write(*,*) "maxPOISSONiter=",maxPOISSONiter
+  read(11,fmt='(/)')
+  read(11,*) epsPOISSON
+  write(*,*) "epsPOISSON=",epsPOISSON
+  read(11,fmt='(/)')
+  read(11,*) debugparam
+  write(*,*) "debug parameter=",debugparam
   close(11)
 
 
-  open(11,file="grid.conf",status="OLD",action="READ")
-  read (11,fmt='(/)')
-  read (11,*) xgridfromfile
-  read (11,fmt='(/)')
-  read (11,*) ygridfromfile
-  read (11,fmt='(/)')
-  read (11,*) zgridfromfile
-  read (11,fmt='(/)')
-  read (11,*) x0
-  write (*,*) "x0=",x0
-  read (11,fmt='(/)')
-  read (11,*) y0
-  write (*,*) "y0=",y0
-  read (11,fmt='(/)')
-  read (11,*) z0
-  write (*,*) "z0=",z0
-  read (11,fmt='(/)')
-  read (11,*) lx
-  write (*,*) "lx=",lx
-  read (11,fmt='(/)')
-  read (11,*) ly
-  write (*,*) "ly=",ly
-  read (11,fmt='(/)')
-  read (11,*) lz
-  write (*,*) "lz=",lz
-  read (11,fmt='(/)')
-  read (11,*) Prnx
-  write (*,*) "nx=",Prnx
-  read (11,fmt='(/)')
-  read (11,*) Prny
-  write (*,*) "ny=",Prny
-  read (11,fmt='(/)')
-  read (11,*) Prnz
-  write (*,*) "ny=",Prnz
+  open(11,file="grid.conf",status="old",action="read")
+  read(11,fmt='(/)')
+  read(11,*) xgridfromfile
+  read(11,fmt='(/)')
+  read(11,*) ygridfromfile
+  read(11,fmt='(/)')
+  read(11,*) zgridfromfile
+  read(11,fmt='(/)')
+  read(11,*) x0
+  write(*,*) "x0=",x0
+  read(11,fmt='(/)')
+  read(11,*) y0
+  write(*,*) "y0=",y0
+  read(11,fmt='(/)')
+  read(11,*) z0
+  write(*,*) "z0=",z0
+  read(11,fmt='(/)')
+  read(11,*) lx
+  write(*,*) "lx=",lx
+  read(11,fmt='(/)')
+  read(11,*) ly
+  write(*,*) "ly=",ly
+  read(11,fmt='(/)')
+  read(11,*) lz
+  write(*,*) "lz=",lz
+  read(11,fmt='(/)')
+  read(11,*) Prnx
+  write(*,*) "nx=",Prnx
+  read(11,fmt='(/)')
+  read(11,*) Prny
+  write(*,*) "ny=",Prny
+  read(11,fmt='(/)')
+  read(11,*) Prnz
+  write(*,*) "ny=",Prnz
   close(11)
 
-  open(11,file="boundconds.conf",status="OLD",action="READ")
-  read (11,fmt='(/)')
-  read (11,*) BtypeW
-  read (11,fmt='(/)')
-  read (11,*) BtypeE
-  read (11,fmt='(/)')
-  read (11,*) BtypeS
-  read (11,fmt='(/)')
-  read (11,*) BtypeN
-  read (11,fmt='(/)')
-  read (11,*) BtypeB
-  read (11,fmt='(/)')
-  read (11,*) BtypeT
-  read (11,fmt='(/)')
-  read (11,*) SsideU
-  read (11,fmt='(/)')
-  read (11,*) SsideV
-  read (11,fmt='(/)')
-  read (11,*) SsideW
-  read (11,fmt='(/)')
-  read (11,*) NsideU
-  read (11,fmt='(/)')
-  read (11,*) NsideV
-  read (11,fmt='(/)')
-  read (11,*) NsideW
-  read (11,fmt='(/)')
-  read (11,*) BsideU
-  read (11,fmt='(/)')
-  read (11,*) BsideV
-  read (11,fmt='(/)')
-  read (11,*) BsideW
-  read (11,fmt='(/)')
-  read (11,*) TsideU
-  read (11,fmt='(/)')
-  read (11,*) TsideV
-  read (11,fmt='(/)')
-  read (11,*) TsideW
-  read (11,fmt='(/)')
-  read (11,*) z0W
-  read (11,fmt='(/)')
-  read (11,*) z0E
-  read (11,fmt='(/)')
-  read (11,*) z0S
-  read (11,fmt='(/)')
-  read (11,*) z0N
-  read (11,fmt='(/)')
-  read (11,*) z0B
-  read (11,fmt='(/)')
-  read (11,*) z0T
+  open(11,file="boundconds.conf",status="old",action="read")
+  read(11,fmt='(/)')
+  read(11,*) BtypeW
+  read(11,fmt='(/)')
+  read(11,*) BtypeE
+  read(11,fmt='(/)')
+  read(11,*) BtypeS
+  read(11,fmt='(/)')
+  read(11,*) BtypeN
+  read(11,fmt='(/)')
+  read(11,*) BtypeB
+  read(11,fmt='(/)')
+  read(11,*) BtypeT
+  read(11,fmt='(/)')
+  read(11,*) SsideU
+  read(11,fmt='(/)')
+  read(11,*) SsideV
+  read(11,fmt='(/)')
+  read(11,*) SsideW
+  read(11,fmt='(/)')
+  read(11,*) NsideU
+  read(11,fmt='(/)')
+  read(11,*) NsideV
+  read(11,fmt='(/)')
+  read(11,*) NsideW
+  read(11,fmt='(/)')
+  read(11,*) BsideU
+  read(11,fmt='(/)')
+  read(11,*) BsideV
+  read(11,fmt='(/)')
+  read(11,*) BsideW
+  read(11,fmt='(/)')
+  read(11,*) TsideU
+  read(11,fmt='(/)')
+  read(11,*) TsideV
+  read(11,fmt='(/)')
+  read(11,*) TsideW
+  read(11,fmt='(/)')
+  read(11,*) z0W
+  read(11,fmt='(/)')
+  read(11,*) z0E
+  read(11,fmt='(/)')
+  read(11,*) z0S
+  read(11,fmt='(/)')
+  read(11,*) z0N
+  read(11,fmt='(/)')
+  read(11,*) z0B
+  read(11,fmt='(/)')
+  read(11,*) z0T
   close(11)
 
-  
-  open(11,file="thermal.conf",status="OLD",action="READ")
-  read (11,fmt='(/)')
-  read (11,*) buoyancy
-  read (11,fmt='(/)')
-  read (11,*) Prandtl
-  read (11,fmt='(/)')
-  read (11,*) grav_acc
-  read (11,fmt='(/)')
-  read (11,*) temperature_ref
-  read (11,fmt='(/)')
-  read (11,*) TBtypeW
-  read (11,fmt='(/)')
-  read (11,*) TBtypeE
-  read (11,fmt='(/)')
-  read (11,*) TBtypeS
-  read (11,fmt='(/)')
-  read (11,*) TBtypeN
-  read (11,fmt='(/)')
-  read (11,*) TBtypeB
-  read (11,fmt='(/)')
-  read (11,*) TBtypeT
-  read (11,fmt='(/)')
-  read (11,*) WsideTemp
-  read (11,fmt='(/)')
-  read (11,*) EsideTemp
-  read (11,fmt='(/)')
-  read (11,*) SsideTemp
-  read (11,fmt='(/)')
-  read (11,*) NsideTemp
-  read (11,fmt='(/)')
-  read (11,*) BsideTemp
-  read (11,fmt='(/)')
-  read (11,*) TsideTemp
+
+  open(11,file="thermal.conf",status="old",action="read")
+  read(11,fmt='(/)')
+  read(11,*) buoyancy
+  read(11,fmt='(/)')
+  read(11,*) Prandtl
+  read(11,fmt='(/)')
+  read(11,*) grav_acc
+  read(11,fmt='(/)')
+  read(11,*) temperature_ref
+  read(11,fmt='(/)')
+  read(11,*) TBtypeW
+  read(11,fmt='(/)')
+  read(11,*) TBtypeE
+  read(11,fmt='(/)')
+  read(11,*) TBtypeS
+  read(11,fmt='(/)')
+  read(11,*) TBtypeN
+  read(11,fmt='(/)')
+  read(11,*) TBtypeB
+  read(11,fmt='(/)')
+  read(11,*) TBtypeT
+  read(11,fmt='(/)')
+  read(11,*) WsideTemp
+  read(11,fmt='(/)')
+  read(11,*) EsideTemp
+  read(11,fmt='(/)')
+  read(11,*) SsideTemp
+  read(11,fmt='(/)')
+  read(11,*) NsideTemp
+  read(11,fmt='(/)')
+  read(11,*) BsideTemp
+  read(11,fmt='(/)')
+  read(11,*) TsideTemp
   close(11)
 
-  open(11,file="inlet.conf",status="OLD",action="READ")
-  read (11,fmt='(/)')
-  read (11,*) inlettype
-  read (11,fmt='(/)')
-  read (11,*) profiletype
-  read (11,fmt='(/)')
-  read (11,*) SHEARG
-  write (*,*) "G=",SHEARG
-  read (11,fmt='(/)')
-  read (11,*) Uinlet
-  write (*,*) "Uinlet=",Uinlet
-  read (11,fmt='(/)')
-  read (11,*) ustarsurfin  !-<u'w'>
-  read (11,fmt='(/)')
-  read (11,*) stressgradin !in relative part per 1m
-  read (11,fmt='(/)')
-  read (11,*) z0inlet
-  read (11,fmt='(/)')
-  read (11,*) powerexpin
-  read (11,fmt='(/)')
-  read (11,*) zrefin
-  read (11,fmt='(/)')
-  read (11,*) Urefin
-  read (11,fmt='(/)')
-  read (11,*)  relativestress(1,1)
-  read (11,fmt='(/)')
-  read (11,*)  relativestress(2,2)
-  read (11,fmt='(/)')
-  read (11,*) relativestress(3,3)
-  read (11,fmt='(/)')
-  read (11,*) relativestress(1,2)
-  read (11,fmt='(/)')
-  read (11,*) relativestress(1,3)
-  read (11,fmt='(/)')
-  read (11,*) relativestress(2,3)
+  open(11,file="inlet.conf",status="old",action="read")
+  read(11,fmt='(/)')
+  read(11,*) inlettype
+  read(11,fmt='(/)')
+  read(11,*) profiletype
+  read(11,fmt='(/)')
+  read(11,*) SHEARG
+  write(*,*) "G=",SHEARG
+  read(11,fmt='(/)')
+  read(11,*) Uinlet
+  write(*,*) "Uinlet=",Uinlet
+  read(11,fmt='(/)')
+  read(11,*) ustarsurfin  !-<u'w'>
+  read(11,fmt='(/)')
+  read(11,*) stressgradin !in relative part per 1m
+  read(11,fmt='(/)')
+  read(11,*) z0inlet
+  read(11,fmt='(/)')
+  read(11,*) powerexpin
+  read(11,fmt='(/)')
+  read(11,*) zrefin
+  read(11,fmt='(/)')
+  read(11,*) Urefin
+  read(11,fmt='(/)')
+  read(11,*)  relativestress(1,1)
+  read(11,fmt='(/)')
+  read(11,*)  relativestress(2,2)
+  read(11,fmt='(/)')
+  read(11,*) relativestress(3,3)
+  read(11,fmt='(/)')
+  read(11,*) relativestress(1,2)
+  read(11,fmt='(/)')
+  read(11,*) relativestress(1,3)
+  read(11,fmt='(/)')
+  read(11,*) relativestress(2,3)
   close(11)
- 
+
   relativestress(2,1)=relativestress(1,2)
   relativestress(3,1)=relativestress(1,3)
   relativestress(3,2)=relativestress(2,3)
 
-  open(11,file="scalars.conf",status="OLD",action="READ")
-  read (11,fmt='(/)')
-  read (11,*) computescalars
-  read (11,fmt='(/)')
-  read (11,*) computedeposition
-  read (11,fmt='(/)')
-  read (11,*) computegravsettling
-  read (11,fmt='(/)')
-  read (11,*) partdistrib
-  read (11,fmt='(/)')
-  read (11,*) totalscalsource
-  read (11,fmt='(/)')
-  read (11,*) pointscalsource
+  open(11,file="scalars.conf",status="old",action="read")
+  read(11,fmt='(/)')
+  read(11,*) computescalars
+  read(11,fmt='(/)')
+  read(11,*) computedeposition
+  read(11,fmt='(/)')
+  read(11,*) computegravsettling
+  read(11,fmt='(/)')
+  read(11,*) partdistrib
+  read(11,fmt='(/)')
+  read(11,*) totalscalsource
+  read(11,fmt='(/)')
+  read(11,*) pointscalsource
 
-  read (11,fmt='(/)')
-  read (11,*) ScalBtypeW
-  read (11,fmt='(/)')
-  read (11,*) ScalBtypeE
-  read (11,fmt='(/)')
-  read (11,*) ScalBtypeS
-  read (11,fmt='(/)')
-  read (11,*) ScalBtypeN
-  read (11,fmt='(/)')
-  read (11,*) ScalBtypeB
-  read (11,fmt='(/)')
-  read (11,*) ScalBtypeT
-  read (11,fmt='(/)')
-  read (11,*) WsideScal
-  read (11,fmt='(/)')
-  read (11,*) EsideScal
-  read (11,fmt='(/)')
-  read (11,*) SsideScal
-  read (11,fmt='(/)')
-  read (11,*) NsideScal
-  read (11,fmt='(/)')
-  read (11,*) BsideScal
-  read (11,fmt='(/)')
-  read (11,*) TsideScal
-  
+  read(11,fmt='(/)')
+  read(11,*) ScalBtypeW
+  read(11,fmt='(/)')
+  read(11,*) ScalBtypeE
+  read(11,fmt='(/)')
+  read(11,*) ScalBtypeS
+  read(11,fmt='(/)')
+  read(11,*) ScalBtypeN
+  read(11,fmt='(/)')
+  read(11,*) ScalBtypeB
+  read(11,fmt='(/)')
+  read(11,*) ScalBtypeT
+  read(11,fmt='(/)')
+  read(11,*) WsideScal
+  read(11,fmt='(/)')
+  read(11,*) EsideScal
+  read(11,fmt='(/)')
+  read(11,*) SsideScal
+  read(11,fmt='(/)')
+  read(11,*) NsideScal
+  read(11,fmt='(/)')
+  read(11,*) BsideScal
+  read(11,fmt='(/)')
+  read(11,*) TsideScal
+
   if (partdistrib>0) then
      allocate(partdiam(partdistrib),partrho(partdistrib),percdistrib(partdistrib))
      allocate(scalsrcx(partdistrib),scalsrcy(partdistrib),scalsrcz(partdistrib))
      allocate(scalsrci(partdistrib),scalsrcj(partdistrib),scalsrck(partdistrib))
      do i=1,partdistrib
-      read (11,fmt='(/)')
-      read (11,*) partdiam(i)
-      read (11,fmt='(/)')
-      read (11,*) partrho(i)
-      read (11,fmt='(/)')
-      read (11,*) percdistrib(i)
-      read (11,fmt='(/)')
-      read (11,*) scalsrcx(i)
-      read (11,fmt='(/)')
-      read (11,*) scalsrcy(i)
-      read (11,fmt='(/)')
-      read (11,*) scalsrcz(i)
+      read(11,fmt='(/)')
+      read(11,*) partdiam(i)
+      read(11,fmt='(/)')
+      read(11,*) partrho(i)
+      read(11,fmt='(/)')
+      read(11,*) percdistrib(i)
+      read(11,fmt='(/)')
+      read(11,*) scalsrcx(i)
+      read(11,fmt='(/)')
+      read(11,*) scalsrcy(i)
+      read(11,fmt='(/)')
+      read(11,*) scalsrcz(i)
      enddo
-   
+
   else
      allocate(partdiam(computescalars),partrho(computescalars),percdistrib(computescalars))
      allocate(scalsrcx(computescalars),scalsrcy(computescalars),scalsrcz(computescalars))
      allocate(scalsrci(computescalars),scalsrcj(computescalars),scalsrck(computescalars))
      do i=1,computescalars
-      read (11,fmt='(/)')
-      read (11,*) partdiam(i)
-      read (11,fmt='(/)')
-      read (11,*) partrho(i)
-      read (11,fmt='(/)')
-      read (11,*) percdistrib(i)
-      read (11,fmt='(/)')
-      read (11,*) scalsrcx(i)
-      read (11,fmt='(/)')
-      read (11,*) scalsrcy(i)
-      read (11,fmt='(/)')
-      read (11,*) scalsrcz(i)
+      read(11,fmt='(/)')
+      read(11,*) partdiam(i)
+      read(11,fmt='(/)')
+      read(11,*) partrho(i)
+      read(11,fmt='(/)')
+      read(11,*) percdistrib(i)
+      read(11,fmt='(/)')
+      read(11,*) scalsrcx(i)
+      read(11,fmt='(/)')
+      read(11,*) scalsrcy(i)
+      read(11,fmt='(/)')
+      read(11,*) scalsrcz(i)
      enddo
   endif
   close(11)
 
   if (poissmet==3.or.poissmet==4.or.poissmet==5) then
-    open(11,file="mgopts.conf",status="OLD",action="READ")
-    read (11,fmt='(/)')
-    read (11,*) lmg
-    read (11,fmt='(/)')
-    read (11,*) minmglevel
-    read (11,fmt='(/)')
-    read (11,*) bnx
-    read (11,fmt='(/)')
-    read (11,*) bny
-    read (11,fmt='(/)')
-    read (11,*) bnz
-    read (11,fmt='(/)')
-    read (11,*) mgncgc
-    read (11,fmt='(/)')
-    read (11,*) mgnpre
-    read (11,fmt='(/)')
-    read (11,*) mgnpost
-    read (11,fmt='(/)')
-    read (11,*) mgmaxinnerGSiter
-    read (11,fmt='(/)')
-    read (11,*) mgepsinnerGS
-    read (11,fmt='(/)',iostat=io)
-    read (11,*,iostat=io) minGPUlevel
+    open(11,file="mgopts.conf",status="old",action="read")
+    read(11,fmt='(/)')
+    read(11,*) lmg
+    read(11,fmt='(/)')
+    read(11,*) minmglevel
+    read(11,fmt='(/)')
+    read(11,*) bnx
+    read(11,fmt='(/)')
+    read(11,*) bny
+    read(11,fmt='(/)')
+    read(11,*) bnz
+    read(11,fmt='(/)')
+    read(11,*) mgncgc
+    read(11,fmt='(/)')
+    read(11,*) mgnpre
+    read(11,fmt='(/)')
+    read(11,*) mgnpost
+    read(11,fmt='(/)')
+    read(11,*) mgmaxinnerGSiter
+    read(11,fmt='(/)')
+    read(11,*) mgepsinnerGS
+    read(11,fmt='(/)',iostat=io)
+    read(11,*,iostat=io) minGPUlevel
     close(11)
 
     if (poissmet==3.or.poissmet==4) then
@@ -391,21 +386,133 @@ contains
     endif
   endif
 
-  open(11,file="frames.conf",status="OLD",action="READ")
-  read (11,fmt='(/)')
-  read (11,*) frames
-  read (11,fmt='(/)')
-  read (11,*) timefram1
-  read (11,fmt='(/)')
-  read (11,*) timefram2
-  read (11,fmt='(/)')
-  read (11,*) framedimension
-  read (11,fmt='(/)')
-  read (11,*) slicedir
-  read (11,fmt='(/)')
-  read (11,*) slicex
+  open(11,file="frames.conf",status="old",action="read")
+  read(11,fmt='(/)')
+  read(11,*) frames
+  read(11,fmt='(/)')
+  read(11,*) timefram1
+  read(11,fmt='(/)')
+  read(11,*) timefram2
+  read(11,fmt='(/)')
+
+  read(11,*) store%frame_U
+  read(11,fmt='(/)')
+  read(11,*) store%frame_vort
+  read(11,fmt='(/)')
+  read(11,*) store%frame_Pr
+  read(11,fmt='(/)')
+  read(11,*) store%frame_lambda2
+  read(11,fmt='(/)')
+  read(11,*) store%frame_scalars
+  read(11,fmt='(/)')
+  read(11,*) store%frame_sumscalars
+  read(11,fmt='(/)')
+  read(11,*) store%frame_T
+
+
+  read(11,fmt='(/)')
+  read(11,*) framedimension
+  read(11,fmt='(/)')
+  read(11,*) slicedir
+  read(11,fmt='(/)')
+  read(11,*) slicex
   close(11)
 
+  open(11,file="output.conf",status="old",action="read",iostat=io)
+  if (io==0) then
+    read(11,fmt='(/)')
+    read(11,*) display%delta
+    read(11,fmt='(/)')
+    read(11,*) display%ustar
+    read(11,fmt='(/)')
+    read(11,*) display%tstar
+
+    read(11,fmt='(/)')
+    read(11,*) store%U
+    read(11,fmt='(/)')
+    read(11,*) store%U_interp
+    read(11,fmt='(/)')
+    read(11,*) store%V
+    read(11,fmt='(/)')
+    read(11,*) store%V_interp
+    read(11,fmt='(/)')
+    read(11,*) store%W
+    read(11,fmt='(/)')
+    read(11,*) store%W_interp
+
+    read(11,fmt='(/)')
+    read(11,*) store%out
+
+    read(11,fmt='(/)')
+    read(11,*) store%out_U
+    read(11,fmt='(/)')
+    read(11,*) store%out_vort
+    read(11,fmt='(/)')
+    read(11,*) store%out_Pr
+    read(11,fmt='(/)')
+    read(11,*) store%out_Prtype
+    read(11,fmt='(/)')
+    read(11,*) store%out_lambda2
+    read(11,fmt='(/)')
+    read(11,*) store%out_T
+    read(11,fmt='(/)')
+    read(11,*) store%out_div
+    read(11,fmt='(/)')
+    read(11,*) store%out_visc
+
+    read(11,fmt='(/)')
+    read(11,*) store%avg
+
+    read(11,fmt='(/)')
+    read(11,*) store%avg_U
+    read(11,fmt='(/)')
+    read(11,*) store%avg_vort
+    read(11,fmt='(/)')
+    read(11,*) store%avg_Pr
+    read(11,fmt='(/)')
+    read(11,*) store%avg_Prtype
+    read(11,fmt='(/)')
+    read(11,*) store%avg_T
+
+    read(11,fmt='(/)')
+    read(11,*) store%scalars
+    read(11,fmt='(/)')
+    read(11,*) store%scalarsavg
+
+    read(11,fmt='(/)')
+    read(11,*) store%deposition
+
+    read(11,fmt='(/)')
+    read(11,*) store%deltime
+    read(11,fmt='(/)')
+    read(11,*) store%tke
+    read(11,fmt='(/)')
+    read(11,*) store%dissip
+    read(11,fmt='(/)')
+    read(11,*) store%scalsumtime
+    read(11,fmt='(/)')
+    read(11,*) store%scaltotsumtime
+    read(11,fmt='(/)')
+    read(11,*) store%ustar
+    read(11,fmt='(/)')
+    read(11,*) store%tstar
+    read(11,fmt='(/)')
+    read(11,*) store%blprofiles
+
+    read(11,fmt='(/)')
+    read(11,*) NumProbes
+    allocate(probes(Numprobes))
+
+    do i=1,NumProbes
+      read(11,fmt='(/)')
+      read(11,*) probes(i)%x
+      read(11,fmt='(/)')
+      read(11,*) probes(i)%y
+      read(11,fmt='(/)')
+      read(11,*) probes(i)%y
+    enddo
+    close(11)
+  endif
 
 
   write(*,*) "computescalars",computescalars
@@ -415,17 +522,19 @@ contains
 
 
   windangle=0._KND
+
   projectiontype=1
+
   fullstress=0
 
   if (CFL<=0)  CFL=0.5
 
 
-  write (*,*) "Boundaries:"
-  write (*,*) "W"
+  write(*,*) "Boundaries:"
+  write(*,'(a2)',advance='no') "W "
   select case (BtypeW)
    case (NOSLIP)
-    write (*,*) "noslip"
+    write(*,*) "noslip"
    case (FREESLIP)
     write(*,*) "freeslip"
    case (PERIODIC)
@@ -435,10 +544,10 @@ contains
    case (NEUMANN)
     write(*,*) "neumann"
   endselect
-  write (*,*) "E"
+  write(*,'(a2)',advance='no') "E "
   select case (BtypeE)
    case (NOSLIP)
-    write (*,*) "noslip"
+    write(*,*) "noslip"
    case (FREESLIP)
     write(*,*) "freeslip"
    case (PERIODIC)
@@ -448,10 +557,10 @@ contains
    case (NEUMANN)
     write(*,*) "neumann"
   endselect
-  write (*,*) "S"
+  write(*,'(a2)',advance='no') "S "
   select case (BtypeS)
    case (NOSLIP)
-    write (*,*) "noslip"
+    write(*,*) "noslip"
    case (FREESLIP)
     write(*,*) "freeslip"
    case (PERIODIC)
@@ -461,10 +570,10 @@ contains
    case (NEUMANN)
     write(*,*) "neumann"
   endselect
-  write (*,*) "N"
+  write(*,'(a2)',advance='no') "N "
   select case (BtypeN)
    case (NOSLIP)
-    write (*,*) "noslip"
+    write(*,*) "noslip"
    case (FREESLIP)
     write(*,*) "freeslip"
    case (PERIODIC)
@@ -474,10 +583,10 @@ contains
    case (NEUMANN)
     write(*,*) "neumann"
   endselect
-  write (*,*) "B"
+  write(*,'(a2)',advance='no') "B "
   select case (BtypeB)
    case (NOSLIP)
-    write (*,*) "noslip"
+    write(*,*) "noslip"
    case (FREESLIP)
     write(*,*) "freeslip"
    case (PERIODIC)
@@ -487,10 +596,10 @@ contains
    case (NEUMANN)
     write(*,*) "neumann"
   endselect
-  write (*,*) "T"
+  write(*,'(a2)',advance='no') "T "
   select case (BtypeT)
    case (NOSLIP)
-    write (*,*) "noslip"
+    write(*,*) "noslip"
    case (FREESLIP)
     write(*,*) "freeslip"
    case (PERIODIC)
@@ -503,32 +612,8 @@ contains
 
 
 
-  if (tasktype==3) then
-   x0=-pi
-   y0=-pi
-   z0=-pi
-  endif
-  patternnx=1
-  patternny=1
-  patternny=1
-  if (tasktype==6) then
-   patternnx=4
-   patternny=4
-   patternnz=6
-   boxnx=Prnx
-   boxny=Prny
-   boxnz=Prnz
-   tilenx=boxnx*2
-   tileny=(boxny*3)/2
-   tilenz=boxnz
-   Prnx=tilenx*patternnx
-   Prny=tileny*patternny
-   Prnz=tilenz*patternnz
-   lx=2*patternnx
-   ly=(3./2.)*patternny
-   lz=patternnz
-  endif
-  
+
+
   dxmin=lx/(Prnx)
   dymin=ly/(Prny)
   dzmin=lz/(Prnz)
@@ -540,15 +625,15 @@ contains
   elseif (Prnz==1) then
    dzmin=sqrt(dxmin*dymin)
   endif
-  write (*,*) "dxmin ",dxmin
-  write (*,*) "dymin ",dymin
-  write (*,*) "dzmin ",dzmin
+  write(*,*) "dxmin ",dxmin
+  write(*,*) "dymin ",dymin
+  write(*,*) "dzmin ",dzmin
 
   write(*,*) "lx:",lx
   write(*,*) "ly:",ly
   write(*,*) "lz:",lz
-  
-  
+
+
   nt=maxiter
 
   if (BtypeE==PERIODIC) then
@@ -577,7 +662,7 @@ contains
 
   if (BtypeW==TURBULENTINLET) inlettype=TURBULENTINLET
   if (BtypeW==INLETFROMFILE) inlettype=INLETFROMFILE
-  
+
 
   if (Abs(Uinlet)>0) then
    dt=Abs(dxmin/Uinlet)
@@ -585,8 +670,8 @@ contains
    dt=dxmin
   endif
   deb=1
-  
-  if ((timeavg1>=0).and.(timeavg2>=timeavg1)) then 
+
+  if ((timeavg1>=0).and.(timeavg2>=timeavg1)) then
     averaging=1
   else
     averaging=0
@@ -594,58 +679,38 @@ contains
 
   if (.not.xgridfromfile.and..not.ygridfromfile.and..not.zgridfromfile) then
    gridtype=UNIFORMGRID
-   write (*,*) "Uniform grid"
+   write(*,*) "Uniform grid"
   else
    gridtype=GENERALGRID
-   write (*,*) "General grid"
-  endif
-
-  if (probex<x0) then
-   probex=x0
-  elseif (probex>x0+lx) then
-   probex=x0+lx
-  endif
-
-  if (probey<y0) then
-   probey=y0
-  elseif (probey>y0+ly) then
-   probey=y0+ly
-  endif
-
-  if (probez<z0) then
-   probez=z0
-  elseif (probez>z0+lz) then
-   probez=z0+lz
+   write(*,*) "General grid"
   endif
 
 
-  meanustar=ustarsurfin
-
-  write (*,*) "set"
- end subroutine READPARAMS
+  write(*,*) "set"
+ end subroutine ReadParams
 
  subroutine ReadIC(U,V,W,Pr)
  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
  integer i,j,k
    open(11,file="in.vtk",position="rewind",status="old",action="read")
    do i=1,14
-    read (11,*)
+    read(11,*)
    enddo
    do k=1,Prnz
     do j=1,Prny
      do i=1,Prnx
-      read (11,*) Pr(i,j,k)
+      read(11,*) Pr(i,j,k)
      enddo
     enddo
    enddo
    if (buoyancy==1) then
     do i=1,3
-     read (11,*)
+     read(11,*)
     enddo
     do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
-       read (11,*) temperature(i,j,k)
+       read(11,*) temperature(i,j,k)
       enddo
      enddo
     enddo
@@ -654,12 +719,12 @@ contains
 
    open(11,file="Uin.vtk",position="rewind",status="old",action="read")
    do i=1,14
-    read (11,*)
+    read(11,*)
    enddo
    do k=1,Unz
     do j=1,Uny
      do i=1,Unx
-      read (11,*) U(i,j,k)
+      read(11,*) U(i,j,k)
      enddo
     enddo
    enddo
@@ -667,12 +732,12 @@ contains
 
    open(11,file="Vin.vtk",position="rewind",status="old",action="read")
    do i=1,14
-    read (11,*)
+    read(11,*)
    enddo
    do k=1,Vnz
     do j=1,Vny
      do i=1,Vnx
-      read (11,*) V(i,j,k)
+      read(11,*) V(i,j,k)
      enddo
     enddo
    enddo
@@ -680,12 +745,12 @@ contains
 
    open(11,file="Win.vtk",position="rewind",status="old",action="read")
    do i=1,14
-    read (11,*)
+    read(11,*)
    enddo
    do k=1,Wnz
     do j=1,Wny
      do i=1,Wnx
-      read (11,*) W(i,j,k)
+      read(11,*) W(i,j,k)
      enddo
     enddo
    enddo
@@ -711,14 +776,14 @@ contains
 
  if (initcondsfromfile==1) then
   call ReadIC(U,V,W,Pr)
-  
+
   if (Re>0) then
    Visc=1._KND/Re
   else
    Visc=0
   endif
   if (buoyancy==1.or.computescalars>0) TDiff=1._KND/(Re*Prandtl)
-  
+
   call Bound_CondU(U)
   call Bound_CondV(V)
   call Bound_CondW(W)
@@ -731,7 +796,7 @@ contains
    do k=1,Unz
     do j=1,Uny
      do i=1,Unx
-      !if (Utype(i,j,k)==0) then 
+      !if (Utype(i,j,k)==0) then
             !call RANDOM_NUMBER(p)
             x=xU(i)
             y=yPr(j)
@@ -781,7 +846,7 @@ contains
    do k=1,Unz
     do j=1,Uny
      do i=1,Unx
-      !if (Utype(i,j,k)==0) then 
+      !if (Utype(i,j,k)==0) then
             !call RANDOM_NUMBER(p)
             x=xU(i)
             y=yPr(j)
@@ -834,7 +899,7 @@ contains
             if ((abs(y-yPr(Uny/2)))<1.) then
              call RANDOM_NUMBER(p)
             else
-             p=0 
+             p=0
             endif
              x1=xPr(i)
              x2=xPr(i+1)
@@ -855,7 +920,7 @@ contains
                 !Uinlet*tanh(y+0.1*sin(pi*(xU(i)/10)*sin(pi*zPr(k)/10)-yPr(Uny/2)) by mean of integrals
     enddo
    enddo
-  enddo 
+  enddo
    do k=1,Vnz
     do j=1,Vny
      do i=1,Vnx
@@ -864,8 +929,8 @@ contains
             ! call RANDOM_NUMBER(p)
             !else
              p=sin(2*pi*xPr(i)/10)*(1+0.3*sin(3*pi*zPr(k)/10))*exp(-(yV(j)-yPr(Uny/2))*(yV(j)-yPr(Uny/2)))
-            !endif 
-             
+            !endif
+
              V(i,j,k)=0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_KND*(p-0.5_KND)
      enddo
     enddo
@@ -878,8 +943,8 @@ contains
             ! call RANDOM_NUMBER(p)
             !else
              p=cos(2*pi*xPr(i)/10)*(1+0.3*cos(3*pi*zW(k)/10))*exp(-(yPr(j)-yPr(Uny/2))*(yPr(j)-yPr(Uny/2)))
-            !endif 
-             
+            !endif
+
              W(i,j,k)=0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_KND*(p-0.5_KND)
      enddo
     enddo
@@ -892,7 +957,7 @@ contains
 !       U(i,j,k)=-prgradienty/(coriolisparam)*(1+0.1_KND*(p-0.5_KND))
 !      enddo
 !     enddo
-!    enddo  
+!    enddo
 !    do k=1,Vnz
 !     do j=1,Vny
 !      do i=1,Vnx
@@ -908,13 +973,13 @@ contains
 !      enddo
 !     enddo
 !    enddo
-  
+
   else
    U(1:Unx,1:Uny,1:Unz)=Uin(1,1)
    do k=1,Unz
     do j=1,Uny
      do i=1,Unx
-      if (Utype(i,j,k)==0) then 
+      if (Utype(i,j,k)==0) then
             call RANDOM_NUMBER(p)
             U(i,j,k)=Uin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_KND*(p-0.5_KND)!sin(2.*pi*xU(i)+1)*cos(2.*pi*yPr(j)-2)!Uin(j,k)!*(1+0.03_KND*(p-0.5_KND))
        else
@@ -926,7 +991,7 @@ contains
    do k=1,Vnz
     do j=1,Vny
      do i=1,Vnx
-      if (Vtype(i,j,k)==0) then 
+      if (Vtype(i,j,k)==0) then
             call RANDOM_NUMBER(p)
             V(i,j,k)=Vin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_KND*(p-0.5_KND)!-cos(2.*pi*xPr(i)+1)*sin(2.*pi*yV(j)-2)!Uinlet*(0.3_KND*(p-0.5_KND))
        else
@@ -938,7 +1003,7 @@ contains
    do k=1,Wnz
     do j=1,Wny
      do i=1,Wnx
-      if (Wtype(i,j,k)==0) then 
+      if (Wtype(i,j,k)==0) then
             call RANDOM_NUMBER(p)
             W(i,j,k)=Win(j,k)!Uinlet*(0.00001_KND*(p-0.5_KND))
        else
@@ -950,8 +1015,8 @@ contains
   endif
 
 
-  
-  do i=1,computescalars      
+
+  do i=1,computescalars
    SCALAR(1:Prnx,1:Prny,1:Prnz,i)=0
   enddo
 
@@ -981,7 +1046,7 @@ contains
      enddo
     enddo
    enddo
-  elseif (buoyancy==1) then   
+  elseif (buoyancy==1) then
    freetempgradient=0.01!0.0035 !K/m
    !inversionTjump=2 !K
    do k=-2,Prnz+3
@@ -992,7 +1057,7 @@ contains
 !          Tempin(j,k)=265!temperature_ref
 !         endif
 !        Tempin(j,k)=temperature_ref
-!     
+!
     enddo
    enddo
 !    Tempin(j,1)=temperature_ref*1.01
@@ -1022,7 +1087,7 @@ contains
     enddo
    enddo
 
-   
+
   endif
 
 
@@ -1034,7 +1099,7 @@ contains
 
  if (Re>0) then
   if (buoyancy==1.or.computescalars>0) TDiff=1._KND/(Re*Prandtl)
-  
+
   call Bound_CondU(U)
   call Bound_CondV(V)
   call Bound_CondW(W)
@@ -1048,13 +1113,13 @@ contains
                      call DynSmag(U,V,W)
    elseif (sgstype==3) then
                      call VREMAN(U,V,W)
-   else 
+   else
     if (Re>0) then
      Visc=1._KND/Re
     else
      Visc=0
     endif
-   endif                
+   endif
 
    call Bound_Visc(Visc)
 
@@ -1072,22 +1137,22 @@ contains
                    call ComputeViscsWM(U,V,W,Pr)
    endif
    call Bound_Visc(Visc)
-  write (*,*) "set"
+  write(*,*) "set"
  endif
  endsubroutine INITCONDS
 
   subroutine INIT_RANDOM_SEED()
   integer:: i, n, clock
   integer,dimension(:),allocatable:: seed
-          
+
    call RANDOM_SEED(size = n)
    allocate(seed(n))
-          
+
    call SYSTEM_CLOCK(COUNT=clock)
-          
+
    seed=clock+37*(/(i-1,i=1,n)/)
    call RANDOM_SEED(PUT=seed)
-    
+
    deallocate(seed)
   endsubroutine
 

@@ -6,13 +6,13 @@ module SCALARS
 
 implicit none
   private
-  public Bound_Temp, Bound_Visc, Scalar, ScalarAvg, partdiam,partrho,percdistrib, AdvScalar,&
+  public Bound_Temp, Bound_Visc, Scalar, partdiam,partrho,percdistrib, AdvScalar,&
      DiffScalar, Deposition, GravSettling, ComputeTDiff, Prt, Rig, ScalFlSourc
 
 
-  real(KND),allocatable,dimension(:,:,:,:):: SCALAR,SCALARavg  !last index is number of scalar (because of paging)
+  real(KND),allocatable,dimension(:,:,:,:):: SCALAR  !last index is number of scalar (because of paging)
   real(KND),dimension(:),allocatable:: partdiam,partrho,percdistrib !diameter of particles <=0 for gas
-  
+
 
 contains
 
@@ -20,7 +20,7 @@ contains
   real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
   real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in):: sctype
-  
+
    call KappaSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
 
   endsubroutine ADVSCALAR
@@ -37,7 +37,7 @@ contains
 
    if (sctype==1) then
     call BOUND_Temp(SCAL)
-   else 
+   else
     call BOUND_PASSSCALAR(SCAL)
    endif
 
@@ -72,14 +72,14 @@ contains
 
    if (sctype==1) then
     call BOUND_Temp(SCAL)
-   else 
+   else
     call BOUND_PASSSCALAR(SCAL)
    endif
-        
+
         Ax=coef*dt/dxmin
         Ay=coef*dt/dymin
         Az=coef*dt/dzmin
-        
+
         do k=1,nz
             do j=1,ny
                 do i=1,nx
@@ -134,10 +134,10 @@ contains
 
    if (sctype==1) then
     call BOUND_Temp(SCAL)
-   else 
+   else
     call BOUND_PASSSCALAR(SCAL)
    endif
-        
+
    Ax=coef*dt/dxmin
    Ay=coef*dt/dymin
    Az=coef*dt/dzmin
@@ -156,10 +156,10 @@ contains
      enddo
     enddo
    enddo
-       
+
    if (sctype==1) then
     call BOUND_Temp(SCAL2)
-   else 
+   else
     call BOUND_PASSSCALAR(SCAL2)
    endif
    SCAL3=SCAL2
@@ -179,7 +179,7 @@ contains
 
    if (sctype==1) then
     call BOUND_Temp(SCAL2)
-   else 
+   else
     call BOUND_PASSSCALAR(SCAL2)
    endif
    SCAL3=SCAL2
@@ -214,10 +214,10 @@ contains
 
    if (sctype==1) then
     call BOUND_Temp(SCAL)
-   else 
+   else
     call BOUND_PASSSCALAR(SCAL)
    endif
-  
+
   A=coef*dt
   SCAL2=SCAL2+SCAL
 
@@ -239,14 +239,14 @@ contains
      do k=1,Prnz
       if (U(i,j,k)>0) then
        FLUX=U(i,j,k)*SCAL2(i,j,k)+U(i,j,k)*(1-U(i,j,k)*A/dxPr(i))*SLOPE(i,j,k)/2._KND
-      else 
+      else
        FLUX=U(i,j,k)*SCAL2(i+1,j,k)-U(i,j,k)*(1+U(i,j,k)*A/dxPr(i+1))*SLOPE(i+1,j,k)/2._KND
       endif
       SCAL2(i,j,k)=SCAL2(i,j,k)-A*FLUX/dxPr(i)
       SCAL2(i+1,j,k)=SCAL2(i+1,j,k)+A*FLUX/dxPr(i+1)
      enddo
     enddo
-   enddo    
+   enddo
 
    SLOPE=0
    do i=0,Prnx+1
@@ -265,14 +265,14 @@ contains
      do k=1,Prnz
       if (V(i,j,k)>0) then
        FLUX=V(i,j,k)*SCAL2(i,j,k)+V(i,j,k)*(1-V(i,j,k)*A/dyPr(j))*SLOPE(i,j,k)/2._KND
-      else 
+      else
        FLUX=V(i,j,k)*SCAL2(i,j+1,k)-V(i,j,k)*(1+V(i,j,k)*A/dyPr(j+1))*SLOPE(i,j+1,k)/2._KND
       endif
       SCAL2(i,j,k)=SCAL2(i,j,k)-A*FLUX/dyPr(j)
       SCAL2(i,j+1,k)=SCAL2(i,j+1,k)+A*FLUX/dyPr(j+1)
      enddo
     enddo
-   enddo    
+   enddo
 
    SLOPE=0
    do i=0,Prnx+1
@@ -290,7 +290,7 @@ contains
      do k=0,Prnz
       if (W(i,j,k)>0) then
        FLUX=W(i,j,k)*SCAL2(i,j,k)+W(i,j,k)*(1-W(i,j,k)*A/dzPr(k))*SLOPE(i,j,k)/2._KND
-      else 
+      else
        FLUX=W(i,j,k)*SCAL2(i,j,k+1)-W(i,j,k)*(1+W(i,j,k)*A/dzPr(k+1))*SLOPE(i,j,k+1)/2._KND
       endif
       SCAL2(i,j,k)=SCAL2(i,j,k)-A*FLUX/dzPr(k)
@@ -315,7 +315,7 @@ contains
      do k=0,Prnz
       if (W(i,j,k)>0) then
        FLUX=W(i,j,k)*SCAL2(i,j,k)+W(i,j,k)*(1-W(i,j,k)*A/dzPr(k))*SLOPE(i,j,k)/2._KND
-      else 
+      else
        FLUX=W(i,j,k)*SCAL2(i,j,k+1)-W(i,j,k)*(1+W(i,j,k)*A/dzPr(k+1))*SLOPE(i,j,k+1)/2._KND
       endif
       SCAL2(i,j,k)=SCAL2(i,j,k)-A*FLUX/dzPr(k)
@@ -341,14 +341,14 @@ contains
      do k=1,Prnz
       if (V(i,j,k)>0) then
        FLUX=V(i,j,k)*SCAL2(i,j,k)+V(i,j,k)*(1-V(i,j,k)*A/dyPr(j))*SLOPE(i,j,k)/2._KND
-      else 
+      else
        FLUX=V(i,j,k)*SCAL2(i,j+1,k)-V(i,j,k)*(1+V(i,j,k)*A/dyPr(j+1))*SLOPE(i,j+1,k)/2._KND
       endif
       SCAL2(i,j,k)=SCAL2(i,j,k)-A*FLUX/dyPr(j)
       SCAL2(i,j+1,k)=SCAL2(i,j+1,k)+A*FLUX/dyPr(j+1)
      enddo
     enddo
-   enddo    
+   enddo
 
    SLOPE=0
    do i=0,Prnx+1
@@ -367,14 +367,14 @@ contains
      do k=1,Prnz
       if (U(i,j,k)>0) then
        FLUX=U(i,j,k)*SCAL2(i,j,k)+U(i,j,k)*(1-U(i,j,k)*A/dxPr(i))*SLOPE(i,j,k)/2._KND
-      else 
+      else
        FLUX=U(i,j,k)*SCAL2(i+1,j,k)-U(i,j,k)*(1+U(i,j,k)*A/dxPr(i+1))*SLOPE(i+1,j,k)/2._KND
       endif
       SCAL2(i,j,k)=SCAL2(i,j,k)-A*FLUX/dxPr(i)
       SCAL2(i+1,j,k)=SCAL2(i+1,j,k)+A*FLUX/dxPr(i+1)
      enddo
     enddo
-   enddo    
+   enddo
   endif
 
   SCAL2=SCAL2-SCAL
@@ -392,10 +392,10 @@ contains
 
    if (sctype==1) then
     call BOUND_Temp(SCAL)
-   else 
+   else
     call BOUND_PASSSCALAR(SCAL)
    endif
-  
+
   A=coef*dt
 
   SLOPE=0
@@ -415,14 +415,14 @@ contains
     do k=1,Prnz
      if (U(i,j,k)>0) then
       FLUX=U(i,j,k)*SCAL(i,j,k)+U(i,j,k)*(1-U(i,j,k)*A/dxPr(i))*SLOPE(i,j,k)/2._KND
-     else 
+     else
       FLUX=U(i,j,k)*SCAL(i+1,j,k)-U(i,j,k)*(1+U(i,j,k)*A/dxPr(i+1))*SLOPE(i+1,j,k)/2._KND
      endif
      SCAL2(i,j,k)=SCAL2(i,j,k)-A*FLUX/dxPr(i)
      SCAL2(i+1,j,k)=SCAL2(i+1,j,k)+A*FLUX/dxPr(i+1)
     enddo
    enddo
-  enddo    
+  enddo
 
   SLOPE=0
   do i=0,Prnx+1
@@ -441,14 +441,14 @@ contains
     do k=1,Prnz
      if (V(i,j,k)>0) then
       FLUX=V(i,j,k)*SCAL(i,j,k)+V(i,j,k)*(1-V(i,j,k)*A/dyPr(j))*SLOPE(i,j,k)/2._KND
-     else 
+     else
       FLUX=V(i,j,k)*SCAL(i,j+1,k)-V(i,j,k)*(1+V(i,j,k)*A/dyPr(j+1))*SLOPE(i,j+1,k)/2._KND
      endif
      SCAL2(i,j,k)=SCAL2(i,j,k)-A*FLUX/dyPr(j)
      SCAL2(i,j+1,k)=SCAL2(i,j+1,k)+A*FLUX/dyPr(j+1)
     enddo
    enddo
-  enddo    
+  enddo
 
   SLOPE=0
   do i=0,Prnx+1
@@ -466,7 +466,7 @@ contains
     do k=0,Prnz
      if (W(i,j,k)>0) then
       FLUX=W(i,j,k)*SCAL(i,j,k)+W(i,j,k)*(1-W(i,j,k)*A/dzPr(k))*SLOPE(i,j,k)/2._KND
-     else 
+     else
       FLUX=W(i,j,k)*SCAL(i,j,k+1)-W(i,j,k)*(1+W(i,j,k)*A/dzPr(k+1))*SLOPE(i,j,k+1)/2._KND
      endif
      SCAL2(i,j,k)=SCAL2(i,j,k)-A*FLUX/dzPr(k)
@@ -503,10 +503,10 @@ contains
 
    if (sctype==1) then
     call BOUND_Temp(SCAL)
-   else 
+   else
     call BOUND_PASSSCALAR(SCAL)
    endif
-  
+
   A=coef*dt
   Ax=coef*dt/dxmin
   Ay=coef*dt/dymin
@@ -541,7 +541,7 @@ contains
      SCAL2(i+1,j,k)=SCAL2(i+1,j,k)+Ax*FLUX
     enddo
    enddo
-  enddo    
+  enddo
 
 
   SLOPE=0
@@ -574,7 +574,7 @@ contains
      SCAL2(i,j+1,k)=SCAL2(i,j+1,k)+Ay*FLUX
     enddo
    enddo
-  enddo    
+  enddo
 
 
   SLOPE=0
@@ -624,10 +624,10 @@ contains
 
    if (sctype==1) then
     call BOUND_Temp(SCAL)
-   else 
+   else
     call BOUND_PASSSCALAR(SCAL)
    endif
-  
+
   A=coef*dt
 
   SLOPE=0
@@ -659,7 +659,7 @@ contains
      SCAL2(i+1,j,k)=SCAL2(i+1,j,k)+A*FLUX/dxPr(i+1)
     enddo
    enddo
-  enddo    
+  enddo
 
 
   SLOPE=0
@@ -692,7 +692,7 @@ contains
      SCAL2(i,j+1,k)=SCAL2(i,j+1,k)+A*FLUX/dyPr(j+1)
     enddo
    enddo
-  enddo    
+  enddo
 
 
   SLOPE=0
@@ -749,7 +749,7 @@ contains
   if (Re>0) then
    if (sctype==1) then
     call BOUND_Temp(SCAL)
-   else 
+   else
     call BOUND_PASSSCALAR(SCAL)
    endif
 
@@ -828,10 +828,10 @@ contains
     S=0
     if (sctype==1) then
      call BOUND_Temp(SCAL2)
-    else 
+    else
      call BOUND_PASSSCALAR(SCAL2)
     endif
-   
+
     if (gridtype==uniformgrid) then
      !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
      !$OMP DO
@@ -1193,7 +1193,7 @@ contains
   end subroutine BOUND_PASSSCALAR
 
 
-  
+
 
 
 
@@ -1205,14 +1205,14 @@ contains
    nz=Prnz
 !    if (TBtypeW==DIRICHLET) then
 !      do k=1,nz
-!       do j=1,ny                     
+!       do j=1,ny
 !        theta(0,j,k)=WsideTemp!-(theta(1,j,k)-WsideTemp)
 !        theta(-1,j,k)=WsideTemp!-(theta(2,j,k)-WsideTemp)
 !       enddo
 !      enddo
    if (TBtypeW==DIRICHLET) then
      do k=1,nz
-      do j=1,ny                     
+      do j=1,ny
        theta(0,j,k)=Tempin(j,k)!-(theta(1,j,k)-WsideTemp)
        theta(-1,j,k)=Tempin(j,k)!-(theta(2,j,k)-WsideTemp)
       enddo
@@ -1226,14 +1226,14 @@ contains
     enddo
    else if (TBtypeW==NEUMANN) then
     do k=1,nz
-     do j=1,ny                     
+     do j=1,ny
       theta(0,j,k)=theta(1,j,k)-WsideTemp*dxU(0)
       theta(-1,j,k)=theta(1,j,k)-WsideTemp*(dxU(0)+dxU(-1))
      enddo
     enddo
    else if (TBtypeW==CONSTFLUX) then
     do k=1,nz
-     do j=1,ny                      
+     do j=1,ny
 !       theta(0,j,k)=(theta(1,j,k)*(U(0,j,k)/2._KND-(TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))+WsideTemp)/&
 !                                   (U(0,j,k)/2._KND+(TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))
       theta(0,j,k)=(theta(1,j,k)*((TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))+WsideTemp)/&
@@ -1241,9 +1241,9 @@ contains
       theta(-1,j,k)=theta(0,j,k)-(theta(1,j,k)-theta(0,j,k))
      enddo
     enddo
-   else    
+   else
     do k=1,nz
-     do j=1,ny                      
+     do j=1,ny
       theta(0,j,k)=theta(1,j,k)-WsideTemp*dxU(0)
       theta(-1,j,k)=theta(1,j,k)-WsideTemp*(dxU(0)+dxU(-1))
      enddo
@@ -1280,7 +1280,7 @@ contains
        ((TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))
       theta(nx+2,j,k)=theta(nx+1,j,k)-(theta(nx,j,k)-theta(nx+1,j,k))
      enddo
-    enddo   
+    enddo
    else
     do k=1,nz
      do j=1,ny
@@ -1290,7 +1290,7 @@ contains
     enddo
    endif
 
-  
+
    if (TBtypeS==DIRICHLET) then
     do k=1,nz
      do i=-1,nx+2
@@ -1322,7 +1322,7 @@ contains
       theta(i,-1,k)=theta(i,0,k)-(theta(i,1,k)-theta(i,0,k))
      enddo
     enddo
-   else    
+   else
     do k=1,nz
      do i=-1,nx+2
       theta(i,0,k)=theta(i,1,k)-SsideTemp*dyV(0)
@@ -1361,7 +1361,7 @@ contains
        ((TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))
       theta(i,ny+2,k)=theta(i,ny+1,k)-(theta(i,ny,k)-theta(i,ny+1,k))
      enddo
-    enddo   
+    enddo
    else
     do k=1,nz
      do i=-1,ny+2
@@ -1380,7 +1380,7 @@ contains
 !       theta(i,j,-1)=BsideTemp!-(theta(i,j,2)-BsideTemp)
 !      enddo
 !     enddo
-!    else 
+!    else
    if (TBtypeB==PERIODIC) then
     do j=-1,ny+2
      do i=-1,nx+2
@@ -1406,7 +1406,7 @@ contains
       theta(i,j,-1)=theta(i,j,0)-(theta(i,j,1)-theta(i,j,0))
      enddo
     enddo
-   else    
+   else
     do j=-1,ny+2
      do i=-1,nx+2
       theta(i,j,0)=theta(i,j,1)-BsideTemp*dzW(0)
@@ -1444,7 +1444,7 @@ contains
       theta(i,j,nz+1)=theta(i,j,nz)-TsideTemp*dzW(nz)/((TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2._KND))
       theta(i,j,nz+2)=theta(i,j,nz+1)-(theta(i,j,nz)-theta(i,j,nz+1))
      enddo
-    enddo   
+    enddo
    else
     do j=-1,ny+2
      do i=-1,nx+2
@@ -1473,8 +1473,8 @@ contains
       Nu(0,j,k)=Nu(nx,j,k)
       Nu(nx+1,j,k)=Nu(1,j,k)
     enddo
-   enddo   
-  else  
+   enddo
+  else
    do k=1,nz
     do j=1,ny
       Nu(0,j,k)=Nu(1,j,k)
@@ -1489,15 +1489,15 @@ contains
       Nu(i,0,k)=Nu(i,ny,k)
       Nu(i,ny+1,k)=Nu(i,1,k)
     enddo
-   enddo   
-  else  
+   enddo
+  else
    do k=1,nz
     do i=1,nx
       Nu(i,0,k)=Nu(i,1,k)
       Nu(i,ny+1,k)=Nu(i,ny,k)
     enddo
    enddo
-  endif 
+  endif
 
   if (BtypeT==PERIODIC) then
    do j=1,ny
@@ -1513,9 +1513,9 @@ contains
       Nu(i,j,nz+1)=Nu(i,j,nz)
     enddo
    enddo
-  endif 
+  endif
   endsubroutine BOUND_Visc
-  
+
 
 
 
@@ -1543,7 +1543,7 @@ contains
     call BOUND_Temp(SCAL)
    elseif (sctype==3) then
     call BOUND_Visc(SCAL)
-   else 
+   else
     call BOUND_PASSSCALAR(SCAL)
    endif
 
@@ -1582,7 +1582,7 @@ contains
   end subroutine ScalFlSOURC
 
 
-    
+
 
 
 
@@ -1769,13 +1769,13 @@ contains
   subroutine Deposition(SCAL,coef)
   real(KND),dimension(-1:,-1:,-1:,1:),intent(inout):: SCAL
   real(KND),intent(in):: coef
-  type(WMPoint),pointer:: WMP 
+  type(WMPoint),pointer:: WMP
   integer i
   real(KND) deptmp
    if (associated(FirstWMPoint)) then
    WMP => FirstWMPoint
    do
-    if (allocated(WMP%depscalar)) then    
+    if (allocated(WMP%depscalar)) then
     if (partdistrib>0) then
      do i=1,partdistrib
       deptmp=abs(DepositionFlux(WMP,SCAL(WMP%x,WMP%y,WMP%z,1)*percdistrib(i),partdiam(i),partrho(i)))&
@@ -1830,7 +1830,7 @@ contains
     enddo
    enddo
   endif
-  endsubroutine Gravsettling  
+  endsubroutine Gravsettling
 
 
   pure real(KND) function Rig(i,j,k,U,V,temperature)

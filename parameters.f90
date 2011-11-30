@@ -81,12 +81,12 @@ implicit none
   integer(sint),allocatable,dimension(:,:,:):: Utype,Vtype,Wtype,Prtype !number of solid body inside which the point is or 0
 
   real(KND) x0,y0,z0
-  integer step,deb !for debugging purposes
-  real(KND) meanustar
-  integer patternnx,patternny,patternnz,boxnx,boxny,boxnz,tilenx,tileny,tilenz
+  integer step
+  integer deb !for debugging purposes
+
   logical xgridfromfile,ygridfromfile,zgridfromfile
-  integer initcondsfromfile 
- 
+  integer initcondsfromfile
+
   integer BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT       !boundary condition types see below for values
   integer TBtypeW,TBtypeE,TBtypeS,TBtypeN,TBtypeB,TBtypeT !boundary condition types for temperature
   integer ScalBtypeW,ScalBtypeE,ScalBtypeS,ScalBtypeN,ScalBtypeB,ScalBtypeT !boundary condition types for scalars
@@ -108,8 +108,6 @@ implicit none
   integer,parameter:: GENERALGRID=1,UNIFORMGRID=2
   integer,parameter:: textvtk=1,binaryvtk=2
   integer,parameter:: SmagorinskyModel=1,DynSmagorinskyModel=2,VremanModel=3,StabSmagorinskyModel=4
-
-  real(KND) probex,probey,probez
 
   integer:: debuglevel !amount of information to write out
 
