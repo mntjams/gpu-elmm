@@ -7,7 +7,7 @@ module SCALARS
 implicit none
  
 
-  real(KND),allocatable,dimension(:,:,:,:):: SCALAR,SCALARavg  !last index is number of scalar (because of paging)
+  real(KND),allocatable,dimension(:,:,:,:):: SCALAR  !last index is number of scalar (because of paging)
   real(KND),dimension(:),allocatable:: partdiam,partrho,percdistrib !diameter of particles <=0 for gas
   
 
