@@ -9,7 +9,7 @@ module TSTEPS
   use POISSON, only: Pr_Correct
   use SMAGORINSKY, only: Smag, Dynsmag, StabSmag, Vreman
   use SCALARS, only:  Bound_Temp, Bound_Visc, Scalar, percdistrib, AdvScalar,&
-     DiffScalar, ComputeTDiff, Deposition, GravSettling, ScalFlSourc
+     DiffScalar, ComputeTDiff, Deposition, GravSettling, ScalFlSourc, VolScalSource
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
   use GEOMETRIC, only: IBLinInt,IBBiLinInt,IBTriLinInt
   use Wallmodels, only: ComputeViscsWM
@@ -35,7 +35,7 @@ contains
   integer,save:: called=0
   integer i
 
-  
+
  if (called==0) then
    called=1
    if (computescalars>0) then
@@ -43,18 +43,18 @@ contains
    endif
    if (buoyancy>0) then
     allocate(temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-   endif 
+   endif
    if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
-  endif 
+  endif
 
   if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
- 
+
   call Bound_CondU(U)
   call Bound_CondV(V)
   call Bound_CondW(W)
   if (buoyancy==1)  call Bound_Temp(temperature)
 
- 
+
 
   U2=1e19
   V2=1e19
@@ -91,9 +91,9 @@ contains
   if (masssourc==1) then
       call MASS_SOURC(Q,U2,V2,W2)
   endif
-  
- 
-  
+
+
+
   call Bound_CondU(U2)
   call Bound_CondV(V2)
   call Bound_CondW(W2)
@@ -107,7 +107,7 @@ contains
   endif
 
 
-  
+
   if (computescalars>0) then
    Scalar_2=0
    do i=1,computescalars
@@ -123,7 +123,7 @@ contains
    if (computegravsettling>0) call GravSettling(Scalar_2,1._KND)
    Scalar=Scalar_2
   endif
-    
+
   if (buoyancy>0) then
    if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
    call Bound_Visc(TDiff)
@@ -148,7 +148,7 @@ contains
   V=V2
   W=W2
  end subroutine TMarchEul
-  
+
 
 
 
@@ -310,7 +310,7 @@ contains
 
     if (computescalars>0) then
       Scalar_2=0
- 
+
       Scalar_2=Scalar_2+Scalar_adv*rho
 
       Scalar_adv=0
@@ -319,10 +319,16 @@ contains
       enddo
       Scalar_2=Scalar_2+Scalar_adv*beta
 
-      if (pointscalsource==1) then
+      if (scalsourcetype==pointsource) then
        do i=1,computescalars
         Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)=Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
          percdistrib(i)*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
+       enddo
+      endif
+
+      if (scalsourcetype==volumesource) then
+       do i=1,computescalars
+        call VolScalSource(Scalar_2,1._KND)
        enddo
       endif
 
@@ -385,7 +391,7 @@ contains
 
 
 
-  
+
  subroutine TMarchRK2(U,V,W,Pr,delta)
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND),intent(out):: delta
@@ -410,10 +416,10 @@ contains
    endif
    if (buoyancy>0) then
     allocate(temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-   endif 
+   endif
    if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
-  endif 
-  
+  endif
+
   if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
 
   call Bound_CondU(U)
@@ -421,7 +427,7 @@ contains
   call Bound_CondW(W)
   if (buoyancy==1)  call Bound_Temp(temperature)
 
-  
+
 
 
       call timestepEUL(U,V,W)
@@ -459,7 +465,7 @@ contains
    call CoriolisForce(U2,V2,Ustar,Vstar,1._KND)
      if (buoyancy==1) call BuoyancyForce(W2,temperature,1._KND)
 
-   
+
    U2=Ustar/2._KND-U/2._KND+U2
    V2=Vstar/2._KND-V/2._KND+V2
    W2=Wstar/2._KND-W/2._KND+W2
@@ -467,8 +473,8 @@ contains
    U2(1:Unx,1:Uny,1:Unz)=0
    V2(1:Vnx,1:Vny,1:Vnz)=0
    W2(1:Wnx,1:Wny,1:Wnz)=0
-  endif 
- 
+  endif
+
 
    call OtherTerms(U,V,W,U2,V2,W2,Pr,1._KND)
 
@@ -476,31 +482,31 @@ contains
   if (BtypeT==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
   if (BtypeE==OutletBuff) call AttenuateOut(U2,V2,W2,Pr)
 
-  
+
   if (masssourc==1) then
       call MASS_SOURC(Q,U2,V2,W2)
   endif
-   
+
 
   call Bound_CondU(U2)
   call Bound_CondV(V2)
   call Bound_CondW(W2)
-  
+
 
   if (poissmet>0) then
   if (masssourc==1) then
     call Pr_Correct(U2,V2,W2,Pr,1._KND,Q)
   else
     call Pr_Correct(U2,V2,W2,Pr,1._KND)
-  endif  
+  endif
   endif
 
-  
+
   call Bound_CondU(U2)
   call Bound_CondV(V2)
   call Bound_CondW(W2)
-  
-  
+
+
 
   if (computescalars>=4)then
    if (time>(endtime-starttime)/3._KND.and.maxval(scalar(:,:,:,1))==0) then
@@ -571,7 +577,7 @@ contains
     Scalar=Scalar/p
    endif
   endif
-  
+
   if (computescalars>0) then
    Scalar_2=0
    do i=1,computescalars
@@ -599,21 +605,17 @@ contains
    call DiffScalar(temperature2,temperature,1,1._KND)
    temperature=temperature2
   endif
-  
+
   call NullInterior(U2,V2,W2)
-  
+
   delta=sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
   delta=delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
   delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
   U=U2
   V=V2
   W=W2
-    
+
  endsubroutine TMarchRK2
-  
-  
-  
-  
 
 
 
@@ -626,7 +628,11 @@ contains
 
 
 
-  
+
+
+
+
+
  subroutine TMarchRK3(U,V,W,Pr,delta)
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND),intent(out):: delta
@@ -786,10 +792,16 @@ write(*,*) "Test codelet:", i
       enddo
       Scalar_2=Scalar_2+Scalar_adv*beta(l)
 
-      if (pointscalsource==1) then
+      if (scalsourcetype==pointsource) then
        do i=1,computescalars
         Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)=Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
          percdistrib(i)*(rho(l)+beta(l))*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
+       enddo
+      endif
+
+      if (scalsourcetype==volumesource) then
+       do i=1,computescalars
+        call VolScalSource(Scalar_2,rho(l)+beta(l))
        enddo
       endif
 
@@ -845,13 +857,13 @@ write(*,*) "Test codelet:", i
     W=W2
    enddo
  end subroutine TMarchRK3
-    
-  
 
 
 
-  
-   
+
+
+
+
  subroutine TMarchShiftInlet(U,V,W,Pr,delta) !Only shifts inlet in the x direction, for debugging purposes
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND),intent(out):: delta
@@ -868,14 +880,14 @@ write(*,*) "Test codelet:", i
     endif
     if (buoyancy>0) then
      allocate(temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-    endif 
-  endif 
- 
+    endif
+  endif
+
   if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
   if (BtypeW==InletFromFile) call GetInletFromFile(time)
 
   write (*,*) "time:",time,"dt: ",dt
- 
+
   call Bound_CondU(U)
   call Bound_CondV(V)
   call Bound_CondW(W)
@@ -923,7 +935,7 @@ write(*,*) "Test codelet:", i
     Scalar(i,j,k,1)=1._KND/(dxPr(i)*dyPr(j)*dzPr(k))
    endif
   endif
-  
+
 
 
   if (wallmodeltype>0) then
@@ -932,9 +944,9 @@ write(*,*) "Test codelet:", i
 
   delta=1
  endsubroutine TMarchShiftInlet
-  
-  
-  
+
+
+
  subroutine Explosion
   real(KND) xc,yc,xs,xf,ys,yf,zs,zf,dxp,dyp,dzp,ct,cr,xp,yp,zp,p
   integer i,j,k,xi,yj,zk,nprobx,nproby,nprobz
@@ -992,12 +1004,12 @@ write(*,*) "Test codelet:", i
    endif
   endif
 
-  
+
  endsubroutine Explosion
-  
-  
-  
-  
+
+
+
+
 
 
   subroutine MomSourc(U,V,W)
@@ -1236,7 +1248,7 @@ write(*,*) "Test codelet:", i
   endif
 
   end subroutine MomSourc
-   
+
 
   subroutine MASS_SOURC(Q,U,V,W)
   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
@@ -1293,16 +1305,16 @@ write(*,*) "Test codelet:", i
     enddo
    enddo
   enddo
-  
-  if (m>0.1*Uinlet/dxmin) then 
+
+  if (m>0.1*Uinlet/dxmin) then
    dt=0.25_KND/(m)
   else
    dt=0.25_KND/(Uinlet/dxmin)
   endif
   endsubroutine TIMESTEPCW
-  
 
-  
+
+
   subroutine TIMESTEPEUL(U,V,W)
   real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer i,j,k,maxI,maxJ,maxK
@@ -1328,7 +1340,7 @@ write(*,*) "Test codelet:", i
   enddo
 
 
-  if (m>0) then 
+  if (m>0) then
    dt=MIN(CFL/(m),dxmin/Uref)
   else
    dt=dxmin/Uref
@@ -1373,11 +1385,11 @@ write(*,*) "Test codelet:", i
    if (coriolisparam>0) then
     do k=1,Unz
      do j=1,Uny
-      do i=1,Unx   
+      do i=1,Unx
            U2(i,j,k)=U2(i,j,k)-A*coriolisparam*(V(i,j-1,k)+V(i+1,j-1,k)+V(i,j,k)+V(i+1,j,k))/4._KND
       enddo
      enddo
-    enddo   
+    enddo
     do k=1,Vnz
      do j=1,Vny
       do i=1,Vnx
@@ -1399,7 +1411,7 @@ write(*,*) "Test codelet:", i
    real(KND),intent(inout):: Pr(1:,1:,1:)
    real(KND),intent(inout):: U2(-2:,-2:,-2:),V2(-2:,-2:,-2:),W2(-2:,-2:,-2:)
    real(KND),intent(in):: coef
-       
+
    real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: U3
    real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: V3
    real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: W3
@@ -1408,7 +1420,7 @@ write(*,*) "Test codelet:", i
    integer i,j,k,it,x,y,z
 
    type(TIBPoint),pointer:: IBP
-write(*,*) "Otherterms:"   
+write(*,*) "Otherterms:"
    Apre=-coef*dt
    Aprn=-coef*dt
    Aprt=-coef*dt
@@ -1418,7 +1430,7 @@ write(*,*) "Otherterms:"
    !Pressure gradient terms
    do k=1,Unz
     do j=1,Uny
-     do i=1,Unx   
+     do i=1,Unx
           U2(i,j,k)=U2(i,j,k)+Apre*(Pr(i+1,j,k)-Pr(i,j,k))/dxU(i)+Apre*prgradientx
      enddo
     enddo
@@ -1567,7 +1579,7 @@ write(*,*) "Otherterms:"
      U2=U3
      V2=V3
      W2=W3
-  
+
    else  Re_gt_0  !Re<=0
 
     U2=U+U2
@@ -2265,7 +2277,7 @@ write(*,*) "Otherterms:"
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer i,j,k
 
-  
+
    do k=1,Unz
     do j=1,Uny
      do i=1,Unx
@@ -2635,7 +2647,7 @@ write(*,*) "Otherterms:"
         Ax=0.25_KND*dt/dx
         Ay=0.25_KND*dt/dy
         Az=0.25_KND*dt/dz
-       !$hmppcg grid blocksize 512x1        
+       !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
         do k=1,Unz
             do j=1,Uny
@@ -2650,7 +2662,7 @@ write(*,*) "Otherterms:"
             enddo
         enddo
 
-       !$hmppcg grid blocksize 512x1        
+       !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
         do k=1,Vnz
             do j=1,Vny
@@ -2665,7 +2677,7 @@ write(*,*) "Otherterms:"
             enddo
         enddo
 
-       !$hmppcg grid blocksize 512x1        
+       !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
         do k=1,Wnz
             do j=1,Wny

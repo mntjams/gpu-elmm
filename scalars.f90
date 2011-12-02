@@ -3,32 +3,33 @@ module SCALARS
  use WALLMODELS
  use GEOMETRIC
  use LIMITERS
+ use BOUNDARIES
 
 implicit none
   private
   public Bound_Temp, Bound_Visc, Scalar, partdiam,partrho,percdistrib, AdvScalar,&
-     DiffScalar, Deposition, GravSettling, ComputeTDiff, Prt, Rig, ScalFlSourc
+     DiffScalar, Deposition, GravSettling, ComputeTDiff, Prt, Rig, ScalFlSourc, VolScalSource
 
 
-  real(KND),allocatable,dimension(:,:,:,:):: SCALAR  !last index is number of scalar (because of paging)
-  real(KND),dimension(:),allocatable:: partdiam,partrho,percdistrib !diameter of particles <=0 for gas
+  real(KND),allocatable,dimension(:,:,:,:) :: SCALAR  !last index is number of scalar (because of paging)
+  real(KND),dimension(:),allocatable :: partdiam,partrho,percdistrib !diameter of particles <=0 for gas
 
 
 contains
 
   subroutine ADVSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
-  real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in):: sctype
+  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
+  real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  integer,intent(in)      :: sctype
 
    call KappaSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
 
   endsubroutine ADVSCALAR
 
   pure subroutine CDSSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
-  real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in):: sctype
+  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
+  real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  integer,intent(in)      :: sctype
   integer nx,ny,nz,i,j,k
   real(KND) Ax,Ay,Az
         nx=Prnx
@@ -61,9 +62,9 @@ contains
   end subroutine CDSSCALAR
 
   pure subroutine UDSSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
-  real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in):: sctype
+  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
+  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  integer,intent(in) :: sctype
   integer nx,ny,nz,i,j,k
   real(KND) Ax,Ay,Az
         nx=Prnx
@@ -125,10 +126,10 @@ contains
 
 
   pure subroutine QUICKSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
-  real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in):: sctype
-  real(KND)::Scal3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
+  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  integer,intent(in) :: sctype
+  real(KND) :: Scal3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
   integer nx,ny,nz,i,j,k
   real(KND) Ax,Ay,Az,F
 
@@ -204,13 +205,13 @@ contains
 
 
   subroutine PLMSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
-  real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in):: sctype
+  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
+  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  integer,intent(in) :: sctype
   integer i,j,k
   real(KND) SL,SR,FLUX,A
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2):: SLOPE
-  logical,save::direction=.true.
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
+  logical,save :: direction=.true.
 
    if (sctype==1) then
     call BOUND_Temp(SCAL)
@@ -383,12 +384,12 @@ contains
 
 
   pure subroutine PLMSCALARNOSPLIT(SCAL2,SCAL,U,V,W,sctype,coef)
-  real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in):: sctype
+  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
+  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  integer,intent(in) :: sctype
   integer i,j,k
   real(KND) SL,SR,FLUX,A
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2):: SLOPE
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
 
    if (sctype==1) then
     call BOUND_Temp(SCAL)
@@ -479,9 +480,9 @@ contains
 
 
   subroutine KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
-  real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in):: sctype
+  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  integer,intent(in) :: sctype
 
    if (gridtype==uniformgrid) then
     call KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef)
@@ -492,14 +493,14 @@ contains
 
 
   subroutine KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
-  real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in):: sctype
+  real(KND),intent(inout) ::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  integer,intent(in) :: sctype
   integer i,j,k
   real(KND) A,Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
   real(KND) SL,SR,FLUX
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2):: SLOPE
-  real(KND),parameter::eps=1e-8
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
+  real(KND),parameter ::eps=1e-8
 
    if (sctype==1) then
     call BOUND_Temp(SCAL)
@@ -613,13 +614,13 @@ contains
 
 
   subroutine KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
-  real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in):: sctype
+  real(KND),intent(inout) ::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  integer,intent(in) :: sctype
   integer i,j,k
   real(KND) A                       !Auxiliary variables to store muliplication constants for efficiency
   real(KND) SL,SR,FLUX
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2):: SLOPE
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
   real(KND),parameter::eps=1e-8
 
    if (sctype==1) then
@@ -732,9 +733,9 @@ contains
 
 
   subroutine DIFFSCALAR(SCAL2,SCAL,sctype,coef)
-  real(KND),intent(inout)::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in):: coef
-  integer,intent(in):: sctype
+  real(KND),intent(inout) ::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
+  real(KND),intent(in) :: coef
+  integer,intent(in) :: sctype
   real(KND) Scal3(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
   integer nx,ny,nz,i,j,k,l
   real(KND) p,S
@@ -941,7 +942,7 @@ contains
 
 
   pure subroutine BOUND_PASSSCALAR(SCAL)
-  real(KND),intent(inout):: SCAL(-1:,-1:,-1:)
+  real(KND),intent(inout) :: SCAL(-1:,-1:,-1:)
   integer i,j,k,nx,ny,nz
 
    nx=Prnx
@@ -1198,7 +1199,7 @@ contains
 
 
   pure subroutine BOUND_TEMP(Theta)
-  real(KND),intent(inout):: theta(-1:,-1:,-1:)
+  real(KND),intent(inout) :: theta(-1:,-1:,-1:)
   integer i,j,k,nx,ny,nz
    nx=Prnx
    ny=Prny
@@ -1460,7 +1461,7 @@ contains
 
 
   pure subroutine BOUND_Visc(Nu)
-  real(KND),intent(inout):: Nu(-1:,-1:,-1:)
+  real(KND),intent(inout) :: Nu(-1:,-1:,-1:)
   integer i,j,k,nx,ny,nz
 
   nx=Prnx
@@ -1533,8 +1534,8 @@ contains
 
 
   subroutine ScalFlSOURC(SCAL,sctype)  !Virtual scalar source for the Immersed Boundary Method with prescribed scalar flux on the boundary
-   real(KND),intent(inout):: SCAL(-1:,-1:,-1:)
-   integer,intent(in):: sctype
+   real(KND),intent(inout) :: SCAL(-1:,-1:,-1:)
+   integer,intent(in) :: sctype
    real(KND) intscal,intTDiff
    type(TScalFlIBPoint),pointer:: SIBP
    integer xi,yj,zk,dirx,diry,dirz,n1,i
@@ -1596,20 +1597,20 @@ contains
 
 
   pure real(DBL) function AirDensity(press,temp)
-  real(KND),intent(in):: press,temp
+  real(KND),intent(in) :: press,temp
   AirDensity=press/(287.05_DBL*temp)
   endfunction AirDensity
 
 
   pure real(DBL) function AirDynVisc(temp)
-  real(KND),intent(in):: temp
+  real(KND),intent(in) :: temp
   AirDynVisc=1.85e-5_DBL
   endfunction AirDynVisc
 
 
 
   pure real(DBL) function CorrFactor(dp,press,temp)
-  real(KND),intent(in):: dp,press,temp
+  real(KND),intent(in) :: dp,press,temp
   real(DBL) l
   l=MeanFreePath(press,temp)
   CorrFactor=1+(2*l/dp)*(1.257_KND+0.4_KND*exp(-0.55_KND*dp/l))
@@ -1617,13 +1618,13 @@ contains
 
 
   pure real(DBL) function MeanFreePath(press,temp)
-  real(KND),intent(in):: press,temp
+  real(KND),intent(in) :: press,temp
   MeanFreePath=2.24e-5_DBL*temp/press
   endfunction MeanFreePath
 
 
   pure real(DBL) function BrownDiffusivity(dp,press,temp)
-  real(KND),intent(in):: dp,press,temp
+  real(KND),intent(in) :: dp,press,temp
   real(DBL) C
   C=Corrfactor(dp,press,temp)
   BrownDiffusivity=BoltzC*temp*C/(3._KND*pi*AirDynVisc(temp)*dp)
@@ -1631,7 +1632,7 @@ contains
 
 
   pure real(KND) function BrownEff(dp,press,temp)
-  real(KND),intent(in):: dp,press,temp
+  real(KND),intent(in) :: dp,press,temp
   real(KND) Sc
   Sc=(AirDynVisc(temp)/AirDensity(press,temp))/BrownDiffusivity(dp,press,temp)
   BrownEff=Sc**(-0.54_KND)
@@ -1639,7 +1640,7 @@ contains
 
 
   pure real(KND) function ImpactEff(dp,press,temp,ustar,visc)
-  real(KND),intent(in):: dp,press,temp,ustar,visc
+  real(KND),intent(in) :: dp,press,temp,ustar,visc
   real(KND) St
   St=SedimVelocity2(dp,press,temp)*ustar**2/visc
   ImpactEff=St**2/(400+St**2)
@@ -1647,14 +1648,14 @@ contains
 
 
   pure real(KND) function SedimVelocity2(dp,press,temp)
-  real(KND),intent(in):: dp,temp,press
+  real(KND),intent(in) :: dp,temp,press
   real(KND) C
   C=CorrFactor(dp,press,temp)
   SedimVelocity2=AirDensity(press,temp)*dp**2*9.81_KND*C/(18._KND*AirDynVisc(temp))
   endfunction SedimVelocity2
 
   pure real(DBL) function SedimVelocity(dp,rhop,press,temp)
-  real(KND),intent(in):: dp,rhop,temp,press
+  real(KND),intent(in) :: dp,rhop,temp,press
   real(DBL) C,us,rho,mu
   rho=AirDensity(press,temp)
   mu=AirDynVisc(temp)
@@ -1667,7 +1668,7 @@ contains
 
 
   pure real(KND) function DyerH(zL)
-  real(KND),intent(in):: zL
+  real(KND),intent(in) :: zL
   if (zL>=0) then
    DyerH=1._KND+5._KND*zl
   else
@@ -1678,8 +1679,8 @@ contains
 
 
   pure real(KND) function AerResist(z,z0,zL,ustar,visc)
-  real(KND),intent(in):: z,z0,zL,ustar,visc
-  real(KND),parameter:: yplcrit=11.225
+  real(KND),intent(in) :: z,z0,zL,ustar,visc
+  real(KND),parameter :: yplcrit=11.225
 
   if (z>z0.and.z0>0) then
    AerResist=(log(z/z0)-DyerH(zl))/(0.4_KND*ustar)
@@ -1693,7 +1694,7 @@ contains
   endfunction AerResist
 
   pure real(KND) function DepositionVelocity3(dp,rhop,press,temp,z,z0,zL,ustar) !EMRAS recommended values
-  real(KND),intent(in):: dp,rhop,press,temp,z,z0,zL,ustar
+  real(KND),intent(in) :: dp,rhop,press,temp,z,z0,zL,ustar
 
    if (dp<1e-6) then
     DepositionVelocity3=0.5e-4
@@ -1709,7 +1710,7 @@ contains
 
 
   pure real(KND) function DepositionVelocity2(dp,press,temp,z,z0,zL,ustar)
-  real(KND),intent(in):: dp,press,temp,z,z0,zL,ustar
+  real(KND),intent(in) :: dp,press,temp,z,z0,zL,ustar
   real(KND) SurfResist,St,visc
 
    visc=AirDynVisc(temp)/AirDensity(press,temp)
@@ -1720,9 +1721,9 @@ contains
 
 
   pure real(KND) function DepositionVelocity(dp,rhop,press,temp,z,z0,zL,ustar) !Kharchenko
-  real(KND),intent(in):: dp,rhop,press,temp,z,z0,zL,ustar
+  real(KND),intent(in) :: dp,rhop,press,temp,z,z0,zL,ustar
   real(DBL) visc,us,Intz,Intexp,BD,tp
-  real(DBL),parameter:: zexp=0.01
+  real(DBL),parameter :: zexp=0.01
 
    us=SedimVelocity(dp,rhop,press,temp)
    visc=AirDynVisc(temp)/AirDensity(press,temp)
@@ -1751,9 +1752,9 @@ contains
 
 
   pure real(KND) function DepositionFlux(WMP,conc,partdiam,rhop)
-  type(WMPoint),intent(in):: WMP
-  real(KND),intent(in):: conc,partdiam,rhop
-  real(KND):: press,temp,depvel
+  type(WMPoint),intent(in) :: WMP
+  real(KND),intent(in) :: conc,partdiam,rhop
+  real(KND) :: press,temp,depvel
 
    press=101300
    temp=temperature_ref
@@ -1767,9 +1768,9 @@ contains
   endfunction DepositionFlux
 
   subroutine Deposition(SCAL,coef)
-  real(KND),dimension(-1:,-1:,-1:,1:),intent(inout):: SCAL
-  real(KND),intent(in):: coef
-  type(WMPoint),pointer:: WMP
+  real(KND),dimension(-1:,-1:,-1:,1:),intent(inout) :: SCAL
+  real(KND),intent(in) :: coef
+  type(WMPoint),pointer :: WMP
   integer i
   real(KND) deptmp
    if (associated(FirstWMPoint)) then
@@ -1803,10 +1804,10 @@ contains
 
 
   subroutine Gravsettling(SCAL,coef)
-  real(KND),dimension(-1:,-1:,-1:,1:):: SCAL
+  real(KND),dimension(-1:,-1:,-1:,1:) :: SCAL
   integer i,j,k,l
-  real(KND),dimension(Prnx,Prny,Prnz)::flux
-  real(KND):: coef,press,temp,us
+  real(KND),dimension(Prnx,Prny,Prnz) :: flux
+  real(KND) :: coef,press,temp,us
 
   press=101300
   temp=temperature_ref
@@ -1834,9 +1835,9 @@ contains
 
 
   pure real(KND) function Rig(i,j,k,U,V,temperature)
-  integer,intent(in):: i,j,k
-  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V
-  real(KND),dimension(-1:,-1:,-1:),intent(in):: temperature
+  integer,intent(in) :: i,j,k
+  real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V
+  real(KND),dimension(-1:,-1:,-1:),intent(in) :: temperature
   real(KND) num,denom
 
   num=(grav_acc/temperature_ref)*(temperature(i,j,k+1)-temperature(i,j,k-1))/(zPr(k+1)-zPr(k-1))
@@ -1852,7 +1853,7 @@ contains
 
 
   subroutine ComputeTDiff(U,V,W)
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer:: i,j,k
    if (Re>0) then
     forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
@@ -1867,9 +1868,9 @@ contains
 
 
   pure real(KND) function Prt(i,j,k,U,V,temperature)
-  integer,intent(in):: i,j,k
-  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V
-  real(KND),dimension(-1:,-1:,-1:),intent(in):: temperature
+  integer,intent(in) :: i,j,k
+  real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V
+  real(KND),dimension(-1:,-1:,-1:),intent(in) :: temperature
 
 !   if (buoyancy>0) then
 !    Prt=0.8_KND+min(max(3._KND*Rig(i,j,k,U,V,temperature),0._KND),sqrt(huge(1._KND)))
@@ -1877,5 +1878,14 @@ contains
    Prt=debugparam!0.6_KND
 !   endif
   endfunction Prt
+
+
+  subroutine VolScalSource(Scal,coef)
+  real(KND),intent(inout) :: Scal(-1:,-1:,-1:,:)
+  real(KND),intent(in) :: coef
+
+   include "customvolscalsource.f90"
+  end subroutine VolScalSource
+
 
 end module SCALARS

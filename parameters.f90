@@ -50,7 +50,7 @@ implicit none
   real(KND) totalscalsource
 
   integer,dimension(:),allocatable:: scalsrci,scalsrcj,scalsrck
-  integer pointscalsource
+  integer scalsourcetype
 
   real(KND),dimension(1:3,1:3):: relativestress
 
@@ -108,6 +108,7 @@ implicit none
   integer,parameter:: GENERALGRID=1,UNIFORMGRID=2
   integer,parameter:: textvtk=1,binaryvtk=2
   integer,parameter:: SmagorinskyModel=1,DynSmagorinskyModel=2,VremanModel=3,StabSmagorinskyModel=4
+  integer,parameter:: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4
 
   integer:: debuglevel !amount of information to write out
 
