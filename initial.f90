@@ -9,12 +9,14 @@ module INITIAL
   use OUTPUTS, only: store, display, probes, NumProbes
   use SCALARS
   use SMAGORINSKY
+  use TURBINLET
+  use GEOMETRIC
   use WALLMODELS
 
   implicit none
 
   private
-  public  ReadParams, Initconds
+  public  ReadParams, Initconds, ReadBounds
 
 
 
@@ -274,7 +276,7 @@ contains
   read(11,fmt='(/)')
   read(11,*) totalscalsource
   read(11,fmt='(/)')
-  read(11,*) pointscalsource
+  read(11,*) scalsourcetype
 
   read(11,fmt='(/)')
   read(11,*) ScalBtypeW
@@ -509,7 +511,7 @@ contains
       read(11,fmt='(/)')
       read(11,*) probes(i)%y
       read(11,fmt='(/)')
-      read(11,*) probes(i)%y
+      read(11,*) probes(i)%z
     enddo
     close(11)
   endif
@@ -1140,6 +1142,522 @@ contains
   write(*,*) "set"
  endif
  endsubroutine INITCONDS
+
+
+
+
+
+
+  subroutine READBOUNDS
+  real(KND),allocatable:: xU2(:),yV2(:),zW2(:)
+  integer i,j,k,nx,ny,nz,nxup,nxdown,nyup,nydown,nzup,nzdown,io
+  real(KND) P
+  type(WMPoint):: WMP
+
+
+  nx=Prnx-1
+  ny=Prny-1
+  nz=Prnz-1
+
+  if (xgridfromfile) then
+   open(11,file="xgrid.txt")
+   j=-1
+   do
+    read (11,*,iostat=io) P
+    if (io==0) then
+      j=j+1
+    else
+      exit
+    endif
+   enddo
+   nx=j
+   Prnx=nx
+   Vnx=Prnx
+   Wnx=Prnx
+   if (BtypeE==PERIODIC) then
+                         Unx=Prnx
+                        else
+                         Unx=Prnx-1
+   endif
+   close(11)
+  endif
+
+  if (ygridfromfile) then
+   open(11,file="ygrid.txt")
+   j=-1
+   do
+    read (11,*,iostat=io) P
+    if (io==0) then
+      j=j+1
+    else
+      exit
+    endif
+   enddo
+   ny=j
+   Prny=ny
+   Uny=Prny
+   Wny=Prny
+   if (BtypeN==PERIODIC) then
+                         Vny=Prny
+                        else
+                         Vny=Prny-1
+   endif
+   close(11)
+  endif
+
+  if (zgridfromfile) then
+   open(11,file="zgrid.txt")
+   j=-1
+   do
+    read (11,*,iostat=io) P
+    if (io==0) then
+      j=j+1
+      write(*,*) j
+    else
+      exit
+    endif
+   enddo
+   nz=j
+   Prnz=nz
+   Unz=Prnz
+   Vnz=Prnz
+   if (BtypeT==PERIODIC) then
+                         Wnz=Prnz
+                        else
+                         Wnz=Prnz-1
+   endif
+   close(11)
+  endif
+
+
+
+
+
+  allocate(xU2(-3:nx+4))
+  allocate(yV2(-3:ny+4))
+  allocate(zW2(-3:nz+4))
+
+
+
+  if (xgridfromfile) then
+   open(11,file="xgrid.txt")
+   do j=0,nx
+    write(*,*) j
+    read(11,*) xU2(j)
+   enddo
+   close(11)
+
+   if (BtypeW==PERIODIC) then
+    do j=-1,-3,-1
+     xU2(j)=xU2(0)-(xU2(nx)-xU2(nx+j))
+    enddo
+   else
+    do j=-1,-3,-1
+     xU2(j)=xU2(0)-(xU2(0-j)-xU2(0))
+    enddo
+   endif
+
+   if (BtypeE==PERIODIC) then
+    do j=nx+1,nx+4
+     xU2(j)=xU2(nx)+(xU2(j-nx)-xU2(0))
+    enddo
+   else
+    do j=nx+1,nx+4
+     xU2(j)=xU2(nx)+(xU2(nx)-xU2(nx-(j-nx)))
+    enddo
+   endif
+
+   x0=xU2(0)
+  else
+   forall (i=-3:nx+4)
+    xU2(i)=(i)*dxmin+x0
+   endforall
+  endif
+
+
+  if (ygridfromfile) then
+   open(11,file="ygrid.txt")
+   do j=0,ny
+    read(11,*) yV2(j)
+   enddo
+   close(11)
+
+   if (BtypeS==PERIODIC) then
+    do j=-1,-3,-1
+     yV2(j)=yV2(0)-(yV2(ny)-yV2(ny+j))
+    enddo
+   else
+    do j=-1,-3,-1
+     yV2(j)=yV2(0)-(yV2(0-j)-yV2(0))
+    enddo
+   endif
+
+   if (BtypeN==PERIODIC) then
+    do j=ny+1,ny+4
+     yV2(j)=yV2(ny)+(yV2(j-ny)-yV2(0))
+    enddo
+   else
+    do j=ny+1,ny+4
+     yV2(j)=yV2(ny)+(yV2(ny)-yV2(ny-(j-ny)))
+    enddo
+   endif
+
+   y0=yV2(0)
+  else
+   forall (j=-3:ny+4)
+     yV2(j)=(j)*dymin+y0
+   endforall
+  endif
+
+
+  if (zgridfromfile) then
+   open(11,file="zgrid.txt")
+   do j=0,nz
+    read(11,*) zW2(j)
+   enddo
+   close(11)
+
+   if (BtypeB==PERIODIC) then
+    do j=-1,-3,-1
+     zW2(j)=zW2(0)-(zW2(nz)-zW2(nz+j))
+    enddo
+   else
+    do j=-1,-3,-1
+     zW2(j)=zW2(0)-(zW2(0-j)-zW2(0))
+    enddo
+   endif
+
+   if (BtypeT==PERIODIC) then
+    do j=nz+1,nz+4
+     zW2(j)=zW2(nz)+(zW2(j-nz)-zW2(0))
+    enddo
+   else
+    do j=nz+1,nz+4
+     zW2(j)=zW2(nz)+(zW2(nz)-zW2(nz-(j-nz)))
+    enddo
+   endif
+
+   z0=zW2(0)
+  else
+   forall (k=-3:nz+4)
+    zW2(k)=(k)*dzmin+z0
+   endforall
+  endif
+
+
+  nxup=nx+1
+  nxdown=0
+  nyup=ny+1
+  nydown=0
+  nzup=nz+1
+  nzdown=0
+
+
+  allocate(xU(-3:nx+4))
+  allocate(yV(-3:ny+4))
+  allocate(zW(-3:nz+4))
+  allocate(dxU(-2:nx+3))
+  allocate(dyV(-2:ny+3))
+  allocate(dzW(-2:nz+3))
+  allocate(xPr(-2:nx+4),dxPr(-2:nx+4))
+  allocate(yPr(-2:ny+4),dyPr(-2:ny+4))
+  allocate(zPr(-2:nz+4),dzPr(-2:nz+4))
+
+  xU=xU2(nxdown-3:nxup+3)
+  yV=yV2(nydown-3:nyup+3)
+  zW=zW2(nzdown-3:nzup+3)
+
+  forall (i=-2:nx+4)
+   xPr(i)=(xU(i-1)+xU(i))/2._KND
+   dxPr(i)=xU(i)-xU(i-1)
+  endforall
+  forall (j=-2:ny+4)
+   yPr(j)=(yV(j-1)+yV(j))/2._KND
+   dyPr(j)=yV(j)-yV(j-1)
+  endforall
+  forall (k=-2:nz+4)
+   zPr(k)=(zW(k-1)+zW(k))/2._KND
+   dzPr(k)=zW(k)-zW(k-1)
+  endforall
+  forall (i=-2:nx+3)
+   dxU(i)=xPr(i+1)-xPr(i)
+  endforall
+  forall (j=-2:ny+3)
+   dyV(j)=yPr(j+1)-yPr(j)
+  endforall
+  forall (k=-2:nz+3)
+   dzW(k)=zPr(k+1)-zPr(k)
+  endforall
+
+  deallocate(xU2)
+  deallocate(yV2)
+  deallocate(zW2)
+
+
+  allocate(Utype(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+  allocate(Vtype(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+  allocate(Wtype(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+  allocate(Prtype(0:Prnx+1,0:Prny+1,0:Prnz+1))
+  Utype=0
+  Vtype=0
+  Wtype=0
+  Prtype=0
+
+!   write (*,*) Prnx
+!   write (*,*) Prny
+!   write (*,*) Prnz
+!   write (*,*) Unx
+!   write (*,*) Uny
+!   write (*,*) Unz
+
+
+  allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
+  if (buoyancy>0) allocate(Tempin(-2:Prny+3,-2:Prnz+3))
+
+  select case (inlettype)
+   case (NOINLET)
+    Uin=0
+    Vin=0
+    Win=0
+   case (SHEAR)
+    call SHEARINLET(SHEARG)
+   case (PARABOLIC)
+    call PARINLET
+   case (TURBULENTINLET)
+    call GETTURBINLET
+   case (INLETFROMFILE)
+    call GETINLETFROMFILE(starttime)
+   case default
+    call CONSTINLET
+  endselect
+
+
+  if (buoyancy==1) then
+     if (TBtypeB==CONSTFLUX.or.TBtypeB==DIRICHLET) then
+       allocate(BsideTFLArr(-1:Prnx+2,-1:Prny+2))
+       if (TBtypeB==CONSTFLUX) then
+        BsideTFLArr=BsideTemp
+       else
+        BsideTFLArr=0
+       endif
+       if (TBtypeB==DIRICHLET) then
+        allocate(BsideTArr(-1:Prnx+2,-1:Prny+2))
+        BsideTArr=BsideTemp
+       endif
+      endif
+  endif
+
+
+
+
+
+    allocate(WMP%depscalar(computescalars))
+    WMP%depscalar=0
+
+    if (BtypeW==NOSLIP) then
+     do k=1,Prnz
+      do j=1,Prny
+       WMP%x=1
+       WMP%y=j
+       WMP%z=k
+       WMP%distx=(xPr(1)-xU(0))
+       WMP%disty=0
+       WMP%distz=0
+       WMP%ustar=1
+       WMP%z0=z0W
+       call AddWMPoint(WMP)
+      enddo
+     enddo
+    endif
+
+    if (BtypeE==NOSLIP) then
+     do k=1,Prnz
+      do j=1,Prny
+       WMP%x=Prnx
+       WMP%y=j
+       WMP%z=k
+       WMP%distx=(xPr(Prnx)-xU(Unx+1))
+       WMP%disty=0
+       WMP%distz=0
+       WMP%ustar=1
+       WMP%z0=z0E
+       call AddWMPoint(WMP)
+      enddo
+     enddo
+    endif
+
+    if (BtypeS==NOSLIP) then
+     do k=1,Prnz
+      do i=1,Prnx
+       WMP%x=i
+       WMP%y=1
+       WMP%z=k
+       WMP%distx=0
+       WMP%disty=(yPr(1)-yV(0))
+       WMP%distz=0
+       WMP%ustar=1
+       WMP%z0=z0S
+       call AddWMPoint(WMP)
+      enddo
+     enddo
+    elseif (BtypeS==DIRICHLET) then
+     do k=1,Prnz
+      do i=1,Prnx
+       WMP%x=i
+       WMP%y=1
+       WMP%z=k
+       WMP%distx=0
+       WMP%disty=(yPr(1)-yV(0))
+       WMP%distz=0
+       WMP%ustar=1
+       WMP%wallu=SsideU
+       WMP%wallv=SsideV
+       WMP%wallw=SsideW
+       WMP%z0=z0S
+       call AddWMPoint(WMP)
+      enddo
+     enddo
+    endif
+
+    if (BtypeN==NOSLIP) then
+     do k=1,Prnz
+      do i=1,Prnx
+       WMP%x=i
+       WMP%y=Prny
+       WMP%z=k
+       WMP%distx=0
+       WMP%disty=(yPr(Prny)-yV(Vny+1))
+       WMP%distz=0
+       WMP%ustar=1
+       WMP%z0=z0N
+       call AddWMPoint(WMP)
+      enddo
+     enddo
+    elseif (BtypeN==DIRICHLET) then
+     do k=1,Prnz
+      do i=1,Prnx
+       WMP%x=i
+       WMP%y=Prny
+       WMP%z=k
+       WMP%distx=0
+       WMP%disty=(yPr(Prny)-yV(Vny+1))
+       WMP%distz=0
+       WMP%ustar=1
+       WMP%wallu=NsideU
+       WMP%wallv=NsideV
+       WMP%wallw=NsideW
+       WMP%z0=z0N
+       call AddWMPoint(WMP)
+      enddo
+     enddo
+    endif
+
+    if (BtypeB==NOSLIP) then
+     do j=1,Prny
+      do i=1,Prnx
+       if (Prtype(i,j,0)==0) then
+        WMP%x=i
+        WMP%y=j
+        WMP%z=1
+        WMP%distx=0
+        WMP%disty=0
+        WMP%distz=(zPr(1)-zW(0))
+        WMP%ustar=1
+        WMP%z0=z0B
+       if (TBtypeB==CONSTFLUX) then
+        WMP%tempfl=BsideTemp
+       else
+        WMP%temp=0
+       endif
+       if (TBtypeB==DIRICHLET) then
+        WMP%temp=BsideTemp
+       endif
+        call AddWMPoint(WMP)
+       endif
+      enddo
+     enddo
+    elseif (BtypeB==DIRICHLET) then
+     do j=1,Prny
+      do i=1,Prnx
+       WMP%x=i
+       WMP%y=j
+       WMP%z=1
+       WMP%distx=0
+       WMP%disty=0
+       WMP%distz=(zPr(1)-zW(0))
+       WMP%ustar=1
+       WMP%wallu=BsideU
+       WMP%wallv=BsideV
+       WMP%wallw=BsideW
+       WMP%z0=z0B
+       if (TBtypeB==CONSTFLUX) then
+        WMP%tempfl=BsideTemp
+       else
+        WMP%temp=0
+       endif
+       if (TBtypeB==DIRICHLET) then
+        WMP%temp=BsideTemp
+       endif
+
+       call AddWMPoint(WMP)
+      enddo
+     enddo
+    endif
+
+    if (BtypeT==NOSLIP) then
+     do j=1,Prny
+      do i=1,Prnx
+       WMP%x=i
+       WMP%y=j
+       WMP%z=Prnz
+       WMP%distx=0
+       WMP%disty=0
+       WMP%distz=(zPr(Prnz)-zW(Wnz+1))
+       WMP%ustar=1
+       WMP%z0=z0T
+       call AddWMPoint(WMP)
+      enddo
+     enddo
+    elseif (BtypeT==DIRICHLET) then
+     do j=1,Prny
+      do i=1,Prnx
+       WMP%x=i
+       WMP%y=j
+       WMP%z=Prnz
+       WMP%distx=0
+       WMP%disty=0
+       WMP%distz=(zPr(Prnz)-zW(Wnz+1))
+       WMP%ustar=1
+       WMP%wallu=TsideU
+       WMP%wallv=TsideV
+       WMP%wallw=TsideW
+       WMP%z0=z0T
+       call AddWMPoint(WMP)
+      enddo
+     enddo
+    endif
+
+
+   if (computescalars>0.and.scalsourcetype==pointsource) then
+        call Gridcoords(scalsrci(:),scalsrcj(:),scalsrck(:),scalsrcx(:),scalsrcy(:),scalsrcz(:))
+   endif
+
+   call InitSolidBodies
+   call GetSolidBodiesBC
+
+  write (*,*) "set"
+ end subroutine READBOUNDS
+
+
+
+
+
+
+
+
+
+
+
 
   subroutine INIT_RANDOM_SEED()
   integer:: i, n, clock

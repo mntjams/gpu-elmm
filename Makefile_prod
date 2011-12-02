@@ -34,9 +34,9 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/multigrid.o \
 	$(TARGETDIR_CLMM)/multigrid2d.o \
 	$(TARGETDIR_CLMM)/geometric.o \
-	$(TARGETDIR_CLMM)/scalars.o \
 	$(TARGETDIR_CLMM)/turbinlet.o \
 	$(TARGETDIR_CLMM)/boundaries.o \
+	$(TARGETDIR_CLMM)/scalars.o \
 	$(TARGETDIR_CLMM)/smagorinsky.o \
 	$(TARGETDIR_CLMM)/outputs.o \
 	$(TARGETDIR_CLMM)/fishpoisson.o \
@@ -126,7 +126,7 @@ $(TARGETDIR_CLMM)/tsteps.o: $(TARGETDIR_CLMM) tsteps.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ tsteps.f90
 
 $(TARGETDIR_CLMM)/main.o: $(TARGETDIR_CLMM) main.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -xfilebyteorder=big4:%all -o $@ main.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ main.f90
 
 
 

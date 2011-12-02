@@ -41,7 +41,7 @@ module OUTPUTS
     real(KND) :: x,y,z                       !physical coordinates of probes
  end type TProbe
 
- type(TProbe),allocatable,dimension(:) :: probes
+ type(TProbe),allocatable,dimension(:),save :: probes
 
  type TOutputSwitches
     integer :: U = 0
@@ -94,7 +94,7 @@ module OUTPUTS
     integer :: blprofiles = 0
   end type TOutputSwitches
 
-  type(TOutputSwitches) :: store
+  type(TOutputSwitches),save :: store
 
   type TDisplaySwitches
     integer :: delta = 1
@@ -102,7 +102,7 @@ module OUTPUTS
     integer :: tstar = 0
   endtype
 
-  type(TDisplaySwitches) :: display
+  type(TDisplaySwitches),save :: display
 
 
 contains
@@ -199,7 +199,7 @@ contains
   endif
 
   do k=1,NumProbes
-    call GridCoordsPr(probes(k)%i,probes(k)%j,probes(k)%k,probes(k)%x,probes(k)%y,probes(k)%z)
+    call GridCoords(probes(k)%i,probes(k)%j,probes(k)%k,probes(k)%x,probes(k)%y,probes(k)%z)
 
     probes(k)%i=max(probes(k)%i,1)
     probes(k)%j=max(probes(k)%j,1)
@@ -1126,9 +1126,9 @@ contains
 
  subroutine OutputUVW(U,V,W)
  real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
- real(KND),dimension(1:Unx,1:Uny,1:Unz) ::Uinterp,Uinterpdir
- real(KND),dimension(1:Vnx,1:Vny,1:Vnz) ::Vinterp,Vinterpdir
- real(KND),dimension(1:Wnx,1:Wny,1:Wnz) ::Winterp,Winterpdir
+ real(KND),dimension(1:Unx,1:Uny,1:Unz) :: Uinterp,Uinterpdir
+ real(KND),dimension(1:Vnx,1:Vny,1:Vnz) :: Vinterp,Vinterpdir
+ real(KND),dimension(1:Wnx,1:Wny,1:Wnz) :: Winterp,Winterpdir
  type(TIBPoint),pointer :: IBP
  character(70) :: str
  integer i,j,k
@@ -1762,15 +1762,15 @@ contains
    str="X_COORDINATES"
    write (str(15:),'(i5,2x,a)') Prnx,"float"
    write (20) str,lf
-   write (20) (real(xPr(i),SNG),i=1,Prnx),lf
+   write (20) (BigEnd(real(xPr(i),SNG)),i=1,Prnx),lf
    str="Y_COORDINATES"
    write (str(15:),'(i5,2x,a)') Prny,"float"
    write (20) str,lf
-   write (20) (real(yPr(j),SNG),j=1,Prny),lf
+   write (20) (BigEnd(real(yPr(j),SNG)),j=1,Prny),lf
    str="Z_COORDINATES"
    write (str(15:),'(i5,2x,a)') Prnz,"float"
    write (20) str,lf
-   write (20) (real(zPr(k),SNG),k=1,Prnz),lf
+   write (20) (BigEnd(real(zPr(k),SNG)),k=1,Prnz),lf
    str="POINT_DATA"
    write (str(12:),*) Prnx*Prny*Prnz
    write (20) str,lf
@@ -1784,7 +1784,7 @@ contains
        if (Prtype(i,j,k)==0) then
         write (20) real(Pr(1:Prnx,1:Prny,1:Prnz),SNG)
        else
-        write (20) 0._SNG
+        write (20) BigEnd(0._SNG)
        endif
       enddo
      enddo
@@ -1801,7 +1801,7 @@ contains
        if (Prtype(i,j,k)==0) then
         write (20) real(Lambda2(i,j,k,U,V,W),SNG)
        else
-        write (20) 0._SNG
+        write (20) BigEnd(0._SNG)
        endif
       enddo
      enddo
@@ -1820,7 +1820,7 @@ contains
         if (Prtype(i,j,k)==0) then
          write (20) real(SCALAR(i,j,k,l),SNG)
         else
-         write (20) 0._SNG
+         write (20) BigEnd(0._SNG)
         endif
        enddo
       enddo
@@ -1834,9 +1834,9 @@ contains
       do j=1,Prny
        do i=1,Prnx
         if (Prtype(i,j,k)==0) then
-         write (20) real(SUM(SCALAR(i,j,k,:)),SNG)
+         write (20) BigEnd(real(SUM(SCALAR(i,j,k,:)),SNG))
         else
-         write (20) 0._SNG
+         write (20) BigEnd(0._SNG)
         endif
        enddo
       enddo
@@ -1852,9 +1852,9 @@ contains
        do j=1,Prny
         do i=1,Prnx
          if (Prtype(i,j,k)==0) then
-          write (20) real(Temperature(i,j,k),SNG)
+          write (20) BigEnd(real(Temperature(i,j,k),SNG))
          else
-          write (20) 0._SNG
+          write (20) BigEnd(0._SNG)
          endif
         enddo
        enddo
@@ -1869,10 +1869,10 @@ contains
      do j=1,Prny
       do i=1,Prnx
        if (Prtype(i,j,k)==0) then
-        write (20) real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG),real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG)&
-         ,real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG)
+        write (20) BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG)),BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG))&
+         ,BigEnd(real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG))
        else
-        write (20) 0._SNG,0._SNG,0._SNG
+        write (20) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
        endif
       enddo
      enddo
@@ -1886,14 +1886,14 @@ contains
      do j=1,Prny
       do i=1,Prnx
        if (Prtype(i,j,k)==0) then
-        write (20) real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
-                       -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG),&
-                     real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
-                       -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG),&
-                     real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
-                        -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin),SNG)
+        write (20) BigEnd(real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+                       -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG)),&
+                     BigEnd(real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
+                       -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG)),&
+                     BigEnd(real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
+                        -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin),SNG))
        else
-        write (20) 0._SNG,0._SNG,0._SNG
+        write (20) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
        endif
       enddo
      enddo
@@ -1942,15 +1942,15 @@ contains
    str="X_COORDINATES"
    write (str(15:),'(i5,2x,a)') maxi-mini+1,"float"
    write (20) str,lf
-   write (20) (real(xPr(i),SNG),i=mini,maxi),lf
+   write (20) (BigEnd(real(xPr(i),SNG)),i=mini,maxi),lf
    str="Y_COORDINATES"
    write (str(15:),'(i5,2x,a)') maxj-minj+1,"float"
    write (20) str,lf
-   write (20) (real(yPr(j),SNG),j=minj,maxj),lf
+   write (20) (BigEnd(real(yPr(j),SNG)),j=minj,maxj),lf
    str="Z_COORDINATES"
    write (str(15:),'(i5,2x,a)') maxk-mink+1,"float"
    write (20) str,lf
-   write (20) (real(zPr(k),SNG),k=mink,maxk),lf
+   write (20) (BigEnd(real(zPr(k),SNG)),k=mink,maxk),lf
    str="POINT_DATA"
    write (str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
    write (20) str,lf
@@ -1962,9 +1962,9 @@ contains
      do j=minj,maxj
       do i=mini,maxi
        if (Prtype(i,j,k)==0) then
-        write (20) real(Pr(i,j,k),SNG)
+        write (20) BigEnd(real(Pr(i,j,k),SNG))
        else
-        write (20) 0._SNG
+        write (20) BigEnd(0._SNG)
        endif
       enddo
      enddo
@@ -1979,9 +1979,9 @@ contains
      do j=minj,maxj
       do i=mini,maxi
        if (Prtype(i,j,k)==0) then
-        write (20) real(Lambda2(i,j,k,U,V,W),SNG)
+        write (20) BigEnd(real(Lambda2(i,j,k,U,V,W),SNG))
        else
-        write (20) 0._SNG
+        write (20) BigEnd(0._SNG)
        endif
       enddo
      enddo
@@ -1998,9 +1998,9 @@ contains
       do j=minj,maxj
        do i=mini,maxi
         if (Prtype(i,j,k)==0) then
-         write (20) real(SCALAR(i,j,k,l),SNG)
+         write (20) BigEnd(real(SCALAR(i,j,k,l),SNG))
         else
-         write (20) 0._SNG
+         write (20) BigEnd(0._SNG)
         endif
        enddo
       enddo
@@ -2014,9 +2014,9 @@ contains
       do j=minj,maxj
        do i=mini,maxi
         if (Prtype(i,j,k)==0) then
-         write (20) real(SUM(SCALAR(i,j,k,:)),SNG)
+         write (20) BigEnd(real(SUM(SCALAR(i,j,k,:)),SNG))
         else
-         write (20) 0._SNG
+         write (20) BigEnd(0._SNG)
         endif
        enddo
       enddo
@@ -2032,9 +2032,9 @@ contains
       do j=minj,maxj
        do i=mini,maxi
         if (Prtype(i,j,k)==0) then
-         write (20) real(Temperature(i,j,k),SNG)
+         write (20) BigEnd(real(Temperature(i,j,k),SNG))
         else
-         write (20) 0._SNG
+         write (20) BigEnd(0._SNG)
         endif
        enddo
       enddo
@@ -2049,10 +2049,10 @@ contains
      do j=minj,maxj
       do i=mini,maxi
        if (Prtype(i,j,k)==0) then
-        write (20) real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG),real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG)&
-         ,real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG)
+        write (20) BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG)),BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG))&
+         ,BigEnd(real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG))
        else
-        write (20) 0._SNG,0._SNG,0._SNG
+        write (20) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
        endif
       enddo
      enddo
@@ -2066,14 +2066,14 @@ contains
      do j=minj,maxj
       do i=mini,maxi
        if (Prtype(i,j,k)==0) then
-        write (20) real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
-                        -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG),&
-                     real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
-                       -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG),&
-                     real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
-                       -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin),SNG)
+        write (20) BigEnd(real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+                        -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG)),&
+                     BigEnd(real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
+                       -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG)),&
+                     BigEnd(real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
+                       -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin),SNG))
        else
-        write (20) 0._SNG,0._SNG,0._SNG
+        write (20) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
        endif
       enddo
      enddo
@@ -2542,8 +2542,8 @@ contains
 
 
 
-   pure real(KND) function TriLinInt(a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111)
-   real(KND),intent(in) :: a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111
+  pure real(KND) function TriLinInt(a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111)
+  real(KND),intent(in) :: a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111
 
     TriLinInt=   (1-a)*(1-b)*(1-c)*vel000+&
                  a*(1-b)*(1-c)*vel100+&
@@ -2554,128 +2554,32 @@ contains
                  (1-a)*b*c*vel011+&
                  a*b*c*vel111
 
-   endfunction TriLinInt
+  endfunction TriLinInt
 
 
-   subroutine GridCoordsU(xi,yj,zk,x,y,z)
-   integer,intent(out) :: xi,yj,zk
-   real(KND),intent(in) :: x,y,z
-   integer i
+  real(SNG) function BigEnd(x)
+  real(SNG),intent(in)::x
+  integer,save:: called=0
+  logical,save:: littleendian !endianess of the machine
+  integer(selected_int_kind(1)),dimension(4):: bytes,tmp !may not work on some processors
+    if (called==0) then
+      bytes=transfer(1,bytes,4)
+      if (bytes(4)==1) then
+       littleendian=.false.
+      else
+       littleendian=.true.
+      endif
+      called=1
+    endif
 
-   xi=Unx+1
-   do i=1,Unx+1
-    if (xPr(i+1)>=x) then
-                  xi=i-1
-                  exit
-                 endif
-   enddo
-
-   yj=Vny
-   do i=1,Vny
-    if (yV(i)>=y) then
-                  yj=i
-                  exit
-                 endif
-   enddo
-   zk=Wnz
-   do i=1,Wnz
-    if (zW(i)>=z) then
-                  zk=i
-                  exit
-                 endif
-   enddo
-   end subroutine GridCoordsU
-
-
-   subroutine GridCoordsV(xi,yj,zk,x,y,z)
-   integer,intent(out) :: xi,yj,zk
-   real(KND),intent(in) :: x,y,z
-   integer i
-
-   xi=Unx
-   do i=1,Unx
-    if (xU(i)>=x) then
-                  xi=i
-                  exit
-                 endif
-   enddo
-
-   yj=Vny+1
-   do i=1,Vny+1
-    if (yPr(i)>=y) then
-                  yj=i-1
-                  exit
-                 endif
-   enddo
-   zk=Wnz
-   do i=1,Wnz
-    if (zW(i)>=z) then
-                  zk=i
-                  exit
-                 endif
-   enddo
-   end subroutine GridCoordsV
-
-
-   subroutine GridCoordsW(xi,yj,zk,x,y,z)
-   integer,intent(out) :: xi,yj,zk
-   real(KND),intent(in) :: x,y,z
-   integer i
-
-   xi=Unx
-   do i=1,Unx
-    if (xU(i)>=x) then
-                  xi=i
-                  exit
-                 endif
-   enddo
-
-   yj=Vny
-   do i=1,Vny
-    if (yV(i)>=y) then
-                  yj=i
-                  exit
-                 endif
-   enddo
-   zk=Wnz+1
-   do i=1,Wnz+1
-    if (zPr(i)>=z) then
-                  zk=i-1
-                  exit
-                 endif
-   enddo
-   end subroutine GridCoordsW
-
-
-   subroutine GridCoordsPr(xi,yj,zk,x,y,z)
-   integer,intent(out) :: xi,yj,zk
-   real(KND),intent(in) :: x,y,z
-   integer i
-
-   xi=Prnx
-   do i=1,Prnx
-    if (xU(i)>=x) then
-                  xi=i
-                  exit
-                 endif
-   enddo
-
-   yj=Prny
-   do i=1,Prny
-    if (yV(i)>=y) then
-                  yj=i
-                  exit
-                 endif
-   enddo
-
-   zk=Prnz
-   do i=1,Prnz
-    if (zW(i)>=z) then
-                  zk=i
-                  exit
-                 endif
-   enddo
-   end subroutine GridCoordsPr
-
+    if (.not.littleendian) then
+     BigEnd=x
+    else
+     bytes=transfer(x,bytes,4)
+     tmp=bytes
+     bytes=tmp(4:1:-1)
+     BigEnd=transfer(bytes,x)
+    endif
+  end function BigEnd
 
 end module OUTPUTS

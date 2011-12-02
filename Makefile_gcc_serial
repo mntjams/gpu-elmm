@@ -14,7 +14,7 @@
 
 #### Compiler and tool definitions shared by all build targets #####
 FC = gfortran
-BASICOPTS = -O5 -fprefetch-loop-arrays -finline-functions -funroll-all-loops -pg  -fconvert=big-endian -ffpe-trap=zero,overflow -ffast-math
+BASICOPTS = -O5 -fprefetch-loop-arrays -finline-functions -funroll-all-loops -pg  -ffpe-trap=zero,overflow -ffast-math
 FFLAGS = $(BASICOPTS)
 
 
@@ -35,9 +35,9 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/multigrid.o \
 	$(TARGETDIR_CLMM)/multigrid2d.o \
 	$(TARGETDIR_CLMM)/geometric.o \
-	$(TARGETDIR_CLMM)/scalars.o \
 	$(TARGETDIR_CLMM)/turbinlet.o \
 	$(TARGETDIR_CLMM)/boundaries.o \
+	$(TARGETDIR_CLMM)/scalars.o \
 	$(TARGETDIR_CLMM)/smagorinsky.o \
 	$(TARGETDIR_CLMM)/outputs.o \
 	$(TARGETDIR_CLMM)/fishpoisson.o \

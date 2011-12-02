@@ -1,53 +1,139 @@
 module BOUNDARIES
 use PARAMETERS
 use WALLMODELS
-use SCALARS
-use TURBINLET
-use GEOMETRIC
 
 implicit none
 
 
   private
-  public GridCoords, Bound_CondU, Bound_CondV, Bound_CondW, Bound_CondU2, Bound_CondV2, Bound_CondW2,&
-         Bound_Phi, Bound_Pr, Bound_Q, ReadBounds
+  public GridCoords, GridCoordsU, GridCoordsV, GridCoordsW,&
+         Bound_CondU, Bound_CondV, Bound_CondW,&
+         Bound_CondU2, Bound_CondV2, Bound_CondW2,&
+         Bound_Phi, Bound_Pr, Bound_Q,&
+         ShearInlet, ParInlet, ConstInlet
 
-  integer nBoundUx,nBoundUy,nBoundUz,nBoundVx,nBoundVy,nBoundVz,nBoundWx,nBoundWy,nBoundWz
-  integer iXupa,iXup,jYha,jYh
+
+ contains
 
 
- contains 
-  
+  elemental subroutine GridCoords(xi,yj,zk,x,y,z)
+  integer,intent(out):: xi,yj,zk
+  real(KND),intent(in):: x,y,z
+  integer i
 
-   elemental subroutine GridCoords(xi,yj,zk,x,y,z)
-   integer,intent(out):: xi,yj,zk
-   real(KND),intent(in):: x,y,z
-   integer i
+  xi=Prnx
+  do i=1,Prnx
+   if (xU(i)>=x) then
+                 xi=i
+                 exit
+                endif
+  enddo
 
-   xi=Prnx
-   do i=1,Prnx
-    if (xU(i)>=x) then
-                  xi=i
-                  exit
-                 endif
-   enddo
+  yj=Prny
+  do i=1,Prny
+   if (yV(i)>=y) then
+                 yj=i
+                 exit
+                endif
+  enddo
+  zk=Prnz
+  do i=1,Prnz
+   if (zW(i)>=z) then
+                 zk=i
+                 exit
+                endif
+  enddo
+  endsubroutine GridCoords
 
-   yj=Prny
-   do i=1,Prny
-    if (yV(i)>=y) then
-                  yj=i
-                  exit
-                 endif
-   enddo
-   zk=Prnz
-   do i=1,Prnz
-    if (zW(i)>=z) then
-                  zk=i
-                  exit
-                 endif
-   enddo
-   endsubroutine GridCoords
+  elemental subroutine GridCoordsU(xi,yj,zk,x,y,z)
+  integer,intent(out) :: xi,yj,zk
+  real(KND),intent(in) :: x,y,z
+  integer i
 
+  xi=Unx+1
+  do i=1,Unx+1
+   if (xPr(i+1)>=x) then
+                 xi=i-1
+                 exit
+                endif
+  enddo
+
+  yj=Vny
+  do i=1,Vny
+   if (yV(i)>=y) then
+                 yj=i
+                 exit
+                endif
+  enddo
+  zk=Wnz
+  do i=1,Wnz
+   if (zW(i)>=z) then
+                 zk=i
+                 exit
+                endif
+  enddo
+  end subroutine GridCoordsU
+
+
+  elemental subroutine GridCoordsV(xi,yj,zk,x,y,z)
+  integer,intent(out) :: xi,yj,zk
+  real(KND),intent(in) :: x,y,z
+  integer i
+
+  xi=Unx
+  do i=1,Unx
+   if (xU(i)>=x) then
+                 xi=i
+                 exit
+                endif
+  enddo
+
+  yj=Vny+1
+  do i=1,Vny+1
+   if (yPr(i)>=y) then
+                 yj=i-1
+                 exit
+                endif
+  enddo
+  zk=Wnz
+  do i=1,Wnz
+   if (zW(i)>=z) then
+                 zk=i
+                 exit
+                endif
+  enddo
+  end subroutine GridCoordsV
+
+
+  elemental subroutine GridCoordsW(xi,yj,zk,x,y,z)
+  integer,intent(out) :: xi,yj,zk
+  real(KND),intent(in) :: x,y,z
+  integer i
+
+  xi=Unx
+  do i=1,Unx
+   if (xU(i)>=x) then
+                 xi=i
+                 exit
+                endif
+  enddo
+
+  yj=Vny
+  do i=1,Vny
+   if (yV(i)>=y) then
+                 yj=i
+                 exit
+                endif
+  enddo
+
+  zk=Wnz+1
+  do i=1,Wnz+1
+   if (zPr(i)>=z) then
+                 zk=i-1
+                 exit
+                endif
+  enddo
+  end subroutine GridCoordsW
 
   subroutine BOUND_CONDU(U)
   real(KND),intent(inout):: U(-2:,-2:,-2:)
@@ -55,8 +141,8 @@ implicit none
 
   nx=Unx
   ny=Uny
-  nz=Unz   
- 
+  nz=Unz
+
   !!! corners and edges for periodic conditions
   if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
    do k=nz+1,nz+3
@@ -118,28 +204,28 @@ implicit none
   endif
 
   if (BtypeE==PERIODIC.and.BtypeN==PERIODIC) then
-   do k=1,nz    
+   do k=1,nz
     do j=ny+1,ny+3
      do i=nx+1,nx+3
       U(i,j,k)=U(i-nx,j-ny,k)
      enddo
     enddo
    enddo
-   do k=1,nz    
+   do k=1,nz
     do j=-2,0
      do i=nx+1,nx+3
       U(i,j,k)=U(i-nx,j+ny,k)
      enddo
     enddo
    enddo
-   do k=1,nz    
+   do k=1,nz
     do j=ny+1,ny+3
      do i=-2,0
       U(i,j,k)=U(i+nx,j-ny,k)
      enddo
     enddo
    enddo
-   do k=1,nz    
+   do k=1,nz
     do j=-2,0
      do i=-2,0
       U(i,j,k)=U(i+nx,j+ny,k)
@@ -157,21 +243,21 @@ implicit none
      enddo
     enddo
    enddo
-   do k=-2,0    
+   do k=-2,0
     do j=1,ny
      do i=nx+1,nx+3
       U(i,j,k)=U(i-nx,j,k+nz)
      enddo
     enddo
    enddo
-   do k=nz+1,nz+3    
+   do k=nz+1,nz+3
     do j=1,ny
      do i=-2,0
       U(i,j,k)=U(i+nx,j,k-nz)
      enddo
     enddo
    enddo
-   do k=-2,0    
+   do k=-2,0
     do j=1,ny
      do i=-2,0
       U(i,j,k)=U(i+nx,j,k+nz)
@@ -219,7 +305,7 @@ implicit none
      U(0,j,k)=Uin(j,k)
      U(-1,j,k)=Uin(j,k)
      U(-2,j,k)=Uin(j,k)
-    enddo       
+    enddo
    enddo
   elseif (BtypeW==NOSLIP) then
    do k=-2,nz+3
@@ -239,7 +325,7 @@ implicit none
    enddo
   elseif (BtypeW==FREESLIP) then  !FREESLIP
    do k=-2,nz+3
-    do j=-2,ny+3                       
+    do j=-2,ny+3
      U(0,j,k)=0
      U(-1,j,k)=-U(1,j,k)
      U(-2,j,k)=-U(2,j,k)
@@ -247,7 +333,7 @@ implicit none
    enddo
   elseif (BtypeW==PERIODIC) then  !Periodic BC
    do k=-2,nz+3
-    do j=-2,ny+3                       
+    do j=-2,ny+3
      U(0,j,k)=U(nx,j,k)
      U(-1,j,k)=U(nx-1,j,k)
      U(-2,j,k)=U(nx-2,j,k)
@@ -259,7 +345,7 @@ implicit none
      U(0,j,k)=Uin(j,k)
      U(-1,j,k)=Uin(j,k)
      U(-2,j,k)=Uin(j,k)
-    enddo       
+    enddo
    enddo
   elseif (BtypeW==TURBULENTINLET) then
    do k=1,Prnz
@@ -267,7 +353,7 @@ implicit none
      U(0,j,k)=Uin(j,k)
      U(-1,j,k)=Uin(j,k)
      U(-2,j,k)=Uin(j,k)
-    enddo       
+    enddo
    enddo
   elseif (BtypeW==INLETFROMFILE) then
    do k=1,Prnz
@@ -275,18 +361,18 @@ implicit none
      U(0,j,k)=Uin(j,k)
      U(-1,j,k)=Uin(j,k)
      U(-2,j,k)=Uin(j,k)
-    enddo       
+    enddo
    enddo
-  endif      
+  endif
 
-     
+
   if (BtypeE==DIRICHLET) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Dirichlet inlet
      U(nx+1,j,k)=Uin(j,k)
      U(nx+2,j,k)=Uin(j,k)
      U(nx+3,j,k)=Uin(j,k)
-    enddo       
+    enddo
    enddo
   elseif (BtypeE==NOSLIP) then
    do k=-2,nz+3
@@ -303,10 +389,10 @@ implicit none
      U(nx+2,j,k)=U(nx,j,k)
      U(nx+3,j,k)=U(nx,j,k)
     enddo
-   enddo   
+   enddo
   elseif (BtypeE==FREESLIP) then  !FREESLIP
    do k=-2,nz+3
-    do j=-2,ny+3                       
+    do j=-2,ny+3
      U(nx+1,j,k)=0
      U(nx+2,j,k)=-U(nx,j,k)
      U(nx+3,j,k)=-U(nx-1,j,k)
@@ -314,30 +400,30 @@ implicit none
    enddo
   elseif (BtypeE==PERIODIC) then  !Periodic BC
    do k=-2,nz+3
-    do j=-2,ny+3                       
+    do j=-2,ny+3
      U(nx+1,j,k)=U(1,j,k)
      U(nx+2,j,k)=U(2,j,k)
      U(nx+3,j,k)=U(3,j,k)
     enddo
-   enddo      
+   enddo
   elseif (BtypeE==TURBULENTINLET) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Dirichlet inlet
      U(nx+1,j,k)=Uin(j,k)
      U(nx+2,j,k)=Uin(j,k)
      U(nx+3,j,k)=Uin(j,k)
-    enddo       
+    enddo
    enddo
   endif
-  
+
   if (BtypeS==DIRICHLET) then
    do k=-2,nz+3
     do i=-2,nx+3                       !Dirichlet inlet
      U(i,0,k)=SsideU+(SsideU-U(i,1,k))
      U(i,-1,k)=SsideU+(SsideU-U(i,2,k))
      U(i,-2,k)=SsideU+(SsideU-U(i,3,k))
-    enddo       
-   enddo   
+    enddo
+   enddo
   elseif (BtypeS==NOSLIP) then
    do k=-2,nz+3
     do i=-2,nx+3                       !Solid wall
@@ -369,8 +455,8 @@ implicit none
      U(i,-1,k)=U(i,ny-1,k)
      U(i,-2,k)=U(i,ny-2,k)
     enddo
-   enddo      
-  endif   
+   enddo
+  endif
 
 
   if (BtypeN==DIRICHLET) then
@@ -379,8 +465,8 @@ implicit none
      U(i,ny+1,k)=NsideU+(NsideU-U(i,ny,k))
      U(i,ny+2,k)=NsideU+(NsideU-U(i,ny-1,k))
      U(i,ny+3,k)=NsideU+(NsideU-U(i,ny-2,k))
-    enddo       
-   enddo   
+    enddo
+   enddo
   elseif (BtypeN==NOSLIP) then
    do k=-2,nz+3
     do i=-2,nx+3                       !Solid wall
@@ -412,7 +498,7 @@ implicit none
      U(i,ny+2,k)=U(i,2,k)
      U(i,ny+3,k)=U(i,3,k)
     enddo
-   enddo      
+   enddo
   endif
 
 
@@ -422,8 +508,8 @@ implicit none
      U(i,j,0)=BsideU+(BsideU-U(i,j,1))
      U(i,j,-1)=BsideU+(BsideU-U(i,j,2))
      U(i,j,-2)=BsideU+(BsideU-U(i,j,3))
-    enddo       
-   enddo   
+    enddo
+   enddo
   elseif (BtypeB==NOSLIP) then
    do j=-2,ny+3
     do i=-2,nx+3                       !Solid wall
@@ -455,17 +541,17 @@ implicit none
      U(i,j,-1)=U(i,j,nz-1)
      U(i,j,-2)=U(i,j,nz-2)
     enddo
-   enddo      
-  endif   
-  
+   enddo
+  endif
+
   if (BtypeT==DIRICHLET) then
    do j=-2,ny+3
     do i=-2,nx+3                       !Dirichlet inlet
      U(i,j,nz+1)=TsideU+(TsideU-U(i,j,nz))
      U(i,j,nz+2)=TsideU+(TsideU-U(i,j,nz-1))
      U(i,j,nz+3)=TsideU+(TsideU-U(i,j,nz-2))
-    enddo       
-   enddo   
+    enddo
+   enddo
   elseif (BtypeT==NOSLIP) then
    do j=-2,ny+3
     do i=-2,nx+3                       !Solid wall
@@ -497,9 +583,9 @@ implicit none
      U(i,j,nz+2)=U(i,j,2)
      U(i,j,nz+3)=U(i,j,3)
     enddo
-   enddo      
+   enddo
   endif
-   
+
   end subroutine BOUND_CONDU
 
 
@@ -576,28 +662,28 @@ implicit none
   endif
 
   if (BtypeE==PERIODIC.and.BtypeN==PERIODIC) then
-   do k=1,nz    
+   do k=1,nz
     do j=ny+1,ny+3
      do i=nx+1,nx+3
       V(i,j,k)=V(i-nx,j-ny,k)
      enddo
     enddo
    enddo
-   do k=1,nz    
+   do k=1,nz
     do j=-2,0
      do i=nx+1,nx+3
       V(i,j,k)=V(i-nx,j+ny,k)
      enddo
     enddo
    enddo
-   do k=1,nz    
+   do k=1,nz
     do j=ny+1,ny+3
      do i=-2,0
       V(i,j,k)=V(i+nx,j-ny,k)
      enddo
     enddo
    enddo
-   do k=1,nz    
+   do k=1,nz
     do j=-2,0
      do i=-2,0
       V(i,j,k)=V(i+nx,j+ny,k)
@@ -614,21 +700,21 @@ implicit none
      enddo
     enddo
    enddo
-   do k=-2,0    
+   do k=-2,0
     do j=1,ny
      do i=nx+1,nx+3
       V(i,j,k)=V(i-nx,j,k+nz)
      enddo
     enddo
    enddo
-   do k=nz+1,nz+3    
+   do k=nz+1,nz+3
     do j=1,ny
      do i=-2,0
       V(i,j,k)=V(i+nx,j,k-nz)
      enddo
     enddo
    enddo
-   do k=-2,0    
+   do k=-2,0
     do j=1,ny
      do i=-2,0
       V(i,j,k)=V(i+nx,j,k+nz)
@@ -668,14 +754,14 @@ implicit none
    enddo
   endif
 
-  
+
   if (BtypeW==DIRICHLET) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Dirichlet inlet
      V(0,j,k)=0
      V(-1,j,k)=0
      V(-2,j,k)=0
-    enddo       
+    enddo
    enddo
   elseif (BtypeW==NOSLIP) then
    do k=-2,nz+3
@@ -695,7 +781,7 @@ implicit none
    enddo
   elseif (BtypeW==FREESLIP) then  !FREESLIP
    do k=-2,nz+3
-    do j=-2,ny+3                       
+    do j=-2,ny+3
      V(0,j,k)=V(1,j,k)
      V(-1,j,k)=V(1,j,k)
      V(-2,j,k)=V(1,j,k)
@@ -703,19 +789,19 @@ implicit none
    enddo
   elseif (BtypeW==PERIODIC) then  !Periodic BC
    do k=-2,nz+3
-    do j=-2,ny+3                       
+    do j=-2,ny+3
      V(0,j,k)=V(nx,j,k)
      V(-1,j,k)=V(nx-1,j,k)
      V(-2,j,k)=V(nx-2,j,k)
     enddo
-   enddo      
+   enddo
   elseif (BtypeW==TURBULENTINLET) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Dirichlet inlet
      V(0,j,k)=Vin(j,k)
      V(-1,j,k)=Vin(j,k)
      V(-2,j,k)=Vin(j,k)
-    enddo       
+    enddo
    enddo
   elseif (BtypeW==INLETFROMFILE) then
    do k=-2,nz+3
@@ -723,17 +809,17 @@ implicit none
      V(0,j,k)=Vin(j,k)
      V(-1,j,k)=Vin(j,k)
      V(-2,j,k)=Vin(j,k)
-    enddo       
+    enddo
    enddo
-  endif      
-     
+  endif
+
   if (BtypeE==DIRICHLET) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Dirichlet inlet
      V(nx+1,j,k)=0
      V(nx+2,j,k)=0
      V(nx+3,j,k)=0
-    enddo       
+    enddo
    enddo
   elseif (BtypeE==NOSLIP) then
    do k=-2,nz+3
@@ -753,7 +839,7 @@ implicit none
    enddo
   elseif (BtypeE==FREESLIP) then  !FREESLIP
    do k=-2,nz+3
-    do j=-2,ny+3                       
+    do j=-2,ny+3
      V(nx+1,j,k)=V(nx,j,k)
      V(nx+2,j,k)=V(nx,j,k)
      V(nx+3,j,k)=V(nx,j,k)
@@ -761,7 +847,7 @@ implicit none
    enddo
   elseif (BtypeE==PERIODIC) then  !Periodic BC
    do k=-2,nz+3
-    do j=-2,ny+3                       
+    do j=-2,ny+3
      V(nx+1,j,k)=V(1,j,k)
      V(nx+2,j,k)=V(2,j,k)
      V(nx+3,j,k)=V(3,j,k)
@@ -773,18 +859,18 @@ implicit none
      V(nx+1,j,k)=Vin(j,k)
      V(nx+2,j,k)=Vin(j,k)
      V(nx+3,j,k)=Vin(j,k)
-    enddo       
+    enddo
    enddo
   endif
-      
+
   if (BtypeS==DIRICHLET) then
    do k=-2,nz+3
     do i=-2,nx+3                       !Dirichlet inlet
      V(i,0,k)=SsideV
      V(i,-1,k)=SsideV+(SsideV-V(i,1,k))
      V(i,-2,k)=SsideV+(SsideV-V(i,2,k))
-    enddo       
-   enddo   
+    enddo
+   enddo
   elseif (BtypeS==NOSLIP) then
    do k=-2,nz+3
     do i=-2,nx+3                       !Solid wall
@@ -816,8 +902,8 @@ implicit none
      V(i,-1,k)=V(i,ny-1,k)
      V(i,-2,k)=V(i,ny-2,k)
     enddo
-   enddo      
-  endif   
+   enddo
+  endif
 
   if (BtypeN==DIRICHLET) then
    do k=-2,nz+3
@@ -825,8 +911,8 @@ implicit none
      V(i,ny+1,k)=NsideV
      V(i,ny+2,k)=NsideV+(NsideV-V(i,ny,k))
      V(i,ny+3,k)=NsideV+(NsideV-V(i,ny-1,k))
-    enddo       
-   enddo   
+    enddo
+   enddo
   elseif (BtypeN==NOSLIP) then
    do k=-2,nz+3
     do i=-2,nx+3                       !Solid wall
@@ -858,7 +944,7 @@ implicit none
      V(i,ny+2,k)=V(i,2,k)
      V(i,ny+3,k)=V(i,3,k)
     enddo
-   enddo      
+   enddo
   endif
 
   if (BtypeB==DIRICHLET) then
@@ -867,8 +953,8 @@ implicit none
      V(i,j,0)=BsideV+(BsideV-V(i,j,1))
      V(i,j,-1)=BsideV+(BsideV-V(i,j,2))
      V(i,j,-2)=BsideV+(BsideV-V(i,j,3))
-    enddo       
-   enddo   
+    enddo
+   enddo
   elseif (BtypeB==NOSLIP) then
    do j=-2,ny+3
     do i=-2,nx+3                       !Solid wall
@@ -900,17 +986,17 @@ implicit none
      V(i,j,-1)=V(i,j,nz-1)
      V(i,j,-2)=V(i,j,nz-2)
     enddo
-   enddo      
-  endif   
-  
+   enddo
+  endif
+
   if (BtypeT==DIRICHLET) then
    do j=-2,ny+3
     do i=-2,nx+3                       !Dirichlet inlet
      V(i,j,nz+1)=TsideV+(TsideV-V(i,j,nz))
      V(i,j,nz+2)=TsideV+(TsideV-V(i,j,nz-1))
      V(i,j,nz+3)=TsideV+(TsideV-V(i,j,nz-2))
-    enddo       
-   enddo   
+    enddo
+   enddo
   elseif (BtypeT==NOSLIP) then
    do j=-2,ny+3
     do i=-2,nx+3                       !Solid wall
@@ -942,7 +1028,7 @@ implicit none
      V(i,j,nz+2)=V(i,j,2)
      V(i,j,nz+3)=V(i,j,3)
     enddo
-   enddo      
+   enddo
   endif
   end subroutine BOUND_CONDV
 
@@ -959,7 +1045,7 @@ implicit none
   nx=Wnx
   ny=Wny
   nz=Wnz
-    
+
   !!! corners and edges for periodic conditions
   if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
    do k=nz+1,nz+3
@@ -1021,28 +1107,28 @@ implicit none
   endif
 
   if (BtypeE==PERIODIC.and.BtypeN==PERIODIC) then
-   do k=1,nz    
+   do k=1,nz
     do j=ny+1,ny+3
      do i=nx+1,nx+3
       W(i,j,k)=W(i-nx,j-ny,k)
      enddo
     enddo
    enddo
-   do k=1,nz    
+   do k=1,nz
     do j=-2,0
      do i=nx+1,nx+3
       W(i,j,k)=W(i-nx,j+ny,k)
      enddo
     enddo
    enddo
-   do k=1,nz    
+   do k=1,nz
     do j=ny+1,ny+3
      do i=-2,0
       W(i,j,k)=W(i+nx,j-ny,k)
      enddo
     enddo
    enddo
-   do k=1,nz    
+   do k=1,nz
     do j=-2,0
      do i=-2,0
       W(i,j,k)=W(i+nx,j+ny,k)
@@ -1059,21 +1145,21 @@ implicit none
      enddo
     enddo
    enddo
-   do k=-2,0    
+   do k=-2,0
     do j=1,ny
      do i=nx+1,nx+3
       W(i,j,k)=W(i-nx,j,k+nz)
      enddo
     enddo
    enddo
-   do k=nz+1,nz+3    
+   do k=nz+1,nz+3
     do j=1,ny
      do i=-2,0
       W(i,j,k)=W(i+nx,j,k-nz)
      enddo
     enddo
    enddo
-   do k=-2,0    
+   do k=-2,0
     do j=1,ny
      do i=-2,0
       W(i,j,k)=W(i+nx,j,k+nz)
@@ -1113,14 +1199,14 @@ implicit none
    enddo
   endif
 
-  
+
   if (BtypeW==DIRICHLET) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Dirichlet inlet
      W(0,j,k)=0
      W(-1,j,k)=0
      W(-2,j,k)=0
-    enddo       
+    enddo
    enddo
   elseif (BtypeW==NOSLIP) then
    do k=-2,nz+3
@@ -1140,7 +1226,7 @@ implicit none
    enddo
   elseif (BtypeW==FREESLIP) then  !FREESLIP
    do k=-2,nz+3
-    do j=-2,ny+3                       
+    do j=-2,ny+3
      W(0,j,k)=W(1,j,k)
      W(-1,j,k)=W(1,j,k)
      W(-2,j,k)=W(1,j,k)
@@ -1148,19 +1234,19 @@ implicit none
    enddo
   elseif (BtypeW==PERIODIC) then  !Periodic BC
    do k=-2,nz+3
-    do j=-2,ny+3                       
+    do j=-2,ny+3
      W(0,j,k)=W(nx,j,k)
      W(-1,j,k)=W(nx-1,j,k)
      W(-2,j,k)=W(nx-2,j,k)
     enddo
-   enddo      
+   enddo
   elseif (BtypeW==TURBULENTINLET) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Dirichlet inlet
      W(0,j,k)=Win(j,k)
      W(-1,j,k)=Win(j,k)
      W(-2,j,k)=Win(j,k)
-    enddo       
+    enddo
    enddo
   elseif (BtypeW==INLETFROMFILE) then
    do k=-2,nz+3
@@ -1168,17 +1254,17 @@ implicit none
      W(0,j,k)=Win(j,k)
      W(-1,j,k)=Win(j,k)
      W(-2,j,k)=Win(j,k)
-    enddo       
+    enddo
    enddo
-  endif      
-     
+  endif
+
   if (BtypeE==DIRICHLET) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Dirichlet inlet
      W(nx+1,j,k)=0
      W(nx+2,j,k)=0
      W(nx+3,j,k)=0
-    enddo       
+    enddo
    enddo
   elseif (BtypeE==NOSLIP) then
    do k=-2,nz+3
@@ -1198,7 +1284,7 @@ implicit none
    enddo
   elseif (BtypeE==FREESLIP) then  !FREESLIP
    do k=-2,nz+3
-    do j=-2,ny+3                       
+    do j=-2,ny+3
      W(nx+1,j,k)=W(nx,j,k)
      W(nx+2,j,k)=W(nx,j,k)
      W(nx+3,j,k)=W(nx,j,k)
@@ -1206,30 +1292,30 @@ implicit none
    enddo
   elseif (BtypeE==PERIODIC) then  !Periodic BC
    do k=-2,nz+3
-    do j=-2,ny+3                       
+    do j=-2,ny+3
      W(nx+1,j,k)=W(1,j,k)
      W(nx+2,j,k)=W(2,j,k)
      W(nx+3,j,k)=W(3,j,k)
     enddo
-   enddo      
+   enddo
   elseif (BtypeE==TURBULENTINLET) then
    do k=-2,nz+3
     do j=-2,ny+3                       !Dirichlet inlet
      W(nx+1,j,k)=Win(j,k)
      W(nx+2,j,k)=Win(j,k)
      W(nx+3,j,k)=Win(j,k)
-    enddo       
+    enddo
    enddo
   endif
-      
+
   if (BtypeS==DIRICHLET) then
    do k=-2,nz+3
     do i=-2,nx+3                       !Dirichlet inlet
      W(i,0,k)=SsideW+(SsideW-W(i,1,k))
      W(i,-1,k)=SsideW+(SsideW-W(i,2,k))
      W(i,-2,k)=SsideW+(SsideW-W(i,3,k))
-    enddo       
-   enddo   
+    enddo
+   enddo
   elseif (BtypeS==NOSLIP) then
    do k=-2,nz+3
     do i=-2,nx+3                       !Solid wall
@@ -1261,8 +1347,8 @@ implicit none
      W(i,-1,k)=W(i,ny-1,k)
      W(i,-2,k)=W(i,ny-2,k)
     enddo
-   enddo      
-  endif   
+   enddo
+  endif
 
   if (BtypeN==DIRICHLET) then
    do k=-2,nz+3
@@ -1270,8 +1356,8 @@ implicit none
      W(i,ny+1,k)=NsideW+(NsideW-W(i,ny,k))
      W(i,ny+2,k)=NsideW+(NsideW-W(i,ny-1,k))
      W(i,ny+3,k)=NsideW+(NsideW-W(i,ny-2,k))
-    enddo       
-   enddo   
+    enddo
+   enddo
   elseif (BtypeN==NOSLIP) then
    do k=-2,nz+3
     do i=-2,nx+3                       !Solid wall
@@ -1303,7 +1389,7 @@ implicit none
      W(i,ny+2,k)=W(i,2,k)
      W(i,ny+3,k)=W(i,3,k)
     enddo
-   enddo      
+   enddo
   endif
 
   if (BtypeB==DIRICHLET) then
@@ -1312,8 +1398,8 @@ implicit none
      W(i,j,0)=BsideW
      W(i,j,-1)=BsideW+(BsideW-W(i,j,1))
      W(i,j,-2)=BsideW+(BsideW-W(i,j,2))
-    enddo       
-   enddo   
+    enddo
+   enddo
   elseif (BtypeB==NOSLIP) then
    do j=-2,ny+3
     do i=-2,nx+3                       !Solid wall
@@ -1345,17 +1431,17 @@ implicit none
      W(i,j,-1)=W(i,j,nz-1)
      W(i,j,-2)=W(i,j,nz-2)
     enddo
-   enddo      
-  endif   
-  
+   enddo
+  endif
+
   if (BtypeT==DIRICHLET) then
    do j=-2,ny+3
     do i=-2,nx+3                       !Dirichlet inlet
      W(i,j,nz+1)=TsideW
      W(i,j,nz+2)=TsideW+(TsideW-W(i,j,nz))
      W(i,j,nz+3)=TsideW+(TsideW-W(i,j,nz-1))
-    enddo       
-   enddo   
+    enddo
+   enddo
   elseif (BtypeT==NOSLIP) then
    do j=-2,ny+3
     do i=-2,nx+3                       !Solid wall
@@ -1387,7 +1473,7 @@ implicit none
      W(i,j,nz+2)=W(i,j,2)
      W(i,j,nz+3)=W(i,j,3)
     enddo
-   enddo      
+   enddo
   endif
   end subroutine BOUND_CONDW
 
@@ -2669,7 +2755,7 @@ implicit none
       Phi(0,j,k)=Phi(1,j,k)
      enddo
     enddo
-   endif 
+   endif
 
    if (BtypeE==PERIODIC) then
     do k=1,nz
@@ -2677,13 +2763,13 @@ implicit none
       Phi(nx+1,j,k)=Phi(1,j,k)
      enddo
     enddo
-   else 
+   else
     do k=1,nz
      do j=1,ny                      !Other BCs
       Phi(nx+1,j,k)=Phi(nx,j,k)
      enddo
     enddo
-   endif 
+   endif
 
    if (BtypeS==PERIODIC) then
    do k=1,nz
@@ -2697,7 +2783,7 @@ implicit none
       Phi(i,0,k)=Phi(i,1,k)
      enddo
     enddo
-   endif 
+   endif
 
    if (BtypeN==PERIODIC) then
    do k=1,nz
@@ -2711,7 +2797,7 @@ implicit none
       Phi(i,ny+1,k)=Phi(i,ny,k)
      enddo
     enddo
-   endif 
+   endif
 
    if (BtypeB==PERIODIC) then
     do j=1,ny
@@ -2725,7 +2811,7 @@ implicit none
       Phi(i,j,0)=Phi(i,j,1)
      enddo
     enddo
-   endif 
+   endif
 
    if (BtypeT==PERIODIC) then
     do j=1,ny
@@ -2739,7 +2825,7 @@ implicit none
       Phi(i,j,nz+1)=Phi(i,j,nz)
      enddo
     enddo
-   endif 
+   endif
   end subroutine BOUND_Phi
 
   pure subroutine BOUND_Pr(Pr)
@@ -2818,7 +2904,7 @@ implicit none
       Phi(0,j,k)=0
      enddo
     enddo
-   endif 
+   endif
 
    if (BtypeE==PERIODIC) then
     do k=1,nz
@@ -2827,14 +2913,14 @@ implicit none
       Phi(nx+1,j,k)=0
      enddo
     enddo
-   else 
+   else
     do k=1,nz
      do j=1,ny                      !Other BCs
       Phi(nx,j,k)=Phi(nx,j,k)+Phi(nx+1,j,k)
       Phi(nx+1,j,k)=0
      enddo
     enddo
-   endif 
+   endif
 
    if (BtypeS==PERIODIC) then
    do k=1,nz
@@ -2850,7 +2936,7 @@ implicit none
       Phi(i,0,k)=0
      enddo
     enddo
-   endif 
+   endif
 
    if (BtypeN==PERIODIC) then
    do k=1,nz
@@ -2866,7 +2952,7 @@ implicit none
       Phi(i,ny+1,k)=0
      enddo
     enddo
-   endif 
+   endif
 
    if (BtypeB==PERIODIC) then
     do j=1,ny
@@ -2882,7 +2968,7 @@ implicit none
       Phi(i,j,0)=0
      enddo
     enddo
-   endif 
+   endif
 
    if (BtypeT==PERIODIC) then
     do j=1,ny
@@ -2898,9 +2984,9 @@ implicit none
       Phi(i,j,nz+1)=0
      enddo
     enddo
-   endif 
+   endif
   end subroutine BOUND_Q
-  
+
 
 
 
@@ -2923,17 +3009,17 @@ implicit none
    do j=LBOUND(Uin,1),UBOUND(Uin,1)
      Uin(j,k)=Uinlet
    enddo
-  enddo 
+  enddo
   do k=LBOUND(Vin,2),UBOUND(Vin,2)
    do j=LBOUND(Vin,1),UBOUND(Vin,1)
      Vin(j,k)=0
    enddo
-  enddo 
+  enddo
   do k=LBOUND(Win,2),UBOUND(Win,2)
    do j=LBOUND(Win,1),UBOUND(Win,1)
      Win(j,k)=0
    enddo
-  enddo 
+  enddo
   endsubroutine CONSTINLET
 
   subroutine SHEARINLET(G)
@@ -2959,517 +3045,5 @@ implicit none
   Win=0
   endsubroutine PARINLET
 
-
-  
-
-  subroutine READBOUNDS
-  real(KND),allocatable:: xU2(:),yV2(:),zW2(:)
-  integer i,j,k,nx,ny,nz,nxup,nxdown,nyup,nydown,nzup,nzdown,io
-  real(KND) P
-  type(WMPoint):: WMP
-  
-  nx=Prnx-1
-  ny=Prny-1
-  nz=Prnz-1
-  
-  if (xgridfromfile) then
-   open(11,file="xgrid.txt")
-   j=-1
-   do
-    read (11,*,iostat=io) P
-    if (io==0) then
-      j=j+1
-    else
-      exit
-    endif
-   enddo
-   nx=j
-   Prnx=nx
-   Vnx=Prnx
-   Wnx=Prnx
-   if (BtypeE==PERIODIC) then
-                         Unx=Prnx
-                        else
-                         Unx=Prnx-1
-   endif
-   close(11)
-  endif
-
-  if (ygridfromfile) then
-   open(11,file="ygrid.txt")
-   j=-1
-   do
-    read (11,*,iostat=io) P
-    if (io==0) then
-      j=j+1
-    else
-      exit
-    endif
-   enddo
-   ny=j
-   Prny=ny
-   Uny=Prny
-   Wny=Prny
-   if (BtypeN==PERIODIC) then
-                         Vny=Prny
-                        else
-                         Vny=Prny-1
-   endif
-   close(11)
-  endif
-
-  if (zgridfromfile) then
-   open(11,file="zgrid.txt")
-   j=-1
-   do
-    read (11,*,iostat=io) P
-    if (io==0) then
-      j=j+1
-      write(*,*) j
-    else
-      exit
-    endif
-   enddo
-   nz=j
-   Prnz=nz
-   Unz=Prnz
-   Vnz=Prnz
-   if (BtypeT==PERIODIC) then
-                         Wnz=Prnz
-                        else
-                         Wnz=Prnz-1
-   endif
-   close(11)
-  endif 
-
-
-
-
-
-  allocate(xU2(-3:nx+4))
-  allocate(yV2(-3:ny+4))
-  allocate(zW2(-3:nz+4))
-
-
-
-  if (xgridfromfile) then
-   open(11,file="xgrid.txt")
-   do j=0,nx
-    write(*,*) j
-    read(11,*) xU2(j)
-   enddo
-   close(11)
-
-   if (BtypeW==PERIODIC) then
-    do j=-1,-3,-1
-     xU2(j)=xU2(0)-(xU2(nx)-xU2(nx+j))
-    enddo
-   else
-    do j=-1,-3,-1
-     xU2(j)=xU2(0)-(xU2(0-j)-xU2(0))
-    enddo
-   endif
-
-   if (BtypeE==PERIODIC) then   
-    do j=nx+1,nx+4
-     xU2(j)=xU2(nx)+(xU2(j-nx)-xU2(0))
-    enddo
-   else
-    do j=nx+1,nx+4
-     xU2(j)=xU2(nx)+(xU2(nx)-xU2(nx-(j-nx)))
-    enddo
-   endif
-
-   x0=xU2(0)
-  else
-   forall (i=-3:nx+4)
-    xU2(i)=(i)*dxmin+x0
-   endforall
-  endif
-
-
-  if (ygridfromfile) then
-   open(11,file="ygrid.txt")
-   do j=0,ny
-    read(11,*) yV2(j)
-   enddo
-   close(11)
-
-   if (BtypeS==PERIODIC) then
-    do j=-1,-3,-1
-     yV2(j)=yV2(0)-(yV2(ny)-yV2(ny+j))
-    enddo
-   else
-    do j=-1,-3,-1
-     yV2(j)=yV2(0)-(yV2(0-j)-yV2(0))
-    enddo
-   endif
-
-   if (BtypeN==PERIODIC) then   
-    do j=ny+1,ny+4
-     yV2(j)=yV2(ny)+(yV2(j-ny)-yV2(0))
-    enddo
-   else
-    do j=ny+1,ny+4
-     yV2(j)=yV2(ny)+(yV2(ny)-yV2(ny-(j-ny)))
-    enddo
-   endif
-
-   y0=yV2(0)
-  else
-   forall (j=-3:ny+4)
-     yV2(j)=(j)*dymin+y0
-   endforall
-  endif
-
-
-  if (zgridfromfile) then
-   open(11,file="zgrid.txt")
-   do j=0,nz
-    read(11,*) zW2(j)
-   enddo
-   close(11)
-
-   if (BtypeB==PERIODIC) then
-    do j=-1,-3,-1
-     zW2(j)=zW2(0)-(zW2(nz)-zW2(nz+j))
-    enddo
-   else
-    do j=-1,-3,-1
-     zW2(j)=zW2(0)-(zW2(0-j)-zW2(0))
-    enddo
-   endif
-
-   if (BtypeT==PERIODIC) then   
-    do j=nz+1,nz+4
-     zW2(j)=zW2(nz)+(zW2(j-nz)-zW2(0))
-    enddo
-   else
-    do j=nz+1,nz+4
-     zW2(j)=zW2(nz)+(zW2(nz)-zW2(nz-(j-nz)))
-    enddo
-   endif
-
-   z0=zW2(0)
-  else
-   forall (k=-3:nz+4)
-    zW2(k)=(k)*dzmin+z0
-   endforall
-  endif
-
-
-  nxup=nx+1
-  nxdown=0
-  nyup=ny+1
-  nydown=0
-  nzup=nz+1
-  nzdown=0
-
-  
-  allocate(xU(-3:nx+4))
-  allocate(yV(-3:ny+4))
-  allocate(zW(-3:nz+4))
-  allocate(dxU(-2:nx+3))
-  allocate(dyV(-2:ny+3))
-  allocate(dzW(-2:nz+3))
-  allocate(xPr(-2:nx+4),dxPr(-2:nx+4))
-  allocate(yPr(-2:ny+4),dyPr(-2:ny+4))
-  allocate(zPr(-2:nz+4),dzPr(-2:nz+4))
-
-  xU=xU2(nxdown-3:nxup+3)
-  yV=yV2(nydown-3:nyup+3)
-  zW=zW2(nzdown-3:nzup+3)
-  
-  forall (i=-2:nx+4)
-   xPr(i)=(xU(i-1)+xU(i))/2._KND
-   dxPr(i)=xU(i)-xU(i-1)
-  endforall
-  forall (j=-2:ny+4)
-   yPr(j)=(yV(j-1)+yV(j))/2._KND
-   dyPr(j)=yV(j)-yV(j-1)
-  endforall
-  forall (k=-2:nz+4)
-   zPr(k)=(zW(k-1)+zW(k))/2._KND
-   dzPr(k)=zW(k)-zW(k-1)
-  endforall
-  forall (i=-2:nx+3)
-   dxU(i)=xPr(i+1)-xPr(i)
-  endforall 
-  forall (j=-2:ny+3)
-   dyV(j)=yPr(j+1)-yPr(j)
-  endforall 
-  forall (k=-2:nz+3)
-   dzW(k)=zPr(k+1)-zPr(k)
-  endforall 
-    
-  deallocate(xU2)
-  deallocate(yV2)
-  deallocate(zW2)
-
-  
-  allocate(Utype(-2:Unx+3,-2:Uny+3,-2:Unz+3))
-  allocate(Vtype(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
-  allocate(Wtype(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-  allocate(Prtype(0:Prnx+1,0:Prny+1,0:Prnz+1))
-  Utype=0
-  Vtype=0
-  Wtype=0
-  Prtype=0
-  
-!   write (*,*) Prnx
-!   write (*,*) Prny
-!   write (*,*) Prnz
-!   write (*,*) Unx
-!   write (*,*) Uny
-!   write (*,*) Unz
-
-
-  allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
-  if (buoyancy>0) allocate(Tempin(-2:Prny+3,-2:Prnz+3))
- 
-  select case (inlettype)
-   case (NOINLET)
-    Uin=0
-    Vin=0
-    Win=0
-   case (SHEAR)
-    call SHEARINLET(SHEARG)
-   case (PARABOLIC)
-    call PARINLET
-   case (TURBULENTINLET)
-    call GETTURBINLET
-   case (INLETFROMFILE)
-    call GETINLETFROMFILE(starttime)
-   case default
-    call CONSTINLET
-  endselect
-
-  nBoundUx=0
-  nBoundVx=0
-  nBoundWx=0
-  nBoundUy=0
-  nBoundVy=0
-  nBoundWy=0
-  nBoundUz=0
-  nBoundVz=0
-  nBoundWz=0
-  
-  
-  if (buoyancy==1) then
-     if (TBtypeB==CONSTFLUX.or.TBtypeB==DIRICHLET) then
-       allocate(BsideTFLArr(-1:Prnx+2,-1:Prny+2))
-       if (TBtypeB==CONSTFLUX) then
-        BsideTFLArr=BsideTemp
-       else
-        BsideTFLArr=0
-       endif
-       if (TBtypeB==DIRICHLET) then
-        allocate(BsideTArr(-1:Prnx+2,-1:Prny+2))
-        BsideTArr=BsideTemp
-       endif
-      endif
-  endif
-
-
-
-
-
-    allocate(WMP%depscalar(computescalars))
-    WMP%depscalar=0
-
-    if (BtypeW==NOSLIP) then    
-     do k=1,Prnz
-      do j=1,Prny
-       WMP%x=1
-       WMP%y=j
-       WMP%z=k
-       WMP%distx=(xPr(1)-xU(0))
-       WMP%disty=0
-       WMP%distz=0
-       WMP%ustar=1
-       WMP%z0=z0W
-       call AddWMPoint(WMP)
-      enddo
-     enddo     
-    endif
-    
-    if (BtypeE==NOSLIP) then
-     do k=1,Prnz
-      do j=1,Prny
-       WMP%x=Prnx
-       WMP%y=j
-       WMP%z=k
-       WMP%distx=(xPr(Prnx)-xU(Unx+1))
-       WMP%disty=0
-       WMP%distz=0
-       WMP%ustar=1
-       WMP%z0=z0E
-       call AddWMPoint(WMP)
-      enddo
-     enddo     
-    endif
-   
-    if (BtypeS==NOSLIP) then
-     do k=1,Prnz
-      do i=1,Prnx
-       WMP%x=i
-       WMP%y=1
-       WMP%z=k
-       WMP%distx=0
-       WMP%disty=(yPr(1)-yV(0))
-       WMP%distz=0
-       WMP%ustar=1
-       WMP%z0=z0S
-       call AddWMPoint(WMP)
-      enddo
-     enddo
-    elseif (BtypeS==DIRICHLET) then 
-     do k=1,Prnz
-      do i=1,Prnx
-       WMP%x=i
-       WMP%y=1
-       WMP%z=k
-       WMP%distx=0
-       WMP%disty=(yPr(1)-yV(0))
-       WMP%distz=0
-       WMP%ustar=1
-       WMP%wallu=SsideU
-       WMP%wallv=SsideV
-       WMP%wallw=SsideW
-       WMP%z0=z0S
-       call AddWMPoint(WMP)
-      enddo
-     enddo     
-    endif
-    
-    if (BtypeN==NOSLIP) then
-     do k=1,Prnz
-      do i=1,Prnx
-       WMP%x=i
-       WMP%y=Prny
-       WMP%z=k
-       WMP%distx=0
-       WMP%disty=(yPr(Prny)-yV(Vny+1))
-       WMP%distz=0
-       WMP%ustar=1
-       WMP%z0=z0N
-       call AddWMPoint(WMP)
-      enddo
-     enddo
-    elseif (BtypeN==DIRICHLET) then
-     do k=1,Prnz
-      do i=1,Prnx
-       WMP%x=i
-       WMP%y=Prny
-       WMP%z=k
-       WMP%distx=0
-       WMP%disty=(yPr(Prny)-yV(Vny+1))
-       WMP%distz=0
-       WMP%ustar=1
-       WMP%wallu=NsideU
-       WMP%wallv=NsideV
-       WMP%wallw=NsideW
-       WMP%z0=z0N
-       call AddWMPoint(WMP)
-      enddo
-     enddo
-    endif
-
-    if (BtypeB==NOSLIP) then
-     do j=1,Prny
-      do i=1,Prnx
-       if (Prtype(i,j,0)==0) then
-        WMP%x=i
-        WMP%y=j
-        WMP%z=1
-        WMP%distx=0
-        WMP%disty=0
-        WMP%distz=(zPr(1)-zW(0))
-        WMP%ustar=1
-        WMP%z0=z0B
-       if (TBtypeB==CONSTFLUX) then
-        WMP%tempfl=BsideTemp
-       else
-        WMP%temp=0
-       endif
-       if (TBtypeB==DIRICHLET) then
-        WMP%temp=BsideTemp
-       endif
-        call AddWMPoint(WMP)
-       endif
-      enddo
-     enddo     
-    elseif (BtypeB==DIRICHLET) then
-     do j=1,Prny
-      do i=1,Prnx
-       WMP%x=i
-       WMP%y=j
-       WMP%z=1
-       WMP%distx=0
-       WMP%disty=0
-       WMP%distz=(zPr(1)-zW(0))
-       WMP%ustar=1
-       WMP%wallu=BsideU
-       WMP%wallv=BsideV
-       WMP%wallw=BsideW
-       WMP%z0=z0B
-       if (TBtypeB==CONSTFLUX) then
-        WMP%tempfl=BsideTemp
-       else
-        WMP%temp=0
-       endif
-       if (TBtypeB==DIRICHLET) then
-        WMP%temp=BsideTemp
-       endif
-
-       call AddWMPoint(WMP)
-      enddo
-     enddo     
-    endif
-    
-    if (BtypeT==NOSLIP) then
-     do j=1,Prny
-      do i=1,Prnx
-       WMP%x=i
-       WMP%y=j
-       WMP%z=Prnz
-       WMP%distx=0
-       WMP%disty=0
-       WMP%distz=(zPr(Prnz)-zW(Wnz+1))
-       WMP%ustar=1
-       WMP%z0=z0T
-       call AddWMPoint(WMP)
-      enddo
-     enddo     
-    elseif (BtypeT==DIRICHLET) then
-     do j=1,Prny
-      do i=1,Prnx
-       WMP%x=i
-       WMP%y=j
-       WMP%z=Prnz
-       WMP%distx=0
-       WMP%disty=0
-       WMP%distz=(zPr(Prnz)-zW(Wnz+1))
-       WMP%ustar=1
-       WMP%wallu=TsideU
-       WMP%wallv=TsideV
-       WMP%wallw=TsideW
-       WMP%z0=z0T
-       call AddWMPoint(WMP)
-      enddo
-     enddo     
-    endif
-        
-
-   if (computescalars>0.and.pointscalsource==1) then
-        call Gridcoords(scalsrci(:),scalsrcj(:),scalsrck(:),scalsrcx(:),scalsrcy(:),scalsrcz(:))
-   endif
-
-   call InitSolidBodies
-   call GetSolidBodiesBC
-
-  write (*,*) "set"
- end subroutine READBOUNDS
- 
 
 end module BOUNDARIES

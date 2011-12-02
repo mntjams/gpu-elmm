@@ -14,7 +14,7 @@
 
 #### Compiler and tool definitions shared by all build targets #####
 FC = gfortran-4.6
-BASICOPTS = -O5 -fopenmp -ftree-parallelize-loops=8 -floop-parallelize-all -fprefetch-loop-arrays -finline-functions -funroll-all-loops -pg  -fconvert=big-endian -ffpe-trap=zero,overflow
+BASICOPTS = -O5 -fopenmp -ftree-parallelize-loops=8 -floop-parallelize-all -fprefetch-loop-arrays -finline-functions -funroll-all-loops -pg -ffpe-trap=zero,overflow
 FFLAGS = $(BASICOPTS)
 
 
@@ -35,9 +35,9 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/multigrid.o \
 	$(TARGETDIR_CLMM)/multigrid2d.o \
 	$(TARGETDIR_CLMM)/geometric.o \
-	$(TARGETDIR_CLMM)/scalars.o \
 	$(TARGETDIR_CLMM)/turbinlet.o \
 	$(TARGETDIR_CLMM)/boundaries.o \
+	$(TARGETDIR_CLMM)/scalars.o \
 	$(TARGETDIR_CLMM)/smagorinsky.o \
 	$(TARGETDIR_CLMM)/outputs.o \
 	$(TARGETDIR_CLMM)/fishpoisson.o \
@@ -48,9 +48,9 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/laxfried.o \
 	$(TARGETDIR_CLMM)/laxwend.o \
 	$(TARGETDIR_CLMM)/tsteps.o \
-	$(TARGETDIR_CLMM)/main.o 
+	$(TARGETDIR_CLMM)/main.o
 USERLIBS_CLMM = $(SYSLIBS_CLMM)
-DEPLIBS_CLMM = 
+DEPLIBS_CLMM =
 LDLIBS_CLMM = $(USERLIBS_CLMM) -llapack
 
 
