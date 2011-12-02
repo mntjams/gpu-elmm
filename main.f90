@@ -15,7 +15,7 @@ program CLMM
 
 
   real(KND),allocatable:: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)
-  real(KND) :: delta
+  real(KND) :: delta = 0
 
   pi=2.0_KND*acos(0.0_KND)
 
