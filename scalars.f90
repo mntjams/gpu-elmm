@@ -1844,10 +1844,10 @@ contains
   denom=((U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(2._KND*(zPr(k+1)-zPr(k-1))))**2
   denom=denom+((V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(2._KND*(zPr(k+1)-zPr(k-1))))**2
 
-  if (abs(denom)>1E-5_KND*abs(nom)) then
+  if (abs(denom)>1E-5_KND*abs(num)) then
    Rig=num/denom
   else
-   Rig=100000._KND*sign(1.0_KND,nom)*sign(1.0_KND,denom)
+   Rig=100000._KND*sign(1.0_KND,num)*sign(1.0_KND,denom)
   endif
   endfunction Rig
 
