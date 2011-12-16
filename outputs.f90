@@ -213,7 +213,7 @@ contains
     call GridCoordsW(probes(k)%Wi,probes(k)%Wj,probes(k)%Wk,probes(k)%x,probes(k)%y,probes(k)%z)
   enddo
 
-  if (store%BLprofiles>0) then
+  if (store%BLprofiles>0.and.averaging==1) then
     allocate(profU(0:Unz+1),profV(0:Vnz+1),profUavg(0:Unz+1),profVavg(0:Vnz+1),profUavg2(0:Unz+1),profVavg2(0:Vnz+1))
     allocate(profuuavg(1:Unz),profvvavg(1:Vnz),profwwavg(0:Wnz),profuu(1:Unz),profvv(1:Vnz),profww(0:Wnz))
     allocate(profuw(0:Prnz),profuwavg(0:Prnz),profuwsgs(0:Prnz),profuwsgsavg(0:Prnz))
@@ -481,7 +481,7 @@ contains
  real(KND),dimension(1:,1:,1:),intent(in) :: Pr
  character(70) :: str
  character(2) :: prob
- real(KND) :: S,S2
+ real(KND) :: S,S2,nom,denom
  integer :: i,j,k
 
   do k=1,NumProbes
@@ -588,7 +588,7 @@ contains
   endif
 
 
-  if (store%BLprofiles>0) then
+  if (store%BLprofiles>0.and.averaging==1) then
 
      open(11,file="profu.txt")
      do k=1,Unz
@@ -677,12 +677,13 @@ contains
 
          S=S/(Prnx*Prny)
          S2=S2/(Prnx*Prny)
+         nom=(grav_acc/temperature_ref)*(proftempflavg(k)+proftempflsgsavg(k))
+         denom=((profuwavg(k)+profuwsgsavg(k))*S+(profvwavg(k)+profvwsgsavg(k))*S2)
 
-         if (abs((profuwavg(k)+profuwsgsavg(k))*S+(profvwavg(k)+profvwsgsavg(k))*S2)>tiny(1._KND)) then
-          S=(grav_acc/temperature_ref)*(proftempflavg(k)+proftempflsgsavg(k))/&
-           ((profuwavg(k)+profuwsgsavg(k))*S+(profvwavg(k)+profvwsgsavg(k))*S2)
+         if (abs(denom)>1E-5_KND*abs(nom)) then
+           S=nom/denom
          else
-             S=0
+           S=100000._KND*sign(1.0_KND,nom)*sign(1.0_KND,denom)
          endif
 
          write (11,*) zPr(k),S
