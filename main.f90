@@ -48,10 +48,11 @@ program CLMM
 
 
 
+  if (endtime>starttime) then
 
-  write (*,*) "Computing..."
+    write (*,*) "Computing..."
 
-  do step=1,nt
+    do step=1,nt
 
       write (*,*) "-----------"
       write (*,*) " "
@@ -104,7 +105,9 @@ program CLMM
         exit
       endif
 
-  enddo
+    enddo
+
+  endif
 
 
 
@@ -131,7 +134,7 @@ program CLMM
 
      if (buoyancy==1) then
        allocate(temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-       temperature=huge(1.0_KND)
+       temperature=0
      else
        allocate(temperature(0,0,0))
      endif
