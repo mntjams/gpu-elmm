@@ -36,11 +36,11 @@ implicit none
 
 
  contains
-  
+
 
   subroutine AddWMpoint(WMP)
   type(WMpoint),intent(in):: WMP
-  
+
    if (.not.associated(LastWMPoint)) then
     allocate(FirstWMPoint)
     if (computedeposition>0) allocate(FirstWMPoint%depscalar(SIZE(WMP%depscalar,1)))
@@ -128,7 +128,7 @@ implicit none
     i=WMP%x
     j=WMP%y
     k=WMP%z
-    
+
     dist=sqrt(WMP%distx**2+WMP%disty**2+WMP%distz**2)
 
     vel=0
@@ -389,7 +389,7 @@ implicit none
    i=WMP%x
    j=WMP%y
    k=WMP%z
-  
+
    dist=sqrt(WMP%distx**2+WMP%disty**2+WMP%distz**2)
 
    vel=0
@@ -465,7 +465,7 @@ implicit none
    i=WMP%x
    j=WMP%y
    k=WMP%z
-   
+
    dist=sqrt(WMP%distx**2+WMP%disty**2+WMP%distz**2)
 
    vel=0
@@ -605,8 +605,8 @@ implicit none
    real(DBL) t
 
    if (buoyancy==1.and.TBtypeB==DIRICHLET) then
-    do j=1,Prnz
-     do i=1,Prny
+    do j=1,Prny
+     do i=1,Prnx
       t=time+dt/2._KND
       BsideTArr(i,j)=SurfTemperature(xPr(i),yPr(j),t)
      enddo
@@ -656,7 +656,7 @@ implicit none
    real(KND),intent(in):: x,y
    real(DBL),intent(in):: t
 
-   SurfTemperature=265-t*0.25_KND/3600._KND  !GABLS prescribed (Beare et al, BLM 2004)
+   SurfTemperature=BsideTemp  ! Needs bet to allow time evolution somehow
   endfunction
 
   recursive subroutine DeallWMP(WMP)
@@ -670,8 +670,9 @@ implicit none
   real(KND) function LambertW(x)
    real(KND) x
 
-   LambertW=11 !PREDELAT!!!
+   LambertW=11
    write(*,*) "Warning, Lambert function not defined!"
+   STOP
   endfunction LambertW
 
  endmodule Wallmodels
