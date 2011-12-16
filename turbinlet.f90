@@ -4,16 +4,20 @@ module TURBINLET
 
   implicit none
 
+  private
+  public GetTurbInlet, GetInletFromFile, TLag, Lturby, Lturbz, ustarinlet, transformtensor
 
-  real(KND),allocatable,dimension(:,:,:):: Ru,Rv,Rw !arrays of randoms
-  real(KND),allocatable,dimension(:,:,:):: Psiu,Psiv,Psiw
-  real(KND),allocatable,dimension(:,:,:):: bfilt !filter coefficients (ii,jj,kk,kz)
-  real(KND),allocatable,dimension(:):: ustarinlet !friction velocity profile at inlet
-  real(KND),allocatable,dimension(:,:):: Uinavg,Vinavg,Winavg !mean values of U,V,W at inflow
-  real(KND),allocatable,dimension(:,:,:):: transformtensor
+  real(KND),save :: TLag
+  real(KND),save :: Lturby
+  real(KND),save :: Lturbz
+
+
+  real(KND),allocatable,dimension(:),save     :: ustarinlet !friction velocity profile at inlet
+  real(KND),allocatable,dimension(:,:),save   :: Uinavg,Vinavg,Winavg !mean values of U,V,W at inflow
+  real(KND),allocatable,dimension(:,:,:),save :: transformtensor
 
    type TInlet
-    real(KND),allocatable,dimension(:,:):: U,V,W,temperature
+    real(KND),allocatable,dimension(:,:) :: U,V,W,temperature
    endtype
 
   interface GETTURBINLET
@@ -28,6 +32,9 @@ contains
  integer i,j,k,ii,jj,kk
  integer,save:: filtnx,filtny,filtnz,bigNx,bigNy,bigNz
  real(KND) Ui,Vi,Wi,bx,by,bz,bxsum,bysum,bzsum
+ real(KND),allocatable,dimension(:,:,:),save :: Ru,Rv,Rw !arrays of randoms
+ real(KND),allocatable,dimension(:,:,:),save :: Psiu,Psiv,Psiw
+ real(KND),allocatable,dimension(:,:,:),save :: bfilt !filter coefficients (ii,jj,kk,kz)
 
  if (.not. called) then
     write(*,*) "INITTURBULENCEPROFILES"
@@ -39,12 +46,12 @@ contains
     filtnz=1!max(Prnz/20,2)
     filtny=1!max((Prnz*dzmin/dymin)/20,2)
     filtnx=1!max((Prnz*dzmin/dxmin)/20,2)
- 
-    write(*,*) "filtn",filtnx,filtny,filtnz 
+
+    write(*,*) "filtn",filtnx,filtny,filtnz
     bigNx=2*filtnx
     bigNy=2*filtny
     bigNz=2*filtnz
-    write(*,*) "bigN",bigNx,bigNy,bigNz 
+    write(*,*) "bigN",bigNx,bigNy,bigNz
 
     allocate(Ru(-bigNx:bigNx,-bigNy+1:Prny+bigNy,-bigNz+1:Prnz+bigNz))
     allocate(Rv(-bigNx:bigNx,-bigNy+1:Prny+bigNy,-bigNz+1:Prnz+bigNz))
@@ -153,7 +160,7 @@ contains
       enddo
      enddo
     enddo
-     
+
     do k=1,Prnz
      do j=1,Prny
       Ui=Uin(j,k)
@@ -170,7 +177,7 @@ contains
                             +transformtensor(6,j,k)*Wi
      enddo
     enddo
-    
+
     do k=-bigNz+1,Prnz+bigNz
      do j=-bigNy+1,Prny+bigNy
       do i=-bigNx,bigNx-1
@@ -181,7 +188,7 @@ contains
      enddo
     enddo
 
-   
+
     do k=-bigNz+1,Prnz+bigNz
      do j=-bigNy+1,Prny+bigNy
        Ru(bigNx,j,k)=RANDOMGAUSS()
@@ -234,7 +241,7 @@ contains
 !     do k=1,Wnz
 !      write(*,*) "W",k,Win(1,k),Winavg(1,k)
 !     enddo
-! 
+!
 !   OPEN(11,file="RandU.vtk")
 !   write (11,"(A)") "# vtk DataFile Version 2.0"
 !   write (11,"(A)") "diplomka output file"
@@ -258,8 +265,8 @@ contains
 !   str="POINT_DATA"
 !   write (str(12:),*) (2*bigNx+1)*(Prny+2*bigNy)*(Prnz+2*bigNz)
 !   write (11,"(A)") str
-! 
-!   
+!
+!
 !   write (11,"(A)") "SCALARS RandU float"
 !   write (11,"(A)") "LOOKUP_TABLE default"
 !     do k=-bigNz+1,Prnz+bigNz
@@ -291,8 +298,11 @@ contains
  integer i,j,k
  integer,save:: filtny,filtnz,bigNy,bigNz
  real(KND) Ui,Vi,Wi,bysum,bzsum,p
- real(KND),save:: TLag,compat
  real(KND),allocatable,dimension(:):: expsy,expsz
+ real(KND),save:: compat
+ real(KND),allocatable,dimension(:,:,:),save :: Ru,Rv,Rw !arrays of randoms
+ real(KND),allocatable,dimension(:,:,:),save :: Psiu,Psiv,Psiw
+ real(KND),allocatable,dimension(:,:,:),save :: bfilt !filter coefficients (ii,jj,kk,kz)
 
  if (.not. called) then
     write(*,*) "INITTURBULENCEPROFILES"
@@ -302,15 +312,13 @@ contains
  write(*,*) "GETTURBINLET-cont"
 
 
-    filtnz=min(max(NINT(lz/dzmin/5._KND),1),ceiling(1._KND*Prnz/10))
-    filtny=min(max(NINT(lz/dymin/5._KND),1),ceiling(1._KND*Prny/10))
-
+    filtnz=min(max(NINT(lturbz/dzmin),1),ceiling(1._KND*Prnz/3))
+    filtny=min(max(NINT(lturby/dymin),1),ceiling(1._KND*Prny/3))
 
 
     bigNy=2*filtny
     bigNz=2*filtnz
 
-    TLag=2*MAX(bigNz*dzmin/Uinavg(Uny/2,Unz/2),bigNy*dymin/Uinavg(Uny/2,Unz/2))
 
     allocate(Ru(-bigNy+1:Prny+bigNy,-bigNz+1:Prnz+bigNz,2))
     allocate(Rv(-bigNy+1:Prny+bigNy,-bigNz+1:Prnz+bigNz,2))
@@ -515,7 +523,7 @@ contains
                                 transformtensor(2,j,k)*transformtensor(4,j,k))/transformtensor(3,j,k)
        transformtensor(6,j,k)=SQRT((ustarinlet(k)**2)*relativestress(3,3)-&
                                 transformtensor(4,j,k)**2-transformtensor(5,j,k)**2)
-       
+
     enddo
    enddo
   endsubroutine INITTURBULENCEPROFILES
@@ -574,7 +582,7 @@ contains
   S=S-0.5*n
   S=S/SQRT(n/12._KND)
   RANDOMGAUSS=(p-0.5)*sqrt(12._KND)!S
-  
+
   endfunction RANDOMGAUSS
 
 
@@ -618,7 +626,7 @@ contains
      fname(1:5)="frame"
      write(fname(6:8),"(I3.3)") inletfnum
      fname(9:12)=".unf"
-     
+
      open(11,file=fname,form='unformatted',status='old',action='read',iostat=io)
      if (io/=0) then
       write(*,*) "Error while opening file ", fname

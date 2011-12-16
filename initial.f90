@@ -9,7 +9,7 @@ module INITIAL
   use OUTPUTS, only: store, display, probes, NumProbes
   use SCALARS
   use SMAGORINSKY
-  use TURBINLET
+  use TURBINLET, only: GetTurbInlet, GetInletFromFile, TLag, Lturby, Lturbz, ustarinlet, transformtensor
   use GEOMETRIC
   use WALLMODELS
 
@@ -258,6 +258,12 @@ contains
   read(11,*) relativestress(1,3)
   read(11,fmt='(/)')
   read(11,*) relativestress(2,3)
+  read(11,fmt='(/)')
+  read(11,*) TLag
+  read(11,fmt='(/)')
+  read(11,*) Lturby
+  read(11,fmt='(/)')
+  read(11,*) Lturbz
   close(11)
 
   relativestress(2,1)=relativestress(1,2)
@@ -1049,7 +1055,7 @@ contains
     enddo
    enddo
   elseif (buoyancy==1) then
-   freetempgradient=0.01!0.0035 !K/m
+   freetempgradient=0.02!0.0035 !K/m
    !inversionTjump=2 !K
    do k=-2,Prnz+3
     do j=-2,Prny+3
