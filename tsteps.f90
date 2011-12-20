@@ -1473,7 +1473,12 @@ write(*,*) "Otherterms:"
      elseif (sgstype==DynSmagorinskyModel) then
                        call DynSmag(U,V,W)
      elseif (sgstype==VremanModel) then
-                       call Vreman(U,V,W)
+                       if (GPU>0.and.gridtype==uniformgrid.and. Prnx*Prny*Prnz > 5000000) then
+                           !$hmpp Vreman_GPU callsite
+                           call Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Re,U,V,W,Visc)
+                       else
+                           call Vreman(U,V,W)
+                       endif
      elseif (sgstype==StabSmagorinskyModel) then
                        call StabSmag(U,V,W)
      else
@@ -2693,6 +2698,87 @@ write(*,*) "Otherterms:"
         enddo
 
     end subroutine CDS_GPU
+
+
+
+  !$hmpp Vreman_GPU codelet, target=CUDA
+  subroutine Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dx,dy,dz,dt,Re,U,V,W,Visc)
+   !Vreman subgrid model (Physics of Fluids, 2004)
+   implicit none
+   integer,parameter :: KND=4
+
+   integer,intent(in)    :: Prnx, Prny, Prnz, Unx, Uny, Unz, Vnx, Vny, Vnz, Wnx, Wny, Wnz
+   real(KND),intent(in)  :: dx, dy, dz, dt, Re
+   real(KND),dimension(-2:Prnx+3,-2:Prny+3,-2:Prnz+3),intent(in):: U,V,W
+   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(out):: Visc
+
+   integer i,j,k,ii,jj
+   real(KND)::bb,aa
+   real(KND),dimension(1:3,1:3)::a,b
+   real(KND) :: dx2,dy2,dz2
+   real(KND),parameter::c=0.05
+
+   intrinsic abs,sqrt
+
+
+
+   dx2=dx**2
+   dy2=dy**2
+   dz2=dz**2
+   !$hmppcg grid blocksize 512x1
+   !$ hmppcg gridify (k,i)
+   do k=-1,Prnz+2
+    do i=-1,Prnx+2
+     do j=-1,Prny+2
+      a(1,1)=(U(i,j,k)-U(i-1,j,k))/dx
+      a(2,1)=(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._KND*dy)
+      a(3,1)=(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._KND*dz)
+
+      a(2,2)=(V(i,j,k)-V(i,j-1,k))/dy
+      a(1,2)=(V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(4._KND*dx)
+      a(3,2)=(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(4._KND*dz)
+
+      a(3,3)=(W(i,j,k)-W(i,j,k-1))/dz
+      a(1,3)=(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4._KND*dx)
+      a(2,3)=(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4._KND*dy)
+
+      do jj=1,3
+       do ii=1,3
+        b(ii,jj)=dx2*a(1,ii)*a(1,jj)+&
+                       dy2*a(2,ii)*a(2,jj)+&
+                       dz2*a(3,ii)*a(3,jj)
+       enddo
+      enddo
+
+      bb=          b(1,1)*b(2,2)-b(1,2)**2
+      bb=bb+b(1,1)*b(3,3)-b(1,3)**2
+      bb=bb+b(2,2)*b(3,3)-b(2,3)**2
+
+      aa=0
+
+
+
+      Visc(i,j,k)=0._KND
+
+      do jj=1,3
+       do ii=1,3
+        aa=aa+(a(ii,jj)**2)
+       enddo
+      enddo
+
+
+
+      if (abs(aa)>1e-5.and.bb>0)  Visc(i,j,k)=c*sqrt(bb/aa)
+
+
+      if (Re>0)  Visc(i,j,k)=Visc(i,j,k)+1._KND/Re
+
+     enddo
+    enddo
+   enddo
+  endsubroutine Vreman_GPU
+
+
 
 
 

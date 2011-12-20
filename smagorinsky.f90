@@ -7,11 +7,11 @@ module SMAGORINSKY
 
  private
  public :: Smag, Smag2, StabSmag, DynSmag, Vreman, Filter
- 
+
  real(KND),parameter:: CSmag=0.1_KND
- 
+
  contains
- 
+
   subroutine Smag(U,V,W)  !Standard Smagorinsky model with implicit filtering
    integer i,j,k
    real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W
@@ -32,7 +32,7 @@ module SMAGORINSKY
    endif
   endsubroutine Smag
 
-  
+
   subroutine Smag2(U,V,W,width)  !Standard Smagorinsky model with explicit filtering
    integer,intent(in):: width
    real(KND),dimension(-2:,-2:,-2:):: U,V,W
@@ -82,7 +82,7 @@ module SMAGORINSKY
    Sbar=Strainu(S)
    NuSmag2=Sbar*((width2)*width*CSmag)**2
   endfunction NuSmag2
- 
+
 
 
 
@@ -157,7 +157,7 @@ module SMAGORINSKY
                  1._KND/l0**2  +  1._KND/(0.4_KND*(z+z0))**2 &
                  )
   end function WallDamp
-  
+
 
   pure real(KND) function Rig(i,j,k,U,V,temperature)
    integer,intent(in):: i,j,k
@@ -193,8 +193,8 @@ module SMAGORINSKY
    Strainu=SQRT(2._KND*Strainu)
   endfunction Strainu
 
-  
-  
+
+
   pure subroutine StrainIJ(i,j,k,U,V,W,S)     !Computes components of the strain rate tensor.
    real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
    real(KND),intent(out):: S(1:3,1:3)
@@ -230,7 +230,7 @@ module SMAGORINSKY
 
 
 
-  
+
 
   subroutine DynSmag(U,V,W)    ! Dynamic Smagorinsky
    integer ii,jj,i,j,k
@@ -470,52 +470,112 @@ module SMAGORINSKY
   subroutine Vreman(U,V,W)   !Vreman subgrid model (Physics of Fluids, 2004)
    real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W
    integer i,j,k,ii,jj
-   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)::bb
-   real(KND),dimension(1:3,1:3,-1:Prnx+2,-1:Prny+2,-1:Prnz+2)::a,b
+   real(KND)::aa,bb
+   real(KND),dimension(1:3,1:3)::a,b
+   real(KND) :: dx2,dy2,dz2
    real(KND),parameter::c=0.05
 
    call Bound_CondU(U)
    call Bound_CondV(V)
    call Bound_CondW(W)
 
-   do k=-1,Prnz+2
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
-      a(1,1,i,j,k)=(U(i,j,k)-U(i-1,j,k))/dxPr(i)
-      a(2,1,i,j,k)=(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(2._KND*(dyV(j)+dyV(j-1)))
-      a(3,1,i,j,k)=(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(2._KND*(dzW(k)+dzW(k-1)))
-      a(2,2,i,j,k)=(V(i,j,k)-V(i,j-1,k))/dyPr(j)
-      a(1,2,i,j,k)=(V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(2._KND*(dxU(i)+dxU(i-1)))
-      a(3,2,i,j,k)=(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(2._KND*(dzW(k)+dzW(k-1)))
-      a(3,3,i,j,k)=(W(i,j,k)-W(i,j,k-1))/dzPr(k)
-      a(1,3,i,j,k)=(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(2._KND*(dxU(i)+dxU(i-1)))
-      a(2,3,i,j,k)=(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(2._KND*(dyV(j)+dyV(j-1)))
-     enddo
-    enddo
-   enddo
+   if (gridtype==uniformgrid) then
 
 
-   forall(k=-1:Prnz+2,j=-1:Prny+2,i=-1:Prnx+2,jj=1:3,ii=1:3)
-    b(ii,jj,i,j,k)=(dxPr(i))**2*a(1,ii,i,j,k)*a(1,jj,i,j,k)+&
-                   (dyPr(j))**2*a(2,ii,i,j,k)*a(2,jj,i,j,k)+&
-                   (dzPr(k))**2*a(3,ii,i,j,k)*a(3,jj,i,j,k)
-   endforall
+       dx2=dxmin**2
+       dy2=dymin**2
+       dz2=dzmin**2
 
-   bb(:,:,:)=          b(1,1,:,:,:)*b(2,2,:,:,:)-b(1,2,:,:,:)**2
-   bb(:,:,:)=bb(:,:,:)+b(1,1,:,:,:)*b(3,3,:,:,:)-b(1,3,:,:,:)**2
-   bb(:,:,:)=bb(:,:,:)+b(2,2,:,:,:)*b(3,3,:,:,:)-b(2,3,:,:,:)**2
+       do k=-1,Prnz+2
+        do i=-1,Prnx+2
+         do j=-1,Prny+2
+          a(1,1)=(U(i,j,k)-U(i-1,j,k))/dxmin
+          a(2,1)=(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._KND*dymin)
+          a(3,1)=(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._KND*dzmin)
 
-   Visc=0._KND
-   forall(k=-1:Prnz+2,j=-1:Prny+2,i=-1:Prnx+2)
-        a(1,1,i,j,k)=sum(a(:,:,i,j,k)**2)
-   endforall
-   forall(k=-1:Prnz+2,j=-1:Prny+2,i=-1:Prnx+2,abs(a(1,1,i,j,k))>1e-5.and.bb(i,j,k)>0)
-        Visc(i,j,k)=c*sqrt(bb(i,j,k)/a(1,1,i,j,k))
-   endforall
+          a(2,2)=(V(i,j,k)-V(i,j-1,k))/dymin
+          a(1,2)=(V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(4._KND*dxmin)
+          a(3,2)=(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(4._KND*dzmin)
 
-   if (Re>0) then
-     Visc=Visc+1._KND/Re
-   endif
+          a(3,3)=(W(i,j,k)-W(i,j,k-1))/dzmin
+          a(1,3)=(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4._KND*dxmin)
+          a(2,3)=(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4._KND*dymin)
+
+          do jj=1,3
+           do ii=1,3
+            b(ii,jj)=dx2*a(1,ii)*a(1,jj)+&
+                     dy2*a(2,ii)*a(2,jj)+&
+                     dz2*a(3,ii)*a(3,jj)
+           enddo
+          enddo
+
+          bb=          b(1,1)*b(2,2)-b(1,2)**2
+          bb=bb+b(1,1)*b(3,3)-b(1,3)**2
+          bb=bb+b(2,2)*b(3,3)-b(2,3)**2
+
+          aa=0
+
+
+
+          Visc(i,j,k)=0._KND
+
+          do jj=1,3
+           do ii=1,3
+            aa=aa+(a(ii,jj)**2)
+           enddo
+          enddo
+
+
+
+          if (abs(aa)>1e-5.and.bb>0)  Visc(i,j,k)=c*sqrt(bb/aa)
+
+
+          if (Re>0)  Visc(i,j,k)=Visc(i,j,k)+1._KND/Re
+
+         enddo
+        enddo
+       enddo
+
+   else !general grid
+
+       do k=-1,Prnz+2
+        do j=-1,Prny+2
+         do i=-1,Prnx+2
+          a(1,1)=(U(i,j,k)-U(i-1,j,k))/dxPr(i)
+          a(2,1)=(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(2._KND*(dyV(j)+dyV(j-1)))
+          a(3,1)=(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(2._KND*(dzW(k)+dzW(k-1)))
+          a(2,2)=(V(i,j,k)-V(i,j-1,k))/dyPr(j)
+          a(1,2)=(V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(2._KND*(dxU(i)+dxU(i-1)))
+          a(3,2)=(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(2._KND*(dzW(k)+dzW(k-1)))
+          a(3,3)=(W(i,j,k)-W(i,j,k-1))/dzPr(k)
+          a(1,3)=(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(2._KND*(dxU(i)+dxU(i-1)))
+          a(2,3)=(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(2._KND*(dyV(j)+dyV(j-1)))
+
+
+          forall(jj=1:3,ii=1:3)
+           b(ii,jj)=(dxPr(i))**2*a(1,ii)*a(1,jj)+&
+                          (dyPr(j))**2*a(2,ii)*a(2,jj)+&
+                          (dzPr(k))**2*a(3,ii)*a(3,jj)
+          endforall
+
+          bb=   b(1,1)*b(2,2)-b(1,2)**2
+          bb=bb+b(1,1)*b(3,3)-b(1,3)**2
+          bb=bb+b(2,2)*b(3,3)-b(2,3)**2
+
+          Visc(i,j,k)=0._KND
+
+
+          aa=sum(a(:,:)**2)
+
+          if (abs(aa)>1e-5.and.bb>0) Visc(i,j,k)=c*sqrt(bb/aa)
+
+          if (Re>0)  Visc(i,j,k)=Visc(i,j,k)+1._KND/Re
+
+         enddo
+        enddo
+       enddo
+
+   endif !general grid
   endsubroutine Vreman
 
 
@@ -595,5 +655,5 @@ module SMAGORINSKY
   call TrapesField(U1,U2,nx,ny,nz)
 
  endsubroutine Filter
- 
+
 endmodule SMAGORINSKY
