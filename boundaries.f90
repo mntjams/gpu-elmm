@@ -339,14 +339,6 @@ implicit none
      U(-2,j,k)=U(nx-2,j,k)
     enddo
    enddo
-  elseif (BtypeW==PERIODIC) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     U(0,j,k)=Uin(j,k)
-     U(-1,j,k)=Uin(j,k)
-     U(-2,j,k)=Uin(j,k)
-    enddo
-   enddo
   elseif (BtypeW==TURBULENTINLET) then
    do k=1,Prnz
     do j=1,Prny                       !Dirichlet inlet
