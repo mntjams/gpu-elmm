@@ -649,26 +649,16 @@ contains
                 lbound(Scalar,3):ubound(Scalar,3),lbound(Scalar,4):ubound(Scalar,4))::Scalar_adv,Scalar_2
   real(KND),dimension(lbound(Temperature,1):ubound(Temperature,1),lbound(Temperature,2):ubound(Temperature,2),&
    lbound(Temperature,3):ubound(Temperature,3))::Temperature_adv,Temperature2
-  real(KND),dimension(1:3),save:: alpha,beta,rho
+  real(KND),dimension(1:3),parameter:: alpha = (/ 4._KND/15._KND, 1._KND/15._KND, 1._KND/6._KND /)
+  real(KND),dimension(1:3),parameter:: beta  = (/ 8._KND/15._KND, 5._KND/12._KND, 3._KND/4._KND /)
+  real(KND),dimension(1:3),parameter:: rho   = (/       0._KND, -17._KND/60._KND,-5._KND/12._KND/)
   integer i,j,k,l
   real(KND) p
   integer,save:: called=0
   real time1,time2
 
-i=0
 
-write(*,*) "Test codelet:", i
   if (called==0) then
-   alpha(1)=4._KND/15._KND
-   alpha(2)=1._KND/15._KND
-   alpha(3)=1._KND/6._KND
-   beta(1)=8._KND/15._KND
-   beta(2)=5._KND/12._KND
-   beta(3)=3._KND/4._KND
-   rho(1)=0
-   rho(2)=-17._KND/60._KND
-   rho(3)=-5._KND/12._KND
-
    called=1
    if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
   endif
