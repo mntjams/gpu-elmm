@@ -5,7 +5,7 @@ module TSTEPS
   use LAXFRIED
   use LAXWEND
   use PARAMETERS
-  use BOUNDARIES, only: Bound_CondU,Bound_CondV,Bound_CondW,Bound_Q
+  use BOUNDARIES, only: BoundU,Bound_Q
   use POISSON, only: Pr_Correct
   use SMAGORINSKY, only: Smag, Dynsmag, StabSmag, Vreman
   use SCALARS, only:  Bound_Temp, Bound_Visc, Scalar, percdistrib, AdvScalar,&
@@ -49,9 +49,9 @@ contains
 
   if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
 
-  call Bound_CondU(U)
-  call Bound_CondV(V)
-  call Bound_CondW(W)
+  call BoundU(1,U)
+  call BoundU(2,V)
+  call BoundU(3,W)
   if (buoyancy==1)  call Bound_Temp(temperature)
 
 
@@ -94,9 +94,9 @@ contains
 
 
 
-  call Bound_CondU(U2)
-  call Bound_CondV(V2)
-  call Bound_CondW(W2)
+  call BoundU(1,U2)
+  call BoundU(2,V2)
+  call BoundU(3,W2)
 
   if (poissmet>0) then
   if (masssourc==1) then
@@ -208,9 +208,9 @@ contains
 
   endif
 
-  call Bound_CondU(U)
-  call Bound_CondV(V)
-  call Bound_CondW(W)
+  call BoundU(1,U)
+  call BoundU(2,V)
+  call BoundU(3,W)
 
   if (buoyancy==1)  call Bound_Temp(temperature)
 
@@ -292,9 +292,9 @@ contains
     endif
 
 
-    call Bound_CondU(U2)
-    call Bound_CondV(V2)
-    call Bound_CondW(W2)
+    call BoundU(1,U2)
+    call BoundU(2,V2)
+    call BoundU(3,W2)
 
 
     if (poissmet>0) then
@@ -422,9 +422,10 @@ contains
 
   if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
 
-  call Bound_CondU(U)
-  call Bound_CondV(V)
-  call Bound_CondW(W)
+  call BoundU(1,U)
+  call BoundU(2,V)
+  call BoundU(3,W)
+
   if (buoyancy==1)  call Bound_Temp(temperature)
 
 
@@ -488,9 +489,9 @@ contains
   endif
 
 
-  call Bound_CondU(U2)
-  call Bound_CondV(V2)
-  call Bound_CondW(W2)
+  call BoundU(1,U2)
+  call BoundU(2,V2)
+  call BoundU(3,W2)
 
 
   if (poissmet>0) then
@@ -502,9 +503,9 @@ contains
   endif
 
 
-  call Bound_CondU(U2)
-  call Bound_CondV(V2)
-  call Bound_CondW(W2)
+  call BoundU(1,U2)
+  call BoundU(2,V2)
+  call BoundU(3,W2)
 
 
 
@@ -672,9 +673,9 @@ write(*,*) "Test codelet:", i
    if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
   endif
 
-  call Bound_CondU(U)
-  call Bound_CondV(V)
-  call Bound_CondW(W)
+  call BoundU(1,U)
+  call BoundU(2,V)
+  call BoundU(3,W)
 
   if (buoyancy==1)  call Bound_Temp(temperature)
 
@@ -717,9 +718,9 @@ write(*,*) "Test codelet:", i
        call KAPPAW(Wstar,U,V,W,1._KND)
       else if (GPU>0) then
        write(*,*) "Call GPU CDS"
-       call BOUND_CONDU(U)
-       call BOUND_CONDV(V)
-       call BOUND_CONDW(W)
+       call BoundU(1,U)
+       call BoundU(2,V)
+       call BoundU(3,W)
        !$hmpp CDS_GPU callsite
        call CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Ustar,Vstar,Wstar,U,V,W)
        write(*,*) "Back from  GPU CDS"
@@ -765,9 +766,9 @@ write(*,*) "Test codelet:", i
     endif
 
 
-    call Bound_CondU(U2)
-    call Bound_CondV(V2)
-    call Bound_CondW(W2)
+    call BoundU(1,U2)
+    call BoundU(2,V2)
+    call BoundU(3,W2)
 
 
     if (poissmet>0) then
@@ -888,9 +889,9 @@ write(*,*) "Test codelet:", i
 
   write (*,*) "time:",time,"dt: ",dt
 
-  call Bound_CondU(U)
-  call Bound_CondV(V)
-  call Bound_CondW(W)
+  call BoundU(1,U)
+  call BoundU(2,V)
+  call BoundU(3,W)
 
   do k=1,Unz
    do j=1,Uny
@@ -1018,9 +1019,9 @@ write(*,*) "Test codelet:", i
    type(TIBPoint),pointer:: IBP
    integer x,y,z,dirx,diry,dirz,n
 
-   call Bound_CondU(U)
-   call Bound_CondV(V)
-   call Bound_CondW(W)
+   call BoundU(1,U)
+   call BoundU(2,V)
+   call BoundU(3,W)
 
   if (associated(FirstIBPoint)) then
    IBP => FirstIBPoint
@@ -1451,9 +1452,9 @@ write(*,*) "Otherterms:"
    enddo
 
 
-   call Bound_CondU2(U2)
-   call Bound_CondV2(V2)
-   call Bound_CondW2(W2)
+   call BoundU(1,U2,2)
+   call BoundU(2,V2,2)
+   call BoundU(3,W2,2)
 
    Re_gt_0: if (Re>0) then
 
@@ -1462,9 +1463,9 @@ write(*,*) "Otherterms:"
      !iteration SOR or Gauss-Seidel
 
 
-     call Bound_CondU(U)
-     call Bound_CondV(V)
-     call Bound_CONDW(W)
+     call BoundU(1,U)
+     call BoundU(2,V)
+     call BoundU(3,W)
      U3=U+U2
      V3=V+V2
      W3=W+W2
@@ -1540,9 +1541,9 @@ write(*,*) "Otherterms:"
      enddo
 
 
-     call Bound_CondU(U3)
-     call Bound_CondV(V3)
-     call Bound_CondW(W3)
+     call BoundU(1,U3)
+     call BoundU(2,V3)
+     call BoundU(3,W3)
      call MomSourc(U3,V3,W3)
 
      if (associated(FirstIBPoint)) then   !Immersed boundary terms, in the future should be in an array
@@ -1730,9 +1731,9 @@ write(*,*) "Otherterms:"
 
 
        do l=1,maxCNiter               !Gauss-Seidel iteration for Crank-Nicolson result
-!         call Bound_CondU(U3)
-!         call Bound_CondV(V3)
-!         call Bound_CondW(W3)
+!         call BoundU(1,U3)
+!         call BoundU(2,V3)
+!         call BoundU(3,W3)
         S=0
         Su=0
         Sv=0
@@ -1973,9 +1974,9 @@ write(*,*) "Otherterms:"
 
 
        do l=1,maxCNiter               !Gauss-Seidel iteration for Crank-Nicolson result
-        call Bound_CondU(U3)
-        call Bound_CondV(V3)
-        call Bound_CondW(W3)
+        call BoundU(1,U3)
+        call BoundU(2,V3)
+        call BoundU(3,W3)
         S=0
         Su=0
         Sv=0
@@ -2503,9 +2504,9 @@ write(*,*) "Otherterms:"
        l=1
        S=epsCN+1.
        do while (S>epsCN.and.l<=maxCNiter)          !Gauss-Seidel iteration for Crank-Nicolson result
-        !call Bound_CondU(U3)
-        !call Bound_CondV(V3)
-        !call Bound_CondW(W3)
+        !call BoundU(1,U3)
+        !call BoundU(2,V3)
+        !call BoundU(3,W3)
         S=0
         Su=0
         Sv=0

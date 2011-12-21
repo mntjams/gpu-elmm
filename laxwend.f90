@@ -14,9 +14,9 @@ module LAXWEND
  integer i,j,k
  real(KND) Uloc,Uloce,Ulocw,Vloc,Vlocn,Vlocs,Wloc,Wloct,Wlocb
 
-  call Bound_CondU(U)
-  call Bound_CondV(V)
-  call Bound_CondW(W)
+  call BoundU(1,U)
+  call BoundU(2,V)
+  call BoundU(3,W)
 
   do k=1,Unz
    do j=1,Uny
@@ -46,7 +46,7 @@ module LAXWEND
                -(dt/dzmin)*((V(i,j,k+1)*Wloct)-(V(i,j,k)*Wloc))
     enddo
    enddo
-  enddo             
+  enddo
 
   do k=1,Wnz
    do j=1,Wny
@@ -61,11 +61,11 @@ module LAXWEND
                -(dt/dzmin)*((W(i,j,k+1)*W(i,j,k+1))-(W(i,j,k)*W(i,j,k)))
     enddo
    enddo
-  enddo             
- 
-  call Bound_CondU(U1)
-  call Bound_CondV(V1)
-  call Bound_CondW(W1)
+  enddo
+
+  call BoundU(1,U1)
+  call BoundU(2,V1)
+  call BoundU(3,W1)
 
   do k=1,Unz
    do j=1,Uny
@@ -95,7 +95,7 @@ module LAXWEND
                -(dt/dzmin)*((V1(i,j,k)*Wloc)-(V1(i,j,k-1)*Wlocb)))/2._KND
     enddo
    enddo
-  enddo             
+  enddo
 
   do k=1,Wnz
    do j=1,Wny
@@ -110,7 +110,7 @@ module LAXWEND
                -(dt/dzmin)*((W1(i,j,k)*W1(i,j,k))-(W1(i,j,k-1)*W1(i,j,k-1))))/2._KND
     enddo
    enddo
-  enddo             
+  enddo
 
 
   U2=U2-U
@@ -128,9 +128,9 @@ module LAXWEND
  integer i,j,k
  real(KND) Uloc,Uloce,Ulocw,Vloc,Vlocn,Vlocs,Wloc,Wloct,Wlocb
 
-  call Bound_CondU(U)
-  call Bound_CondV(V)
-  call Bound_CondW(W)
+  call BoundU(1,U)
+  call BoundU(2,V)
+  call BoundU(3,W)
 
   do k=1,Unz
    do j=1,Uny
@@ -160,7 +160,7 @@ module LAXWEND
                -(dt/dzmin)*((V1(i,j,k)*Wloc)-(V1(i,j,k-1)*Wlocb))
     enddo
    enddo
-  enddo             
+  enddo
 
   do k=1,Wnz
    do j=1,Wny
@@ -175,11 +175,11 @@ module LAXWEND
                -(dt/dzmin)*((W1(i,j,k)*W1(i,j,k))-(W1(i,j,k-1)*W1(i,j,k-1)))
     enddo
    enddo
-  enddo             
- 
-  call Bound_CondU(U1)
-  call Bound_CondV(V1)
-  call Bound_CondW(W1)
+  enddo
+
+  call BoundU(1,U1)
+  call BoundU(2,V1)
+  call BoundU(3,W1)
 
   do k=1,Unz
    do j=1,Uny
@@ -209,7 +209,7 @@ module LAXWEND
                -(dt/dzmin)*((V(i,j,k+1)*Wloct)-(V(i,j,k)*Wloc)))/2._KND
     enddo
    enddo
-  enddo             
+  enddo
 
   do k=1,Wnz
    do j=1,Wny
@@ -224,7 +224,7 @@ module LAXWEND
                -(dt/dzmin)*((W(i,j,k+1)*W(i,j,k+1))-(W(i,j,k)*W(i,j,k))))/2._KND
     enddo
    enddo
-  enddo             
+  enddo
 
 
   U2=U2-U

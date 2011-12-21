@@ -4,7 +4,7 @@ module POISSON
  use BOUNDARIES
  use MULTIGRID,   only: POISSMG
  use MULTIGRID2d, only: POISSMG2d
- use FISHPOISSON 
+ use FISHPOISSON
 
 implicit none
 
@@ -102,9 +102,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     dt3=0
    endif
 
-   call Bound_CondU(U)
-   call Bound_CondV(V)
-   call Bound_CondW(W)
+   call BoundU(1,U)
+   call BoundU(2,V)
+   call BoundU(3,W)
 
    S=0
    do k=1,Prnz
@@ -125,7 +125,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
    maxJ=-5
    maxK=-5
 
-   
+
    do k=1,Prnz            !divergence of U -> RHS
     do j=1,Prny
      do i=1,Prnx
@@ -185,9 +185,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
        write(*,*) "MUDPACK support disabled."
    endif
-   
 
-  
+
+
    Phiref=Phi(Prnx/2,Prny/2,Prnz/2)
    do k=1,Prnz
     do j=1,Prny
@@ -200,10 +200,10 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
    call Bound_Phi(Phi)
 
-   
-  
 
- do k=1,Unz  
+
+
+ do k=1,Unz
   do j=1,Uny
     do i=1,Unx
       U(i,j,k)=U(i,j,k)-dt2*(Phi(i+1,j,k)-Phi(i,j,k))/dxU(i)
@@ -250,9 +250,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   maxI=-5
   maxJ=-5
   maxK=-5
-  call Bound_CondU(U)
-  call Bound_CondV(V)
-  call Bound_CondW(W)
+  call BoundU(1,U)
+  call BoundU(2,V)
+  call BoundU(3,W)
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
@@ -280,7 +280,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     enddo
    enddo
   enddo
-  
+
   if ((maxI>-1).and.(maxJ>-1)) write (*,*) "maxRHS",maxI,maxJ,maxK,S
   write (*,*) "avgRHS",S2/(lx*ly*lz)
 
@@ -309,8 +309,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 !   str="POINT_DATA"
 !   write (str(12:),*) Prnx*Prny*Prnz
 !   write (11,"(A)") str
-! 
-!   
+!
+!
 !   write (11,"(A)") "SCALARS RHS float"
 !   write (11,"(A)") "LOOKUP_TABLE default"
 !   do k=1,Prnz
@@ -319,7 +319,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 !       Write (11,*) Phi(i,j,k)
 !     enddo
 !    enddo
-!   enddo 
+!   enddo
 !   write (11,*)
 !   CLOSE(11)
 !   20 continue
@@ -346,8 +346,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 !   str="POINT_DATA"
 !   write (str(12:),*) Prnx*Prny*Prnz
 !   write (11,"(A)") str
-! 
-!   
+!
+!
 !   write (11,"(A)") "SCALARS RHS float"
 !   write (11,"(A)") "LOOKUP_TABLE default"
 !   do k=1,Prnz
@@ -356,13 +356,13 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 !       Write (11,*) coef*RHS(i,j,k)*dt*3./(1./dxmin+1./dymin+1./dzmin)
 !     enddo
 !    enddo
-!   enddo 
+!   enddo
 !   write (11,*)
 !   CLOSE(11)
 !   30 continue
   endsubroutine PR_CORRECT
 
-  
+
 
   subroutine POISSSOR(Phi,RHS)        !Solves Poisson equation using Successive over-relaxation
 
@@ -423,7 +423,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
       write (*,*) "GPU Poisson iter: ",l,S
      enddo
       !$hmpp <SOR> delegatedStore,Args[Res_GPU::Phi]
-      !$hmpp <SOR> release      
+      !$hmpp <SOR> release
    else
     l=1
     S=huge(1.0_KND)
@@ -546,17 +546,17 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
           p=abs(maxval(Phi(1:nx,1:ny,1:nz)))
           if (p>0) S=S/p
           if (MOD(l,10)==0)  write (*,*) "   Poisson iter: ",l,S
-        enddo          
+        enddo
    endif
  end subroutine POISSSOR
-  
-  
-  
 
-  
 
-  
-  
+
+
+
+
+
+
 
 
   subroutine  POISSVEL(Phi,RHS)      !Calls Bicgstab solver from LAPACK, does not work
@@ -591,13 +591,13 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   itol=1
   tol=5.e-5
 
-  
+
     !call  poisson2(nx,ny,nz,np,x,y,z,rhs2,dbcx,dbcy,dbcz,i0,j0,k0,phi2,itmax,itol,tol,err)
 
   Phi(0:Prnx+1,0:Prny+1,0:Prnz+1)=Phi2
   endsubroutine POISSVEL
 
-  
+
 
 
   subroutine POISSADI(Phi,RHS)                      !Alternating direction implicit with tridiag solver from LINPACK
@@ -668,7 +668,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
         dx(nx+2)=1
         ex(2)=-1
         cx(nx+1)=-1
-       endif 
+       endif
      if (BtypeW==PERIODIC) then
       bx(1)=Phi(nx,j,k)
       bx(nx+2)=Phi(1,j,k)
@@ -684,7 +684,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      if (info/=0)  write (*,*) info
 
      Phi(1:nx,j,k)=bx(2:nx+1)
-    enddo 
+    enddo
    enddo
 
    call Bound_Phi(Phi)
@@ -692,7 +692,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     do i=1,nx
        forall(j=2:ny+1)
         dy(j)=-Apy(j-1)-adirelaxpar
-       endforall       
+       endforall
        forall(j=2:ny)
         cy(j)=As(j)
        endforall
@@ -709,7 +709,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
         dy(ny+2)=1
         ey(2)=-1
         cy(ny+1)=-1
-       endif 
+       endif
      if (BtypeS==PERIODIC) then
       by(1)=Phi(i,ny,k)
       by(ny+2)=Phi(i,1,k)
@@ -724,7 +724,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
      if (info/=0)  write (*,*) "info",info
     Phi(i,1:ny,k)=by(2:ny+1)
-    enddo 
+    enddo
    enddo
 
 
@@ -750,7 +750,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
         dz(nz+2)=1
         ez(2)=-1
         cz(nz+1)=-1
-       endif 
+       endif
      if (BtypeB==PERIODIC) then
       bz(1)=Phi(i,j,nz)
       bz(nz+2)=Phi(i,j,1)
@@ -765,7 +765,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
      if (info/=0) write (*,*) "info",info
      Phi(i,j,1:nz)=bz(2:nz+1)
-    enddo 
+    enddo
    enddo
    S=SUM(Abs(Phi(1:Prnx,1:Prny,1:Prnz)-Phi2(1:Prnx,1:Prny,1:Prnz)))/(Prnx*Prny*Prnz)
    write (*,*) l,S
@@ -844,7 +844,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      !write(*,*) bx
      S=S+sum(abs(Phi(1:nx,j,k)-bx(2:nx+1)))/(Prnx*Prny*Prnz)
      Phi2(1:nx,j,k)=bx(2:nx+1)
-    enddo 
+    enddo
    enddo
    write(*,*)"x", S
 
@@ -863,7 +863,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
      S=S+sum(abs(Phi(i,1:ny,k)-by(2:ny+1)))/(Prnx*Prny*Prnz)
      Phi2(i,1:ny,k)=by(2:ny+1)
-    enddo 
+    enddo
    enddo
    write(*,*)"y", S
 
@@ -882,11 +882,11 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
      S=S+sum(abs(Phi(i,j,1:nz)-bz(2:nz+1)))/(Prnx*Prny*Prnz)
      Phi2(i,j,1:nz)=bz(2:nz+1)
-    enddo 
+    enddo
    enddo
    Phi=Phi2
    write (*,*) l,S
-   
+
   enddo
 
   endsubroutine POISSADIGS

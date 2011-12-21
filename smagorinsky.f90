@@ -1,7 +1,7 @@
 module SMAGORINSKY
 
  use PARAMETERS
- use BOUNDARIES, only : Bound_CondU, Bound_CondV, Bound_CondW
+ use BOUNDARIES, only : BoundU
 
  implicit none
 
@@ -16,9 +16,9 @@ module SMAGORINSKY
    integer i,j,k
    real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W
 
-   call Bound_CondU(U)
-   call Bound_CondV(V)
-   call Bound_CondW(W)
+   call BoundU(1,U)
+   call BoundU(2,V)
+   call BoundU(3,W)
 
    do k=-1,Prnz+2
     do j=-1,Prny+2
@@ -38,9 +38,9 @@ module SMAGORINSKY
    real(KND),dimension(-2:,-2:,-2:):: U,V,W
    integer i,j,k
 
-   call Bound_CondU(U)
-   call Bound_CondV(V)
-   call Bound_CondW(W)
+   call BoundU(1,U)
+   call BoundU(2,V)
+   call BoundU(3,W)
 
    do k=-1,Prnz+2
     do j=-1,Prny+2
@@ -94,9 +94,9 @@ module SMAGORINSKY
    real(KND),parameter:: CS=0.17_KND
    real(KND) S(1:3,1:3)
 
-   call Bound_CondU(U)
-   call Bound_CondV(V)
-   call Bound_CondW(W)
+   call BoundU(1,U)
+   call BoundU(2,V)
+   call BoundU(3,W)
 
    do k=0,Prnz+1
     do j=0,Prny+1
@@ -244,9 +244,9 @@ module SMAGORINSKY
    real(KND) Strain,A,B,sums
    character(70):: str
 
-   call Bound_CondU(U)
-   call Bound_CondV(V)
-   call Bound_CondW(W)
+   call BoundU(1,U)
+   call BoundU(2,V)
+   call BoundU(3,W)
 
    FiltU=0
    FiltV=0
@@ -475,9 +475,9 @@ module SMAGORINSKY
    real(KND) :: dx2,dy2,dz2
    real(KND),parameter::c=0.05
 
-   call Bound_CondU(U)
-   call Bound_CondV(V)
-   call Bound_CondW(W)
+   call BoundU(1,U)
+   call BoundU(2,V)
+   call BoundU(3,W)
 
    if (gridtype==uniformgrid) then
 

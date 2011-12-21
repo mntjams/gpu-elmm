@@ -7,12 +7,12 @@ module CDS
 
     private
     public CDU, CDV, CDW, KAPPAU, KAPPAV, KAPPAW
-    
-    contains
-    
-    
 
-          
+    contains
+
+
+
+
 
     subroutine CDU(U2,U,V,W,coef)
     real(KND) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
@@ -25,15 +25,15 @@ module CDS
      nx=Unx
      ny=Uny
      nz=Unz
-     call BOUND_CONDU(U)
-     call BOUND_CONDV(V)
-     call BOUND_CONDW(W)
+     call BoundU(1,U)
+     call BoundU(2,V)
+     call BoundU(3,W)
 
      if (gridtype==UNIFORMGRID) then
         Ax=0.25*coef*dt/dxmin
         Ay=0.25*coef*dt/dymin
         Az=0.25*coef*dt/dzmin
-        
+
         do k=1,nz
             do j=1,ny
                 do i=1,nx
@@ -71,7 +71,7 @@ module CDS
         enddo
      endif
     end subroutine CDU
-        
+
 
 
 
@@ -89,15 +89,15 @@ module CDS
      nx=Vnx
      ny=Vny
      nz=Vnz
-     call BOUND_CONDU(U)
-     call BOUND_CONDV(V)
-     call BOUND_CONDW(W)
+     call BoundU(1,U)
+     call BoundU(2,V)
+     call BoundU(3,W)
 
      if (gridtype==UNIFORMGRID) then
         Ax=0.25*coef*dt/dxmin
         Ay=0.25*coef*dt/dymin
         Az=0.25*coef*dt/dzmin
-        
+
         do k=1,nz
             do j=1,ny
                 do i=1,nx
@@ -135,7 +135,7 @@ module CDS
         enddo
      endif
     end subroutine CDV
-    
+
 
 
 
@@ -151,15 +151,15 @@ module CDS
      nx=Wnx
      ny=Wny
      nz=Wnz
-     call BOUND_CONDU(U)
-     call BOUND_CONDV(V)
-     call BOUND_CONDW(W)
+     call BoundU(1,U)
+     call BoundU(2,V)
+     call BoundU(3,W)
 
      if (gridtype==UNIFORMGRID) then
         Ax=0.25*coef*dt/dxmin
         Ay=0.25*coef*dt/dymin
         Az=0.25*coef*dt/dzmin
-        
+
         do k=1,nz
             do j=1,ny
                 do i=1,nx
@@ -177,7 +177,7 @@ module CDS
          allocate(ht(0:nz),hp(1:nz),fe(0:nx),gn(0:ny))
          called=1
          forall (k=0:nz)      ht(k)=(zPr(k+1)-zW(k))/(zW(k+1)-zW(k))
-         forall (k=1:nz)      hp(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))        
+         forall (k=1:nz)      hp(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
          forall (i=0:nx)      fe(i)=(xU(i)-xPr(i))/(xPr(i+1)-xPr(i))
          forall (j=0:ny)      gn(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
         endif
@@ -197,8 +197,8 @@ module CDS
         enddo
      endif
     end subroutine CDW
-            
-            
+
+
   subroutine KAPPAU(U2,U,V,W,coef)
   real(KND),intent(inout)::U2(-2:,-2:,-2:),U(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
   real(KND),intent(in):: V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
@@ -207,7 +207,7 @@ module CDS
   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3):: SLOPE
   real(KND),parameter::eps=1e-8
 
-  call BOUND_CONDU(U)
+  call BoundU(1,U)
 
   A=coef*dt/2._KND
 
@@ -272,7 +272,7 @@ module CDS
      U2(i,j+1,k)=U2(i,j+1,k)+A*FLUX/dyPr(j+1)
     enddo
    enddo
-  enddo    
+  enddo
 
   SLOPE=0
   do i=1,Unx
@@ -316,8 +316,8 @@ module CDS
   real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3):: SLOPE
   real(KND),parameter::eps=1e-8
 
-  call BOUND_CONDV(V)
-  
+  call BoundU(2,V)
+
   A=coef*dt/2._KND
 
   SLOPE=0
@@ -349,7 +349,7 @@ module CDS
      V2(i+1,j,k)=V2(i+1,j,k)+A*FLUX/dxPr(i+1)
     enddo
    enddo
-  enddo    
+  enddo
 
   SLOPE=0
   do i=1,Vnx
@@ -381,7 +381,7 @@ module CDS
      V2(i,j+1,k)=V2(i,j+1,k)+A*FLUX/dyPr(j+1)
     enddo
    enddo
-  enddo    
+  enddo
 
   SLOPE=0
   do i=1,Vnx
@@ -423,8 +423,8 @@ module CDS
   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3):: SLOPE
   real(KND),parameter::eps=1e-8
 
-  call BOUND_CONDW(W)
-  
+  call BoundU(3,W)
+
   A=coef*dt/2._KND
 
   SLOPE=0
@@ -456,7 +456,7 @@ module CDS
      W2(i+1,j,k)=W2(i+1,j,k)+A*FLUX/dxPr(i+1)
     enddo
    enddo
-  enddo    
+  enddo
 
   SLOPE=0
   do i=1,Wnx
@@ -488,7 +488,7 @@ module CDS
      W2(i,j+1,k)=W2(i,j+1,k)+A*FLUX/dyPr(j+1)
     enddo
    enddo
-  enddo    
+  enddo
 
   SLOPE=0
   do i=1,Wnx

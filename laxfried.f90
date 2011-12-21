@@ -12,20 +12,20 @@ module LAXFRIED
  subroutine LF(U2,V2,W2,U,V,W)
   real(KND),dimension(-2:,-2:,-2:):: U2,V2,W2,U,V,W
 
-  call Bound_CondU(U)
-  call Bound_CondV(V)
-  call Bound_CondW(W)
+  call BoundU(1,U)
+  call BoundU(2,V)
+  call BoundU(3,W)
 
   call FLUXESU(U2,U,V,W)
   call FLUXESV(V2,U,V,W)
   call FLUXESW(W2,U,V,W)
  endsubroutine LF
-  
+
  subroutine FLUXESU(U2,U,V,W)
  real(KND),dimension(-2:,-2:,-2:):: U2,U,V,W
  real(KND) Vlocn,Vlocs,Wloct,Wlocb
  integer i,j,k
- 
+
   do k=1,Unz
    do j=1,Uny
     do i=1,Unx
@@ -39,7 +39,7 @@ module LAXFRIED
                -(dt/dzmin)*((U(i,j,k+1)*Wloct)-(U(i,j,k-1)*Wlocb))/2._KND
     enddo
    enddo
-  enddo             
+  enddo
   U2=U2-U
  endsubroutine FLUXESU
 
@@ -61,10 +61,10 @@ module LAXFRIED
                -(dt/dzmin)*((V(i,j,k+1)*Wloct)-(V(i,j,k-1)*Wlocb))/2._KND
     enddo
    enddo
-  enddo             
+  enddo
   V2=V2-V
  endsubroutine FLUXESV
- 
+
  subroutine FLUXESW(W2,U,V,W)
  real(KND),dimension(-2:,-2:,-2:):: W2,U,V,W
  real(KND) Uloce,Ulocw,Vlocn,Vlocs
@@ -83,12 +83,12 @@ module LAXFRIED
                -(dt/dzmin)*((W(i,j,k+1)*W(i,j,k+1))-(W(i,j,k-1)*W(i,j,k-1)))/2._KND
     enddo
    enddo
-  enddo             
+  enddo
   W2=W2-W
  endsubroutine FLUXESW
 
 
   !!!!Jsou ted spravne indexy hran a objemu????
- 
+
 
 end module LAXFRIED

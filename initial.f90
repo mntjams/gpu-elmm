@@ -792,9 +792,9 @@ contains
   endif
   if (buoyancy==1.or.computescalars>0) TDiff=1._KND/(Re*Prandtl)
 
-  call Bound_CondU(U)
-  call Bound_CondV(V)
-  call Bound_CondW(W)
+  call BoundU(1,U)
+  call BoundU(2,V)
+  call BoundU(3,W)
   call Bound_Pr(Pr)
 
  else
@@ -1108,9 +1108,9 @@ contains
  if (Re>0) then
   if (buoyancy==1.or.computescalars>0) TDiff=1._KND/(Re*Prandtl)
 
-  call Bound_CondU(U)
-  call Bound_CondV(V)
-  call Bound_CondW(W)
+  call BoundU(1,U)
+  call BoundU(2,V)
+  call BoundU(3,W)
   call Bound_Pr(Pr)
   call Pr_Correct(U,V,W,Pr,1._KND)
 

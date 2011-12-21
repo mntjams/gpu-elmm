@@ -7,9 +7,7 @@ implicit none
 
   private
   public GridCoords, GridCoordsU, GridCoordsV, GridCoordsW,&
-         Bound_CondU, Bound_CondV, Bound_CondW,&
-         Bound_CondU2, Bound_CondV2, Bound_CondW2,&
-         Bound_Phi, Bound_Pr, Bound_Q,&
+         BoundU, Bound_Phi, Bound_Pr, Bound_Q,&
          ShearInlet, ParInlet, ConstInlet
 
 
@@ -135,13 +133,34 @@ implicit none
   enddo
   end subroutine GridCoordsW
 
-  subroutine BOUND_CONDU(U)
-  real(KND),intent(inout):: U(-2:,-2:,-2:)
-  integer i,j,k,nx,ny,nz
 
-  nx=Unx
-  ny=Uny
-  nz=Unz
+
+  pure subroutine BoundU(component,U,reg)
+  integer,intent(in)           :: component
+  real(KND),intent(inout)      :: U(-2:,-2:,-2:)
+  integer,optional,intent(in) :: reg
+  integer regime,i,j,k,nx,ny,nz
+  integer,parameter :: interm = 2
+
+  if (present(reg)) then
+    regime=reg
+  else
+    regime=0
+  endif
+
+  if (component==1) then
+    nx=Unx
+    ny=Uny
+    nz=Unz
+  elseif (component==2) then
+    nx=Vnx
+    ny=Vny
+    nz=Vnz
+  else
+    nx=Wnx
+    ny=Wny
+    nz=Wnz
+  endif
 
   !!! corners and edges for periodic conditions
   if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
@@ -298,234 +317,363 @@ implicit none
    enddo
   endif
 
-
   if (BtypeW==DIRICHLET) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     U(0,j,k)=Uin(j,k)
-     U(-1,j,k)=Uin(j,k)
-     U(-2,j,k)=Uin(j,k)
-    enddo
-   enddo
-  elseif (BtypeW==NOSLIP) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Solid wall
-     U(0,j,k)=0
-     U(-1,j,k)=-U(1,j,k)
-     U(-2,j,k)=-U(2,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==NEUMANN) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Neumann inlet
-     U(0,j,k)=U(1,j,k)
-     U(-1,j,k)=U(1,j,k)
-     U(-2,j,k)=U(1,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do j=-2,ny+3
-     U(0,j,k)=0
-     U(-1,j,k)=-U(1,j,k)
-     U(-2,j,k)=-U(2,j,k)
-    enddo
-   enddo
+    if (component==1.and.regime/=interm) then
+       do k=-2,nz+3
+        do j=-2,ny+3                       !Dirichlet inlet
+         U(0,j,k)=Uin(j,k)
+         U(-1,j,k)=Uin(j,k)
+         U(-2,j,k)=Uin(j,k)
+        enddo
+       enddo
+    else
+       do k=-2,nz+3
+        do j=-2,ny+3                       !Dirichlet inlet
+         U(0,j,k)=0
+         U(-1,j,k)=0
+         U(-2,j,k)=0
+        enddo
+       enddo
+    endif
+  elseif (BtypeW==NOSLIP.or.(component==1.and.BtypeW==FREESLIP)) then
+    if (component==1) then
+       do k=-2,nz+3
+        do j=-2,ny+3                       !Solid wall
+         U(0,j,k)=0
+         U(-1,j,k)=-U(1,j,k)
+         U(-2,j,k)=-U(2,j,k)
+        enddo
+       enddo
+    else
+       do k=-2,nz+3
+        do j=-2,ny+3                       !Solid wall
+         U(0,j,k)=-U(1,j,k)
+         U(-1,j,k)=-U(2,j,k)
+         U(-2,j,k)=-U(3,j,k)
+        enddo
+       enddo
+    endif
+  elseif (BtypeW==NEUMANN.or.(component/=1.and.BtypeW==FREESLIP)) then
+    if (component==1) then
+       do k=-2,nz+3
+        do j=-2,ny+3                       !Neumann inlet
+         U(0,j,k)=U(1,j,k)
+         U(-1,j,k)=U(1,j,k)
+         U(-2,j,k)=U(1,j,k)
+        enddo
+       enddo
+    else
+       do k=-2,nz+3
+        do j=-2,ny+3                       !Neumann inlet
+         U(0,j,k)=U(1,j,k)
+         U(-1,j,k)=U(1,j,k)
+         U(-2,j,k)=U(1,j,k)
+        enddo
+       enddo
+    endif
   elseif (BtypeW==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do j=-2,ny+3
-     U(0,j,k)=U(nx,j,k)
-     U(-1,j,k)=U(nx-1,j,k)
-     U(-2,j,k)=U(nx-2,j,k)
+    do k=-2,nz+3
+     do j=-2,ny+3
+      U(0,j,k)=U(nx,j,k)
+      U(-1,j,k)=U(nx-1,j,k)
+      U(-2,j,k)=U(nx-2,j,k)
+     enddo
     enddo
-   enddo
-  elseif (BtypeW==TURBULENTINLET) then
-   do k=1,Prnz
-    do j=1,Prny                       !Dirichlet inlet
-     U(0,j,k)=Uin(j,k)
-     U(-1,j,k)=Uin(j,k)
-     U(-2,j,k)=Uin(j,k)
-    enddo
-   enddo
-  elseif (BtypeW==INLETFROMFILE) then
-   do k=1,Prnz
-    do j=1,Prny                       !Dirichlet inlet
-     U(0,j,k)=Uin(j,k)
-     U(-1,j,k)=Uin(j,k)
-     U(-2,j,k)=Uin(j,k)
-    enddo
-   enddo
+  elseif (BtypeW==TURBULENTINLET.or.BtypeW==INLETFROMFILE) then
+    if (regime/=interm) then
+      do k=1,Prnz
+       do j=1,Prny                       !Dirichlet inlet
+        U(0,j,k)=Uin(j,k)
+        U(-1,j,k)=Uin(j,k)
+        U(-2,j,k)=Uin(j,k)
+       enddo
+      enddo
+    else
+      do k=1,Prnz
+       do j=1,Prny                       !Dirichlet inlet
+        U(0,j,k)=0
+        U(-1,j,k)=0
+        U(-2,j,k)=0
+       enddo
+      enddo
+    endif
   endif
 
 
   if (BtypeE==DIRICHLET) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     U(nx+1,j,k)=Uin(j,k)
-     U(nx+2,j,k)=Uin(j,k)
-     U(nx+3,j,k)=Uin(j,k)
+    if (component==1.and.regime/=interm) then
+      do k=-2,nz+3
+       do j=-2,ny+3                       !Dirichlet inlet
+        U(nx+1,j,k)=Uin(j,k)
+        U(nx+2,j,k)=Uin(j,k)
+        U(nx+3,j,k)=Uin(j,k)
+       enddo
+      enddo
+    else
+      do k=-2,nz+3
+       do j=-2,ny+3                       !Dirichlet inlet
+        U(nx+1,j,k)=0
+        U(nx+2,j,k)=0
+        U(nx+3,j,k)=0
+       enddo
+      enddo
+    endif
+  elseif (BtypeE==NOSLIP.or.(component==1.and.BtypeE==FREESLIP)) then
+    if (component==1) then
+      do k=-2,nz+3
+       do j=-2,ny+3                       !Solid wall
+        U(nx+1,j,k)=0
+        U(nx+2,j,k)=-U(nx,j,k)
+        U(nx+3,j,k)=-U(nx-1,j,k)
+       enddo
+      enddo
+    else
+      do k=-2,nz+3
+       do j=-2,ny+3                       !Solid wall
+        U(nx+1,j,k)=-U(nx,j,k)
+        U(nx+2,j,k)=-U(nx-1,j,k)
+        U(nx+3,j,k)=-U(nx-2,j,k)
+       enddo
+      enddo
+    endif
+  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF.or.(component/=1.and.BtypeE==FREESLIP)) then   !Neumann outlet
+    do k=-2,nz+3
+     do j=-2,ny+3
+      U(nx+1,j,k)=U(nx,j,k)
+      U(nx+2,j,k)=U(nx,j,k)
+      U(nx+3,j,k)=U(nx,j,k)
+     enddo
     enddo
-   enddo
-  elseif (BtypeE==NOSLIP) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Solid wall
-     U(nx+1,j,k)=0
-     U(nx+2,j,k)=-U(nx,j,k)
-     U(nx+3,j,k)=-U(nx-1,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF) then   !Neumann outlet
-   do k=-2,nz+3
-    do j=-2,ny+3
-     U(nx+1,j,k)=U(nx,j,k)
-     U(nx+2,j,k)=U(nx,j,k)
-     U(nx+3,j,k)=U(nx,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do j=-2,ny+3
-     U(nx+1,j,k)=0
-     U(nx+2,j,k)=-U(nx,j,k)
-     U(nx+3,j,k)=-U(nx-1,j,k)
-    enddo
-   enddo
   elseif (BtypeE==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do j=-2,ny+3
-     U(nx+1,j,k)=U(1,j,k)
-     U(nx+2,j,k)=U(2,j,k)
-     U(nx+3,j,k)=U(3,j,k)
+    do k=-2,nz+3
+     do j=-2,ny+3
+      U(nx+1,j,k)=U(1,j,k)
+      U(nx+2,j,k)=U(2,j,k)
+      U(nx+3,j,k)=U(3,j,k)
+     enddo
     enddo
-   enddo
   elseif (BtypeE==TURBULENTINLET) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     U(nx+1,j,k)=Uin(j,k)
-     U(nx+2,j,k)=Uin(j,k)
-     U(nx+3,j,k)=Uin(j,k)
-    enddo
-   enddo
+    if (regime/=interm) then
+      do k=-2,nz+3
+       do j=-2,ny+3                       !Dirichlet inlet
+        U(nx+1,j,k)=Uin(j,k)
+        U(nx+2,j,k)=Uin(j,k)
+        U(nx+3,j,k)=Uin(j,k)
+       enddo
+      enddo
+    else
+     do k=-2,nz+3
+       do j=-2,ny+3                       !Dirichlet inlet
+        U(nx+1,j,k)=0
+        U(nx+2,j,k)=0
+        U(nx+3,j,k)=0
+       enddo
+      enddo
+    endif
   endif
 
   if (BtypeS==DIRICHLET) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     U(i,0,k)=SsideU+(SsideU-U(i,1,k))
-     U(i,-1,k)=SsideU+(SsideU-U(i,2,k))
-     U(i,-2,k)=SsideU+(SsideU-U(i,3,k))
+    if (component==1.and.regime/=interm) then
+      do k=-2,nz+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,0,k)=SsideU+(SsideU-U(i,1,k))
+        U(i,-1,k)=SsideU+(SsideU-U(i,2,k))
+        U(i,-2,k)=SsideU+(SsideU-U(i,3,k))
+       enddo
+      enddo
+    elseif (component==2.and.regime/=interm) then
+      do k=-2,nz+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,0,k)=SsideV
+        U(i,-1,k)=SsideV+(SsideV-U(i,1,k))
+        U(i,-2,k)=SsideV+(SsideV-U(i,2,k))
+       enddo
+      enddo
+    else if (component==3.and.regime/=interm) then
+      do k=-2,nz+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,0,k)=SsideW+(SsideW-U(i,1,k))
+        U(i,-1,k)=SsideW+(SsideW-U(i,2,k))
+        U(i,-2,k)=SsideW+(SsideW-U(i,3,k))
+       enddo
+      enddo
+    else
+      do k=-2,nz+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,0,k)=0
+        U(i,-1,k)=0
+        U(i,-2,k)=0
+       enddo
+      enddo
+    endif
+  elseif (BtypeS==NOSLIP.or.(component==2.and.BtypeS==FREESLIP)) then
+    if (component==2) then
+      do k=-2,nz+3
+       do i=-2,nx+3                       !Solid wall
+        U(i,0,k)=0
+        U(i,-1,k)=-U(i,1,k)
+        U(i,-2,k)=-U(i,2,k)
+       enddo
+      enddo
+    else
+      do k=-2,nz+3
+       do i=-2,nx+3                       !Solid wall
+        U(i,0,k)=-U(i,1,k)
+        U(i,-1,k)=-U(i,2,k)
+        U(i,-2,k)=-U(i,3,k)
+       enddo
+      enddo
+    endif
+  elseif (BtypeS==NEUMANN.or.(component/=2.and.BtypeS==FREESLIP)) then
+    do k=-2,nz+3
+     do i=-2,nx+3                       !Neumann inlet
+      U(i,0,k)=U(i,1,k)
+      U(i,-1,k)=U(i,1,k)
+      U(i,-2,k)=U(i,1,k)
+     enddo
     enddo
-   enddo
-  elseif (BtypeS==NOSLIP) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Solid wall
-     U(i,0,k)=-U(i,1,k)
-     U(i,-1,k)=-U(i,2,k)
-     U(i,-2,k)=-U(i,3,k)
-    enddo
-   enddo
-  elseif (BtypeS==NEUMANN) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Neumann inlet
-     U(i,0,k)=U(i,1,k)
-     U(i,-1,k)=U(i,1,k)
-     U(i,-2,k)=U(i,1,k)
-    enddo
-   enddo
-  elseif (BtypeS==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do i=-2,nx+3
-     U(i,0,k)=U(i,1,k)
-     U(i,-1,k)=U(i,1,k)
-     U(i,-2,k)=U(i,1,k)
-    enddo
-   enddo
   elseif (BtypeS==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do i=-2,nx+3
-     U(i,0,k)=U(i,ny,k)
-     U(i,-1,k)=U(i,ny-1,k)
-     U(i,-2,k)=U(i,ny-2,k)
+    do k=-2,nz+3
+     do i=-2,nx+3
+      U(i,0,k)=U(i,ny,k)
+      U(i,-1,k)=U(i,ny-1,k)
+      U(i,-2,k)=U(i,ny-2,k)
+     enddo
     enddo
-   enddo
   endif
 
 
   if (BtypeN==DIRICHLET) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     U(i,ny+1,k)=NsideU+(NsideU-U(i,ny,k))
-     U(i,ny+2,k)=NsideU+(NsideU-U(i,ny-1,k))
-     U(i,ny+3,k)=NsideU+(NsideU-U(i,ny-2,k))
+    if (component==1.and.regime/=interm) then
+      do k=-2,nz+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,ny+1,k)=NsideU+(NsideU-U(i,ny,k))
+        U(i,ny+2,k)=NsideU+(NsideU-U(i,ny-1,k))
+        U(i,ny+3,k)=NsideU+(NsideU-U(i,ny-2,k))
+       enddo
+      enddo
+    elseif (component==2.and.regime/=interm) then
+      do k=-2,nz+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,ny+1,k)=NsideV
+        U(i,ny+2,k)=NsideV+(NsideV-U(i,ny,k))
+        U(i,ny+3,k)=NsideV+(NsideV-U(i,ny-1,k))
+       enddo
+      enddo
+    elseif (component==3.and.regime/=interm) then
+      do k=-2,nz+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,ny+1,k)=NsideW+(NsideW-U(i,ny,k))
+        U(i,ny+2,k)=NsideW+(NsideW-U(i,ny-1,k))
+        U(i,ny+3,k)=NsideW+(NsideW-U(i,ny-2,k))
+       enddo
+      enddo
+    else
+      do k=-2,nz+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,ny+1,k)=0
+        U(i,ny+2,k)=0
+        U(i,ny+3,k)=0
+       enddo
+      enddo
+    endif
+  elseif (BtypeN==NOSLIP.or.(component==2.and.BtypeS==FREESLIP)) then
+    if (component==2) then
+      do k=-2,nz+3
+       do i=-2,nx+3                       !Solid wall
+        U(i,ny+1,k)=0
+        U(i,ny+2,k)=-U(i,ny,k)
+        U(i,ny+3,k)=-U(i,ny-1,k)
+       enddo
+      enddo
+    else
+      do k=-2,nz+3
+       do i=-2,nx+3                       !Solid wall
+        U(i,ny+1,k)=-U(i,ny,k)
+        U(i,ny+2,k)=-U(i,ny-1,k)
+        U(i,ny+3,k)=-U(i,ny-2,k)
+       enddo
+      enddo
+    endif
+  elseif (BtypeN==NEUMANN.or.(component/=2.and.BtypeN==FREESLIP)) then
+    do k=-2,nz+3
+     do i=-2,nx+3                       !Neumann inlet
+      U(i,ny+1,k)=U(i,ny,k)
+      U(i,ny+2,k)=U(i,ny,k)
+      U(i,ny+3,k)=U(i,ny,k)
+     enddo
     enddo
-   enddo
-  elseif (BtypeN==NOSLIP) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Solid wall
-     U(i,ny+1,k)=-U(i,ny,k)
-     U(i,ny+2,k)=-U(i,ny-1,k)
-     U(i,ny+3,k)=-U(i,ny-2,k)
-    enddo
-   enddo
-  elseif (BtypeN==NEUMANN) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Neumann inlet
-     U(i,ny+1,k)=U(i,ny,k)
-     U(i,ny+2,k)=U(i,ny,k)
-     U(i,ny+3,k)=U(i,ny,k)
-    enddo
-   enddo
-  elseif (BtypeN==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do i=-2,nx+3
-     U(i,ny+1,k)=U(i,ny,k)
-     U(i,ny+2,k)=U(i,ny,k)
-     U(i,ny+3,k)=U(i,ny,k)
-    enddo
-   enddo
   elseif (BtypeN==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do i=-2,nx+3
-     U(i,ny+1,k)=U(i,1,k)
-     U(i,ny+2,k)=U(i,2,k)
-     U(i,ny+3,k)=U(i,3,k)
+    do k=-2,nz+3
+     do i=-2,nx+3
+      U(i,ny+1,k)=U(i,1,k)
+      U(i,ny+2,k)=U(i,2,k)
+      U(i,ny+3,k)=U(i,3,k)
+     enddo
     enddo
-   enddo
   endif
 
 
   if (BtypeB==DIRICHLET) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     U(i,j,0)=BsideU+(BsideU-U(i,j,1))
-     U(i,j,-1)=BsideU+(BsideU-U(i,j,2))
-     U(i,j,-2)=BsideU+(BsideU-U(i,j,3))
+    if (component==1.and.regime/=interm) then
+      do j=-2,ny+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,j,0)=BsideU+(BsideU-U(i,j,1))
+        U(i,j,-1)=BsideU+(BsideU-U(i,j,2))
+        U(i,j,-2)=BsideU+(BsideU-U(i,j,3))
+       enddo
+      enddo
+    elseif (component==2.and.regime/=interm) then
+      do j=-2,ny+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,j,0)=BsideV+(BsideV-U(i,j,1))
+        U(i,j,-1)=BsideV+(BsideV-U(i,j,2))
+        U(i,j,-2)=BsideV+(BsideV-U(i,j,3))
+       enddo
+      enddo
+    elseif (component==3.and.regime/=interm) then
+      do j=-2,ny+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,j,0)=BsideW
+        U(i,j,-1)=BsideW+(BsideW-U(i,j,1))
+        U(i,j,-2)=BsideW+(BsideW-U(i,j,2))
+       enddo
+      enddo
+    else
+      do j=-2,ny+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,j,0)=0
+        U(i,j,-1)=0
+        U(i,j,-2)=0
+       enddo
+      enddo
+    endif
+  elseif (BtypeB==NOSLIP.or.(component==3.and.BtypeB==FREESLIP)) then
+    if (component==3) then
+      do j=-2,ny+3
+       do i=-2,nx+3                       !Solid wall
+        U(i,j,0)=0
+        U(i,j,-1)=-U(i,j,1)
+        U(i,j,-2)=-U(i,j,2)
+       enddo
+      enddo
+    else
+      do j=-2,ny+3
+       do i=-2,nx+3                       !Solid wall
+        U(i,j,0)=-U(i,j,1)
+        U(i,j,-1)=-U(i,j,2)
+        U(i,j,-2)=-U(i,j,3)
+       enddo
+      enddo
+    endif
+  elseif (BtypeB==NEUMANN.or.(component/=3.and.BtypeB==FREESLIP)) then
+    do j=-2,ny+3
+     do i=-2,nx+3                       !Neumann inlet
+      U(i,j,0)=U(i,j,1)
+      U(i,j,-1)=U(i,j,1)
+      U(i,j,-2)=U(i,j,1)
+     enddo
     enddo
-   enddo
-  elseif (BtypeB==NOSLIP) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Solid wall
-     U(i,j,0)=-U(i,j,1)
-     U(i,j,-1)=-U(i,j,2)
-     U(i,j,-2)=-U(i,j,3)
-    enddo
-   enddo
-  elseif (BtypeB==NEUMANN) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Neumann inlet
-     U(i,j,0)=U(i,j,1)
-     U(i,j,-1)=U(i,j,1)
-     U(i,j,-2)=U(i,j,1)
-    enddo
-   enddo
-  elseif (BtypeB==FREESLIP) then  !FREESLIP
-   do j=-2,ny+3
-    do i=-2,nx+3
-     U(i,j,0)=U(i,j,1)
-     U(i,j,-1)=U(i,j,1)
-     U(i,j,-2)=U(i,j,1)
-    enddo
-   enddo
   elseif (BtypeB==PERIODIC) then  !Periodic BC
    do j=-2,ny+3
     do i=-2,nx+3
@@ -537,37 +685,65 @@ implicit none
   endif
 
   if (BtypeT==DIRICHLET) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     U(i,j,nz+1)=TsideU+(TsideU-U(i,j,nz))
-     U(i,j,nz+2)=TsideU+(TsideU-U(i,j,nz-1))
-     U(i,j,nz+3)=TsideU+(TsideU-U(i,j,nz-2))
+    if (component==1.and.regime/=interm) then
+      do j=-2,ny+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,j,nz+1)=TsideU+(TsideU-U(i,j,nz))
+        U(i,j,nz+2)=TsideU+(TsideU-U(i,j,nz-1))
+        U(i,j,nz+3)=TsideU+(TsideU-U(i,j,nz-2))
+       enddo
+      enddo
+    elseif (component==2.and.regime/=interm) then
+      do j=-2,ny+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,j,nz+1)=TsideV+(TsideV-U(i,j,nz))
+        U(i,j,nz+2)=TsideV+(TsideV-U(i,j,nz-1))
+        U(i,j,nz+3)=TsideV+(TsideV-U(i,j,nz-2))
+       enddo
+      enddo
+    elseif (component==3.and.regime/=interm) then
+      do j=-2,ny+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,j,nz+1)=TsideW
+        U(i,j,nz+2)=TsideW+(TsideW-U(i,j,nz))
+        U(i,j,nz+3)=TsideW+(TsideW-U(i,j,nz-1))
+       enddo
+      enddo
+    else
+      do j=-2,ny+3
+       do i=-2,nx+3                       !Dirichlet inlet
+        U(i,j,nz+1)=0
+        U(i,j,nz+2)=0
+        U(i,j,nz+3)=0
+       enddo
+      enddo
+    endif
+  elseif (BtypeT==NOSLIP.or.(component==3.and.(BtypeT==FREESLIP.or.BtypeT==FREESLIPBUFF))) then
+    if (component==3) then
+      do j=-2,ny+3
+       do i=-2,nx+3                       !Solid wall
+        U(i,j,nz+1)=0
+        U(i,j,nz+2)=-U(i,j,nz)
+        U(i,j,nz+3)=-U(i,j,nz-1)
+       enddo
+      enddo
+    else
+      do j=-2,ny+3
+       do i=-2,nx+3                       !Solid wall
+        U(i,j,nz+1)=-U(i,j,nz)
+        U(i,j,nz+2)=-U(i,j,nz-1)
+        U(i,j,nz+3)=-U(i,j,nz-2)
+       enddo
+      enddo
+    endif
+  elseif (BtypeT==NEUMANN.or.(component/=3.and.(BtypeT==FREESLIP.or.BtypeT==FREESLIPBUFF))) then
+    do j=-2,ny+3
+     do i=-2,nx+3                       !Neumann inlet
+      U(i,j,nz+1)=U(i,j,nz)
+      U(i,j,nz+2)=U(i,j,nz)
+      U(i,j,nz+3)=U(i,j,nz)
+     enddo
     enddo
-   enddo
-  elseif (BtypeT==NOSLIP) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Solid wall
-     U(i,j,nz+1)=-U(i,j,nz)
-     U(i,j,nz+2)=-U(i,j,nz-1)
-     U(i,j,nz+3)=-U(i,j,nz-2)
-    enddo
-   enddo
-  elseif (BtypeT==NEUMANN) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Neumann inlet
-     U(i,j,nz+1)=U(i,j,nz)
-     U(i,j,nz+2)=U(i,j,nz)
-     U(i,j,nz+3)=U(i,j,nz)
-    enddo
-   enddo
-  elseif (BtypeT==FREESLIPBUFF.or.BtypeT==FREESLIP) then  !FREESLIP
-   do j=-2,ny+3
-    do i=-2,nx+3
-     U(i,j,nz+1)=U(i,j,nz)
-     U(i,j,nz+2)=U(i,j,nz)
-     U(i,j,nz+3)=U(i,j,nz)
-    enddo
-   enddo
   elseif (BtypeT==PERIODIC) then  !Periodic BC
    do j=-2,ny+3
     do i=-2,nx+3
@@ -578,2151 +754,14 @@ implicit none
    enddo
   endif
 
-  end subroutine BOUND_CONDU
+  end subroutine BoundU
 
 
 
 
 
 
-  pure subroutine BOUND_CONDV(V)
-  real(KND),intent(inout):: V(-2:,-2:,-2:)
-  integer i,j,k,nx,ny,nz
 
-  nx=Vnx
-  ny=Vny
-  nz=Vnz
-
-  !!! corners and edges for periodic conditions
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC) then
-   do k=1,nz
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j-ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=-2,0
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j+ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=ny+1,ny+3
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j-ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=-2,0
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j+ny,k)
-     enddo
-    enddo
-   enddo
-   endif
-
-  if (BtypeE==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=1,ny
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=1,ny
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=1,ny
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=1,ny
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-  if (BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=1,nx
-      V(i,j,k)=V(i,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=1,nx
-      V(i,j,k)=V(i,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=1,nx
-      V(i,j,k)=V(i,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=1,nx
-      V(i,j,k)=V(i,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-
-  if (BtypeW==DIRICHLET) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     V(0,j,k)=0
-     V(-1,j,k)=0
-     V(-2,j,k)=0
-    enddo
-   enddo
-  elseif (BtypeW==NOSLIP) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Solid wall
-     V(0,j,k)=-V(1,j,k)
-     V(-1,j,k)=-V(2,j,k)
-     V(-2,j,k)=-V(3,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==NEUMANN) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Neumann inlet
-     V(0,j,k)=V(1,j,k)
-     V(-1,j,k)=V(1,j,k)
-     V(-2,j,k)=V(1,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do j=-2,ny+3
-     V(0,j,k)=V(1,j,k)
-     V(-1,j,k)=V(1,j,k)
-     V(-2,j,k)=V(1,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do j=-2,ny+3
-     V(0,j,k)=V(nx,j,k)
-     V(-1,j,k)=V(nx-1,j,k)
-     V(-2,j,k)=V(nx-2,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==TURBULENTINLET) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     V(0,j,k)=Vin(j,k)
-     V(-1,j,k)=Vin(j,k)
-     V(-2,j,k)=Vin(j,k)
-    enddo
-   enddo
-  elseif (BtypeW==INLETFROMFILE) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     V(0,j,k)=Vin(j,k)
-     V(-1,j,k)=Vin(j,k)
-     V(-2,j,k)=Vin(j,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeE==DIRICHLET) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     V(nx+1,j,k)=0
-     V(nx+2,j,k)=0
-     V(nx+3,j,k)=0
-    enddo
-   enddo
-  elseif (BtypeE==NOSLIP) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Solid wall
-     V(nx+1,j,k)=-V(nx,j,k)
-     V(nx+2,j,k)=-V(nx-1,j,k)
-     V(nx+3,j,k)=-V(nx-2,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Neumann inlet
-     V(nx+1,j,k)=V(nx,j,k)
-     V(nx+2,j,k)=V(nx,j,k)
-     V(nx+3,j,k)=V(nx,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do j=-2,ny+3
-     V(nx+1,j,k)=V(nx,j,k)
-     V(nx+2,j,k)=V(nx,j,k)
-     V(nx+3,j,k)=V(nx,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do j=-2,ny+3
-     V(nx+1,j,k)=V(1,j,k)
-     V(nx+2,j,k)=V(2,j,k)
-     V(nx+3,j,k)=V(3,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==TURBULENTINLET) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     V(nx+1,j,k)=Vin(j,k)
-     V(nx+2,j,k)=Vin(j,k)
-     V(nx+3,j,k)=Vin(j,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeS==DIRICHLET) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     V(i,0,k)=SsideV
-     V(i,-1,k)=SsideV+(SsideV-V(i,1,k))
-     V(i,-2,k)=SsideV+(SsideV-V(i,2,k))
-    enddo
-   enddo
-  elseif (BtypeS==NOSLIP) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Solid wall
-     V(i,0,k)=0
-     V(i,-1,k)=-V(i,1,k)
-     V(i,-2,k)=-V(i,2,k)
-    enddo
-   enddo
-  elseif (BtypeS==NEUMANN) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Neumann inlet
-     V(i,0,k)=V(i,1,k)
-     V(i,-1,k)=V(i,1,k)
-     V(i,-2,k)=V(i,1,k)
-    enddo
-   enddo
-  elseif (BtypeS==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do i=-2,nx+3
-     V(i,0,k)=0
-     V(i,-1,k)=-V(i,1,k)
-     V(i,-2,k)=-V(i,2,k)
-    enddo
-   enddo
-  elseif (BtypeS==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do i=-2,nx+3
-     V(i,0,k)=V(i,ny,k)
-     V(i,-1,k)=V(i,ny-1,k)
-     V(i,-2,k)=V(i,ny-2,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeN==DIRICHLET) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     V(i,ny+1,k)=NsideV
-     V(i,ny+2,k)=NsideV+(NsideV-V(i,ny,k))
-     V(i,ny+3,k)=NsideV+(NsideV-V(i,ny-1,k))
-    enddo
-   enddo
-  elseif (BtypeN==NOSLIP) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Solid wall
-     V(i,ny+1,k)=0
-     V(i,ny+2,k)=-V(i,ny,k)
-     V(i,ny+3,k)=-V(i,ny-1,k)
-    enddo
-   enddo
-  elseif (BtypeN==NEUMANN) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Neumann inlet
-     V(i,ny+1,k)=V(i,ny,k)
-     V(i,ny+2,k)=V(i,ny,k)
-     V(i,ny+3,k)=V(i,ny,k)
-    enddo
-   enddo
-  elseif (BtypeN==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do i=-2,nx+3
-     V(i,ny+1,k)=0
-     V(i,ny+2,k)=-V(i,ny,k)
-     V(i,ny+3,k)=-V(i,ny-1,k)
-    enddo
-   enddo
-  elseif (BtypeN==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do i=-2,nx+3
-     V(i,ny+1,k)=V(i,1,k)
-     V(i,ny+2,k)=V(i,2,k)
-     V(i,ny+3,k)=V(i,3,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeB==DIRICHLET) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     V(i,j,0)=BsideV+(BsideV-V(i,j,1))
-     V(i,j,-1)=BsideV+(BsideV-V(i,j,2))
-     V(i,j,-2)=BsideV+(BsideV-V(i,j,3))
-    enddo
-   enddo
-  elseif (BtypeB==NOSLIP) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Solid wall
-     V(i,j,0)=-V(i,j,1)
-     V(i,j,-1)=-V(i,j,2)
-     V(i,j,-2)=-V(i,j,3)
-    enddo
-   enddo
-  elseif (BtypeB==NEUMANN) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Neumann inlet
-     V(i,j,0)=V(i,j,1)
-     V(i,j,-1)=V(i,j,1)
-     V(i,j,-2)=V(i,j,1)
-    enddo
-   enddo
-  elseif (BtypeB==FREESLIP) then  !FREESLIP
-   do j=-2,ny+3
-    do i=-2,nx+3
-     V(i,j,0)=V(i,j,1)
-     V(i,j,-1)=V(i,j,1)
-     V(i,j,-2)=V(i,j,1)
-    enddo
-   enddo
-  elseif (BtypeB==PERIODIC) then  !Periodic BC
-   do j=-2,ny+3
-    do i=-2,nx+3
-     V(i,j,0)=V(i,j,nz)
-     V(i,j,-1)=V(i,j,nz-1)
-     V(i,j,-2)=V(i,j,nz-2)
-    enddo
-   enddo
-  endif
-
-  if (BtypeT==DIRICHLET) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     V(i,j,nz+1)=TsideV+(TsideV-V(i,j,nz))
-     V(i,j,nz+2)=TsideV+(TsideV-V(i,j,nz-1))
-     V(i,j,nz+3)=TsideV+(TsideV-V(i,j,nz-2))
-    enddo
-   enddo
-  elseif (BtypeT==NOSLIP) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Solid wall
-     V(i,j,nz+1)=-V(i,j,nz)
-     V(i,j,nz+2)=-V(i,j,nz-1)
-     V(i,j,nz+3)=-V(i,j,nz-2)
-    enddo
-   enddo
-  elseif (BtypeT==NEUMANN) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Neumann inlet
-     V(i,j,nz+1)=V(i,j,nz)
-     V(i,j,nz+2)=V(i,j,nz)
-     V(i,j,nz+3)=V(i,j,nz)
-    enddo
-   enddo
-  elseif (BtypeT==FREESLIPBUFF.or.BtypeT==FREESLIP) then  !FREESLIP
-   do j=-2,ny+3
-    do i=-2,nx+3
-     V(i,j,nz+1)=V(i,j,nz)
-     V(i,j,nz+2)=V(i,j,nz)
-     V(i,j,nz+3)=V(i,j,nz)
-    enddo
-   enddo
-  elseif (BtypeT==PERIODIC) then  !Periodic BC
-   do j=-2,ny+3
-    do i=-2,nx+3
-     V(i,j,nz+1)=V(i,j,1)
-     V(i,j,nz+2)=V(i,j,2)
-     V(i,j,nz+3)=V(i,j,3)
-    enddo
-   enddo
-  endif
-  end subroutine BOUND_CONDV
-
-
-
-
-
-
-
-  pure subroutine BOUND_CONDW(W)
-  real(KND),intent(inout):: W(-2:,-2:,-2:)
-  integer i,j,k,nx,ny,nz
-
-  nx=Wnx
-  ny=Wny
-  nz=Wnz
-
-  !!! corners and edges for periodic conditions
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC) then
-   do k=1,nz
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j-ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=-2,0
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j+ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=ny+1,ny+3
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j-ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=-2,0
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j+ny,k)
-     enddo
-    enddo
-   enddo
-   endif
-
-  if (BtypeE==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=1,ny
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=1,ny
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=1,ny
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=1,ny
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-  if (BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=1,nx
-      W(i,j,k)=W(i,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=1,nx
-      W(i,j,k)=W(i,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=1,nx
-      W(i,j,k)=W(i,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=1,nx
-      W(i,j,k)=W(i,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-
-  if (BtypeW==DIRICHLET) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     W(0,j,k)=0
-     W(-1,j,k)=0
-     W(-2,j,k)=0
-    enddo
-   enddo
-  elseif (BtypeW==NOSLIP) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Solid wall
-     W(0,j,k)=-W(1,j,k)
-     W(-1,j,k)=-W(2,j,k)
-     W(-2,j,k)=-W(3,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==NEUMANN) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Neumann inlet
-     W(0,j,k)=W(1,j,k)
-     W(-1,j,k)=W(1,j,k)
-     W(-2,j,k)=W(1,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do j=-2,ny+3
-     W(0,j,k)=W(1,j,k)
-     W(-1,j,k)=W(1,j,k)
-     W(-2,j,k)=W(1,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do j=-2,ny+3
-     W(0,j,k)=W(nx,j,k)
-     W(-1,j,k)=W(nx-1,j,k)
-     W(-2,j,k)=W(nx-2,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==TURBULENTINLET) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     W(0,j,k)=Win(j,k)
-     W(-1,j,k)=Win(j,k)
-     W(-2,j,k)=Win(j,k)
-    enddo
-   enddo
-  elseif (BtypeW==INLETFROMFILE) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     W(0,j,k)=Win(j,k)
-     W(-1,j,k)=Win(j,k)
-     W(-2,j,k)=Win(j,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeE==DIRICHLET) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     W(nx+1,j,k)=0
-     W(nx+2,j,k)=0
-     W(nx+3,j,k)=0
-    enddo
-   enddo
-  elseif (BtypeE==NOSLIP) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Solid wall
-     W(nx+1,j,k)=-W(nx,j,k)
-     W(nx+2,j,k)=-W(nx-1,j,k)
-     W(nx+3,j,k)=-W(nx-2,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Neumann inlet
-     W(nx+1,j,k)=W(nx,j,k)
-     W(nx+2,j,k)=W(nx,j,k)
-     W(nx+3,j,k)=W(nx,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do j=-2,ny+3
-     W(nx+1,j,k)=W(nx,j,k)
-     W(nx+2,j,k)=W(nx,j,k)
-     W(nx+3,j,k)=W(nx,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do j=-2,ny+3
-     W(nx+1,j,k)=W(1,j,k)
-     W(nx+2,j,k)=W(2,j,k)
-     W(nx+3,j,k)=W(3,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==TURBULENTINLET) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     W(nx+1,j,k)=Win(j,k)
-     W(nx+2,j,k)=Win(j,k)
-     W(nx+3,j,k)=Win(j,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeS==DIRICHLET) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     W(i,0,k)=SsideW+(SsideW-W(i,1,k))
-     W(i,-1,k)=SsideW+(SsideW-W(i,2,k))
-     W(i,-2,k)=SsideW+(SsideW-W(i,3,k))
-    enddo
-   enddo
-  elseif (BtypeS==NOSLIP) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Solid wall
-     W(i,0,k)=-W(i,1,k)
-     W(i,-1,k)=-W(i,2,k)
-     W(i,-2,k)=-W(i,3,k)
-    enddo
-   enddo
-  elseif (BtypeS==NEUMANN) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Neumann inlet
-     W(i,0,k)=W(i,1,k)
-     W(i,-1,k)=W(i,1,k)
-     W(i,-2,k)=W(i,1,k)
-    enddo
-   enddo
-  elseif (BtypeS==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do i=-2,nx+3
-     W(i,0,k)=W(i,1,k)
-     W(i,-1,k)=W(i,1,k)
-     W(i,-2,k)=W(i,1,k)
-    enddo
-   enddo
-  elseif (BtypeS==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do i=-2,nx+3
-     W(i,0,k)=W(i,ny,k)
-     W(i,-1,k)=W(i,ny-1,k)
-     W(i,-2,k)=W(i,ny-2,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeN==DIRICHLET) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     W(i,ny+1,k)=NsideW+(NsideW-W(i,ny,k))
-     W(i,ny+2,k)=NsideW+(NsideW-W(i,ny-1,k))
-     W(i,ny+3,k)=NsideW+(NsideW-W(i,ny-2,k))
-    enddo
-   enddo
-  elseif (BtypeN==NOSLIP) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Solid wall
-     W(i,ny+1,k)=-W(i,ny,k)
-     W(i,ny+2,k)=-W(i,ny-1,k)
-     W(i,ny+3,k)=-W(i,ny-2,k)
-    enddo
-   enddo
-  elseif (BtypeN==NEUMANN) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Neumann inlet
-     W(i,ny+1,k)=W(i,ny,k)
-     W(i,ny+2,k)=W(i,ny,k)
-     W(i,ny+3,k)=W(i,ny,k)
-    enddo
-   enddo
-  elseif (BtypeN==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do i=-2,nx+3
-     W(i,ny+1,k)=W(i,ny,k)
-     W(i,ny+2,k)=W(i,ny,k)
-     W(i,ny+3,k)=W(i,ny,k)
-    enddo
-   enddo
-  elseif (BtypeN==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do i=-2,nx+3
-     W(i,ny+1,k)=W(i,1,k)
-     W(i,ny+2,k)=W(i,2,k)
-     W(i,ny+3,k)=W(i,3,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeB==DIRICHLET) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     W(i,j,0)=BsideW
-     W(i,j,-1)=BsideW+(BsideW-W(i,j,1))
-     W(i,j,-2)=BsideW+(BsideW-W(i,j,2))
-    enddo
-   enddo
-  elseif (BtypeB==NOSLIP) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Solid wall
-     W(i,j,0)=0
-     W(i,j,-1)=-W(i,j,1)
-     W(i,j,-2)=-W(i,j,2)
-    enddo
-   enddo
-  elseif (BtypeB==NEUMANN) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Neumann inlet
-     W(i,j,0)=W(i,j,1)
-     W(i,j,-1)=W(i,j,1)
-     W(i,j,-2)=W(i,j,1)
-    enddo
-   enddo
-  elseif (BtypeB==FREESLIP) then  !FREESLIP
-   do j=-2,ny+3
-    do i=-2,nx+3
-     W(i,j,0)=0
-     W(i,j,-1)=-W(i,j,1)
-     W(i,j,-2)=-W(i,j,2)
-    enddo
-   enddo
-  elseif (BtypeB==PERIODIC) then  !Periodic BC
-   do j=-2,ny+3
-    do i=-2,nx+3
-     W(i,j,0)=W(i,j,nz)
-     W(i,j,-1)=W(i,j,nz-1)
-     W(i,j,-2)=W(i,j,nz-2)
-    enddo
-   enddo
-  endif
-
-  if (BtypeT==DIRICHLET) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     W(i,j,nz+1)=TsideW
-     W(i,j,nz+2)=TsideW+(TsideW-W(i,j,nz))
-     W(i,j,nz+3)=TsideW+(TsideW-W(i,j,nz-1))
-    enddo
-   enddo
-  elseif (BtypeT==NOSLIP) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Solid wall
-     W(i,j,nz+1)=0
-     W(i,j,nz+2)=-W(i,j,nz)
-     W(i,j,nz+3)=-W(i,j,nz-1)
-    enddo
-   enddo
-  elseif (BtypeT==NEUMANN) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Neumann inlet
-     W(i,j,nz+1)=W(i,j,nz)
-     W(i,j,nz+2)=W(i,j,nz)
-     W(i,j,nz+3)=W(i,j,nz)
-    enddo
-   enddo
-  elseif (BtypeT==FREESLIPBUFF.or.BtypeT==FREESLIP) then  !FREESLIP
-   do j=-2,ny+3
-    do i=-2,nx+3
-     W(i,j,nz+1)=0
-     W(i,j,nz+2)=-W(i,j,nz)
-     W(i,j,nz+3)=-W(i,j,nz-1)
-    enddo
-   enddo
-  elseif (BtypeT==PERIODIC) then  !Periodic BC
-   do j=-2,ny+3
-    do i=-2,nx+3
-     W(i,j,nz+1)=W(i,j,1)
-     W(i,j,nz+2)=W(i,j,2)
-     W(i,j,nz+3)=W(i,j,3)
-    enddo
-   enddo
-  endif
-  end subroutine BOUND_CONDW
-
-
-
-
-
-  pure subroutine BOUND_CONDU2(U)
-  real(KND),intent(inout):: U(-2:,-2:,-2:)
-  integer i,j,k,nx,ny,nz
-
-  nx=Unx
-  ny=Uny
-  nz=Unz
-
-  !!! corners and edges for periodic conditions
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      U(i,j,k)=U(i-nx,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      U(i,j,k)=U(i-nx,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=nx+1,nx+3
-      U(i,j,k)=U(i-nx,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=-2,0
-      U(i,j,k)=U(i+nx,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=nx+1,nx+3
-      U(i,j,k)=U(i-nx,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=-2,0
-      U(i,j,k)=U(i+nx,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=-2,0
-      U(i,j,k)=U(i+nx,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=-2,0
-      U(i,j,k)=U(i+nx,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC) then
-   do k=1,nz
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      U(i,j,k)=U(i-nx,j-ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=-2,0
-     do i=nx+1,nx+3
-      U(i,j,k)=U(i-nx,j+ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=ny+1,ny+3
-     do i=-2,0
-      U(i,j,k)=U(i+nx,j-ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=-2,0
-     do i=-2,0
-      U(i,j,k)=U(i+nx,j+ny,k)
-     enddo
-    enddo
-   enddo
-   endif
-
-  if (BtypeE==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=1,ny
-     do i=nx+1,nx+3
-      U(i,j,k)=U(i-nx,j,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=1,ny
-     do i=nx+1,nx+3
-      U(i,j,k)=U(i-nx,j,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=1,ny
-     do i=-2,0
-      U(i,j,k)=U(i+nx,j,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=1,ny
-     do i=-2,0
-      U(i,j,k)=U(i+nx,j,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-  if (BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=1,nx
-      U(i,j,k)=U(i,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=1,nx
-      U(i,j,k)=U(i,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=1,nx
-      U(i,j,k)=U(i,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=1,nx
-      U(i,j,k)=U(i,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-
-  if (BtypeS==DIRICHLET) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     U(i,0,k)=-U(i,1,k)
-     U(i,-1,k)=-U(i,2,k)
-     U(i,-2,k)=-U(i,3,k)
-    enddo
-   enddo
-  elseif (BtypeS==NOSLIP) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Solid wall
-     U(i,0,k)=-U(i,1,k)
-     U(i,-1,k)=-U(i,2,k)
-     U(i,-2,k)=-U(i,3,k)
-    enddo
-   enddo
-  elseif (BtypeS==NEUMANN) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Neumann inlet
-     U(i,0,k)=U(i,1,k)
-     U(i,-1,k)=U(i,1,k)
-     U(i,-2,k)=U(i,1,k)
-    enddo
-   enddo
-  elseif (BtypeS==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do i=-2,nx+3
-     U(i,0,k)=U(i,1,k)
-     U(i,-1,k)=U(i,1,k)
-     U(i,-2,k)=U(i,1,k)
-    enddo
-   enddo
-  elseif (BtypeS==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do i=-2,nx+3
-     U(i,0,k)=U(i,ny,k)
-     U(i,-1,k)=U(i,ny-1,k)
-     U(i,-2,k)=U(i,ny-2,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeN==DIRICHLET) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     U(i,ny+1,k)=-U(i,ny,k)
-     U(i,ny+2,k)=-U(i,ny-1,k)
-     U(i,ny+3,k)=-U(i,ny-2,k)
-    enddo
-   enddo
-  elseif (BtypeN==NOSLIP) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Solid wall
-     U(i,ny+1,k)=-U(i,ny,k)
-     U(i,ny+2,k)=-U(i,ny-1,k)
-     U(i,ny+3,k)=-U(i,ny-2,k)
-    enddo
-   enddo
-  elseif (BtypeN==NEUMANN) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Neumann inlet
-     U(i,ny+1,k)=U(i,ny,k)
-     U(i,ny+2,k)=U(i,ny,k)
-     U(i,ny+3,k)=U(i,ny,k)
-    enddo
-   enddo
-  elseif (BtypeN==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do i=-2,nx+3
-     U(i,ny+1,k)=U(i,ny,k)
-     U(i,ny+2,k)=U(i,ny,k)
-     U(i,ny+3,k)=U(i,ny,k)
-    enddo
-   enddo
-  elseif (BtypeN==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do i=-2,nx+3
-     U(i,ny+1,k)=U(i,1,k)
-     U(i,ny+2,k)=U(i,2,k)
-     U(i,ny+3,k)=U(i,3,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeB==DIRICHLET) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     U(i,j,0)=-U(i,j,1)
-     U(i,j,-1)=-U(i,j,2)
-     U(i,j,-2)=-U(i,j,3)
-    enddo
-   enddo
-  elseif (BtypeB==NOSLIP) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Solid wall
-     U(i,j,0)=-U(i,j,1)
-     U(i,j,-1)=-U(i,j,2)
-     U(i,j,-2)=-U(i,j,3)
-    enddo
-   enddo
-  elseif (BtypeB==NEUMANN) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Neumann inlet
-     U(i,j,0)=U(i,j,1)
-     U(i,j,-1)=U(i,j,1)
-     U(i,j,-2)=U(i,j,1)
-    enddo
-   enddo
-  elseif (BtypeB==FREESLIP) then  !FREESLIP
-   do j=-2,ny+3
-    do i=-2,nx+3
-     U(i,j,0)=U(i,j,1)
-     U(i,j,-1)=U(i,j,1)
-     U(i,j,-2)=U(i,j,1)
-    enddo
-   enddo
-  elseif (BtypeB==PERIODIC) then  !Periodic BC
-   do j=-2,ny+3
-    do i=-2,nx+3
-     U(i,j,0)=U(i,j,nz)
-     U(i,j,-1)=U(i,j,nz-1)
-     U(i,j,-2)=U(i,j,nz-2)
-    enddo
-   enddo
-  endif
-
-  if (BtypeT==DIRICHLET) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     U(i,j,nz+1)=-U(i,j,nz)
-     U(i,j,nz+2)=-U(i,j,nz-1)
-     U(i,j,nz+3)=-U(i,j,nz-2)
-    enddo
-   enddo
-  elseif (BtypeT==NOSLIP) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Solid wall
-     U(i,j,nz+1)=-U(i,j,nz)
-     U(i,j,nz+2)=-U(i,j,nz-1)
-     U(i,j,nz+3)=-U(i,j,nz-2)
-    enddo
-   enddo
-  elseif (BtypeT==NEUMANN) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Neumann inlet
-     U(i,j,nz+1)=U(i,j,nz)
-     U(i,j,nz+2)=U(i,j,nz)
-     U(i,j,nz+3)=U(i,j,nz)
-    enddo
-   enddo
-  elseif (BtypeT==FREESLIPBUFF.or.BtypeT==FREESLIP) then  !FREESLIP
-   do j=-2,ny+3
-    do i=-2,nx+3
-     U(i,j,nz+1)=U(i,j,nz)
-     U(i,j,nz+2)=U(i,j,nz)
-     U(i,j,nz+3)=U(i,j,nz)
-    enddo
-   enddo
-  elseif (BtypeT==PERIODIC) then  !Periodic BC
-   do j=-2,ny+3
-    do i=-2,nx+3
-     U(i,j,nz+1)=U(i,j,1)
-     U(i,j,nz+2)=U(i,j,2)
-     U(i,j,nz+3)=U(i,j,3)
-    enddo
-   enddo
-  endif
-
-  if ((BtypeW==DIRICHLET).or.(BtypeW==TURBULENTINLET).or.(BtypeW==INLETFROMFILE)) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     U(0,j,k)=0
-     U(-1,j,k)=0
-     U(-2,j,k)=0
-    enddo
-   enddo
-  elseif (BtypeW==NOSLIP) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Solid wall
-     U(0,j,k)=0
-     U(-1,j,k)=-U(1,j,k)
-     U(-2,j,k)=-U(2,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==NEUMANN) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Neumann inlet
-     U(0,j,k)=U(1,j,k)
-     U(-1,j,k)=U(1,j,k)
-     U(-2,j,k)=U(1,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do j=-2,ny+3
-     U(0,j,k)=0
-     U(-1,j,k)=-U(1,j,k)
-     U(-2,j,k)=-U(2,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do j=-2,ny+3
-     U(0,j,k)=U(nx,j,k)
-     U(-1,j,k)=U(nx-1,j,k)
-     U(-2,j,k)=U(nx-2,j,k)
-    enddo
-   enddo
-  endif
-
-  if ((BtypeE==DIRICHLET).or.(BtypeE==TURBULENTINLET)) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     U(nx+1,j,k)=0
-     U(nx+2,j,k)=0
-     U(nx+3,j,k)=0
-    enddo
-   enddo
-  elseif (BtypeE==NOSLIP) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Solid wall
-     U(nx+1,j,k)=0
-     U(nx+2,j,k)=-U(nx,j,k)
-     U(nx+3,j,k)=-U(nx-1,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF) then   !Neumann outlet
-
-   do k=-2,nz+3
-    do j=-2,ny+3
-     U(nx+1,j,k)=U(nx,j,k)
-     U(nx+2,j,k)=U(nx,j,k)
-     U(nx+3,j,k)=U(nx,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do j=-2,ny+3
-     U(nx+1,j,k)=0
-     U(nx+2,j,k)=-U(nx,j,k)
-     U(nx+3,j,k)=-U(nx-1,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do j=-2,ny+3
-     U(nx+1,j,k)=U(1,j,k)
-     U(nx+2,j,k)=U(2,j,k)
-     U(nx+3,j,k)=U(3,j,k)
-    enddo
-   enddo
-  endif
-
-  end subroutine BOUND_CONDU2
-
-
-  pure subroutine BOUND_CONDV2(V)
-  real(KND),intent(inout):: V(-2:,-2:,-2:)
-  integer i,j,k,nx,ny,nz
-
-  nx=Vnx
-  ny=Vny
-  nz=Vnz
-
-  !!! corners and edges for periodic conditions
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC) then
-   do k=1,nz
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j-ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=-2,0
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j+ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=ny+1,ny+3
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j-ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=-2,0
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j+ny,k)
-     enddo
-    enddo
-   enddo
-   endif
-
-  if (BtypeE==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=1,ny
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=1,ny
-     do i=nx+1,nx+3
-      V(i,j,k)=V(i-nx,j,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=1,ny
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=1,ny
-     do i=-2,0
-      V(i,j,k)=V(i+nx,j,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-  if (BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=1,nx
-      V(i,j,k)=V(i,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=1,nx
-      V(i,j,k)=V(i,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=1,nx
-      V(i,j,k)=V(i,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=1,nx
-      V(i,j,k)=V(i,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-
-  if ((BtypeW==DIRICHLET).or.(BtypeW==TURBULENTINLET).or.(BtypeW==INLETFROMFILE)) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     V(0,j,k)=0
-     V(-1,j,k)=0
-     V(-2,j,k)=0
-    enddo
-   enddo
-  elseif (BtypeW==NOSLIP) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Solid wall
-     V(0,j,k)=-V(1,j,k)
-     V(-1,j,k)=-V(2,j,k)
-     V(-2,j,k)=-V(3,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==NEUMANN) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Neumann inlet
-     V(0,j,k)=V(1,j,k)
-     V(-1,j,k)=V(1,j,k)
-     V(-2,j,k)=V(1,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do j=-2,ny+3
-     V(0,j,k)=V(1,j,k)
-     V(-1,j,k)=V(1,j,k)
-     V(-2,j,k)=V(1,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do j=-2,ny+3
-     V(0,j,k)=V(nx,j,k)
-     V(-1,j,k)=V(nx-1,j,k)
-     V(-2,j,k)=V(nx-2,j,k)
-    enddo
-   enddo
-  endif
-
-  if ((BtypeE==DIRICHLET).or.(BtypeE==TURBULENTINLET)) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     V(nx+1,j,k)=0
-     V(nx+2,j,k)=0
-     V(nx+3,j,k)=0
-    enddo
-   enddo
-  elseif (BtypeE==NOSLIP) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Solid wall
-     V(nx+1,j,k)=-V(nx,j,k)
-     V(nx+2,j,k)=-V(nx-1,j,k)
-     V(nx+3,j,k)=-V(nx-2,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Neumann inlet
-     V(nx+1,j,k)=V(nx,j,k)
-     V(nx+2,j,k)=V(nx,j,k)
-     V(nx+3,j,k)=V(nx,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do j=-2,ny+3
-     V(nx+1,j,k)=V(nx,j,k)
-     V(nx+2,j,k)=V(nx,j,k)
-     V(nx+3,j,k)=V(nx,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do j=-2,ny+3
-     V(nx+1,j,k)=V(1,j,k)
-     V(nx+2,j,k)=V(2,j,k)
-     V(nx+3,j,k)=V(3,j,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeS==DIRICHLET) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     V(i,0,k)=0
-     V(i,-1,k)=-V(i,1,k)
-     V(i,-2,k)=-V(i,2,k)
-    enddo
-   enddo
-  elseif (BtypeS==NOSLIP) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Solid wall
-     V(i,0,k)=0
-     V(i,-1,k)=-V(i,1,k)
-     V(i,-2,k)=-V(i,2,k)
-    enddo
-   enddo
-  elseif (BtypeS==NEUMANN) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Neumann inlet
-     V(i,0,k)=V(i,1,k)
-     V(i,-1,k)=V(i,1,k)
-     V(i,-2,k)=V(i,1,k)
-    enddo
-   enddo
-  elseif (BtypeS==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do i=-2,nx+3
-     V(i,0,k)=0
-     V(i,-1,k)=-V(i,1,k)
-     V(i,-2,k)=-V(i,2,k)
-    enddo
-   enddo
-  elseif (BtypeS==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do i=-2,nx+3
-     V(i,0,k)=V(i,ny,k)
-     V(i,-1,k)=V(i,ny-1,k)
-     V(i,-2,k)=V(i,ny-2,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeN==DIRICHLET) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     V(i,ny+1,k)=0
-     V(i,ny+2,k)=-V(i,ny,k)
-     V(i,ny+3,k)=-V(i,ny-1,k)
-    enddo
-   enddo
-  elseif (BtypeN==NOSLIP) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Solid wall
-     V(i,ny+1,k)=0
-     V(i,ny+2,k)=-V(i,ny,k)
-     V(i,ny+3,k)=-V(i,ny-1,k)
-    enddo
-   enddo
-  elseif (BtypeN==NEUMANN) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Neumann inlet
-     V(i,ny+1,k)=V(i,ny,k)
-     V(i,ny+2,k)=V(i,ny,k)
-     V(i,ny+3,k)=V(i,ny,k)
-    enddo
-   enddo
-  elseif (BtypeN==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do i=-2,nx+3
-     V(i,ny+1,k)=0
-     V(i,ny+2,k)=-V(i,ny,k)
-     V(i,ny+3,k)=-V(i,ny-1,k)
-    enddo
-   enddo
-  elseif (BtypeN==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do i=-2,nx+3
-     V(i,ny+1,k)=V(i,1,k)
-     V(i,ny+2,k)=V(i,2,k)
-     V(i,ny+3,k)=V(i,3,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeB==DIRICHLET) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     V(i,j,0)=-V(i,j,1)
-     V(i,j,-1)=-V(i,j,2)
-     V(i,j,-2)=-V(i,j,3)
-    enddo
-   enddo
-  elseif (BtypeB==NOSLIP) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Solid wall
-     V(i,j,0)=-V(i,j,1)
-     V(i,j,-1)=-V(i,j,2)
-     V(i,j,-2)=-V(i,j,3)
-    enddo
-   enddo
-  elseif (BtypeB==NEUMANN) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Neumann inlet
-     V(i,j,0)=V(i,j,1)
-     V(i,j,-1)=V(i,j,1)
-     V(i,j,-2)=V(i,j,1)
-    enddo
-   enddo
-  elseif (BtypeB==FREESLIP) then  !FREESLIP
-   do j=-2,ny+3
-    do i=-2,nx+3
-     V(i,j,0)=V(i,j,1)
-     V(i,j,-1)=V(i,j,1)
-     V(i,j,-2)=V(i,j,1)
-    enddo
-   enddo
-  elseif (BtypeB==PERIODIC) then  !Periodic BC
-   do j=-2,ny+3
-    do i=-2,nx+3
-     V(i,j,0)=V(i,j,nz)
-     V(i,j,-1)=V(i,j,nz-1)
-     V(i,j,-2)=V(i,j,nz-2)
-    enddo
-   enddo
-  endif
-
-  if (BtypeT==DIRICHLET) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     V(i,j,nz+1)=-V(i,j,nz)
-     V(i,j,nz+2)=-V(i,j,nz-1)
-     V(i,j,nz+3)=-V(i,j,nz-2)
-    enddo
-   enddo
-  elseif (BtypeT==NOSLIP) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Solid wall
-     V(i,j,nz+1)=-V(i,j,nz)
-     V(i,j,nz+2)=-V(i,j,nz-1)
-     V(i,j,nz+3)=-V(i,j,nz-2)
-    enddo
-   enddo
-  elseif (BtypeT==NEUMANN) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Neumann inlet
-     V(i,j,nz+1)=V(i,j,nz)
-     V(i,j,nz+2)=V(i,j,nz)
-     V(i,j,nz+3)=V(i,j,nz)
-    enddo
-   enddo
-  elseif (BtypeT==FREESLIPBUFF.or.BtypeT==FREESLIP) then  !FREESLIP
-   do j=-2,ny+3
-    do i=-2,nx+3
-     V(i,j,nz+1)=V(i,j,nz)
-     V(i,j,nz+2)=V(i,j,nz)
-     V(i,j,nz+3)=V(i,j,nz)
-    enddo
-   enddo
-  elseif (BtypeT==PERIODIC) then  !Periodic BC
-   do j=-2,ny+3
-    do i=-2,nx+3
-     V(i,j,nz+1)=V(i,j,1)
-     V(i,j,nz+2)=V(i,j,2)
-     V(i,j,nz+3)=V(i,j,3)
-    enddo
-   enddo
-  endif
-
-  end subroutine BOUND_CONDV2
-
-
-  pure subroutine BOUND_CONDW2(W)
-  real(KND),intent(inout):: W(-2:,-2:,-2:)
-  integer i,j,k,nx,ny,nz
-
-  nx=Wnx
-  ny=Wny
-  nz=Wnz
-
-  !!! corners and edges for periodic conditions
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC) then
-   do k=1,nz
-    do j=ny+1,ny+3
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j-ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=-2,0
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j+ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=ny+1,ny+3
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j-ny,k)
-     enddo
-    enddo
-   enddo
-   do k=1,nz
-    do j=-2,0
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j+ny,k)
-     enddo
-    enddo
-   enddo
-   endif
-
-  if (BtypeE==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=1,ny
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=1,ny
-     do i=nx+1,nx+3
-      W(i,j,k)=W(i-nx,j,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=1,ny
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=1,ny
-     do i=-2,0
-      W(i,j,k)=W(i+nx,j,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-  if (BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
-   do k=nz+1,nz+3
-    do j=ny+1,ny+3
-     do i=1,nx
-      W(i,j,k)=W(i,j-ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=ny+1,ny+3
-     do i=1,nx
-      W(i,j,k)=W(i,j-ny,k+nz)
-     enddo
-    enddo
-   enddo
-   do k=nz+1,nz+3
-    do j=-2,0
-     do i=1,nx
-      W(i,j,k)=W(i,j+ny,k-nz)
-     enddo
-    enddo
-   enddo
-   do k=-2,0
-    do j=-2,0
-     do i=1,nx
-      W(i,j,k)=W(i,j+ny,k+nz)
-     enddo
-    enddo
-   enddo
-  endif
-
-
-  if ((BtypeW==DIRICHLET).or.(BtypeW==TURBULENTINLET).or.(BtypeW==INLETFROMFILE)) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     W(0,j,k)=0
-     W(-1,j,k)=0
-     W(-2,j,k)=0
-    enddo
-   enddo
-  elseif (BtypeW==NOSLIP) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Solid wall
-     W(0,j,k)=-W(1,j,k)
-     W(-1,j,k)=-W(2,j,k)
-     W(-2,j,k)=-W(3,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==NEUMANN) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Neumann inlet
-     W(0,j,k)=W(1,j,k)
-     W(-1,j,k)=W(1,j,k)
-     W(-2,j,k)=W(1,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do j=-2,ny+3
-     W(0,j,k)=W(1,j,k)
-     W(-1,j,k)=W(1,j,k)
-     W(-2,j,k)=W(1,j,k)
-    enddo
-   enddo
-  elseif (BtypeW==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do j=-2,ny+3
-     W(0,j,k)=W(nx,j,k)
-     W(-1,j,k)=W(nx-1,j,k)
-     W(-2,j,k)=W(nx-2,j,k)
-    enddo
-   enddo
-  endif
-
-  if ((BtypeE==DIRICHLET).or.(BtypeE==TURBULENTINLET)) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Dirichlet inlet
-     W(nx+1,j,k)=0
-     W(nx+2,j,k)=0
-     W(nx+3,j,k)=0
-    enddo
-   enddo
-  elseif (BtypeE==NOSLIP) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Solid wall
-     W(nx+1,j,k)=-W(nx,j,k)
-     W(nx+2,j,k)=-W(nx-1,j,k)
-     W(nx+3,j,k)=-W(nx-2,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==NEUMANN.or.BtypeE==OUTLETBUFF) then
-   do k=-2,nz+3
-    do j=-2,ny+3                       !Neumann inlet
-     W(nx+1,j,k)=W(nx,j,k)
-     W(nx+2,j,k)=W(nx,j,k)
-     W(nx+3,j,k)=W(nx,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do j=-2,ny+3
-     W(nx+1,j,k)=W(nx,j,k)
-     W(nx+2,j,k)=W(nx,j,k)
-     W(nx+3,j,k)=W(nx,j,k)
-    enddo
-   enddo
-  elseif (BtypeE==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do j=-2,ny+3
-     W(nx+1,j,k)=W(1,j,k)
-     W(nx+2,j,k)=W(2,j,k)
-     W(nx+3,j,k)=W(3,j,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeS==DIRICHLET) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     W(i,0,k)=-W(i,1,k)
-     W(i,-1,k)=-W(i,2,k)
-     W(i,-2,k)=-W(i,3,k)
-    enddo
-   enddo
-  elseif (BtypeS==NOSLIP) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Solid wall
-     W(i,0,k)=-W(i,1,k)
-     W(i,-1,k)=-W(i,2,k)
-     W(i,-2,k)=-W(i,3,k)
-    enddo
-   enddo
-  elseif (BtypeS==NEUMANN) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Neumann inlet
-     W(i,0,k)=W(i,1,k)
-     W(i,-1,k)=W(i,1,k)
-     W(i,-2,k)=W(i,1,k)
-    enddo
-   enddo
-  elseif (BtypeS==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do i=-2,nx+3
-     W(i,0,k)=W(i,1,k)
-     W(i,-1,k)=W(i,1,k)
-     W(i,-2,k)=W(i,1,k)
-    enddo
-   enddo
-  elseif (BtypeS==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do i=-2,nx+3
-     W(i,0,k)=W(i,ny,k)
-     W(i,-1,k)=W(i,ny-1,k)
-     W(i,-2,k)=W(i,ny-2,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeN==DIRICHLET) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     W(i,ny+1,k)=-W(i,ny,k)
-     W(i,ny+2,k)=-W(i,ny-1,k)
-     W(i,ny+3,k)=-W(i,ny-2,k)
-    enddo
-   enddo
-  elseif (BtypeN==NOSLIP) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Solid wall
-     W(i,ny+1,k)=-W(i,ny,k)
-     W(i,ny+2,k)=-W(i,ny-1,k)
-     W(i,ny+3,k)=-W(i,ny-2,k)
-    enddo
-   enddo
-  elseif (BtypeN==NEUMANN) then
-   do k=-2,nz+3
-    do i=-2,nx+3                       !Neumann inlet
-     W(i,ny+1,k)=W(i,ny,k)
-     W(i,ny+2,k)=W(i,ny,k)
-     W(i,ny+3,k)=W(i,ny,k)
-    enddo
-   enddo
-  elseif (BtypeN==FREESLIP) then  !FREESLIP
-   do k=-2,nz+3
-    do i=-2,nx+3
-     W(i,ny+1,k)=W(i,ny,k)
-     W(i,ny+2,k)=W(i,ny,k)
-     W(i,ny+3,k)=W(i,ny,k)
-    enddo
-   enddo
-  elseif (BtypeN==PERIODIC) then  !Periodic BC
-   do k=-2,nz+3
-    do i=-2,nx+3
-     W(i,ny+1,k)=W(i,1,k)
-     W(i,ny+2,k)=W(i,2,k)
-     W(i,ny+3,k)=W(i,3,k)
-    enddo
-   enddo
-  endif
-
-  if (BtypeB==DIRICHLET) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     W(i,j,0)=0
-     W(i,j,-1)=-W(i,j,1)
-     W(i,j,-2)=-W(i,j,2)
-    enddo
-   enddo
-  elseif (BtypeB==NOSLIP) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Solid wall
-     W(i,j,0)=0
-     W(i,j,-1)=-W(i,j,1)
-     W(i,j,-2)=-W(i,j,2)
-    enddo
-   enddo
-  elseif (BtypeB==NEUMANN) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Neumann inlet
-     W(i,j,0)=W(i,j,1)
-     W(i,j,-1)=W(i,j,1)
-     W(i,j,-2)=W(i,j,1)
-    enddo
-   enddo
-  elseif (BtypeB==FREESLIP) then  !FREESLIP
-   do j=-2,ny+3
-    do i=-2,nx+3
-     W(i,j,0)=0
-     W(i,j,-1)=-W(i,j,1)
-     W(i,j,-2)=-W(i,j,2)
-    enddo
-   enddo
-  elseif (BtypeB==PERIODIC) then  !Periodic BC
-   do j=-2,ny+3
-    do i=-2,nx+3
-     W(i,j,0)=W(i,j,nz)
-     W(i,j,-1)=W(i,j,nz-1)
-     W(i,j,-2)=W(i,j,nz-2)
-    enddo
-   enddo
-  endif
-
-  if (BtypeT==DIRICHLET) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Dirichlet inlet
-     W(i,j,nz+1)=0
-     W(i,j,nz+2)=-W(i,j,nz)
-     W(i,j,nz+3)=-W(i,j,nz-1)
-    enddo
-   enddo
-  elseif (BtypeT==NOSLIP) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Solid wall
-     W(i,j,nz+1)=0
-     W(i,j,nz+2)=-W(i,j,nz)
-     W(i,j,nz+3)=-W(i,j,nz-1)
-    enddo
-   enddo
-  elseif (BtypeT==NEUMANN) then
-   do j=-2,ny+3
-    do i=-2,nx+3                       !Neumann inlet
-     W(i,j,nz+1)=W(i,j,nz)
-     W(i,j,nz+2)=W(i,j,nz)
-     W(i,j,nz+3)=W(i,j,nz)
-    enddo
-   enddo
-  elseif (BtypeT==FREESLIPBUFF.or.BtypeT==FREESLIP) then  !FREESLIP
-   do j=-2,ny+3
-    do i=-2,nx+3
-     W(i,j,nz+1)=0
-     W(i,j,nz+2)=-W(i,j,nz)
-     W(i,j,nz+3)=-W(i,j,nz-1)
-    enddo
-   enddo
-  elseif (BtypeT==PERIODIC) then  !Periodic BC
-   do j=-2,ny+3
-    do i=-2,nx+3
-     W(i,j,nz+1)=W(i,j,1)
-     W(i,j,nz+2)=W(i,j,2)
-     W(i,j,nz+3)=W(i,j,3)
-    enddo
-   enddo
-  endif
-
-  end subroutine BOUND_CONDW2
 
 
 

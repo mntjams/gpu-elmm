@@ -1374,9 +1374,9 @@ contains
  real(KND),dimension(-2:,-2:,-2:),intent(inout) :: U,V,W
  real(KND),dimension(1:,1:,1:),intent(inout) :: Pr
 
-  call Bound_CondU(U)
-  call Bound_CondV(V)
-  call Bound_CondW(W)
+  call BoundU(1,U)
+  call BoundU(2,V)
+  call BoundU(3,W)
 
   call OutputProfiles(U,V,W,Pr)
 
