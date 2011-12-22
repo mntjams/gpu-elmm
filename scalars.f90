@@ -777,6 +777,17 @@ contains
    enddo
 
    call ScalFlSOURC(SCAL2,sctype)
+
+!    do i=1,NIBPointsSc
+!     xi=IBPijkSc(1,i)
+!     yj=IBPijkSc(2,i)
+!     zk=IBPijkSc(3,i)
+!     SCAL2(xi,yj,zk)=SCAL2(xi,yj,zk)+IBPsourcSc*dt
+!     SCAL3(xi,yj,zk)=SCAL3(xi,yj,zk)+IBPsourcSc*dt
+!    enddo
+
+
+
    if (associated(FirstScalFlIBPoint)) then
     SFlIBP => FirstScalFlIBPoint
     do
@@ -948,40 +959,40 @@ contains
    nx=Prnx
    ny=Prny
    nz=Prnz
-    if (ScalBtypeW==DIRICHLET) then
+    if (ScalBtype(We)==DIRICHLET) then
       do k=1,nz
        do j=1,ny
-        SCAL(0,j,k)=WsideScal-(SCAL(1,j,k)-WsideScal)
-        SCAL(-1,j,k)=WsideScal-(SCAL(2,j,k)-WsideScal)
+        SCAL(0,j,k)=sideScal(We)-(SCAL(1,j,k)-sideScal(We))
+        SCAL(-1,j,k)=sideScal(We)-(SCAL(2,j,k)-sideScal(We))
        enddo
       enddo
-!   if (ScalBtypeW==DIRICHLET) then
+!   if (ScalBtype(We)==DIRICHLET) then
 !     do k=1,nz
 !      do j=1,ny
-!       SCAL(0,j,k)=Scalin(j,k)!-(SCAL(1,j,k)-WsideScal)
-!       SCAL(-1,j,k)=Scalin(j,k)!-(SCAL(2,j,k)-WsideScal)
+!       SCAL(0,j,k)=Scalin(j,k)!-(SCAL(1,j,k)-sideScal(We))
+!       SCAL(-1,j,k)=Scalin(j,k)!-(SCAL(2,j,k)-sideScal(We))
 !      enddo
 !     enddo
-   else if (ScalBtypeW==PERIODIC) then
+   else if (ScalBtype(We)==PERIODIC) then
     do k=1,nz
      do j=1,ny
       SCAL(0,j,k)=SCAL(nx,j,k)
       SCAL(-1,j,k)=SCAL(nx-1,j,k)
      enddo
     enddo
-   else if (ScalBtypeW==NEUMANN) then
+   else if (ScalBtype(We)==NEUMANN) then
     do k=1,nz
      do j=1,ny
-      SCAL(0,j,k)=SCAL(1,j,k)-WsideScal*dxU(0)
-      SCAL(-1,j,k)=SCAL(1,j,k)-WsideScal*(dxU(0)+dxU(-1))
+      SCAL(0,j,k)=SCAL(1,j,k)-sideScal(We)*dxU(0)
+      SCAL(-1,j,k)=SCAL(1,j,k)-sideScal(We)*(dxU(0)+dxU(-1))
      enddo
     enddo
-   else if (ScalBtypeW==CONSTFLUX) then
+   else if (ScalBtype(We)==CONSTFLUX) then
     do k=1,nz
      do j=1,ny
-!       SCAL(0,j,k)=(SCAL(1,j,k)*(U(0,j,k)/2._KND-(TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))+WsideScal)/&
+!       SCAL(0,j,k)=(SCAL(1,j,k)*(U(0,j,k)/2._KND-(TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))+sideScal(We))/&
 !                                   (U(0,j,k)/2._KND+(TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))
-      SCAL(0,j,k)=(SCAL(1,j,k)*((TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))+WsideScal)/&
+      SCAL(0,j,k)=(SCAL(1,j,k)*((TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))+sideScal(We))/&
                                   ((TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))
       SCAL(-1,j,k)=SCAL(0,j,k)-(SCAL(1,j,k)-SCAL(0,j,k))
      enddo
@@ -989,39 +1000,39 @@ contains
    else
     do k=1,nz
      do j=1,ny
-      SCAL(0,j,k)=SCAL(1,j,k)-WsideScal*dxU(0)
-      SCAL(-1,j,k)=SCAL(1,j,k)-WsideScal*(dxU(0)+dxU(-1))
+      SCAL(0,j,k)=SCAL(1,j,k)-sideScal(We)*dxU(0)
+      SCAL(-1,j,k)=SCAL(1,j,k)-sideScal(We)*(dxU(0)+dxU(-1))
      enddo
     enddo
    endif
 
-   if (ScalBtypeE==DIRICHLET) then
+   if (ScalBtype(Ea)==DIRICHLET) then
     do k=1,nz
      do j=1,ny
-      SCAL(nx+1,j,k)=EsideScal-(SCAL(nx,j,k)-EsideScal)
-      SCAL(nx+2,j,k)=EsideScal-(SCAL(nx-1,j,k)-EsideScal)
+      SCAL(nx+1,j,k)=sideScal(Ea)-(SCAL(nx,j,k)-sideScal(Ea))
+      SCAL(nx+2,j,k)=sideScal(Ea)-(SCAL(nx-1,j,k)-sideScal(Ea))
      enddo
     enddo
-   else if (ScalBtypeE==PERIODIC) then
+   else if (ScalBtype(Ea)==PERIODIC) then
     do k=1,nz
      do j=1,ny
       SCAL(nx+1,j,k)=SCAL(1,j,k)
       SCAL(nx+2,j,k)=SCAL(2,j,k)
      enddo
     enddo
-   else if (ScalBtypeE==NEUMANN) then
+   else if (ScalBtype(Ea)==NEUMANN) then
     do k=1,nz
      do j=1,ny
-      SCAL(nx+1,j,k)=SCAL(nx,j,k)+EsideScal*dxU(nx+1)
-      SCAL(nx+2,j,k)=SCAL(nx,j,k)+EsideScal*(dxU(nx+1)+dxU(nx+2))
+      SCAL(nx+1,j,k)=SCAL(nx,j,k)+sideScal(Ea)*dxU(nx+1)
+      SCAL(nx+2,j,k)=SCAL(nx,j,k)+sideScal(Ea)*(dxU(nx+1)+dxU(nx+2))
      enddo
     enddo
-   else if (ScalBtypeE==CONSTFLUX) then
+   else if (ScalBtype(Ea)==CONSTFLUX) then
     do k=1,nz
      do j=1,ny
-!       SCAL(nx+1,j,k)=(SCAL(nx,j,k)*(U(nx,j,k)/2._KND+(TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))+EsideScal)/&
+!       SCAL(nx+1,j,k)=(SCAL(nx,j,k)*(U(nx,j,k)/2._KND+(TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))+sideScal(Ea))/&
 !        (-U(nx,j,k)/2._KND+(TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))
-      SCAL(nx+1,j,k)=(SCAL(nx,j,k)*((TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))+EsideScal)/&
+      SCAL(nx+1,j,k)=(SCAL(nx,j,k)*((TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))+sideScal(Ea))/&
        ((TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))
       SCAL(nx+2,j,k)=SCAL(nx+1,j,k)-(SCAL(nx,j,k)-SCAL(nx+1,j,k))
      enddo
@@ -1029,40 +1040,40 @@ contains
    else
     do k=1,nz
      do j=1,ny
-      SCAL(nx+1,j,k)=SCAL(nx,j,k)+EsideScal*dxU(nx+1)
-      SCAL(nx+2,j,k)=SCAL(nx,j,k)+EsideScal*(dxU(nx+1)+dxU(nx+2))
+      SCAL(nx+1,j,k)=SCAL(nx,j,k)+sideScal(Ea)*dxU(nx+1)
+      SCAL(nx+2,j,k)=SCAL(nx,j,k)+sideScal(Ea)*(dxU(nx+1)+dxU(nx+2))
      enddo
     enddo
    endif
 
 
-   if (ScalBtypeS==DIRICHLET) then
+   if (ScalBtype(So)==DIRICHLET) then
     do k=1,nz
      do i=-1,nx+2
-      SCAL(i,0,k)=SsideScal-(SCAL(i,1,k)-SsideScal)
-      SCAL(i,-1,k)=SsideScal-(SCAL(i,2,k)-SsideScal)
+      SCAL(i,0,k)=sideScal(So)-(SCAL(i,1,k)-sideScal(So))
+      SCAL(i,-1,k)=sideScal(So)-(SCAL(i,2,k)-sideScal(So))
      enddo
     enddo
-   else if (ScalBtypeS==PERIODIC) then
+   else if (ScalBtype(So)==PERIODIC) then
     do k=1,nz
      do i=-1,nx+2
       SCAL(i,0,k)=SCAL(i,ny,k)
       SCAL(i,-1,k)=SCAL(i,ny-1,k)
      enddo
     enddo
-   else if (ScalBtypeS==NEUMANN) then
+   else if (ScalBtype(So)==NEUMANN) then
     do k=1,nz
      do i=-1,nx+2
-      SCAL(i,0,k)=SCAL(i,1,k)-SsideScal*dyV(0)
-      SCAL(i,-1,k)=SCAL(i,1,k)-SsideScal*(dyV(0)+dyV(-1))
+      SCAL(i,0,k)=SCAL(i,1,k)-sideScal(So)*dyV(0)
+      SCAL(i,-1,k)=SCAL(i,1,k)-sideScal(So)*(dyV(0)+dyV(-1))
      enddo
     enddo
-   else if (ScalBtypeS==CONSTFLUX) then
+   else if (ScalBtype(So)==CONSTFLUX) then
     do k=1,nz
      do i=-1,nx+2
-!       SCAL(i,0,k)=(SCAL(i,1,k)*(V(i,0,k)/2._KND-(TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))+SsideScal)/&
+!       SCAL(i,0,k)=(SCAL(i,1,k)*(V(i,0,k)/2._KND-(TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))+sideScal(So))/&
 !                                   (V(i,0,k)/2._KND+(TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))
-      SCAL(i,0,k)=(SCAL(i,1,k)*((TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))+SsideScal)/&
+      SCAL(i,0,k)=(SCAL(i,1,k)*((TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))+sideScal(So))/&
                                   ((TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))
       SCAL(i,-1,k)=SCAL(i,0,k)-(SCAL(i,1,k)-SCAL(i,0,k))
      enddo
@@ -1070,39 +1081,39 @@ contains
    else
     do k=1,nz
      do i=-1,nx+2
-      SCAL(i,0,k)=SCAL(i,1,k)-SsideScal*dyV(0)
-      SCAL(i,-1,k)=SCAL(i,1,k)-SsideScal*(dyV(0)+dyV(-1))
+      SCAL(i,0,k)=SCAL(i,1,k)-sideScal(So)*dyV(0)
+      SCAL(i,-1,k)=SCAL(i,1,k)-sideScal(So)*(dyV(0)+dyV(-1))
      enddo
     enddo
    endif
 
-   if (ScalBtypeN==DIRICHLET) then
+   if (ScalBtype(No)==DIRICHLET) then
     do k=1,nz
      do i=-1,nx+2
-       SCAL(i,ny+1,k)=NsideScal-(SCAL(i,ny,k)-NsideScal)
-       SCAL(i,ny+2,k)=NsideScal-(SCAL(i,ny-1,k)-NsideScal)
+       SCAL(i,ny+1,k)=sideScal(No)-(SCAL(i,ny,k)-sideScal(No))
+       SCAL(i,ny+2,k)=sideScal(No)-(SCAL(i,ny-1,k)-sideScal(No))
       enddo
      enddo
-   else if (ScalBtypeN==PERIODIC) then
+   else if (ScalBtype(No)==PERIODIC) then
     do k=1,nz
      do i=-1,nx+2
       SCAL(i,ny+1,k)=SCAL(i,1,k)
       SCAL(i,ny+2,k)=SCAL(i,2,k)
      enddo
     enddo
-   else if (ScalBtypeN==NEUMANN) then
+   else if (ScalBtype(No)==NEUMANN) then
     do k=1,nz
      do i=-1,nx+2
-      SCAL(i,ny+1,k)=SCAL(i,ny,k)+NsideScal*dyV(ny+1)
-      SCAL(i,ny+2,k)=SCAL(i,ny,k)+NsideScal*(dyV(ny+1)+dyV(ny+2))
+      SCAL(i,ny+1,k)=SCAL(i,ny,k)+sideScal(No)*dyV(ny+1)
+      SCAL(i,ny+2,k)=SCAL(i,ny,k)+sideScal(No)*(dyV(ny+1)+dyV(ny+2))
      enddo
     enddo
-   else if (ScalBtypeN==CONSTFLUX) then
+   else if (ScalBtype(No)==CONSTFLUX) then
     do k=1,nz
      do i=-1,nx+2
-!       SCAL(i,ny+1,k)=(SCAL(i,ny,k)*(V(i,ny,k)/2._KND+(TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))+NsideScal)/&
+!       SCAL(i,ny+1,k)=(SCAL(i,ny,k)*(V(i,ny,k)/2._KND+(TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))+sideScal(No))/&
 !        (-V(i,ny,k)/2._KND+(TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))
-      SCAL(i,ny+1,k)=(SCAL(i,ny,k)*((TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))+NsideScal)/&
+      SCAL(i,ny+1,k)=(SCAL(i,ny,k)*((TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))+sideScal(No))/&
        ((TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))
       SCAL(i,ny+2,k)=SCAL(i,ny+1,k)-(SCAL(i,ny,k)-SCAL(i,ny+1,k))
      enddo
@@ -1110,84 +1121,84 @@ contains
    else
     do k=1,nz
      do i=-1,ny+2
-      SCAL(i,ny+1,k)=SCAL(i,ny,k)+NsideScal*dyV(ny+1)
-      SCAL(i,ny+2,k)=SCAL(i,ny,k)+NsideScal*(dyV(ny+1)+dyV(ny+2))
+      SCAL(i,ny+1,k)=SCAL(i,ny,k)+sideScal(No)*dyV(ny+1)
+      SCAL(i,ny+2,k)=SCAL(i,ny,k)+sideScal(No)*(dyV(ny+1)+dyV(ny+2))
      enddo
     enddo
    endif
 
 
 
-    if (ScalBtypeB==DIRICHLET)  then
+    if (ScalBtype(Bo)==DIRICHLET)  then
      do j=-1,ny+2
       do i=-1,nx+2
-       SCAL(i,j,0)=BsideScal-(SCAL(i,j,1)-BsideScal)
-       SCAL(i,j,-1)=BsideScal-(SCAL(i,j,2)-BsideScal)
+       SCAL(i,j,0)=sideScal(Bo)-(SCAL(i,j,1)-sideScal(Bo))
+       SCAL(i,j,-1)=sideScal(Bo)-(SCAL(i,j,2)-sideScal(Bo))
       enddo
      enddo
-   else if (ScalBtypeB==PERIODIC) then
+   else if (ScalBtype(Bo)==PERIODIC) then
     do j=-1,ny+2
      do i=-1,nx+2
       SCAL(i,j,0)=SCAL(i,j,nz)
       SCAL(i,j,-1)=SCAL(i,j,nz-1)
      enddo
     enddo
-   else if (ScalBtypeB==NEUMANN) then
+   else if (ScalBtype(Bo)==NEUMANN) then
     do j=-1,ny+2
      do i=-1,nx+2
-      SCAL(i,j,0)=SCAL(i,j,1)-BsideScal*dzW(0)
-      SCAL(i,j,-1)=SCAL(i,j,1)-BsideScal*(dzW(0)+dzW(-1))
+      SCAL(i,j,0)=SCAL(i,j,1)-sideScal(Bo)*dzW(0)
+      SCAL(i,j,-1)=SCAL(i,j,1)-sideScal(Bo)*(dzW(0)+dzW(-1))
      enddo
     enddo
-   else if (ScalBtypeB==CONSTFLUX.or.ScalBtypeB==DIRICHLET) then
+   else if (ScalBtype(Bo)==CONSTFLUX.or.ScalBtype(Bo)==DIRICHLET) then
     do j=-1,ny+2
      do i=-1,nx+2
-      SCAL(i,j,0)=SCAL(i,j,1)+BsideScal*dzW(0)/((TDiff(i,j,1)+TDiff(i,j,0))/(2._KND))
+      SCAL(i,j,0)=SCAL(i,j,1)+sideScal(Bo)*dzW(0)/((TDiff(i,j,1)+TDiff(i,j,0))/(2._KND))
       SCAL(i,j,-1)=SCAL(i,j,0)-(SCAL(i,j,1)-SCAL(i,j,0))
      enddo
     enddo
    else
     do j=-1,ny+2
      do i=-1,nx+2
-      SCAL(i,j,0)=SCAL(i,j,1)-BsideScal*dzW(0)
-      SCAL(i,j,-1)=SCAL(i,j,1)-BsideScal*(dzW(0)+dzW(-1))
+      SCAL(i,j,0)=SCAL(i,j,1)-sideScal(Bo)*dzW(0)
+      SCAL(i,j,-1)=SCAL(i,j,1)-sideScal(Bo)*(dzW(0)+dzW(-1))
      enddo
     enddo
    endif
 
-   if (ScalBtypeT==DIRICHLET) then
+   if (ScalBtype(To)==DIRICHLET) then
     do j=-1,ny+2
      do i=-1,nx+2
-       SCAL(i,j,nz+1)=TsideScal-(SCAL(i,j,nz)-TsideScal)
-       SCAL(i,j,nz+2)=TsideScal-(SCAL(i,j,nz-1)-TsideScal)
+       SCAL(i,j,nz+1)=sideScal(To)-(SCAL(i,j,nz)-sideScal(To))
+       SCAL(i,j,nz+2)=sideScal(To)-(SCAL(i,j,nz-1)-sideScal(To))
       enddo
      enddo
-   else if (ScalBtypeT==PERIODIC) then
+   else if (ScalBtype(To)==PERIODIC) then
     do j=-1,ny+2
      do i=-1,nx+2
       SCAL(i,j,nz+1)=SCAL(i,j,1)
       SCAL(i,j,nz+2)=SCAL(i,j,2)
      enddo
     enddo
-   else if (ScalBtypeT==NEUMANN) then
+   else if (ScalBtype(To)==NEUMANN) then
     do j=-1,ny+2
      do i=-1,nx+2
-      SCAL(i,j,nz+1)=SCAL(i,j,nz)+TsideScal*dzW(nz+1)
-      SCAL(i,j,nz+2)=SCAL(i,j,nz)+TsideScal*(dzW(nz+1)+dzW(nz+2))
+      SCAL(i,j,nz+1)=SCAL(i,j,nz)+sideScal(To)*dzW(nz+1)
+      SCAL(i,j,nz+2)=SCAL(i,j,nz)+sideScal(To)*(dzW(nz+1)+dzW(nz+2))
      enddo
     enddo
-   else if (ScalBtypeT==CONSTFLUX) then
+   else if (ScalBtype(To)==CONSTFLUX) then
     do j=-1,ny+2
      do i=-1,nx+2
-      SCAL(i,j,nz+1)=SCAL(i,j,nz)-TsideScal*dzW(nz)/((TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2._KND))
+      SCAL(i,j,nz+1)=SCAL(i,j,nz)-sideScal(To)*dzW(nz)/((TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2._KND))
       SCAL(i,j,nz+2)=SCAL(i,j,nz+1)-(SCAL(i,j,nz)-SCAL(i,j,nz+1))
      enddo
     enddo
    else
     do j=-1,ny+2
      do i=-1,nx+2
-      SCAL(i,j,nz+1)=SCAL(i,j,nz)+TsideScal*dzW(nz+1)
-      SCAL(i,j,nz+2)=SCAL(i,j,nz)+TsideScal*(dzW(nz+1)+dzW(nz+2))
+      SCAL(i,j,nz+1)=SCAL(i,j,nz)+sideScal(To)*dzW(nz+1)
+      SCAL(i,j,nz+2)=SCAL(i,j,nz)+sideScal(To)*(dzW(nz+1)+dzW(nz+2))
      enddo
     enddo
    endif
@@ -1204,40 +1215,40 @@ contains
    nx=Prnx
    ny=Prny
    nz=Prnz
-!    if (TBtypeW==DIRICHLET) then
+!    if (TBtype(We)==DIRICHLET) then
 !      do k=1,nz
 !       do j=1,ny
-!        theta(0,j,k)=WsideTemp!-(theta(1,j,k)-WsideTemp)
-!        theta(-1,j,k)=WsideTemp!-(theta(2,j,k)-WsideTemp)
+!        theta(0,j,k)=sideTemp(We)!-(theta(1,j,k)-sideTemp(We))
+!        theta(-1,j,k)=sideTemp(We)!-(theta(2,j,k)-sideTemp(We))
 !       enddo
 !      enddo
-   if (TBtypeW==DIRICHLET) then
+   if (TBtype(We)==DIRICHLET) then
      do k=1,nz
       do j=1,ny
-       theta(0,j,k)=Tempin(j,k)!-(theta(1,j,k)-WsideTemp)
-       theta(-1,j,k)=Tempin(j,k)!-(theta(2,j,k)-WsideTemp)
+       theta(0,j,k)=Tempin(j,k)!-(theta(1,j,k)-sideTemp(We))
+       theta(-1,j,k)=Tempin(j,k)!-(theta(2,j,k)-sideTemp(We))
       enddo
      enddo
-   else if (TBtypeW==PERIODIC) then
+   else if (TBtype(We)==PERIODIC) then
     do k=1,nz
      do j=1,ny
       theta(0,j,k)=theta(nx,j,k)
       theta(-1,j,k)=theta(nx-1,j,k)
      enddo
     enddo
-   else if (TBtypeW==NEUMANN) then
+   else if (TBtype(We)==NEUMANN) then
     do k=1,nz
      do j=1,ny
-      theta(0,j,k)=theta(1,j,k)-WsideTemp*dxU(0)
-      theta(-1,j,k)=theta(1,j,k)-WsideTemp*(dxU(0)+dxU(-1))
+      theta(0,j,k)=theta(1,j,k)-sideTemp(We)*dxU(0)
+      theta(-1,j,k)=theta(1,j,k)-sideTemp(We)*(dxU(0)+dxU(-1))
      enddo
     enddo
-   else if (TBtypeW==CONSTFLUX) then
+   else if (TBtype(We)==CONSTFLUX) then
     do k=1,nz
      do j=1,ny
-!       theta(0,j,k)=(theta(1,j,k)*(U(0,j,k)/2._KND-(TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))+WsideTemp)/&
+!       theta(0,j,k)=(theta(1,j,k)*(U(0,j,k)/2._KND-(TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))+sideTemp(We))/&
 !                                   (U(0,j,k)/2._KND+(TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))
-      theta(0,j,k)=(theta(1,j,k)*((TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))+WsideTemp)/&
+      theta(0,j,k)=(theta(1,j,k)*((TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))+sideTemp(We))/&
                                   ((TDiff(1,j,k)+TDiff(0,j,k))/(2*dxU(0)))
       theta(-1,j,k)=theta(0,j,k)-(theta(1,j,k)-theta(0,j,k))
      enddo
@@ -1245,39 +1256,39 @@ contains
    else
     do k=1,nz
      do j=1,ny
-      theta(0,j,k)=theta(1,j,k)-WsideTemp*dxU(0)
-      theta(-1,j,k)=theta(1,j,k)-WsideTemp*(dxU(0)+dxU(-1))
+      theta(0,j,k)=theta(1,j,k)-sideTemp(We)*dxU(0)
+      theta(-1,j,k)=theta(1,j,k)-sideTemp(We)*(dxU(0)+dxU(-1))
      enddo
     enddo
    endif
 
-   if (TBtypeE==DIRICHLET) then
+   if (TBtype(Ea)==DIRICHLET) then
     do k=1,nz
      do j=1,ny
-      theta(nx+1,j,k)=EsideTemp!-(theta(nx,j,k)-EsideTemp)
-      theta(nx+2,j,k)=EsideTemp!-(theta(nx-1,j,k)-EsideTemp)
+      theta(nx+1,j,k)=sideTemp(Ea)!-(theta(nx,j,k)-sideTemp(Ea))
+      theta(nx+2,j,k)=sideTemp(Ea)!-(theta(nx-1,j,k)-sideTemp(Ea))
      enddo
     enddo
-   else if (TBtypeE==PERIODIC) then
+   else if (TBtype(Ea)==PERIODIC) then
     do k=1,nz
      do j=1,ny
       theta(nx+1,j,k)=theta(1,j,k)
       theta(nx+2,j,k)=theta(2,j,k)
      enddo
     enddo
-   else if (TBtypeE==NEUMANN) then
+   else if (TBtype(Ea)==NEUMANN) then
     do k=1,nz
      do j=1,ny
-      theta(nx+1,j,k)=theta(nx,j,k)+EsideTemp*dxU(nx+1)
-      theta(nx+2,j,k)=theta(nx,j,k)+EsideTemp*(dxU(nx+1)+dxU(nx+2))
+      theta(nx+1,j,k)=theta(nx,j,k)+sideTemp(Ea)*dxU(nx+1)
+      theta(nx+2,j,k)=theta(nx,j,k)+sideTemp(Ea)*(dxU(nx+1)+dxU(nx+2))
      enddo
     enddo
-   else if (TBtypeE==CONSTFLUX) then
+   else if (TBtype(Ea)==CONSTFLUX) then
     do k=1,nz
      do j=1,ny
-!       theta(nx+1,j,k)=(theta(nx,j,k)*(U(nx,j,k)/2._KND+(TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))+EsideTemp)/&
+!       theta(nx+1,j,k)=(theta(nx,j,k)*(U(nx,j,k)/2._KND+(TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))+sideTemp(Ea))/&
 !        (-U(nx,j,k)/2._KND+(TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))
-      theta(nx+1,j,k)=(theta(nx,j,k)*((TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))+EsideTemp)/&
+      theta(nx+1,j,k)=(theta(nx,j,k)*((TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))+sideTemp(Ea))/&
        ((TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2*dxU(nx)))
       theta(nx+2,j,k)=theta(nx+1,j,k)-(theta(nx,j,k)-theta(nx+1,j,k))
      enddo
@@ -1285,40 +1296,40 @@ contains
    else
     do k=1,nz
      do j=1,ny
-      theta(nx+1,j,k)=theta(nx,j,k)+EsideTemp*dxU(nx+1)
-      theta(nx+2,j,k)=theta(nx,j,k)+EsideTemp*(dxU(nx+1)+dxU(nx+2))
+      theta(nx+1,j,k)=theta(nx,j,k)+sideTemp(Ea)*dxU(nx+1)
+      theta(nx+2,j,k)=theta(nx,j,k)+sideTemp(Ea)*(dxU(nx+1)+dxU(nx+2))
      enddo
     enddo
    endif
 
 
-   if (TBtypeS==DIRICHLET) then
+   if (TBtype(So)==DIRICHLET) then
     do k=1,nz
      do i=-1,nx+2
-      theta(i,0,k)=SsideTemp!-(theta(i,1,k)-SsideTemp)
-      theta(i,-1,k)=SsideTemp!-(theta(i,2,k)-SsideTemp)
+      theta(i,0,k)=sideTemp(So)!-(theta(i,1,k)-sideTemp(So))
+      theta(i,-1,k)=sideTemp(So)!-(theta(i,2,k)-sideTemp(So))
      enddo
     enddo
-   else if (TBtypeS==PERIODIC) then
+   else if (TBtype(So)==PERIODIC) then
     do k=1,nz
      do i=-1,nx+2
       theta(i,0,k)=theta(i,ny,k)
       theta(i,-1,k)=theta(i,ny-1,k)
      enddo
     enddo
-   else if (TBtypeS==NEUMANN) then
+   else if (TBtype(So)==NEUMANN) then
     do k=1,nz
      do i=-1,nx+2
-      theta(i,0,k)=theta(i,1,k)-SsideTemp*dyV(0)
-      theta(i,-1,k)=theta(i,1,k)-SsideTemp*(dyV(0)+dyV(-1))
+      theta(i,0,k)=theta(i,1,k)-sideTemp(So)*dyV(0)
+      theta(i,-1,k)=theta(i,1,k)-sideTemp(So)*(dyV(0)+dyV(-1))
      enddo
     enddo
-   else if (TBtypeS==CONSTFLUX) then
+   else if (TBtype(So)==CONSTFLUX) then
     do k=1,nz
      do i=-1,nx+2
-!       theta(i,0,k)=(theta(i,1,k)*(V(i,0,k)/2._KND-(TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))+SsideTemp)/&
+!       theta(i,0,k)=(theta(i,1,k)*(V(i,0,k)/2._KND-(TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))+sideTemp(So))/&
 !                                   (V(i,0,k)/2._KND+(TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))
-      theta(i,0,k)=(theta(i,1,k)*((TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))+SsideTemp)/&
+      theta(i,0,k)=(theta(i,1,k)*((TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))+sideTemp(So))/&
                                   ((TDiff(i,1,k)+TDiff(i,0,k))/(2*dyV(0)))
       theta(i,-1,k)=theta(i,0,k)-(theta(i,1,k)-theta(i,0,k))
      enddo
@@ -1326,39 +1337,39 @@ contains
    else
     do k=1,nz
      do i=-1,nx+2
-      theta(i,0,k)=theta(i,1,k)-SsideTemp*dyV(0)
-      theta(i,-1,k)=theta(i,1,k)-SsideTemp*(dyV(0)+dyV(-1))
+      theta(i,0,k)=theta(i,1,k)-sideTemp(So)*dyV(0)
+      theta(i,-1,k)=theta(i,1,k)-sideTemp(So)*(dyV(0)+dyV(-1))
      enddo
     enddo
    endif
 
-   if (TBtypeN==DIRICHLET) then
+   if (TBtype(No)==DIRICHLET) then
     do k=1,nz
      do i=-1,nx+2
-       theta(i,ny+1,k)=NsideTemp!-(theta(i,ny,k)-NsideTemp)
-       theta(i,ny+2,k)=NsideTemp!-(theta(i,ny-1,k)-NsideTemp)
+       theta(i,ny+1,k)=sideTemp(No)!-(theta(i,ny,k)-sideTemp(No))
+       theta(i,ny+2,k)=sideTemp(No)!-(theta(i,ny-1,k)-sideTemp(No))
       enddo
      enddo
-   else if (TBtypeN==PERIODIC) then
+   else if (TBtype(No)==PERIODIC) then
     do k=1,nz
      do i=-1,nx+2
       theta(i,ny+1,k)=theta(i,1,k)
       theta(i,ny+2,k)=theta(i,2,k)
      enddo
     enddo
-   else if (TBtypeN==NEUMANN) then
+   else if (TBtype(No)==NEUMANN) then
     do k=1,nz
      do i=-1,nx+2
-      theta(i,ny+1,k)=theta(i,ny,k)+NsideTemp*dyV(ny+1)
-      theta(i,ny+2,k)=theta(i,ny,k)+NsideTemp*(dyV(ny+1)+dyV(ny+2))
+      theta(i,ny+1,k)=theta(i,ny,k)+sideTemp(No)*dyV(ny+1)
+      theta(i,ny+2,k)=theta(i,ny,k)+sideTemp(No)*(dyV(ny+1)+dyV(ny+2))
      enddo
     enddo
-   else if (TBtypeN==CONSTFLUX) then
+   else if (TBtype(No)==CONSTFLUX) then
     do k=1,nz
      do i=-1,nx+2
-!       theta(i,ny+1,k)=(theta(i,ny,k)*(V(i,ny,k)/2._KND+(TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))+NsideTemp)/&
+!       theta(i,ny+1,k)=(theta(i,ny,k)*(V(i,ny,k)/2._KND+(TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))+sideTemp(No))/&
 !        (-V(i,ny,k)/2._KND+(TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))
-      theta(i,ny+1,k)=(theta(i,ny,k)*((TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))+NsideTemp)/&
+      theta(i,ny+1,k)=(theta(i,ny,k)*((TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))+sideTemp(No))/&
        ((TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2*dyV(ny)))
       theta(i,ny+2,k)=theta(i,ny+1,k)-(theta(i,ny,k)-theta(i,ny+1,k))
      enddo
@@ -1366,40 +1377,40 @@ contains
    else
     do k=1,nz
      do i=-1,ny+2
-      theta(i,ny+1,k)=theta(i,ny,k)+NsideTemp*dyV(ny+1)
-      theta(i,ny+2,k)=theta(i,ny,k)+NsideTemp*(dyV(ny+1)+dyV(ny+2))
+      theta(i,ny+1,k)=theta(i,ny,k)+sideTemp(No)*dyV(ny+1)
+      theta(i,ny+2,k)=theta(i,ny,k)+sideTemp(No)*(dyV(ny+1)+dyV(ny+2))
      enddo
     enddo
    endif
 
 
 
-!    if (TBtypeB==DIRICHLET)  then
+!    if (TBtype(Bo)==DIRICHLET)  then
 !     do j=-1,ny+2
 !      do i=-1,nx+2
-!       theta(i,j,0)=BsideTemp!-(theta(i,j,1)-BsideTemp)
-!       theta(i,j,-1)=BsideTemp!-(theta(i,j,2)-BsideTemp)
+!       theta(i,j,0)=sideTemp(Bo)!-(theta(i,j,1)-sideTemp(Bo))
+!       theta(i,j,-1)=sideTemp(Bo)!-(theta(i,j,2)-sideTemp(Bo))
 !      enddo
 !     enddo
 !    else
-   if (TBtypeB==PERIODIC) then
+   if (TBtype(Bo)==PERIODIC) then
     do j=-1,ny+2
      do i=-1,nx+2
       theta(i,j,0)=theta(i,j,nz)
       theta(i,j,-1)=theta(i,j,nz-1)
      enddo
     enddo
-   else if (TBtypeB==NEUMANN) then
+   else if (TBtype(Bo)==NEUMANN) then
     do j=-1,ny+2
      do i=-1,nx+2
-      theta(i,j,0)=theta(i,j,1)-BsideTemp*dzW(0)
-      theta(i,j,-1)=theta(i,j,1)-BsideTemp*(dzW(0)+dzW(-1))
+      theta(i,j,0)=theta(i,j,1)-sideTemp(Bo)*dzW(0)
+      theta(i,j,-1)=theta(i,j,1)-sideTemp(Bo)*(dzW(0)+dzW(-1))
      enddo
     enddo
-   else if (TBtypeB==CONSTFLUX.or.TBtypeB==DIRICHLET) then
+   else if (TBtype(Bo)==CONSTFLUX.or.TBtype(Bo)==DIRICHLET) then
     do j=-1,ny+2
      do i=-1,nx+2
-      if (abs(BsideTFLArr(i,j))<tiny(1._KND).and.TDiff(i,j,1)<1.1_KND/(Prandtl*Re).and.TBtypeB==DIRICHLET) then
+      if (abs(BsideTFLArr(i,j))<tiny(1._KND).and.TDiff(i,j,1)<1.1_KND/(Prandtl*Re).and.TBtype(Bo)==DIRICHLET) then
        theta(i,j,0)=BsideTArr(i,j)
       else
        theta(i,j,0)=theta(i,j,1)+BsideTFLArr(i,j)*dzW(0)/((TDiff(i,j,1)+TDiff(i,j,0))/(2._KND))
@@ -1410,47 +1421,47 @@ contains
    else
     do j=-1,ny+2
      do i=-1,nx+2
-      theta(i,j,0)=theta(i,j,1)-BsideTemp*dzW(0)
-      theta(i,j,-1)=theta(i,j,1)-BsideTemp*(dzW(0)+dzW(-1))
+      theta(i,j,0)=theta(i,j,1)-sideTemp(Bo)*dzW(0)
+      theta(i,j,-1)=theta(i,j,1)-sideTemp(Bo)*(dzW(0)+dzW(-1))
      enddo
     enddo
    endif
 
-   if (TBtypeT==DIRICHLET) then
+   if (TBtype(To)==DIRICHLET) then
     do j=-1,ny+2
      do i=-1,nx+2
-       theta(i,j,nz+1)=TsideTemp!-(theta(i,j,nz)-TsideTemp)
-       theta(i,j,nz+2)=TsideTemp!-(theta(i,j,nz-1)-TsideTemp)
+       theta(i,j,nz+1)=sideTemp(To)!-(theta(i,j,nz)-sideTemp(To))
+       theta(i,j,nz+2)=sideTemp(To)!-(theta(i,j,nz-1)-sideTemp(To))
       enddo
      enddo
-   else if (TBtypeT==PERIODIC) then
+   else if (TBtype(To)==PERIODIC) then
     do j=-1,ny+2
      do i=-1,nx+2
       theta(i,j,nz+1)=theta(i,j,1)
       theta(i,j,nz+2)=theta(i,j,2)
      enddo
     enddo
-   else if (TBtypeT==NEUMANN) then
+   else if (TBtype(To)==NEUMANN) then
     do j=-1,ny+2
      do i=-1,nx+2
-      theta(i,j,nz+1)=theta(i,j,nz)+TsideTemp*dzW(nz+1)
-      theta(i,j,nz+2)=theta(i,j,nz)+TsideTemp*(dzW(nz+1)+dzW(nz+2))
+      theta(i,j,nz+1)=theta(i,j,nz)+sideTemp(To)*dzW(nz+1)
+      theta(i,j,nz+2)=theta(i,j,nz)+sideTemp(To)*(dzW(nz+1)+dzW(nz+2))
      enddo
     enddo
-   else if (TBtypeT==CONSTFLUX) then
+   else if (TBtype(To)==CONSTFLUX) then
     do j=-1,ny+2
      do i=-1,nx+2
-!       theta(i,j,nz+1)=(theta(i,j,nz)*(W(i,j,nz)/2._KND+(TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2*dzW(nz)))+TsideTemp)/&
+!       theta(i,j,nz+1)=(theta(i,j,nz)*(W(i,j,nz)/2._KND+(TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2*dzW(nz)))+sideTemp(To))/&
 !        (-W(i,j,nz)/2._KND+(TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2*dzW(nz)))
-      theta(i,j,nz+1)=theta(i,j,nz)-TsideTemp*dzW(nz)/((TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2._KND))
+      theta(i,j,nz+1)=theta(i,j,nz)-sideTemp(To)*dzW(nz)/((TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2._KND))
       theta(i,j,nz+2)=theta(i,j,nz+1)-(theta(i,j,nz)-theta(i,j,nz+1))
      enddo
     enddo
    else
     do j=-1,ny+2
      do i=-1,nx+2
-      theta(i,j,nz+1)=theta(i,j,nz)+TsideTemp*dzW(nz+1)
-      theta(i,j,nz+2)=theta(i,j,nz)+TsideTemp*(dzW(nz+1)+dzW(nz+2))
+      theta(i,j,nz+1)=theta(i,j,nz)+sideTemp(To)*dzW(nz+1)
+      theta(i,j,nz+2)=theta(i,j,nz)+sideTemp(To)*(dzW(nz+1)+dzW(nz+2))
      enddo
     enddo
    endif
@@ -1468,7 +1479,7 @@ contains
   ny=Prny
   nz=Prnz
 
-  if (BtypeE==PERIODIC) then
+  if (Btype(Ea)==PERIODIC) then
    do k=1,nz
     do j=1,ny
       Nu(0,j,k)=Nu(nx,j,k)
@@ -1484,7 +1495,7 @@ contains
    enddo
   endif
 
-  if (BtypeN==PERIODIC) then
+  if (Btype(No)==PERIODIC) then
    do k=1,nz
     do i=1,nx
       Nu(i,0,k)=Nu(i,ny,k)
@@ -1500,7 +1511,7 @@ contains
    enddo
   endif
 
-  if (BtypeT==PERIODIC) then
+  if (Btype(To)==PERIODIC) then
    do j=1,ny
     do i=1,nx
       Nu(i,j,0)=Nu(i,j,nz)

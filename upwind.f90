@@ -370,7 +370,7 @@ module UPWIND
    enddo
   enddo
 
-  if (BtypeE==PERIODIC) then
+  if (Btype(Ea)==PERIODIC) then
    do k=1,nz
     do j=1,ny
      Ut(nx+1,j,k)=Ut(1,j,k)
@@ -550,7 +550,7 @@ module UPWIND
    enddo
   enddo
 
-  if (BtypeN==PERIODIC) then
+  if (Btype(No)==PERIODIC) then
    do k=1,nz
     do i=1,nx
      Vt(i,ny+1,k)=Vt(i,1,k)
@@ -729,7 +729,7 @@ module UPWIND
    enddo
   enddo
 
-  if (BtypeT==PERIODIC) then
+  if (Btype(To)==PERIODIC) then
    do j=1,ny
     do i=1,nx
      Wt(i,j,nz+1)=Wt(i,j,1)
@@ -905,7 +905,7 @@ module UPWIND
  do k=1,Unz
   i=1
   do j=1,Uny
-    if (BtypeW==PERIODIC) then
+    if (Btype(We)==PERIODIC) then
        UL=U(i-1,j,k)+(xPr(i)-xU(i-1))*Ux(i-1,j,k)+Ut(Unx,j,k)
     else
        UL=U(i-1,j,k)+(xPr(i)-xU(i-1))*Ux(i-1,j,k)
@@ -941,7 +941,7 @@ module UPWIND
   i=Unx+1
   do j=1,Uny
     UL=U(i-1,j,k)+(xPr(i)-xU(i-1))*Ux(i-1,j,k)+Ut(i-1,j,k)
-    if (BtypeE==PERIODIC) then
+    if (Btype(Ea)==PERIODIC) then
        UR=U(i,j,k)-(xU(i)-xPr(i))*Ux(i,j,k)+Ut(1,j,k)
     else
        UR=U(i,j,k)-(xU(i)-xPr(i))*Ux(i,j,k)
@@ -995,7 +995,7 @@ module UPWIND
  do k=1,Vnz
   j=1
   do i=1,Vnx
-    if (BtypeS==PERIODIC) then
+    if (Btype(So)==PERIODIC) then
        VL=V(i,j-1,k)+(yPr(j)-yV(j-1))*Vy(i,j-1,k)+Vt(i,Vny,k)
     else
        VL=V(i,j-1,k)+(yPr(j)-yV(j-1))*Vy(i,j-1,k)
@@ -1029,7 +1029,7 @@ module UPWIND
   j=Vny+1
   do i=1,Vnx
     VL=V(i,j-1,k)+(yPr(j)-yV(j-1))*Vy(i,j-1,k)+Vt(i,j-1,k)
-    if (BtypeN==PERIODIC) then
+    if (Btype(No)==PERIODIC) then
        VR=V(i,j,k)-(yV(j)-yPr(j))*Vy(i,j,k)+Vt(i,1,k)
     else
        VR=V(i,j,k)-(yV(j)-yPr(j))*Vy(i,j,k)
@@ -1083,7 +1083,7 @@ module UPWIND
  do j=1,Wny
   k=1
   do i=1,Wnx
-    if (BtypeB==PERIODIC) then
+    if (Btype(Bo)==PERIODIC) then
        WL=W(i,j,k-1)+(zPr(k)-zW(k-1))*Wz(i,j,k-1)+Wt(Wnx,j,k)
     else
        WL=W(i,j,k-1)+(zPr(k)-zW(k-1))*Wz(i,j,k-1)
@@ -1117,7 +1117,7 @@ module UPWIND
   k=Wnz+1
   do i=1,Wnx
     WL=W(i,j,k-1)+(zPr(k)-zW(k-1))*Wz(i,j,k-1)+Wt(i,j,k-1)
-    if (BtypeT==PERIODIC) then
+    if (Btype(To)==PERIODIC) then
        WR=W(i,j,k)-(zW(k)-zPr(k))*Wz(i,j,k)+Wt(i,j,1)
     else
        WR=W(i,j,k)-(zW(k)-zPr(k))*Wz(i,j,k)
@@ -1170,15 +1170,15 @@ module UPWIND
   ny=Vny
   nz=Wnz
 
-  if (BtypeS==DIRICHLET) then
+  if (Btype(So)==DIRICHLET) then
    do k=1,nz
     do i=1,nx                       !Dirichlet inlet
-     Uco(i,0,k)=SsideU
-     Uco(i,-1,k)=SsideU+(SsideU-Uco(i,1,k))
-     Uco(i,-2,k)=SsideU+(SsideU-Uco(i,2,k))
+     Uco(i,0,k)=sideU(1,So)
+     Uco(i,-1,k)=sideU(1,So)+(sideU(1,So)-Uco(i,1,k))
+     Uco(i,-2,k)=sideU(1,So)+(sideU(1,So)-Uco(i,2,k))
     enddo
    enddo
-  elseif (BtypeS==NOSLIP) then
+  elseif (Btype(So)==NOSLIP) then
    do k=1,nz
     do i=1,nx                       !Solid wall
      Uco(i,0,k)=0
@@ -1186,7 +1186,7 @@ module UPWIND
      Uco(i,-2,k)=-Uco(i,2,k)
     enddo
    enddo
-  elseif (BtypeS==NEUMANN) then
+  elseif (Btype(So)==NEUMANN) then
    do k=1,nz
     do i=1,nx                       !Neumann inlet
      Uco(i,0,k)=Uco(i,1,k)
@@ -1194,7 +1194,7 @@ module UPWIND
      Uco(i,-2,k)=Uco(i,1,k)
     enddo
    enddo
-  elseif (BtypeS==FREESLIP) then  !FREESLIP
+  elseif (Btype(So)==FREESLIP) then  !FREESLIP
    do k=1,nz
     do i=1,nx
      Uco(i,0,k)=Uco(i,1,k)
@@ -1202,7 +1202,7 @@ module UPWIND
      Uco(i,-2,k)=Uco(i,1,k)
     enddo
    enddo
-  elseif (BtypeS==PERIODIC) then  !Periodic BC
+  elseif (Btype(So)==PERIODIC) then  !Periodic BC
    do k=1,nz
     do i=1,nx
      Uco(i,0,k)=Uco(i,ny,k)
@@ -1212,15 +1212,15 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeN==DIRICHLET) then
+  if (Btype(No)==DIRICHLET) then
    do k=1,nz
     do i=1,nx                       !Dirichlet inlet
-     Uco(i,ny+1,k)=NsideU
-     Uco(i,ny+2,k)=NsideU+(NsideU-Uco(i,ny,k))
-     Uco(i,ny+3,k)=NsideU+(NsideU-Uco(i,ny-1,k))
+     Uco(i,ny+1,k)=sideU(1,No)
+     Uco(i,ny+2,k)=sideU(1,No)+(sideU(1,No)-Uco(i,ny,k))
+     Uco(i,ny+3,k)=sideU(1,No)+(sideU(1,No)-Uco(i,ny-1,k))
     enddo
    enddo
-  elseif (BtypeN==NOSLIP) then
+  elseif (Btype(No)==NOSLIP) then
    do k=1,nz
     do i=1,nx                       !Solid wall
      Uco(i,ny+1,k)=0
@@ -1228,7 +1228,7 @@ module UPWIND
      Uco(i,ny+3,k)=-Uco(i,ny-1,k)
     enddo
    enddo
-  elseif (BtypeN==NEUMANN) then
+  elseif (Btype(No)==NEUMANN) then
    do k=1,nz
     do i=1,nx                       !Neumann inlet
      Uco(i,ny+1,k)=Uco(i,ny,k)
@@ -1236,7 +1236,7 @@ module UPWIND
      Uco(i,ny+3,k)=Uco(i,ny,k)
     enddo
    enddo
-  elseif (BtypeN==FREESLIP) then  !FREESLIP
+  elseif (Btype(No)==FREESLIP) then  !FREESLIP
    do k=1,nz
     do i=1,nx
      Uco(i,ny+1,k)=Uco(i,ny,k)
@@ -1244,7 +1244,7 @@ module UPWIND
      Uco(i,ny+3,k)=Uco(i,ny,k)
     enddo
    enddo
-  elseif (BtypeN==PERIODIC) then  !Periodic BC
+  elseif (Btype(No)==PERIODIC) then  !Periodic BC
    do k=1,nz
     do i=1,nx
      Uco(i,ny+1,k)=Uco(i,1,k)
@@ -1254,15 +1254,15 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeB==DIRICHLET) then
+  if (Btype(Bo)==DIRICHLET) then
    do j=1,ny
     do i=1,nx                       !Dirichlet inlet
-     Uco(i,j,0)=BsideU
-     Uco(i,j,-1)=BsideU+(BsideU-Uco(i,j,1))
-     Uco(i,j,-2)=BsideU+(BsideU-Uco(i,j,2))
+     Uco(i,j,0)=sideU(1,Bo)
+     Uco(i,j,-1)=sideU(1,Bo)+(sideU(1,Bo)-Uco(i,j,1))
+     Uco(i,j,-2)=sideU(1,Bo)+(sideU(1,Bo)-Uco(i,j,2))
     enddo
    enddo
-  elseif (BtypeB==NOSLIP) then
+  elseif (Btype(Bo)==NOSLIP) then
    do j=1,ny
     do i=1,nx                       !Solid wall
      Uco(i,j,0)=0
@@ -1270,7 +1270,7 @@ module UPWIND
      Uco(i,j,-2)=-Uco(i,j,2)
     enddo
    enddo
-  elseif (BtypeB==NEUMANN) then
+  elseif (Btype(Bo)==NEUMANN) then
    do j=1,ny
     do i=1,nx                       !Neumann inlet
      Uco(i,j,0)=Uco(i,j,1)
@@ -1278,7 +1278,7 @@ module UPWIND
      Uco(i,j,-2)=Uco(i,j,1)
     enddo
    enddo
-  elseif (BtypeB==FREESLIP) then  !FREESLIP
+  elseif (Btype(Bo)==FREESLIP) then  !FREESLIP
    do j=1,ny
     do i=1,nx
      Uco(i,j,0)=Uco(i,j,1)
@@ -1286,7 +1286,7 @@ module UPWIND
      Uco(i,j,-2)=Uco(i,j,1)
     enddo
    enddo
-  elseif (BtypeB==PERIODIC) then  !Periodic BC
+  elseif (Btype(Bo)==PERIODIC) then  !Periodic BC
    do j=1,ny
     do i=1,nx
      Uco(i,j,0)=Uco(i,j,nz)
@@ -1296,15 +1296,15 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeT==DIRICHLET) then
+  if (Btype(To)==DIRICHLET) then
    do j=1,ny
     do i=1,nx                       !Dirichlet inlet
-     Uco(i,j,nz+1)=TsideU
-     Uco(i,j,nz+2)=TsideU+(TsideU-Uco(i,j,nz))
-     Uco(i,j,nz+3)=TsideU+(TsideU-Uco(i,j,nz-1))
+     Uco(i,j,nz+1)=sideU(1,To)
+     Uco(i,j,nz+2)=sideU(1,To)+(sideU(1,To)-Uco(i,j,nz))
+     Uco(i,j,nz+3)=sideU(1,To)+(sideU(1,To)-Uco(i,j,nz-1))
     enddo
    enddo
-  elseif (BtypeT==NOSLIP) then
+  elseif (Btype(To)==NOSLIP) then
    do j=1,ny
     do i=1,nx                       !Solid wall
      Uco(i,j,nz+1)=0
@@ -1312,7 +1312,7 @@ module UPWIND
      Uco(i,j,nz+3)=-Uco(i,j,nz-1)
     enddo
    enddo
-  elseif (BtypeT==NEUMANN) then
+  elseif (Btype(To)==NEUMANN) then
    do j=1,ny
     do i=1,nx                       !Neumann inlet
      Uco(i,j,nz+1)=Uco(i,j,nz)
@@ -1320,7 +1320,7 @@ module UPWIND
      Uco(i,j,nz+3)=Uco(i,j,nz)
     enddo
    enddo
-  elseif (BtypeT==FREESLIP) then  !FREESLIP
+  elseif (Btype(To)==FREESLIP) then  !FREESLIP
    do j=1,ny
     do i=1,nx
      Uco(i,j,nz+1)=Uco(i,j,nz)
@@ -1328,7 +1328,7 @@ module UPWIND
      Uco(i,j,nz+3)=Uco(i,j,nz)
     enddo
    enddo
-  elseif (BtypeT==PERIODIC) then  !Periodic BC
+  elseif (Btype(To)==PERIODIC) then  !Periodic BC
    do j=1,ny
     do i=1,nx
      Uco(i,j,nz+1)=Uco(i,j,1)
@@ -1338,7 +1338,7 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeW==DIRICHLET) then
+  if (Btype(We)==DIRICHLET) then
    do k=1,nz
     do j=1,ny                       !Dirichlet inlet
      Uco(0,j,k)=(Uin(j,k)+Uin(j+1,k)+Uin(j,k+1)+Uin(j+1,k+1))/4._KND
@@ -1346,7 +1346,7 @@ module UPWIND
      Uco(-2,j,k)=(Uin(j,k)+Uin(j+1,k)+Uin(j,k+1)+Uin(j+1,k+1))/4._KND
     enddo
    enddo
-  elseif (BtypeW==NOSLIP) then
+  elseif (Btype(We)==NOSLIP) then
    do k=1,nz
     do j=1,ny                       !Solid wall
      Uco(0,j,k)=0
@@ -1354,7 +1354,7 @@ module UPWIND
      Uco(-2,j,k)=-Uco(2,j,k)
     enddo
    enddo
-  elseif (BtypeW==NEUMANN) then
+  elseif (Btype(We)==NEUMANN) then
    do k=1,nz
     do j=1,ny                       !Neumann inlet
      Uco(0,j,k)=Uco(1,j,k)
@@ -1362,7 +1362,7 @@ module UPWIND
      Uco(-2,j,k)=Uco(1,j,k)
     enddo
    enddo
-  elseif (BtypeW==FREESLIP) then  !FREESLIP
+  elseif (Btype(We)==FREESLIP) then  !FREESLIP
    do k=1,nz
     do j=1,ny
      Uco(0,j,k)=0
@@ -1370,7 +1370,7 @@ module UPWIND
      Uco(-2,j,k)=-Uco(2,j,k)
     enddo
    enddo
-  elseif (BtypeW==PERIODIC) then  !Periodic BC
+  elseif (Btype(We)==PERIODIC) then  !Periodic BC
    do k=1,nz
     do j=1,ny
      Uco(0,j,k)=Uco(nx,j,k)
@@ -1380,7 +1380,7 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeE==DIRICHLET) then
+  if (Btype(Ea)==DIRICHLET) then
    do k=1,nz
     do j=1,ny                       !Dirichlet inlet
      Uco(nx+1,j,k)=(Uin(j,k)+Uin(j+1,k)+Uin(j,k+1)+Uin(j+1,k+1))/4._KND
@@ -1388,7 +1388,7 @@ module UPWIND
      Uco(nx+3,j,k)=(Uin(j,k)+Uin(j+1,k)+Uin(j,k+1)+Uin(j+1,k+1))/4._KND
     enddo
    enddo
-  elseif (BtypeE==NOSLIP) then
+  elseif (Btype(Ea)==NOSLIP) then
    do k=1,nz
     do j=1,ny                       !Solid wall
      Uco(nx+1,j,k)=0
@@ -1396,7 +1396,7 @@ module UPWIND
      Uco(nx+3,j,k)=-Uco(nx-1,j,k)
     enddo
    enddo
-  elseif (BtypeE==NEUMANN) then   !Neumann outlet
+  elseif (Btype(Ea)==NEUMANN) then   !Neumann outlet
    do k=-2,nz+3
     do j=-2,ny+3
      Uco(nx+1,j,k)=Uco(nx,j,k)
@@ -1404,7 +1404,7 @@ module UPWIND
      Uco(nx+3,j,k)=Uco(nx,j,k)
     enddo
    enddo
-  elseif (BtypeE==FREESLIP) then  !FREESLIP
+  elseif (Btype(Ea)==FREESLIP) then  !FREESLIP
    do k=1,nz
     do j=1,ny
      Uco(nx+1,j,k)=0
@@ -1412,7 +1412,7 @@ module UPWIND
      Uco(nx+3,j,k)=Uco(nx-1,j,k)
     enddo
    enddo
-  elseif (BtypeE==PERIODIC) then  !Periodic BC
+  elseif (Btype(Ea)==PERIODIC) then  !Periodic BC
    do k=1,nz
     do j=1,ny
      Uco(nx+1,j,k)=Uco(1,j,k)
@@ -1426,19 +1426,19 @@ module UPWIND
 
   !!!!!!ROHY
 
-  if (BtypeS==NOSLIP.or.BtypeB==NOSLIP) then
+  if (Btype(So)==NOSLIP.or.Btype(Bo)==NOSLIP) then
    do i=1,nx
     Uco(i,0,0)=0
    enddo
-  elseif (BtypeS==PERIODIC.and.BtypeB==PERIODIC) then
+  elseif (Btype(So)==PERIODIC.and.Btype(Bo)==PERIODIC) then
    do i=1,nx
     Uco(i,0,0)=(Uco(i,1,1)+Uco(i,1,nz)+Uco(i,ny,1)+Uco(i,ny,nz))/4._KND
    enddo
-  elseif (BtypeS==PERIODIC) then
+  elseif (Btype(So)==PERIODIC) then
    do i=1,nx
     Uco(i,0,0)=(Uco(i,1,0)+Uco(i,ny,0))/2._KND
    enddo
-  elseif (BtypeB==PERIODIC) then
+  elseif (Btype(Bo)==PERIODIC) then
    do i=1,nx
     Uco(i,0,0)=(Uco(i,0,1)+Uco(i,0,nz))/2._KND
    enddo
@@ -1448,19 +1448,19 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeN==NOSLIP.or.BtypeB==NOSLIP) then
+  if (Btype(No)==NOSLIP.or.Btype(Bo)==NOSLIP) then
    do i=1,nx
     Uco(i,ny+1,0)=0
    enddo
-  elseif (BtypeN==PERIODIC.and.BtypeB==PERIODIC) then
+  elseif (Btype(No)==PERIODIC.and.Btype(Bo)==PERIODIC) then
    do i=1,nx
     Uco(i,ny+1,0)=(Uco(i,1,1)+Uco(i,1,nz)+Uco(i,ny,1)+Uco(i,ny,nz))/4._KND
    enddo
-  elseif (BtypeN==PERIODIC) then
+  elseif (Btype(No)==PERIODIC) then
    do i=1,nx
     Uco(i,ny+1,0)=(Uco(i,1,0)+Uco(i,ny,0))/2._KND
    enddo
-  elseif (BtypeB==PERIODIC) then
+  elseif (Btype(Bo)==PERIODIC) then
    do i=1,nx
     Uco(i,ny+1,0)=(Uco(i,ny+1,1)+Uco(i,ny+1,nz))/2._KND
    enddo
@@ -1470,19 +1470,19 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeS==NOSLIP.or.BtypeT==NOSLIP) then
+  if (Btype(So)==NOSLIP.or.Btype(To)==NOSLIP) then
    do i=1,nx
     Uco(i,0,nz+1)=0
    enddo
-  elseif (BtypeS==PERIODIC.and.BtypeT==PERIODIC) then
+  elseif (Btype(So)==PERIODIC.and.Btype(To)==PERIODIC) then
    do i=1,nx
     Uco(i,0,nz+1)=(Uco(i,1,1)+Uco(i,1,nz)+Uco(i,ny,1)+Uco(i,ny,nz))/4._KND
    enddo
-  elseif (BtypeS==PERIODIC) then
+  elseif (Btype(So)==PERIODIC) then
    do i=1,nx
     Uco(i,0,nz+1)=(Uco(i,1,nz+1)+Uco(i,ny,nz+1))/2._KND
    enddo
-  elseif (BtypeT==PERIODIC) then
+  elseif (Btype(To)==PERIODIC) then
    do i=1,nx
     Uco(i,0,nz+1)=(Uco(i,0,1)+Uco(i,0,nz))/2._KND
    enddo
@@ -1492,19 +1492,19 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeN==NOSLIP.or.BtypeT==NOSLIP) then
+  if (Btype(No)==NOSLIP.or.Btype(To)==NOSLIP) then
    do i=1,nx
     Uco(i,ny+1,nz+1)=0
    enddo
-  elseif (BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
+  elseif (Btype(No)==PERIODIC.and.Btype(To)==PERIODIC) then
    do i=1,nx
     Uco(i,ny+1,nz+1)=(Uco(i,1,1)+Uco(i,1,nz)+Uco(i,ny,1)+Uco(i,ny,nz))/4._KND
    enddo
-  elseif (BtypeN==PERIODIC) then
+  elseif (Btype(No)==PERIODIC) then
    do i=1,nx
     Uco(i,ny+1,nz+1)=(Uco(i,1,nz+1)+Uco(i,ny,nz+1))/2._KND
    enddo
-  elseif (BtypeT==PERIODIC) then
+  elseif (Btype(To)==PERIODIC) then
    do i=1,nx
     Uco(i,ny+1,nz+1)=(Uco(i,ny+1,1)+Uco(i,ny+1,nz))/2._KND
    enddo
@@ -1515,7 +1515,7 @@ module UPWIND
   endif
 
 
-  if (BtypeE==NOSLIP.or.BtypeE==FREESLIP) then
+  if (Btype(Ea)==NOSLIP.or.Btype(Ea)==FREESLIP) then
    do k=1,nz
     Uco(nx+1,0,k)=0
     Uco(nx+1,ny+1,k)=0
@@ -1524,7 +1524,7 @@ module UPWIND
     Uco(nx+1,j,0)=0
     Uco(nx+1,j,nz+1)=0
    enddo
-  elseif (BtypeE==DIRICHLET) then
+  elseif (Btype(Ea)==DIRICHLET) then
    do k=1,nz
     Uco(nx+1,0,k)=(Uin(0,k)+Uin(1,k)+Uin(0,k+1)+Uin(1,k+1))/4._KND
     Uco(nx+1,ny+1,k)=(Uin(ny+1,k)+Uin(ny+2,k)+Uin(ny+1,k+1)+Uin(ny+2,k+1))/4._KND
@@ -1533,7 +1533,7 @@ module UPWIND
     Uco(nx+1,j,0)=(Uin(j,0)+Uin(j+1,0)+Uin(j,1)+Uin(j+1,1))/4._KND
     Uco(nx+1,j,nz+1)=(Uin(j,nz+1)+Uin(j+1,nz+1)+Uin(j,nz+2)+Uin(j+1,nz+2))/4._KND
    enddo
-  elseif (BtypeE==PERIODIC) then
+  elseif (Btype(Ea)==PERIODIC) then
    do k=1,nz
     Uco(nx+1,0,k)=(Uco(1,0,k)+Uco(nx,0,k))/2._KND
     Uco(nx+1,ny+1,k)=(Uco(1,ny+1,k)+Uco(nx,ny+1,k))/2._KND
@@ -1554,7 +1554,7 @@ module UPWIND
   endif
 
 
-  if (BtypeW==NOSLIP.or.BtypeW==FREESLIP) then
+  if (Btype(We)==NOSLIP.or.Btype(We)==FREESLIP) then
    do k=1,nz
     Uco(0,0,k)=0
     Uco(0,ny+1,k)=0
@@ -1563,7 +1563,7 @@ module UPWIND
     Uco(0,j,0)=0
     Uco(0,j,nz+1)=0
    enddo
-  elseif (BtypeW==DIRICHLET) then
+  elseif (Btype(We)==DIRICHLET) then
    do k=1,nz
     Uco(0,0,k)=(Uin(0,k)+Uin(1,k)+Uin(0,k+1)+Uin(1,k+1))/4._KND
     Uco(0,ny+1,k)=(Uin(ny+1,k)+Uin(ny+2,k)+Uin(ny+1,k+1)+Uin(ny+2,k+1))/4._KND
@@ -1572,7 +1572,7 @@ module UPWIND
     Uco(0,j,0)=(Uin(j,0)+Uin(j+1,0)+Uin(j,1)+Uin(j+1,1))/4._KND
     Uco(0,j,nz+1)=(Uin(j,nz+1)+Uin(j+1,nz+1)+Uin(j,nz+2)+Uin(j+1,nz+2))/4._KND
    enddo
-  elseif (BtypeW==PERIODIC) then
+  elseif (Btype(We)==PERIODIC) then
    do k=1,nz
     Uco(0,0,k)=(Uco(1,0,k)+Uco(nx,0,k))/2._KND
     Uco(0,ny+1,k)=(Uco(1,ny+1,k)+Uco(nx,ny+1,k))/2._KND
@@ -1592,7 +1592,7 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
+  if (Btype(Ea)==PERIODIC.and.Btype(No)==PERIODIC.and.Btype(To)==PERIODIC) then
    Uco(0,0,0)=(Uco(1,0,0)+Uco(0,1,0)+Uco(0,0,1)+Uco(nx,0,0)+Uco(0,ny,0)+Uco(0,0,nz))/6._KND
    Uco(nx,0,0)=(Uco(1,0,0)+Uco(0,1,0)+Uco(0,0,1)+Uco(nx,0,0)+Uco(0,ny,0)+Uco(0,0,nz))/6._KND
    Uco(0,ny,0)=(Uco(1,0,0)+Uco(0,1,0)+Uco(0,0,1)+Uco(nx,0,0)+Uco(0,ny,0)+Uco(0,0,nz))/6._KND
@@ -1615,7 +1615,7 @@ module UPWIND
   ny=Vny
   nz=Wnz
 
-  if (BtypeW==DIRICHLET) then
+  if (Btype(We)==DIRICHLET) then
    do k=1,nz
     do j=1,ny                       !Dirichlet inlet
      Vco(0,j,k)=0
@@ -1623,7 +1623,7 @@ module UPWIND
      Vco(-2,j,k)=0
     enddo
    enddo
-  elseif (BtypeW==NOSLIP) then
+  elseif (Btype(We)==NOSLIP) then
    do k=1,nz
     do j=1,ny                       !Solid wall
      Vco(0,j,k)=0
@@ -1631,7 +1631,7 @@ module UPWIND
      Vco(-2,j,k)=-Vco(2,j,k)
     enddo
    enddo
-  elseif (BtypeW==NEUMANN) then
+  elseif (Btype(We)==NEUMANN) then
    do k=1,nz
     do j=1,ny                       !Neumann inlet
      Vco(0,j,k)=Vco(1,j,k)
@@ -1639,7 +1639,7 @@ module UPWIND
      Vco(-2,j,k)=Vco(1,j,k)
     enddo
    enddo
-  elseif (BtypeW==FREESLIP) then  !FREESLIP
+  elseif (Btype(We)==FREESLIP) then  !FREESLIP
    do k=1,nz
     do j=1,ny
      Vco(0,j,k)=Vco(1,j,k)
@@ -1647,7 +1647,7 @@ module UPWIND
      Vco(-2,j,k)=Vco(1,j,k)
     enddo
    enddo
-  elseif (BtypeW==PERIODIC) then  !Periodic BC
+  elseif (Btype(We)==PERIODIC) then  !Periodic BC
    do k=1,nz
     do j=1,ny
      Vco(0,j,k)=Vco(nx,j,k)
@@ -1657,7 +1657,7 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeE==DIRICHLET) then
+  if (Btype(Ea)==DIRICHLET) then
    do k=1,nz
     do j=1,ny                       !Dirichlet inlet
      Vco(nx+1,j,k)=0
@@ -1665,7 +1665,7 @@ module UPWIND
      Vco(nx+3,j,k)=0
     enddo
    enddo
-  elseif (BtypeE==NOSLIP) then
+  elseif (Btype(Ea)==NOSLIP) then
    do k=1,nz
     do j=1,ny                       !Solid wall
      Vco(nx+1,j,k)=0
@@ -1673,7 +1673,7 @@ module UPWIND
      Vco(nx+3,j,k)=-Vco(nx-1,j,k)
     enddo
    enddo
-  elseif (BtypeE==NEUMANN) then
+  elseif (Btype(Ea)==NEUMANN) then
    do k=1,nz
     do j=1,ny                       !Neumann inlet
      Vco(nx+1,j,k)=Vco(nx,j,k)
@@ -1681,7 +1681,7 @@ module UPWIND
      Vco(nx+3,j,k)=Vco(nx,j,k)
     enddo
    enddo
-  elseif (BtypeE==FREESLIP) then  !FREESLIP
+  elseif (Btype(Ea)==FREESLIP) then  !FREESLIP
    do k=1,nz
     do j=1,ny
      Vco(nx+1,j,k)=Vco(nx,j,k)
@@ -1689,7 +1689,7 @@ module UPWIND
      Vco(nx+3,j,k)=Vco(nx,j,k)
     enddo
    enddo
-  elseif (BtypeE==PERIODIC) then  !Periodic BC
+  elseif (Btype(Ea)==PERIODIC) then  !Periodic BC
    do k=1,nz
     do j=1,ny
      Vco(nx+1,j,k)=Vco(1,j,k)
@@ -1699,15 +1699,15 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeS==DIRICHLET) then
+  if (Btype(So)==DIRICHLET) then
    do k=1,nz
     do i=1,nx                       !Dirichlet inlet
-     Vco(i,0,k)=SsideV
-     Vco(i,-1,k)=SsideV+(SsideV-Vco(i,1,k))
-     Vco(i,-2,k)=SsideV+(SsideV-Vco(i,2,k))
+     Vco(i,0,k)=sideU(2,So)
+     Vco(i,-1,k)=sideU(2,So)+(sideU(2,So)-Vco(i,1,k))
+     Vco(i,-2,k)=sideU(2,So)+(sideU(2,So)-Vco(i,2,k))
     enddo
    enddo
-  elseif (BtypeS==NOSLIP) then
+  elseif (Btype(So)==NOSLIP) then
    do k=1,nz
     do i=1,nx                       !Solid wall
      Vco(i,0,k)=0
@@ -1715,7 +1715,7 @@ module UPWIND
      Vco(i,-2,k)=-Vco(i,2,k)
     enddo
    enddo
-  elseif (BtypeS==NEUMANN) then
+  elseif (Btype(So)==NEUMANN) then
    do k=1,nz
     do i=1,nx                       !Neumann inlet
      Vco(i,0,k)=Vco(i,1,k)
@@ -1723,7 +1723,7 @@ module UPWIND
      Vco(i,-2,k)=Vco(i,1,k)
     enddo
    enddo
-  elseif (BtypeS==FREESLIP) then  !FREESLIP
+  elseif (Btype(So)==FREESLIP) then  !FREESLIP
    do k=1,nz
     do i=1,nx
      Vco(i,0,k)=0
@@ -1731,7 +1731,7 @@ module UPWIND
      Vco(i,-2,k)=-Vco(i,2,k)
     enddo
    enddo
-  elseif (BtypeS==PERIODIC) then  !Periodic BC
+  elseif (Btype(So)==PERIODIC) then  !Periodic BC
    do k=1,nz
     do i=1,nx
      Vco(i,0,k)=Vco(i,ny,k)
@@ -1741,15 +1741,15 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeN==DIRICHLET) then
+  if (Btype(No)==DIRICHLET) then
    do k=1,nz
     do i=1,nx                       !Dirichlet inlet
-     Vco(i,ny+1,k)=NsideV
-     Vco(i,ny+2,k)=NsideV+(NsideV-Vco(i,ny,k))
-     Vco(i,ny+3,k)=NsideV+(NsideV-Vco(i,ny-1,k))
+     Vco(i,ny+1,k)=sideU(2,No)
+     Vco(i,ny+2,k)=sideU(2,No)+(sideU(2,No)-Vco(i,ny,k))
+     Vco(i,ny+3,k)=sideU(2,No)+(sideU(2,No)-Vco(i,ny-1,k))
     enddo
    enddo
-  elseif (BtypeN==NOSLIP) then
+  elseif (Btype(No)==NOSLIP) then
    do k=1,nz
     do i=1,nx                       !Solid wall
      Vco(i,ny+1,k)=0
@@ -1757,7 +1757,7 @@ module UPWIND
      Vco(i,ny+3,k)=-Vco(i,ny-1,k)
     enddo
    enddo
-  elseif (BtypeN==NEUMANN) then
+  elseif (Btype(No)==NEUMANN) then
    do k=1,nz
     do i=1,nx                       !Neumann inlet
      Vco(i,ny+1,k)=Vco(i,ny,k)
@@ -1765,7 +1765,7 @@ module UPWIND
      Vco(i,ny+3,k)=Vco(i,ny,k)
     enddo
    enddo
-  elseif (BtypeN==FREESLIP) then  !FREESLIP
+  elseif (Btype(No)==FREESLIP) then  !FREESLIP
    do k=1,nz
     do i=1,nx
      Vco(i,ny+1,k)=0
@@ -1773,7 +1773,7 @@ module UPWIND
      Vco(i,ny+3,k)=-Vco(i,ny-1,k)
     enddo
    enddo
-  elseif (BtypeN==PERIODIC) then  !Periodic BC
+  elseif (Btype(No)==PERIODIC) then  !Periodic BC
    do k=1,nz
     do i=1,nx
      Vco(i,ny+1,k)=Vco(i,1,k)
@@ -1783,15 +1783,15 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeB==DIRICHLET) then
+  if (Btype(Bo)==DIRICHLET) then
    do j=1,ny
     do i=1,nx                       !Dirichlet inlet
-     Vco(i,j,0)=BsideV
-     Vco(i,j,-1)=BsideV+(BsideV-Vco(i,j,1))
-     Vco(i,j,-2)=BsideV+(BsideV-Vco(i,j,2))
+     Vco(i,j,0)=sideU(2,Bo)
+     Vco(i,j,-1)=sideU(2,Bo)+(sideU(2,Bo)-Vco(i,j,1))
+     Vco(i,j,-2)=sideU(2,Bo)+(sideU(2,Bo)-Vco(i,j,2))
     enddo
    enddo
-  elseif (BtypeB==NOSLIP) then
+  elseif (Btype(Bo)==NOSLIP) then
    do j=1,ny
     do i=1,nx                       !Solid wall
      Vco(i,j,0)=0
@@ -1799,7 +1799,7 @@ module UPWIND
      Vco(i,j,-2)=-Vco(i,j,2)
     enddo
    enddo
-  elseif (BtypeB==NEUMANN) then
+  elseif (Btype(Bo)==NEUMANN) then
    do j=1,ny
     do i=1,nx                       !Neumann inlet
      Vco(i,j,0)=Vco(i,j,1)
@@ -1807,7 +1807,7 @@ module UPWIND
      Vco(i,j,-2)=Vco(i,j,1)
     enddo
    enddo
-  elseif (BtypeB==FREESLIP) then  !FREESLIP
+  elseif (Btype(Bo)==FREESLIP) then  !FREESLIP
    do j=1,ny
     do i=1,nx
      Vco(i,j,0)=Vco(i,j,1)
@@ -1815,7 +1815,7 @@ module UPWIND
      Vco(i,j,-2)=Vco(i,j,1)
     enddo
    enddo
-  elseif (BtypeB==PERIODIC) then  !Periodic BC
+  elseif (Btype(Bo)==PERIODIC) then  !Periodic BC
    do j=1,ny
     do i=1,nx
      Vco(i,j,0)=Vco(i,j,nz)
@@ -1825,15 +1825,15 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeT==DIRICHLET) then
+  if (Btype(To)==DIRICHLET) then
    do j=1,ny
     do i=1,nx                       !Dirichlet inlet
-     Vco(i,j,nz+1)=TsideV
-     Vco(i,j,nz+2)=TsideV+(TsideV-Vco(i,j,nz))
-     Vco(i,j,nz+3)=TsideV+(TsideV-Vco(i,j,nz-1))
+     Vco(i,j,nz+1)=sideU(2,To)
+     Vco(i,j,nz+2)=sideU(2,To)+(sideU(2,To)-Vco(i,j,nz))
+     Vco(i,j,nz+3)=sideU(2,To)+(sideU(2,To)-Vco(i,j,nz-1))
     enddo
    enddo
-  elseif (BtypeT==NOSLIP) then
+  elseif (Btype(To)==NOSLIP) then
    do j=1,ny
     do i=1,nx                       !Solid wall
      Vco(i,j,nz+1)=0
@@ -1841,7 +1841,7 @@ module UPWIND
      Vco(i,j,nz+3)=-Vco(i,j,nz-1)
     enddo
    enddo
-  elseif (BtypeT==NEUMANN) then
+  elseif (Btype(To)==NEUMANN) then
    do j=1,ny
     do i=1,nx                       !Neumann inlet
      Vco(i,j,nz+1)=Vco(i,j,nz)
@@ -1849,7 +1849,7 @@ module UPWIND
      Vco(i,j,nz+3)=Vco(i,j,nz)
     enddo
    enddo
-  elseif (BtypeT==FREESLIP) then  !FREESLIP
+  elseif (Btype(To)==FREESLIP) then  !FREESLIP
    do j=1,ny
     do i=1,nx
      Vco(i,j,nz+1)=Vco(i,j,nz)
@@ -1857,7 +1857,7 @@ module UPWIND
      Vco(i,j,nz+3)=Vco(i,j,nz)
     enddo
    enddo
-  elseif (BtypeT==PERIODIC) then  !Periodic BC
+  elseif (Btype(To)==PERIODIC) then  !Periodic BC
    do j=1,ny
     do i=1,nx
      Vco(i,j,nz+1)=Vco(i,j,1)
@@ -1869,19 +1869,19 @@ module UPWIND
 
   !!!!!!ROHY
 
-  if (BtypeW==NOSLIP.or.BtypeB==NOSLIP) then
+  if (Btype(We)==NOSLIP.or.Btype(Bo)==NOSLIP) then
    do j=1,ny
     Vco(0,j,0)=0
    enddo
-  elseif (BtypeW==PERIODIC.and.BtypeB==PERIODIC) then
+  elseif (Btype(We)==PERIODIC.and.Btype(Bo)==PERIODIC) then
    do j=1,ny
     Vco(0,j,0)=(Vco(1,j,1)+Vco(1,j,nz)+Vco(nx,j,1)+Vco(nx,j,nz))/4._KND
    enddo
-  elseif (BtypeW==PERIODIC) then
+  elseif (Btype(We)==PERIODIC) then
    do j=1,ny
     Vco(0,j,0)=(Vco(1,j,0)+Vco(nx,j,0))/2._KND
    enddo
-  elseif (BtypeB==PERIODIC) then
+  elseif (Btype(Bo)==PERIODIC) then
    do j=1,ny
     Vco(0,j,0)=(Vco(0,j,1)+Vco(0,j,nz))/2._KND
    enddo
@@ -1891,19 +1891,19 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeE==NOSLIP.or.BtypeB==NOSLIP) then
+  if (Btype(Ea)==NOSLIP.or.Btype(Bo)==NOSLIP) then
    do j=1,ny
     Vco(nx+1,j,0)=0
    enddo
-  elseif (BtypeE==PERIODIC.and.BtypeB==PERIODIC) then
+  elseif (Btype(Ea)==PERIODIC.and.Btype(Bo)==PERIODIC) then
    do j=1,ny
     Vco(nx+1,j,0)=(Vco(1,j,1)+Vco(1,j,nz)+Vco(nx,j,1)+Vco(nx,j,nz))/4._KND
    enddo
-  elseif (BtypeE==PERIODIC) then
+  elseif (Btype(Ea)==PERIODIC) then
    do j=1,ny
     Vco(nx+1,j,0)=(Vco(1,j,0)+Vco(nx,j,0))/2._KND
    enddo
-  elseif (BtypeB==PERIODIC) then
+  elseif (Btype(Bo)==PERIODIC) then
    do j=1,ny
     Vco(nx+1,j,0)=(Vco(nx+1,j,1)+Vco(nx+1,j,nz))/2._KND
    enddo
@@ -1913,19 +1913,19 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeW==NOSLIP.or.BtypeT==NOSLIP) then
+  if (Btype(We)==NOSLIP.or.Btype(To)==NOSLIP) then
    do j=1,ny
     Vco(0,j,nz+1)=0
    enddo
-  elseif (BtypeW==PERIODIC.and.BtypeT==PERIODIC) then
+  elseif (Btype(We)==PERIODIC.and.Btype(To)==PERIODIC) then
    do j=1,ny
     Vco(0,j,nz+1)=(Vco(1,j,1)+Vco(1,j,nz)+Vco(nx,j,1)+Vco(nx,j,nz))/4._KND
    enddo
-  elseif (BtypeW==PERIODIC) then
+  elseif (Btype(We)==PERIODIC) then
    do j=1,ny
     Vco(0,j,nz+1)=(Vco(1,j,nz+1)+Vco(nx,j,nz+1))/2._KND
    enddo
-  elseif (BtypeT==PERIODIC) then
+  elseif (Btype(To)==PERIODIC) then
    do j=1,ny
     Vco(0,j,nz+1)=(Vco(0,j,1)+Vco(0,j,nz))/2._KND
    enddo
@@ -1935,19 +1935,19 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeE==NOSLIP.or.BtypeT==NOSLIP) then
+  if (Btype(Ea)==NOSLIP.or.Btype(To)==NOSLIP) then
    do j=1,ny
     Vco(nx+1,j,nz+1)=0
    enddo
-  elseif (BtypeE==PERIODIC.and.BtypeT==PERIODIC) then
+  elseif (Btype(Ea)==PERIODIC.and.Btype(To)==PERIODIC) then
    do j=1,ny
     Vco(nx+1,j,nz+1)=(Vco(1,j,1)+Vco(1,j,nz)+Vco(nx,j,1)+Vco(nx,j,nz))/4._KND
    enddo
-  elseif (BtypeE==PERIODIC) then
+  elseif (Btype(Ea)==PERIODIC) then
    do j=1,ny
     Vco(nx+1,j,nz+1)=(Vco(1,j,nz+1)+Vco(nx,j,nz+1))/2._KND
    enddo
-  elseif (BtypeT==PERIODIC) then
+  elseif (Btype(To)==PERIODIC) then
    do j=1,ny
     Vco(nx+1,j,nz+1)=(Vco(nx+1,j,1)+Vco(nx+1,j,nz))/2._KND
    enddo
@@ -1958,7 +1958,7 @@ module UPWIND
   endif
 
 
-  if (BtypeN==NOSLIP.or.BtypeN==FREESLIP) then
+  if (Btype(No)==NOSLIP.or.Btype(No)==FREESLIP) then
    do k=1,nz
     Vco(0,ny+1,k)=0
     Vco(nx+1,ny+1,k)=0
@@ -1967,16 +1967,16 @@ module UPWIND
     Vco(i,ny+1,0)=0
     Vco(i,ny+1,nz+1)=0
    enddo
-  elseif (BtypeN==DIRICHLET) then
+  elseif (Btype(No)==DIRICHLET) then
    do k=1,nz
-    Vco(0,ny+1,k)=NsideV
-    Vco(nx+1,ny+1,k)=NsideV
+    Vco(0,ny+1,k)=sideU(2,No)
+    Vco(nx+1,ny+1,k)=sideU(2,No)
    enddo
    do i=1,nx
-    Vco(i,ny+1,0)=NsideV
-    Vco(i,ny+1,nz+1)=NsideV
+    Vco(i,ny+1,0)=sideU(2,No)
+    Vco(i,ny+1,nz+1)=sideU(2,No)
    enddo
-  elseif (BtypeN==PERIODIC) then
+  elseif (Btype(No)==PERIODIC) then
    do k=1,nz
     Vco(0,ny+1,k)=(Vco(0,1,k)+Vco(0,ny,k))/2._KND
     Vco(nx+1,ny+1,k)=(Vco(nx+1,1,k)+Vco(nx+1,ny,k))/2._KND
@@ -1997,7 +1997,7 @@ module UPWIND
   endif
 
 
-  if (BtypeS==NOSLIP.or.BtypeS==FREESLIP) then
+  if (Btype(So)==NOSLIP.or.Btype(So)==FREESLIP) then
    do k=1,nz
     Vco(0,0,k)=0
     Vco(nx+1,0,k)=0
@@ -2006,16 +2006,16 @@ module UPWIND
     Vco(i,0,0)=0
     Vco(i,0,nz+1)=0
    enddo
-  elseif (BtypeS==DIRICHLET) then
+  elseif (Btype(So)==DIRICHLET) then
    do k=1,nz
-    Vco(0,0,k)=SsideV
-    Vco(nx+1,0,k)=SsideV
+    Vco(0,0,k)=sideU(2,So)
+    Vco(nx+1,0,k)=sideU(2,So)
    enddo
    do i=1,nx
-    Vco(i,0,0)=SsideV
-    Vco(i,0,nz+1)=SsideV
+    Vco(i,0,0)=sideU(2,So)
+    Vco(i,0,nz+1)=sideU(2,So)
    enddo
-  elseif (BtypeS==PERIODIC) then
+  elseif (Btype(So)==PERIODIC) then
    do k=1,nz
     Vco(0,0,k)=(Vco(0,1,k)+Vco(0,ny,k))/2._KND
     Vco(nx+1,0,k)=(Vco(nx+1,1,k)+Vco(nx+1,ny,k))/2._KND
@@ -2035,7 +2035,7 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
+  if (Btype(Ea)==PERIODIC.and.Btype(No)==PERIODIC.and.Btype(To)==PERIODIC) then
    Vco(0,0,0)=(Vco(1,0,0)+Vco(0,1,0)+Vco(0,0,1)+Vco(nx,0,0)+Vco(0,ny,0)+Vco(0,0,nz))/6._KND
    Vco(nx,0,0)=(Vco(1,0,0)+Vco(0,1,0)+Vco(0,0,1)+Vco(nx,0,0)+Vco(0,ny,0)+Vco(0,0,nz))/6._KND
    Vco(0,ny,0)=(Vco(1,0,0)+Vco(0,1,0)+Vco(0,0,1)+Vco(nx,0,0)+Vco(0,ny,0)+Vco(0,0,nz))/6._KND
@@ -2057,7 +2057,7 @@ module UPWIND
   ny=Vny
   nz=Wnz
 
-  if (BtypeW==DIRICHLET) then
+  if (Btype(We)==DIRICHLET) then
    do k=1,nz
     do j=1,ny                       !Dirichlet inlet
      Wco(0,j,k)=0
@@ -2065,7 +2065,7 @@ module UPWIND
      Wco(-2,j,k)=0
     enddo
    enddo
-  elseif (BtypeW==NOSLIP) then
+  elseif (Btype(We)==NOSLIP) then
    do k=1,nz
     do j=1,ny                       !Solid wall
      Wco(0,j,k)=0
@@ -2073,7 +2073,7 @@ module UPWIND
      Wco(-2,j,k)=-Wco(2,j,k)
     enddo
    enddo
-  elseif (BtypeW==NEUMANN) then
+  elseif (Btype(We)==NEUMANN) then
    do k=1,nz
     do j=1,ny                       !Neumann inlet
      Wco(0,j,k)=Wco(1,j,k)
@@ -2081,7 +2081,7 @@ module UPWIND
      Wco(-2,j,k)=Wco(1,j,k)
     enddo
    enddo
-  elseif (BtypeW==FREESLIP) then  !FREESLIP
+  elseif (Btype(We)==FREESLIP) then  !FREESLIP
    do k=1,nz
     do j=1,ny
      Wco(0,j,k)=Wco(1,j,k)
@@ -2089,7 +2089,7 @@ module UPWIND
      Wco(-2,j,k)=Wco(1,j,k)
     enddo
    enddo
-  elseif (BtypeW==PERIODIC) then  !Periodic BC
+  elseif (Btype(We)==PERIODIC) then  !Periodic BC
    do k=1,nz
     do j=1,ny
      Wco(0,j,k)=Wco(nx,j,k)
@@ -2099,7 +2099,7 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeE==DIRICHLET) then
+  if (Btype(Ea)==DIRICHLET) then
    do k=1,nz
     do j=1,ny                       !Dirichlet inlet
      Wco(nx+1,j,k)=0
@@ -2107,7 +2107,7 @@ module UPWIND
      Wco(nx+3,j,k)=0
     enddo
    enddo
-  elseif (BtypeE==NOSLIP) then
+  elseif (Btype(Ea)==NOSLIP) then
    do k=1,nz
     do j=1,ny                       !Solid wall
      Wco(nx+1,j,k)=0
@@ -2115,7 +2115,7 @@ module UPWIND
      Wco(nx+3,j,k)=-Wco(nx-1,j,k)
     enddo
    enddo
-  elseif (BtypeE==NEUMANN) then
+  elseif (Btype(Ea)==NEUMANN) then
    do k=1,nz
     do j=1,ny                       !Neumann inlet
      Wco(nx+1,j,k)=Wco(nx,j,k)
@@ -2123,7 +2123,7 @@ module UPWIND
      Wco(nx+3,j,k)=Wco(nx,j,k)
     enddo
    enddo
-  elseif (BtypeE==FREESLIP) then  !FREESLIP
+  elseif (Btype(Ea)==FREESLIP) then  !FREESLIP
    do k=1,nz
     do j=1,ny
      Wco(nx+1,j,k)=Wco(nx,j,k)
@@ -2131,7 +2131,7 @@ module UPWIND
      Wco(nx+3,j,k)=Wco(nx,j,k)
     enddo
    enddo
-  elseif (BtypeE==PERIODIC) then  !Periodic BC
+  elseif (Btype(Ea)==PERIODIC) then  !Periodic BC
    do k=1,nz
     do j=1,ny
      Wco(nx+1,j,k)=Wco(1,j,k)
@@ -2141,15 +2141,15 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeS==DIRICHLET) then
+  if (Btype(So)==DIRICHLET) then
    do k=1,nz
     do i=1,nx                       !Dirichlet inlet
-     Wco(i,0,k)=SsideW
-     Wco(i,-1,k)=SsideW+(SsideW-Wco(i,1,k))
-     Wco(i,-2,k)=SsideW+(SsideW-Wco(i,2,k))
+     Wco(i,0,k)=sideU(3,So)
+     Wco(i,-1,k)=sideU(3,So)+(sideU(3,So)-Wco(i,1,k))
+     Wco(i,-2,k)=sideU(3,So)+(sideU(3,So)-Wco(i,2,k))
     enddo
    enddo
-  elseif (BtypeS==NOSLIP) then
+  elseif (Btype(So)==NOSLIP) then
    do k=1,nz
     do i=1,nx                       !Solid wall
      Wco(i,0,k)=0
@@ -2157,7 +2157,7 @@ module UPWIND
      Wco(i,-2,k)=-Wco(i,2,k)
     enddo
    enddo
-  elseif (BtypeS==NEUMANN) then
+  elseif (Btype(So)==NEUMANN) then
    do k=1,nz
     do i=1,nx                       !Neumann inlet
      Wco(i,0,k)=Wco(i,1,k)
@@ -2165,7 +2165,7 @@ module UPWIND
      Wco(i,-2,k)=Wco(i,1,k)
     enddo
    enddo
-  elseif (BtypeS==FREESLIP) then  !FREESLIP
+  elseif (Btype(So)==FREESLIP) then  !FREESLIP
    do k=1,nz
     do i=1,nx
      Wco(i,0,k)=Wco(i,1,k)
@@ -2173,7 +2173,7 @@ module UPWIND
      Wco(i,-2,k)=Wco(i,1,k)
     enddo
    enddo
-  elseif (BtypeS==PERIODIC) then  !Periodic BC
+  elseif (Btype(So)==PERIODIC) then  !Periodic BC
    do k=1,nz
     do i=1,nx
      Wco(i,0,k)=Wco(i,ny,k)
@@ -2183,15 +2183,15 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeN==DIRICHLET) then
+  if (Btype(No)==DIRICHLET) then
    do k=1,nz
     do i=1,nx                       !Dirichlet inlet
-     Wco(i,ny+1,k)=NsideW
-     Wco(i,ny+2,k)=NsideW+(NsideW-Wco(i,ny,k))
-     Wco(i,ny+3,k)=NsideW+(NsideW-Wco(i,ny-1,k))
+     Wco(i,ny+1,k)=sideU(3,No)
+     Wco(i,ny+2,k)=sideU(3,No)+(sideU(3,No)-Wco(i,ny,k))
+     Wco(i,ny+3,k)=sideU(3,No)+(sideU(3,No)-Wco(i,ny-1,k))
     enddo
    enddo
-  elseif (BtypeN==NOSLIP) then
+  elseif (Btype(No)==NOSLIP) then
    do k=1,nz
     do i=1,nx                       !Solid wall
      Wco(i,ny+1,k)=0
@@ -2199,7 +2199,7 @@ module UPWIND
      Wco(i,ny+3,k)=-Wco(i,ny-1,k)
     enddo
    enddo
-  elseif (BtypeN==NEUMANN) then
+  elseif (Btype(No)==NEUMANN) then
    do k=1,nz
     do i=1,nx                       !Neumann inlet
      Wco(i,ny+1,k)=Wco(i,ny,k)
@@ -2207,7 +2207,7 @@ module UPWIND
      Wco(i,ny+3,k)=Wco(i,ny,k)
     enddo
    enddo
-  elseif (BtypeN==FREESLIP) then  !FREESLIP
+  elseif (Btype(No)==FREESLIP) then  !FREESLIP
    do k=1,nz
     do i=1,nx
      Wco(i,ny+1,k)=Wco(i,ny,k)
@@ -2215,7 +2215,7 @@ module UPWIND
      Wco(i,ny+3,k)=Wco(i,ny,k)
     enddo
    enddo
-  elseif (BtypeN==PERIODIC) then  !Periodic BC
+  elseif (Btype(No)==PERIODIC) then  !Periodic BC
    do k=1,nz
     do i=1,nx
      Wco(i,ny+1,k)=Wco(i,1,k)
@@ -2225,15 +2225,15 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeB==DIRICHLET) then
+  if (Btype(Bo)==DIRICHLET) then
    do j=1,ny
     do i=1,nx                       !Dirichlet inlet
-     Wco(i,j,0)=BsideW
-     Wco(i,j,-1)=BsideW+(BsideW-Wco(i,j,1))
-     Wco(i,j,-2)=BsideW+(BsideW-Wco(i,j,2))
+     Wco(i,j,0)=sideU(3,Bo)
+     Wco(i,j,-1)=sideU(3,Bo)+(sideU(3,Bo)-Wco(i,j,1))
+     Wco(i,j,-2)=sideU(3,Bo)+(sideU(3,Bo)-Wco(i,j,2))
     enddo
    enddo
-  elseif (BtypeB==NOSLIP) then
+  elseif (Btype(Bo)==NOSLIP) then
    do j=1,ny
     do i=1,nx                       !Solid wall
      Wco(i,j,0)=0
@@ -2241,7 +2241,7 @@ module UPWIND
      Wco(i,j,-2)=-Wco(i,j,2)
     enddo
    enddo
-  elseif (BtypeB==NEUMANN) then
+  elseif (Btype(Bo)==NEUMANN) then
    do j=1,ny
     do i=1,nx                       !Neumann inlet
      Wco(i,j,0)=Wco(i,j,1)
@@ -2249,7 +2249,7 @@ module UPWIND
      Wco(i,j,-2)=Wco(i,j,1)
     enddo
    enddo
-  elseif (BtypeB==FREESLIP) then  !FREESLIP
+  elseif (Btype(Bo)==FREESLIP) then  !FREESLIP
    do j=1,ny
     do i=1,nx
      Wco(i,j,0)=0
@@ -2257,7 +2257,7 @@ module UPWIND
      Wco(i,j,-2)=-Wco(i,j,2)
     enddo
    enddo
-  elseif (BtypeB==PERIODIC) then  !Periodic BC
+  elseif (Btype(Bo)==PERIODIC) then  !Periodic BC
    do j=1,ny
     do i=1,nx
      Wco(i,j,0)=Wco(i,j,nz)
@@ -2267,15 +2267,15 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeT==DIRICHLET) then
+  if (Btype(To)==DIRICHLET) then
    do j=1,ny
     do i=1,nx                       !Dirichlet inlet
-     Wco(i,j,nz+1)=TsideW
-     Wco(i,j,nz+2)=TsideW+(TsideW-Wco(i,j,nz))
-     Wco(i,j,nz+3)=TsideW+(TsideW-Wco(i,j,nz-1))
+     Wco(i,j,nz+1)=sideU(3,To)
+     Wco(i,j,nz+2)=sideU(3,To)+(sideU(3,To)-Wco(i,j,nz))
+     Wco(i,j,nz+3)=sideU(3,To)+(sideU(3,To)-Wco(i,j,nz-1))
     enddo
    enddo
-  elseif (BtypeT==NOSLIP) then
+  elseif (Btype(To)==NOSLIP) then
    do j=1,ny
     do i=1,nx                       !Solid wall
      Wco(i,j,nz+1)=0
@@ -2283,7 +2283,7 @@ module UPWIND
      Wco(i,j,nz+3)=-Wco(i,j,nz-1)
     enddo
    enddo
-  elseif (BtypeT==NEUMANN) then
+  elseif (Btype(To)==NEUMANN) then
    do j=1,ny
     do i=1,nx                       !Neumann inlet
      Wco(i,j,nz+1)=Wco(i,j,nz)
@@ -2291,7 +2291,7 @@ module UPWIND
      Wco(i,j,nz+3)=Wco(i,j,nz)
     enddo
    enddo
-  elseif (BtypeT==FREESLIP) then  !FREESLIP
+  elseif (Btype(To)==FREESLIP) then  !FREESLIP
    do j=1,ny
     do i=1,nx
      Wco(i,j,nz+1)=0
@@ -2299,7 +2299,7 @@ module UPWIND
      Wco(i,j,nz+3)=-Wco(i,j,nz-1)
     enddo
    enddo
-  elseif (BtypeT==PERIODIC) then  !Periodic BC
+  elseif (Btype(To)==PERIODIC) then  !Periodic BC
    do j=1,ny
     do i=1,nx
      Wco(i,j,nz+1)=Wco(i,j,1)
@@ -2311,19 +2311,19 @@ module UPWIND
 
 
 
-  if (BtypeW==NOSLIP.or.BtypeS==NOSLIP) then
+  if (Btype(We)==NOSLIP.or.Btype(So)==NOSLIP) then
    do k=1,nz
     Wco(0,0,k)=0
    enddo
-  elseif (BtypeW==PERIODIC.and.BtypeS==PERIODIC) then
+  elseif (Btype(We)==PERIODIC.and.Btype(So)==PERIODIC) then
    do k=1,nz
     Wco(0,0,k)=(Wco(1,1,k)+Wco(1,ny,k)+Wco(nx,1,k)+Wco(nx,ny,k))/4._KND
    enddo
-  elseif (BtypeW==PERIODIC) then
+  elseif (Btype(We)==PERIODIC) then
    do k=1,nz
     Wco(0,0,k)=(Wco(1,0,k)+Wco(nx,0,k))/2._KND
    enddo
-  elseif (BtypeS==PERIODIC) then
+  elseif (Btype(So)==PERIODIC) then
    do k=1,nz
     Wco(0,0,k)=(Wco(0,1,k)+Wco(0,ny,k))/2._KND
    enddo
@@ -2333,19 +2333,19 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeE==NOSLIP.or.BtypeS==NOSLIP) then
+  if (Btype(Ea)==NOSLIP.or.Btype(So)==NOSLIP) then
    do k=1,nz
     Wco(nx+1,0,k)=0
    enddo
-  elseif (BtypeE==PERIODIC.and.BtypeS==PERIODIC) then
+  elseif (Btype(Ea)==PERIODIC.and.Btype(So)==PERIODIC) then
    do k=1,nz
     Wco(nx+1,0,k)=(Wco(1,1,k)+Wco(1,ny,k)+Wco(nx,1,k)+Wco(nx,ny,k))/4._KND
    enddo
-  elseif (BtypeE==PERIODIC) then
+  elseif (Btype(Ea)==PERIODIC) then
    do k=1,nz
     Wco(nx+1,0,k)=(Wco(1,0,k)+Wco(nx,0,k))/2._KND
    enddo
-  elseif (BtypeS==PERIODIC) then
+  elseif (Btype(So)==PERIODIC) then
    do k=1,nz
     Wco(nx+1,0,k)=(Wco(nx+1,1,k)+Wco(nx+1,ny,k))/2._KND
    enddo
@@ -2355,19 +2355,19 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeW==NOSLIP.or.BtypeN==NOSLIP) then
+  if (Btype(We)==NOSLIP.or.Btype(No)==NOSLIP) then
    do k=1,nz
     Wco(0,ny+1,k)=0
    enddo
-  elseif (BtypeW==PERIODIC.and.BtypeN==PERIODIC) then
+  elseif (Btype(We)==PERIODIC.and.Btype(No)==PERIODIC) then
    do k=1,nz
     Wco(0,ny+1,k)=(Wco(1,1,k)+Wco(1,ny,k)+Wco(nx,1,k)+Wco(nx,ny,k))/4._KND
    enddo
-  elseif (BtypeW==PERIODIC) then
+  elseif (Btype(We)==PERIODIC) then
    do k=1,nz
     Wco(0,ny+1,k)=(Wco(1,ny+1,k)+Wco(nx,ny+1,k))/2._KND
    enddo
-  elseif (BtypeN==PERIODIC) then
+  elseif (Btype(No)==PERIODIC) then
    do k=1,nz
     Wco(0,ny+1,k)=(Wco(0,1,k)+Wco(0,ny,k))/2._KND
    enddo
@@ -2377,19 +2377,19 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeE==NOSLIP.or.BtypeN==NOSLIP) then
+  if (Btype(Ea)==NOSLIP.or.Btype(No)==NOSLIP) then
    do k=1,nz
     Wco(nx+1,ny+1,k)=0
    enddo
-  elseif (BtypeE==PERIODIC.and.BtypeN==PERIODIC) then
+  elseif (Btype(Ea)==PERIODIC.and.Btype(No)==PERIODIC) then
    do k=1,nz
     Wco(nx+1,ny+1,k)=(Wco(1,1,k)+Wco(1,ny,k)+Wco(nx,1,k)+Wco(nx,ny,k))/4._KND
    enddo
-  elseif (BtypeE==PERIODIC) then
+  elseif (Btype(Ea)==PERIODIC) then
    do k=1,nz
     Wco(nx+1,ny+1,k)=(Wco(1,ny+1,k)+Wco(nx,ny+1,k))/2._KND
    enddo
-  elseif (BtypeN==PERIODIC) then
+  elseif (Btype(No)==PERIODIC) then
    do k=1,nz
     Wco(nx+1,ny+1,k)=(Wco(nx+1,1,k)+Wco(nx+1,ny,k))/2._KND
    enddo
@@ -2400,7 +2400,7 @@ module UPWIND
   endif
 
 
-  if (BtypeT==NOSLIP.or.BtypeT==FREESLIP) then
+  if (Btype(To)==NOSLIP.or.Btype(To)==FREESLIP) then
    do j=1,ny
     Wco(0,j,nz+1)=0
     Wco(nx+1,j,nz+1)=0
@@ -2409,16 +2409,16 @@ module UPWIND
     Wco(i,0,nz+1)=0
     Wco(i,ny+1,nz+1)=0
    enddo
-  elseif (BtypeT==DIRICHLET) then
+  elseif (Btype(To)==DIRICHLET) then
    do j=1,ny
-    Wco(0,j,nz+1)=TsideW
-    Wco(nx+1,j,nz+1)=TsideW
+    Wco(0,j,nz+1)=sideU(3,To)
+    Wco(nx+1,j,nz+1)=sideU(3,To)
    enddo
    do i=1,nx
-    Wco(i,0,nz+1)=TsideW
-    Wco(i,ny+1,nz+1)=TsideW
+    Wco(i,0,nz+1)=sideU(3,To)
+    Wco(i,ny+1,nz+1)=sideU(3,To)
    enddo
-  elseif (BtypeT==PERIODIC) then
+  elseif (Btype(To)==PERIODIC) then
    do j=1,ny
     Wco(0,j,nz+1)=(Wco(0,j,1)+Wco(0,j,nz))/2._KND
     Wco(nx+1,j,nz+1)=(Wco(nx+1,j,1)+Wco(nx+1,j,nz))/2._KND
@@ -2439,7 +2439,7 @@ module UPWIND
   endif
 
 
-  if (BtypeB==NOSLIP.or.BtypeB==FREESLIP) then
+  if (Btype(Bo)==NOSLIP.or.Btype(Bo)==FREESLIP) then
    do j=1,ny
     Wco(0,j,0)=0
     Wco(nx+1,j,0)=0
@@ -2448,16 +2448,16 @@ module UPWIND
     Wco(i,0,0)=0
     Wco(i,ny+1,0)=0
    enddo
-  elseif (BtypeB==DIRICHLET) then
+  elseif (Btype(Bo)==DIRICHLET) then
    do j=1,ny
-    Wco(0,j,0)=BsideW
-    Wco(nx+1,j,0)=BsideW
+    Wco(0,j,0)=sideU(3,Bo)
+    Wco(nx+1,j,0)=sideU(3,Bo)
    enddo
    do i=1,nx
-    Wco(i,0,0)=BsideW
-    Wco(i,ny+1,0)=BsideW
+    Wco(i,0,0)=sideU(3,Bo)
+    Wco(i,ny+1,0)=sideU(3,Bo)
    enddo
-  elseif (BtypeB==PERIODIC) then
+  elseif (Btype(Bo)==PERIODIC) then
    do j=1,ny
     Wco(0,j,0)=(Wco(0,j,1)+Wco(0,j,nz))/2._KND
     Wco(nx+1,j,0)=(Wco(nx+1,j,1)+Wco(nx+1,j,nz))/2._KND
@@ -2477,7 +2477,7 @@ module UPWIND
    enddo
   endif
 
-  if (BtypeE==PERIODIC.and.BtypeN==PERIODIC.and.BtypeT==PERIODIC) then
+  if (Btype(Ea)==PERIODIC.and.Btype(No)==PERIODIC.and.Btype(To)==PERIODIC) then
    Wco(0,0,0)=(Wco(1,0,0)+Wco(0,1,0)+Wco(0,0,1)+Wco(nx,0,0)+Wco(0,ny,0)+Wco(0,0,nz))/6._KND
    Wco(nx,0,0)=(Wco(1,0,0)+Wco(0,1,0)+Wco(0,0,1)+Wco(nx,0,0)+Wco(0,ny,0)+Wco(0,0,nz))/6._KND
    Wco(0,ny,0)=(Wco(1,0,0)+Wco(0,1,0)+Wco(0,0,1)+Wco(nx,0,0)+Wco(0,ny,0)+Wco(0,0,nz))/6._KND

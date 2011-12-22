@@ -66,8 +66,8 @@ module GEOMETRIC
  endtype TSolidbody
 
  type(TSolidBody),pointer:: FirstSB => null()         !First member of the linked list of solid objects
-  
- 
+
+
 
 
  type TIBPoint
@@ -124,7 +124,7 @@ contains
     endif
    enddo
   endsubroutine SetCurrentSB
-  
+
   pure logical function PlaneInt(x,y,z,PL,eps)
    real(KND),intent(in):: x,y,z
    type(TPlane),intent(in):: PL
@@ -340,7 +340,7 @@ contains
    TerrainInt=interior
   endfunction TerrainInt
 
-    
+
   pure logical function SolidBodyInt(x,y,z,SB,eps)
    real(KND),intent(in):: x,y,z
    type(TSolidBody),intent(in):: SB
@@ -350,13 +350,13 @@ contains
    x2=x
    y2=y
    z2=z
-   if (BtypeE==PERIODIC.and.x2>xU(Prnx+1)) x2=x2-lx
-   if (BtypeN==PERIODIC.and.y2>yV(Prny+1)) y2=y2-ly
-   if (BtypeT==PERIODIC.and.z2>zW(Prnz+1)) z2=z2-lz
+   if (Btype(Ea)==PERIODIC.and.x2>xU(Prnx+1)) x2=x2-lx
+   if (Btype(No)==PERIODIC.and.y2>yV(Prny+1)) y2=y2-ly
+   if (Btype(To)==PERIODIC.and.z2>zW(Prnz+1)) z2=z2-lz
 
-   if (BtypeW==PERIODIC.and.x2<xU(0)) x2=x2+lx
-   if (BtypeS==PERIODIC.and.y2<yV(0)) y2=y2+ly
-   if (BtypeB==PERIODIC.and.z2<zW(0)) z2=z2+lz
+   if (Btype(We)==PERIODIC.and.x2<xU(0)) x2=x2+lx
+   if (Btype(So)==PERIODIC.and.y2<yV(0)) y2=y2+ly
+   if (Btype(Bo)==PERIODIC.and.z2<zW(0)) z2=z2+lz
 
    select case (SB%typeofbody)
 
@@ -422,7 +422,7 @@ contains
    real(KND),intent(in)::x,y,z
    type(TPlane),intent(in):: PL
    real(KND) t
-   
+
    if (((PL%a/=0).or.(PL%b/=0)).or.(PL%c/=0)) then
     t=-(PL%a*x+PL%b*y+PL%c*z+PL%d)/(PL%a**2+PL%b**2+PL%c**2)
    else
@@ -458,7 +458,7 @@ contains
    real(KND),intent(in):: x,y,z
    type(TCylinder),intent(in):: C
    real(KND) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
-  
+
    !!!Only for Planes perpendicular to jacket!!!!
 
    if (associated(C%Plane1)) then
@@ -541,7 +541,7 @@ contains
    integer   :: info                                   !
    real(KND) :: rcond                                  !
    character :: equed                                  !
-   
+
   !Vzdalenosti od rovin, pokud je nejbl. bod roviny uvnitr jine, nebo puv. bod na vnitrni strane -> vzd. *-1
   !Pokud je nejbl. body +- eps. (norm. vektor!,dxmin/100) uvnitr a vne polyh -> hotovo
   !Jinak 2. nejbl. rovina v abs. hodnote -> prusecnice a nejbl bod na ni
@@ -598,7 +598,7 @@ contains
    ailine=PH%Planes(nearest)%b*PH%Planes(nearest2)%c-PH%Planes(nearest)%c*PH%Planes(nearest2)%b
    biline=PH%Planes(nearest)%c*PH%Planes(nearest2)%a-PH%Planes(nearest)%a*PH%Planes(nearest2)%c
    ciline=PH%Planes(nearest)%a*PH%Planes(nearest2)%b-PH%Planes(nearest)%b*PH%Planes(nearest2)%a
- 
+
    if (abs(ailine)<=epsilon(ailine).and.abs(biline)<=epsilon(biline).and.abs(ciline)<=epsilon(ciline)) then
     write(*,*) PH%Planes(nearest)%c*PH%Planes(nearest2)%a,PH%Planes(nearest)%a*PH%Planes(nearest2)%c
     write(*,*) "cross product 0"
@@ -679,7 +679,7 @@ contains
     znear=zln
     return
    endif
-  
+
 
 
    ag=reshape(source=(/ PH%Planes(nearest)%a,PH%Planes(nearest2)%a,PH%Planes(nearest3)%a,&
@@ -693,7 +693,7 @@ contains
    else
     call SGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
    endif
-      
+
    xnear=xg(1)
    ynear=xg(2)
    znear=xg(3)
@@ -701,7 +701,7 @@ contains
   endsubroutine PolyhedronNearest
 
 
-   
+
 
   subroutine TerrainNearest(xnear,ynear,znear,x,y,z,T)
    real(KND),intent(out):: xnear,ynear,znear
@@ -726,7 +726,7 @@ contains
     Pl%b=b
     Pl%c=-1._KND
     Pl%d=-a*x-b*y+zloc
-    
+
     call PlaneNearest(xnear,ynear,znear,x,y,z,Pl)
 
    elseif (comp==2) then
@@ -763,7 +763,7 @@ contains
    real(KND),intent(out):: xnear,ynear,znear
    real(KND),intent(in):: x,y,z
    type(TSolidBody),intent(in):: SB
-   
+
    select case (SB%typeofbody)
     case (1)
      call PolyhedronNearest(xnear,ynear,znear,x,y,z,SB%Polyhedron)
@@ -785,7 +785,7 @@ contains
    real(KND),intent(in):: x,y,z
    type(TCylinder),intent(in):: C
    real(KND) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
-  
+
    if (associated(C%Plane1)) then
      call PlaneNearest(xP1,yP1,zP1,x,y,z,C%Plane1)
    else
@@ -904,7 +904,7 @@ contains
     endif
     CurrentSB=>CurrentSB%next
    enddo
-      
+
    CurrentSB=>FirstSB
    do
     if (associated(CurrentSB)) then
@@ -955,10 +955,10 @@ contains
 
 
    call InitImBoundaries
-   
+
    allocate(WMP%depscalar(computescalars))
 
-   do k=1,Prnz 
+   do k=1,Prnz
     do j=1,Prny
      do i=1,Prnx
       if (Prtype(i,j,k)==0) then
@@ -973,8 +973,8 @@ contains
             call SolidBodyNearest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k),CurrentSB)
             if (SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
              dist=SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
-             nb=Prtype(i+m,j+n,k+o)            
-            endif            
+             nb=Prtype(i+m,j+n,k+o)
+            endif
           endif
          enddo
         enddo
@@ -1008,12 +1008,12 @@ contains
      enddo
     enddo
    enddo
- 
+
   endsubroutine GetSolidBodiesBC
 
 
 
-  ! File customBC.f90 should contain user generated subroutine InitSolidBodies that inicializes 
+  ! File customBC.f90 should contain user generated subroutine InitSolidBodies that inicializes
   ! the linked list of solid bodies objects. This is to avoid unnecessary changes in the history
   ! of this file, when only boundary conditions changes, until a runtime BC generation is developed.
   subroutine InitSolidBodies
@@ -1025,7 +1025,7 @@ contains
 
   subroutine AddIBpoint(IBP)
   type(TIBPoint),intent(in):: IBP
-  
+
   if (.not.associated(LastIBPoint)) then
    allocate(FirstIBPoint)
    FirstIBPoint=IBP
@@ -1039,7 +1039,7 @@ contains
 
   subroutine AddScalIBpoint(SIBP)
   type(TScalFlIBPoint),intent(in):: SIBP
-  
+
   if (.not.associated(LastScalFlIBPoint)) then
    allocate(FirstScalFlIBPoint)
    FirstScalFlIBPoint=SIBP
@@ -1226,7 +1226,7 @@ contains
    IBP%dirx=0
    IBP%diry=0
    IBP%dirz=0
-   
+
   elseif ((free100.and.dirx==1).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then !Three free directions,
    IBP%interp=3                                                                           !use trilinear interpolation.
    IBP%interpdir=0
@@ -1269,7 +1269,7 @@ contains
   elseif (free100.and.dirx==1) then  !Only one free direction, use linear interpolation in direction x.
    IBP%interp=1
    IBP%interpdir=1
-   if (diry==1.or.dirz==1) then                   !If other dir components nonzero, delete them and 
+   if (diry==1.or.dirz==1) then                   !If other dir components nonzero, delete them and
     t=NearestOnLineOut(x,y,z,x+IBP%distx,y,z,SB)  !find an intersection of the new vector with the boundary
 
     diry=0
@@ -1326,7 +1326,7 @@ contains
    write(*,*) "y",y
    write(*,*) "z",z
    write(*,*) "component",IBP%component
-   stop 
+   stop
   endif
   endsubroutine GetUIBPoint
 
@@ -1361,7 +1361,7 @@ contains
   dirx=abs(IBP%dirx)
   diry=abs(IBP%diry)
   dirz=abs(IBP%dirz)
-    
+
   if (.not.SolidBodyInt(xPr(xi),yV(yj),zPr(zk),SB))  then  !For now, if actually outside the body, set an artificial boundary
    IBP%interp=0                                            !point here. In future we can use another interpolation.
    IBP%interpdir=0
@@ -1608,7 +1608,7 @@ contains
   dirx=abs(IBP%dirx)
   diry=abs(IBP%diry)
   dirz=abs(IBP%dirz)
-  
+
   if (.not.SolidBodyInt(xPr(xi),yPr(yj),zW(zk),SB))  then  !For now, if actually outside the body, set an artificial boundary
    IBP%interp=0                                            !point here. In future we can use another interpolation.
    IBP%interpdir=0
@@ -1711,7 +1711,7 @@ contains
    IBP%dirz=0
   endif
 
-  
+
   if ((dirx==0.and.diry==0.and.dirz==0).or.((.not.free001).and.(.not.free010).and.(.not.free100))) then
    IBP%interp=0
    IBP%interpdir=0
@@ -2174,7 +2174,7 @@ contains
    IBLinInt=-(h0/(h1-h0))*vel1
 !   elseif  (h1-h0<h1/10._KND) then
 !    IBLinInt= 0
-  else   
+  else
    IBLinInt=-((h2-2*h0)*vel1+(2*h0-h1)*vel2)/(h2-h1)
   endif
   endfunction IBLinInt

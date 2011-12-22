@@ -87,18 +87,18 @@ implicit none
   logical xgridfromfile,ygridfromfile,zgridfromfile
   integer initcondsfromfile
 
-  integer BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT       !boundary condition types see below for values
-  integer TBtypeW,TBtypeE,TBtypeS,TBtypeN,TBtypeB,TBtypeT !boundary condition types for temperature
-  integer ScalBtypeW,ScalBtypeE,ScalBtypeS,ScalBtypeN,ScalBtypeB,ScalBtypeT !boundary condition types for scalars
+  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+
+  integer,dimension(6) :: Btype     !boundary condition types see below for values
+  integer,dimension(6) :: TBtype    !boundary condition types for temperature
+  integer,dimension(6) :: ScalBtype !boundary condition types for scalars
 
 
-  real(KND) SsideU,NsideU,BsideU,TsideU                     !velocities on boundaries in case of Dirichlet BC
-  real(KND) SsideV,NsideV,BsideV,TsideV
-  real(KND) SsideW,NsideW,BsideW,TsideW
-  real(KND) SsideTemp,NsideTemp,BsideTemp,TsideTemp,WsideTemp,EsideTemp  !temperatures or temperature fluxes on boundaries
-  real(KND),allocatable:: BsideTArr(:,:),BsideTFLArr(:,:)
+  real(KND),dimension(3,6) :: sideU    !velocities on boundaries in case of Dirichlet BC
+  real(KND),dimension(6)   :: sideTemp !temperatures or temperature fluxes on boundaries
+  real(KND),allocatable    :: BsideTArr(:,:),BsideTFLArr(:,:)
 
-  real(KND) SsideScal,NsideScal,BsideScal,TsideScal,WsideScal,EsideScal  !scalarss or scalar fluxes on boundaries
+  real(KND),dimension(6) :: sideScal  !scalars or scalar fluxes on boundaries
 
   integer vtkformat
 

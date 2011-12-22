@@ -47,17 +47,17 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
   write (*,*) "Preparing pressure correction"
 
-  if (BtypeE==PERIODIC.and.poissmet==2) then
+  if (Btype(Ea)==PERIODIC.and.poissmet==2) then
    nx=Prnx+1
   else
    nx=Prnx
   endif
-  if (BtypeN==PERIODIC.and.poissmet==2) then
+  if (Btype(No)==PERIODIC.and.poissmet==2) then
    ny=Prny+1
   else
    ny=Prny
   endif
-  if (BtypeT==PERIODIC.and.poissmet==2) then
+  if (Btype(To)==PERIODIC.and.poissmet==2) then
    nz=Prnz+1
   else
    nz=Prnz
@@ -406,18 +406,18 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      !$hmpp <SOR> allocate
      !$hmpp <SOR> advancedload, args[GS_GPU::Phi,GS_GPU::RHS,GS_GPU::nx,GS_GPU::ny,GS_GPU::nz,GS_GPU::nit,&
      !$hmpp <SOR>    GS_GPU::Aw,GS_GPU::Ae,GS_GPU::As,GS_GPU::An,GS_GPU::Ab,GS_GPU::At,&
-     !$hmpp <SOR>    GS_GPU::BtypeW,GS_GPU::BtypeE,GS_GPU::BtypeS,GS_GPU::BtypeN,GS_GPU::BtypeB,GS_GPU::BtypeT]
+     !$hmpp <SOR>    GS_GPU::Btype(We),GS_GPU::Btype(Ea),GS_GPU::Btype(So),GS_GPU::Btype(No),GS_GPU::Btype(Bo),GS_GPU::Btype(To)]
      do while (l<=maxPoissoniter.and.S>epsPoisson)
       !$hmpp  <SOR> GS_GPU callsite
       call GS_GPU(nx,ny,nz,blockit,&
                       Phi,RHS,&
                       Aw,Ae,As,An,Ab,At,&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+                      Btype)
       !$hmpp  <SOR> Res_GPU callsite
       call Res_GPU(nx,ny,nz,&
                       Phi,RHS,&
                       Aw,Ae,As,An,Ab,At,&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,S)
+                      Btype,S)
       !$hmpp <SOR> delegatedStore,Args[Res_GPU::R]
       l=l+blockit
       write (*,*) "GPU Poisson iter: ",l,S
@@ -439,42 +439,42 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
                   if (i>1) then
                             p=p+Phi(i-1,j,k)*Aw(i)
                             Ap=Ap+Aw(i)
-                  elseif (BtypeW==PERIODIC) then
+                  elseif (Btype(We)==PERIODIC) then
                             p=p+Phi(nx,j,k)*Aw(i)
                             Ap=Ap+Aw(i)
                   endif
                   if (i<nx) then
                             p=p+Phi(i+1,j,k)*Ae(i)
                             Ap=Ap+Ae(i)
-                  elseif (BtypeW==PERIODIC) then
+                  elseif (Btype(We)==PERIODIC) then
                             p=p+Phi(1,j,k)*Ae(i)
                             Ap=Ap+Ae(i)
                   endif
                   if (j>1) then
                             p=p+Phi(i,j-1,k)*As(j)
                             Ap=Ap+As(j)
-                  elseif (BtypeN==PERIODIC) then
+                  elseif (Btype(No)==PERIODIC) then
                             p=p+Phi(i,ny,k)*As(j)
                             Ap=Ap+As(j)
                   endif
                   if (j<ny) then
                             p=p+Phi(i,j+1,k)*An(j)
                             Ap=Ap+An(j)
-                  elseif (BtypeN==PERIODIC) then
+                  elseif (Btype(No)==PERIODIC) then
                             p=p+Phi(i,1,k)*An(j)
                             Ap=Ap+An(j)
                   endif
                   if (k>1) then
                             p=p+Phi(i,j,k-1)*Ab(k)
                             Ap=Ap+Ab(k)
-                  elseif (BtypeT==PERIODIC) then
+                  elseif (Btype(To)==PERIODIC) then
                             p=p+Phi(i,j,nz)*Ab(k)
                             Ap=Ap+Ab(k)
                   endif
                   if (k<nz) then
                             p=p+Phi(i,j,k+1)*At(k)
                             Ap=Ap+At(k)
-                  elseif (BtypeT==PERIODIC) then
+                  elseif (Btype(To)==PERIODIC) then
                             p=p+Phi(i,j,1)*At(k)
                             Ap=Ap+At(k)
                   endif
@@ -495,42 +495,42 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
                   if (i>1) then
                             p=p+Phi(i-1,j,k)*Aw(i)
                             Ap=Ap+Aw(i)
-                  elseif (BtypeW==PERIODIC) then
+                  elseif (Btype(We)==PERIODIC) then
                             p=p+Phi(nx,j,k)*Aw(i)
                             Ap=Ap+Aw(i)
                   endif
                   if (i<nx) then
                             p=p+Phi(i+1,j,k)*Ae(i)
                             Ap=Ap+Ae(i)
-                  elseif (BtypeW==PERIODIC) then
+                  elseif (Btype(We)==PERIODIC) then
                             p=p+Phi(1,j,k)*Ae(i)
                             Ap=Ap+Ae(i)
                   endif
                   if (j>1) then
                             p=p+Phi(i,j-1,k)*As(j)
                             Ap=Ap+As(j)
-                  elseif (BtypeN==PERIODIC) then
+                  elseif (Btype(No)==PERIODIC) then
                             p=p+Phi(i,ny,k)*As(j)
                             Ap=Ap+As(j)
                   endif
                   if (j<ny) then
                             p=p+Phi(i,j+1,k)*An(j)
                             Ap=Ap+An(j)
-                  elseif (BtypeN==PERIODIC) then
+                  elseif (Btype(No)==PERIODIC) then
                             p=p+Phi(i,1,k)*An(j)
                             Ap=Ap+An(j)
                   endif
                   if (k>1) then
                             p=p+Phi(i,j,k-1)*Ab(k)
                             Ap=Ap+Ab(k)
-                  elseif (BtypeT==PERIODIC) then
+                  elseif (Btype(To)==PERIODIC) then
                             p=p+Phi(i,j,nz)*Ab(k)
                             Ap=Ap+Ab(k)
                   endif
                   if (k<nz) then
                             p=p+Phi(i,j,k+1)*At(k)
                             Ap=Ap+At(k)
-                  elseif (BtypeT==PERIODIC) then
+                  elseif (Btype(To)==PERIODIC) then
                             p=p+Phi(i,j,1)*At(k)
                             Ap=Ap+At(k)
                   endif
@@ -658,7 +658,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
        forall(i=3:nx+1)
         ex(i)=Ae(i-2)
        endforall
-       if (BtypeW==PERIODIC) then
+       if (Btype(We)==PERIODIC) then
         dx(1)=1
         dx(nx+2)=1
         ex(2)=0
@@ -669,7 +669,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
         ex(2)=-1
         cx(nx+1)=-1
        endif
-     if (BtypeW==PERIODIC) then
+     if (Btype(We)==PERIODIC) then
       bx(1)=Phi(nx,j,k)
       bx(nx+2)=Phi(1,j,k)
      else
@@ -699,7 +699,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
        forall(j=3:ny+1)
         ey(j)=An(j-2)
        endforall
-       if (BtypeS==PERIODIC) then
+       if (Btype(So)==PERIODIC) then
         dy(1)=1
         dy(ny+2)=1
         ey(2)=0
@@ -710,7 +710,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
         ey(2)=-1
         cy(ny+1)=-1
        endif
-     if (BtypeS==PERIODIC) then
+     if (Btype(So)==PERIODIC) then
       by(1)=Phi(i,ny,k)
       by(ny+2)=Phi(i,1,k)
      else
@@ -740,7 +740,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
        forall(k=3:nz+1)
         ez(k)=At(k-2)
        endforall
-       if (BtypeB==PERIODIC) then
+       if (Btype(Bo)==PERIODIC) then
         dz(1)=1
         dz(nz+2)=1
         ez(2)=0
@@ -751,7 +751,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
         ez(2)=-1
         cz(nz+1)=-1
        endif
-     if (BtypeB==PERIODIC) then
+     if (Btype(Bo)==PERIODIC) then
       bz(1)=Phi(i,j,nz)
       bz(nz+2)=Phi(i,j,1)
      else
@@ -839,7 +839,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      bx(2:nx+1)=cx(1:nx)
      dx(1:nx)=Apx(1:nx)-adirelaxpar
 !     write (*,*) "-",k,j
-     call TRIDAGGS(nx,BtypeW,BtypeE,Aw(1:nx),Ae(1:nx),dx(1:nx),bx(1:nx+2),cx(1:nx))
+     call TRIDAGGS(nx,Btype(We),Btype(Ea),Aw(1:nx),Ae(1:nx),dx(1:nx),bx(1:nx+2),cx(1:nx))
       !write(*,*) "***"
      !write(*,*) bx
      S=S+sum(abs(Phi(1:nx,j,k)-bx(2:nx+1)))/(Prnx*Prny*Prnz)
@@ -859,7 +859,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      by(2:ny+1)=cy(1:ny)
      dy(1:ny)=Apy(1:ny)-adirelaxpar
 
-     call TRIDAGGS(ny,BtypeS,BtypeN,As(1:ny),An(1:ny),dy(1:ny),by(1:ny+2),cy(1:ny))
+     call TRIDAGGS(ny,Btype(So),Btype(No),As(1:ny),An(1:ny),dy(1:ny),by(1:ny+2),cy(1:ny))
 
      S=S+sum(abs(Phi(i,1:ny,k)-by(2:ny+1)))/(Prnx*Prny*Prnz)
      Phi2(i,1:ny,k)=by(2:ny+1)
@@ -878,7 +878,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      bz(2:nz+1)=cz(1:nz)
      dz(1:nz)=Apz(1:nz)-adirelaxpar
 
-     call TRIDAGGS(nz,BtypeB,BtypeT,Ab(1:nz),At(1:nz),dz(1:nz),bz(1:nz+2),cz(1:nz))
+     call TRIDAGGS(nz,Btype(Bo),Btype(To),Ab(1:nz),At(1:nz),dz(1:nz),bz(1:nz+2),cz(1:nz))
 
      S=S+sum(abs(Phi(i,j,1:nz)-bz(2:nz+1)))/(Prnx*Prny*Prnz)
      Phi2(i,j,1:nz)=bz(2:nz+1)
@@ -941,12 +941,12 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 !GPU Codelets. More or less like externals. Inside the module only because of KND.
 
   !$hmpp <SOR> group, target=CUDA
-  !$hmpp <SOR> mapbyname, nx,ny,nz,Phi,RHS,Aw,Ae,As,An,Ab,At,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+  !$hmpp <SOR> mapbyname, nx,ny,nz,Phi,RHS,Aw,Ae,As,An,Ab,At,Btype(We),Btype(Ea),Btype(So),Btype(No),Btype(Bo),Btype(To)
 
 !$hmpp <SOR> GS_GPU codelet
 subroutine GS_GPU(nx,ny,nz,nit,Phi,RHS,&
                      Aw,Ae,As,An,Ab,At,&
-                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+                     Btype)
    implicit none
 
    integer,parameter:: KND=4,PERIODIC=3
@@ -957,7 +957,7 @@ subroutine GS_GPU(nx,ny,nz,nit,Phi,RHS,&
    real(KND),dimension(1:nx),intent(in) :: Aw,Ae
    real(KND),dimension(1:ny),intent(in) :: As,An
    real(KND),dimension(1:nz),intent(in) :: Ab,At
-   integer(KND),intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+   integer(KND),intent(in) :: Btype(6)
    integer i,j,k,l
    real(KND) :: p,Ap
    intrinsic mod
@@ -973,42 +973,42 @@ subroutine GS_GPU(nx,ny,nz,nit,Phi,RHS,&
              if (i>1) then
                        p=p+Phi(i-1,j,k)*Aw(i)
                        Ap=Ap+Aw(i)
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        p=p+Phi(nx-1,j,k)*Aw(i)
                        Ap=Ap+Aw(i)
              endif
              if (i<nx) then
                        p=p+Phi(i+1,j,k)*Ae(i)
                        Ap=Ap+Ae(i)
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        p=p+Phi(1,j,k)*Ae(i)
                        Ap=Ap+Ae(i)
              endif
              if (j>1) then
                        p=p+Phi(i,j-1,k)*As(j)
                        Ap=Ap+As(j)
-             elseif (BtypeS==PERIODIC) then
+             elseif (Btype(So)==PERIODIC) then
                        p=p+Phi(i,ny-1,k)*As(j)
                        Ap=Ap+As(j)
              endif
              if (j<ny) then
                        p=p+Phi(i,j+1,k)*An(j)
                        Ap=Ap+An(j)
-             elseif (BtypeN==PERIODIC) then
+             elseif (Btype(No)==PERIODIC) then
                        p=p+Phi(i,1,k)*An(j)
                        Ap=Ap+An(j)
              endif
              if (k>1) then
                        p=p+Phi(i,j,k-1)*Ab(k)
                        Ap=Ap+Ab(k)
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        p=p+Phi(i,j,nz-1)*Ab(k)
                        Ap=Ap+Ab(k)
              endif
              if (k<nz) then
                        p=p+Phi(i,j,k+1)*At(k)
                        Ap=Ap+At(k)
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        p=p+Phi(i,j,1)*At(k)
                        Ap=Ap+At(k)
              endif
@@ -1029,42 +1029,42 @@ subroutine GS_GPU(nx,ny,nz,nit,Phi,RHS,&
              if (i>1) then
                        p=p+Phi(i-1,j,k)*Aw(i)
                        Ap=Ap+Aw(i)
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        p=p+Phi(nx-1,j,k)*Aw(i)
                        Ap=Ap+Aw(i)
              endif
              if (i<nx) then
                        p=p+Phi(i+1,j,k)*Ae(i)
                        Ap=Ap+Ae(i)
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        p=p+Phi(1,j,k)*Ae(i)
                        Ap=Ap+Ae(i)
              endif
              if (j>1) then
                        p=p+Phi(i,j-1,k)*As(j)
                        Ap=Ap+As(j)
-             elseif (BtypeS==PERIODIC) then
+             elseif (Btype(So)==PERIODIC) then
                        p=p+Phi(i,ny-1,k)*As(j)
                        Ap=Ap+As(j)
              endif
              if (j<ny) then
                        p=p+Phi(i,j+1,k)*An(j)
                        Ap=Ap+An(j)
-             elseif (BtypeN==PERIODIC) then
+             elseif (Btype(No)==PERIODIC) then
                        p=p+Phi(i,1,k)*An(j)
                        Ap=Ap+An(j)
              endif
              if (k>1) then
                        p=p+Phi(i,j,k-1)*Ab(k)
                        Ap=Ap+Ab(k)
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        p=p+Phi(i,j,nz-1)*Ab(k)
                        Ap=Ap+Ab(k)
              endif
              if (k<nz) then
                        p=p+Phi(i,j,k+1)*At(k)
                        Ap=Ap+At(k)
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        p=p+Phi(i,j,1)*At(k)
                        Ap=Ap+At(k)
              endif
@@ -1082,7 +1082,7 @@ endsubroutine GS_GPU
 !$hmpp <SOR> Res_GPU codelet
 subroutine Res_GPU(nx,ny,nz,Phi,RHS,&
                      Aw,Ae,As,An,Ab,At,&
-                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+                     Btype,R)
 
    implicit none
    intrinsic mod, abs, max
@@ -1096,7 +1096,7 @@ subroutine Res_GPU(nx,ny,nz,Phi,RHS,&
    real(KND),dimension(1:nx),intent(in) :: Aw,Ae
    real(KND),dimension(1:ny),intent(in) :: As,An
    real(KND),dimension(1:nz),intent(in) :: Ab,At
-   integer(KND),intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+   integer(KND),intent(in) :: Btype(6)
    real(KND),intent(out) :: R
    integer i,j,k,l
    real(KND) :: p,Ap
@@ -1112,42 +1112,42 @@ subroutine Res_GPU(nx,ny,nz,Phi,RHS,&
              if (i>1) then
                        p=p+Phi(i-1,j,k)*Aw(i)
                        Ap=Ap+Aw(i)
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        p=p+Phi(nx-1,j,k)*Aw(i)
                        Ap=Ap+Aw(i)
              endif
              if (i<nx) then
                        p=p+Phi(i+1,j,k)*Ae(i)
                        Ap=Ap+Ae(i)
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        p=p+Phi(1,j,k)*Ae(i)
                        Ap=Ap+Ae(i)
              endif
              if (j>1) then
                        p=p+Phi(i,j-1,k)*As(j)
                        Ap=Ap+As(j)
-             elseif (BtypeS==PERIODIC) then
+             elseif (Btype(So)==PERIODIC) then
                        p=p+Phi(i,ny-1,k)*As(j)
                        Ap=Ap+As(j)
              endif
              if (j<ny) then
                        p=p+Phi(i,j+1,k)*An(j)
                        Ap=Ap+An(j)
-             elseif (BtypeN==PERIODIC) then
+             elseif (Btype(No)==PERIODIC) then
                        p=p+Phi(i,1,k)*An(j)
                        Ap=Ap+An(j)
              endif
              if (k>1) then
                        p=p+Phi(i,j,k-1)*Ab(k)
                        Ap=Ap+Ab(k)
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        p=p+Phi(i,j,nz-1)*Ab(k)
                        Ap=Ap+Ab(k)
              endif
              if (k<nz) then
                        p=p+Phi(i,j,k+1)*At(k)
                        Ap=Ap+At(k)
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        p=p+Phi(i,j,1)*At(k)
                        Ap=Ap+At(k)
              endif

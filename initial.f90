@@ -138,41 +138,41 @@ contains
 
   open(11,file="boundconds.conf",status="old",action="read")
   read(11,fmt='(/)')
-  read(11,*) BtypeW
+  read(11,*) Btype(We)
   read(11,fmt='(/)')
-  read(11,*) BtypeE
+  read(11,*) Btype(Ea)
   read(11,fmt='(/)')
-  read(11,*) BtypeS
+  read(11,*) Btype(So)
   read(11,fmt='(/)')
-  read(11,*) BtypeN
+  read(11,*) Btype(No)
   read(11,fmt='(/)')
-  read(11,*) BtypeB
+  read(11,*) Btype(Bo)
   read(11,fmt='(/)')
-  read(11,*) BtypeT
+  read(11,*) Btype(To)
   read(11,fmt='(/)')
-  read(11,*) SsideU
+  read(11,*) sideU(1,So)
   read(11,fmt='(/)')
-  read(11,*) SsideV
+  read(11,*) sideU(2,So)
   read(11,fmt='(/)')
-  read(11,*) SsideW
+  read(11,*) sideU(3,So)
   read(11,fmt='(/)')
-  read(11,*) NsideU
+  read(11,*) sideU(1,No)
   read(11,fmt='(/)')
-  read(11,*) NsideV
+  read(11,*) sideU(2,No)
   read(11,fmt='(/)')
-  read(11,*) NsideW
+  read(11,*) sideU(3,No)
   read(11,fmt='(/)')
-  read(11,*) BsideU
+  read(11,*) sideU(1,Bo)
   read(11,fmt='(/)')
-  read(11,*) BsideV
+  read(11,*) sideU(2,Bo)
   read(11,fmt='(/)')
-  read(11,*) BsideW
+  read(11,*) sideU(3,Bo)
   read(11,fmt='(/)')
-  read(11,*) TsideU
+  read(11,*) sideU(1,To)
   read(11,fmt='(/)')
-  read(11,*) TsideV
+  read(11,*) sideU(2,To)
   read(11,fmt='(/)')
-  read(11,*) TsideW
+  read(11,*) sideU(3,To)
   read(11,fmt='(/)')
   read(11,*) z0W
   read(11,fmt='(/)')
@@ -198,29 +198,29 @@ contains
   read(11,fmt='(/)')
   read(11,*) temperature_ref
   read(11,fmt='(/)')
-  read(11,*) TBtypeW
+  read(11,*) TBtype(We)
   read(11,fmt='(/)')
-  read(11,*) TBtypeE
+  read(11,*) TBtype(Ea)
   read(11,fmt='(/)')
-  read(11,*) TBtypeS
+  read(11,*) TBtype(So)
   read(11,fmt='(/)')
-  read(11,*) TBtypeN
+  read(11,*) TBtype(No)
   read(11,fmt='(/)')
-  read(11,*) TBtypeB
+  read(11,*) TBtype(Bo)
   read(11,fmt='(/)')
-  read(11,*) TBtypeT
+  read(11,*) TBtype(To)
   read(11,fmt='(/)')
-  read(11,*) WsideTemp
+  read(11,*) sideTemp(We)
   read(11,fmt='(/)')
-  read(11,*) EsideTemp
+  read(11,*) sideTemp(Ea)
   read(11,fmt='(/)')
-  read(11,*) SsideTemp
+  read(11,*) sideTemp(So)
   read(11,fmt='(/)')
-  read(11,*) NsideTemp
+  read(11,*) sideTemp(No)
   read(11,fmt='(/)')
-  read(11,*) BsideTemp
+  read(11,*) sideTemp(Bo)
   read(11,fmt='(/)')
-  read(11,*) TsideTemp
+  read(11,*) sideTemp(To)
   close(11)
 
   open(11,file="inlet.conf",status="old",action="read")
@@ -285,29 +285,29 @@ contains
   read(11,*) scalsourcetype
 
   read(11,fmt='(/)')
-  read(11,*) ScalBtypeW
+  read(11,*) ScalBtype(We)
   read(11,fmt='(/)')
-  read(11,*) ScalBtypeE
+  read(11,*) ScalBtype(Ea)
   read(11,fmt='(/)')
-  read(11,*) ScalBtypeS
+  read(11,*) ScalBtype(So)
   read(11,fmt='(/)')
-  read(11,*) ScalBtypeN
+  read(11,*) ScalBtype(No)
   read(11,fmt='(/)')
-  read(11,*) ScalBtypeB
+  read(11,*) ScalBtype(Bo)
   read(11,fmt='(/)')
-  read(11,*) ScalBtypeT
+  read(11,*) ScalBtype(To)
   read(11,fmt='(/)')
-  read(11,*) WsideScal
+  read(11,*) sideScal(We)
   read(11,fmt='(/)')
-  read(11,*) EsideScal
+  read(11,*) sideScal(Ea)
   read(11,fmt='(/)')
-  read(11,*) SsideScal
+  read(11,*) sideScal(So)
   read(11,fmt='(/)')
-  read(11,*) NsideScal
+  read(11,*) sideScal(No)
   read(11,fmt='(/)')
-  read(11,*) BsideScal
+  read(11,*) sideScal(Bo)
   read(11,fmt='(/)')
-  read(11,*) TsideScal
+  read(11,*) sideScal(To)
 
   if (partdistrib>0) then
      allocate(partdiam(partdistrib),partrho(partdistrib),percdistrib(partdistrib))
@@ -540,7 +540,7 @@ contains
 
   write(*,*) "Boundaries:"
   write(*,'(a2)',advance='no') "W "
-  select case (BtypeW)
+  select case (Btype(We))
    case (NOSLIP)
     write(*,*) "noslip"
    case (FREESLIP)
@@ -553,7 +553,7 @@ contains
     write(*,*) "neumann"
   endselect
   write(*,'(a2)',advance='no') "E "
-  select case (BtypeE)
+  select case (Btype(Ea))
    case (NOSLIP)
     write(*,*) "noslip"
    case (FREESLIP)
@@ -566,7 +566,7 @@ contains
     write(*,*) "neumann"
   endselect
   write(*,'(a2)',advance='no') "S "
-  select case (BtypeS)
+  select case (Btype(So))
    case (NOSLIP)
     write(*,*) "noslip"
    case (FREESLIP)
@@ -579,7 +579,7 @@ contains
     write(*,*) "neumann"
   endselect
   write(*,'(a2)',advance='no') "N "
-  select case (BtypeN)
+  select case (Btype(No))
    case (NOSLIP)
     write(*,*) "noslip"
    case (FREESLIP)
@@ -592,7 +592,7 @@ contains
     write(*,*) "neumann"
   endselect
   write(*,'(a2)',advance='no') "B "
-  select case (BtypeB)
+  select case (Btype(Bo))
    case (NOSLIP)
     write(*,*) "noslip"
    case (FREESLIP)
@@ -605,7 +605,7 @@ contains
     write(*,*) "neumann"
   endselect
   write(*,'(a2)',advance='no') "T "
-  select case (BtypeT)
+  select case (Btype(To))
    case (NOSLIP)
     write(*,*) "noslip"
    case (FREESLIP)
@@ -644,7 +644,7 @@ contains
 
   nt=maxiter
 
-  if (BtypeE==PERIODIC) then
+  if (Btype(Ea)==PERIODIC) then
                          Unx=Prnx
                         else
                          Unx=Prnx-1
@@ -653,7 +653,7 @@ contains
   Unz=Prnz
 
   Vnx=Prnx
-  if (BtypeN==PERIODIC) then
+  if (Btype(No)==PERIODIC) then
                          Vny=Prny
                         else
                          Vny=Prny-1
@@ -662,14 +662,14 @@ contains
 
   Wnx=Prnx
   Wny=Prny
-  if (BtypeT==PERIODIC) then
+  if (Btype(To)==PERIODIC) then
                          Wnz=Prnz
                         else
                          Wnz=Prnz-1
   endif
 
-  if (BtypeW==TURBULENTINLET) inlettype=TURBULENTINLET
-  if (BtypeW==INLETFROMFILE) inlettype=INLETFROMFILE
+  if (Btype(We)==TURBULENTINLET) inlettype=TURBULENTINLET
+  if (Btype(We)==INLETFROMFILE) inlettype=INLETFROMFILE
 
 
   if (Abs(Uinlet)>0) then
@@ -1180,7 +1180,7 @@ contains
    Prnx=nx
    Vnx=Prnx
    Wnx=Prnx
-   if (BtypeE==PERIODIC) then
+   if (Btype(Ea)==PERIODIC) then
                          Unx=Prnx
                         else
                          Unx=Prnx-1
@@ -1203,7 +1203,7 @@ contains
    Prny=ny
    Uny=Prny
    Wny=Prny
-   if (BtypeN==PERIODIC) then
+   if (Btype(No)==PERIODIC) then
                          Vny=Prny
                         else
                          Vny=Prny-1
@@ -1227,7 +1227,7 @@ contains
    Prnz=nz
    Unz=Prnz
    Vnz=Prnz
-   if (BtypeT==PERIODIC) then
+   if (Btype(To)==PERIODIC) then
                          Wnz=Prnz
                         else
                          Wnz=Prnz-1
@@ -1253,7 +1253,7 @@ contains
    enddo
    close(11)
 
-   if (BtypeW==PERIODIC) then
+   if (Btype(We)==PERIODIC) then
     do j=-1,-3,-1
      xU2(j)=xU2(0)-(xU2(nx)-xU2(nx+j))
     enddo
@@ -1263,7 +1263,7 @@ contains
     enddo
    endif
 
-   if (BtypeE==PERIODIC) then
+   if (Btype(Ea)==PERIODIC) then
     do j=nx+1,nx+4
      xU2(j)=xU2(nx)+(xU2(j-nx)-xU2(0))
     enddo
@@ -1288,7 +1288,7 @@ contains
    enddo
    close(11)
 
-   if (BtypeS==PERIODIC) then
+   if (Btype(So)==PERIODIC) then
     do j=-1,-3,-1
      yV2(j)=yV2(0)-(yV2(ny)-yV2(ny+j))
     enddo
@@ -1298,7 +1298,7 @@ contains
     enddo
    endif
 
-   if (BtypeN==PERIODIC) then
+   if (Btype(No)==PERIODIC) then
     do j=ny+1,ny+4
      yV2(j)=yV2(ny)+(yV2(j-ny)-yV2(0))
     enddo
@@ -1323,7 +1323,7 @@ contains
    enddo
    close(11)
 
-   if (BtypeB==PERIODIC) then
+   if (Btype(Bo)==PERIODIC) then
     do j=-1,-3,-1
      zW2(j)=zW2(0)-(zW2(nz)-zW2(nz+j))
     enddo
@@ -1333,7 +1333,7 @@ contains
     enddo
    endif
 
-   if (BtypeT==PERIODIC) then
+   if (Btype(To)==PERIODIC) then
     do j=nz+1,nz+4
      zW2(j)=zW2(nz)+(zW2(j-nz)-zW2(0))
     enddo
@@ -1439,16 +1439,16 @@ contains
 
 
   if (buoyancy==1) then
-     if (TBtypeB==CONSTFLUX.or.TBtypeB==DIRICHLET) then
+     if (TBtype(Bo)==CONSTFLUX.or.TBtype(Bo)==DIRICHLET) then
        allocate(BsideTFLArr(-1:Prnx+2,-1:Prny+2))
-       if (TBtypeB==CONSTFLUX) then
-        BsideTFLArr=BsideTemp
+       if (TBtype(Bo)==CONSTFLUX) then
+        BsideTFLArr=sideTemp(Bo)
        else
         BsideTFLArr=0
        endif
-       if (TBtypeB==DIRICHLET) then
+       if (TBtype(Bo)==DIRICHLET) then
         allocate(BsideTArr(-1:Prnx+2,-1:Prny+2))
-        BsideTArr=BsideTemp
+        BsideTArr=sideTemp(Bo)
        endif
       endif
   endif
@@ -1460,7 +1460,7 @@ contains
     allocate(WMP%depscalar(computescalars))
     WMP%depscalar=0
 
-    if (BtypeW==NOSLIP) then
+    if (Btype(We)==NOSLIP) then
      do k=1,Prnz
       do j=1,Prny
        WMP%x=1
@@ -1476,7 +1476,7 @@ contains
      enddo
     endif
 
-    if (BtypeE==NOSLIP) then
+    if (Btype(Ea)==NOSLIP) then
      do k=1,Prnz
       do j=1,Prny
        WMP%x=Prnx
@@ -1492,7 +1492,7 @@ contains
      enddo
     endif
 
-    if (BtypeS==NOSLIP) then
+    if (Btype(So)==NOSLIP) then
      do k=1,Prnz
       do i=1,Prnx
        WMP%x=i
@@ -1506,7 +1506,7 @@ contains
        call AddWMPoint(WMP)
       enddo
      enddo
-    elseif (BtypeS==DIRICHLET) then
+    elseif (Btype(So)==DIRICHLET) then
      do k=1,Prnz
       do i=1,Prnx
        WMP%x=i
@@ -1516,16 +1516,16 @@ contains
        WMP%disty=(yPr(1)-yV(0))
        WMP%distz=0
        WMP%ustar=1
-       WMP%wallu=SsideU
-       WMP%wallv=SsideV
-       WMP%wallw=SsideW
+       WMP%wallu=sideU(1,So)
+       WMP%wallv=sideU(2,So)
+       WMP%wallw=sideU(3,So)
        WMP%z0=z0S
        call AddWMPoint(WMP)
       enddo
      enddo
     endif
 
-    if (BtypeN==NOSLIP) then
+    if (Btype(No)==NOSLIP) then
      do k=1,Prnz
       do i=1,Prnx
        WMP%x=i
@@ -1539,7 +1539,7 @@ contains
        call AddWMPoint(WMP)
       enddo
      enddo
-    elseif (BtypeN==DIRICHLET) then
+    elseif (Btype(No)==DIRICHLET) then
      do k=1,Prnz
       do i=1,Prnx
        WMP%x=i
@@ -1549,16 +1549,16 @@ contains
        WMP%disty=(yPr(Prny)-yV(Vny+1))
        WMP%distz=0
        WMP%ustar=1
-       WMP%wallu=NsideU
-       WMP%wallv=NsideV
-       WMP%wallw=NsideW
+       WMP%wallu=sideU(1,No)
+       WMP%wallv=sideU(2,No)
+       WMP%wallw=sideU(3,No)
        WMP%z0=z0N
        call AddWMPoint(WMP)
       enddo
      enddo
     endif
 
-    if (BtypeB==NOSLIP) then
+    if (Btype(Bo)==NOSLIP) then
      do j=1,Prny
       do i=1,Prnx
        if (Prtype(i,j,0)==0) then
@@ -1570,19 +1570,19 @@ contains
         WMP%distz=(zPr(1)-zW(0))
         WMP%ustar=1
         WMP%z0=z0B
-       if (TBtypeB==CONSTFLUX) then
-        WMP%tempfl=BsideTemp
+       if (TBtype(Bo)==CONSTFLUX) then
+        WMP%tempfl=sideTemp(Bo)
        else
         WMP%temp=0
        endif
-       if (TBtypeB==DIRICHLET) then
-        WMP%temp=BsideTemp
+       if (TBtype(Bo)==DIRICHLET) then
+        WMP%temp=sideTemp(Bo)
        endif
         call AddWMPoint(WMP)
        endif
       enddo
      enddo
-    elseif (BtypeB==DIRICHLET) then
+    elseif (Btype(Bo)==DIRICHLET) then
      do j=1,Prny
       do i=1,Prnx
        WMP%x=i
@@ -1592,17 +1592,17 @@ contains
        WMP%disty=0
        WMP%distz=(zPr(1)-zW(0))
        WMP%ustar=1
-       WMP%wallu=BsideU
-       WMP%wallv=BsideV
-       WMP%wallw=BsideW
+       WMP%wallu=sideU(1,Bo)
+       WMP%wallv=sideU(2,Bo)
+       WMP%wallw=sideU(3,Bo)
        WMP%z0=z0B
-       if (TBtypeB==CONSTFLUX) then
-        WMP%tempfl=BsideTemp
+       if (TBtype(Bo)==CONSTFLUX) then
+        WMP%tempfl=sideTemp(Bo)
        else
         WMP%temp=0
        endif
-       if (TBtypeB==DIRICHLET) then
-        WMP%temp=BsideTemp
+       if (TBtype(Bo)==DIRICHLET) then
+        WMP%temp=sideTemp(Bo)
        endif
 
        call AddWMPoint(WMP)
@@ -1610,7 +1610,7 @@ contains
      enddo
     endif
 
-    if (BtypeT==NOSLIP) then
+    if (Btype(To)==NOSLIP) then
      do j=1,Prny
       do i=1,Prnx
        WMP%x=i
@@ -1624,7 +1624,7 @@ contains
        call AddWMPoint(WMP)
       enddo
      enddo
-    elseif (BtypeT==DIRICHLET) then
+    elseif (Btype(To)==DIRICHLET) then
      do j=1,Prny
       do i=1,Prnx
        WMP%x=i
@@ -1634,9 +1634,9 @@ contains
        WMP%disty=0
        WMP%distz=(zPr(Prnz)-zW(Wnz+1))
        WMP%ustar=1
-       WMP%wallu=TsideU
-       WMP%wallv=TsideV
-       WMP%wallw=TsideW
+       WMP%wallu=sideU(1,To)
+       WMP%wallv=sideU(2,To)
+       WMP%wallw=sideU(3,To)
        WMP%z0=z0T
        call AddWMPoint(WMP)
       enddo

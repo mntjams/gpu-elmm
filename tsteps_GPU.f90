@@ -1,9 +1,6 @@
   !$hmpp <tsteps_gpu> UnifRedBlack codelet
   subroutine UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,&
-                              BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,&
-                              SsideU,NsideU,BsideU,TsideU,&
-                              SsideV,NsideV,BsideV,TsideV,&
-                              SsideW,NsideW,BsideW,TsideW,&
+                              Btype,sideU,&
                               dt,dxmin,dymin,dzmin,&
                               Uin,Vin,Win,U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
                               coef,maxCNiter,epsCN,iters,residuum)
@@ -15,10 +12,8 @@
 
 
    integer,intent(in):: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz
-   integer,intent(in):: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
-   real(KND),intent(in)::  SsideU,NsideU,BsideU,TsideU,&
-                           SsideV,NsideV,BsideV,TsideV,&
-                           SsideW,NsideW,BsideW,TsideW
+   integer,intent(in):: Btype(6)
+   real(KND),intent(in):: sideU(3,6)
    real(KND),dimension(-2:Prny+3,-2:Prnz+3),intent(in)          :: Uin,Vin,Win
    real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout):: U,U2,U3
    real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout):: V,V2,V3
@@ -174,22 +169,13 @@
        S=epsCN+1.
        do while (S>epsCN.and.l<=maxCNiter)          !Gauss-Seidel iteration for Crank-Nicolson result
         call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
-                             BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,&
-                             SsideU,NsideU,BsideU,TsideU,&
-                             SsideV,NsideV,BsideV,TsideV,&
-                             SsideW,NsideW,BsideW,TsideW,&
+                             Btype,sideU,&
                              Uin,U3,0)
         call BoundU_GPU(1,Vnx,Vny,Vnz,Prny,Prnz,&
-                             BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,&
-                             SsideU,NsideU,BsideU,TsideU,&
-                             SsideV,NsideV,BsideV,TsideV,&
-                             SsideW,NsideW,BsideW,TsideW,&
+                             Btype,sideU,&
                              Vin,V3,0)
         call BoundU_GPU(1,Wnx,Wny,Wnz,Prny,Prnz,&
-                             BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,&
-                             SsideU,NsideU,BsideU,TsideU,&
-                             SsideV,NsideV,BsideV,TsideV,&
-                             SsideW,NsideW,BsideW,TsideW,&
+                             Btype,sideU,&
                              Win,W3,0)
         S=0
         Su=0

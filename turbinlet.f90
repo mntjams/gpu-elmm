@@ -67,7 +67,7 @@ contains
      enddo
     enddo
 
-    if ((BtypeS==PERIODIC).or.(BtypeN==PERIODIC)) then
+    if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
       do k=-bigNz+1,Prnz+bigNz
        do j=-bigNy+1,0
         do i=-bigNx,bigNx
@@ -87,7 +87,7 @@ contains
        enddo
       enddo
     endif
-    if  ((BtypeB==PERIODIC).or.(BtypeT==PERIODIC)) then
+    if  ((Btype(Bo)==PERIODIC).or.(Btype(To)==PERIODIC)) then
       do k=-bigNz+1,0
        do j=-bigNy+1,Prny+bigNy
         do i=-bigNx,bigNx
@@ -198,7 +198,7 @@ contains
      enddo
 
 
-    if ((BtypeS==PERIODIC).or.(BtypeN==PERIODIC)) then
+    if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
       do k=-bigNz+1,Prnz+bigNz
        do j=-bigNy+1,0
          Ru(bigNx,j,k)=Ru(bigNx,j+Prny,k)
@@ -214,7 +214,7 @@ contains
        enddo
       enddo
     endif
-    if  ((BtypeB==PERIODIC).or.(BtypeT==PERIODIC)) then
+    if  ((Btype(Bo)==PERIODIC).or.(Btype(To)==PERIODIC)) then
       do k=-bigNz+1,0
        do j=-bigNy+1,Prny+bigNy
          Ru(bigNx,j,k)=Ru(bigNx,j,k+Prnz)
@@ -343,7 +343,7 @@ contains
     enddo
 
 
-    if ((BtypeS==PERIODIC).or.(BtypeN==PERIODIC)) then
+    if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
       forall(k=-bigNz+1:Prnz+bigNz,j=-bigNy+1:0)
          Ru(j,k,1:2)=Ru(j+Prny,k,1:2)
          Rv(j,k,1:2)=Rv(j+Prny,k,1:2)
@@ -355,7 +355,7 @@ contains
          Rw(j,k,1:2)=Rw(j-Prny,k,1:2)
       endforall
     endif
-    if  ((BtypeB==PERIODIC).or.(BtypeT==PERIODIC)) then
+    if  ((Btype(Bo)==PERIODIC).or.(Btype(To)==PERIODIC)) then
       forall(k=-bigNz+1:0,j=-bigNy+1:Prny+bigNy)
          Ru(j,k,1:2)=Ru(j,k+Prnz,1:2)
          Rv(j,k,1:2)=Rv(j,k+Prnz,1:2)
@@ -450,7 +450,7 @@ contains
     enddo
 
 
-    if ((BtypeS==PERIODIC).or.(BtypeN==PERIODIC)) then
+    if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
       forall(k=-bigNz+1:Prnz+bigNz,j=-bigNy+1:0)
          Ru(j,k,1:2)=Ru(j+Prny,k,1:2)
          Rv(j,k,1:2)=Rv(j+Prny,k,1:2)
@@ -462,7 +462,7 @@ contains
          Rw(j,k,1:2)=Rw(j-Prny,k,1:2)
       endforall
     endif
-    if  ((BtypeB==PERIODIC).or.(BtypeT==PERIODIC)) then
+    if  ((Btype(Bo)==PERIODIC).or.(Btype(To)==PERIODIC)) then
       forall(k=-bigNz+1:0,j=-bigNy+1:Prny+bigNy)
          Ru(j,k,1:2)=Ru(j,k+Prnz,1:2)
          Rv(j,k,1:2)=Rv(j,k+Prnz,1:2)

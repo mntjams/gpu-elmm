@@ -47,7 +47,7 @@ contains
    if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
   endif
 
-  if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
+  if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) call GetTurbInlet
 
   call BoundU(1,U)
   call BoundU(2,V)
@@ -85,7 +85,7 @@ contains
   call OtherTerms(U,V,W,U2,V2,W2,Pr,1._KND)
 
 
-  if (BtypeT==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
+  if (Btype(To)==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
 
 
   if (masssourc==1) then
@@ -214,8 +214,8 @@ contains
 
   if (buoyancy==1)  call Bound_Temp(temperature)
 
-  if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
-  if (BtypeW==InletFromFile) call GetInletFromFile(time)
+  if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) call GetTurbInlet
+  if (Btype(We)==InletFromFile) call GetInletFromFile(time)
 
   call timestepEUL(U,V,W)
 
@@ -278,8 +278,8 @@ contains
      time1=time2
     endif
 
-    if (BtypeT==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
-    if (BtypeE==OutletBuff) then
+    if (Btype(To)==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
+    if (Btype(Ea)==OutletBuff) then
       if (buoyancy==1) then
         call AttenuateOut(U2,V2,W2,Pr,temperature)
       else
@@ -362,7 +362,7 @@ contains
       temperature=temperature2
     endif
 
-    if (BtypeE==OutletBuff) then
+    if (Btype(Ea)==OutletBuff) then
       if (buoyancy==1) then
         call AttenuateOut(U2,V2,W2,Pr,temperature)
       else
@@ -420,7 +420,7 @@ contains
    if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
   endif
 
-  if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
+  if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) call GetTurbInlet
 
   call BoundU(1,U)
   call BoundU(2,V)
@@ -480,8 +480,8 @@ contains
    call OtherTerms(U,V,W,U2,V2,W2,Pr,1._KND)
 
 
-  if (BtypeT==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
-  if (BtypeE==OutletBuff) call AttenuateOut(U2,V2,W2,Pr)
+  if (Btype(To)==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
+  if (Btype(Ea)==OutletBuff) call AttenuateOut(U2,V2,W2,Pr)
 
 
   if (masssourc==1) then
@@ -670,8 +670,8 @@ contains
 
   if (buoyancy==1)  call Bound_Temp(temperature)
 
-  if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
-  if (BtypeW==InletFromFile) call GetInletFromFile(time)
+  if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) call GetTurbInlet
+  if (Btype(We)==InletFromFile) call GetInletFromFile(time)
 
   call timestepEUL(U,V,W)
 
@@ -743,8 +743,8 @@ contains
      time1=time2
     endif
 
-    if (BtypeT==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
-    if (BtypeE==OutletBuff) then
+    if (Btype(To)==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
+    if (Btype(Ea)==OutletBuff) then
       if (buoyancy==1) then
         call AttenuateOut(U2,V2,W2,Pr,temperature)
       else
@@ -829,7 +829,7 @@ contains
       temperature=temperature2
     endif
 
-    if (BtypeE==OutletBuff) then
+    if (Btype(Ea)==OutletBuff) then
       if (buoyancy==1) then
         call AttenuateOut(U2,V2,W2,Pr,temperature)
       else
@@ -878,8 +878,8 @@ contains
     endif
   endif
 
-  if ((BtypeW==TurbulentInlet).or.(BtypeE==TurbulentInlet)) call GetTurbInlet
-  if (BtypeW==InletFromFile) call GetInletFromFile(time)
+  if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) call GetTurbInlet
+  if (Btype(We)==InletFromFile) call GetInletFromFile(time)
 
   write (*,*) "time:",time,"dt: ",dt
 
@@ -1520,6 +1520,31 @@ write(*,*) "Otherterms:"
      call BoundU(3,W3)
      call MomSourc(U3,V3,W3)
 
+
+!      do i=1,NIBPointsU
+!       xi=IBPijkU(1,i)
+!       yj=IBPijkU(2,i)
+!       zk=IBPijkU(3,i)
+!       U3(xi,yj,zk)=U3(xi,yj,zk)+IBPsourcU*dt
+!       U2(xi,yj,zk)=U2(xi,yj,zk)+IBPsourcU*dt
+!      enddo
+!
+!      do i=1,NIBPointsV
+!       xi=IBPijkV(1,i)
+!       yj=IBPijkV(2,i)
+!       zk=IBPijkV(3,i)
+!       V3(xi,yj,zk)=V3(xi,yj,zk)+IBPsourcV*dt
+!       V2(xi,yj,zk)=V2(xi,yj,zk)+IBPsourcV*dt
+!      enddo
+!
+!      do i=1,NIBPointsW
+!       xi=IBPijkW(1,i)
+!       yj=IBPijkW(2,i)
+!       zk=IBPijkW(3,i)
+!       W3(xi,yj,zk)=W3(xi,yj,zk)+IBPsourcW*dt
+!       W2(xi,yj,zk)=W2(xi,yj,zk)+IBPsourcW*dt
+!      enddo
+
      if (associated(FirstIBPoint)) then   !Immersed boundary terms, in the future should be in an array
       IBP => FirstIBPoint
       do
@@ -1548,10 +1573,7 @@ write(*,*) "Otherterms:"
       write (*,*) "GPU CN call"
       !$hmpp <tsteps_gpu> UNIFREDBLACK callsite
       call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,&
-                            BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,&
-                            SsideU,NsideU,BsideU,TsideU,&
-                            SsideV,NsideV,BsideV,TsideV,&
-                            SsideW,NsideW,BsideW,TsideW,&
+                            Btype,sideU,&
                             dt,dxmin,dymin,dzmin,&
                             Uin,Vin,Win,&
                             U,V,W,U2,V2,W2,U3,V3,W3,Visc,&

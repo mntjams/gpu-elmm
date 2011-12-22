@@ -181,7 +181,7 @@ contains
     ustar=huge(1.0)
   endif
 
-  if (wallmodeltype>0.and.buoyancy==1.and.TBtypeB==DIRICHLET.and.store%tstar>0) then
+  if (wallmodeltype>0.and.buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.store%tstar>0) then
     allocate(tstar(2,0:nt))
     tstar=huge(1.0)
   endif
@@ -428,7 +428,7 @@ contains
   endif
 
 
-   if (wallmodeltype>0.and.buoyancy==1.and.TBtypeB==DIRICHLET.and.(display%tstar>0.or.store%tstar>0)) then
+   if (wallmodeltype>0.and.buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.(display%tstar>0.or.store%tstar>0)) then
     S2=SUM(BsideTFLArr(1:Prnx,1:Prny))/(Prnx*Prny)
     S=-S*S2
 
@@ -562,7 +562,7 @@ contains
     close(11)
   endif
 
-  if (wallmodeltype>0.and.buoyancy==1.and.TBtypeB==DIRICHLET.and.store%tstar>0) then
+  if (wallmodeltype>0.and.buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.store%tstar>0) then
     open(11,file="tflux.txt")
     do j=0,endstep
      write (11,*) times(j),tstar(:,j)

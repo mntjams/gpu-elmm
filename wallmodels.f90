@@ -147,19 +147,19 @@ implicit none
        dpx=0
        if (i>1) dpx=dpx+(Pr(i,j,k)-Pr(i-1,j,k))/(xPr(i)-xPr(i-1))
        if (i<Unx) dpx=dpx+(Pr(i+1,j,k)-Pr(i,j,k))/(xPr(i+1)-xPr(i))
-       if (i==1.and.BtypeW==PERIODIC) dpx=dpx+(Pr(1,j,k)-Pr(Prnx,j,k))/(xPr(1)-xPr(0))
+       if (i==1.and.Btype(We)==PERIODIC) dpx=dpx+(Pr(1,j,k)-Pr(Prnx,j,k))/(xPr(1)-xPr(0))
        dpx=dpx/2
 
        dpy=0
        if (j>1) dpy=dpy+(Pr(i,j,k)-Pr(i,j-1,k))/(yPr(j)-yPr(j-1))
        if (j<Vny) dpy=dpy+(Pr(i,j+1,k)-Pr(i,j,k))/(yPr(j+1)-yPr(j))
-       if (j==1.and.BtypeS==PERIODIC) dpy=dpy+(Pr(i,1,k)-Pr(i,Prny,k))/(yPr(1)-yPr(0))
+       if (j==1.and.Btype(So)==PERIODIC) dpy=dpy+(Pr(i,1,k)-Pr(i,Prny,k))/(yPr(1)-yPr(0))
        dpy=dpy/2
 
        dpz=0
        if (k>1) dpz=dpz+(Pr(i,j,k)-Pr(i,j,k-1))/(zPr(k)-zPr(k-1))
        if (k<Wnz) dpz=dpz+(Pr(i,j,k+1)-Pr(i,j,k))/(zPr(k+1)-zPr(k))
-       if (k==1.and.BtypeB==PERIODIC) dpz=dpz+(Pr(i,j,1)-Pr(i,j,Prnz))/(zPr(1)-zPr(0))
+       if (k==1.and.Btype(Bo)==PERIODIC) dpz=dpz+(Pr(i,j,1)-Pr(i,j,Prnz))/(zPr(1)-zPr(0))
        dpz=dpz/2
 
        if (abs(WMP%distx)*1.1>dist)&
@@ -406,19 +406,19 @@ implicit none
       dpx=0
       if (i>1) dpx=dpx+(Pr(i,j,k)-Pr(i-1,j,k))/(xPr(i)-xPr(i-1))
       if (i<Unx) dpx=dpx+(Pr(i+1,j,k)-Pr(i,j,k))/(xPr(i+1)-xPr(i))
-      if (i==1.and.BtypeW==PERIODIC) dpx=dpx+(Pr(1,j,k)-Pr(Prnx,j,k))/(xPr(1)-xPr(0))
+      if (i==1.and.Btype(We)==PERIODIC) dpx=dpx+(Pr(1,j,k)-Pr(Prnx,j,k))/(xPr(1)-xPr(0))
       dpx=dpx/2
 
       dpy=0
       if (j>1) dpy=dpy+(Pr(i,j,k)-Pr(i,j-1,k))/(yPr(j)-yPr(j-1))
       if (j<Vny) dpy=dpy+(Pr(i,j+1,k)-Pr(i,j,k))/(yPr(j+1)-yPr(j))
-      if (j==1.and.BtypeS==PERIODIC) dpy=dpy+(Pr(i,1,k)-Pr(i,Prny,k))/(yPr(1)-yPr(0))
+      if (j==1.and.Btype(So)==PERIODIC) dpy=dpy+(Pr(i,1,k)-Pr(i,Prny,k))/(yPr(1)-yPr(0))
       dpy=dpy/2
 
       dpz=0
       if (k>1) dpz=dpz+(Pr(i,j,k)-Pr(i,j,k-1))/(zPr(k)-zPr(k-1))
       if (k<Wnz) dpz=dpz+(Pr(i,j,k+1)-Pr(i,j,k))/(zPr(k+1)-zPr(k))
-      if (k==1.and.BtypeB==PERIODIC) dpz=dpz+(Pr(i,j,1)-Pr(i,j,Prnz))/(zPr(1)-zPr(0))
+      if (k==1.and.Btype(Bo)==PERIODIC) dpz=dpz+(Pr(i,j,1)-Pr(i,j,Prnz))/(zPr(1)-zPr(0))
       dpz=dpz/2
 
       if (abs(WMP%distx)*1.1>dist)&
@@ -548,7 +548,7 @@ implicit none
    nx=Prnx
    ny=Prny
 
-   if (BtypeE==PERIODIC) then
+   if (Btype(Ea)==PERIODIC) then
      do j=1,ny
        Nu(0,j)=Nu(nx,j)
        Nu(nx+1,j)=Nu(1,j)
@@ -560,7 +560,7 @@ implicit none
      enddo
    endif
 
-   if (BtypeN==PERIODIC) then
+   if (Btype(No)==PERIODIC) then
      do i=1,nx
        Nu(i,0)=Nu(i,ny)
        Nu(i,ny+1)=Nu(i,1)
@@ -580,7 +580,7 @@ implicit none
   subroutine InitTempFL
    type(WMPoint),pointer:: WMP
 
-   if (buoyancy==1.and.TBtypeB==DIRICHLET) then
+   if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
     if (associated(FirstWMPoint)) then
     WMP => FirstWMPoint
     do
@@ -604,7 +604,7 @@ implicit none
    integer i,j
    real(DBL) t
 
-   if (buoyancy==1.and.TBtypeB==DIRICHLET) then
+   if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
     do j=1,Prny
      do i=1,Prnx
       t=time+dt/2._KND
@@ -620,9 +620,9 @@ implicit none
 
       if (WMP%z0>0) then
 
-        if (buoyancy==1.and.TBtypeB==CONSTFLUX) then
+        if (buoyancy==1.and.TBtype(Bo)==CONSTFLUX) then
           Visc(WMP%x,WMP%y,WMP%z)=WM2Visc(WMP,U,V,W,Pr)!WM_MO_FLUX(WMP,U,V,W,Pr)
-        else if (buoyancy==1.and.TBtypeB==DIRICHLET) then
+        else if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
          if (WMP%z==1) WMP%temp=BsideTArr(WMP%x,WMP%y)
          call WM_MO_DIRICHLET(Visc(WMP%x,WMP%y,WMP%z),WMP,U,V,W,Pr)
         else
@@ -647,7 +647,7 @@ implicit none
 
    endif
 
-   if (buoyancy==1.and. TBtypeB==DIRICHLET) call Bound_tempfl(BsideTFLArr)
+   if (buoyancy==1.and. TBtype(Bo)==DIRICHLET) call Bound_tempfl(BsideTFLArr)
   endsubroutine ComputeViscsWM
 
 
@@ -656,7 +656,7 @@ implicit none
    real(KND),intent(in):: x,y
    real(DBL),intent(in):: t
 
-   SurfTemperature=BsideTemp  ! Needs bet to allow time evolution somehow
+   SurfTemperature=sideTemp(Bo)  ! Needs bet to allow time evolution somehow
   endfunction
 
   recursive subroutine DeallWMP(WMP)

@@ -50,7 +50,7 @@ contains
   mgepsinnerGS=lmgepsinnerGS
  endsubroutine SetMGParams2d
 
- 
+
  pure subroutine Prolongate(AFine,ACoarse,level)
   integer,intent(in):: level
   real(KND),dimension(-1:,-1:),intent(in):: ACoarse
@@ -93,44 +93,44 @@ contains
    do k=0,nz
      do i=0,nx
         ACoarse(i,k)=AFine(2*i,2*k); q=1.0
-        
+
         if (i<nx) then
          ACoarse(i,k)=ACoarse(i,k)+0.5*AFine(2*i+1,2*k); q=q+0.5
         endif
-        
+
         if (i>0) then
          ACoarse(i,k)=ACoarse(i,k)+0.5*AFine(2*i-1,2*k); q=q+0.5
         endif
-        
+
         if (k<nz) then
          ACoarse(i,k)=ACoarse(i,k)+0.5*AFine(2*i,2*k+1); q=q+0.5
         endif
-        
+
         if (k>0) then
          ACoarse(i,k)=ACoarse(i,k)+0.5*AFine(2*i,2*k-1); q=q+0.5
         endif
-        
+
         if ((i<nx).and.(k<nz)) then
          ACoarse(i,k)=ACoarse(i,k)+0.25*AFine(2*i+1,2*k+1); q=q+0.25
         endif
-        
+
         if ((i>0).and.(k>0)) then
          ACoarse(i,k)=ACoarse(i,k)+0.25*AFine(2*i-1,2*k-1); q=q+0.25
         endif
-        
+
         if ((i>0).and.(k<nz)) then
          ACoarse(i,k)=ACoarse(i,k)+0.25*AFine(2*i-1,2*k+1); q=q+0.25
         endif
-        
+
         if ((i<nx).and.(k>0)) then
          ACoarse(i,k)=ACoarse(i,k)+0.25*AFine(2*i+1,2*k-1); q=q+0.25
         endif
-        
+
         ACoarse(i,k)=ACoarse(i,k)/q
      enddo
    enddo
-    if (BtypeE==PERIODIC) ACoarse(0,:)=ACoarse(nx,:)
-    if (BtypeT==PERIODIC) ACoarse(:,0)=ACoarse(:,nz)
+    if (Btype(Ea)==PERIODIC) ACoarse(0,:)=ACoarse(nx,:)
+    if (Btype(To)==PERIODIC) ACoarse(:,0)=ACoarse(:,nz)
 endsubroutine Restrict
 
 
@@ -145,7 +145,7 @@ pure subroutine BOUND_Phi_MG(Phi,nx,nz)
   integer i,k
 
 
-   if (BtypeW==PERIODIC) then
+   if (Btype(We)==PERIODIC) then
     do k=0,nz
       Phi(-1,k)=Phi(nx-1,k)
     enddo
@@ -155,7 +155,7 @@ pure subroutine BOUND_Phi_MG(Phi,nx,nz)
     enddo
    endif
 
-   if (BtypeE==PERIODIC) then
+   if (Btype(Ea)==PERIODIC) then
     do k=0,nz
       Phi(nx+1,k)=Phi(1,k)
     enddo
@@ -165,7 +165,7 @@ pure subroutine BOUND_Phi_MG(Phi,nx,nz)
     enddo
    endif
 
-   if (BtypeB==PERIODIC) then
+   if (Btype(Bo)==PERIODIC) then
      do i=-1,nx+1                      !Periodic BC
       Phi(i,-1)=Phi(i,nz-1)
      enddo
@@ -175,7 +175,7 @@ pure subroutine BOUND_Phi_MG(Phi,nx,nz)
      enddo
    endif
 
-   if (BtypeT==PERIODIC) then
+   if (Btype(To)==PERIODIC) then
      do i=-1,nx+1                      !Periodic BC
       Phi(i,nz+1)=Phi(i,1)
      enddo
@@ -211,12 +211,12 @@ character(1),save:: equed
   nx=CoefMG(level)%nx
   nz=CoefMG(level)%nz
 
-  if (BtypeE==PERIODIC) then
+  if (Btype(Ea)==PERIODIC) then
    nulx=1
   else
    nulx=0
   endif
-  if (BtypeT==PERIODIC) then
+  if (Btype(To)==PERIODIC) then
    nulz=1
   else
    nulz=0
@@ -249,28 +249,28 @@ character(1),save:: equed
              if (i>nulx) then
                        age(l,ind(level,nulx,nulz,i-1,k))=CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        age(l,ind(level,nulx,nulz,nx,k))=CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
              endif
              if (i<nx) then
                        age(l,ind(level,nulx,nulz,i+1,k))=CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        age(l,ind(level,nulx,nulz,nulx,k))=CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
              endif
              if (k>nulz) then
                        age(l,ind(level,nulx,nulz,i,k-1))=CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        age(l,ind(level,nulx,nulz,i,nz))=CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
              endif
              if (k<nz) then
                        age(l,ind(level,nulx,nulz,i,k+1))=CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        age(l,ind(level,nulx,nulz,i,nulz))=CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
              endif
@@ -346,10 +346,10 @@ character(1),save:: equed
            enddo
      enddo
 
- if (BtypeE==PERIODIC) then
+ if (Btype(Ea)==PERIODIC) then
   PhiMG(level)%Arr(0,:)=PhiMG(level)%Arr(nx,:)
  endif
- if (BtypeT==PERIODIC) then
+ if (Btype(To)==PERIODIC) then
   PhiMG(level)%Arr(:,0)=PhiMG(level)%Arr(:,nz)
  endif
 
@@ -370,12 +370,12 @@ character(1),save:: equed
   nx=CoefMG(level)%nx
   nz=CoefMG(level)%nz
 
-  if (BtypeE==PERIODIC) then
+  if (Btype(Ea)==PERIODIC) then
    nulx=1
   else
    nulx=0
   endif
-  if (BtypeT==PERIODIC) then
+  if (Btype(To)==PERIODIC) then
    nulz=1
   else
    nulz=0
@@ -408,28 +408,28 @@ character(1),save:: equed
              if (i>nulx) then
                        age(l,ind(level,nulx,nulz,i-1,k))=CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        age(l,ind(level,nulx,nulz,nx,k))=CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
              endif
              if (i<nx) then
                        age(l,ind(level,nulx,nulz,i+1,k))=CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        age(l,ind(level,nulx,nulz,nulx,k))=CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
              endif
              if (k>nulz) then
                        age(l,ind(level,nulx,nulz,i,k-1))=CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        age(l,ind(level,nulx,nulz,i,nz))=CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
              endif
              if (k<nz) then
                        age(l,ind(level,nulx,nulz,i,k+1))=CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        age(l,ind(level,nulx,nulz,i,nulz))=CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
              endif
@@ -501,10 +501,10 @@ character(1),save:: equed
            enddo
      enddo
 
- if (BtypeE==PERIODIC) then
+ if (Btype(Ea)==PERIODIC) then
   PhiMG(level)%Arr(0,:)=PhiMG(level)%Arr(nx,:)
  endif
- if (BtypeT==PERIODIC) then
+ if (Btype(To)==PERIODIC) then
   PhiMG(level)%Arr(:,0)=PhiMG(level)%Arr(:,nz)
  endif
 
@@ -527,12 +527,12 @@ integer,save:: nx,nz,nulx,nulz,nxyz,called=0
   nx=CoefMG(level)%nx
   nz=CoefMG(level)%nz
 
-  if (BtypeE==PERIODIC) then
+  if (Btype(Ea)==PERIODIC) then
    nulx=1
   else
    nulx=0
   endif
-  if (BtypeT==PERIODIC) then
+  if (Btype(To)==PERIODIC) then
    nulz=1
   else
    nulz=0
@@ -557,28 +557,28 @@ integer,save:: nx,nz,nulx,nulz,nxyz,called=0
              if (i>nulx) then
                        age(l,ind(level,nulx,nulz,i-1,k))=CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        age(l,ind(level,nulx,nulz,nx,k))=CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
              endif
              if (i<nx) then
                        age(l,ind(level,nulx,nulz,i+1,k))=CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        age(l,ind(level,nulx,nulz,nulx,k))=CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
              endif
              if (k>nulz) then
                        age(l,ind(level,nulx,nulz,i,k-1))=CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        age(l,ind(level,nulx,nulz,i,nz))=CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
              endif
              if (k<nz) then
                        age(l,ind(level,nulx,nulz,i,k+1))=CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        age(l,ind(level,nulx,nulz,i,nulz))=CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
              endif
@@ -669,10 +669,10 @@ integer,save:: nx,nz,nulx,nulz,nxyz,called=0
            enddo
      enddo
 
- if (BtypeE==PERIODIC) then
+ if (Btype(Ea)==PERIODIC) then
   PhiMG(level)%Arr(0,:)=PhiMG(level)%Arr(nx,:)
  endif
- if (BtypeT==PERIODIC) then
+ if (Btype(To)==PERIODIC) then
   PhiMG(level)%Arr(:,0)=PhiMG(level)%Arr(:,nz)
  endif
 
@@ -703,28 +703,28 @@ real(KND) p,Ap
              if (i>0) then
                        p=p+PhiMG(level)%Arr(i-1,k)*CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(CoefMG(level)%nx-1,k)*CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
              endif
              if (i<CoefMG(level)%nx) then
                        p=p+PhiMG(level)%Arr(i+1,k)*CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(1,k)*CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
              endif
              if (k>0) then
                        p=p+PhiMG(level)%Arr(i,k-1)*CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,CoefMG(level)%nz-1)*CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
              endif
              if (k<CoefMG(level)%nz) then
                        p=p+PhiMG(level)%Arr(i,k+1)*CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,1)*CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
              endif
@@ -743,28 +743,28 @@ real(KND) p,Ap
              if (i>0) then
                        p=p+PhiMG(level)%Arr(i-1,k)*CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(CoefMG(level)%nx-1,k)*CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
              endif
              if (i<CoefMG(level)%nx) then
                        p=p+PhiMG(level)%Arr(i+1,k)*CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(1,k)*CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
              endif
              if (k>0) then
                        p=p+PhiMG(level)%Arr(i,k-1)*CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,CoefMG(level)%nz-1)*CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
              endif
              if (k<CoefMG(level)%nz) then
                        p=p+PhiMG(level)%Arr(i,k+1)*CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,1)*CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
              endif
@@ -795,28 +795,28 @@ character(70):: str
              if (i>0) then
                        p=p+PhiMG(level)%Arr(i-1,k)*CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(CoefMG(level)%nx-1,k)*CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
              endif
              if (i<CoefMG(level)%nx) then
                        p=p+PhiMG(level)%Arr(i+1,k)*CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(1,k)*CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
              endif
              if (k>0) then
                        p=p+PhiMG(level)%Arr(i,k-1)*CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,CoefMG(level)%nz-1)*CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
              endif
              if (k<CoefMG(level)%nz) then
                        p=p+PhiMG(level)%Arr(i,k+1)*CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,1)*CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
              endif
@@ -896,13 +896,13 @@ real(KND),save:: called=0
  mgeps=epsPoisson
  Phi=0
 
- if (BtypeE==PERIODIC) then
+ if (Btype(Ea)==PERIODIC) then
   sx=1
  else
   sx=0
  endif
 
- if (BtypeT==PERIODIC) then
+ if (Btype(To)==PERIODIC) then
   sz=1
  else
   sz=0
@@ -941,11 +941,11 @@ real(KND),save:: called=0
  PhiMG(LMG)%Arr(0+sx:nx,0+sz:nz)=Phi(1:Prnx,1,1:Prnz)
  RHSMG(LMG)%Arr(0+sx:nx,0+sz:nz)=RHS(1:Prnx,1,1:Prnz)
 
- if (BtypeE==PERIODIC) then
+ if (Btype(Ea)==PERIODIC) then
   RHSMG(LMG)%Arr(0,:)=RHSMG(LMG)%Arr(Prnx,:)
   PhiMG(LMG)%Arr(0,:)=PhiMG(LMG)%Arr(Prnx,:)
  endif
- if (BtypeT==PERIODIC) then
+ if (Btype(To)==PERIODIC) then
   RHSMG(LMG)%Arr(:,0)=RHSMG(LMG)%Arr(:,Prnz)
   PhiMG(LMG)%Arr(:,0)=PhiMG(LMG)%Arr(:,Prnz)
  endif
@@ -966,7 +966,7 @@ real(KND),save:: called=0
  write (*,*) "MG residuum",R
  enddo
  write (*,*) "MG residuum",R
- 
+
  forall(l=1:Prny) Phi(1:Prnx,l,1:Prnz)=PhiMG(LMG)%Arr(0+sx:nx,0+sz:nz)
 
 endsubroutine POISSMG2d

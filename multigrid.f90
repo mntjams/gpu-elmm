@@ -34,7 +34,7 @@ module MULTIGRID
   integer,dimension(0:8) :: nxa,nya,nza
   real(KND),dimension(0:8) :: Aw,Ae,As,An,Ab,At
 
-contains 
+contains
 
 
  subroutine SetMGParams(llmg, lminmglevel, lmingpulevel, lbnx, lbny, lbnz,&
@@ -63,19 +63,19 @@ contains
   integer:: i,j,k,nx,ny,nz
   real(KND):: A1,A2,A4,A8
 
- 
+
    nx=bnx*2**level !level means from which grid we interpolate
    ny=bny*2**level
    nz=bnz*2**level
 
    if (GPU>0.and.level>=minGPUlevel-1) then!.and.level>3
 
-      
+
       !$hmpp <GSKernels> advancedload, args[Pr::level]
       !$hmpp <GSKernels> Pr callsite,args[*].noupdate=true
       call Pr_GPU(nxa,nya,nza,PhiMG(0)%Arr,PhiMG(1)%Arr,PhiMG(2)%Arr,PhiMG(3)%Arr,PhiMG(4)%Arr,&
                              PhiMG(5)%Arr,PhiMG(6)%Arr,PhiMG(7)%Arr,PhiMG(8)%Arr,&
-                                 BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level)
+                             Btype,level)
 
    else
     do k=0,nz
@@ -126,7 +126,7 @@ contains
  real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
  real(KND) q
  integer:: i,j,k,nx,ny,nz
- 
+
    nx=bnx*2**level !level means on which grid we restrict
    ny=bny*2**level
    nz=bnz*2**level
@@ -138,7 +138,7 @@ contains
                              RHSMG(5)%Arr,RHSMG(6)%Arr,RHSMG(7)%Arr,RHSMG(8)%Arr,&
                              ResMG(0)%Arr,ResMG(1)%Arr,ResMG(2)%Arr,ResMG(3)%Arr,ResMG(4)%Arr,&
                              ResMG(5)%Arr,ResMG(6)%Arr,ResMG(7)%Arr,ResMG(8)%Arr,&
-                                 BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level)
+                             Btype,level)
    else
 
 
@@ -253,13 +253,13 @@ contains
               ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k-1); q=q+0.125
             endif
 
-            ACoarse(i,j,k)=ACoarse(i,j,k)/q       
+            ACoarse(i,j,k)=ACoarse(i,j,k)/q
         enddo
         enddo
       enddo
-        if (BtypeE==PERIODIC) ACoarse(0,:,:)=ACoarse(nx,:,:)
-        if (BtypeN==PERIODIC) ACoarse(:,0,:)=ACoarse(:,ny,:)
-        if (BtypeT==PERIODIC) ACoarse(:,:,0)=ACoarse(:,:,nz)
+        if (Btype(Ea)==PERIODIC) ACoarse(0,:,:)=ACoarse(nx,:,:)
+        if (Btype(No)==PERIODIC) ACoarse(:,0,:)=ACoarse(:,ny,:)
+        if (Btype(To)==PERIODIC) ACoarse(:,:,0)=ACoarse(:,:,nz)
    endif
 endsubroutine Restrict
 
@@ -275,7 +275,7 @@ pure subroutine BOUND_Phi_MG(Phi,nx,ny,nz)
   integer i,j,k
 
 
-   if (BtypeW==PERIODIC) then
+   if (Btype(We)==PERIODIC) then
     do k=0,nz
      do j=0,ny                      !Periodic BC
       Phi(-1,j,k)=Phi(nx-1,j,k)
@@ -289,13 +289,13 @@ pure subroutine BOUND_Phi_MG(Phi,nx,ny,nz)
     enddo
    endif
 
-   if (BtypeE==PERIODIC) then
+   if (Btype(Ea)==PERIODIC) then
     do k=0,nz
      do j=0,ny                      !Periodic BC
       Phi(nx+1,j,k)=Phi(1,j,k)
      enddo
     enddo
-   else 
+   else
     do k=0,nz
      do j=0,ny                      !Other BCs
       Phi(nx+1,j,k)=Phi(nx,j,k)
@@ -303,7 +303,7 @@ pure subroutine BOUND_Phi_MG(Phi,nx,ny,nz)
     enddo
    endif
 
-   if (BtypeS==PERIODIC) then
+   if (Btype(So)==PERIODIC) then
    do k=0,nz
      do i=-1,nx+1                      !Periodic BC
       Phi(i,-1,k)=Phi(i,ny-1,k)
@@ -317,7 +317,7 @@ pure subroutine BOUND_Phi_MG(Phi,nx,ny,nz)
     enddo
    endif
 
-   if (BtypeN==PERIODIC) then
+   if (Btype(No)==PERIODIC) then
    do k=0,nz
      do i=-1,nx+1                      !Periodic BC
       Phi(i,ny+1,k)=Phi(i,1,k)
@@ -331,7 +331,7 @@ pure subroutine BOUND_Phi_MG(Phi,nx,ny,nz)
     enddo
    endif
 
-   if (BtypeB==PERIODIC) then
+   if (Btype(Bo)==PERIODIC) then
     do j=-1,ny+1
      do i=-1,nx+1                      !Periodic BC
       Phi(i,j,-1)=Phi(i,j,nz-1)
@@ -345,7 +345,7 @@ pure subroutine BOUND_Phi_MG(Phi,nx,ny,nz)
     enddo
    endif
 
-   if (BtypeT==PERIODIC) then
+   if (Btype(To)==PERIODIC) then
     do j=-1,ny+1
      do i=-1,nx+1                      !Periodic BC
       Phi(i,j,nz+1)=Phi(i,j,1)
@@ -386,17 +386,17 @@ character(1),save:: equed
   ny=CoefMG(level)%ny
   nz=CoefMG(level)%nz
 
-  if (BtypeE==PERIODIC) then
+  if (Btype(Ea)==PERIODIC) then
    nulx=1
   else
    nulx=0
   endif
-  if (BtypeN==PERIODIC) then
+  if (Btype(No)==PERIODIC) then
    nuly=1
   else
    nuly=0
   endif
-  if (BtypeT==PERIODIC) then
+  if (Btype(To)==PERIODIC) then
    nulz=1
   else
    nulz=0
@@ -430,42 +430,42 @@ character(1),save:: equed
              if (i>nulx) then
                        age(l,ind(level,nulx,nuly,nulz,i-1,j,k))=CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,nx,j,k))=CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
              endif
              if (i<nx) then
                        age(l,ind(level,nulx,nuly,nulz,i+1,j,k))=CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,nulx,j,k))=CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
              endif
              if (j>nuly) then
                        age(l,ind(level,nulx,nuly,nulz,i,j-1,k))=CoefMG(level)%As
                        Ap=Ap+CoefMG(level)%As
-             elseif (BtypeS==PERIODIC) then
+             elseif (Btype(So)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,i,ny,k))=CoefMG(level)%As
                        Ap=Ap+CoefMG(level)%As
              endif
              if (j<ny) then
                        age(l,ind(level,nulx,nuly,nulz,i,j+1,k))=CoefMG(level)%An
                        Ap=Ap+CoefMG(level)%An
-             elseif (BtypeN==PERIODIC) then
+             elseif (Btype(No)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,i,nuly,k))=CoefMG(level)%An
                        Ap=Ap+CoefMG(level)%An
              endif
              if (k>nulz) then
                        age(l,ind(level,nulx,nuly,nulz,i,j,k-1))=CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,i,j,nz))=CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
              endif
              if (k<nz) then
                        age(l,ind(level,nulx,nuly,nulz,i,j,k+1))=CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,i,j,nulz))=CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
              endif
@@ -480,7 +480,7 @@ character(1),save:: equed
     age(1,:)=0
     age(1,1)=age(2,2)
     bge(1)=0
-    
+
 
     if (KND==DBL) then
      call DGESVX("E","N",nxyz,1,age,nxyz,af,nxyz,ipivot,EQUED,R,C,bge,nxyz,xge,nxyz,rcond,ferr,berr,work,work2,info)
@@ -504,7 +504,7 @@ character(1),save:: equed
             bge(l)=RHSMG(level)%Arr(i,j,k)
           enddo
        enddo
-    enddo     
+    enddo
     bge(1)=0
 
 
@@ -514,7 +514,7 @@ character(1),save:: equed
      call SGESVX("F","N",nxyz,1,age,nxyz,af,nxyz,ipivot,EQUED,R,C,bge,nxyz,xge,nxyz,rcond,ferr,berr,work,work2,info)
     endif
 
-     
+
     if (info/=0) then
      stop
      write (*,*) "info",info
@@ -546,13 +546,13 @@ character(1),save:: equed
         enddo
      enddo
 
- if (BtypeE==PERIODIC) then
+ if (Btype(Ea)==PERIODIC) then
   PhiMG(level)%Arr(0,:,:)=PhiMG(level)%Arr(nx,:,:)
  endif
- if (BtypeN==PERIODIC) then
+ if (Btype(No)==PERIODIC) then
   PhiMG(level)%Arr(:,0,:)=PhiMG(level)%Arr(:,ny,:)
  endif
- if (BtypeT==PERIODIC) then
+ if (Btype(To)==PERIODIC) then
   PhiMG(level)%Arr(:,:,0)=PhiMG(level)%Arr(:,:,nz)
  endif
 
@@ -574,17 +574,17 @@ character(1),save:: equed
   ny=CoefMG(level)%ny
   nz=CoefMG(level)%nz
 
-  if (BtypeE==PERIODIC) then
+  if (Btype(Ea)==PERIODIC) then
    nulx=1
   else
    nulx=0
   endif
-  if (BtypeN==PERIODIC) then
+  if (Btype(No)==PERIODIC) then
    nuly=1
   else
    nuly=0
   endif
-  if (BtypeT==PERIODIC) then
+  if (Btype(To)==PERIODIC) then
    nulz=1
   else
    nulz=0
@@ -618,42 +618,42 @@ character(1),save:: equed
              if (i>nulx) then
                        age(l,ind(level,nulx,nuly,nulz,i-1,j,k))=CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,nx,j,k))=CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
              endif
              if (i<nx) then
                        age(l,ind(level,nulx,nuly,nulz,i+1,j,k))=CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,nulx,j,k))=CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
              endif
              if (j>nuly) then
                        age(l,ind(level,nulx,nuly,nulz,i,j-1,k))=CoefMG(level)%As
                        Ap=Ap+CoefMG(level)%As
-             elseif (BtypeS==PERIODIC) then
+             elseif (Btype(So)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,i,ny,k))=CoefMG(level)%As
                        Ap=Ap+CoefMG(level)%As
              endif
              if (j<ny) then
                        age(l,ind(level,nulx,nuly,nulz,i,j+1,k))=CoefMG(level)%An
                        Ap=Ap+CoefMG(level)%An
-             elseif (BtypeN==PERIODIC) then
+             elseif (Btype(No)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,i,nuly,k))=CoefMG(level)%An
                        Ap=Ap+CoefMG(level)%An
              endif
              if (k>nulz) then
                        age(l,ind(level,nulx,nuly,nulz,i,j,k-1))=CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,i,j,nz))=CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
              endif
              if (k<nz) then
                        age(l,ind(level,nulx,nuly,nulz,i,j,k+1))=CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,i,j,nulz))=CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
              endif
@@ -668,7 +668,7 @@ character(1),save:: equed
     age(1,:)=0
     age(1,1)=age(2,2)
 !     bge(1)=0
-    
+
 
     if (KND==DBL) then
      call  DGETRF(nxyz,nxyz,age,nxyz,ipivot,info)
@@ -690,7 +690,7 @@ character(1),save:: equed
             bge(l)=RHSMG(level)%Arr(i,j,k)
           enddo
        enddo
-    enddo     
+    enddo
     bge(1)=0
 
     if (KND==DBL) then
@@ -698,12 +698,12 @@ character(1),save:: equed
     else
      call SGETRS("N",nxyz,1,age,nxyz,ipivot,bge,nxyz,info)
     endif
-     
+
     if (info/=0) then
      stop
      write (*,*) "info",info
     endif
- 
+
 !  do i=1,l
 !   write (*,*) "diag",i,l,age(i,i)
 !  enddo
@@ -730,13 +730,13 @@ character(1),save:: equed
         enddo
      enddo
 
- if (BtypeE==PERIODIC) then
+ if (Btype(Ea)==PERIODIC) then
   PhiMG(level)%Arr(0,:,:)=PhiMG(level)%Arr(nx,:,:)
  endif
- if (BtypeN==PERIODIC) then
+ if (Btype(No)==PERIODIC) then
   PhiMG(level)%Arr(:,0,:)=PhiMG(level)%Arr(:,ny,:)
  endif
- if (BtypeT==PERIODIC) then
+ if (Btype(To)==PERIODIC) then
   PhiMG(level)%Arr(:,:,0)=PhiMG(level)%Arr(:,:,nz)
  endif
 
@@ -760,17 +760,17 @@ integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
   ny=CoefMG(level)%ny
   nz=CoefMG(level)%nz
 
-  if (BtypeE==PERIODIC) then
+  if (Btype(Ea)==PERIODIC) then
    nulx=1
   else
    nulx=0
   endif
-  if (BtypeN==PERIODIC) then
+  if (Btype(No)==PERIODIC) then
    nuly=1
   else
    nuly=0
   endif
-  if (BtypeT==PERIODIC) then
+  if (Btype(To)==PERIODIC) then
    nulz=1
   else
    nulz=0
@@ -796,42 +796,42 @@ integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
              if (i>nulx) then
                        age(l,ind(level,nulx,nuly,nulz,i-1,j,k))=CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,nx,j,k))=CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
              endif
              if (i<nx) then
                        age(l,ind(level,nulx,nuly,nulz,i+1,j,k))=CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,nulx,j,k))=CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
              endif
              if (j>nuly) then
                        age(l,ind(level,nulx,nuly,nulz,i,j-1,k))=CoefMG(level)%As
                        Ap=Ap+CoefMG(level)%As
-             elseif (BtypeS==PERIODIC) then
+             elseif (Btype(So)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,i,ny,k))=CoefMG(level)%As
                        Ap=Ap+CoefMG(level)%As
              endif
              if (j<ny) then
                        age(l,ind(level,nulx,nuly,nulz,i,j+1,k))=CoefMG(level)%An
                        Ap=Ap+CoefMG(level)%An
-             elseif (BtypeN==PERIODIC) then
+             elseif (Btype(No)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,i,nuly,k))=CoefMG(level)%An
                        Ap=Ap+CoefMG(level)%An
              endif
              if (k>nulz) then
                        age(l,ind(level,nulx,nuly,nulz,i,j,k-1))=CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,i,j,nz))=CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
              endif
              if (k<nz) then
                        age(l,ind(level,nulx,nuly,nulz,i,j,k+1))=CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        age(l,ind(level,nulx,nuly,nulz,i,j,nulz))=CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
              endif
@@ -846,7 +846,7 @@ integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
     age(1,:)=0
     age(1,1)=age(2,2)
 !     bge(1)=0
-    
+
 
     if (KND==DBL) then
      call  DGETRF(nxyz,nxyz,age,nxyz,ipivot,info)
@@ -866,7 +866,7 @@ integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
     else
      call SGETRI(nxyz,age,nxyz,ipivot,work,-1,info)
     endif
-     
+
     if (info/=0) then
      stop
      write (*,*) "info",info
@@ -882,7 +882,7 @@ integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
     else
      call SGETRI(nxyz,age,nxyz,ipivot,work,ldwork,info)
     endif
-     
+
     if (info/=0) then
      stop
      write (*,*) "info",info
@@ -898,10 +898,10 @@ integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
             bge(l)=RHSMG(level)%Arr(i,j,k)
           enddo
        enddo
-    enddo     
+    enddo
     bge(1)=0
 
- 
+
 !     do j=1,nxyz !rows of X{j}
 !      xge(j)=0
 !      do i=1,nxyz !columns of A(i,j)
@@ -911,7 +911,7 @@ integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
 
     xge=0
     do j=1,nxyz !rows of X{j}
-     do i=1,nxyz !columns of A(i,j) if (age(i,j)>100*tiny(1._KND)) 
+     do i=1,nxyz !columns of A(i,j) if (age(i,j)>100*tiny(1._KND))
       xge(i)=xge(i)+age(i,j)*bge(j)
      enddo
     enddo
@@ -927,13 +927,13 @@ integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
         enddo
      enddo
 
- if (BtypeE==PERIODIC) then
+ if (Btype(Ea)==PERIODIC) then
   PhiMG(level)%Arr(0,:,:)=PhiMG(level)%Arr(nx,:,:)
  endif
- if (BtypeN==PERIODIC) then
+ if (Btype(No)==PERIODIC) then
   PhiMG(level)%Arr(:,0,:)=PhiMG(level)%Arr(:,ny,:)
  endif
- if (BtypeT==PERIODIC) then
+ if (Btype(To)==PERIODIC) then
   PhiMG(level)%Arr(:,:,0)=PhiMG(level)%Arr(:,:,nz)
  endif
 
@@ -954,13 +954,13 @@ real(KND) p,Ap
   if (GPU>0.and.level>=minGPUlevel) then!.and.level>3
 !    write (*,*) "Gauss-Seidel GPU call level", level
    !$hmpp  <GSKernels> advancedload, args[GS::nit,GS::level]
-   !$hmpp  <GSKernels> Gs callsite,args[*].noupdate=true   
+   !$hmpp  <GSKernels> Gs callsite,args[*].noupdate=true
    call Gs_GPU(nxa,nya,nza,niter,PhiMG(0)%Arr,PhiMG(1)%Arr,PhiMG(2)%Arr,PhiMG(3)%Arr,PhiMG(4)%Arr,&
                              PhiMG(5)%Arr,PhiMG(6)%Arr,PhiMG(7)%Arr,PhiMG(8)%Arr,&
                              RHSMG(0)%Arr,RHSMG(1)%Arr,RHSMG(2)%Arr,RHSMG(3)%Arr,RHSMG(4)%Arr,&
                              RHSMG(5)%Arr,RHSMG(6)%Arr,RHSMG(7)%Arr,RHSMG(8)%Arr,&
                      Aw,Ae,As,An,Ab,At,&
-                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level)
+                     Btype,level)
 
   else
 
@@ -975,42 +975,42 @@ real(KND) p,Ap
              if (i>0) then
                        p=p+PhiMG(level)%Arr(i-1,j,k)*CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(CoefMG(level)%nx-1,j,k)*CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
              endif
              if (i<CoefMG(level)%nx) then
                        p=p+PhiMG(level)%Arr(i+1,j,k)*CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(1,j,k)*CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
              endif
              if (j>0) then
                        p=p+PhiMG(level)%Arr(i,j-1,k)*CoefMG(level)%As
                        Ap=Ap+CoefMG(level)%As
-             elseif (BtypeS==PERIODIC) then
+             elseif (Btype(So)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,CoefMG(level)%ny-1,k)*CoefMG(level)%As
                        Ap=Ap+CoefMG(level)%As
              endif
              if (j<CoefMG(level)%ny) then
                        p=p+PhiMG(level)%Arr(i,j+1,k)*CoefMG(level)%An
                        Ap=Ap+CoefMG(level)%An
-             elseif (BtypeN==PERIODIC) then
+             elseif (Btype(No)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,1,k)*CoefMG(level)%An
                        Ap=Ap+CoefMG(level)%An
              endif
              if (k>0) then
                        p=p+PhiMG(level)%Arr(i,j,k-1)*CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,j,CoefMG(level)%nz-1)*CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
              endif
              if (k<CoefMG(level)%nz) then
                        p=p+PhiMG(level)%Arr(i,j,k+1)*CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,j,1)*CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
              endif
@@ -1031,42 +1031,42 @@ real(KND) p,Ap
              if (i>0) then
                        p=p+PhiMG(level)%Arr(i-1,j,k)*CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(CoefMG(level)%nx-1,j,k)*CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
              endif
              if (i<CoefMG(level)%nx) then
                        p=p+PhiMG(level)%Arr(i+1,j,k)*CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(1,j,k)*CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
              endif
              if (j>0) then
                        p=p+PhiMG(level)%Arr(i,j-1,k)*CoefMG(level)%As
                        Ap=Ap+CoefMG(level)%As
-             elseif (BtypeS==PERIODIC) then
+             elseif (Btype(So)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,CoefMG(level)%ny-1,k)*CoefMG(level)%As
                        Ap=Ap+CoefMG(level)%As
              endif
              if (j<CoefMG(level)%ny) then
                        p=p+PhiMG(level)%Arr(i,j+1,k)*CoefMG(level)%An
                        Ap=Ap+CoefMG(level)%An
-             elseif (BtypeN==PERIODIC) then
+             elseif (Btype(No)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,1,k)*CoefMG(level)%An
                        Ap=Ap+CoefMG(level)%An
              endif
              if (k>0) then
                        p=p+PhiMG(level)%Arr(i,j,k-1)*CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,j,CoefMG(level)%nz-1)*CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
              endif
              if (k<CoefMG(level)%nz) then
                        p=p+PhiMG(level)%Arr(i,j,k+1)*CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,j,1)*CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
              endif
@@ -1092,7 +1092,7 @@ real(KND),save:: p,Ap
 
   if (GPU>0.and.level>=minGPUlevel) then!.and.level>3
     !$hmpp <GSKernels> advancedload, args[Res::level]
-   !$hmpp  <GSKernels> Res callsite,args[*].noupdate=true   
+   !$hmpp  <GSKernels> Res callsite,args[*].noupdate=true
    call Res_GPU(nxa,nya,nza,PhiMG(0)%Arr,PhiMG(1)%Arr,PhiMG(2)%Arr,PhiMG(3)%Arr,PhiMG(4)%Arr,&
                              PhiMG(5)%Arr,PhiMG(6)%Arr,PhiMG(7)%Arr,PhiMG(8)%Arr,&
                              RHSMG(0)%Arr,RHSMG(1)%Arr,RHSMG(2)%Arr,RHSMG(3)%Arr,RHSMG(4)%Arr,&
@@ -1100,7 +1100,7 @@ real(KND),save:: p,Ap
                              ResMG(0)%Arr,ResMG(1)%Arr,ResMG(2)%Arr,ResMG(3)%Arr,ResMG(4)%Arr,&
                              ResMG(5)%Arr,ResMG(6)%Arr,ResMG(7)%Arr,ResMG(8)%Arr,&
                      Aw,Ae,As,An,Ab,At,&
-                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R,level)
+                     Btype,R,level)
   else
 
      do k=0,CoefMG(level)%nz
@@ -1111,42 +1111,42 @@ real(KND),save:: p,Ap
              if (i>0) then
                        p=p+PhiMG(level)%Arr(i-1,j,k)*CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(CoefMG(level)%nx-1,j,k)*CoefMG(level)%Aw
                        Ap=Ap+CoefMG(level)%Aw
              endif
              if (i<CoefMG(level)%nx) then
                        p=p+PhiMG(level)%Arr(i+1,j,k)*CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(1,j,k)*CoefMG(level)%Ae
                        Ap=Ap+CoefMG(level)%Ae
              endif
              if (j>0) then
                        p=p+PhiMG(level)%Arr(i,j-1,k)*CoefMG(level)%As
                        Ap=Ap+CoefMG(level)%As
-             elseif (BtypeS==PERIODIC) then
+             elseif (Btype(So)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,CoefMG(level)%ny-1,k)*CoefMG(level)%As
                        Ap=Ap+CoefMG(level)%As
              endif
              if (j<CoefMG(level)%ny) then
                        p=p+PhiMG(level)%Arr(i,j+1,k)*CoefMG(level)%An
                        Ap=Ap+CoefMG(level)%An
-             elseif (BtypeN==PERIODIC) then
+             elseif (Btype(No)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,1,k)*CoefMG(level)%An
                        Ap=Ap+CoefMG(level)%An
              endif
              if (k>0) then
                        p=p+PhiMG(level)%Arr(i,j,k-1)*CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,j,CoefMG(level)%nz-1)*CoefMG(level)%Ab
                        Ap=Ap+CoefMG(level)%Ab
              endif
              if (k<CoefMG(level)%nz) then
                        p=p+PhiMG(level)%Arr(i,j,k+1)*CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        p=p+PhiMG(level)%Arr(i,j,1)*CoefMG(level)%At
                        Ap=Ap+CoefMG(level)%At
              endif
@@ -1173,7 +1173,7 @@ integer l
                              RHSMG(0)%Arr,RHSMG(1)%Arr,RHSMG(2)%Arr,RHSMG(3)%Arr,RHSMG(4)%Arr,&
                              RHSMG(5)%Arr,RHSMG(6)%Arr,RHSMG(7)%Arr,&
                              ResMG(0)%Arr,ResMG(1)%Arr,ResMG(2)%Arr,ResMG(3)%Arr,ResMG(4)%Arr,&
-                             ResMG(5)%Arr,ResMG(6)%Arr,ResMG(7)%Arr,level,minmglevel)  
+                             ResMG(5)%Arr,ResMG(6)%Arr,ResMG(7)%Arr,level,minmglevel)
  else
   do l=level,minmglevel,-1
    PhiMG(l)%Arr=0
@@ -1292,17 +1292,17 @@ real(KND),save:: called=0
  mgeps=epsPoisson
  Phi=0
 
- if (BtypeE==PERIODIC) then
+ if (Btype(Ea)==PERIODIC) then
   sx=1
  else
   sx=0
  endif
- if (BtypeN==PERIODIC) then
+ if (Btype(No)==PERIODIC) then
   sy=1
  else
   sy=0
  endif
- if (BtypeT==PERIODIC) then
+ if (Btype(To)==PERIODIC) then
   sz=1
  else
   sz=0
@@ -1357,15 +1357,15 @@ real(KND),save:: called=0
  PhiMG(LMG)%Arr(0+sx:nx,0+sy:ny,0+sz:nz)=Phi(1:Prnx,1:Prny,1:Prnz)
  RHSMG(LMG)%Arr(0+sx:nx,0+sy:ny,0+sz:nz)=RHS(1:Prnx,1:Prny,1:Prnz)
 
- if (BtypeE==PERIODIC) then
+ if (Btype(Ea)==PERIODIC) then
   RHSMG(LMG)%Arr(0,:,:)=RHSMG(LMG)%Arr(Prnx,:,:)
   PhiMG(LMG)%Arr(0,:,:)=PhiMG(LMG)%Arr(Prnx,:,:)
  endif
- if (BtypeN==PERIODIC) then
+ if (Btype(No)==PERIODIC) then
   RHSMG(LMG)%Arr(:,0,:)=RHSMG(LMG)%Arr(:,Prny,:)
   PhiMG(LMG)%Arr(:,0,:)=PhiMG(LMG)%Arr(:,Prny,:)
  endif
- if (BtypeT==PERIODIC) then
+ if (Btype(To)==PERIODIC) then
   RHSMG(LMG)%Arr(:,:,0)=RHSMG(LMG)%Arr(:,:,Prnz)
   PhiMG(LMG)%Arr(:,:,0)=PhiMG(LMG)%Arr(:,:,Prnz)
  endif
@@ -1396,7 +1396,7 @@ real(KND),save:: called=0
 
   !$hmpp <GSKernels> allocate
   !$hmpp <GSkernels> advancedload, args[GS::nx,GS::ny,GS::nz,GS::Aw,GS::Ae,GS::As,GS::An,GS::Ab,GS::At,&
-  !$hmpp <GSkernels>  GS::BtypeW,GS::BtypeE,GS::BtypeS,GS::BtypeN,GS::BtypeB,GS::BtypeT]
+  !$hmpp <GSkernels>  GS::Btype(We),GS::Btype(Ea),GS::Btype(So),GS::Btype(No),GS::Btype(Bo),GS::Btype(To)]
 
 
 
@@ -1511,7 +1511,7 @@ endsubroutine POISSMG
   !$hmpp <GSKernels> group, target=CUDA
 
 
-  !$hmpp <GSKernels> mapbyname, nx,ny,nz,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+  !$hmpp <GSKernels> mapbyname, nx,ny,nz,Btype
   !$hmpp <GSKernels> mapbyname, Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,Phi8
   !$hmpp <GSKernels> mapbyname, RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,RHS8
   !$hmpp <GSKernels> mapbyname, Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,Res8
@@ -1520,7 +1520,7 @@ endsubroutine POISSMG
 
  !$hmpp <GSKernels> Pr codelet
  subroutine Pr_GPU(nx,ny,nz,Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,Phi8,&
-                                 BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level)
+                                 Btype,level)
  implicit none
  integer,parameter:: KND=4,PERIODIC=3
   integer,intent(in),dimension(0:8) :: nx,ny,nz
@@ -1533,7 +1533,7 @@ endsubroutine POISSMG
   real(KND),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6
   real(KND),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7
   real(KND),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Phi8
-  integer,intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level
+  integer,intent(in) :: Btype(6),level
   integer :: nxl, nyl, nzl
 
   nxl=nx(level)
@@ -1541,30 +1541,30 @@ endsubroutine POISSMG
   nzl=nz(level)
 
     if (level==0) then
-     call Prolongate_GPU(nxl,nyl,nzl,Phi1,Phi0,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Prolongate_GPU(nxl,nyl,nzl,Phi1,Phi0,Btype)
     elseif (level==1) then
-     call Prolongate_GPU(nxl,nyl,nzl,Phi2,Phi1,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Prolongate_GPU(nxl,nyl,nzl,Phi2,Phi1,Btype)
     elseif (level==2) then
-     call Prolongate_GPU(nxl,nyl,nzl,Phi3,Phi2,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Prolongate_GPU(nxl,nyl,nzl,Phi3,Phi2,Btype)
     elseif (level==3) then
-     call Prolongate_GPU(nxl,nyl,nzl,Phi4,Phi3,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Prolongate_GPU(nxl,nyl,nzl,Phi4,Phi3,Btype)
     elseif (level==4) then
-     call Prolongate_GPU(nxl,nyl,nzl,Phi5,Phi4,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Prolongate_GPU(nxl,nyl,nzl,Phi5,Phi4,Btype)
     elseif (level==5) then
-     call Prolongate_GPU(nxl,nyl,nzl,Phi6,Phi5,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Prolongate_GPU(nxl,nyl,nzl,Phi6,Phi5,Btype)
     elseif (level==6) then
-     call Prolongate_GPU(nxl,nyl,nzl,Phi7,Phi6,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Prolongate_GPU(nxl,nyl,nzl,Phi7,Phi6,Btype)
     elseif (level==7) then
-     call Prolongate_GPU(nxl,nyl,nzl,Phi8,Phi7,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Prolongate_GPU(nxl,nyl,nzl,Phi8,Phi7,Btype)
     endif
  endsubroutine Pr_GPU
 
 
- subroutine Prolongate_GPU(nx,ny,nz,AFine,ACoarse,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+ subroutine Prolongate_GPU(nx,ny,nz,AFine,ACoarse,Btype)
 
  implicit none
  integer,parameter:: KND=4,PERIODIC=3
- integer,intent(in):: nx,ny,nz,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+ integer,intent(in):: nx,ny,nz,Btype(6)
  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in):: ACoarse
  real(KND),dimension(-1:2*nx+1,-1:2*ny+1,-1:2*nz+1),intent(inout):: AFine
  real(KND),dimension(-1:1,-1:1,-1:1):: Cf
@@ -1585,7 +1585,7 @@ endsubroutine POISSMG
     end if
    enddo
   enddo
- enddo 
+ enddo
 
  do kk=-1,1
   do jj=-1,1
@@ -1605,7 +1605,7 @@ endsubroutine POISSMG
   enddo
  enddo
 
-   if (BtypeW==PERIODIC) then
+   if (Btype(We)==PERIODIC) then
     do k=0,2*nz
      do j=0,2*ny                      !Periodic BC
       Afine(-1,j,k)=Afine(2*nx-1,j,k)
@@ -1619,13 +1619,13 @@ endsubroutine POISSMG
     enddo
    endif
 
-   if (BtypeE==PERIODIC) then
+   if (Btype(Ea)==PERIODIC) then
     do k=0,2*nz
      do j=0,2*ny                      !Periodic BC
       Afine(2*nx+1,j,k)=Afine(1,j,k)
      enddo
     enddo
-   else 
+   else
     do k=0,2*nz
      do j=0,2*ny                      !Other BCs
       Afine(2*nx+1,j,k)=Afine(2*nx,j,k)
@@ -1633,7 +1633,7 @@ endsubroutine POISSMG
     enddo
    endif
 
-   if (BtypeS==PERIODIC) then
+   if (Btype(So)==PERIODIC) then
    do k=0,2*nz
      do i=-1,2*nx+1                      !Periodic BC
       Afine(i,-1,k)=Afine(i,2*ny-1,k)
@@ -1647,7 +1647,7 @@ endsubroutine POISSMG
     enddo
    endif
 
-   if (BtypeN==PERIODIC) then
+   if (Btype(No)==PERIODIC) then
    do k=0,2*nz
      do i=-1,2*nx+1                      !Periodic BC
       Afine(i,2*ny+1,k)=Afine(i,1,k)
@@ -1661,7 +1661,7 @@ endsubroutine POISSMG
     enddo
    endif
 
-   if (BtypeB==PERIODIC) then
+   if (Btype(Bo)==PERIODIC) then
     do j=-1,2*ny+1
      do i=-1,2*nx+1                      !Periodic BC
       Afine(i,j,-1)=Afine(i,j,2*nz-1)
@@ -1675,7 +1675,7 @@ endsubroutine POISSMG
     enddo
    endif
 
-   if (BtypeT==PERIODIC) then
+   if (Btype(To)==PERIODIC) then
     do j=-1,2*ny+1
      do i=-1,2*nx+1                      !Periodic BC
       Afine(i,j,2*nz+1)=Afine(i,j,1)
@@ -1697,7 +1697,7 @@ endsubroutine POISSMG
  !$hmpp <GSKernels> Re codelet
  subroutine Re_GPU(nx,ny,nz,RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,RHS8,&
                             Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,Res8,&
-                                 BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level)
+                                 Btype,level)
  implicit none
  integer,parameter:: KND=4,PERIODIC=3
   integer,intent(in),dimension(0:8) :: nx,ny,nz
@@ -1710,7 +1710,7 @@ endsubroutine POISSMG
   real(KND),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Res6,RHS6
   real(KND),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Res7,RHS7
   real(KND),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Res8,RHS8
-  integer,intent(in) :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level
+  integer,intent(in) :: Btype(6),level
   integer :: nxl, nyl, nzl
 
   nxl=nx(level)
@@ -1718,38 +1718,38 @@ endsubroutine POISSMG
   nzl=nz(level)
 
     if (level==0) then
-     call Restrict_GPU(nxl,nyl,nzl,RHS0,Res1,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Restrict_GPU(nxl,nyl,nzl,RHS0,Res1,Btype)
     elseif (level==1) then
-     call Restrict_GPU(nxl,nyl,nzl,RHS1,Res2,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Restrict_GPU(nxl,nyl,nzl,RHS1,Res2,Btype)
     elseif (level==2) then
-     call Restrict_GPU(nxl,nyl,nzl,RHS2,Res3,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Restrict_GPU(nxl,nyl,nzl,RHS2,Res3,Btype)
     elseif (level==3) then
-     call Restrict_GPU(nxl,nyl,nzl,RHS3,Res4,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Restrict_GPU(nxl,nyl,nzl,RHS3,Res4,Btype)
     elseif (level==4) then
-     call Restrict_GPU(nxl,nyl,nzl,RHS4,Res5,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Restrict_GPU(nxl,nyl,nzl,RHS4,Res5,Btype)
     elseif (level==5) then
-     call Restrict_GPU(nxl,nyl,nzl,RHS5,Res6,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Restrict_GPU(nxl,nyl,nzl,RHS5,Res6,Btype)
     elseif (level==6) then
-     call Restrict_GPU(nxl,nyl,nzl,RHS6,Res7,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Restrict_GPU(nxl,nyl,nzl,RHS6,Res7,Btype)
     elseif (level==7) then
-     call Restrict_GPU(nxl,nyl,nzl,RHS6,Res7,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+     call Restrict_GPU(nxl,nyl,nzl,RHS6,Res7,Btype)
     endif
  endsubroutine Re_GPU
 
 
 
 
- subroutine Restrict_GPU(nx,ny,nz,ACoarse,AFine,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+ subroutine Restrict_GPU(nx,ny,nz,ACoarse,AFine,Btype)
  implicit none
  integer,parameter:: KND=4,PERIODIC=3
- integer,intent(in):: nx,ny,nz,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+ integer,intent(in):: nx,ny,nz,Btype(6)
  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out):: ACoarse
  real(KND),dimension(-1:2*nx+1,-1:2*ny+1,-1:2*nz+1),intent(inout):: AFine
  real(KND) q
  integer:: i,j,k
- 
 
-   if (BtypeW==PERIODIC) then
+
+   if (Btype(We)==PERIODIC) then
     do k=0,2*nz
      do j=0,2*ny                      !Periodic BC
       Afine(-1,j,k)=Afine(2*nx-1,j,k)
@@ -1763,13 +1763,13 @@ endsubroutine POISSMG
     enddo
    endif
 
-   if (BtypeE==PERIODIC) then
+   if (Btype(Ea)==PERIODIC) then
     do k=0,2*nz
      do j=0,2*ny                      !Periodic BC
       Afine(2*nx+1,j,k)=Afine(1,j,k)
      enddo
     enddo
-   else 
+   else
     do k=0,2*nz
      do j=0,2*ny                      !Other BCs
       Afine(2*nx+1,j,k)=Afine(2*nx,j,k)
@@ -1777,7 +1777,7 @@ endsubroutine POISSMG
     enddo
    endif
 
-   if (BtypeS==PERIODIC) then
+   if (Btype(So)==PERIODIC) then
    do k=0,2*nz
      do i=-1,2*nx+1                      !Periodic BC
       Afine(i,-1,k)=Afine(i,2*ny-1,k)
@@ -1791,7 +1791,7 @@ endsubroutine POISSMG
     enddo
    endif
 
-   if (BtypeN==PERIODIC) then
+   if (Btype(No)==PERIODIC) then
    do k=0,2*nz
      do i=-1,2*nx+1                      !Periodic BC
       Afine(i,2*ny+1,k)=Afine(i,1,k)
@@ -1805,7 +1805,7 @@ endsubroutine POISSMG
     enddo
    endif
 
-   if (BtypeB==PERIODIC) then
+   if (Btype(Bo)==PERIODIC) then
     do j=-1,2*ny+1
      do i=-1,2*nx+1                      !Periodic BC
       Afine(i,j,-1)=Afine(i,j,2*nz-1)
@@ -1819,7 +1819,7 @@ endsubroutine POISSMG
     enddo
    endif
 
-   if (BtypeT==PERIODIC) then
+   if (Btype(To)==PERIODIC) then
     do j=-1,2*ny+1
      do i=-1,2*nx+1                      !Periodic BC
       Afine(i,j,2*nz+1)=Afine(i,j,1)
@@ -1832,7 +1832,7 @@ endsubroutine POISSMG
      enddo
     enddo
    endif
- 
+
 
    !$hmppcg permute (k,i,j)
    !$hmppcg grid blocksize 512x1
@@ -1946,24 +1946,24 @@ endsubroutine POISSMG
               ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k-1); q=q+0.125
             endif
 
-            ACoarse(i,j,k)=ACoarse(i,j,k)/q       
+            ACoarse(i,j,k)=ACoarse(i,j,k)/q
         enddo
        enddo
       enddo
-      
+
       do k=-1,nz+1
        do j=-1,ny+1
-        if (BtypeE==PERIODIC) ACoarse(0,j,k)=ACoarse(nx,j,k)
+        if (Btype(Ea)==PERIODIC) ACoarse(0,j,k)=ACoarse(nx,j,k)
        enddo
       enddo
       do k=-1,nz+1
        do i=-1,nx+1
-        if (BtypeN==PERIODIC) ACoarse(i,0,k)=ACoarse(i,ny,k)
+        if (Btype(No)==PERIODIC) ACoarse(i,0,k)=ACoarse(i,ny,k)
        enddo
       enddo
       do j=-1,ny+1
        do i=-1,nx+1
-        if (BtypeT==PERIODIC) ACoarse(i,j,0)=ACoarse(i,j,nz)
+        if (Btype(To)==PERIODIC) ACoarse(i,j,0)=ACoarse(i,j,nz)
        enddo
       enddo
 endsubroutine Restrict_GPU
@@ -1976,7 +1976,7 @@ endsubroutine Restrict_GPU
   subroutine GS_GPU(nx,ny,nz,nit,Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,Phi8,&
                               RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,RHS8,&
                      Aw,Ae,As,An,Ab,At,&
-                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,level)
+                     Btype,level)
   implicit none
   integer,parameter:: KND=4
   integer,intent(in),dimension(0:8) :: nx,ny,nz
@@ -1992,7 +1992,7 @@ endsubroutine Restrict_GPU
   real(KND),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Phi8,RHS8
   integer,intent(in) :: level
   real(KND),dimension(0:8),intent(in) :: Aw,Ae,As,An,Ab,At
-  integer,intent(in)   :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+  integer,intent(in)   :: Btype(6)
   integer :: nxl, nyl, nzl
 
   nxl=nx(level)
@@ -2003,47 +2003,47 @@ endsubroutine Restrict_GPU
       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
                       Phi0,RHS0,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+                      Btype)
    elseif (level==1) then
       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
                       Phi1,RHS1,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+                      Btype)
    elseif (level==2) then
       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
                       Phi2,RHS2,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+                      Btype)
    elseif (level==3) then
       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
                       Phi3,RHS3,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+                      Btype)
    elseif (level==4) then
       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
                       Phi4,RHS4,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+                      Btype)
    elseif (level==5) then
       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
                       Phi5,RHS5,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+                      Btype)
    elseif (level==6) then
       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
                       Phi6,RHS6,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+                      Btype)
    elseif (level==7) then
       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
                       Phi7,RHS7,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+                      Btype)
    elseif (level==8) then
       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
                       Phi8,RHS8,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+                      Btype)
    endif
 
   endsubroutine GS_GPU
@@ -2052,15 +2052,15 @@ endsubroutine Restrict_GPU
 
   subroutine MG_GS_GPU(nx,ny,nz,nit,Phi,RHS,&
                      Aw,Ae,As,An,Ab,At,&
-                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT)
+                     Btype)
   implicit none
 
   integer,parameter:: KND=4,PERIODIC=3
 
-  integer,intent(in)   :: nx,ny,nz,nit,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+  integer,intent(in)   :: nx,ny,nz,nit,Btype(6)
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::Phi
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::RHS
-  real(KND),intent(in) :: Aw,Ae,As,An,Ab,At 
+  real(KND),intent(in) :: Aw,Ae,As,An,Ab,At
   integer i,j,k,l
   real(KND) :: p,Ap
   intrinsic mod
@@ -2076,42 +2076,42 @@ endsubroutine Restrict_GPU
              if (i>0) then
                        p=p+Phi(i-1,j,k)*Aw
                        Ap=Ap+Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        p=p+Phi(nx-1,j,k)*Aw
                        Ap=Ap+Aw
              endif
              if (i<nx) then
                        p=p+Phi(i+1,j,k)*Ae
                        Ap=Ap+Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        p=p+Phi(1,j,k)*Ae
                        Ap=Ap+Ae
              endif
              if (j>0) then
                        p=p+Phi(i,j-1,k)*As
                        Ap=Ap+As
-             elseif (BtypeS==PERIODIC) then
+             elseif (Btype(So)==PERIODIC) then
                        p=p+Phi(i,ny-1,k)*As
                        Ap=Ap+As
              endif
              if (j<ny) then
                        p=p+Phi(i,j+1,k)*An
                        Ap=Ap+An
-             elseif (BtypeN==PERIODIC) then
+             elseif (Btype(No)==PERIODIC) then
                        p=p+Phi(i,1,k)*An
                        Ap=Ap+An
              endif
              if (k>0) then
                        p=p+Phi(i,j,k-1)*Ab
                        Ap=Ap+Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        p=p+Phi(i,j,nz-1)*Ab
                        Ap=Ap+Ab
              endif
              if (k<nz) then
                        p=p+Phi(i,j,k+1)*At
                        Ap=Ap+At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        p=p+Phi(i,j,1)*At
                        Ap=Ap+At
              endif
@@ -2132,42 +2132,42 @@ endsubroutine Restrict_GPU
              if (i>0) then
                        p=p+Phi(i-1,j,k)*Aw
                        Ap=Ap+Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        p=p+Phi(nx-1,j,k)*Aw
                        Ap=Ap+Aw
              endif
              if (i<nx) then
                        p=p+Phi(i+1,j,k)*Ae
                        Ap=Ap+Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        p=p+Phi(1,j,k)*Ae
                        Ap=Ap+Ae
              endif
              if (j>0) then
                        p=p+Phi(i,j-1,k)*As
                        Ap=Ap+As
-             elseif (BtypeS==PERIODIC) then
+             elseif (Btype(So)==PERIODIC) then
                        p=p+Phi(i,ny-1,k)*As
                        Ap=Ap+As
              endif
              if (j<ny) then
                        p=p+Phi(i,j+1,k)*An
                        Ap=Ap+An
-             elseif (BtypeN==PERIODIC) then
+             elseif (Btype(No)==PERIODIC) then
                        p=p+Phi(i,1,k)*An
                        Ap=Ap+An
              endif
              if (k>0) then
                        p=p+Phi(i,j,k-1)*Ab
                        Ap=Ap+Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        p=p+Phi(i,j,nz-1)*Ab
                        Ap=Ap+Ab
              endif
              if (k<nz) then
                        p=p+Phi(i,j,k+1)*At
                        Ap=Ap+At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        p=p+Phi(i,j,1)*At
                        Ap=Ap+At
              endif
@@ -2187,7 +2187,7 @@ endsubroutine Restrict_GPU
                               RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,RHS8,&
                               Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,Res8,&
                      Aw,Ae,As,An,Ab,At,&
-                     BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R,level)
+                     Btype,R,level)
   implicit none
   integer,parameter:: KND=4
   integer,intent(in),dimension(0:8) :: nx,ny,nz
@@ -2202,7 +2202,7 @@ endsubroutine Restrict_GPU
   real(KND),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Phi8,Res8,RHS8
   integer,intent(in) :: level
   real(KND),dimension(0:8),intent(in) :: Aw,Ae,As,An,Ab,At
-  integer,intent(in)   :: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+  integer,intent(in)   :: Btype(6)
   real(KND),intent(out) :: R
   integer :: nxl, nyl, nzl
 
@@ -2215,47 +2215,47 @@ endsubroutine Restrict_GPU
       call MG_Res_GPU(nxl,nyl,nzl,&
                       Phi0,Res0,RHS0,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+                      Btype,R)
    elseif (level==1) then
       call MG_Res_GPU(nxl,nyl,nzl,&
                       Phi1,Res1,RHS1,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+                      Btype,R)
    elseif (level==2) then
       call MG_Res_GPU(nxl,nyl,nzl,&
                       Phi2,Res2,RHS2,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+                      Btype,R)
    elseif (level==3) then
       call MG_Res_GPU(nxl,nyl,nzl,&
                       Phi3,Res3,RHS3,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+                      Btype,R)
    elseif (level==4) then
       call MG_Res_GPU(nxl,nyl,nzl,&
                       Phi4,Res4,RHS4,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+                      Btype,R)
    elseif (level==5) then
       call MG_Res_GPU(nxl,nyl,nzl,&
                       Phi5,Res5,RHS5,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+                      Btype,R)
    elseif (level==6) then
       call MG_Res_GPU(nxl,nyl,nzl,&
                       Phi6,Res6,RHS6,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+                      Btype,R)
    elseif (level==7) then
       call MG_Res_GPU(nxl,nyl,nzl,&
                       Phi7,Res7,RHS7,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+                      Btype,R)
    elseif (level==8) then
       call MG_Res_GPU(nxl,nyl,nzl,&
                       Phi8,Res8,RHS8,&
                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+                      Btype,R)
    endif
 
   end subroutine Res_GPU
@@ -2266,14 +2266,14 @@ endsubroutine Restrict_GPU
 
   subroutine MG_Res_GPU(nx,ny,nz,Phi,Res,RHS,&
                              Aw,Ae,As,An,Ab,At,&
-                             BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,R)
+                             Btype,R)
 
    implicit none
 
 
    integer,parameter:: KND=4,PERIODIC=3
 
-   integer,intent(in)   :: nx,ny,nz,BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT
+   integer,intent(in)   :: nx,ny,nz,Btype(6)
    real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::Phi
    real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
    real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
@@ -2293,42 +2293,42 @@ endsubroutine Restrict_GPU
              if (i>0) then
                        p=p+Phi(i-1,j,k)*Aw
                        Ap=Ap+Aw
-             elseif (BtypeW==PERIODIC) then
+             elseif (Btype(We)==PERIODIC) then
                        p=p+Phi(nx-1,j,k)*Aw
                        Ap=Ap+Aw
              endif
              if (i<nx) then
                        p=p+Phi(i+1,j,k)*Ae
                        Ap=Ap+Ae
-             elseif (BtypeE==PERIODIC) then
+             elseif (Btype(Ea)==PERIODIC) then
                        p=p+Phi(1,j,k)*Ae
                        Ap=Ap+Ae
              endif
              if (j>0) then
                        p=p+Phi(i,j-1,k)*As
                        Ap=Ap+As
-             elseif (BtypeS==PERIODIC) then
+             elseif (Btype(So)==PERIODIC) then
                        p=p+Phi(i,ny-1,k)*As
                        Ap=Ap+As
              endif
              if (j<ny) then
                        p=p+Phi(i,j+1,k)*An
                        Ap=Ap+An
-             elseif (BtypeN==PERIODIC) then
+             elseif (Btype(No)==PERIODIC) then
                        p=p+Phi(i,1,k)*An
                        Ap=Ap+An
              endif
              if (k>0) then
                        p=p+Phi(i,j,k-1)*Ab
                        Ap=Ap+Ab
-             elseif (BtypeB==PERIODIC) then
+             elseif (Btype(Bo)==PERIODIC) then
                        p=p+Phi(i,j,nz-1)*Ab
                        Ap=Ap+Ab
              endif
              if (k<nz) then
                        p=p+Phi(i,j,k+1)*At
                        Ap=Ap+At
-             elseif (BtypeT==PERIODIC) then
+             elseif (Btype(To)==PERIODIC) then
                        p=p+Phi(i,j,1)*At
                        Ap=Ap+At
              endif
@@ -2348,14 +2348,14 @@ endsubroutine Restrict_GPU
              R=max(R,abs(Res(i,j,k)))
             enddo
         enddo
-    enddo    
+    enddo
   endsubroutine MG_Res_GPU
 
 
 
 
 
-  
+
   !$hmpp <GSKernels> Cl codelet
   subroutine Cl_GPU(nx,ny,nz,Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,&
                              RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,&
@@ -2378,7 +2378,7 @@ endsubroutine Restrict_GPU
   nxl=nx(level)
   nyl=ny(level)
   nzl=nz(level)
-  
+
   do l=level,minmglevel,-1
    if (l==0) then
     call Clear_GPU(nx(l),ny(l),nz(l),Phi0,RHS0,Res0)
