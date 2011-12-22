@@ -1607,7 +1607,7 @@ write(*,*) "Otherterms:"
   real(KND),intent(inout):: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
   real(KND),intent(inout):: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
   real(KND),intent(inout):: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),intent(in) :: dxU(-2:Prnx-1),dyV(-2:Prny-1),dzW(-2:Prnz-1),prgradientx,prgradienty,dt,coef
+  real(KND),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2),prgradientx,prgradienty,dt,coef
   real(KND) :: A
   integer i,j,k
 
