@@ -879,7 +879,7 @@ contains
 
 
   subroutine GetSolidBodiesBC
-  use WallModels
+  use WallModels, only: WMPoint, AddWMPoint
   integer i,j,k,m,n,o
   integer(SINT) nb
   real(KND) dist,nearx,neary,nearz
@@ -887,7 +887,7 @@ contains
   type(WMPOINT):: WMP
 
    !find if the gridpoints lie inside a solid body and write it's number
-   !do not nullifie the .type arrays, they could have been made nonzero by other unit
+   !do not nullify the .type arrays, they could have been made nonzero by other unit
    CurrentSB=>FirstSB
 
    do
