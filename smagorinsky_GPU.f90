@@ -1,11 +1,12 @@
 
 
-  !$hmpp Vreman_GPU codelet, target=CUDA
+  !$hmpp <tsteps_gpu> Vreman codelet
   subroutine Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dx,dy,dz,dt,Re,U,V,W,Visc)
    !Vreman subgrid model (Physics of Fluids, 2004)
    implicit none
+#ifdef __HMPP
    integer,parameter :: KND=4
-
+#endif
    integer,intent(in)    :: Prnx, Prny, Prnz, Unx, Uny, Unz, Vnx, Vny, Vnz, Wnx, Wny, Wnz
    real(KND),intent(in)  :: dx, dy, dz, dt, Re
    real(KND),dimension(-2:Prnx+3,-2:Prny+3,-2:Prnz+3),intent(in):: U,V,W

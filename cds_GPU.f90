@@ -1,9 +1,10 @@
 
-    !$hmpp CDS_GPU codelet, target=CUDA
+    !$hmpp <tsteps_gpu> CDS codelet
     subroutine CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dx,dy,dz,dt,U2,V2,W2,U,V,W)
     implicit none
-    integer, parameter:: KND=4
-
+#ifdef __HMPP
+    integer,parameter :: KND=4
+#endif
     integer,intent(in)    :: Unx, Uny, Unz, Vnx, Vny, Vnz, Wnx, Wny, Wnz
     real(KND),intent(in)  :: dx, dy, dz, dt
     real(KND),intent(out) :: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3)

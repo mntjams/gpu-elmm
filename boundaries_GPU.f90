@@ -1,11 +1,13 @@
-  pure subroutine BoundU_GPU(component,nx,ny,nz,Prny,Prnz,&
+ pure subroutine BoundU_GPU(component,nx,ny,nz,Prny,Prnz,&
                              BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,&
                              SsideU,NsideU,BsideU,TsideU,&
                              SsideV,NsideV,BsideV,TsideV,&
                              SsideW,NsideW,BsideW,TsideW,&
                              Uin,U,regime)
   implicit none
-  integer,parameter       :: KND = 4
+#ifdef __HMPP
+  integer,parameter :: KND=4
+#endif
   integer,parameter       :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
                                TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
   integer,parameter       :: interm=2

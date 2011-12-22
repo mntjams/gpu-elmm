@@ -1,4 +1,4 @@
-  !$hmpp UNIFREDBLACK_GPU codelet, target=CUDA
+  !$hmpp <tsteps_gpu> UnifRedBlack codelet
   subroutine UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,&
                               BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,&
                               SsideU,NsideU,BsideU,TsideU,&
@@ -9,7 +9,10 @@
                               coef,maxCNiter,epsCN,iters,residuum)
   implicit none
 
+#ifdef __HMPP
    integer, parameter:: KND=4,TIM=4
+#endif
+
 
    integer,intent(in):: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz
    integer,intent(in):: BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT

@@ -657,6 +657,7 @@ contains
   integer,save:: called=0
   real time1,time2
 
+  !$hmpp <tsteps_gpu> allocate
 
   if (called==0) then
    called=1
@@ -711,7 +712,7 @@ contains
        call BoundU(1,U)
        call BoundU(2,V)
        call BoundU(3,W)
-       !$hmpp CDS_GPU callsite
+       !$hmpp <tsteps_gpu> CDS callsite
        call CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Ustar,Vstar,Wstar,U,V,W)
        write(*,*) "Back from  GPU CDS"
       else
@@ -759,6 +760,8 @@ contains
     call BoundU(1,U2)
     call BoundU(2,V2)
     call BoundU(3,W2)
+   !$hmpp <tsteps_gpu> release
+
 
 
     if (poissmet>0) then
@@ -847,6 +850,7 @@ contains
     V=V2
     W=W2
    enddo
+
  end subroutine TMarchRK3
 
 
@@ -1406,45 +1410,25 @@ contains
    real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: U3
    real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: V3
    real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: W3
-   real(KND) Af,Ap,Apre,Aprn,Aprt,S
+   real(KND) Ap,Apre,Aprn,Aprt,S
 
    integer i,j,k,it,x,y,z
 
    type(TIBPoint),pointer:: IBP
 write(*,*) "Otherterms:"
-   Apre=-coef*dt
-   Aprn=-coef*dt
-   Aprt=-coef*dt
-   Af=dt
 
    call Bound_Pr(Pr)
+
    !Pressure gradient terms
-   do k=1,Unz
-    do j=1,Uny
-     do i=1,Unx
-          U2(i,j,k)=U2(i,j,k)+Apre*(Pr(i+1,j,k)-Pr(i,j,k))/dxU(i)+Apre*prgradientx
-     enddo
-    enddo
-   enddo
-   do k=1,Vnz
-    do j=1,Vny
-     do i=1,Vnx
-          V2(i,j,k)=V2(i,j,k)+Aprn*(Pr(i,j+1,k)-Pr(i,j,k))/dyV(j)+Aprn*prgradienty
-     enddo
-    enddo
-   enddo
-   do k=1,Wnz
-    do j=1,Wny
-     do i=1,Wnx
-          W2(i,j,k)=W2(i,j,k)+Aprt*(Pr(i,j,k+1)-Pr(i,j,k))/dzW(k)
-     enddo
-    enddo
-   enddo
+   !$hmpp <tsteps_gpu> PressureGrad callsite
+   call PressureGrad(Prnx,Prny,Prnz,&
+                     Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                     dxU,dyV,dzW,&
+                     prgradientx,prgradienty,&
+                     Pr,U2,V2,W2,&
+                     dt,coef)
 
 
-   call BoundU(1,U2,2)
-   call BoundU(2,V2,2)
-   call BoundU(3,W2,2)
 
    Re_gt_0: if (Re>0) then
 
@@ -1465,7 +1449,7 @@ write(*,*) "Otherterms:"
                        call DynSmag(U,V,W)
      elseif (sgstype==VremanModel) then
                        if (GPU>0.and.gridtype==uniformgrid.and. Prnx*Prny*Prnz > 5000000) then
-                           !$hmpp Vreman_GPU callsite
+                           !$hmpp <tsteps_gpu> Vreman callsite
                            call Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Re,U,V,W,Visc)
                        else
                            call Vreman(U,V,W)
@@ -1562,7 +1546,7 @@ write(*,*) "Otherterms:"
 
      if (gridtype==UNIFORMGRID.and.GPU>0) then                  !Performs the diffusion terms
       write (*,*) "GPU CN call"
-      !$hmpp UNIFREDBLACK_GPU callsite
+      !$hmpp <tsteps_gpu> UNIFREDBLACK callsite
       call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,&
                             BtypeW,BtypeE,BtypeS,BtypeN,BtypeB,BtypeT,&
                             SsideU,NsideU,BsideU,TsideU,&
@@ -1612,6 +1596,46 @@ write(*,*) "Otherterms:"
   endsubroutine OtherTerms
 
 
+  !$hmpp <tsteps_gpu> PressureGrad codelet
+  subroutine PressureGrad(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxU,dyV,dzW,prgradientx,prgradienty,Pr,U,V,W,dt,coef)
+  implicit none
+#ifdef __HMPP
+  integer,parameter :: KND=4
+#endif
+  integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
+  real(KND),intent(inout):: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
+  real(KND),intent(inout):: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+  real(KND),intent(inout):: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+  real(KND),intent(inout):: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND),intent(in) :: dxU(-2:Prnx-1),dyV(-2:Prny-1),dzW(-2:Prnz-1),prgradientx,prgradienty,dt,coef
+  real(KND) :: A
+  integer i,j,k
+
+   A=-coef*dt
+   A=-coef*dt
+   A=-coef*dt
+   do k=1,Unz
+    do j=1,Uny
+     do i=1,Unx
+          U(i,j,k)=U(i,j,k)+A*(Pr(i+1,j,k)-Pr(i,j,k))/dxU(i)+A*prgradientx
+     enddo
+    enddo
+   enddo
+   do k=1,Vnz
+    do j=1,Vny
+     do i=1,Vnx
+          V(i,j,k)=V(i,j,k)+A*(Pr(i,j+1,k)-Pr(i,j,k))/dyV(j)+A*prgradienty
+     enddo
+    enddo
+   enddo
+   do k=1,Wnz
+    do j=1,Wny
+     do i=1,Wnx
+          W(i,j,k)=W(i,j,k)+A*(Pr(i,j,k+1)-Pr(i,j,k))/dzW(k)
+     enddo
+    enddo
+   enddo
+  end subroutine PressureGrad
 
 
   subroutine UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
@@ -2343,7 +2367,7 @@ write(*,*) "Otherterms:"
 
  !GPU codelets
 
-
+!$hmpp <tsteps_gpu> group, target=CUDA
 
 #include "boundaries_GPU.f90"
 #include "cds_GPU.f90"
