@@ -621,7 +621,7 @@ implicit none
       if (WMP%z0>0) then
 
         if (buoyancy==1.and.TBtype(Bo)==CONSTFLUX) then
-          Visc(WMP%x,WMP%y,WMP%z)=WM2Visc(WMP,U,V,W,Pr)!WM_MO_FLUX(WMP,U,V,W,Pr)
+          Visc(WMP%x,WMP%y,WMP%z)=WM_MO_FLUX(WMP,U,V,W,Pr)
         else if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
          if (WMP%z==1) WMP%temp=BsideTArr(WMP%x,WMP%y)
          call WM_MO_DIRICHLET(Visc(WMP%x,WMP%y,WMP%z),WMP,U,V,W,Pr)
