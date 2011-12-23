@@ -10,7 +10,8 @@ module OUTPUTS
 
 
  private
- public OutTStep, Output, store, display, probes, NumProbes, AllocateOutputs
+ public OutTStep, Output, store, display, probes, NumProbes, AllocateOutputs,&
+        Tprobe, TOutputSwitches, TDisplaySwitches
 
  real(KND),dimension(:),allocatable :: profuavg,profuavg2,profvavg,profvavg2,profuuavg,profvvavg,profwwavg,&
                                         profU,profV,profuu,profvv,profww,proftauavg,proftau,proftausgs,proftausgsavg,&
