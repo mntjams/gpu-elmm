@@ -581,4 +581,62 @@
 
   end subroutine BoundU_GPU
 
+  !
+  pure subroutine BoundPr_GPU(Unx,Vny,Wnz,Prnx,Prny,Prnz,Pr)
+#ifdef __HMPP
+  integer,parameter  :: KND=4
+  integer,parameter  :: PERIODIC=3
+  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#endif
+  integer,intent(in)     :: Unx,Vny,Wnz,Prnx,Prny,Prnz
+  real(KND),intent(inout):: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
 
+  integer :: i,j,k,nx,ny,nz
+
+  nx=Prnx
+  ny=Prny
+  nz=Prnz
+
+  if (Btype(We)==PERIODIC) then
+   do k=1,nz
+    do j=1,ny
+     Pr(nx+1,j,k)=Pr(1,j,k)
+    enddo
+   enddo
+  endif
+  if (Btype(No)==PERIODIC) then
+   do k=1,nz
+    do i=1,nx
+     Pr(i,ny+1,k)=Pr(i,1,k)
+    enddo
+   enddo
+  endif
+  if (Btype(To)==PERIODIC) then
+   do j=1,ny
+    do i=1,nx
+     Pr(i,j,nz+1)=Pr(i,j,1)
+    enddo
+   enddo
+  endif
+
+  if (Btype(We)==PERIODIC.and.Btype(No)==PERIODIC) then
+   do k=1,nz
+      Pr(nx+1,ny+1,k)=Pr(1,1,k)
+   enddo
+  endif
+
+   if (Btype(We)==PERIODIC.and.Btype(To)==PERIODIC) then
+   do j=1,ny
+      Pr(nx+1,j,nz+1)=Pr(1,j,1)
+   enddo
+  endif
+
+  if (Btype(No)==PERIODIC.and.Btype(To)==PERIODIC) then
+   do i=1,nx
+      Pr(i,ny+1,nz+1)=Pr(i,1,1)
+   enddo
+  endif
+
+  if (Btype(We)==PERIODIC.and.Btype(No)==PERIODIC.and.Btype(To)==PERIODIC)  Pr(nx+1,ny+1,nz+1)=Pr(1,1,1)
+
+  end subroutine BoundPr_GPU

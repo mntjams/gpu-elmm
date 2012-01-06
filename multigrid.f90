@@ -1396,7 +1396,7 @@ real(KND),save:: called=0
 
   !$hmpp <GSKernels> allocate
   !$hmpp <GSkernels> advancedload, args[GS::nx,GS::ny,GS::nz,GS::Aw,GS::Ae,GS::As,GS::An,GS::Ab,GS::At,&
-  !$hmpp <GSkernels>  GS::Btype(We),GS::Btype(Ea),GS::Btype(So),GS::Btype(No),GS::Btype(Bo),GS::Btype(To)]
+  !$hmpp <GSkernels>  GS::Btype]
 
 
 

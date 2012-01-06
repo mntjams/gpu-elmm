@@ -406,7 +406,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      !$hmpp <SOR> allocate
      !$hmpp <SOR> advancedload, args[GS_GPU::Phi,GS_GPU::RHS,GS_GPU::nx,GS_GPU::ny,GS_GPU::nz,GS_GPU::nit,&
      !$hmpp <SOR>    GS_GPU::Aw,GS_GPU::Ae,GS_GPU::As,GS_GPU::An,GS_GPU::Ab,GS_GPU::At,&
-     !$hmpp <SOR>    GS_GPU::Btype(We),GS_GPU::Btype(Ea),GS_GPU::Btype(So),GS_GPU::Btype(No),GS_GPU::Btype(Bo),GS_GPU::Btype(To)]
+     !$hmpp <SOR>    GS_GPU::Btype]
      do while (l<=maxPoissoniter.and.S>epsPoisson)
       !$hmpp  <SOR> GS_GPU callsite
       call GS_GPU(nx,ny,nz,blockit,&
@@ -941,7 +941,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 !GPU Codelets. More or less like externals. Inside the module only because of KND.
 
   !$hmpp <SOR> group, target=CUDA
-  !$hmpp <SOR> mapbyname, nx,ny,nz,Phi,RHS,Aw,Ae,As,An,Ab,At,Btype(We),Btype(Ea),Btype(So),Btype(No),Btype(Bo),Btype(To)
+  !$hmpp <SOR> mapbyname, nx,ny,nz,Phi,RHS,Aw,Ae,As,An,Ab,At,Btype
 
 !$hmpp <SOR> GS_GPU codelet
 subroutine GS_GPU(nx,ny,nz,nit,Phi,RHS,&
@@ -950,6 +950,7 @@ subroutine GS_GPU(nx,ny,nz,nit,Phi,RHS,&
    implicit none
 
    integer,parameter:: KND=4,PERIODIC=3
+   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
 
    integer,intent(in)   :: nx,ny,nz,nit
    real(KND),dimension(0:nx+1,0:ny+1,0:nz+1),intent(inout)::Phi
@@ -1089,6 +1090,7 @@ subroutine Res_GPU(nx,ny,nz,Phi,RHS,&
 
 
    integer,parameter:: KND=4,PERIODIC=3
+   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
 
    integer,intent(in)   :: nx,ny,nz
    real(KND),dimension(0:nx+1,0:ny+1,0:nz+1),intent(inout)::Phi
