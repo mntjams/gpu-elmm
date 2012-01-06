@@ -6,7 +6,7 @@ module SMAGORINSKY
  implicit none
 
  private
- public :: Smag, Smag2, StabSmag, DynSmag, Vreman, Filter
+ public :: Smag, Smag2, StabSmag, Vreman, Filter
 
  real(KND),parameter:: CSmag=0.1_KND
 
@@ -14,11 +14,7 @@ module SMAGORINSKY
 
   subroutine Smag(U,V,W)  !Standard Smagorinsky model with implicit filtering
    integer i,j,k
-   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W
-
-   call BoundU(1,U)
-   call BoundU(2,V)
-   call BoundU(3,W)
+   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
 
    do k=-1,Prnz+2
     do j=-1,Prny+2
@@ -35,12 +31,8 @@ module SMAGORINSKY
 
   subroutine Smag2(U,V,W,width)  !Standard Smagorinsky model with explicit filtering
    integer,intent(in):: width
-   real(KND),dimension(-2:,-2:,-2:):: U,V,W
+   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
    integer i,j,k
-
-   call BoundU(1,U)
-   call BoundU(2,V)
-   call BoundU(3,W)
 
    do k=-1,Prnz+2
     do j=-1,Prny+2
@@ -88,15 +80,11 @@ module SMAGORINSKY
 
   subroutine StabSmag(U,V,W)  !Smagorinsky with a stability correction Brown et al. (1994)
    integer i,j,k
-   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W
+   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
    real(KND) Ri,l,l0
    real(KND) width,Sbar
    real(KND),parameter:: CS=0.17_KND
    real(KND) S(1:3,1:3)
-
-   call BoundU(1,U)
-   call BoundU(2,V)
-   call BoundU(3,W)
 
    do k=0,Prnz+1
     do j=0,Prny+1
@@ -231,253 +219,14 @@ module SMAGORINSKY
 
 
 
-
-  subroutine DynSmag(U,V,W)    ! Dynamic Smagorinsky
-   integer ii,jj,i,j,k
-   real(KND),dimension(-2:,-2:,-2:):: U,V,W
-   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3):: FiltU
-   real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3):: FiltV
-   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3):: FiltW
-   real(KND),dimension(-2:Prnx+3,-2:Prny+3,-2:Prnz+3):: P,CSDyn
-   real(KND),dimension(1:3,1:3,-2:Prnx+3,-2:Prny+3,-2:Prnz+3):: M,L
-   real(KND),dimension(1:3,1:3):: S
-   real(KND) Strain,A,B,sums
-   character(70):: str
-
-   call BoundU(1,U)
-   call BoundU(2,V)
-   call BoundU(3,W)
-
-   FiltU=0
-   FiltV=0
-   FiltW=0
-
-   call Filter(U,FILTU,Unx,Uny,Unz,1)
-   call Filter(V,FILTV,Vnx,Vny,Vnz,1)
-   call Filter(W,FILTW,Wnx,Wny,Wnz,1)
-
-
-
-
-   do k=-2,Prnz+3           !Aij -> Lij
-    do j=-2,Prny+3
-     do i=-2,Prnx+3
-      call StrainIJ(i,j,k,U,V,W,S)
-      Strain=Strainu(S)
-      L(:,:,i,j,k)=Abs(Strain)*S*((dxPr(i)*dyPr(j)*dzPr(k))**(1._KND/3._KND))**2
-     enddo
-    enddo
-   enddo
-   M=0
-   call Filter(L(1,1,:,:,:),M(1,1,:,:,:),Prnx,Prny,Prnz,1)         !F(Aij) -> Mij
-   call Filter(L(2,2,:,:,:),M(2,2,:,:,:),Prnx,Prny,Prnz,1)
-   call Filter(L(3,3,:,:,:),M(3,3,:,:,:),Prnx,Prny,Prnz,1)
-   call Filter(L(1,2,:,:,:),M(1,2,:,:,:),Prnx,Prny,Prnz,1)
-   call Filter(L(1,3,:,:,:),M(1,3,:,:,:),Prnx,Prny,Prnz,1)
-   call Filter(L(2,3,:,:,:),M(2,3,:,:,:),Prnx,Prny,Prnz,1)
-   M(2,1,:,:,:)=M(1,2,:,:,:)
-   M(3,1,:,:,:)=M(1,3,:,:,:)
-   M(3,2,:,:,:)=M(2,3,:,:,:)
-   P=0
-   do k=-1,Prnz+2 !FiltS used here for UiUj               F(UiUj) -> L
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
-      P(i,j,k)=((U(i,j,k)+U(i-1,j,k))/2._KND)*((U(i,j,k)+U(i-1,j,k))/2._KND)
-     enddo
-    enddo
-   enddo
-
-   call Filter(P,L(1,1,:,:,:),Prnx,Prny,Prnz,1)
-
-   do k=-1,Prnz+2 !FiltS used here for UiUj
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
-      P(i,j,k)=((V(i,j,k)+V(i,j-1,k))/2._KND)*((V(i,j,k)+V(i,j-1,k))/2._KND)
-     enddo
-    enddo
-   enddo
-
-   call Filter(P,L(2,2,:,:,:),Prnx,Prny,Prnz,1)
-
-   do k=-1,Prnz+2 !FiltS used here for UiUj
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
-      P(i,j,k)=((W(i,j,k)+W(i,j,k-1))/2._KND)*((W(i,j,k)+W(i,j,k-1))/2._KND)
-    enddo
-    enddo
-   enddo
-
-   call Filter(P,L(3,3,:,:,:),Prnx,Prny,Prnz,1)
-
-   do k=-1,Prnz+2 !FiltS used here for UiUj
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
-      P(i,j,k)=((U(i,j,k)+U(i-1,j,k))/2._KND)*((V(i,j,k)+V(i,j-1,k))/2._KND)
-     enddo
-    enddo
-   enddo
-
-   call Filter(P,L(1,2,:,:,:),Prnx,Prny,Prnz,1)
-
-   do k=-1,Prnz+2 !FiltS used here for UiUj
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
-      P(i,j,k)=((U(i,j,k)+U(i-1,j,k))/2._KND)*((W(i,j,k)+W(i,j,k-1))/2._KND)
-     enddo
-    enddo
-   enddo
-
-   call Filter(P,L(1,3,:,:,:),Prnx,Prny,Prnz,1)
-
-   do k=-1,Prnz+2 !FiltS used here for UiUj
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
-      P(i,j,k)=((V(i,j,k)+V(i,j-1,k))/2._KND)*((W(i,j,k)+W(i,j,k-1))/2._KND)
-     enddo
-    enddo
-   enddo
-
-   call Filter(P,L(2,3,:,:,:),Prnx,Prny,Prnz,1)
-
-   do k=-1,Prnz+2 !Modified Leonard stresses         F(Ui)F(Uj)-F(UiUj) -> Lij
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
-      L(1,1,i,j,k)=-L(1,1,i,j,k)+&
-                (FiltU(i,j,k)+FiltU(i-1,j,k)/2._KND)*(FiltU(i,j,k)+FiltU(i-1,j,k)/2._KND)
-      L(2,2,i,j,k)=-L(2,2,i,j,k)+&
-                (FiltV(i,j,k)+FiltV(i,j-1,k)/2._KND)*(FiltV(i,j,k)+FiltV(i,j-1,k)/2._KND)
-      L(3,3,i,j,k)=-L(3,3,i,j,k)+&
-                (FiltW(i,j,k)+FiltW(i,j,k-1)/2._KND)*(FiltW(i,j,k)+FiltW(i,j,k-1)/2._KND)
-      L(1,2,i,j,k)=-L(1,2,i,j,k)+&
-                (FiltU(i,j,k)+FiltU(i-1,j,k)/2._KND)*(FiltV(i,j,k)+FiltV(i,j-1,k)/2._KND)
-      L(1,3,i,j,k)=-L(1,3,i,j,k)+&
-                (FiltU(i,j,k)+FiltU(i-1,j,k)/2._KND)*(FiltW(i,j,k)+FiltW(i,j,k-1)/2._KND)
-      L(2,3,i,j,k)=-L(2,3,i,j,k)+&
-                (FiltV(i,j,k)+FiltV(i,j-1,k)/2._KND)*(FiltW(i,j,k)+FiltW(i,j,k-1)/2._KND)
-     enddo
-    enddo
-   enddo
-
-   L(2,1,:,:,:)=L(1,2,:,:,:)
-   L(3,1,:,:,:)=L(1,3,:,:,:)
-   L(3,2,:,:,:)=L(2,3,:,:,:)
-
-   !write(*,*) "i",SUM(L)/(9*Prnx*Prny*Prnz)
-   do k=-1,Prnz+2                                ! Bij)-F(Aij) ->Mij
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
-      call StrainIJ(i,j,k,FiltU,FiltV,FiltW,S)
-      Strain=Strainu(S)
-      M(:,:,i,j,k)=((1._KND/debugparam)**2)*(((dxPr(i)*dyPr(j)*dzPr(k))**(1._KND/3._KND))**2)*ABS(Strain)*S(:,:)-M(:,:,i,j,k)
-     enddo
-    enddo
-   enddo
-
-   do k=-1,Prnz+2
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
-      A=0
-      B=0
-      do jj=1,3
-       do ii=1,3
-        A=A+L(ii,jj,i,j,k)*M(ii,jj,i,j,k)
-        B=B+M(ii,jj,i,j,k)*M(ii,jj,i,j,k)
-       enddo
-      enddo
-      CSDyn(i,j,k)=A
-      P(i,j,k)=B
-     enddo
-    enddo
-   enddo
-
-
-
-    L(1,1,:,:,:)=CSDyn
-    M(1,1,:,:,:)=P
-
- !     do i=1,10
- !      call  Filter(CSDyn,L(1,1,:,:,:),Prnx,Prny,Prnz,1)
- !      call  Filter(P,M(1,1,:,:,:),Prnx,Prny,Prnz,1)
- !      CSDyn=L(1,1,:,:,:)
- !      P=M(1,1,:,:,:)
- !     enddo
-
- !   L(1,1,:,:,:)=SUM(L(1:Prnx,1:Prny,1:Prnz,1,1))/(Prnx*Prny*Prnz)
- !   M(1,1,:,:,:)=SUM(M(1:Prnx,1:Prny,1:Prnz,1,1))/(Prnx*Prny*Prnz)
-
-
-
-
-
-   Sums=0
-   do k=-1,Prnz+2
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
-      if (abs(M(1,1,i,j,k))<1.e-4_KND*abs(L(1,1,i,j,k))) then
-                              CSDyn(i,j,k)=0
-                              if (i>0.and.i<Prnx+1.and.j>0.and.j<Prny+1.and.k>0.and.k<Prnz+1.) Sums=Sums+1
-                             else
-                              CSDyn(i,j,k)=0.5_KND*L(1,1,i,j,k)/M(1,1,i,j,k)
-                              !if (i>0.and.i<Prnx+1.and.j>0.and.j<Prny+1.and.k>0.and.k<Prnz+1.) write (*,*) A,"/",B,"=",CSDyn(i,j,k)
-                             endif
-     enddo
-    enddo
-   enddo
-
-
-
-   write(*,*)  100*Sums/(Prnx*Prny*Prnz),"% of zero nominator"
-
-   !do j=-1,Prny+2
-   ! CSDyn(1:Prnx,j,1:Prnz)=SUM(CSDyn(1:Prnx,j,1:Prnz))/(Prnx*Prnz)
-   ! write(*,*) j,CSDyn(1,j,1)
-   !enddo
-
-   Strain=0
-   do k=-1,Prnz+2
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
-      CSDyn(i,j,k)=MIN(CSDyn(i,j,k),10000._KND)
-      CSDyn(i,j,k)=MAX(-0.001_KND,CSDyn(i,j,k))
-      if (i>0.and.i<Prnx+1.and.j>0.and.j<Prny+1.and.k>0.and.k<Prnz+1.)  Strain=Strain+CSDyn(i,j,k)
-     enddo
-    enddo
-   enddo
-   write(*,*) "Average dynamic constant:",Strain/(Prnx*Prny*Prnz)
-   write(*,*) "Maximal dynamic constant:",MAXVAL(CSDyn(1:Prnx,1:Prny,1:Prnz))
-
-
-
-   do k=1,Prnz
-    do j=1,Prny
-     do i=1,Prnx
-      call StrainIJ(i,j,k,U,V,W,S)
-      Strain=Strainu(S)
-      if (Re>0) then
-       Visc(i,j,k)=1._KND/Re+CSDyn(i,j,k)*(((dxPr(i)*dyPr(j)*dzPr(k))**(1._KND/3._KND))**2)*Strain
-      else
-       Visc(i,j,k)=CSDyn(i,j,k)*(((dxPr(i)*dyPr(j)*dzPr(k))**(1._KND/3._KND))**2)*Strain
-      endif
-     enddo
-    enddo
-   enddo
-  endsubroutine DynSmag
-
-
-
-
-
   subroutine Vreman(U,V,W)   !Vreman subgrid model (Physics of Fluids, 2004)
-   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W
+   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
    integer i,j,k,ii,jj
    real(KND)::aa,bb
    real(KND),dimension(1:3,1:3)::a,b
    real(KND) :: dx2,dy2,dz2
    real(KND),parameter::c=0.05
 
-   call BoundU(1,U)
-   call BoundU(2,V)
-   call BoundU(3,W)
 
    if (gridtype==uniformgrid) then
 
