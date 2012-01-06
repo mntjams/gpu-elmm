@@ -1,5 +1,5 @@
 
-    !$hmpp <tsteps_gpu> CDS codelet
+    !$hmpp <tsteps> CDS codelet
     subroutine CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dx,dy,dz,dt,U2,V2,W2,U,V,W)
     implicit none
 #ifdef __HMPP

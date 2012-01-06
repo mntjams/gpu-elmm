@@ -1,4 +1,4 @@
-  !$hmpp <tsteps_gpu> UnifRedBlack codelet
+  !$hmpp <tsteps> UnifRedBlack codelet
   subroutine UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,&
                               Btype,sideU,&
                               dt,dxmin,dymin,dzmin,&
@@ -15,9 +15,12 @@
    integer,intent(in):: Btype(6)
    real(KND),intent(in):: sideU(3,6)
    real(KND),dimension(-2:Prny+3,-2:Prnz+3),intent(in)          :: Uin,Vin,Win
-   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout):: U,U2,U3
-   real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout):: V,V2,V3
-   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout):: W,W2,W3
+   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in):: U
+   real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in):: V
+   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in):: W
+   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout):: U2,U3
+   real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout):: V2,V3
+   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout):: W2,W3
    real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in):: Visc
    real(TIM),intent(in):: dt
    real(KND),intent(in):: dxmin,dymin,dzmin,coef,epsCN

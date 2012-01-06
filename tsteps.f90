@@ -7,7 +7,7 @@ module TSTEPS
   use PARAMETERS
   use BOUNDARIES, only: BoundU,Bound_Q
   use POISSON, only: Pr_Correct
-  use SMAGORINSKY, only: Smag, Dynsmag, StabSmag, Vreman
+  use SMAGORINSKY, only: Smag, StabSmag, Vreman
   use SCALARS, only:  Bound_Temp, Bound_Visc, Scalar, percdistrib, AdvScalar,&
      DiffScalar, ComputeTDiff, Deposition, GravSettling, ScalFlSourc, VolScalSource
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
@@ -18,616 +18,11 @@ module TSTEPS
 
 
   private
-  public TMarchEul,TMarchAB2,TMarchRK2,TMarchRK3,TMarchShiftInlet
+  public TMarchRK3
 
   logical:: released=.false.
 
 contains
- subroutine TMarchEul(U,V,W,Pr,delta)
-  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),intent(out):: delta
-  real(KND),allocatable,dimension(:,:,:),save:: Q
-  real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: U2
-  real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: V2
-  real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: W2
-  real(KND),allocatable,dimension(:,:,:,:),save:: Scalar_2
-  real(KND),allocatable,dimension(:,:,:),save:: temperature2
-  integer,save:: called=0
-  integer i
-
-
- if (called==0) then
-   called=1
-   if (computescalars>0) then
-    allocate(Scalar_2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
-   endif
-   if (buoyancy>0) then
-    allocate(temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-   endif
-   if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
-  endif
-
-  if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) call GetTurbInlet
-
-  call BoundU(1,U)
-  call BoundU(2,V)
-  call BoundU(3,W)
-  if (buoyancy==1)  call Bound_Temp(temperature)
-
-
-
-  U2=1e19
-  V2=1e19
-  W2=1e19
-
-  call timestepEUL(U,V,W)
-
-  if (steady==0.and.dt+time>endtime)  dt=endtime-time
-  write (*,*) "time:",time,"dt: ",dt
-
-
-
-  if (convmet==1) then
-   call LF(U2,V2,W2,U,V,W)
-  elseif (convmet==2) then
-   call MC1(U2,V2,W2,U,V,W)
-  elseif (convmet==3) then
-   call Tau(U2,V2,W2,U,V,W,Pr)
-  else
-   U2(1:Unx,1:Uny,1:Unz)=0
-   V2(1:Vnx,1:Vny,1:Vnz)=0
-   W2(1:Wnx,1:Wny,1:Wnz)=0
-  endif
-  call CoriolisForce(U2,V2,U,V,1._KND)
-  if (buoyancy==1) call BuoyancyForce(W2,temperature,1._KND)
-
-
-  call OtherTerms(U,V,W,U2,V2,W2,Pr,1._KND)
-
-
-  if (Btype(To)==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
-
-
-  if (masssourc==1) then
-      call MASS_SOURC(Q,U2,V2,W2)
-  endif
-
-
-
-  call BoundU(1,U2)
-  call BoundU(2,V2)
-  call BoundU(3,W2)
-
-  if (poissmet>0) then
-  if (masssourc==1) then
-    call Pr_Correct(U2,V2,W2,Pr,1._KND,Q)
-  else
-    call Pr_Correct(U2,V2,W2,Pr,1._KND)
-  endif
-  endif
-
-
-
-  if (computescalars>0) then
-   Scalar_2=0
-   do i=1,computescalars
-    call AdvScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),U2,V2,W2,2,1._KND)
-   enddo
-   Scalar=Scalar+Scalar_2
-   if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
-   call Bound_Visc(TDiff)
-   do i=1,computescalars
-    call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,1._KND)
-   enddo
-   if (computedeposition>0) call Deposition(Scalar_2,1._KND)
-   if (computegravsettling>0) call GravSettling(Scalar_2,1._KND)
-   Scalar=Scalar_2
-  endif
-
-  if (buoyancy>0) then
-   if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
-   call Bound_Visc(TDiff)
-   temperature2=0
-   call Bound_Temp(temperature)
-   call AdvScalar(temperature2,temperature,U2,V2,W2,1,1._KND)
-   temperature=temperature+temperature2
-   call Bound_Temp(temperature2)
-   call DiffScalar(temperature2,temperature,1,1._KND)
-!    temperature2=temperature+temperature2
-   temperature=temperature2
-  endif
-
-
-  delta=sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-  delta=delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
-  delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
-  delta=delta/dt
-
-
-  U=U2
-  V=V2
-  W=W2
- end subroutine TMarchEul
-
-
-
-
- subroutine TMarchAB2(U,V,W,Pr,delta)
-  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),intent(out):: delta
-
-  real(KND),save:: dtlast
-  real(KND),save:: rho,beta
-
-  real(KND),allocatable,dimension(:,:,:),save:: Q,U2,V2,W2,Ustar,Vstar,Wstar
-
-  real(KND),allocatable,dimension(:,:,:),save:: Temperature_adv,Temperature2
-  real(KND),allocatable,dimension(:,:,:,:),save:: Scalar_adv,Scalar_2
-
-  integer i,j,k
-  real(KND) p
-  integer,save:: called=0
-  real time1,time2
-
-
-  if (called==0) then
-
-   called=1
-   if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
-
-   allocate(Ustar(-2:Unx+3,-2:Uny+3,-2:Unz+3))
-   allocate(Vstar(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
-   allocate(Wstar(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-
-   allocate(U2(-2:Unx+3,-2:Uny+3,-2:Unz+3))
-   allocate(V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
-   allocate(W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-
-   if (buoyancy==1) then
-    allocate(temperature_adv(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-    allocate(temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-   endif
-
-   if (computescalars>0) then
-    allocate(Scalar_adv(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
-    allocate(Scalar_2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
-   endif
-
-   rho=0
-   beta=1._KND
-
-   Ustar=0
-   Vstar=0
-   Wstar=0
-   Scalar_adv=0
-   Temperature_adv=0
-
-  else
-   rho=-(dt/dtlast)/2._KND
-   beta=1._KND+(dt/dtlast)/2._KND
-
-  endif
-
-  call BoundU(1,U)
-  call BoundU(2,V)
-  call BoundU(3,W)
-
-  if (buoyancy==1)  call Bound_Temp(temperature)
-
-  if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) call GetTurbInlet
-  if (Btype(We)==InletFromFile) call GetInletFromFile(time)
-
-  call timestepEUL(U,V,W)
-
-  if (steady==0.and.dt+time>endtime)  dt=endtime-time
-
-  write (*,*) "time:",time,"dt: ",dt
-
-  temperature_adv=0
-
-
-    if (debugparam>1) call cpu_time(time1)
-
-    U2=0
-    V2=0
-    W2=0
-
-
-    if (convmet>0) then
-
-      U2=U2+Ustar*rho
-      V2=V2+Vstar*rho
-      W2=W2+Wstar*rho
-
-
-      Ustar=0
-      Vstar=0
-      Wstar=0
-
-      if (convmet==1) then
-       call LF(Ustar,Vstar,Wstar,U,V,W)
-      elseif (convmet==3) then
-       call KAPPAU(Ustar,U,V,W,1._KND)
-       call KAPPAV(Vstar,U,V,W,1._KND)
-       call KAPPAW(Wstar,U,V,W,1._KND)
-      else
-       call CDU(Ustar,U,V,W,1._KND)
-       call CDV(Vstar,U,V,W,1._KND)
-       call CDW(Wstar,U,V,W,1._KND)
-      endif
-
-      call CoriolisForce(Ustar,Vstar,U,V,1._KND)
-      if (buoyancy==1) call BuoyancyForce(Wstar,temperature,1._KND)
-
-      U2=U2+Ustar*beta
-      V2=V2+Vstar*beta
-      W2=W2+Wstar*beta
-    endif
-
-    if (debugparam>1) then
-     call cpu_time(time2)
-     write (*,*) "ET of part 1", (time2-time1)
-     time1=time2
-    endif
-
-    call OtherTerms(U,V,W,U2,V2,W2,Pr,1._KND)
-
-    if (debugparam>1) then
-     call cpu_time(time2)
-     write (*,*) "ET of part 2", (time2-time1)
-     time1=time2
-    endif
-
-    if (Btype(To)==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
-    if (Btype(Ea)==OutletBuff) then
-      if (buoyancy==1) then
-        call AttenuateOut(U2,V2,W2,Pr,temperature)
-      else
-        call AttenuateOut(U2,V2,W2,Pr)
-      endif
-    endif
-
-    if (masssourc==1) then
-        call MASS_SOURC(Q,U2,V2,W2)
-    endif
-
-
-    call BoundU(1,U2)
-    call BoundU(2,V2)
-    call BoundU(3,W2)
-
-
-    if (poissmet>0) then
-     if (masssourc==1) then
-       call Pr_Correct(U2,V2,W2,Pr,1._KND,Q)
-     else
-       call Pr_Correct(U2,V2,W2,Pr,1._KND)
-     endif
-    endif
-
-
-    if (computescalars>0.and..not.released) call Explosion
-
-    if (computescalars>0) then
-      Scalar_2=0
-
-      Scalar_2=Scalar_2+Scalar_adv*rho
-
-      Scalar_adv=0
-      do i=1,computescalars
-       call AdvScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U2,V2,W2,2,1._KND)
-      enddo
-      Scalar_2=Scalar_2+Scalar_adv*beta
-
-      if (scalsourcetype==pointsource) then
-       do i=1,computescalars
-        Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)=Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
-         percdistrib(i)*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
-       enddo
-      endif
-
-      if (scalsourcetype==volumesource) then
-       do i=1,computescalars
-        call VolScalSource(Scalar_2,1._KND)
-       enddo
-      endif
-
-      Scalar=Scalar+Scalar_2
-      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
-      call Bound_Visc(TDiff)
-      do i=1,computescalars
-         call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,1._KND)
-      enddo
-      if (computedeposition>0) call Deposition(Scalar_2,1._KND)
-      if (computegravsettling>0) call GravSettling(Scalar_2,1._KND)
-      Scalar=Scalar_2
-    endif
-
-    if (buoyancy>0) then
-      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
-      call Bound_Visc(TDiff)
-      temperature2=0
-      call Bound_Temp(temperature)
-
-
-      temperature2=temperature2+temperature_adv*rho
-
-      temperature_adv=0
-      call AdvScalar(temperature_adv,temperature,U2,V2,W2,1,1._KND)
-      temperature2=temperature2+temperature_adv*beta
-
-      temperature=temperature+temperature2
-      call Bound_Temp(temperature)
-       call DiffScalar(temperature2,temperature,1,1._KND)
-      temperature=temperature2
-    endif
-
-    if (Btype(Ea)==OutletBuff) then
-      if (buoyancy==1) then
-        call AttenuateOut(U2,V2,W2,Pr,temperature)
-      else
-        call AttenuateOut(U2,V2,W2,Pr)
-      endif
-    endif
-
-
-    delta=sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-    delta=delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
-    delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
-
-
-    call NullInterior(U2,V2,W2)
-
-    U=U2
-    V=V2
-    W=W2
-
-    dtlast=dt
-
- end subroutine TMarchAB2
-
-
-
-
-
-
-
- subroutine TMarchRK2(U,V,W,Pr,delta)
-  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),intent(out):: delta
-  real(KND),allocatable,dimension(:,:,:),save:: Q
-  real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),&
-                                              lbound(U,3):ubound(U,3)):: U2,Ustar
-  real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),&
-                                              lbound(V,3):ubound(V,3)):: V2,Vstar
-  real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),&
-                                              lbound(W,3):ubound(W,3)):: W2,Wstar
-  real(KND) p
-  integer i,j,k
-  real(KND),allocatable,dimension(:,:,:,:),save:: Scalar_2
-  real(KND),allocatable,dimension(:,:,:),save:: temperature2
-  integer,save:: called=0
-
-
-  if (called==0) then
-   called=1
-   if (computescalars>0) then
-    allocate(Scalar_2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
-   endif
-   if (buoyancy>0) then
-    allocate(temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-   endif
-   if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
-  endif
-
-  if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) call GetTurbInlet
-
-  call BoundU(1,U)
-  call BoundU(2,V)
-  call BoundU(3,W)
-
-  if (buoyancy==1)  call Bound_Temp(temperature)
-
-
-
-
-      call timestepEUL(U,V,W)
-
-  if (steady==0.and.dt+time>endtime)  dt=endtime-time
-  write (*,*) "time:",time,"dt: ",dt
-
-  U2=1e9
-  V2=1e9
-  W2=1e9
-
-
-
-  if (convmet>0) then
-   U2(1:Unx,1:Uny,1:Unz)=0
-   V2(1:Vnx,1:Vny,1:Vnz)=0
-   W2(1:Wnx,1:Wny,1:Wnz)=0
-   call CDU(U2,U,V,W,1._KND)
-   call CDV(V2,U,V,W,1._KND)
-   call CDW(W2,U,V,W,1._KND)
-   call CoriolisForce(Ustar,Vstar,U,V,1._KND)
-   if (buoyancy==1) call BuoyancyForce(Wstar,temperature,1._KND)
-
-   Ustar=U+U2
-   Vstar=V+V2
-   Wstar=W+W2
-
-   U2=0
-   V2=0
-   W2=0
-
-   call CDU(U2,Ustar,Vstar,Wstar,0.5_KND)
-   call CDV(V2,Ustar,Vstar,Wstar,0.5_KND)
-   call CDW(W2,Ustar,Vstar,Wstar,0.5_KND)
-   call CoriolisForce(U2,V2,Ustar,Vstar,1._KND)
-     if (buoyancy==1) call BuoyancyForce(W2,temperature,1._KND)
-
-
-   U2=Ustar/2._KND-U/2._KND+U2
-   V2=Vstar/2._KND-V/2._KND+V2
-   W2=Wstar/2._KND-W/2._KND+W2
-  else
-   U2(1:Unx,1:Uny,1:Unz)=0
-   V2(1:Vnx,1:Vny,1:Vnz)=0
-   W2(1:Wnx,1:Wny,1:Wnz)=0
-  endif
-
-
-   call OtherTerms(U,V,W,U2,V2,W2,Pr,1._KND)
-
-
-  if (Btype(To)==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
-  if (Btype(Ea)==OutletBuff) call AttenuateOut(U2,V2,W2,Pr)
-
-
-  if (masssourc==1) then
-      call MASS_SOURC(Q,U2,V2,W2)
-  endif
-
-
-  call BoundU(1,U2)
-  call BoundU(2,V2)
-  call BoundU(3,W2)
-
-
-  if (poissmet>0) then
-  if (masssourc==1) then
-    call Pr_Correct(U2,V2,W2,Pr,1._KND,Q)
-  else
-    call Pr_Correct(U2,V2,W2,Pr,1._KND)
-  endif
-  endif
-
-
-  call BoundU(1,U2)
-  call BoundU(2,V2)
-  call BoundU(3,W2)
-
-
-
-  if (computescalars>=4)then
-   if (time>(endtime-starttime)/3._KND.and.maxval(scalar(:,:,:,1))==0) then
-    p=0
-    do k=1,Prnz
-     do j=1,Prny
-      do i=1,Prnx
-       if (((xPr(i)>-3.5.and.xPr(i)<3.5).or.(xPr(i)>3.5.and.xPr(i-1)<-3.5)).and.&
-           ((yPr(j)>-3.5.and.yPr(j)<3.5).or.(yPr(j)>3.5.and.yPr(j-1)<-3.5)).and.&
-           (zPr(k)<12.or.(zPr(k)>12.and.zPr(k-1)<0))) then
-        Scalar(i,j,k,1)=0.10
-        p=p+dxPr(i)*dyPr(j)*dzPr(k)
-       endif
-      enddo
-     enddo
-    enddo
-    do k=1,Prnz
-     do j=1,Prny
-      do i=1,Prnx
-       if (((xPr(i)>-3.5.and.xPr(i)<3.5).or.(xPr(i)>3.5.and.xPr(i-1)<-3.5)).and.&
-           ((yPr(j)>-3.5.and.yPr(j)<3.5).or.(yPr(j)>3.5.and.yPr(j-1)<-3.5)).and.&
-           (zPr(k)<12.or.(zPr(k)>12.and.zPr(k-1)<0))) then
-        Scalar(i,j,k,2)=0.13
-       endif
-      enddo
-     enddo
-    enddo
-    do k=1,Prnz
-     do j=1,Prny
-      do i=1,Prnx
-       if (((xPr(i)>-3.5.and.xPr(i)<3.5).or.(xPr(i)>3.5.and.xPr(i-1)<-3.5)).and.&
-           ((yPr(j)>-3.5.and.yPr(j)<3.5).or.(yPr(j)>3.5.and.yPr(j-1)<-3.5)).and.&
-           (zPr(k)<12.or.(zPr(k)>12.and.zPr(k-1)<0))) then
-        Scalar(i,j,k,3)=0.64
-       endif
-      enddo
-     enddo
-    enddo
-    do k=1,Prnz
-     do j=1,Prny
-      do i=1,Prnx
-       if (((xPr(i)>-3.5.and.xPr(i)<3.5).or.(xPr(i)>3.5.and.xPr(i-1)<-3.5)).and.&
-           ((yPr(j)>-3.5.and.yPr(j)<3.5).or.(yPr(j)>3.5.and.yPr(j-1)<-3.5)).and.&
-           (zPr(k)<12.or.(zPr(k)>12.and.zPr(k-1)<0))) then
-        Scalar(i,j,k,4)=0.13
-       endif
-      enddo
-     enddo
-    enddo
-    Scalar=Scalar/p
-   endif
-
-  elseif (computescalars>0.and.partdistrib>0) then
-   if (time>(endtime-starttime)/2._KND.and.maxval(scalar(:,:,:,1))==0) then
-    p=0
-    do k=1,Prnz
-     do j=1,Prny
-      do i=1,Prnx
-       if (((xPr(i)>-3.5.and.xPr(i)<3.5).or.(xPr(i)>3.5.and.xPr(i-1)<-3.5)).and.&
-           ((yPr(j)>-3.5.and.yPr(j)<3.5).or.(yPr(j)>3.5.and.yPr(j-1)<-3.5)).and.&
-           (zPr(k)<12.or.(zPr(k)>12.and.zPr(k-1)<0))) then
-        Scalar(i,j,k,1)=1._KND
-        p=p+dxPr(i)*dyPr(j)*dzPr(k)
-       endif
-      enddo
-     enddo
-    enddo
-    Scalar=Scalar/p
-   endif
-  endif
-
-  if (computescalars>0) then
-   Scalar_2=0
-   do i=1,computescalars
-    call AdvScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),U2,V2,W2,2,1._KND)
-   enddo
-   Scalar=Scalar+Scalar_2
-   if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
-   call Bound_Visc(TDiff)
-    do i=1,computescalars
-     call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,1._KND)
-    enddo
-    if (computedeposition>0) call Deposition(Scalar_2,1._KND)
-    if (computegravsettling>0) call GravSettling(Scalar_2,1._KND)
-   Scalar=Scalar_2
-  endif
-
-  if (buoyancy>0) then
-   if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
-   call Bound_Visc(TDiff)
-   temperature2=0
-   call Bound_Temp(temperature)
-   call AdvScalar(temperature2,temperature,U2,V2,W2,1,1._KND)
-   temperature=temperature+temperature2
-   call Bound_Temp(temperature)
-   call DiffScalar(temperature2,temperature,1,1._KND)
-   temperature=temperature2
-  endif
-
-  call NullInterior(U2,V2,W2)
-
-  delta=sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-  delta=delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
-  delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
-  U=U2
-  V=V2
-  W=W2
-
- endsubroutine TMarchRK2
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -657,7 +52,6 @@ contains
   integer,save:: called=0
   real time1,time2
 
-  !$hmpp <tsteps_gpu> allocate
 
   if (called==0) then
    called=1
@@ -684,7 +78,21 @@ contains
   Wstar=0
 
   do l=1,3
+    !$hmpp <tsteps> allocate
+    !$hmpp <tsteps> advancedload, args[Vreman::Prnx,Vreman::Prny,Vreman::Prnz]
+    !$hmpp <tsteps> advancedload, args[Vreman::Unx,Vreman::Uny,Vreman::Unz,&
+    !$hmpp <tsteps>     Vreman::Vnx,Vreman::Vny,Vreman::Vnz,Vreman::Wnx,Vreman::Wny,Vreman::Wnz]
+    !$hmpp <tsteps> advancedload, args[Vreman::dx,Vreman::dy,Vreman::dz,Vreman::dt,Vreman::Re]
+
+
     if (debugparam>1) call cpu_time(time1)
+
+    call BoundU(1,U)
+    call BoundU(2,V)
+    call BoundU(3,W)
+
+    !$hmpp <tsteps> advancedload, args[Vreman::U,Vreman::V,Vreman::W]
+    call SubgridStresses(U,V,W,Pr)
 
     U2=0
     V2=0
@@ -709,17 +117,23 @@ contains
        call KAPPAW(Wstar,U,V,W,1._KND)
       else if (GPU>0) then
        write(*,*) "Call GPU CDS"
-       call BoundU(1,U)
-       call BoundU(2,V)
-       call BoundU(3,W)
-       !$hmpp <tsteps_gpu> CDS callsite
+
+
+       !$hmpp <tsteps> CDS callsite, args[*].noupdate=true
        call CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Ustar,Vstar,Wstar,U,V,W)
+
+       !$hmpp <tsteps> delegatedstore, args[CDS::U2,CDS::V2,CDS::W2]
+
        write(*,*) "Back from  GPU CDS"
       else
        call CDU(Ustar,U,V,W,1._KND)
        call CDV(Vstar,U,V,W,1._KND)
        call CDW(Wstar,U,V,W,1._KND)
       endif
+
+write (*,*) "sum Ustar",sum(Ustar(1:Unx,1:Uny,1:Unz))
+write (*,*) "sum Vstar",sum(Vstar(1:Vnx,1:Vny,1:Vnz))
+write (*,*) "sum Wstar",sum(Wstar(1:Wnx,1:Wny,1:Wnz))
 
       call CoriolisForce(Ustar,Vstar,U,V,1._KND)
       if (buoyancy==1) call BuoyancyForce(Wstar,temperature,1._KND)
@@ -735,7 +149,11 @@ contains
      time1=time2
     endif
 
+
     call OtherTerms(U,V,W,U2,V2,W2,Pr,2._KND*alpha(l))
+   !$hmpp <tsteps> release
+
+
 
     if (debugparam>1) then
      call cpu_time(time2)
@@ -760,7 +178,6 @@ contains
     call BoundU(1,U2)
     call BoundU(2,V2)
     call BoundU(3,W2)
-   !$hmpp <tsteps_gpu> release
 
 
 
@@ -856,92 +273,6 @@ contains
 
 
 
-
-
-
- subroutine TMarchShiftInlet(U,V,W,Pr,delta) !Only shifts inlet in the x direction, for debugging purposes
-  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),intent(out):: delta
-  integer i,j,k
-  real(KND),allocatable,dimension(:,:,:,:),save:: Scalar_2
-  real(KND),allocatable,dimension(:,:,:),save:: temperature2
-  integer,save:: called=0
-
-
-  if (called==0) then
-    called=1
-    if (computescalars>0) then
-     allocate(Scalar_2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
-    endif
-    if (buoyancy>0) then
-     allocate(temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-    endif
-  endif
-
-  if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) call GetTurbInlet
-  if (Btype(We)==InletFromFile) call GetInletFromFile(time)
-
-  write (*,*) "time:",time,"dt: ",dt
-
-  call BoundU(1,U)
-  call BoundU(2,V)
-  call BoundU(3,W)
-
-  do k=1,Unz
-   do j=1,Uny
-    do i=Unx,1,-1
-     U(i,j,k)=U(i-1,j,k)
-    enddo
-   enddo
-  enddo
-  do k=1,Vnz
-   do j=1,Vny
-    do i=Vnx,1,-1
-     V(i,j,k)=V(i-1,j,k)
-    enddo
-   enddo
-  enddo
-  do k=1,Wnz
-   do j=1,Wny
-    do i=Wnx,1,-1
-     W(i,j,k)=W(i-1,j,k)
-    enddo
-   enddo
-  enddo
-
-  if (buoyancy==1) then
-    call Bound_Temp(temperature)
-    do k=1,Prnz
-     do j=1,Prny
-      do i=Prnx,1,-1
-       temperature(i,j,k)=temperature(i-1,j,k)
-      enddo
-     enddo
-    enddo
-  endif
-
-  if (poissmet>0) then
-    call Pr_Correct(U,V,W,Pr,1._KND)
-  endif
-
-  if (computescalars>0)then
-   if (time>5.and.maxval(scalar(:,:,:,1))==0) then
-    call GridCoords(i,j,k,0._KND,0._KND,0.5_KND)
-    Scalar(i,j,k,1)=1._KND/(dxPr(i)*dyPr(j)*dzPr(k))
-   endif
-  endif
-
-
-
-  if (wallmodeltype>0) then
-                   call ComputeViscsWM(U,V,W,Pr)
-  endif
-
-  delta=1
- endsubroutine TMarchShiftInlet
-
-
-
  subroutine Explosion
   real(KND) xc,yc,xs,xf,ys,yf,zs,zf,dxp,dyp,dzp,ct,cr,xp,yp,zp,p
   integer i,j,k,xi,yj,zk,nprobx,nproby,nprobz
@@ -1013,9 +344,15 @@ contains
    type(TIBPoint),pointer:: IBP
    integer x,y,z,dirx,diry,dirz,n
 
-   call BoundU(1,U)
-   call BoundU(2,V)
-   call BoundU(3,W)
+        call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
+                             Btype,sideU,&
+                             Uin,U,0)
+        call BoundU_GPU(1,Vnx,Vny,Vnz,Prny,Prnz,&
+                             Btype,sideU,&
+                             Vin,V,0)
+        call BoundU_GPU(1,Wnx,Wny,Wnz,Prny,Prnz,&
+                             Btype,sideU,&
+                             Win,W,0)
 
   if (associated(FirstIBPoint)) then
    IBP => FirstIBPoint
@@ -1415,20 +752,30 @@ contains
    integer i,j,k,it,x,y,z
 
    type(TIBPoint),pointer:: IBP
-write(*,*) "Otherterms:"
 
-   call Bound_Pr(Pr)
+
+   write(*,*) "Otherterms:"
+
+   !$hmpp <tsteps> advancedload, args[PressureGrad::dxU,PressureGrad::dyV,PressureGrad::dzW]
+   !$hmpp <tsteps> advancedload, args[PressureGrad::prgradientx,PressureGrad::prgradienty]
+   !$hmpp <tsteps> advancedload, args[PressureGrad::Pr,PressureGrad::U,PressureGrad::V,PressureGrad::W,PressureGrad::dt]
+   !$hmpp <tsteps> advancedload, args[PressureGrad::Btype]
+
+   !$hmpp <tsteps> advancedload, args[PressureGrad::coef]
 
    !Pressure gradient terms
-   !$hmpp <tsteps_gpu> PressureGrad callsite
+   !$hmpp <tsteps> PressureGrad callsite, args[*].noupdate=true
    call PressureGrad(Prnx,Prny,Prnz,&
                      Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                      dxU,dyV,dzW,&
-                     prgradientx,prgradienty,&
+                     Btype,prgradientx,prgradienty,&
                      Pr,U2,V2,W2,&
                      dt,coef)
 
-
+   !$hmpp <tsteps> delegatedstore, args[PressureGrad::U,PressureGrad::V,PressureGrad::W]
+write (*,*) "sum U2",sum(U2(1:Unx,1:Uny,1:Unz))
+write (*,*) "sum V2",sum(V2(1:Vnx,1:Vny,1:Vnz))
+write (*,*) "sum W2",sum(W2(1:Wnx,1:Wny,1:Wnz))
 
    Re_gt_0: if (Re>0) then
 
@@ -1437,40 +784,198 @@ write(*,*) "Otherterms:"
      !iteration SOR or Gauss-Seidel
 
 
-     call BoundU(1,U)
-     call BoundU(2,V)
-     call BoundU(3,W)
-     U3=U+U2
-     V3=V+V2
-     W3=W+W2
-     if (sgstype==SmagorinskyModel) then
-                       call Smag(U,V,W)
-     elseif (sgstype==DynSmagorinskyModel) then
-                       call DynSmag(U,V,W)
-     elseif (sgstype==VremanModel) then
-                       if (GPU>0.and.gridtype==uniformgrid.and. Prnx*Prny*Prnz > 5000000) then
-                           !$hmpp <tsteps_gpu> Vreman callsite
-                           call Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Re,U,V,W,Visc)
-                       else
-                           call Vreman(U,V,W)
-                       endif
-     elseif (sgstype==StabSmagorinskyModel) then
-                       call StabSmag(U,V,W)
+     !$hmpp <tsteps> advancedload, args[ForwEul::Visc]
+     !$hmpp <tsteps> advancedload, args[ForwEul::dxPr,ForwEul::dyPr,ForwEul::dzPr]
+
+     !$hmpp <tsteps> ForwEul callsite, args[*].noupdate=true
+     call ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                  dxPr,dyPr,dzPr,dxU,dyV,dzW,&
+                  U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
+                  dt,coef)
+
+   !$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
+write (*,*) "sum U3",sum(U3(1:Unx,1:Uny,1:Unz))
+write (*,*) "sum V3",sum(V3(1:Vnx,1:Vny,1:Vnz))
+write (*,*) "sum W3",sum(W3(1:Wnx,1:Wny,1:Wnz))
+
+!      call MomSourc(U3,V3,W3)
+
+
+!      do i=1,NIBPointsU
+!       xi=IBPijkU(1,i)
+!       yj=IBPijkU(2,i)
+!       zk=IBPijkU(3,i)
+!       U3(xi,yj,zk)=U3(xi,yj,zk)+IBPsourcU*dt
+!       U2(xi,yj,zk)=U2(xi,yj,zk)+IBPsourcU*dt
+!      enddo
+!
+!      do i=1,NIBPointsV
+!       xi=IBPijkV(1,i)
+!       yj=IBPijkV(2,i)
+!       zk=IBPijkV(3,i)
+!       V3(xi,yj,zk)=V3(xi,yj,zk)+IBPsourcV*dt
+!       V2(xi,yj,zk)=V2(xi,yj,zk)+IBPsourcV*dt
+!      enddo
+!
+!      do i=1,NIBPointsW
+!       xi=IBPijkW(1,i)
+!       yj=IBPijkW(2,i)
+!       zk=IBPijkW(3,i)
+!       W3(xi,yj,zk)=W3(xi,yj,zk)+IBPsourcW*dt
+!       W2(xi,yj,zk)=W2(xi,yj,zk)+IBPsourcW*dt
+!      enddo
+
+!      if (associated(FirstIBPoint)) then   !Immersed boundary terms, in the future should be in an array
+!       IBP => FirstIBPoint
+!       do
+!        x=IBP%x
+!        y=IBP%y
+!        z=IBP%z
+!         if (IBP%component==1) then
+!          U3(x,y,z)=U3(x,y,z)+IBP%MSourc*dt
+!          U2(x,y,z)=U2(x,y,z)+IBP%MSourc*dt
+!         elseif (IBP%component==2) then
+!          V3(x,y,z)=V3(x,y,z)+IBP%MSourc*dt
+!          V2(x,y,z)=V2(x,y,z)+IBP%MSourc*dt
+!         elseif (IBP%component==3) then
+!          W3(x,y,z)=W3(x,y,z)+IBP%MSourc*dt
+!          W2(x,y,z)=W2(x,y,z)+IBP%MSourc*dt
+!         endif
+!        if (associated(IBP%next)) then
+!         IBP=>IBP%next
+!        else
+!         exit
+!        endif
+!       enddo
+!      endif
+
+     if (gridtype==UNIFORMGRID.and.GPU>0) then                  !Performs the diffusion terms
+      write (*,*) "GPU CN call"
+
+      !$hmpp <tsteps> advancedload, args[UnifRedBlack::sideU,UnifRedBlack::Uin,UnifRedBlack::Vin,UnifRedBlack::Win,&
+      !$hmpp <tsteps>  UnifRedBlack::maxCNiter,UnifRedBlack::epsCN]
+
+
+      !$hmpp <tsteps> UNIFREDBLACK callsite, args[*].noupdate=true
+      call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,&
+                            Btype,sideU,&
+                            dt,dxmin,dymin,dzmin,&
+                            Uin,Vin,Win,&
+                            U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
+                            coef,maxCNiter,epsCN,it,S)
+      write(*,*) "back from GPU CN", it,S
+
+     !$hmpp <tsteps> delegatedstore, args[UnifRedBlack::U3,UnifRedBlack::V3,UnifRedBlack::W3,&
+     !$hmpp <tsteps>   UnifRedBlack::iters,UnifRedBlack::residuum]
+
+     else if (gridtype==UNIFORMGRID) then
+      call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
      else
-                       Visc=1._KND/Re
+      call GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
      endif
 
-     if (debuglevel>0) then
-      write(*,*) "NUt", sum(Visc(1:Prnx,1:Prny,1:Prnz))/(Prnx*Prny*Prnz)
-      write(*,*) "maxNUt", MAXVAL(Visc(1:Prnx,1:Prny,1:Prnz))
-      write(*,*) "minNUt", MINVAL(Visc(1:Prnx,1:Prny,1:Prnz))
-     endif
 
-     if (wallmodeltype>0) then
-                     call ComputeViscsWM(U,V,W,Pr)
-     endif
+     U2=U3
+     V2=V3
+     W2=W3
 
-     call ScalFlSourc(Visc,3)
+   else  Re_gt_0  !Re<=0
+
+    U2=U+U2
+    V2=V+V2
+    W2=W+W2
+
+   endif   Re_gt_0
+
+   if (debuglevel>=2) then  !Compute and output the mean friction in the domain.
+    S=0
+    do k=1,Unz
+     do j=1,Uny
+      do i=1,Unx
+       S=S-((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
+       Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
+         (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
+         0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+          (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
+         0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))
+      enddo
+     enddo
+    enddo
+
+    S=S/(Unx*Uny*Unz)
+    write(*,*) "Mean friction:", S
+   endif
+  endsubroutine OtherTerms
+
+
+  !$hmpp <tsteps> PressureGrad codelet
+  subroutine PressureGrad(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxU,dyV,dzW,&
+                          Btype,prgradientx,prgradienty,&
+                          Pr,U,V,W,&
+                          dt,coef)
+  implicit none
+#ifdef __HMPP
+  integer,parameter :: KND=4
+#endif
+  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
+  real(KND),intent(in)    :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2),prgradientx,prgradienty,dt,coef
+  integer,intent(in)      :: Btype(6)
+  real(KND),intent(inout) :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
+  real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+  real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+  real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND) :: A
+  integer i,j,k
+
+   call BoundPr_GPU(Unx,Vny,Wnz,Prnx,Prny,Prnz,Btype,Pr)
+
+   A=-coef*dt
+   A=-coef*dt
+   A=-coef*dt
+   do k=1,Unz
+    do j=1,Uny
+     do i=1,Unx
+          U(i,j,k)=U(i,j,k)+A*(Pr(i+1,j,k)-Pr(i,j,k))/dxU(i)+A*prgradientx
+     enddo
+    enddo
+   enddo
+   do k=1,Vnz
+    do j=1,Vny
+     do i=1,Vnx
+          V(i,j,k)=V(i,j,k)+A*(Pr(i,j+1,k)-Pr(i,j,k))/dyV(j)+A*prgradienty
+     enddo
+    enddo
+   enddo
+   do k=1,Wnz
+    do j=1,Wny
+     do i=1,Wnx
+          W(i,j,k)=W(i,j,k)+A*(Pr(i,j,k+1)-Pr(i,j,k))/dzW(k)
+     enddo
+    enddo
+   enddo
+  end subroutine PressureGrad
+
+
+
+  !$hmpp <tsteps> ForwEul codelet
+  subroutine ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                    dxPr,dyPr,dzPr,dxU,dyV,dzW,&
+                    U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
+                    dt,coef)
+  implicit none
+#ifdef __HMPP
+  integer,parameter :: KND=4
+#endif
+  integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
+
+  real(KND),intent(in):: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND),intent(in):: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3),V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND),intent(out):: U3(-2:Unx+3,-2:Uny+3,-2:Unz+3),V3(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W3(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND),intent(in):: Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(KND),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
+  real(KND),intent(in) :: dxPr(-2:Prnx+3),dyPr(-2:Prny+3),dzPr(-2:Prnz+3),dt,coef
+  real(KND) :: Ap
+  integer i,j,k
 
      Ap=coef*dt
 
@@ -1513,151 +1018,7 @@ write(*,*) "Otherterms:"
        enddo
       enddo
      enddo
-
-
-     call BoundU(1,U3)
-     call BoundU(2,V3)
-     call BoundU(3,W3)
-     call MomSourc(U3,V3,W3)
-
-
-!      do i=1,NIBPointsU
-!       xi=IBPijkU(1,i)
-!       yj=IBPijkU(2,i)
-!       zk=IBPijkU(3,i)
-!       U3(xi,yj,zk)=U3(xi,yj,zk)+IBPsourcU*dt
-!       U2(xi,yj,zk)=U2(xi,yj,zk)+IBPsourcU*dt
-!      enddo
-!
-!      do i=1,NIBPointsV
-!       xi=IBPijkV(1,i)
-!       yj=IBPijkV(2,i)
-!       zk=IBPijkV(3,i)
-!       V3(xi,yj,zk)=V3(xi,yj,zk)+IBPsourcV*dt
-!       V2(xi,yj,zk)=V2(xi,yj,zk)+IBPsourcV*dt
-!      enddo
-!
-!      do i=1,NIBPointsW
-!       xi=IBPijkW(1,i)
-!       yj=IBPijkW(2,i)
-!       zk=IBPijkW(3,i)
-!       W3(xi,yj,zk)=W3(xi,yj,zk)+IBPsourcW*dt
-!       W2(xi,yj,zk)=W2(xi,yj,zk)+IBPsourcW*dt
-!      enddo
-
-     if (associated(FirstIBPoint)) then   !Immersed boundary terms, in the future should be in an array
-      IBP => FirstIBPoint
-      do
-       x=IBP%x
-       y=IBP%y
-       z=IBP%z
-        if (IBP%component==1) then
-         U3(x,y,z)=U3(x,y,z)+IBP%MSourc*dt
-         U2(x,y,z)=U2(x,y,z)+IBP%MSourc*dt
-        elseif (IBP%component==2) then
-         V3(x,y,z)=V3(x,y,z)+IBP%MSourc*dt
-         V2(x,y,z)=V2(x,y,z)+IBP%MSourc*dt
-        elseif (IBP%component==3) then
-         W3(x,y,z)=W3(x,y,z)+IBP%MSourc*dt
-         W2(x,y,z)=W2(x,y,z)+IBP%MSourc*dt
-        endif
-       if (associated(IBP%next)) then
-        IBP=>IBP%next
-       else
-        exit
-       endif
-      enddo
-     endif
-
-     if (gridtype==UNIFORMGRID.and.GPU>0) then                  !Performs the diffusion terms
-      write (*,*) "GPU CN call"
-      !$hmpp <tsteps_gpu> UNIFREDBLACK callsite
-      call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,&
-                            Btype,sideU,&
-                            dt,dxmin,dymin,dzmin,&
-                            Uin,Vin,Win,&
-                            U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
-                            coef,maxCNiter,epsCN,it,S)
-      write(*,*) "back from GPU CN", it,S
-     else if (gridtype==UNIFORMGRID) then
-      call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
-     else
-      call GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
-     endif
-
-     U2=U3
-     V2=V3
-     W2=W3
-
-   else  Re_gt_0  !Re<=0
-
-    U2=U+U2
-    V2=V+V2
-    W2=W+W2
-
-   endif   Re_gt_0
-
-   if (debuglevel>=2) then  !Compute and output the mean friction in the domain.
-    S=0
-    do k=1,Unz
-     do j=1,Uny
-      do i=1,Unx
-       S=S-((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
-       Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
-         (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
-         0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-          (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
-         0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))
-      enddo
-     enddo
-    enddo
-
-    S=S/(Unx*Uny*Unz)
-    write(*,*) "Mean friction:", S
-   endif
-  endsubroutine OtherTerms
-
-
-  !$hmpp <tsteps_gpu> PressureGrad codelet
-  subroutine PressureGrad(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxU,dyV,dzW,prgradientx,prgradienty,Pr,U,V,W,dt,coef)
-  implicit none
-#ifdef __HMPP
-  integer,parameter :: KND=4
-#endif
-  integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
-  real(KND),intent(inout):: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
-  real(KND),intent(inout):: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
-  real(KND),intent(inout):: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
-  real(KND),intent(inout):: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2),prgradientx,prgradienty,dt,coef
-  real(KND) :: A
-  integer i,j,k
-
-   A=-coef*dt
-   A=-coef*dt
-   A=-coef*dt
-   do k=1,Unz
-    do j=1,Uny
-     do i=1,Unx
-          U(i,j,k)=U(i,j,k)+A*(Pr(i+1,j,k)-Pr(i,j,k))/dxU(i)+A*prgradientx
-     enddo
-    enddo
-   enddo
-   do k=1,Vnz
-    do j=1,Vny
-     do i=1,Vnx
-          V(i,j,k)=V(i,j,k)+A*(Pr(i,j+1,k)-Pr(i,j,k))/dyV(j)+A*prgradienty
-     enddo
-    enddo
-   enddo
-   do k=1,Wnz
-    do j=1,Wny
-     do i=1,Wnx
-          W(i,j,k)=W(i,j,k)+A*(Pr(i,j,k+1)-Pr(i,j,k))/dzW(k)
-     enddo
-    enddo
-   enddo
-  end subroutine PressureGrad
+  end subroutine ForwEul
 
 
   subroutine UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
@@ -2359,8 +1720,38 @@ write(*,*) "Otherterms:"
   endsubroutine NullInterior
 
 
+  subroutine SubgridStresses(U,V,W,Pr)
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+
+     if (sgstype==SmagorinskyModel) then
+                       call Smag(U,V,W)
+     elseif (sgstype==VremanModel) then
+                       if (GPU>0.and.gridtype==uniformgrid.and. Prnx*Prny*Prnz > 50) then
+                           !$hmpp <tsteps> Vreman callsite, args[*].noupdate=true
+     !$hmpp <tsteps> delegatedstore, args[Vreman::Visc]
+                           call Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Re,U,V,W,Visc)
+                       else
+                           call Vreman(U,V,W)
+                       endif
+     elseif (sgstype==StabSmagorinskyModel) then
+                       call StabSmag(U,V,W)
+     else
+                       Visc=1._KND/Re
+     endif
 
 
+     if (debuglevel>0) then
+      write(*,*) "NUt", sum(Visc(1:Prnx,1:Prny,1:Prnz))/(Prnx*Prny*Prnz)
+      write(*,*) "maxNUt", MAXVAL(Visc(1:Prnx,1:Prny,1:Prnz))
+      write(*,*) "minNUt", MINVAL(Visc(1:Prnx,1:Prny,1:Prnz))
+     endif
+
+     if (wallmodeltype>0) then
+                     call ComputeViscsWM(U,V,W,Pr)
+     endif
+
+     call ScalFlSourc(Visc,3)
+  end subroutine SubgridStresses
 
 
 
@@ -2389,7 +1780,34 @@ write(*,*) "Otherterms:"
 
  !GPU codelets
 
-!$hmpp <tsteps_gpu> group, target=CUDA
+!$hmpp <tsteps> group, target=CUDA
+
+  !$hmpp <tsteps> mapbyname, Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
+  !$hmpp <tsteps> mapbyname, Btype,sideU,Re
+  !$hmpp <tsteps> mapbyname, dt
+  !$hmpp <tsteps> mapbyname, dxPr,dyPr,dzPr,dxU,dyV,dzW
+  !$hmpp <tsteps> mapbyname, Uin,Vin,Win,Pr,Visc
+  !$hmpp <tsteps> map, args[Vreman::dx,CDS::dx,UnifRedBlack::dxmin]
+  !$hmpp <tsteps> map, args[Vreman::dy,CDS::dy,UnifRedBlack::dymin]
+  !$hmpp <tsteps> map, args[Vreman::dz,CDS::dz,UnifRedBlack::dzmin]
+
+  !$hmpp <tsteps> map, args[PressureGrad::coef,ForwEul::coef,UnifRedBlack::coef]
+
+ !U,V,W
+ !$hmpp <tsteps> map, args[Vreman::U,CDS::U,ForwEul::U,UnifRedBlack::U]
+ !$hmpp <tsteps> map, args[Vreman::V,CDS::V,ForwEul::V,UnifRedBlack::V]
+ !$hmpp <tsteps> map, args[Vreman::W,CDS::W,ForwEul::W,UnifRedBlack::W]
+
+ !U2,V2,W2
+ !$hmpp <tsteps> map, args[PressureGrad::U,ForwEul::U2,UnifRedBlack::U2]
+ !$hmpp <tsteps> map, args[PressureGrad::V,ForwEul::V2,UnifRedBlack::V2]
+ !$hmpp <tsteps> map, args[PressureGrad::W,ForwEul::W2,UnifRedBlack::W2]
+
+ !U3,V3,W3 on GPU device mapped also to Ustar,Vstar,Wstar
+ !$hmpp <tsteps> map, args[CDS::U2,ForwEul::U3,UnifRedBlack::U3]
+ !$hmpp <tsteps> map, args[CDS::V2,ForwEul::V3,UnifRedBlack::V3]
+ !$hmpp <tsteps> map, args[CDS::W2,ForwEul::W3,UnifRedBlack::W3]
+
 
 #include "boundaries_GPU.f90"
 #include "cds_GPU.f90"

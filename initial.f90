@@ -1117,8 +1117,6 @@ contains
 
    if (sgstype==1) then
                      call Smag(U,V,W)
-   elseif (sgstype==2) then
-                     call DynSmag(U,V,W)
    elseif (sgstype==3) then
                      call VREMAN(U,V,W)
    else

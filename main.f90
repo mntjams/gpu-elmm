@@ -61,27 +61,10 @@ program CLMM
 
 
 
-      if (tempmet==1) then
 
-          call TMarchEul(U,V,W,Pr,delta)
+      call TMarchRK3(U,V,W,Pr,delta)
 
-       elseif (tempmet==2) then
 
-          call TMarchAB2(U,V,W,Pr,delta)
-
-       elseif (tempmet==3) then
-
-          call TMarchRK2(U,V,W,Pr,delta)
-
-       elseif (tempmet==4) then
-
-          call TMarchRK3(U,V,W,Pr,delta)
-
-       elseif (tempmet==5) then
-
-          call TMarchShiftInlet(U,V,W,Pr,delta)
-
-      endif
 
 
       time=time+dt

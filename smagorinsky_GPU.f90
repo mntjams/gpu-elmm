@@ -1,6 +1,6 @@
 
 
-  !$hmpp <tsteps_gpu> Vreman codelet
+  !$hmpp <tsteps> Vreman codelet
   subroutine Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dx,dy,dz,dt,Re,U,V,W,Visc)
    !Vreman subgrid model (Physics of Fluids, 2004)
    implicit none

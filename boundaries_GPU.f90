@@ -1,3 +1,4 @@
+!  !$hmpp <tsteps> BoundU codelet
  pure subroutine BoundU_GPU(component,nx,ny,nz,Prny,Prnz,&
                              Btype,sideU,&
                              Uin,U,regime)
@@ -581,15 +582,17 @@
 
   end subroutine BoundU_GPU
 
-  !
-  pure subroutine BoundPr_GPU(Unx,Vny,Wnz,Prnx,Prny,Prnz,Pr)
+!   !$hmpp <tsteps> BoundPr codelet
+  pure subroutine BoundPr_GPU(Unx,Vny,Wnz,Prnx,Prny,Prnz,Btype,Pr)
+  implicit none
 #ifdef __HMPP
   integer,parameter  :: KND=4
   integer,parameter  :: PERIODIC=3
   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
 #endif
-  integer,intent(in)     :: Unx,Vny,Wnz,Prnx,Prny,Prnz
-  real(KND),intent(inout):: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
+  integer,intent(in)      :: Unx,Vny,Wnz,Prnx,Prny,Prnz
+  integer,intent(in)      :: Btype(6)
+  real(KND),intent(inout) :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
 
   integer :: i,j,k,nx,ny,nz
 
