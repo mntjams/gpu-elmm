@@ -94,54 +94,23 @@ contains
     !$hmpp <tsteps> advancedload, args[Vreman::U,Vreman::V,Vreman::W]
     call SubgridStresses(U,V,W,Pr)
 
-    U2=0
-    V2=0
-    W2=0
 
-    if (convmet>0) then
-      if (l>1) then
-        U2=U2+Ustar*rho(l)
-        V2=V2+Vstar*rho(l)
-        W2=W2+Wstar*rho(l)
-      endif
+    !$hmpp <tsteps> advancedload, args[Convection::buoyancy,Convection::convmet,Convection::coriolisparam]
+    !$hmpp <tsteps> advancedload, args[Convection::grav_acc,Convection::temperature_ref,Convection::beta,Convection::rho]
+    !$hmpp <tsteps> advancedload, args[Convection::Ustar,Convection::Vstar,Convection::Wstar,Convection::lev]
 
-      Ustar=0
-      Vstar=0
-      Wstar=0
-
-      if (convmet==1) then
-       call LF(Ustar,Vstar,Wstar,U,V,W)
-      elseif (convmet==3) then
-       call KAPPAU(Ustar,U,V,W,1._KND)
-       call KAPPAV(Vstar,U,V,W,1._KND)
-       call KAPPAW(Wstar,U,V,W,1._KND)
-      else if (GPU>0) then
-       write(*,*) "Call GPU CDS"
-
-
-       !$hmpp <tsteps> CDS callsite, args[*].noupdate=true
-       call CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Ustar,Vstar,Wstar,U,V,W)
-
-       !$hmpp <tsteps> delegatedstore, args[CDS::U2,CDS::V2,CDS::W2]
-
-       write(*,*) "Back from  GPU CDS"
-      else
-       call CDU(Ustar,U,V,W,1._KND)
-       call CDV(Vstar,U,V,W,1._KND)
-       call CDW(Wstar,U,V,W,1._KND)
-      endif
-
-write (*,*) "sum Ustar",sum(Ustar(1:Unx,1:Uny,1:Unz))
-write (*,*) "sum Vstar",sum(Vstar(1:Vnx,1:Vny,1:Vnz))
-write (*,*) "sum Wstar",sum(Wstar(1:Wnx,1:Wny,1:Wnz))
-
-      call CoriolisForce(Ustar,Vstar,U,V,1._KND)
-      if (buoyancy==1) call BuoyancyForce(Wstar,temperature,1._KND)
-
-      U2=U2+Ustar*beta(l)
-      V2=V2+Vstar*beta(l)
-      W2=W2+Wstar*beta(l)
+    if (buoyancy==1) then
+     !$hmpp <tsteps> advancedload, args[Convection::temperature]
     endif
+
+    !$hmpp <tsteps> Convection callsite, args[*].noupdate=true
+    call Convection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
+                       dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
+                       U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,l,dt)
+
+    !$hmpp <tsteps> delegatedstore, args[Convection::Ustar,Convection::Vstar,Convection::Wstar]
+
+
 
     if (debugparam>1) then
      call cpu_time(time2)
@@ -269,6 +238,178 @@ write (*,*) "sum Wstar",sum(Wstar(1:Wnx,1:Wny,1:Wnz))
    enddo
 
  end subroutine TMarchRK3
+
+
+
+
+
+ !$hmpp <tsteps> Convection codelet
+ subroutine Convection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
+                       dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
+                       U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev,dt)
+  implicit none
+#ifdef __HMPP
+  integer,parameter :: KND=4
+  intrinsic abs
+#endif
+
+  integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,lev
+  real(KND),intent(in) :: dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref
+  real(KND),intent(in) :: dt
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out)   :: U2
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: Ustar
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)    :: V
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(out)   :: V2
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: Vstar
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)    :: W
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(out)   :: W2
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: Wstar
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: temperature
+  real(KND),dimension(1:3),intent(in) :: beta,rho
+  integer i,j,k
+
+      if (lev>1) then
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg permute (k,i,j)
+        do k=1,Unz
+         do j=1,Uny
+          do i=1,Unx
+           U2(i,j,k)=Ustar(i,j,k)*rho(lev)
+          enddo
+         enddo
+        enddo
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg permute (k,i,j)
+        do k=1,Vnz
+         do j=1,Vny
+          do i=1,Vnx
+           V2(i,j,k)=Vstar(i,j,k)*rho(lev)
+          enddo
+         enddo
+        enddo
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg permute (k,i,j)
+        do k=1,Wnz
+         do j=1,Wny
+          do i=1,Wnx
+           W2(i,j,k)=Wstar(i,j,k)*rho(lev)
+          enddo
+         enddo
+        enddo
+      else
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg permute (k,i,j)
+        do k=1,Unz
+         do j=1,Uny
+          do i=1,Unx
+           U2(i,j,k)=0
+          enddo
+         enddo
+        enddo
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg permute (k,i,j)
+        do k=1,Vnz
+         do j=1,Vny
+          do i=1,Vnx
+           V2(i,j,k)=0
+          enddo
+         enddo
+        enddo
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg permute (k,i,j)
+        do k=1,Wnz
+         do j=1,Wny
+          do i=1,Wnx
+           W2(i,j,k)=0
+          enddo
+         enddo
+        enddo
+      endif
+
+      if (convmet>0) then
+
+        call CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Ustar,Vstar,Wstar,U,V,W)
+
+      else
+
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg permute (k,i,j)
+        do k=1,Unz
+         do j=1,Uny
+          do i=1,Unx
+           Ustar(i,j,k)=0
+          enddo
+         enddo
+        enddo
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg permute (k,i,j)
+        do k=1,Vnz
+         do j=1,Vny
+          do i=1,Vnx
+           Vstar(i,j,k)=0
+          enddo
+         enddo
+        enddo
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg permute (k,i,j)
+        do k=1,Wnz
+         do j=1,Wny
+          do i=1,Wnx
+           Wstar(i,j,k)=0
+          enddo
+         enddo
+        enddo
+
+      endif
+
+
+      if (abs(coriolisparam)>1E-10_KND) call CoriolisForce(Unx,Uny,Unz,Vnx,Vny,Vnz,&
+                                                    coriolisparam,&
+                                                    Ustar,Vstar,U,V,dt)
+
+      if (buoyancy==1) call BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,&
+                                grav_acc,temperature_ref,Wstar,temperature,dt)
+
+      !$hmppcg grid blocksize 512x1
+      !$hmppcg permute (k,i,j)
+      do k=1,Unz
+       do j=1,Uny
+        do i=1,Unx
+         U2(i,j,k)=U2(i,j,k)+Ustar(i,j,k)*beta(lev)
+        enddo
+       enddo
+      enddo
+      !$hmppcg grid blocksize 512x1
+      !$hmppcg permute (k,i,j)
+      do k=1,Vnz
+       do j=1,Vny
+        do i=1,Vnx
+         V2(i,j,k)=V2(i,j,k)+Vstar(i,j,k)*beta(lev)
+        enddo
+       enddo
+      enddo
+      !$hmppcg grid blocksize 512x1
+      !$hmppcg permute (k,i,j)
+      do k=1,Wnz
+       do j=1,Wny
+        do i=1,Wnx
+         W2(i,j,k)=W2(i,j,k)+Wstar(i,j,k)*beta(lev)
+        enddo
+       enddo
+      enddo
+
+  end subroutine Convection
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -685,14 +826,21 @@ write (*,*) "sum Wstar",sum(Wstar(1:Wnx,1:Wny,1:Wnz))
 
 
 
-  subroutine BuoyancyForce(W2,theta,coef)
-  real(KND),dimension(-2:,-2:,-2:),intent(inout):: W2
-  real(KND),dimension(-1:,-1:,-1:),intent(in):: theta
-  real(KND),intent(in):: coef
+  pure subroutine BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,grav_acc,temperature_ref,W2,theta,dt)
+  implicit none
+#ifdef __HMPP
+  integer,parameter :: KND=4
+#endif
+  integer,intent(in) :: Prnx,Prny,Prnz,Wnx,Wny,Wnz
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W2
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: theta
+  real(KND),intent(in) :: grav_acc,temperature_ref,dt
   real(KND) A
   integer i,j,k
 
-    A=grav_acc*coef*dt/temperature_ref
+    A=grav_acc*dt/temperature_ref
+    !$hmppcg grid blocksize 512x1
+    !$hmppcg permute (k,i,j)
     do k=1,Wnz
      do j=1,Wny
       do i=1,Wnx
@@ -706,15 +854,26 @@ write (*,*) "sum Wstar",sum(Wstar(1:Wnx,1:Wny,1:Wnz))
 
 
 
-  subroutine CoriolisForce(U2,V2,U,V,coef)
-  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V
-  real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2
-  real(KND),intent(in):: coef
+  pure subroutine CoriolisForce(Unx,Uny,Unz,Vnx,Vny,Vnz,&
+                                 coriolisparam,&
+                                 U2,V2,U,V,dt)
+  implicit none
+#ifdef __HMPP
+  integer,parameter :: KND=4
+#endif
+  integer,intent(in) :: Unx,Uny,Unz,Vnx,Vny,Vnz
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)    :: V
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: U2
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: V2
+  real(KND),intent(in):: coriolisparam,dt
   real(KND) A
   integer i,j,k
 
-   A=-coef*dt
+   A=-dt
    if (coriolisparam>0) then
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg permute (k,i,j)
     do k=1,Unz
      do j=1,Uny
       do i=1,Unx
@@ -722,6 +881,8 @@ write (*,*) "sum Wstar",sum(Wstar(1:Wnx,1:Wny,1:Wnz))
       enddo
      enddo
     enddo
+    !$hmppcg grid blocksize 512x1
+    !$hmppcg permute (k,i,j)
     do k=1,Vnz
      do j=1,Vny
       do i=1,Vnx
@@ -753,12 +914,11 @@ write (*,*) "sum Wstar",sum(Wstar(1:Wnx,1:Wny,1:Wnz))
 
    type(TIBPoint),pointer:: IBP
 
-
    write(*,*) "Otherterms:"
 
    !$hmpp <tsteps> advancedload, args[PressureGrad::dxU,PressureGrad::dyV,PressureGrad::dzW]
    !$hmpp <tsteps> advancedload, args[PressureGrad::prgradientx,PressureGrad::prgradienty]
-   !$hmpp <tsteps> advancedload, args[PressureGrad::Pr,PressureGrad::U,PressureGrad::V,PressureGrad::W,PressureGrad::dt]
+   !$hmpp <tsteps> advancedload, args[PressureGrad::Pr]
    !$hmpp <tsteps> advancedload, args[PressureGrad::Btype]
 
    !$hmpp <tsteps> advancedload, args[PressureGrad::coef]
@@ -772,10 +932,6 @@ write (*,*) "sum Wstar",sum(Wstar(1:Wnx,1:Wny,1:Wnz))
                      Pr,U2,V2,W2,&
                      dt,coef)
 
-   !$hmpp <tsteps> delegatedstore, args[PressureGrad::U,PressureGrad::V,PressureGrad::W]
-write (*,*) "sum U2",sum(U2(1:Unx,1:Uny,1:Unz))
-write (*,*) "sum V2",sum(V2(1:Vnx,1:Vny,1:Vnz))
-write (*,*) "sum W2",sum(W2(1:Wnx,1:Wny,1:Wnz))
 
    Re_gt_0: if (Re>0) then
 
@@ -793,10 +949,7 @@ write (*,*) "sum W2",sum(W2(1:Wnx,1:Wny,1:Wnz))
                   U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
                   dt,coef)
 
-   !$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
-write (*,*) "sum U3",sum(U3(1:Unx,1:Uny,1:Unz))
-write (*,*) "sum V3",sum(V3(1:Vnx,1:Vny,1:Vnz))
-write (*,*) "sum W3",sum(W3(1:Wnx,1:Wny,1:Wnz))
+
 
 !      call MomSourc(U3,V3,W3)
 
@@ -909,7 +1062,7 @@ write (*,*) "sum W3",sum(W3(1:Wnx,1:Wny,1:Wnz))
 
 
   !$hmpp <tsteps> PressureGrad codelet
-  subroutine PressureGrad(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxU,dyV,dzW,&
+  pure subroutine PressureGrad(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxU,dyV,dzW,&
                           Btype,prgradientx,prgradienty,&
                           Pr,U,V,W,&
                           dt,coef)
@@ -932,6 +1085,9 @@ write (*,*) "sum W3",sum(W3(1:Wnx,1:Wny,1:Wnz))
    A=-coef*dt
    A=-coef*dt
    A=-coef*dt
+
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg permute (k,i,j)
    do k=1,Unz
     do j=1,Uny
      do i=1,Unx
@@ -939,6 +1095,8 @@ write (*,*) "sum W3",sum(W3(1:Wnx,1:Wny,1:Wnz))
      enddo
     enddo
    enddo
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg permute (k,i,j)
    do k=1,Vnz
     do j=1,Vny
      do i=1,Vnx
@@ -946,6 +1104,8 @@ write (*,*) "sum W3",sum(W3(1:Wnx,1:Wny,1:Wnz))
      enddo
     enddo
    enddo
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg permute (k,i,j)
    do k=1,Wnz
     do j=1,Wny
      do i=1,Wnx
@@ -979,6 +1139,8 @@ write (*,*) "sum W3",sum(W3(1:Wnx,1:Wny,1:Wnz))
 
      Ap=coef*dt
 
+     !$hmppcg grid blocksize 512x1
+     !$hmppcg permute (k,i,j)
      do k=1,Unz    !Forward Euler for the first approximation
       do j=1,Uny
        do i=1,Unx
@@ -992,6 +1154,8 @@ write (*,*) "sum W3",sum(W3(1:Wnx,1:Wny,1:Wnz))
        enddo
       enddo
      enddo
+     !$hmppcg grid blocksize 512x1
+     !$hmppcg permute (k,i,j)
      do k=1,Vnz
       do j=1,Vny
        do i=1,Vnx
@@ -1005,6 +1169,8 @@ write (*,*) "sum W3",sum(W3(1:Wnx,1:Wny,1:Wnz))
        enddo
       enddo
      enddo
+     !$hmppcg grid blocksize 512x1
+     !$hmppcg permute (k,i,j)
      do k=1,Wnz
       do j=1,Wny
        do i=1,Wnx
@@ -1787,26 +1953,26 @@ write (*,*) "sum W3",sum(W3(1:Wnx,1:Wny,1:Wnz))
   !$hmpp <tsteps> mapbyname, dt
   !$hmpp <tsteps> mapbyname, dxPr,dyPr,dzPr,dxU,dyV,dzW
   !$hmpp <tsteps> mapbyname, Uin,Vin,Win,Pr,Visc
-  !$hmpp <tsteps> map, args[Vreman::dx,CDS::dx,UnifRedBlack::dxmin]
-  !$hmpp <tsteps> map, args[Vreman::dy,CDS::dy,UnifRedBlack::dymin]
-  !$hmpp <tsteps> map, args[Vreman::dz,CDS::dz,UnifRedBlack::dzmin]
+  !$hmpp <tsteps> map, args[Vreman::dx,Convection::dxmin,UnifRedBlack::dxmin]
+  !$hmpp <tsteps> map, args[Vreman::dy,Convection::dymin,UnifRedBlack::dymin]
+  !$hmpp <tsteps> map, args[Vreman::dz,Convection::dzmin,UnifRedBlack::dzmin]
 
   !$hmpp <tsteps> map, args[PressureGrad::coef,ForwEul::coef,UnifRedBlack::coef]
 
  !U,V,W
- !$hmpp <tsteps> map, args[Vreman::U,CDS::U,ForwEul::U,UnifRedBlack::U]
- !$hmpp <tsteps> map, args[Vreman::V,CDS::V,ForwEul::V,UnifRedBlack::V]
- !$hmpp <tsteps> map, args[Vreman::W,CDS::W,ForwEul::W,UnifRedBlack::W]
+ !$hmpp <tsteps> map, args[Vreman::U,Convection::U,ForwEul::U,UnifRedBlack::U]
+ !$hmpp <tsteps> map, args[Vreman::V,Convection::V,ForwEul::V,UnifRedBlack::V]
+ !$hmpp <tsteps> map, args[Vreman::W,Convection::W,ForwEul::W,UnifRedBlack::W]
 
  !U2,V2,W2
- !$hmpp <tsteps> map, args[PressureGrad::U,ForwEul::U2,UnifRedBlack::U2]
- !$hmpp <tsteps> map, args[PressureGrad::V,ForwEul::V2,UnifRedBlack::V2]
- !$hmpp <tsteps> map, args[PressureGrad::W,ForwEul::W2,UnifRedBlack::W2]
+ !$hmpp <tsteps> map, args[Convection::U2,PressureGrad::U,ForwEul::U2,UnifRedBlack::U2]
+ !$hmpp <tsteps> map, args[Convection::V2,PressureGrad::V,ForwEul::V2,UnifRedBlack::V2]
+ !$hmpp <tsteps> map, args[Convection::W2,PressureGrad::W,ForwEul::W2,UnifRedBlack::W2]
 
  !U3,V3,W3 on GPU device mapped also to Ustar,Vstar,Wstar
- !$hmpp <tsteps> map, args[CDS::U2,ForwEul::U3,UnifRedBlack::U3]
- !$hmpp <tsteps> map, args[CDS::V2,ForwEul::V3,UnifRedBlack::V3]
- !$hmpp <tsteps> map, args[CDS::W2,ForwEul::W3,UnifRedBlack::W3]
+ !$hmpp <tsteps> map, args[Convection::Ustar,ForwEul::U3,UnifRedBlack::U3]
+ !$hmpp <tsteps> map, args[Convection::Vstar,ForwEul::V3,UnifRedBlack::V3]
+ !$hmpp <tsteps> map, args[Convection::Wstar,ForwEul::W3,UnifRedBlack::W3]
 
 
 #include "boundaries_GPU.f90"

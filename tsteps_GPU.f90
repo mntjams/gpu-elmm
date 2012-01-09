@@ -45,6 +45,7 @@
        recdymin2=1./dymin**2
        recdzmin2=1./dzmin**2
 
+       !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
        do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
         do j=1,Uny
@@ -59,6 +60,7 @@
          enddo
         enddo
        enddo
+       !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
        do k=1,Vnz
         do j=1,Vny
@@ -73,6 +75,7 @@
          enddo
         enddo
        enddo
+       !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
        do k=1,Wnz
        do j=1,Wny
@@ -88,6 +91,7 @@
        enddo
       enddo
 
+       !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
        do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
         do j=1,Uny
@@ -104,6 +108,7 @@
        enddo
 
 
+       !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
        do k=1,Vnz
         do j=1,Vny
@@ -120,6 +125,7 @@
        enddo
 
 
+       !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
        do k=1,Wnz
         do j=1,Wny
@@ -137,6 +143,7 @@
 
 
        Suavg=0    !maximum values of velocities to norm the residues.
+       !$hmppcg grid blocksize 512x1
        !$hmppcg gridify (k,i), reduce (max:Suavg)
        do k=1,Unz
         do i=1,Unx
@@ -146,6 +153,7 @@
         enddo
        enddo
        Svavg=0
+       !$hmppcg grid blocksize 512x1
        !$hmppcg gridify (k,i), reduce (max:Svavg)
        do k=1,Vnz
         do i=1,Vnx
@@ -155,6 +163,7 @@
         enddo
        enddo
        Swavg=0
+       !$hmppcg grid blocksize 512x1
        !$hmppcg gridify (k,i), reduce (max:Swavg)
        do k=1,Wnz
         do i=1,Wnx
