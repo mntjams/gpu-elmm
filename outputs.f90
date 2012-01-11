@@ -2563,7 +2563,8 @@ contains
   real(SNG),intent(in)::x
   integer,save:: called=0
   logical,save:: littleendian !endianess of the machine
-  integer(selected_int_kind(1)),dimension(4):: bytes,tmp !may not work on some processors
+  integer(selected_int_kind(1)),dimension(4):: bytes !may not work on some processors
+
     if (called==0) then
       bytes=transfer(1,bytes,4)
       if (bytes(4)==1) then
@@ -2578,9 +2579,7 @@ contains
      BigEnd=x
     else
      bytes=transfer(x,bytes,4)
-     tmp=bytes
-     bytes=tmp(4:1:-1)
-     BigEnd=transfer(bytes,x)
+     BigEnd=transfer(bytes(4:1:-1),x)
     endif
   end function BigEnd
 
