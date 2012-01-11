@@ -1215,10 +1215,13 @@ integer k
   endif
 
   if (level == minmglevel) then !1
-   R=huge(mgepsinnerGS)/2.
+     R=huge(mgepsinnerGS)/2.
+
+     if (.not.(GPU>0.and.level>=minGPUlevel)) then
           call MG_GE(level)
           call MG_res(level,R)
 !        write (*,*) "GEres",sqrt(R)
+     endif
 
      if (R>mgepsinnerGS**2) then
       R1=R
@@ -2449,7 +2452,6 @@ endsubroutine Restrict_GPU
   enddo
 
   endsubroutine Clear_GPU
-
 
 
 endmodule MULTIGRID
