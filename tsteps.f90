@@ -56,6 +56,7 @@ contains
   if (called==0) then
    called=1
    if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
+    !$hmpp <tsteps> allocate
   endif
 
   call BoundU(1,U)
@@ -78,7 +79,6 @@ contains
   Wstar=0
 
   do l=1,3
-    !$hmpp <tsteps> allocate
     !$hmpp <tsteps> advancedload, args[Vreman::Prnx,Vreman::Prny,Vreman::Prnz]
     !$hmpp <tsteps> advancedload, args[Vreman::Unx,Vreman::Uny,Vreman::Unz,&
     !$hmpp <tsteps>     Vreman::Vnx,Vreman::Vny,Vreman::Vnz,Vreman::Wnx,Vreman::Wny,Vreman::Wnz]
@@ -120,7 +120,6 @@ contains
 
 
     call OtherTerms(U,V,W,U2,V2,W2,Pr,2._KND*alpha(l))
-   !$hmpp <tsteps> release
 
 
 
@@ -236,7 +235,9 @@ contains
     V=V2
     W=W2
    enddo
-
+   if (.false.) then
+   !$hmpp <tsteps> release
+   endif
  end subroutine TMarchRK3
 
 
