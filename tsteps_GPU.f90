@@ -183,10 +183,10 @@
         call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
                              Btype,sideU,&
                              Uin,U3,0)
-        call BoundU_GPU(1,Vnx,Vny,Vnz,Prny,Prnz,&
+        call BoundU_GPU(2,Vnx,Vny,Vnz,Prny,Prnz,&
                              Btype,sideU,&
                              Vin,V3,0)
-        call BoundU_GPU(1,Wnx,Wny,Wnz,Prny,Prnz,&
+        call BoundU_GPU(3,Wnx,Wny,Wnz,Prny,Prnz,&
                              Btype,sideU,&
                              Win,W3,0)
         S=0
@@ -312,5 +312,38 @@
        enddo
     iters=l-1
     residuum=S
+
+
+    do k=1,Unz
+     do j=1,Uny
+      do i=1,Unx
+       U2(i,j,k)=U3(i,j,k)
+      enddo
+     enddo
+    enddo
+    do k=1,Unz
+     do j=1,Uny
+      do i=1,Unx
+       V2(i,j,k)=V3(i,j,k)
+      enddo
+     enddo
+    enddo
+    do k=1,Unz
+     do j=1,Uny
+      do i=1,Unx
+       W2(i,j,k)=W3(i,j,k)
+      enddo
+     enddo
+    enddo
+
+    call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
+                         Btype,sideU,&
+                         Uin,U2,0)
+    call BoundU_GPU(2,Vnx,Vny,Vnz,Prny,Prnz,&
+                         Btype,sideU,&
+                         Vin,V2,0)
+    call BoundU_GPU(3,Wnx,Wny,Wnz,Prny,Prnz,&
+                         Btype,sideU,&
+                         Win,W2,0)
   endsubroutine UNIFREDBLACK_GPU
 
