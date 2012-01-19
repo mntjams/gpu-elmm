@@ -14,7 +14,7 @@
 
 #### Compiler and tool definitions shared by all build targets #####
 FC = gfortran
-BASICOPTS =   -O5 -fprefetch-loop-arrays -fno-inline-functions -funroll-loops -pg -ffpe-trap=zero,overflow -ffast-math
+BASICOPTS =   -O5 -fprefetch-loop-arrays -finline-functions -funroll-loops -pg -ffpe-trap=zero,overflow -ffast-math
 FFLAGS = $(BASICOPTS)
 
 
@@ -56,7 +56,7 @@ LDLIBS_CLMM = $(USERLIBS_CLMM) -llapack
 
 # Link or archive
 $(TARGETDIR_CLMM)/CLMM: $(TARGETDIR_CLMM) $(OBJS_CLMM) $(DEPLIBS_CLMM)
-	hmpp  --codelet-off $(LINK.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ $(OBJS_CLMM) $(LDLIBS_CLMM)
+	hmpp  $(LINK.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ $(OBJS_CLMM) $(LDLIBS_CLMM)
 
 
 # Compile source files into .o files
@@ -79,7 +79,7 @@ $(TARGETDIR_CLMM)/scalars.o: $(TARGETDIR_CLMM) scalars.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ scalars.f90
 
 $(TARGETDIR_CLMM)/multigrid.o: $(TARGETDIR_CLMM) multigrid.f90
-	hmpp -k --codelet-off $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid.f90
+	hmpp -d3 -k --codelet-off $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid.f90
 
 $(TARGETDIR_CLMM)/multigrid2d.o: $(TARGETDIR_CLMM) multigrid2d.f90
 	hmpp  --codelet-off $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid2d.f90
@@ -106,7 +106,7 @@ $(TARGETDIR_CLMM)/upwind.o: $(TARGETDIR_CLMM) upwind.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ upwind.f90
 
 $(TARGETDIR_CLMM)/laxfried.o: $(TARGETDIR_CLMM) laxfried.f90
-	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ laxfried.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ laxfried.f90
 
 $(TARGETDIR_CLMM)/laxwend.o: $(TARGETDIR_CLMM) laxwend.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ laxwend.f90
