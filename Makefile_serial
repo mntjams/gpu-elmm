@@ -14,7 +14,7 @@
 
 #### Compiler and tool definitions shared by all build targets #####
 FC = f90
-BASICOPTS = -fast   -g -dalign -m64
+BASICOPTS = -fast -g -dalign -m64
 FFLAGS = $(BASICOPTS)
 
 # Define the target directories.
@@ -55,7 +55,7 @@ LDLIBS_CLMM = $(USERLIBS_CLMM) -xlic_lib=sunperf
 
 # Link or archive
 $(TARGETDIR_CLMM)/CLMM: $(TARGETDIR_CLMM) $(OBJS_CLMM) $(DEPLIBS_CLMM)
-	$(LINK.f) -xfilebyteorder=big4:%all $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ $(OBJS_CLMM) $(LDLIBS_CLMM)
+	$(LINK.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ $(OBJS_CLMM) $(LDLIBS_CLMM)
 
 
 # Compile source files into .o files
