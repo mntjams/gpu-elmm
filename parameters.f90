@@ -78,7 +78,11 @@ implicit none
 
 
   real(KND),allocatable:: Visc(:,:,:),TDiff(:,:,:),tstress(:,:,:,:,:)  !(turbulent) viscosity, (turbulent) thermal diffusivity
+
   integer(sint),allocatable,dimension(:,:,:):: Utype,Vtype,Wtype,Prtype !number of solid body inside which the point is or 0
+  integer,allocatable,dimension(:,:):: Unull,Vnull,Wnull                !indexes of points to be nulled every timestep
+
+  integer nUnull,nVnull,nWnull  !second dimension of arrays above (number of points)
 
   real(KND) x0,y0,z0
   integer step

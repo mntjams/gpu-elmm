@@ -782,7 +782,7 @@ contains
 
   subroutine INITCONDS(U,V,W,Pr)
   real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  integer i,j,k
+  integer i,j,k,n
   real(KND) p,x,y,z,x1,x2,y1,y2,z1,z2
 
     call init_random_seed
@@ -1170,6 +1170,102 @@ contains
        call Bound_Visc(Visc)
 
     endif !init conditions not from file
+
+
+    !prepare arrays with indexes of points to be nulled every timestep
+
+    nUnull=0
+
+    do k=1,Unz
+     do j=1,Uny
+      do i=1,Unx
+       if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
+           .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
+           .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  nUnull=nUnull+1
+      enddo
+     enddo
+    enddo
+
+    allocate(Unull(3,nUnull))
+
+    n=0
+
+    do k=1,Unz
+     do j=1,Uny
+      do i=1,Unx
+       if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
+           .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
+           .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  then
+
+            n=n+1
+            Unull(:,n)=(/ i,j,k /)
+
+       endif
+      enddo
+     enddo
+    enddo
+
+    nVnull=0
+
+    do k=1,Vnz
+     do j=1,Vny
+      do i=1,Vnx
+       if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
+           .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
+           .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  nVnull=nVnull+1
+      enddo
+     enddo
+    enddo
+
+    allocate(Vnull(3,nVnull))
+
+    n=0
+
+    do k=1,Vnz
+     do j=1,Vny
+      do i=1,Vnx
+       if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
+           .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
+           .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  then
+
+            n=n+1
+            Vnull(:,n)=(/ i,j,k /)
+
+       endif
+      enddo
+     enddo
+    enddo
+
+    nWnull=0
+
+    do k=1,Wnz
+     do j=1,Wny
+      do i=1,Wnx
+       if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
+           .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
+           .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  nWnull=nWnull+1
+      enddo
+     enddo
+    enddo
+
+    allocate(Wnull(3,nWnull))
+
+    n=0
+
+    do k=1,Wnz
+     do j=1,Wny
+      do i=1,Wnx
+       if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
+           .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
+           .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  then
+
+            n=n+1
+            Wnull(:,n)=(/ i,j,k /)
+
+       endif
+      enddo
+     enddo
+    enddo
 
     write(*,*) "set"
   endsubroutine INITCONDS
