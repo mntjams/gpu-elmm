@@ -1,4 +1,6 @@
-!  !$hmpp <tsteps> BoundU codelet
+ !$hmpp <tsteps> BoundU codelet
+ !$hmpp <tsteps> BoundV codelet
+ !$hmpp <tsteps> BoundW codelet
  pure subroutine BoundU_GPU(component,nx,ny,nz,Prny,Prnz,&
                              Btype,sideU,&
                              Uin,U,regime)

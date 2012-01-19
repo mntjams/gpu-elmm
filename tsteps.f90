@@ -26,27 +26,21 @@ contains
 
 
 
-
-
-
  subroutine TMarchRK3(U,V,W,Pr,delta)
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND),intent(out):: delta
 
-  real(KND),allocatable,dimension(:,:,:),save:: Q
-  real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),&
-                                              lbound(U,3):ubound(U,3))::U2,Ustar
-  real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),&
-                                              lbound(V,3):ubound(V,3))::V2,Vstar
-  real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),&
-                                              lbound(W,3):ubound(W,3))::W2,Wstar
-  real(KND),dimension(lbound(Scalar,1):ubound(Scalar,1),lbound(Scalar,2):ubound(Scalar,2),&
-                lbound(Scalar,3):ubound(Scalar,3),lbound(Scalar,4):ubound(Scalar,4))::Scalar_adv,Scalar_2
-  real(KND),dimension(lbound(Temperature,1):ubound(Temperature,1),lbound(Temperature,2):ubound(Temperature,2),&
-   lbound(Temperature,3):ubound(Temperature,3))::Temperature_adv,Temperature2
+  real(KND),dimension(:,:,:),allocatable,save   :: Q
+  real(KND),dimension(:,:,:),allocatable,save   ::U2,Ustar
+  real(KND),dimension(:,:,:),allocatable,save   ::V2,Vstar
+  real(KND),dimension(:,:,:),allocatable,save   ::W2,Wstar
+  real(KND),dimension(:,:,:,:),allocatable,save ::Scalar_adv,Scalar_2
+  real(KND),dimension(:,:,:),allocatable,save   ::Temperature_adv,Temperature2
+
   real(KND),dimension(1:3),parameter:: alpha = (/ 4._KND/15._KND, 1._KND/15._KND, 1._KND/6._KND /)
   real(KND),dimension(1:3),parameter:: beta  = (/ 8._KND/15._KND, 5._KND/12._KND, 3._KND/4._KND /)
   real(KND),dimension(1:3),parameter:: rho   = (/       0._KND, -17._KND/60._KND,-5._KND/12._KND/)
+
   integer i,j,k,l
   real(KND) p
   integer,save:: called=0
@@ -55,61 +49,118 @@ contains
 
   if (called==0) then
    called=1
+
+   allocate(U2(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)))
+   allocate(V2(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)))
+   allocate(W2(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)))
+
+   allocate(Ustar(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)))
+   allocate(Vstar(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)))
+   allocate(Wstar(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)))
+
+   allocate(Scalar_adv(lbound(Scalar,1):ubound(Scalar,1),lbound(Scalar,2):ubound(Scalar,2),&
+        lbound(Scalar,3):ubound(Scalar,3),lbound(Scalar,4):ubound(Scalar,4)))
+   allocate(Scalar_2(lbound(Scalar,1):ubound(Scalar,1),lbound(Scalar,2):ubound(Scalar,2),&
+        lbound(Scalar,3):ubound(Scalar,3),lbound(Scalar,4):ubound(Scalar,4)))
+
+   allocate(Temperature_adv(lbound(Temperature,1):ubound(Temperature,1),lbound(Temperature,2):ubound(Temperature,2),&
+        lbound(Temperature,3):ubound(Temperature,3)))
+   allocate(Temperature2(lbound(Temperature,1):ubound(Temperature,1),lbound(Temperature,2):ubound(Temperature,2),&
+        lbound(Temperature,3):ubound(Temperature,3)))
+
    if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
     !$hmpp <tsteps> allocate
-  endif
+    !$hmpp <tsteps> advancedload, args[Vreman::Prnx,BoundU::Prny,BoundU::Prnz]
+    !$hmpp <tsteps> advancedload, args[BoundU::nx,BoundU::ny,BoundU::nz,&
+    !$hmpp <tsteps>     BoundV::nx,BoundV::ny,BoundV::nz,BoundW::nx,BoundW::ny,BoundW::nz]
 
-  call BoundU(1,U)
-  call BoundU(2,V)
-  call BoundU(3,W)
+    !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
 
-  if (buoyancy==1)  call Bound_Temp(temperature)
+    !$hmpp <tsteps> advancedload, args[BoundU::component,BoundV::component,BoundW::component]
+    !$hmpp <tsteps> advancedload, args[BoundU::regime,BoundV::regime,BoundW::regime]
 
-  if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) call GetTurbInlet
-  if (Btype(We)==InletFromFile) call GetInletFromFile(time)
-
-  call timestepEUL(U,V,W)
-
-  if (steady==0.and.dt+time>endtime)  dt=endtime-time
-  write (*,*) "time:",time,"dt: ",dt
-
-  temperature_adv=0
-  Ustar=0
-  Vstar=0
-  Wstar=0
-
-  do l=1,3
-    !$hmpp <tsteps> advancedload, args[Vreman::Prnx,Vreman::Prny,Vreman::Prnz]
-    !$hmpp <tsteps> advancedload, args[Vreman::Unx,Vreman::Uny,Vreman::Unz,&
-    !$hmpp <tsteps>     Vreman::Vnx,Vreman::Vny,Vreman::Vnz,Vreman::Wnx,Vreman::Wny,Vreman::Wnz]
-    !$hmpp <tsteps> advancedload, args[Vreman::dx,Vreman::dy,Vreman::dz,Vreman::dt,Vreman::Re]
-
-
-    if (debugparam>1) call cpu_time(time1)
-
-    call BoundU(1,U)
-    call BoundU(2,V)
-    call BoundU(3,W)
-
-    !$hmpp <tsteps> advancedload, args[Vreman::U,Vreman::V,Vreman::W]
-    call SubgridStresses(U,V,W,Pr)
-
-
+    !$hmpp <tsteps> advancedload, args[Vreman::dx,Vreman::dy,Vreman::dz,Vreman::Re]
     !$hmpp <tsteps> advancedload, args[Convection::buoyancy,Convection::convmet,Convection::coriolisparam]
     !$hmpp <tsteps> advancedload, args[Convection::grav_acc,Convection::temperature_ref,Convection::beta,Convection::rho]
-    !$hmpp <tsteps> advancedload, args[Convection::Ustar,Convection::Vstar,Convection::Wstar,Convection::lev]
+    !$hmpp <tsteps> advancedload, args[PressureGrad::prgradientx,PressureGrad::prgradienty]
+
+    !$hmpp <tsteps> advancedload, args[BoundU::Btype]
+
+    !$hmpp <tsteps> advancedload, args[ForwEul::dxPr,ForwEul::dyPr,ForwEul::dzPr]
+    !$hmpp <tsteps> advancedload, args[AttenuateOut::xPr,AttenuateTop::zPr]
+
+    !$hmpp <tsteps> advancedload, args[PressureGrad::dxU,PressureGrad::dyV,PressureGrad::dzW]
+    !$hmpp <tsteps> advancedload, args[AttenuateOut::xU,AttenuateTop::zW]
+
+    !$hmpp <tsteps> advancedload, args[PressureGrad::Pr]
+
+    !$hmpp <tsteps> advancedload, args[NullInterior::Unull,NullInterior::Vnull,NullInterior::Wnull]
+    !$hmpp <tsteps> advancedload, args[NullInterior::nUnull,NullInterior::nVnull,NullInterior::nWnull]
+
+    !$hmpp <tsteps> advancedload, args[TimeStepEul::CFL,TimeStepEul::Uref,TimeStepEul::steady,TimeStepEul::dxmin,TimeStepEul::endtime]
+
+
+    !$hmpp <tsteps> advancedload, args[TimeStepEul::U,TimeStepEul::V,TimeStepEul::W]
 
     if (buoyancy==1) then
      !$hmpp <tsteps> advancedload, args[Convection::temperature]
     endif
+  endif
+
+!   call BoundU(1,U)
+!   call BoundU(2,V)
+!   call BoundU(3,W)
+!
+!   if (buoyancy==1)  call Bound_Temp(temperature)
+
+  if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) then
+    !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
+    call GetTurbInlet
+  else if (Btype(We)==InletFromFile) then
+    !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
+    call GetInletFromFile(time)
+  endif
+
+  !$hmpp <tsteps> TimeStepEul callsite, args[*].noupdate=true
+  call TimeStepEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+               dxmin,dxU,dyV,dzW,CFL,Uref,steady,time,endtime,&
+               U,V,W,dt)
+  !$hmpp <tsteps> delegatedstore, args[TimeStepEul::dt]
+
+  write (*,*) "time:",time,"dt: ",dt
+
+  temperature_adv=0
+
+  do l=1,3
+
+
+    if (debugparam>1) call cpu_time(time1)
+
+    !$hmpp <tsteps> BoundU callsite, args[*].noupdate=true
+    call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
+                         Btype,sideU,&
+                         Uin,U,0)
+
+    !$hmpp <tsteps> BoundV callsite, args[*].noupdate=true
+    call BoundU_GPU(2,Vnx,Vny,Vnz,Prny,Prnz,&
+                         Btype,sideU,&
+                         Vin,V,0)
+
+    !$hmpp <tsteps> BoundW callsite, args[*].noupdate=true
+    call BoundU_GPU(3,Wnx,Wny,Wnz,Prny,Prnz,&
+                         Btype,sideU,&
+                         Win,W,0)
+
+    call SubgridStresses(U,V,W,Pr)
+
+
+    !$hmpp <tsteps> advancedload, args[Convection::lev]
+
 
     !$hmpp <tsteps> Convection callsite, args[*].noupdate=true
     call Convection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
                        dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
                        U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,l,dt)
-
-    !$hmpp <tsteps> delegatedstore, args[Convection::Ustar,Convection::Vstar,Convection::Wstar]
-
 
 
     if (debugparam>1) then
@@ -129,23 +180,36 @@ contains
      time1=time2
     endif
 
-    if (Btype(To)==FreeSlipBuff)  call AttenuateTop(U2,V2,W2,Pr)
+    if (Btype(To)==FreeSlipBuff)  then
+        !$hmpp <tsteps> AttenuateTop callsite, args[*].noupdate=true
+        call AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                          zPr,zW,U2,V2,W2,Pr,temperature,buoyancy)
+        if (.not.(Btype(Ea)==OutletBuff)) then
+          !$hmpp <tsteps> delegatedstore, args[AttenuateTop::Pr]
+        endif
+    endif
+
     if (Btype(Ea)==OutletBuff) then
-      if (buoyancy==1) then
-        call AttenuateOut(U2,V2,W2,Pr,temperature)
-      else
-        call AttenuateOut(U2,V2,W2,Pr)
-      endif
+        !$hmpp <tsteps> AttenuateOut callsite, args[*].noupdate=true
+        call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                          xPr,xU,U2,V2,W2,Pr,temperature,buoyancy)
+        !$hmpp <tsteps> delegatedstore, args[AttenuateOut::Pr]
+    endif
+
+    !download U2 V2 and W2 to main memory
+    !$hmpp <tsteps> delegatedstore, args[AttenuateOut::U,AttenuateOut::V,AttenuateOut::W]
+    if (buoyancy==1) then
+      !$hmpp <tsteps> delegatedstore, args[AttenuateOut::temperature]
     endif
 
     if (masssourc==1) then
         call MASS_SOURC(Q,U2,V2,W2)
+        call BoundU(1,U2)
+        call BoundU(2,V2)
+        call BoundU(3,W2)
     endif
 
 
-    call BoundU(1,U2)
-    call BoundU(2,V2)
-    call BoundU(3,W2)
 
 
 
@@ -158,7 +222,32 @@ contains
     endif
 
 
-    if (computescalars>0.and..not.released) call Explosion
+    if (l==1) delta=0
+!     if (debuglevel>0) then
+      delta=delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
+      delta=delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
+      delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
+!     endif
+
+    U=U2
+    V=V2
+    W=W2
+
+
+
+    !Upload the new values from Pr_Correct to GPU
+
+    !$hmpp <tsteps> advancedload, args[AttenuateOut2::Pr]
+     if (buoyancy==1) then
+       !$hmpp <tsteps> advancedload, args[AttenuateOut2::temperature]
+     endif
+     !$hmpp <tsteps> advancedload, args[AttenuateOut2::U,AttenuateOut2::V,AttenuateOut2::W]
+
+!     if (computescalars>0.and..not.released) call Release
+
+    if (computescalars>0.or.buoyancy==1) then
+      !$hmpp <tsteps> delegatedstore, args[Vreman::Visc]
+    endif
 
     if (computescalars>0) then
       Scalar_2=0
@@ -167,7 +256,7 @@ contains
       endif
       Scalar_adv=0
       do i=1,computescalars
-       call AdvScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U2,V2,W2,2,1._KND)
+       call AdvScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U,V,W,2,1._KND)
       enddo
       Scalar_2=Scalar_2+Scalar_adv*beta(l)
 
@@ -185,7 +274,7 @@ contains
       endif
 
       Scalar=Scalar+Scalar_2
-      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
+      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
       call Bound_Visc(TDiff)
       do i=1,computescalars
          call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,2._KND*alpha(l))
@@ -196,7 +285,7 @@ contains
     endif
 
     if (buoyancy>0) then
-      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U2,V2,W2)
+      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
       call Bound_Visc(TDiff)
       temperature2=0
       call Bound_Temp(temperature)
@@ -205,7 +294,7 @@ contains
        temperature2=temperature2+temperature_adv*rho(l)
       endif
       temperature_adv=0
-      call AdvScalar(temperature_adv,temperature,U2,V2,W2,1,1._KND)
+      call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND)
       temperature2=temperature2+temperature_adv*beta(l)
 
       temperature=temperature+temperature2
@@ -214,31 +303,81 @@ contains
       temperature=temperature2
     endif
 
-    if (Btype(Ea)==OutletBuff) then
-      if (buoyancy==1) then
-        call AttenuateOut(U2,V2,W2,Pr,temperature)
-      else
-        call AttenuateOut(U2,V2,W2,Pr)
-      endif
+    if (buoyancy==1) then
+     !$hmpp <tsteps> advancedload, args[AttenuateOut2::temperature]
     endif
 
-    if (l==1) delta=0
+    if (Btype(Ea)==OutletBuff) then
+     !$hmpp <tsteps> AttenuateOut2 callsite, args[*].noupdate=true
+      call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                        xPr,xU,U,V,W,Pr,temperature,buoyancy)
+    endif
 
-    delta=delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-    delta=delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
-    delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
+
+    !$hmpp <tsteps> NullInterior callsite, args[*].noupdate=true
+    call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                          nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
 
 
-    call NullInterior(U2,V2,W2)
-
-    U=U2
-    V=V2
-    W=W2
    enddo
    if (.false.) then
    !$hmpp <tsteps> release
    endif
  end subroutine TMarchRK3
+
+
+
+
+
+
+
+
+!  !$hmpp <tsteps> UpdateU codelet
+!  subroutine UpdateU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,U,V,W,U2,V2,W2)
+!  implicit none
+! #ifdef __HMPP
+!  integer,parameter :: KND=4
+! #endif
+!  integer,intent(in)   :: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
+!  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out)  :: U
+!  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)   :: U2
+!  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(out)  :: V
+!  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)   :: V2
+!  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(out)  :: W
+!  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)   :: W2
+!  integer i,j,k
+!
+!    !$hmppcg grid blocksize 512x1
+!    !$hmppcg permute (k,i,j)
+!    do k=-2,Unz+3
+!     do j=-2,Uny+3
+!      do i=-2,Unx+3
+!       U(i,j,k)=U2(i,j,k)
+!      enddo
+!     enddo
+!    enddo
+!
+!    !$hmppcg grid blocksize 512x1
+!    !$hmppcg permute (k,i,j)
+!    do k=-2,Vnz+3
+!     do j=-2,Vny+3
+!      do i=-2,Vnx+3
+!       V(i,j,k)=V2(i,j,k)
+!      enddo
+!     enddo
+!    enddo
+!
+!    !$hmppcg grid blocksize 512x1
+!    !$hmppcg permute (k,i,j)
+!    do k=-2,Wnz+3
+!     do j=-2,Wny+3
+!      do i=-2,Wnx+3
+!       W(i,j,k)=W2(i,j,k)
+!      enddo
+!     enddo
+!    enddo
+!  end subroutine UpdateU
+
 
 
 
@@ -299,6 +438,34 @@ contains
          enddo
         enddo
       else
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg permute (k,i,j)
+        do k=1,Unz
+         do j=1,Uny
+          do i=1,Unx
+           Ustar(i,j,k)=0
+          enddo
+         enddo
+        enddo
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg permute (k,i,j)
+        do k=1,Vnz
+         do j=1,Vny
+          do i=1,Vnx
+           Vstar(i,j,k)=0
+          enddo
+         enddo
+        enddo
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg permute (k,i,j)
+        do k=1,Wnz
+         do j=1,Wny
+          do i=1,Wnx
+           Wstar(i,j,k)=0
+          enddo
+         enddo
+        enddo
+
         !$hmppcg grid blocksize 512x1
         !$hmppcg permute (k,i,j)
         do k=1,Unz
@@ -408,14 +575,39 @@ contains
 
 
 
+!  !$hmpp <tsteps> ScalarConvection codelet
+ subroutine ScalarConvection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
+                       dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
+                       U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev,dt)
+  implicit none
+#ifdef __HMPP
+  integer,parameter :: KND=4
+  intrinsic abs
+#endif
+
+  integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,lev
+  real(KND),intent(in) :: dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref
+  real(KND),intent(in) :: dt
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out)   :: U2
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: Ustar
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)    :: V
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(out)   :: V2
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: Vstar
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)    :: W
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(out)   :: W2
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: Wstar
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: temperature
+  real(KND),dimension(1:3),intent(in) :: beta,rho
+  integer i,j,k
 
 
 
 
+  end subroutine ScalarConvection
 
 
-
- subroutine Explosion
+  subroutine Release
   real(KND) xc,yc,xs,xf,ys,yf,zs,zf,dxp,dyp,dzp,ct,cr,xp,yp,zp,p
   integer i,j,k,xi,yj,zk,nprobx,nproby,nprobz
   ct=7
@@ -473,7 +665,7 @@ contains
   endif
 
 
- endsubroutine Explosion
+  endsubroutine Release
 
 
 
@@ -481,18 +673,18 @@ contains
 
 
   subroutine MomSourc(U,V,W)
-   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-   real(KND) intvel,p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7
-   type(TIBPoint),pointer:: IBP
-   integer x,y,z,dirx,diry,dirz,n
+  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  real(KND) intvel,p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7
+  type(TIBPoint),pointer:: IBP
+  integer x,y,z,dirx,diry,dirz,n
 
         call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
                              Btype,sideU,&
                              Uin,U,0)
-        call BoundU_GPU(1,Vnx,Vny,Vnz,Prny,Prnz,&
+        call BoundU_GPU(2,Vnx,Vny,Vnz,Prny,Prnz,&
                              Btype,sideU,&
                              Vin,V,0)
-        call BoundU_GPU(1,Wnx,Wny,Wnz,Prny,Prnz,&
+        call BoundU_GPU(3,Wnx,Wny,Wnz,Prny,Prnz,&
                              Btype,sideU,&
                              Win,W,0)
 
@@ -759,67 +951,51 @@ contains
 
 
 
-
-
-
-
-  subroutine TIMESTEPCW(U,V,W)
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  !$hmpp <tsteps> TimeStepEul codelet
+  subroutine TimeStepEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+               dxmin,dxU,dyV,dzW,CFL,Uref,steady,time,endtime,&
+               U,V,W,dt)
+  implicit none
+#ifdef __HMPP
+  integer,parameter :: KND=4,TIM=4
+  intrinsic min,max,abs
+#endif
+  integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,steady
+  real(KND),intent(in) :: dxmin,dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
+  real(KND),intent(in) :: CFL,Uref
+  real(TIM),intent(in) :: time,endtime
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)  :: U
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)  :: V
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)  :: W
+  real(TIM),intent(out) :: dt
   integer i,j,k
   real(KND) m,p
-  m=0
 
-  do k=1,Prnz
-   do j=1,Prny
-    do i=1,Prnx
-     p=MAX(abs(U(i,j,k)/dxU(i)),abs(U(i-1,j,k)/dxU(i-1)))+&
-        MAX(abs(V(i,j,k)/dyV(j)),abs(V(i,j-1,k)/dyV(j-1)))+&
-        MAX(abs(W(i,j,k)/dzW(k)),abs(W(i,j,k-1)/dzW(k-1)))
-     if (p>m) m=p
+    m=0
+
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg permute (k,i,j)
+   !$hmppcg gridify (k,i), private(p), reduce (max:m)
+   do k=1,Prnz
+     do j=1,Prny
+      do i=1,Prnx
+       p=MAX(MAX(abs(U(i,j,k)/dxU(i)),abs(U(i-1,j,k)/dxU(i-1))),MAX(abs(V(i,j,k)/dyV(j)),abs(V(i,j-1,k)/dyV(j-1))))&
+           +MAX(abs(W(i,j,k)/dzW(k)),abs(W(i,j,k-1)/dzW(k-1)))
+       m=max(m,p)
+      enddo
+     enddo
     enddo
-   enddo
-  enddo
-
-  if (m>0.1*Uinlet/dxmin) then
-   dt=0.25_KND/(m)
-  else
-   dt=0.25_KND/(Uinlet/dxmin)
-  endif
-  endsubroutine TIMESTEPCW
 
 
+    if (m>0) then
+     dt=MIN(CFL/(m),dxmin/Uref)
+    else
+     dt=dxmin/Uref
+    endif
 
-  subroutine TIMESTEPEUL(U,V,W)
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-  integer i,j,k,maxI,maxJ,maxK
-  real(KND) m,p
-  m=0
- maxI=0
- maxJ=0
- maxK=0
+    if (steady==0.and.dt+time>endtime)  dt=endtime-time
 
-  do k=1,Prnz
-   do j=1,Prny
-    do i=1,Prnx
-     p=MAX(MAX(abs(U(i,j,k)/dxU(i)),abs(U(i-1,j,k)/dxU(i-1))),MAX(abs(V(i,j,k)/dyV(j)),abs(V(i,j-1,k)/dyV(j-1))))&
-         +MAX(abs(W(i,j,k)/dzW(k)),abs(W(i,j,k-1)/dzW(k-1)))
-     if (p>m) then
-               m=p
-               maxI=i
-               maxj=j
-               maxk=k
-     endif
-    enddo
-   enddo
-  enddo
-
-
-  if (m>0) then
-   dt=MIN(CFL/(m),dxmin/Uref)
-  else
-   dt=dxmin/Uref
-  endif
-  endsubroutine TIMESTEPEUL
+  endsubroutine TimeStepEul
 
 
 
@@ -911,16 +1087,9 @@ contains
    real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: W3
    real(KND) Ap,Apre,Aprn,Aprt,S
 
-   integer i,j,k,it,x,y,z
-
-   type(TIBPoint),pointer:: IBP
+   integer i,j,k,it
 
    write(*,*) "Otherterms:"
-
-   !$hmpp <tsteps> advancedload, args[PressureGrad::dxU,PressureGrad::dyV,PressureGrad::dzW]
-   !$hmpp <tsteps> advancedload, args[PressureGrad::prgradientx,PressureGrad::prgradienty]
-   !$hmpp <tsteps> advancedload, args[PressureGrad::Pr]
-   !$hmpp <tsteps> advancedload, args[PressureGrad::Btype]
 
    !$hmpp <tsteps> advancedload, args[PressureGrad::coef]
 
@@ -942,7 +1111,6 @@ contains
 
 
      !$hmpp <tsteps> advancedload, args[ForwEul::Visc]
-     !$hmpp <tsteps> advancedload, args[ForwEul::dxPr,ForwEul::dyPr,ForwEul::dzPr]
 
      !$hmpp <tsteps> ForwEul callsite, args[*].noupdate=true
      call ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
@@ -951,63 +1119,13 @@ contains
                   dt,coef)
 
 
+!      call IMboundU(U3,V3,W3)
 
-!      call MomSourc(U3,V3,W3)
-
-
-!      do i=1,NIBPointsU
-!       xi=IBPijkU(1,i)
-!       yj=IBPijkU(2,i)
-!       zk=IBPijkU(3,i)
-!       U3(xi,yj,zk)=U3(xi,yj,zk)+IBPsourcU*dt
-!       U2(xi,yj,zk)=U2(xi,yj,zk)+IBPsourcU*dt
-!      enddo
-!
-!      do i=1,NIBPointsV
-!       xi=IBPijkV(1,i)
-!       yj=IBPijkV(2,i)
-!       zk=IBPijkV(3,i)
-!       V3(xi,yj,zk)=V3(xi,yj,zk)+IBPsourcV*dt
-!       V2(xi,yj,zk)=V2(xi,yj,zk)+IBPsourcV*dt
-!      enddo
-!
-!      do i=1,NIBPointsW
-!       xi=IBPijkW(1,i)
-!       yj=IBPijkW(2,i)
-!       zk=IBPijkW(3,i)
-!       W3(xi,yj,zk)=W3(xi,yj,zk)+IBPsourcW*dt
-!       W2(xi,yj,zk)=W2(xi,yj,zk)+IBPsourcW*dt
-!      enddo
-
-!      if (associated(FirstIBPoint)) then   !Immersed boundary terms, in the future should be in an array
-!       IBP => FirstIBPoint
-!       do
-!        x=IBP%x
-!        y=IBP%y
-!        z=IBP%z
-!         if (IBP%component==1) then
-!          U3(x,y,z)=U3(x,y,z)+IBP%MSourc*dt
-!          U2(x,y,z)=U2(x,y,z)+IBP%MSourc*dt
-!         elseif (IBP%component==2) then
-!          V3(x,y,z)=V3(x,y,z)+IBP%MSourc*dt
-!          V2(x,y,z)=V2(x,y,z)+IBP%MSourc*dt
-!         elseif (IBP%component==3) then
-!          W3(x,y,z)=W3(x,y,z)+IBP%MSourc*dt
-!          W2(x,y,z)=W2(x,y,z)+IBP%MSourc*dt
-!         endif
-!        if (associated(IBP%next)) then
-!         IBP=>IBP%next
-!        else
-!         exit
-!        endif
-!       enddo
-!      endif
 
      if (gridtype==UNIFORMGRID.and.GPU>0) then                  !Performs the diffusion terms
       write (*,*) "GPU CN call"
 
-      !$hmpp <tsteps> advancedload, args[UnifRedBlack::sideU,UnifRedBlack::Uin,UnifRedBlack::Vin,UnifRedBlack::Win,&
-      !$hmpp <tsteps>  UnifRedBlack::maxCNiter,UnifRedBlack::epsCN]
+      !$hmpp <tsteps>  advancedload, args[UnifRedBlack::maxCNiter,UnifRedBlack::epsCN]
 
 
       !$hmpp <tsteps> UNIFREDBLACK callsite, args[*].noupdate=true
@@ -1017,10 +1135,11 @@ contains
                             Uin,Vin,Win,&
                             U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
                             coef,maxCNiter,epsCN,it,S)
+
+     !$hmpp <tsteps> delegatedstore, args[UnifRedBlack::iters,UnifRedBlack::residuum]
+
       write(*,*) "back from GPU CN", it,S
 
-     !$hmpp <tsteps> delegatedstore, args[UnifRedBlack::U3,UnifRedBlack::V3,UnifRedBlack::W3,&
-     !$hmpp <tsteps>   UnifRedBlack::iters,UnifRedBlack::residuum]
 
      else if (gridtype==UNIFORMGRID) then
       call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
@@ -1028,10 +1147,6 @@ contains
       call GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
      endif
 
-
-     U2=U3
-     V2=V3
-     W2=W3
 
    else  Re_gt_0  !Re<=0
 
@@ -1188,8 +1303,88 @@ contains
   end subroutine ForwEul
 
 
+
+
+
+
+
+  subroutine IMboundU(U2,V2,W2,U3,V3,W3)
+   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
+
+   integer :: x,y,z
+
+   type(TIBPoint),pointer:: IBP
+
+     !$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
+     call MomSourc(U3,V3,W3)
+
+
+!      do i=1,NIBPointsU
+!       xi=IBPijkU(1,i)
+!       yj=IBPijkU(2,i)
+!       zk=IBPijkU(3,i)
+!       U3(xi,yj,zk)=U3(xi,yj,zk)+IBPsourcU*dt
+!       U2(xi,yj,zk)=U2(xi,yj,zk)+IBPsourcU*dt
+!      enddo
+!
+!      do i=1,NIBPointsV
+!       xi=IBPijkV(1,i)
+!       yj=IBPijkV(2,i)
+!       zk=IBPijkV(3,i)
+!       V3(xi,yj,zk)=V3(xi,yj,zk)+IBPsourcV*dt
+!       V2(xi,yj,zk)=V2(xi,yj,zk)+IBPsourcV*dt
+!      enddo
+!
+!      do i=1,NIBPointsW
+!       xi=IBPijkW(1,i)
+!       yj=IBPijkW(2,i)
+!       zk=IBPijkW(3,i)
+!       W3(xi,yj,zk)=W3(xi,yj,zk)+IBPsourcW*dt
+!       W2(xi,yj,zk)=W2(xi,yj,zk)+IBPsourcW*dt
+!      enddo
+
+     if (associated(FirstIBPoint)) then   !Immersed boundary terms, in the future should be in an array
+      IBP => FirstIBPoint
+      do
+       x=IBP%x
+       y=IBP%y
+       z=IBP%z
+        if (IBP%component==1) then
+         U3(x,y,z)=U3(x,y,z)+IBP%MSourc*dt
+         U2(x,y,z)=U2(x,y,z)+IBP%MSourc*dt
+        elseif (IBP%component==2) then
+         V3(x,y,z)=V3(x,y,z)+IBP%MSourc*dt
+         V2(x,y,z)=V2(x,y,z)+IBP%MSourc*dt
+        elseif (IBP%component==3) then
+         W3(x,y,z)=W3(x,y,z)+IBP%MSourc*dt
+         W2(x,y,z)=W2(x,y,z)+IBP%MSourc*dt
+        endif
+       if (associated(IBP%next)) then
+        IBP=>IBP%next
+       else
+        exit
+       endif
+      enddo
+     endif
+     !$hmpp <tsteps> advancedload, args[UnifRedBlack::U3,UnifRedBlack::V3,UnifRedBlack::W3]
+  end subroutine IMboundU
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   subroutine UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
-   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W,U2,V2,W2,U3,V3,W3
+   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
    real(KND),intent(in):: coef
    real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
    real(KND),dimension(1:Vnx,1:Vny,1:Vnz):: ApV
@@ -1428,12 +1623,18 @@ contains
         write (*,*) "CN ",l,S
         if (S<=epsCN) exit
        enddo
+
+       U2=U3
+       V2=V3
+       W2=W3
+
   endsubroutine UNIFREDBLACK
 
 
 
   subroutine GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
-   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W,U2,V2,W2,U3,V3,W3
+   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
    real(KND),intent(in):: coef
    real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
    real(KND),dimension(1:Vnx,1:Vny,1:Vnz):: ApV
@@ -1671,6 +1872,11 @@ contains
         write (*,*) "CN ",l,S
         if (S<=epsCN) exit
        enddo
+
+       U2=U3
+       V2=V3
+       W2=W3
+
    endsubroutine GENREDBLACK
 
 
@@ -1679,11 +1885,24 @@ contains
 
 
 
-
-  subroutine AttenuateTop(U,V,W,Pr)
-  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  !$hmpp <tsteps> AttenuateTop codelet
+  subroutine AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,zPr,zW,U,V,W,Pr,temperature,buoyancy)
+  implicit none
+#ifdef __HMPP
+   integer, parameter:: KND=4
+#endif
+  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
+  real(KND),intent(in)    :: zPr(-2:Prnz+3)
+  real(KND),intent(in)    :: zW(-3:Prnz+3)
+  real(KND),intent(inout) :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
+  real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+  real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+  real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
   integer i,j,k,bufn
   real(KND) p,ze,zs,zb,DF
+
+  intrinsic max
 
   bufn=max(5,Prnz/4)
   zs=zW(Prnz-bufn)
@@ -1705,6 +1924,7 @@ contains
        enddo
       enddo
     enddo
+
     do k=Unz-bufn,Unz
      p=0
       do i=1,Unx
@@ -1721,7 +1941,8 @@ contains
        enddo
       enddo
     enddo
-    if (buoyancy>0) then
+
+    if (buoyancy==1) then
      do k=Prnz-bufn,Prnz
        p=0
        do i=1,Prnx
@@ -1739,6 +1960,7 @@ contains
       enddo
      enddo
     endif
+
     do k=Wnz-bufn,Wnz
      p=0
      do i=1,Wnx
@@ -1755,18 +1977,34 @@ contains
       enddo
      enddo
     enddo
+
   endsubroutine AttenuateTop
 
 
-  subroutine AttenuateOut(U,V,W,Pr,temperature)
-  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),optional,intent(inout):: temperature(-1:,-1:,-1:)
+
+  !$hmpp <tsteps> AttenuateOut codelet
+  !$hmpp <tsteps> AttenuateOut2 codelet
+  subroutine AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,xPr,xU,U,V,W,Pr,temperature,buoyancy)
+  implicit none
+#ifdef __HMPP
+   integer, parameter:: KND=4
+#endif
+  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
+  real(KND),intent(in)    :: xPr(-2:Prnx+3)
+  real(KND),intent(in)    :: xU(-3:Prnx+3)
+  real(KND),intent(inout) :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
+  real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+  real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+  real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
   integer i,j,k,bufn
   real(KND) p,xe,xs,xb,DF
+  intrinsic max
 
-  bufn=max(10,Prnx/8)
-  xs=xU(Prnx-bufn)
-  xe=xU(Prnx)
+    bufn=max(10,Prnx/8)
+    xs=xU(Prnx-bufn)
+    xe=xU(Prnx)
+
     do k=1,Unz
      p=0
      do i=2*Unx/3,Unx-4
@@ -1783,6 +2021,7 @@ contains
       enddo
      enddo
     enddo
+
     do k=1,Vnz
      p=0
      do i=2*Vnx/3,Vnx-4
@@ -1799,6 +2038,7 @@ contains
       enddo
      enddo
     enddo
+
     do k=1,Wnz
      p=0
      do i=2*Wnx/3,Wnx-4
@@ -1815,7 +2055,8 @@ contains
       enddo
      enddo
     enddo
-   if (present(temperature).and.buoyancy==1) then
+
+   if (buoyancy==1) then
     do k=1,Prnz
      p=0
      do i=2*Prnx/3,Prnx-4
@@ -1833,13 +2074,20 @@ contains
      enddo
     enddo
    endif
+
   endsubroutine AttenuateOut
 
 
 
   pure function DampF(x)
+  implicit none
+#ifdef __HMPP
+   integer, parameter:: KND=4,TIM=4
+#endif
   real(KND) DampF
   real(KND),intent(in)::x
+  intrinsic exp
+
   if (x<=0) then
     DampF=1
   elseif (x>=1) then
@@ -1850,40 +2098,35 @@ contains
   endfunction Dampf
 
 
-  subroutine NullInterior(U,V,W)
-  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-  integer i,j,k
+  !$hmpp <tsteps> NullInterior codelet
+  subroutine NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                          nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
+  implicit none
+#ifdef __HMPP
+   integer, parameter:: KND=4,TIM=4
+#endif
+  integer,intent(in)      :: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,nUnull,nVnull,nWnull
+  integer,dimension(3,nUnull),intent(in)      :: Unull
+  integer,dimension(3,nVnull),intent(in)      :: Vnull
+  integer,dimension(3,nWnull),intent(in)      :: Wnull
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: U
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: V
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W
+  integer i
 
 
-   do k=1,Unz
-    do j=1,Uny
-     do i=1,Unx
-      if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
-          .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
-          .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  U(i,j,k)=0
-     enddo
+    do i=1,nUnull
+      U(Unull(1,i),Unull(2,i),Unull(3,i))=0
     enddo
-   enddo
 
-   do k=1,Vnz
-    do j=1,Vny
-     do i=1,Vnx
-      if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
-          .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
-          .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  V(i,j,k)=0
-     enddo
+    do i=1,nVnull
+      V(Vnull(1,i),Vnull(2,i),Vnull(3,i))=0
     enddo
-   enddo
 
-   do k=1,Wnz
-    do j=1,Wny
-     do i=1,Wnx
-      if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
-          .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
-          .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  W(i,j,k)=0
-     enddo
+    do i=1,nWnull
+      W(Wnull(1,i),Wnull(2,i),Wnull(3,i))=0
     enddo
-   enddo
+
   endsubroutine NullInterior
 
 
@@ -1949,32 +2192,56 @@ contains
 
 !$hmpp <tsteps> group, target=CUDA
 
-  !$hmpp <tsteps> mapbyname, Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
+  !$hmpp <tsteps> mapbyname, Prnx,Prny,Prnz
   !$hmpp <tsteps> mapbyname, Btype,sideU,Re
   !$hmpp <tsteps> mapbyname, dt
   !$hmpp <tsteps> mapbyname, dxPr,dyPr,dzPr,dxU,dyV,dzW
-  !$hmpp <tsteps> mapbyname, Uin,Vin,Win,Pr,Visc
-  !$hmpp <tsteps> map, args[Vreman::dx,Convection::dxmin,UnifRedBlack::dxmin]
-  !$hmpp <tsteps> map, args[Vreman::dy,Convection::dymin,UnifRedBlack::dymin]
-  !$hmpp <tsteps> map, args[Vreman::dz,Convection::dzmin,UnifRedBlack::dzmin]
+  !$hmpp <tsteps> mapbyname, xPr,zPr,xU,zW
+  !$hmpp <tsteps> mapbyname, Pr,Visc
+
+  !$hmpp <tsteps> mapbyname, buoyancy
+
+  !$hmpp <tsteps> map, args[*::Unx,BoundU::nx]
+  !$hmpp <tsteps> map, args[*::Vnx,BoundV::nx]
+  !$hmpp <tsteps> map, args[*::Wnx,BoundW::nx]
+
+  !$hmpp <tsteps> map, args[*::Uny,BoundU::ny]
+  !$hmpp <tsteps> map, args[*::Vny,BoundV::ny]
+  !$hmpp <tsteps> map, args[*::Wny,BoundW::ny]
+
+  !$hmpp <tsteps> map, args[*::Unz,BoundU::nz]
+  !$hmpp <tsteps> map, args[*::Vnz,BoundV::nz]
+  !$hmpp <tsteps> map, args[*::Wnz,BoundW::nz]
+
+  !$hmpp <tsteps> map, args[UnifRedBlack::Uin,BoundU::Uin]
+  !$hmpp <tsteps> map, args[UnifRedBlack::Vin,BoundV::Uin]
+  !$hmpp <tsteps> map, args[UnifRedBlack::Win,BoundW::Uin]
+
+  !$hmpp <tsteps> map, args[Vreman::dx,*::dxmin]
+  !$hmpp <tsteps> map, args[Vreman::dy,*::dymin]
+  !$hmpp <tsteps> map, args[Vreman::dz,*::dzmin]
 
   !$hmpp <tsteps> map, args[PressureGrad::coef,ForwEul::coef,UnifRedBlack::coef]
 
  !U,V,W
- !$hmpp <tsteps> map, args[Vreman::U,Convection::U,ForwEul::U,UnifRedBlack::U]
- !$hmpp <tsteps> map, args[Vreman::V,Convection::V,ForwEul::V,UnifRedBlack::V]
- !$hmpp <tsteps> map, args[Vreman::W,Convection::W,ForwEul::W,UnifRedBlack::W]
+ !$hmpp <tsteps> map, args[Vreman::U,Convection::U,ForwEul::U,UnifRedBlack::U,TimeStepEul::U,&
+  !$hmpp <tsteps>   AttenuateOut2::U,NullInterior::U]
+ !$hmpp <tsteps> map, args[Vreman::V,Convection::V,ForwEul::V,UnifRedBlack::V,TimeStepEul::V,&
+  !$hmpp  <tsteps>  AttenuateOut2::V,NullInterior::V]
+ !$hmpp <tsteps> map, args[Vreman::W,Convection::W,ForwEul::W,UnifRedBlack::W,TimeStepEul::W,&
+  !$hmpp  <tsteps>  AttenuateOut2::W,NullInterior::W]
 
  !U2,V2,W2
- !$hmpp <tsteps> map, args[Convection::U2,PressureGrad::U,ForwEul::U2,UnifRedBlack::U2]
- !$hmpp <tsteps> map, args[Convection::V2,PressureGrad::V,ForwEul::V2,UnifRedBlack::V2]
- !$hmpp <tsteps> map, args[Convection::W2,PressureGrad::W,ForwEul::W2,UnifRedBlack::W2]
+ !$hmpp <tsteps> map, args[Convection::U2,PressureGrad::U,ForwEul::U2,UnifRedBlack::U2,AttenuateTop::U,AttenuateOut::U]
+ !$hmpp <tsteps> map, args[Convection::V2,PressureGrad::V,ForwEul::V2,UnifRedBlack::V2,AttenuateTop::V,AttenuateOut::V]
+ !$hmpp <tsteps> map, args[Convection::W2,PressureGrad::W,ForwEul::W2,UnifRedBlack::W2,AttenuateTop::W,AttenuateOut::W]
 
  !U3,V3,W3 on GPU device mapped also to Ustar,Vstar,Wstar
- !$hmpp <tsteps> map, args[Convection::Ustar,ForwEul::U3,UnifRedBlack::U3]
- !$hmpp <tsteps> map, args[Convection::Vstar,ForwEul::V3,UnifRedBlack::V3]
- !$hmpp <tsteps> map, args[Convection::Wstar,ForwEul::W3,UnifRedBlack::W3]
+ !$hmpp <tsteps> map, args[ForwEul::U3,UnifRedBlack::U3]
+ !$hmpp <tsteps> map, args[ForwEul::V3,UnifRedBlack::V3]
+ !$hmpp <tsteps> map, args[ForwEul::W3,UnifRedBlack::W3]
 
+ !$hmpp <tsteps> map, args[Convection::temperature,AttenuateTop::temperature,AttenuateOut::temperature,AttenuateOut2::temperature]
 
 #include "boundaries_GPU.f90"
 #include "cds_GPU.f90"
