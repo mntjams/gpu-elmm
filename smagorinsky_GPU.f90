@@ -26,7 +26,7 @@
    dy2=dy**2
    dz2=dz**2
    !$hmppcg grid blocksize 512x1
-   !$ hmppcg gridify (k,i)
+   !$hmppcg gridify (k,i)
    do k=-1,Prnz+2
     do i=-1,Prnx+2
      do j=-1,Prny+2
