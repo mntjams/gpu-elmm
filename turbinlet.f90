@@ -494,13 +494,13 @@ contains
    allocate(ustarinlet(1:Prnz))
    allocate(transformtensor(1:6,1:Prny,1:Prnz))
   !constant stress assumption
-    if ((profiletype==LOGPROF.and.ustarsurfin<=0).or.profiletype==POWERPROF) then
+    if ((profiletype==LOGPROF.and.ustarsurfin<=0).or.(profiletype==POWERPROF.and.ustarsurfin<=0)) then
      ustarsurfin=abs(Karman*Urefin/log(z0inlet/zrefin))
     endif
 
 
      do k=1,Prnz
-      ustarinlet(k)=ustarsurfin*SQRT(1+stressgradin*zPr(k))
+      ustarinlet(k)=ustarsurfin*SQRT(max(1+stressgradin*zPr(k),1E-5_KND))
      enddo
 
 !    !Stress tensor divided by ustar**2
