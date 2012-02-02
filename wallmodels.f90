@@ -347,7 +347,7 @@ implicit none
 
     else
 
-     Rib=-grav_acc*dist*tempdif/(temperature_ref*vel**2)
+     Rib=-grav_acc*dist*tempdif/(temperature_ref*max(vel**2,1E-6_KND))
      zL=0
      i=0
      if (Rib>0.34_KND) then
