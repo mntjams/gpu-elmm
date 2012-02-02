@@ -641,10 +641,13 @@ contains
 
    if (Prnx==1) then
      dxmin=sqrt(dymin*dzmin)
+     lx=dxmin
    elseif (Prny==1) then
      dymin=sqrt(dxmin*dzmin)
+     ly=dymin
    elseif (Prnz==1) then
      dzmin=sqrt(dxmin*dymin)
+     lz=dzmin
    endif
 
    write(*,*) "dxmin ",dxmin
@@ -1076,7 +1079,7 @@ contains
 
        elseif (buoyancy==1) then
 
-         freetempgradient=0.02!0.0035 !K/m
+         freetempgradient=0.1!0.0035 !K/m
          !inversionTjump=2 !K
          do k=-2,Prnz+3
           do j=-2,Prny+3
@@ -1721,23 +1724,28 @@ contains
       do j=1,Prny
        do i=1,Prnx
          if (Prtype(i,j,0)==0) then
-          WMP%x=i
-          WMP%y=j
-          WMP%z=1
-          WMP%distx=0
-          WMP%disty=0
-          WMP%distz=(zPr(1)-zW(0))
-          WMP%ustar=1
-          WMP%z0=z0B
-         if (TBtype(Bo)==CONSTFLUX) then
-          WMP%tempfl=sideTemp(Bo)
-         else
-          WMP%temp=0
-         endif
-         if (TBtype(Bo)==DIRICHLET) then
-          WMP%temp=sideTemp(Bo)
-         endif
-          call AddWMPoint(WMP)
+
+           WMP%x=i
+           WMP%y=j
+           WMP%z=1
+           WMP%distx=0
+           WMP%disty=0
+           WMP%distz=(zPr(1)-zW(0))
+           WMP%ustar=1
+           WMP%z0=z0B
+
+           if (TBtype(Bo)==CONSTFLUX) then
+             WMP%tempfl=sideTemp(Bo)
+           else
+             WMP%temp=0
+           endif
+
+           if (TBtype(Bo)==DIRICHLET) then
+             WMP%temp=sideTemp(Bo)
+           endif
+
+           call AddWMPoint(WMP)
+
          endif
        enddo
       enddo
@@ -1746,29 +1754,31 @@ contains
 
       do j=1,Prny
        do i=1,Prnx
-         WMP%x=i
-         WMP%y=j
-         WMP%z=1
-         WMP%distx=0
-         WMP%disty=0
-         WMP%distz=(zPr(1)-zW(0))
-         WMP%ustar=1
-         WMP%wallu=sideU(1,Bo)
-         WMP%wallv=sideU(2,Bo)
-         WMP%wallw=sideU(3,Bo)
-         WMP%z0=z0B
+         if (Prtype(i,j,0)==0) then
+           WMP%x=i
+           WMP%y=j
+           WMP%z=1
+           WMP%distx=0
+           WMP%disty=0
+           WMP%distz=(zPr(1)-zW(0))
+           WMP%ustar=1
+           WMP%wallu=sideU(1,Bo)
+           WMP%wallv=sideU(2,Bo)
+           WMP%wallw=sideU(3,Bo)
+           WMP%z0=z0B
 
-         if (TBtype(Bo)==CONSTFLUX) then
-           WMP%tempfl=sideTemp(Bo)
-         else
-           WMP%temp=0
+           if (TBtype(Bo)==CONSTFLUX) then
+             WMP%tempfl=sideTemp(Bo)
+           else
+             WMP%temp=0
+           endif
+
+           if (TBtype(Bo)==DIRICHLET) then
+             WMP%temp=sideTemp(Bo)
+           endif
+
+           call AddWMPoint(WMP)
          endif
-
-         if (TBtype(Bo)==DIRICHLET) then
-           WMP%temp=sideTemp(Bo)
-         endif
-
-         call AddWMPoint(WMP)
        enddo
       enddo
 
