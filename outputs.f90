@@ -1516,7 +1516,7 @@ contains
          if (Prtype(i,j,k)==0) then
           write (11,*) Temperature(i,j,k)
          else
-          write (11,*) 0.
+          write (11,*) temperature_ref
          endif
         enddo
        enddo
@@ -1695,7 +1695,7 @@ contains
         if (Prtype(i,j,k)==0) then
          write (11,*) Temperature(i,j,k)
         else
-         write (11,*) 0.
+         write (11,*) temperature_ref
         endif
        enddo
       enddo
@@ -1856,7 +1856,7 @@ contains
          if (Prtype(i,j,k)==0) then
           write (20) BigEnd(real(Temperature(i,j,k),SNG))
          else
-          write (20) BigEnd(0._SNG)
+          write (20) BigEnd(real(temperature_ref,SNG))
          endif
         enddo
        enddo
@@ -2036,7 +2036,7 @@ contains
         if (Prtype(i,j,k)==0) then
          write (20) BigEnd(real(Temperature(i,j,k),SNG))
         else
-         write (20) BigEnd(0._SNG)
+         write (20) BigEnd(real(temperature_ref,SNG))
         endif
        enddo
       enddo
@@ -2109,7 +2109,7 @@ contains
       endif
      enddo
     enddo
-    profU(k)=S/n
+    profU(k)=S/max(n,1)
    enddo
 
    do k=1,Vnz+1
@@ -2123,7 +2123,7 @@ contains
       endif
      enddo
     enddo
-    profV(k)=S/n
+    profV(k)=S/max(n,1)
    enddo
 
   if (present(temperature)) then
@@ -2138,7 +2138,7 @@ contains
       endif
      enddo
     enddo
-    profTemp(k)=S/n
+    profTemp(k)=S/max(n,1)
    enddo
   endif
 
@@ -2161,7 +2161,7 @@ contains
       endif
      enddo
     enddo
-    profuw(k)=S/n
+    profuw(k)=S/max(n,1)
    enddo
 
    do k=0,Prnz
@@ -2175,7 +2175,7 @@ contains
       endif
      enddo
     enddo
-    profvw(k)=S/n
+    profvw(k)=S/max(n,1)
    enddo
 
    do k=0,Prnz
@@ -2189,7 +2189,7 @@ contains
       endif
      enddo
     enddo
-    profuwsgs(k)=S/n
+    profuwsgs(k)=S/max(n,1)
    enddo
 
    do k=0,Prnz
@@ -2203,7 +2203,7 @@ contains
       endif
      enddo
     enddo
-    profvwsgs(k)=S/n
+    profvwsgs(k)=S/max(n,1)
    enddo
 
    do k=1,Unz
@@ -2218,7 +2218,7 @@ contains
       endif
      enddo
     enddo
-    profuu(k)=S/n
+    profuu(k)=S/max(n,1)
    enddo
 
    do k=1,Vnz
@@ -2233,7 +2233,7 @@ contains
       endif
      enddo
     enddo
-    profvv(k)=S/n
+    profvv(k)=S/max(n,1)
    enddo
 
    do k=0,Wnz
@@ -2248,7 +2248,7 @@ contains
       endif
      enddo
     enddo
-    profww(k)=S/n
+    profww(k)=S/max(n,1)
    enddo
 
   if (present(temperature)) then
@@ -2264,7 +2264,7 @@ contains
       endif
      enddo
     enddo
-    proftempfl(k)=S/n
+    proftempfl(k)=S/max(n,1)
    enddo
 
    do k=1,Prnz
@@ -2279,7 +2279,7 @@ contains
       endif
      enddo
     enddo
-    proftt(k)=S/n
+    proftt(k)=S/max(n,1)
    enddo
 
    do k=0,Prnz
@@ -2294,7 +2294,7 @@ contains
       endif
      enddo
     enddo
-    proftempflsgs(k)=S/n
+    proftempflsgs(k)=S/max(n,1)
    enddo
   endif
   called=1
