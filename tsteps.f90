@@ -114,11 +114,11 @@ contains
 !   if (buoyancy==1)  call Bound_Temp(temperature)
 
   if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) then
-    !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
     call GetTurbInlet
-  else if (Btype(We)==InletFromFile) then
     !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
+  else if (Btype(We)==InletFromFile) then
     call GetInletFromFile(time)
+    !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
   endif
 
   !$hmpp <tsteps> TimeStepEul callsite, args[*].noupdate=true
@@ -2070,7 +2070,7 @@ contains
         do i=2*Unx/3,Unx-4
           p=p+U(i,j,k)
         enddo
-        p=p/((Unx-4-2*Unx/3+1)*Uny)
+        p=p/(Unx-4-2*Unx/3+1)
         do i=Unx-bufn,Unx+1
           xb=(xU(i)-xs)/(xe-xs)
           DF=DampF(xb)
@@ -2087,7 +2087,7 @@ contains
         do i=2*Vnx/3,Vnx-4
           p=p+V(i,j,k)
         enddo
-        p=p/((Vnx-4-2*Vnx/3+1)*Vny)
+        p=p/(Vnx-4-2*Vnx/3+1)
         do i=Vnx-bufn,Vnx+1
           xb=(xPr(i)-xs)/(xe-xs)
           DF=DampF(xb)
@@ -2104,7 +2104,7 @@ contains
         do i=2*Wnx/3,Wnx-4
           p=p+W(i,j,k)
         enddo
-        p=p/((Wnx-4-2*Wnx/3+1)*Wny)
+        p=p/((Wnx-4-2*Wnx/3+1))
         do i=Wnx-bufn,Wnx+1
           xb=(xPr(i)-xs)/(xe-xs)
           DF=DampF(xb)
@@ -2122,7 +2122,7 @@ contains
           do i=2*Prnx/3,Prnx-4
             p=p+temperature(i,j,k)
           enddo
-          p=p/((Prnx-4-2*Prnx/3+1)*Prny)
+          p=p/(Prnx-4-2*Prnx/3+1)
           do i=Prnx-bufn,Prnx+1
             xb=(xPr(i)-xs)/(xe-xs)
             DF=DampF(xb)
