@@ -83,7 +83,7 @@ program CLMM
         exit
       endif
 
-      if (dt<abs(CFL*dxmin/Uinlet/30._KND)) then
+      if (dt<abs(CFL*dxmin/Uinlet/100._KND)) then
         write (*,*) "Solution diverged."
         exit
       endif
@@ -123,10 +123,10 @@ program CLMM
      endif
 
      if (computescalars>0) then
-      allocate(Scalar(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
-      Scalar=huge(1.0_KND)
+       allocate(Scalar(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
+       Scalar=huge(1.0_KND)
      else
-      allocate(Scalar(0,0,0,0))
+       allocate(Scalar(0,0,0,0))
      endif
 
 
