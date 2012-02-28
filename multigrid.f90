@@ -1521,11 +1521,13 @@ endsubroutine POISSMG
   !$hmpp <GSKernels> mapbyname, Aw,Ae,As,An,Ab,At
 
 
- !$hmpp <GSKernels> Pr codelet
- subroutine Pr_GPU(nx,ny,nz,Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,Phi8,&
-                                 Btype,level)
- implicit none
- integer,parameter:: KND=4,PERIODIC=3
+  !$hmpp <GSKernels> Pr codelet
+  subroutine Pr_GPU(nx,ny,nz,Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,Phi8,&
+                                  Btype,level)
+  implicit none
+  integer,parameter:: KND=4,PERIODIC=3
+  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0
   real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1
@@ -1539,9 +1541,9 @@ endsubroutine POISSMG
   integer,intent(in) :: Btype(6),level
   integer :: nxl, nyl, nzl
 
-  nxl=nx(level)
-  nyl=ny(level)
-  nzl=nz(level)
+    nxl=nx(level)
+    nyl=ny(level)
+    nzl=nz(level)
 
     if (level==0) then
      call Prolongate_GPU(nxl,nyl,nzl,Phi1,Phi0,Btype)
@@ -1560,149 +1562,153 @@ endsubroutine POISSMG
     elseif (level==7) then
      call Prolongate_GPU(nxl,nyl,nzl,Phi8,Phi7,Btype)
     endif
- endsubroutine Pr_GPU
+  endsubroutine Pr_GPU
 
 
- subroutine Prolongate_GPU(nx,ny,nz,AFine,ACoarse,Btype)
+  subroutine Prolongate_GPU(nx,ny,nz,AFine,ACoarse,Btype)
 
- implicit none
- integer,parameter:: KND=4,PERIODIC=3
- integer,intent(in):: nx,ny,nz,Btype(6)
- real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in):: ACoarse
- real(KND),dimension(-1:2*nx+1,-1:2*ny+1,-1:2*nz+1),intent(inout):: AFine
- real(KND),dimension(-1:1,-1:1,-1:1):: Cf
- integer:: i,j,k,ii,jj,kk
- intrinsic abs
+  implicit none
+  integer,parameter:: KND=4,PERIODIC=3
+  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
 
- do kk=-1,1
-  do jj=-1,1
-   do ii=-1,1
-    if (ii==0.and.jj==0.and.kk==0) then
-        Cf(ii,jj,kk)=1._KND
-    else if (abs(ii)+abs(jj)+abs(kk)==1) then
-        Cf(ii,jj,kk)=1/2._KND
-    else if (abs(ii)+abs(jj)+abs(kk)==2) then
-        Cf(ii,jj,kk)=1/4._KND
-    else
-        Cf(ii,jj,kk)=1/8._KND
-    end if
-   enddo
-  enddo
- enddo
+  integer,intent(in):: nx,ny,nz,Btype(6)
+  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in):: ACoarse
+  real(KND),dimension(-1:2*nx+1,-1:2*ny+1,-1:2*nz+1),intent(inout):: AFine
+  real(KND),dimension(-1:1,-1:1,-1:1):: Cf
+  integer:: i,j,k,ii,jj,kk
+  intrinsic abs
 
- do kk=-1,1
-  do jj=-1,1
-   do ii=-1,1
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg permute (k,i,j)
-   !$hmppcg gridify(k,i)
-    do k=0,nz
-     do j=0,ny
-      do i=0,nx
-                      AFine(2*i+ii,2*j+jj,2*k+kk)=AFine(2*i+ii,2*j+jj,2*k+kk)+Cf(ii,jj,kk)*ACoarse(i,j,k)
+    do kk=-1,1
+     do jj=-1,1
+      do ii=-1,1
+       if (ii==0.and.jj==0.and.kk==0) then
+           Cf(ii,jj,kk)=1._KND
+       else if (abs(ii)+abs(jj)+abs(kk)==1) then
+           Cf(ii,jj,kk)=1/2._KND
+       else if (abs(ii)+abs(jj)+abs(kk)==2) then
+           Cf(ii,jj,kk)=1/4._KND
+       else
+           Cf(ii,jj,kk)=1/8._KND
+       end if
       enddo
      enddo
     enddo
 
-   enddo
-  enddo
- enddo
+    do kk=-1,1
+     do jj=-1,1
+      do ii=-1,1
+      !$hmppcg grid blocksize 512x1
+      !$hmppcg permute (k,i,j)
+      !$hmppcg gridify(k,i)
+       do k=0,nz
+        do j=0,ny
+         do i=0,nx
+                         AFine(2*i+ii,2*j+jj,2*k+kk)=AFine(2*i+ii,2*j+jj,2*k+kk)+Cf(ii,jj,kk)*ACoarse(i,j,k)
+         enddo
+        enddo
+       enddo
 
-   if (Btype(We)==PERIODIC) then
-    do k=0,2*nz
-     do j=0,2*ny                      !Periodic BC
-      Afine(-1,j,k)=Afine(2*nx-1,j,k)
+      enddo
      enddo
     enddo
-  else
-    do k=0,2*nz
-     do j=0,2*ny                      !Other BCs
-      Afine(-1,j,k)=Afine(0,j,k)
-     enddo
-    enddo
-   endif
 
-   if (Btype(Ea)==PERIODIC) then
-    do k=0,2*nz
-     do j=0,2*ny                      !Periodic BC
-      Afine(2*nx+1,j,k)=Afine(1,j,k)
+    if (Btype(We)==PERIODIC) then
+     do k=0,2*nz
+      do j=0,2*ny                      !Periodic BC
+       Afine(-1,j,k)=Afine(2*nx-1,j,k)
+      enddo
      enddo
-    enddo
    else
+     do k=0,2*nz
+      do j=0,2*ny                      !Other BCs
+       Afine(-1,j,k)=Afine(0,j,k)
+      enddo
+     enddo
+    endif
+
+    if (Btype(Ea)==PERIODIC) then
+     do k=0,2*nz
+      do j=0,2*ny                      !Periodic BC
+       Afine(2*nx+1,j,k)=Afine(1,j,k)
+      enddo
+     enddo
+    else
+     do k=0,2*nz
+      do j=0,2*ny                      !Other BCs
+       Afine(2*nx+1,j,k)=Afine(2*nx,j,k)
+      enddo
+     enddo
+    endif
+
+    if (Btype(So)==PERIODIC) then
     do k=0,2*nz
-     do j=0,2*ny                      !Other BCs
-      Afine(2*nx+1,j,k)=Afine(2*nx,j,k)
+      do i=-1,2*nx+1                      !Periodic BC
+       Afine(i,-1,k)=Afine(i,2*ny-1,k)
+      enddo
      enddo
-    enddo
-   endif
+    else
+     do k=0,2*nz
+      do i=-1,2*nx+1                      !Other BCs
+       Afine(i,-1,k)=Afine(i,0,k)
+      enddo
+     enddo
+    endif
 
-   if (Btype(So)==PERIODIC) then
-   do k=0,2*nz
-     do i=-1,2*nx+1                      !Periodic BC
-      Afine(i,-1,k)=Afine(i,2*ny-1,k)
-     enddo
-    enddo
-   else
+    if (Btype(No)==PERIODIC) then
     do k=0,2*nz
-     do i=-1,2*nx+1                      !Other BCs
-      Afine(i,-1,k)=Afine(i,0,k)
+      do i=-1,2*nx+1                      !Periodic BC
+       Afine(i,2*ny+1,k)=Afine(i,1,k)
+      enddo
      enddo
-    enddo
-   endif
-
-   if (Btype(No)==PERIODIC) then
-   do k=0,2*nz
-     do i=-1,2*nx+1                      !Periodic BC
-      Afine(i,2*ny+1,k)=Afine(i,1,k)
+    else
+     do k=0,2*nz
+      do i=-1,2*nx+1                      !Other BCs
+       Afine(i,2*ny+1,k)=Afine(i,2*ny,k)
+      enddo
      enddo
-    enddo
-   else
-    do k=0,2*nz
-     do i=-1,2*nx+1                      !Other BCs
-      Afine(i,2*ny+1,k)=Afine(i,2*ny,k)
+    endif
+
+    if (Btype(Bo)==PERIODIC) then
+     do j=-1,2*ny+1
+      do i=-1,2*nx+1                      !Periodic BC
+       Afine(i,j,-1)=Afine(i,j,2*nz-1)
+      enddo
      enddo
-    enddo
-   endif
-
-   if (Btype(Bo)==PERIODIC) then
-    do j=-1,2*ny+1
-     do i=-1,2*nx+1                      !Periodic BC
-      Afine(i,j,-1)=Afine(i,j,2*nz-1)
+    else
+     do j=-1,2*ny+1
+      do i=-1,2*nx+1                      !Other BCs
+       Afine(i,j,-1)=Afine(i,j,0)
+      enddo
      enddo
-    enddo
-   else
-    do j=-1,2*ny+1
-     do i=-1,2*nx+1                      !Other BCs
-      Afine(i,j,-1)=Afine(i,j,0)
+    endif
+
+    if (Btype(To)==PERIODIC) then
+     do j=-1,2*ny+1
+      do i=-1,2*nx+1                      !Periodic BC
+       Afine(i,j,2*nz+1)=Afine(i,j,1)
+      enddo
      enddo
-    enddo
-   endif
-
-   if (Btype(To)==PERIODIC) then
-    do j=-1,2*ny+1
-     do i=-1,2*nx+1                      !Periodic BC
-      Afine(i,j,2*nz+1)=Afine(i,j,1)
+    else
+     do j=-1,2*ny+1
+      do i=-1,2*nx+1                      !Other BCs
+       Afine(i,j,2*nz+1)=Afine(i,j,2*nz)
+      enddo
      enddo
-    enddo
-   else
-    do j=-1,2*ny+1
-     do i=-1,2*nx+1                      !Other BCs
-      Afine(i,j,2*nz+1)=Afine(i,j,2*nz)
-     enddo
-    enddo
-   endif
- endsubroutine Prolongate_GPU
+    endif
+  endsubroutine Prolongate_GPU
 
 
 
 
 
- !$hmpp <GSKernels> Re codelet
- subroutine Re_GPU(nx,ny,nz,RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,RHS8,&
-                            Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,Res8,&
-                                 Btype,level)
- implicit none
- integer,parameter:: KND=4,PERIODIC=3
+  !$hmpp <GSKernels> Re codelet
+  subroutine Re_GPU(nx,ny,nz,RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,RHS8,&
+                             Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,Res8,&
+                                  Btype,level)
+  implicit none
+  integer,parameter:: KND=4,PERIODIC=3
+  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Res0,RHS0
   real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Res1,RHS1
@@ -1716,9 +1722,9 @@ endsubroutine POISSMG
   integer,intent(in) :: Btype(6),level
   integer :: nxl, nyl, nzl
 
-  nxl=nx(level)
-  nyl=ny(level)
-  nzl=nz(level)
+    nxl=nx(level)
+    nyl=ny(level)
+    nzl=nz(level)
 
     if (level==0) then
      call Restrict_GPU(nxl,nyl,nzl,RHS0,Res1,Btype)
@@ -1737,239 +1743,241 @@ endsubroutine POISSMG
     elseif (level==7) then
      call Restrict_GPU(nxl,nyl,nzl,RHS6,Res7,Btype)
     endif
- endsubroutine Re_GPU
+  endsubroutine Re_GPU
 
 
 
 
- subroutine Restrict_GPU(nx,ny,nz,ACoarse,AFine,Btype)
- implicit none
- integer,parameter:: KND=4,PERIODIC=3
- integer,intent(in):: nx,ny,nz,Btype(6)
- real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out):: ACoarse
- real(KND),dimension(-1:2*nx+1,-1:2*ny+1,-1:2*nz+1),intent(inout):: AFine
- real(KND) q
- integer:: i,j,k
+  subroutine Restrict_GPU(nx,ny,nz,ACoarse,AFine,Btype)
+  implicit none
+  integer,parameter:: KND=4,PERIODIC=3
+  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+
+  integer,intent(in):: nx,ny,nz,Btype(6)
+  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out):: ACoarse
+  real(KND),dimension(-1:2*nx+1,-1:2*ny+1,-1:2*nz+1),intent(inout):: AFine
+  real(KND) q
+  integer:: i,j,k
 
 
-   if (Btype(We)==PERIODIC) then
-    do k=0,2*nz
-     do j=0,2*ny                      !Periodic BC
-      Afine(-1,j,k)=Afine(2*nx-1,j,k)
-     enddo
-    enddo
-  else
-    do k=0,2*nz
-     do j=0,2*ny                      !Other BCs
-      Afine(-1,j,k)=Afine(0,j,k)
-     enddo
-    enddo
-   endif
-
-   if (Btype(Ea)==PERIODIC) then
-    do k=0,2*nz
-     do j=0,2*ny                      !Periodic BC
-      Afine(2*nx+1,j,k)=Afine(1,j,k)
-     enddo
-    enddo
-   else
-    do k=0,2*nz
-     do j=0,2*ny                      !Other BCs
-      Afine(2*nx+1,j,k)=Afine(2*nx,j,k)
-     enddo
-    enddo
-   endif
-
-   if (Btype(So)==PERIODIC) then
-   do k=0,2*nz
-     do i=-1,2*nx+1                      !Periodic BC
-      Afine(i,-1,k)=Afine(i,2*ny-1,k)
-     enddo
-    enddo
-   else
-    do k=0,2*nz
-     do i=-1,2*nx+1                      !Other BCs
-      Afine(i,-1,k)=Afine(i,0,k)
-     enddo
-    enddo
-   endif
-
-   if (Btype(No)==PERIODIC) then
-   do k=0,2*nz
-     do i=-1,2*nx+1                      !Periodic BC
-      Afine(i,2*ny+1,k)=Afine(i,1,k)
-     enddo
-    enddo
-   else
-    do k=0,2*nz
-     do i=-1,2*nx+1                      !Other BCs
-      Afine(i,2*ny+1,k)=Afine(i,2*ny,k)
-     enddo
-    enddo
-   endif
-
-   if (Btype(Bo)==PERIODIC) then
-    do j=-1,2*ny+1
-     do i=-1,2*nx+1                      !Periodic BC
-      Afine(i,j,-1)=Afine(i,j,2*nz-1)
-     enddo
-    enddo
-   else
-    do j=-1,2*ny+1
-     do i=-1,2*nx+1                      !Other BCs
-      Afine(i,j,-1)=Afine(i,j,0)
-     enddo
-    enddo
-   endif
-
-   if (Btype(To)==PERIODIC) then
-    do j=-1,2*ny+1
-     do i=-1,2*nx+1                      !Periodic BC
-      Afine(i,j,2*nz+1)=Afine(i,j,1)
-     enddo
-    enddo
-   else
-    do j=-1,2*ny+1
-     do i=-1,2*nx+1                      !Other BCs
-      Afine(i,j,2*nz+1)=Afine(i,j,2*nz)
-     enddo
-    enddo
-   endif
-
-
-   !$hmppcg permute (k,i,j)
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i)
-      do k=0,nz
-       do j=0,ny
-        do i=0,nx
-            ACoarse(i,j,k)=AFine(2*i,2*j,2*k); q=1.0
-
-            if (i<nx) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i+1,2*j,2*k); q=q+0.5
-            endif
-
-            if (i>0) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i-1,2*j,2*k); q=q+0.5
-            endif
-
-            if (j<ny) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j+1,2*k); q=q+0.5
-            endif
-
-            if (j>0) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j-1,2*k); q=q+0.5
-            endif
-
-            if (k<nz) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k+1); q=q+0.5
-            endif
-
-            if (k>0) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k-1); q=q+0.5
-            endif
-
-            if ((i<nx).and.(j<ny)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j+1,2*k); q=q+0.25
-            endif
-
-            if ((i<nx).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k+1); q=q+0.25
-            endif
-
-            if ((j<ny).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k+1); q=q+0.25
-            endif
-
-            if ((i>0).and.(j>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j-1,2*k); q=q+0.25
-            endif
-
-            if ((i>0).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k-1); q=q+0.25
-            endif
-
-            if ((j>0).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k-1); q=q+0.25
-            endif
-
-            if ((i>0).and.(j<ny)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j+1,2*k); q=q+0.25
-            endif
-
-            if ((i>0).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k+1); q=q+0.25
-            endif
-
-            if ((i<nx).and.(j>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j-1,2*k); q=q+0.25
-            endif
-
-            if ((j>0).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k+1); q=q+0.25
-            endif
-
-            if ((i<nx).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k-1); q=q+0.25
-            endif
-
-            if ((j<ny).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k-1); q=q+0.25
-            endif
-
-            if ((i<nx).and.(j<ny).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k+1); q=q+0.125
-            endif
-
-            if ((i>0).and.(j<ny).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k+1); q=q+0.125
-            endif
-
-            if ((i<nx).and.(j>0).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k+1); q=q+0.125
-            endif
-
-            if ((i<nx).and.(j<ny).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k-1); q=q+0.125
-            endif
-
-            if ((i>0).and.(j>0).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k+1); q=q+0.125
-            endif
-
-            if ((i>0).and.(j<ny).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k-1); q=q+0.125
-            endif
-
-            if ((i<nx).and.(j>0).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k-1); q=q+0.125
-            endif
-
-            if ((i>0).and.(j>0).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k-1); q=q+0.125
-            endif
-
-            ACoarse(i,j,k)=ACoarse(i,j,k)/q
-        enddo
-       enddo
+    if (Btype(We)==PERIODIC) then
+     do k=0,2*nz
+      do j=0,2*ny                      !Periodic BC
+       Afine(-1,j,k)=Afine(2*nx-1,j,k)
       enddo
+     enddo
+    else
+     do k=0,2*nz
+      do j=0,2*ny                      !Other BCs
+       Afine(-1,j,k)=Afine(0,j,k)
+      enddo
+     enddo
+    endif
 
-      do k=-1,nz+1
-       do j=-1,ny+1
-        if (Btype(Ea)==PERIODIC) ACoarse(0,j,k)=ACoarse(nx,j,k)
-       enddo
+    if (Btype(Ea)==PERIODIC) then
+     do k=0,2*nz
+      do j=0,2*ny                      !Periodic BC
+       Afine(2*nx+1,j,k)=Afine(1,j,k)
       enddo
-      do k=-1,nz+1
-       do i=-1,nx+1
-        if (Btype(No)==PERIODIC) ACoarse(i,0,k)=ACoarse(i,ny,k)
-       enddo
+     enddo
+    else
+     do k=0,2*nz
+      do j=0,2*ny                      !Other BCs
+       Afine(2*nx+1,j,k)=Afine(2*nx,j,k)
       enddo
-      do j=-1,ny+1
-       do i=-1,nx+1
-        if (Btype(To)==PERIODIC) ACoarse(i,j,0)=ACoarse(i,j,nz)
-       enddo
+     enddo
+    endif
+
+    if (Btype(So)==PERIODIC) then
+    do k=0,2*nz
+      do i=-1,2*nx+1                      !Periodic BC
+       Afine(i,-1,k)=Afine(i,2*ny-1,k)
       enddo
-endsubroutine Restrict_GPU
+     enddo
+    else
+     do k=0,2*nz
+      do i=-1,2*nx+1                      !Other BCs
+       Afine(i,-1,k)=Afine(i,0,k)
+      enddo
+     enddo
+    endif
+
+    if (Btype(No)==PERIODIC) then
+    do k=0,2*nz
+      do i=-1,2*nx+1                      !Periodic BC
+       Afine(i,2*ny+1,k)=Afine(i,1,k)
+      enddo
+     enddo
+    else
+     do k=0,2*nz
+      do i=-1,2*nx+1                      !Other BCs
+       Afine(i,2*ny+1,k)=Afine(i,2*ny,k)
+      enddo
+     enddo
+    endif
+
+    if (Btype(Bo)==PERIODIC) then
+     do j=-1,2*ny+1
+      do i=-1,2*nx+1                      !Periodic BC
+       Afine(i,j,-1)=Afine(i,j,2*nz-1)
+      enddo
+     enddo
+    else
+     do j=-1,2*ny+1
+      do i=-1,2*nx+1                      !Other BCs
+       Afine(i,j,-1)=Afine(i,j,0)
+      enddo
+     enddo
+    endif
+
+    if (Btype(To)==PERIODIC) then
+     do j=-1,2*ny+1
+      do i=-1,2*nx+1                      !Periodic BC
+       Afine(i,j,2*nz+1)=Afine(i,j,1)
+      enddo
+     enddo
+    else
+     do j=-1,2*ny+1
+      do i=-1,2*nx+1                      !Other BCs
+       Afine(i,j,2*nz+1)=Afine(i,j,2*nz)
+      enddo
+     enddo
+    endif
+
+
+    !$hmppcg permute (k,i,j)
+    !$hmppcg grid blocksize 512x1
+    !$hmppcg gridify(k,i)
+    do k=0,nz
+     do j=0,ny
+      do i=0,nx
+          ACoarse(i,j,k)=AFine(2*i,2*j,2*k); q=1.0
+
+          if (i<nx) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i+1,2*j,2*k); q=q+0.5
+          endif
+
+          if (i>0) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i-1,2*j,2*k); q=q+0.5
+          endif
+
+          if (j<ny) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j+1,2*k); q=q+0.5
+          endif
+
+          if (j>0) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j-1,2*k); q=q+0.5
+          endif
+
+          if (k<nz) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k+1); q=q+0.5
+          endif
+
+          if (k>0) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k-1); q=q+0.5
+          endif
+
+          if ((i<nx).and.(j<ny)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j+1,2*k); q=q+0.25
+          endif
+
+          if ((i<nx).and.(k<nz)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k+1); q=q+0.25
+          endif
+
+          if ((j<ny).and.(k<nz)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k+1); q=q+0.25
+          endif
+
+          if ((i>0).and.(j>0)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j-1,2*k); q=q+0.25
+          endif
+
+          if ((i>0).and.(k>0)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k-1); q=q+0.25
+          endif
+
+          if ((j>0).and.(k>0)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k-1); q=q+0.25
+          endif
+
+          if ((i>0).and.(j<ny)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j+1,2*k); q=q+0.25
+          endif
+
+          if ((i>0).and.(k<nz)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k+1); q=q+0.25
+          endif
+
+          if ((i<nx).and.(j>0)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j-1,2*k); q=q+0.25
+          endif
+
+          if ((j>0).and.(k<nz)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k+1); q=q+0.25
+          endif
+
+          if ((i<nx).and.(k>0)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k-1); q=q+0.25
+          endif
+
+          if ((j<ny).and.(k>0)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k-1); q=q+0.25
+          endif
+
+          if ((i<nx).and.(j<ny).and.(k<nz)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k+1); q=q+0.125
+          endif
+
+          if ((i>0).and.(j<ny).and.(k<nz)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k+1); q=q+0.125
+          endif
+
+          if ((i<nx).and.(j>0).and.(k<nz)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k+1); q=q+0.125
+          endif
+
+          if ((i<nx).and.(j<ny).and.(k>0)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k-1); q=q+0.125
+          endif
+
+          if ((i>0).and.(j>0).and.(k<nz)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k+1); q=q+0.125
+          endif
+
+          if ((i>0).and.(j<ny).and.(k>0)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k-1); q=q+0.125
+          endif
+
+          if ((i<nx).and.(j>0).and.(k>0)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k-1); q=q+0.125
+          endif
+
+          if ((i>0).and.(j>0).and.(k>0)) then
+            ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k-1); q=q+0.125
+          endif
+
+          ACoarse(i,j,k)=ACoarse(i,j,k)/q
+      enddo
+     enddo
+    enddo
+
+    do k=-1,nz+1
+     do j=-1,ny+1
+      if (Btype(Ea)==PERIODIC) ACoarse(0,j,k)=ACoarse(nx,j,k)
+     enddo
+    enddo
+    do k=-1,nz+1
+     do i=-1,nx+1
+      if (Btype(No)==PERIODIC) ACoarse(i,0,k)=ACoarse(i,ny,k)
+     enddo
+    enddo
+    do j=-1,ny+1
+     do i=-1,nx+1
+      if (Btype(To)==PERIODIC) ACoarse(i,j,0)=ACoarse(i,j,nz)
+     enddo
+    enddo
+  endsubroutine Restrict_GPU
 
 
 
@@ -1982,6 +1990,8 @@ endsubroutine Restrict_GPU
                      Btype,level)
   implicit none
   integer,parameter:: KND=4
+  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   integer,intent(in) :: nit
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,RHS0
@@ -1998,56 +2008,56 @@ endsubroutine Restrict_GPU
   integer,intent(in)   :: Btype(6)
   integer :: nxl, nyl, nzl
 
-  nxl=nx(level)
-  nyl=ny(level)
-  nzl=nz(level)
+    nxl=nx(level)
+    nyl=ny(level)
+    nzl=nz(level)
 
-   if (level==0) then
-      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
-                      Phi0,RHS0,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype)
-   elseif (level==1) then
-      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
-                      Phi1,RHS1,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype)
-   elseif (level==2) then
-      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
-                      Phi2,RHS2,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype)
-   elseif (level==3) then
-      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
-                      Phi3,RHS3,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype)
-   elseif (level==4) then
-      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
-                      Phi4,RHS4,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype)
-   elseif (level==5) then
-      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
-                      Phi5,RHS5,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype)
-   elseif (level==6) then
-      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
-                      Phi6,RHS6,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype)
-   elseif (level==7) then
-      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
-                      Phi7,RHS7,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype)
-   elseif (level==8) then
-      call MG_Gs_GPU(nxl,nyl,nzl,nit,&
-                      Phi8,RHS8,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype)
-   endif
+    if (level==0) then
+       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                       Phi0,RHS0,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype)
+    elseif (level==1) then
+       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                       Phi1,RHS1,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype)
+    elseif (level==2) then
+       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                       Phi2,RHS2,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype)
+    elseif (level==3) then
+       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                       Phi3,RHS3,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype)
+    elseif (level==4) then
+       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                       Phi4,RHS4,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype)
+    elseif (level==5) then
+       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                       Phi5,RHS5,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype)
+    elseif (level==6) then
+       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                       Phi6,RHS6,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype)
+    elseif (level==7) then
+       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                       Phi7,RHS7,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype)
+    elseif (level==8) then
+       call MG_Gs_GPU(nxl,nyl,nzl,nit,&
+                       Phi8,RHS8,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype)
+    endif
 
   endsubroutine GS_GPU
 
@@ -2059,6 +2069,7 @@ endsubroutine Restrict_GPU
   implicit none
 
   integer,parameter:: KND=4,PERIODIC=3
+  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
 
   integer,intent(in)   :: nx,ny,nz,nit,Btype(6)
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::Phi
@@ -2068,120 +2079,120 @@ endsubroutine Restrict_GPU
   real(KND) :: p,Ap
   intrinsic mod
 
-  do l=1,nit
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i)
-     do k=0,nz
-        do i=0,nx
-            do j=0+mod(i+k,2),ny,2
-             p=0
-             Ap=0
-             if (i>0) then
-                       p=p+Phi(i-1,j,k)*Aw
-                       Ap=Ap+Aw
-             elseif (Btype(We)==PERIODIC) then
-                       p=p+Phi(nx-1,j,k)*Aw
-                       Ap=Ap+Aw
-             endif
-             if (i<nx) then
-                       p=p+Phi(i+1,j,k)*Ae
-                       Ap=Ap+Ae
-             elseif (Btype(Ea)==PERIODIC) then
-                       p=p+Phi(1,j,k)*Ae
-                       Ap=Ap+Ae
-             endif
-             if (j>0) then
-                       p=p+Phi(i,j-1,k)*As
-                       Ap=Ap+As
-             elseif (Btype(So)==PERIODIC) then
-                       p=p+Phi(i,ny-1,k)*As
-                       Ap=Ap+As
-             endif
-             if (j<ny) then
-                       p=p+Phi(i,j+1,k)*An
-                       Ap=Ap+An
-             elseif (Btype(No)==PERIODIC) then
-                       p=p+Phi(i,1,k)*An
-                       Ap=Ap+An
-             endif
-             if (k>0) then
-                       p=p+Phi(i,j,k-1)*Ab
-                       Ap=Ap+Ab
-             elseif (Btype(Bo)==PERIODIC) then
-                       p=p+Phi(i,j,nz-1)*Ab
-                       Ap=Ap+Ab
-             endif
-             if (k<nz) then
-                       p=p+Phi(i,j,k+1)*At
-                       Ap=Ap+At
-             elseif (Btype(To)==PERIODIC) then
-                       p=p+Phi(i,j,1)*At
-                       Ap=Ap+At
-             endif
-             p=p-RHS(i,j,k)
+    do l=1,nit
+       !$hmppcg grid blocksize 512x1
+       !$hmppcg gridify(k,i)
+       do k=0,nz
+          do i=0,nx
+              do j=0+mod(i+k,2),ny,2
+               p=0
+               Ap=0
+               if (i>0) then
+                         p=p+Phi(i-1,j,k)*Aw
+                         Ap=Ap+Aw
+               elseif (Btype(We)==PERIODIC) then
+                         p=p+Phi(nx-1,j,k)*Aw
+                         Ap=Ap+Aw
+               endif
+               if (i<nx) then
+                         p=p+Phi(i+1,j,k)*Ae
+                         Ap=Ap+Ae
+               elseif (Btype(Ea)==PERIODIC) then
+                         p=p+Phi(1,j,k)*Ae
+                         Ap=Ap+Ae
+               endif
+               if (j>0) then
+                         p=p+Phi(i,j-1,k)*As
+                         Ap=Ap+As
+               elseif (Btype(So)==PERIODIC) then
+                         p=p+Phi(i,ny-1,k)*As
+                         Ap=Ap+As
+               endif
+               if (j<ny) then
+                         p=p+Phi(i,j+1,k)*An
+                         Ap=Ap+An
+               elseif (Btype(No)==PERIODIC) then
+                         p=p+Phi(i,1,k)*An
+                         Ap=Ap+An
+               endif
+               if (k>0) then
+                         p=p+Phi(i,j,k-1)*Ab
+                         Ap=Ap+Ab
+               elseif (Btype(Bo)==PERIODIC) then
+                         p=p+Phi(i,j,nz-1)*Ab
+                         Ap=Ap+Ab
+               endif
+               if (k<nz) then
+                         p=p+Phi(i,j,k+1)*At
+                         Ap=Ap+At
+               elseif (Btype(To)==PERIODIC) then
+                         p=p+Phi(i,j,1)*At
+                         Ap=Ap+At
+               endif
+               p=p-RHS(i,j,k)
 
-             p=p/Ap
-             Phi(i,j,k)=p
-            enddo
-        enddo
-    enddo
-  !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i)
-     do k=0,nz
-        do i=0,nx
-            do j=0+mod(i+k+1,2),ny,2
-             p=0
-             Ap=0
-             if (i>0) then
-                       p=p+Phi(i-1,j,k)*Aw
-                       Ap=Ap+Aw
-             elseif (Btype(We)==PERIODIC) then
-                       p=p+Phi(nx-1,j,k)*Aw
-                       Ap=Ap+Aw
-             endif
-             if (i<nx) then
-                       p=p+Phi(i+1,j,k)*Ae
-                       Ap=Ap+Ae
-             elseif (Btype(Ea)==PERIODIC) then
-                       p=p+Phi(1,j,k)*Ae
-                       Ap=Ap+Ae
-             endif
-             if (j>0) then
-                       p=p+Phi(i,j-1,k)*As
-                       Ap=Ap+As
-             elseif (Btype(So)==PERIODIC) then
-                       p=p+Phi(i,ny-1,k)*As
-                       Ap=Ap+As
-             endif
-             if (j<ny) then
-                       p=p+Phi(i,j+1,k)*An
-                       Ap=Ap+An
-             elseif (Btype(No)==PERIODIC) then
-                       p=p+Phi(i,1,k)*An
-                       Ap=Ap+An
-             endif
-             if (k>0) then
-                       p=p+Phi(i,j,k-1)*Ab
-                       Ap=Ap+Ab
-             elseif (Btype(Bo)==PERIODIC) then
-                       p=p+Phi(i,j,nz-1)*Ab
-                       Ap=Ap+Ab
-             endif
-             if (k<nz) then
-                       p=p+Phi(i,j,k+1)*At
-                       Ap=Ap+At
-             elseif (Btype(To)==PERIODIC) then
-                       p=p+Phi(i,j,1)*At
-                       Ap=Ap+At
-             endif
-             p=p-RHS(i,j,k)
+               p=p/Ap
+               Phi(i,j,k)=p
+              enddo
+          enddo
+      enddo
+      !$hmppcg grid blocksize 512x1
+      !$hmppcg gridify(k,i)
+      do k=0,nz
+          do i=0,nx
+              do j=0+mod(i+k+1,2),ny,2
+               p=0
+               Ap=0
+               if (i>0) then
+                         p=p+Phi(i-1,j,k)*Aw
+                         Ap=Ap+Aw
+               elseif (Btype(We)==PERIODIC) then
+                         p=p+Phi(nx-1,j,k)*Aw
+                         Ap=Ap+Aw
+               endif
+               if (i<nx) then
+                         p=p+Phi(i+1,j,k)*Ae
+                         Ap=Ap+Ae
+               elseif (Btype(Ea)==PERIODIC) then
+                         p=p+Phi(1,j,k)*Ae
+                         Ap=Ap+Ae
+               endif
+               if (j>0) then
+                         p=p+Phi(i,j-1,k)*As
+                         Ap=Ap+As
+               elseif (Btype(So)==PERIODIC) then
+                         p=p+Phi(i,ny-1,k)*As
+                         Ap=Ap+As
+               endif
+               if (j<ny) then
+                         p=p+Phi(i,j+1,k)*An
+                         Ap=Ap+An
+               elseif (Btype(No)==PERIODIC) then
+                         p=p+Phi(i,1,k)*An
+                         Ap=Ap+An
+               endif
+               if (k>0) then
+                         p=p+Phi(i,j,k-1)*Ab
+                         Ap=Ap+Ab
+               elseif (Btype(Bo)==PERIODIC) then
+                         p=p+Phi(i,j,nz-1)*Ab
+                         Ap=Ap+Ab
+               endif
+               if (k<nz) then
+                         p=p+Phi(i,j,k+1)*At
+                         Ap=Ap+At
+               elseif (Btype(To)==PERIODIC) then
+                         p=p+Phi(i,j,1)*At
+                         Ap=Ap+At
+               endif
+               p=p-RHS(i,j,k)
 
-             p=p/Ap
-             Phi(i,j,k)=p
-            enddo
-        enddo
+               p=p/Ap
+               Phi(i,j,k)=p
+              enddo
+          enddo
+      enddo
     enddo
-  enddo
   endsubroutine MG_GS_GPU
 
 
@@ -2193,6 +2204,8 @@ endsubroutine Restrict_GPU
                      Btype,R,level)
   implicit none
   integer,parameter:: KND=4
+  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,Res0,RHS0
   real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1,Res1,RHS1
@@ -2209,57 +2222,57 @@ endsubroutine Restrict_GPU
   real(KND),intent(out) :: R
   integer :: nxl, nyl, nzl
 
-  nxl=nx(level)
-  nyl=ny(level)
-  nzl=nz(level)
+   nxl=nx(level)
+   nyl=ny(level)
+   nzl=nz(level)
 
 
-   if (level==0) then
-      call MG_Res_GPU(nxl,nyl,nzl,&
-                      Phi0,Res0,RHS0,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype,R)
-   elseif (level==1) then
-      call MG_Res_GPU(nxl,nyl,nzl,&
-                      Phi1,Res1,RHS1,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype,R)
-   elseif (level==2) then
-      call MG_Res_GPU(nxl,nyl,nzl,&
-                      Phi2,Res2,RHS2,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype,R)
-   elseif (level==3) then
-      call MG_Res_GPU(nxl,nyl,nzl,&
-                      Phi3,Res3,RHS3,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype,R)
-   elseif (level==4) then
-      call MG_Res_GPU(nxl,nyl,nzl,&
-                      Phi4,Res4,RHS4,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype,R)
-   elseif (level==5) then
-      call MG_Res_GPU(nxl,nyl,nzl,&
-                      Phi5,Res5,RHS5,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype,R)
-   elseif (level==6) then
-      call MG_Res_GPU(nxl,nyl,nzl,&
-                      Phi6,Res6,RHS6,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype,R)
-   elseif (level==7) then
-      call MG_Res_GPU(nxl,nyl,nzl,&
-                      Phi7,Res7,RHS7,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype,R)
-   elseif (level==8) then
-      call MG_Res_GPU(nxl,nyl,nzl,&
-                      Phi8,Res8,RHS8,&
-                      Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
-                      Btype,R)
-   endif
+    if (level==0) then
+       call MG_Res_GPU(nxl,nyl,nzl,&
+                       Phi0,Res0,RHS0,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype,R)
+    elseif (level==1) then
+       call MG_Res_GPU(nxl,nyl,nzl,&
+                       Phi1,Res1,RHS1,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype,R)
+    elseif (level==2) then
+       call MG_Res_GPU(nxl,nyl,nzl,&
+                       Phi2,Res2,RHS2,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype,R)
+    elseif (level==3) then
+       call MG_Res_GPU(nxl,nyl,nzl,&
+                       Phi3,Res3,RHS3,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype,R)
+    elseif (level==4) then
+       call MG_Res_GPU(nxl,nyl,nzl,&
+                       Phi4,Res4,RHS4,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype,R)
+    elseif (level==5) then
+       call MG_Res_GPU(nxl,nyl,nzl,&
+                       Phi5,Res5,RHS5,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype,R)
+    elseif (level==6) then
+       call MG_Res_GPU(nxl,nyl,nzl,&
+                       Phi6,Res6,RHS6,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype,R)
+    elseif (level==7) then
+       call MG_Res_GPU(nxl,nyl,nzl,&
+                       Phi7,Res7,RHS7,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype,R)
+    elseif (level==8) then
+       call MG_Res_GPU(nxl,nyl,nzl,&
+                       Phi8,Res8,RHS8,&
+                       Aw(level),Ae(level),As(level),An(level),Ab(level),At(level),&
+                       Btype,R)
+    endif
 
   end subroutine Res_GPU
 
@@ -2271,24 +2284,25 @@ endsubroutine Restrict_GPU
                              Aw,Ae,As,An,Ab,At,&
                              Btype,R)
 
-   implicit none
+  implicit none
 
 
-   integer,parameter:: KND=4,PERIODIC=3
+  integer,parameter:: KND=4,PERIODIC=3
+  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
 
-   integer,intent(in)   :: nx,ny,nz,Btype(6)
-   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::Phi
-   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
-   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
-   real(KND),intent(in) :: Aw,Ae,As,An,Ab,At
-   real(KND),intent(out) :: R
-   integer i,j,k,l
-   real(KND) :: p,Ap
-   intrinsic max, abs
+  integer,intent(in)   :: nx,ny,nz,Btype(6)
+  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::Phi
+  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
+  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
+  real(KND),intent(in) :: Aw,Ae,As,An,Ab,At
+  real(KND),intent(out) :: R
+  integer i,j,k,l
+  real(KND) :: p,Ap
+  intrinsic max, abs
 
     !$hmppcg grid blocksize 512x1
     !$hmppcg gridify(k,i)
-     do k=0,nz
+    do k=0,nz
         do i=0,nx
             do j=0,ny
              p=0
@@ -2340,12 +2354,12 @@ endsubroutine Restrict_GPU
              Res(i,j,k)=p
             enddo
         enddo
-     enddo
+    enddo
 
-     R=0
-     !$hmppcg grid blocksize 512x1
-     !$hmppcg gridify(k,i), reduce(max:R)
-     do k=0,nz
+    R=0
+    !$hmppcg grid blocksize 512x1
+    !$hmppcg gridify(k,i), reduce(max:R)
+    do k=0,nz
         do i=0,nx
             do j=0,ny
              R=max(R,abs(Res(i,j,k)))
@@ -2365,6 +2379,7 @@ endsubroutine Restrict_GPU
                              Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,level,minmglevel)
   implicit none
   integer,parameter:: KND=4
+
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,Res0,RHS0
   real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1,Res1,RHS1
@@ -2413,43 +2428,45 @@ endsubroutine Restrict_GPU
   subroutine Clear_GPU(nx,ny,nz,Phi,RHS,Res)
   implicit none
   integer,parameter:: KND=4
+
   integer,intent(in) :: nx,ny,nz
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Phi
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::RHS
   integer :: i,j,k
-   !$hmppcg permute (k,i,j)
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i)
-  do k=-1,nz+1
-   do j=-1,ny+1
-    do i=-1,nx+1
-     Phi(i,j,k)=0
-    enddo
-   enddo
-  enddo
 
-   !$hmppcg permute (k,i,j)
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i)
-  do k=-1,nz+1
-   do j=-1,ny+1
-    do i=-1,nx+1
-     Res(i,j,k)=0
+     !$hmppcg permute (k,i,j)
+     !$hmppcg grid blocksize 512x1
+     !$hmppcg gridify(k,i)
+    do k=-1,nz+1
+     do j=-1,ny+1
+      do i=-1,nx+1
+       Phi(i,j,k)=0
+      enddo
+     enddo
     enddo
-   enddo
-  enddo
 
-   !$hmppcg permute (k,i,j)
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i)
-  do k=-1,nz+1
-   do j=-1,ny+1
-    do i=-1,nx+1
-     RHS(i,j,k)=0
+     !$hmppcg permute (k,i,j)
+     !$hmppcg grid blocksize 512x1
+     !$hmppcg gridify(k,i)
+    do k=-1,nz+1
+     do j=-1,ny+1
+      do i=-1,nx+1
+       Res(i,j,k)=0
+      enddo
+     enddo
     enddo
-   enddo
-  enddo
+
+     !$hmppcg permute (k,i,j)
+     !$hmppcg grid blocksize 512x1
+     !$hmppcg gridify(k,i)
+    do k=-1,nz+1
+     do j=-1,ny+1
+      do i=-1,nx+1
+       RHS(i,j,k)=0
+      enddo
+     enddo
+    enddo
 
   endsubroutine Clear_GPU
 
