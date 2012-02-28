@@ -81,7 +81,7 @@ $(TARGETDIR_CLMM)/multigrid.o: $(TARGETDIR_CLMM) multigrid.f90
 	hmpp -d3 -k --codelet-off  $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid.f90
 
 $(TARGETDIR_CLMM)/multigrid2d.o: $(TARGETDIR_CLMM) multigrid2d.f90
-	hmpp  --codelet-off $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid2d.f90
+	hmpp --codelet-off  $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid2d.f90
 
 $(TARGETDIR_CLMM)/boundaries.o: $(TARGETDIR_CLMM) boundaries.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ boundaries.f90
