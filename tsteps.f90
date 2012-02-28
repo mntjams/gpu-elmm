@@ -121,6 +121,7 @@ contains
     !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
   endif
 
+  !$hmpp <tsteps> advancedload, args[TimeStepEul::time]
   !$hmpp <tsteps> TimeStepEul callsite, args[*].noupdate=true
   call TimeStepEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                dxmin,dxU,dyV,dzW,CFL,Uref,steady,time,endtime,&
@@ -180,6 +181,7 @@ contains
      time1=time2
     endif
 
+
     if (Btype(To)==FreeSlipBuff)  then
         !$hmpp <tsteps> AttenuateTop callsite, args[*].noupdate=true
         call AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
@@ -193,10 +195,11 @@ contains
     endif
 
     !download U2 V2 and W2 to main memory
-    !$hmpp <tsteps> delegatedstore, args[AttenuateTop::U,AttenuateTop::V,AttenuateTop::W]
+    !$hmpp <tsteps> delegatedstore, args[AttenuateOut::U,AttenuateOut::V,AttenuateOut::W]
     if (buoyancy==1) then
       !$hmpp <tsteps> delegatedstore, args[AttenuateOut::temperature]
     endif
+
 
     if (masssourc==1) then
         call MASS_SOURC(Q,U2,V2,W2)
@@ -244,9 +247,7 @@ contains
 
 
 
-    if (computescalars>0.or.buoyancy==1) then
-      !$hmpp <tsteps> delegatedstore, args[Vreman::Visc]
-    endif
+   ! Visc should be in memory, as it is computed by CPU for now.
 
     if (computescalars>0) then
       Scalar_2=0
@@ -264,9 +265,7 @@ contains
         Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)=Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
          percdistrib(i)*(rho(l)+beta(l))*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
        enddo
-      endif
-
-      if (scalsourcetype==volumesource) then
+      elseif (scalsourcetype==volumesource) then
        do i=1,computescalars
         call VolScalSource(Scalar_2,rho(l)+beta(l))
        enddo
@@ -993,7 +992,7 @@ contains
      dt=dxmin/Uref
     endif
 
-    if (steady==0.and.dt+time>endtime)  dt=endtime-time
+    if (steady/=1.and.dt+time>endtime)  dt=endtime-time
 
   endsubroutine TimeStepEul
 
@@ -1884,6 +1883,7 @@ contains
 
 
 
+  !Slower using HMPP than CPU, but if we avoid memory transfer, it is still profitable.
 
   !$hmpp <tsteps> AttenuateTop codelet
   subroutine AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,zPr,zW,U,V,W,temperature,buoyancy)
@@ -1899,7 +1899,7 @@ contains
   real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
   integer i,j,k,bufn
-  real(KND) ze,zs,zb
+  real(KND) ze,zs,zb,p
   real(KND),dimension(:),allocatable :: DF,avg
   intrinsic max,min
 
@@ -1910,25 +1910,33 @@ contains
     allocate(DF(min(Unz,Vnz,Wnz)-bufn:max(Unz,Vnz,Wnz)))
     allocate(avg(min(Unz,Vnz,Wnz)-bufn:max(Unz,Vnz,Wnz)))
 
+
+
     do k=Unz-bufn,Unz
       avg(k)=0
     enddo
-    !$hmppcg grid blocksize 512x1
-    !$hmppcg gridify (j,i)
-    do j=1,Uny
-      do i=1,Unx
-        do k=Unz-bufn,Unz
-          avg(k)=avg(k)+U(i,j,k)
+
+    do k=Unz-bufn,Unz
+      p=0
+      !$hmppcg grid blocksize 512x1
+      !$hmppcg gridify (j,i) global(p), reduce(+:p)
+      do j=1,Uny
+        do i=1,Unx
+          p=p+U(i,j,k)
         enddo
       enddo
+      avg(k)=p
     enddo
+
     do k=Unz-bufn,Unz
       avg(k)=avg(k)/(Unx*Uny)
     enddo
+
     do k=Unz-bufn,Unz
       zb=(zPr(k)-zs)/(ze-zs)
       DF(k)=DampF(zb)
     enddo
+
     !$hmppcg grid blocksize 512x1
     !$hmppcg permute(k,i,j)
     !$hmppcg gridify (k,i)
@@ -1945,14 +1953,16 @@ contains
     do k=Vnz-bufn,Vnz
       avg(k)=0
     enddo
-    !$hmppcg grid blocksize 512x1
-    !$hmppcg gridify (j,i)
-    do j=1,Vny
-      do i=1,Vnx
-        do k=Vnz-bufn,Vnz
-          avg(k)=avg(k)+V(i,j,k)
+    do k=Vnz-bufn,Vnz
+      p=0
+      !$hmppcg grid blocksize 512x1
+      !$hmppcg gridify (j,i) global(p), reduce(+:p)
+      do j=1,Vny
+        do i=1,Vnx
+          p=p+V(i,j,k)
         enddo
       enddo
+      avg(k)=p
     enddo
     do k=Vnz-bufn,Vnz
       avg(k)=avg(k)/(Vnx*Vny)
@@ -1977,22 +1987,28 @@ contains
     do k=Wnz-bufn,Wnz
       avg(k)=0
     enddo
-    !$hmppcg grid blocksize 512x1
-    !$hmppcg gridify (j,i)
-    do j=1,Wny
-      do i=1,Wnx
-        do k=Wnz-bufn,Wnz
-          avg(k)=avg(k)+W(i,j,k)
+
+    do k=Wnz-bufn,Wnz
+      p=0
+      !$hmppcg grid blocksize 512x1
+      !$hmppcg gridify (j,i) global(p), reduce(+:p)
+      do j=1,Wny
+        do i=1,Wnx
+          p=p+W(i,j,k)
         enddo
       enddo
+      avg(k)=p
     enddo
+
     do k=Wnz-bufn,Wnz
       avg(k)=avg(k)/(Wnx*Wny)
     enddo
+
     do k=Wnz-bufn,Wnz
       zb=(zW(k)-zs)/(ze-zs)
       DF(k)=DampF(zb)
     enddo
+
     !$hmppcg grid blocksize 512x1
     !$hmppcg permute(k,i,j)
     !$hmppcg gridify (k,i)
@@ -2004,26 +2020,35 @@ contains
       enddo
     enddo
 
+
+
     if (buoyancy==1) then
+
       do k=Prnz-bufn,Prnz
         avg(k)=0
       enddo
-      !$hmppcg grid blocksize 512x1
-      !$hmppcg gridify (j,i)
-      do j=1,Prny
-        do i=1,Prnx
-          do k=Prnz-bufn,Prnz
-            avg(k)=avg(k)+temperature(i,j,k)
+
+      do k=Prnz-bufn,Prnz
+        p=0
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify (j,i) global(p), reduce(+:p)
+        do j=1,Prny
+          do i=1,Prnx
+            p=p+temperature(i,j,k)
           enddo
         enddo
+        avg(k)=p
       enddo
+
       do k=Prnz-bufn,Prnz
         avg(k)=avg(k)/(Prnx*Prny)
       enddo
+
       do k=Prnz-bufn,Prnz
         zb=(zPr(k)-zs)/(ze-zs)
         DF(k)=DampF(zb)
       enddo
+
       !$hmppcg grid blocksize 512x1
       !$hmppcg permute(k,i,j)
       !$hmppcg gridify (k,i)
@@ -2034,6 +2059,7 @@ contains
           enddo
         enddo
       enddo
+
     endif
 
   endsubroutine AttenuateTop
@@ -2063,7 +2089,7 @@ contains
     xe=xU(Prnx)
 
     !$hmppcg grid blocksize 512x1
-    !$hmppcg gridify (k,j)
+    !$hmppcg gridify (k,j) private(p,xb,DF)
     do k=1,Unz
       do j=1,Uny
         p=0
@@ -2080,7 +2106,7 @@ contains
     enddo
 
     !$hmppcg grid blocksize 512x1
-    !$hmppcg gridify (k,j)
+    !$hmppcg gridify (k,j) private(p,xb,DF)
     do k=1,Vnz
       do j=1,Vny
         p=0
@@ -2097,7 +2123,7 @@ contains
     enddo
 
     !$hmppcg grid blocksize 512x1
-    !$hmppcg gridify (k,j)
+    !$hmppcg gridify (k,j) private(p,xb,DF)
     do k=1,Wnz
       do j=1,Wny
         p=0
@@ -2115,7 +2141,7 @@ contains
 
     if (buoyancy==1) then
       !$hmppcg grid blocksize 512x1
-      !$hmppcg gridify (k,j)
+      !$hmppcg gridify (k,j) private(p,xb,DF)
       do k=1,Prnz
         do j=1,Prny
           p=0
@@ -2195,8 +2221,8 @@ contains
      elseif (sgstype==VremanModel) then
                        if (GPU>0.and.gridtype==uniformgrid.and. Prnx*Prny*Prnz > 50) then
                            !$hmpp <tsteps> Vreman callsite, args[*].noupdate=true
-     !$hmpp <tsteps> delegatedstore, args[Vreman::Visc]
                            call Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Re,U,V,W,Visc)
+                           !$hmpp <tsteps> delegatedstore, args[Vreman::Visc]
                        else
                            call Vreman(U,V,W)
                        endif
