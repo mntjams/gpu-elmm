@@ -18,7 +18,7 @@
   integer,intent(in)      :: nx,ny,nz,Prny,Prnz
   integer,intent(in)      :: Btype(6)
   real(KND),intent(in)    :: sideU(3,6)
-  real(KND),intent(in)    :: Uin(-2:Prny+3,-2:Prnz+3)
+  real(KND),intent(in)    :: Uin(-2:ny+3,-2:nz+3)
   real(KND),intent(inout) :: U(-2:nx+3,-2:ny+3,-2:nz+3)
   integer i,j,k
 
