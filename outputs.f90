@@ -20,6 +20,9 @@ module OUTPUTS
                                         profuw,profuwavg,profuwsgs,profuwsgsavg,&
                                         profvw,profvwavg,profvwsgs,profvwsgsavg
 
+ real(KND),dimension(:,:),allocatable ::profscal,profscalfl,profscalavg,profscalavg2,profscalflavg,&  !which scalar, height
+                                        profscalflsgs,profscalflsgsavg,profss,profssavg
+
  real(KND),allocatable :: Uavg(:,:,:),Vavg(:,:,:),Wavg(:,:,:),Pravg(:,:,:),ScalarAvg(:,:,:,:)
 
  real(TIM),allocatable,dimension(:) :: times                                !times of the timesteps
@@ -219,29 +222,53 @@ contains
     allocate(profuuavg(1:Unz),profvvavg(1:Vnz),profwwavg(0:Wnz),profuu(1:Unz),profvv(1:Vnz),profww(0:Wnz))
     allocate(profuw(0:Prnz),profuwavg(0:Prnz),profuwsgs(0:Prnz),profuwsgsavg(0:Prnz))
     allocate(profvw(0:Prnz),profvwavg(0:Prnz),profvwsgs(0:Prnz),profvwsgsavg(0:Prnz))
+
     allocate(proftemp(1:Prnz),proftempfl(0:Prnz),proftempavg(1:Prnz),proftempavg2(1:Prnz),proftempflavg(0:Prnz))
     allocate(proftempflsgs(0:Prnz),proftempflsgsavg(0:Prnz),proftt(1:Prnz),profttavg(1:Prnz))
-    profU(0:Unz+1)=0
-    profV(0:Vnz+1)=0
-    profUavg2(1:Unz)=0
-    profVavg2(1:Vnz)=0
-    profuu(1:Unz)=0
-    profvv(1:Vnz)=0
-    profww(0:Wnz)=0
-    profuuavg(1:Unz)=0
-    profvvavg(1:Vnz)=0
-    profwwavg(1:Wnz)=0
-    profuw(1:Prnz)=0
-    profvw(1:Prnz)=0
-    proftemp(1:Prnz)=0
-    proftempfl(1:Prnz)=0
-    proftempflavg(1:Prnz)=0
-    proftempavg(1:Prnz)=0
-    proftempavg2(1:Prnz)=0
-    proftempflsgs(1:Prnz)=0
-    proftempflsgsavg(1:Prnz)=0
-    proftt(1:Prnz)=0
-    profttavg(1:Prnz)=0
+
+    allocate(profscal(computescalars,1:Prnz),profscalfl(computescalars,0:Prnz),profscalavg(computescalars,1:Prnz))
+    allocate(profscalavg2(computescalars,1:Prnz),profscalflavg(computescalars,0:Prnz))
+    allocate(profscalflsgs(computescalars,0:Prnz),profscalflsgsavg(computescalars,0:Prnz))
+    allocate(profss(computescalars,1:Prnz),profssavg(computescalars,1:Prnz))
+
+    profU=0
+    profV=0
+    profUavg=0
+    profVavg=0
+    profUavg2=0
+    profVavg2=0
+    profuu=0
+    profvv=0
+    profww=0
+    profuuavg=0
+    profvvavg=0
+    profwwavg=0
+    profuw=0
+    profvw=0
+    profuwavg=0
+    profvwavg=0
+
+    proftemp=0
+    proftempavg=0
+    proftempavg2=0
+    proftempfl=0
+    proftempflavg=0
+    proftempflsgs=0
+    proftempflsgsavg=0
+    proftt=0
+    profttavg=0
+
+    if (computescalars>0) then
+      profscal=0
+      profscalavg=0
+      profscalavg2=0
+      profscalfl=0
+      profscalflavg=0
+      profscalflsgs=0
+      profscalflsgsavg=0
+      profss=0
+      profssavg=0
+    endif
   endif
 
  end subroutine AllocateOutputs
@@ -446,15 +473,18 @@ contains
    if (store%BLprofiles>0) then
      if ((averaging==1).and.((time>=timeavg1).and.(time<=timeavg2))) then
 
-      if (buoyancy>0) then
-       call BLProfiles(U,V,W,temperature)
+      if (buoyancy>0.and.computescalars>0) then
+        call BLProfiles(U,V,W,temperature,scalar)
+      elseif (buoyancy>0) then
+        call BLProfiles(U,V,W,temperature=temperature)
+      elseif (computescalars>0) then
+        call BLProfiles(U,V,W,scalar=scalar)
       else
-       call BLProfiles(U,V,W)
+        call BLProfiles(U,V,W)
       endif
 
       profuavg=profuavg+profu*dt/(timeavg2-timeavg1)
       profvavg=profvavg+profv*dt/(timeavg2-timeavg1)
-      proftempavg=proftempavg+proftemp*dt/(timeavg2-timeavg1)
       profuwavg=profuwavg+profuw*dt/(timeavg2-timeavg1)
       profuwsgsavg=profuwsgsavg+profuwsgs*dt/(timeavg2-timeavg1)
       profvwavg=profvwavg+profvw*dt/(timeavg2-timeavg1)
@@ -464,9 +494,17 @@ contains
       profwwavg=profwwavg+profww*dt/(timeavg2-timeavg1)
 
       if (buoyancy>0) then
+        proftempavg=proftempavg+proftemp*dt/(timeavg2-timeavg1)
         proftempflavg=proftempflavg+proftempfl*dt/(timeavg2-timeavg1)
         proftempflsgsavg=proftempflsgsavg+proftempflsgs*dt/(timeavg2-timeavg1)
         profttavg=profttavg+proftt*dt/(timeavg2-timeavg1)
+      endif
+
+      if (computescalars>0) then
+        profscalavg=profscalavg+profscal*dt/(timeavg2-timeavg1)
+        profscalflavg=profscalflavg+profscalfl*dt/(timeavg2-timeavg1)
+        profscalflsgsavg=profscalflsgsavg+profscalflsgs*dt/(timeavg2-timeavg1)
+        profssavg=profssavg+profss*dt/(timeavg2-timeavg1)
       endif
     endif
  endif
@@ -634,6 +672,7 @@ contains
      close(11)
 
      if (buoyancy>0) then
+
         open(11,file="proftemp.txt")
         do k=1,Prnz
          write (11,*) zPr(k),proftempavg(k)
@@ -681,7 +720,7 @@ contains
          nom=(grav_acc/temperature_ref)*(proftempflavg(k)+proftempflsgsavg(k))
          denom=((profuwavg(k)+profuwsgsavg(k))*S+(profvwavg(k)+profvwsgsavg(k))*S2)
 
-         if (abs(denom)>1E-5_KND*abs(nom)) then
+         if (abs(denom)>=1E-5_KND*abs(nom).or.abs(denom)<=tiny(denom)) then
            S=nom/denom
          else
            S=100000._KND*sign(1.0_KND,nom)*sign(1.0_KND,denom)
@@ -692,6 +731,29 @@ contains
         close(11)
 
      endif !buoyancy>0
+
+
+     if (computescalars>0) then
+
+        open(11,file="profscal.txt")
+        do k=1,Prnz
+         write (11,*) zPr(k),(profscalavg(i,k), i=1,computescalars)
+        enddo
+        close(11)
+
+        open(11,file="profscalfl.txt")
+        do k=0,Prnz
+         write (11,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i=1,computescalars)
+        enddo
+        close(11)
+
+        open(11,file="profss.txt")
+        do k=1,Prnz
+         write (11,*) zPr(k),(profssavg(i,k), i=1,computescalars)
+        enddo
+        close(11)
+
+     endif !computescalars>0
 
   endif !store%BLprofiles
 
@@ -1784,7 +1846,7 @@ contains
      do j=1,Prny
       do i=1,Prnx
        if (Prtype(i,j,k)==0) then
-        write (20) real(Pr(1:Prnx,1:Prny,1:Prnz),SNG)
+        write (20) BigEnd(real(Pr(i,j,k),SNG))
        else
         write (20) BigEnd(0._SNG)
        endif
@@ -1801,7 +1863,7 @@ contains
      do j=1,Prny
       do i=1,Prnx
        if (Prtype(i,j,k)==0) then
-        write (20) real(Lambda2(i,j,k,U,V,W),SNG)
+        write (20) BigEnd(real(Lambda2(i,j,k,U,V,W),SNG))
        else
         write (20) BigEnd(0._SNG)
        endif
@@ -1820,7 +1882,7 @@ contains
       do j=1,Prny
        do i=1,Prnx
         if (Prtype(i,j,k)==0) then
-         write (20) real(SCALAR(i,j,k,l),SNG)
+         write (20) BigEnd(real(SCALAR(i,j,k,l),SNG))
         else
          write (20) BigEnd(0._SNG)
         endif
@@ -2089,215 +2151,275 @@ contains
 
 
 
-  subroutine BLProfiles(U,V,W,temperature)
+  subroutine BLProfiles(U,V,W,temperature,scalar)
   real(KND),dimension(-2:,-2:,-2:) :: U,V,W
   real(KND),dimension(-1:,-1:,-1:),optional:: temperature
-  real(KND) :: S, S2
-  real(KND) Str(1:3,1:3)
+  real(KND),dimension(-1:,-1:,-1:,1:),optional:: scalar
+  real(KND) :: S
+  real(KND) :: Str(1:3,1:3)
   real(KND),allocatable,save ::fp(:),ht(:),gp(:)
-  integer i,j,k,n
+  integer   :: i,j,k,l,n
   integer,save :: called=0
 
-   do k=0,Unz+1
-    S=0
-    n=0
-    do j=1,Uny
-     do i=1,Unx
-      if (Utype(i,j,k)==0) then
-       S=S+U(i,j,k)
-       n=n+1
-      endif
-     enddo
-    enddo
-    profU(k)=S/max(n,1)
-   enddo
-
-   do k=1,Vnz+1
-    S=0
-    n=0
-    do j=1,Vny
-     do i=1,Vnx
-      if (Vtype(i,j,k)==0) then
-       S=S+V(i,j,k)
-       n=n+1
-      endif
-     enddo
-    enddo
-    profV(k)=S/max(n,1)
-   enddo
-
-  if (present(temperature)) then
-   do k=1,Prnz
-    S=0
-    n=0
-    do j=1,Prny
-     do i=1,Prnx
-      if (Prtype(i,j,k)==0) then
-       S=S+temperature(i,j,k)
-       n=n+1
-      endif
-     enddo
-    enddo
-    profTemp(k)=S/max(n,1)
-   enddo
-  endif
-
-   if (called==0) then
-    allocate(fp(0:Prnx+1),ht(0:Prnz+1),gp(0:Prny+1))
-    forall (i=0:Prnx+1)      fp(i)=(xU(i)-xPr(i))/(xPr(i+1)-xPr(i))
-    forall (k=0:Prnz+1)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
-    forall (j=0:Prny+1)      gp(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
-   endif
-
-   do k=0,Prnz
-    S=0
-    S2=0
-    n=0
-    do j=1,Uny
-     do i=1,Unx
-      if ((Utype(i,j,k+1)==0.or.Utype(i,j,k)==0).and.(Wtype(i+1,j,k)==0.or.Wtype(i,j,k)==0)) then
-       S=S+((ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))-((1-ht(k))*profU(k)+ht(k)*profU(k+1)))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))
-       n=n+1
-      endif
-     enddo
-    enddo
-    profuw(k)=S/max(n,1)
-   enddo
-
-   do k=0,Prnz
-    S=0
-    n=0
-    do j=1,Vny
-     do i=1,Vnx
-      if ((Vtype(i,j,k+1)==0.or.Vtype(i,j,k)==0).and.(Wtype(i,j+1,k)==0.or.Wtype(i,j,k)==0)) then
-       S=S+(ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)-(ht(k)*profV(k+1)+(1-ht(k))*profV(k)))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))
-       n=n+1
-      endif
-     enddo
-    enddo
-    profvw(k)=S/max(n,1)
-   enddo
-
-   do k=0,Prnz
-    S=0
-    n=0
-    do j=1,Uny
-     do i=1,Unx
-      if (Utype(i,j,k+1)==0.or.Utype(i,j,k)==0) then
-       S=S-0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)
-       n=n+1
-      endif
-     enddo
-    enddo
-    profuwsgs(k)=S/max(n,1)
-   enddo
-
-   do k=0,Prnz
-    S=0
-    n=0
-    do j=1,Vny
-     do i=1,Vnx
-      if (Vtype(i,j,k+1)==0.or.Vtype(i,j,k)==0) then
-       S=S-0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)
-       n=n+1
-      endif
-     enddo
-    enddo
-    profvwsgs(k)=S/max(n,1)
-   enddo
-
-   do k=1,Unz
-    S=0
-    S2=0
-    n=0
-    do j=1,Uny
-     do i=1,Unx
-      if (Utype(i,j,k)==0) then
-       S=S+(U(i,j,k)-profU(k))**2
-       n=n+1
-      endif
-     enddo
-    enddo
-    profuu(k)=S/max(n,1)
-   enddo
-
-   do k=1,Vnz
-    S=0
-    S2=0
-    n=0
-    do j=1,Vny
-     do i=1,Vnx
-      if (Vtype(i,j,k)==0) then
-       S=S+(V(i,j,k)-profV(k))**2
-       n=n+1
-      endif
-     enddo
-    enddo
-    profvv(k)=S/max(n,1)
-   enddo
-
-   do k=0,Wnz
-    S=0
-    S2=0
-    n=0
-    do j=1,Wny
-     do i=1,Wnx
-      if (Wtype(i,j,k)==0) then
-       S=S+(W(i,j,k))**2
-       n=n+1
-      endif
-     enddo
-    enddo
-    profww(k)=S/max(n,1)
-   enddo
-
-  if (present(temperature)) then
-   do k=0,Prnz
-    S=0
-    S2=0
-    n=0
-    do j=1,Prny
-     do i=1,Prnx
-      if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
-       S=S+0.5_KND*(temperature(i,j,k+1)+temperature(i,j,k))*(W(i,j,k))
-       n=n+1
-      endif
-     enddo
-    enddo
-    proftempfl(k)=S/max(n,1)
-   enddo
-
-   do k=1,Prnz
-    S=0
-    S2=0
-    n=0
-    do j=1,Prny
-     do i=1,Prnx
-      if (Prtype(i,j,k)==0) then
-       S=S+(temperature(i,j,k)-profTemp(k))**2
-       n=n+1
-      endif
-     enddo
-    enddo
-    proftt(k)=S/max(n,1)
-   enddo
-
-   do k=0,Prnz
-    S=0
-    S2=0
-    n=0
-    do j=1,Prny
-     do i=1,Prnx
-      if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
-        S=S-(0.5_KND*(TDiff(i,j,k+1)+TDiff(i,j,k))*(temperature(i,j,k+1)-temperature(i,j,k)))/dzW(k)
+    do k=0,Unz+1
+     S=0
+     n=0
+     do j=1,Uny
+      do i=1,Unx
+       if (Utype(i,j,k)==0) then
+        S=S+U(i,j,k)
         n=n+1
-      endif
+       endif
+      enddo
      enddo
+     profU(k)=S/max(n,1)
     enddo
-    proftempflsgs(k)=S/max(n,1)
-   enddo
-  endif
-  called=1
+
+    do k=1,Vnz+1
+     S=0
+     n=0
+     do j=1,Vny
+      do i=1,Vnx
+       if (Vtype(i,j,k)==0) then
+        S=S+V(i,j,k)
+        n=n+1
+       endif
+      enddo
+     enddo
+     profV(k)=S/max(n,1)
+    enddo
+
+    if (present(temperature)) then
+     do k=1,Prnz
+      S=0
+      n=0
+      do j=1,Prny
+       do i=1,Prnx
+        if (Prtype(i,j,k)==0) then
+         S=S+temperature(i,j,k)
+         n=n+1
+        endif
+       enddo
+      enddo
+      proftemp(k)=S/max(n,1)
+     enddo
+    endif
+
+    if (present(scalar)) then
+     do l=1,computescalars
+      do k=1,Prnz
+       S=0
+       n=0
+       do j=1,Prny
+        do i=1,Prnx
+         if (Prtype(i,j,k)==0) then
+          S=S+scalar(i,j,k,l)
+          n=n+1
+         endif
+        enddo
+       enddo
+       profscal(l,k)=S/max(n,1)
+      enddo
+     enddo
+    endif
+
+    if (called==0) then
+     allocate(fp(0:Prnx+1),ht(0:Prnz+1),gp(0:Prny+1))
+     forall (i=0:Prnx+1)      fp(i)=(xU(i)-xPr(i))/(xPr(i+1)-xPr(i))
+     forall (k=0:Prnz+1)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
+     forall (j=0:Prny+1)      gp(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
+    endif
+
+    do k=0,Prnz
+     S=0
+     n=0
+     do j=1,Uny
+      do i=1,Unx
+       if ((Utype(i,j,k+1)==0.or.Utype(i,j,k)==0).and.(Wtype(i+1,j,k)==0.or.Wtype(i,j,k)==0)) then
+        S=S+((ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))-((1-ht(k))*profU(k)+ht(k)*profU(k+1)))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))
+        n=n+1
+       endif
+      enddo
+     enddo
+     profuw(k)=S/max(n,1)
+    enddo
+
+    do k=0,Prnz
+     S=0
+     n=0
+     do j=1,Vny
+      do i=1,Vnx
+       if ((Vtype(i,j,k+1)==0.or.Vtype(i,j,k)==0).and.(Wtype(i,j+1,k)==0.or.Wtype(i,j,k)==0)) then
+        S=S+(ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)-(ht(k)*profV(k+1)+(1-ht(k))*profV(k)))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))
+        n=n+1
+       endif
+      enddo
+     enddo
+     profvw(k)=S/max(n,1)
+    enddo
+
+    do k=0,Prnz
+     S=0
+     n=0
+     do j=1,Uny
+      do i=1,Unx
+       if (Utype(i,j,k+1)==0.or.Utype(i,j,k)==0) then
+        S=S-0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)
+        n=n+1
+       endif
+      enddo
+     enddo
+     profuwsgs(k)=S/max(n,1)
+    enddo
+
+    do k=0,Prnz
+     S=0
+     n=0
+     do j=1,Vny
+      do i=1,Vnx
+       if (Vtype(i,j,k+1)==0.or.Vtype(i,j,k)==0) then
+        S=S-0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)
+        n=n+1
+       endif
+      enddo
+     enddo
+     profvwsgs(k)=S/max(n,1)
+    enddo
+
+    do k=1,Unz
+     S=0
+     n=0
+     do j=1,Uny
+      do i=1,Unx
+       if (Utype(i,j,k)==0) then
+        S=S+(U(i,j,k)-profU(k))**2
+        n=n+1
+       endif
+      enddo
+     enddo
+     profuu(k)=S/max(n,1)
+    enddo
+
+    do k=1,Vnz
+     S=0
+     n=0
+     do j=1,Vny
+      do i=1,Vnx
+       if (Vtype(i,j,k)==0) then
+        S=S+(V(i,j,k)-profV(k))**2
+        n=n+1
+       endif
+      enddo
+     enddo
+     profvv(k)=S/max(n,1)
+    enddo
+
+    do k=0,Wnz
+     S=0
+     n=0
+     do j=1,Wny
+      do i=1,Wnx
+       if (Wtype(i,j,k)==0) then
+        S=S+(W(i,j,k))**2
+        n=n+1
+       endif
+      enddo
+     enddo
+     profww(k)=S/max(n,1)
+    enddo
+
+    if (present(temperature)) then
+     do k=0,Prnz
+      S=0
+      n=0
+      do j=1,Prny
+       do i=1,Prnx
+        if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
+         S=S+0.5_KND*(temperature(i,j,k+1)+temperature(i,j,k))*(W(i,j,k))
+         n=n+1
+        endif
+       enddo
+      enddo
+      proftempfl(k)=S/max(n,1)
+     enddo
+
+     do k=1,Prnz
+      S=0
+      n=0
+      do j=1,Prny
+       do i=1,Prnx
+        if (Prtype(i,j,k)==0) then
+         S=S+(temperature(i,j,k)-profTemp(k))**2
+         n=n+1
+        endif
+       enddo
+      enddo
+      proftt(k)=S/max(n,1)
+     enddo
+
+     do k=0,Prnz
+      S=0
+      n=0
+      do j=1,Prny
+       do i=1,Prnx
+        if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
+          S=S-(0.5_KND*(TDiff(i,j,k+1)+TDiff(i,j,k))*(temperature(i,j,k+1)-temperature(i,j,k)))/dzW(k)
+          n=n+1
+        endif
+       enddo
+      enddo
+      proftempflsgs(k)=S/max(n,1)
+     enddo
+    endif ! present(temperature)
+
+
+    if (present(scalar)) then
+     do l=1,computescalars
+      do k=0,Prnz
+       S=0
+       n=0
+       do j=1,Prny
+        do i=1,Prnx
+         if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
+          S=S+0.5_KND*(scalar(i,j,k+1,l)+scalar(i,j,k,l))*(W(i,j,k))
+          n=n+1
+         endif
+        enddo
+       enddo
+       profscalfl(l,k)=S/max(n,1)
+      enddo
+
+      do k=1,Prnz
+       S=0
+       n=0
+       do j=1,Prny
+        do i=1,Prnx
+         if (Prtype(i,j,k)==0) then
+          S=S+(scalar(i,j,k,l)-profscal(l,k))**2
+          n=n+1
+         endif
+        enddo
+       enddo
+       profss(l,k)=S/max(n,1)
+      enddo
+
+      do k=0,Prnz
+       S=0
+       n=0
+       do j=1,Prny
+        do i=1,Prnx
+         if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
+           S=S-(0.5_KND*(TDiff(i,j,k+1)+TDiff(i,j,k))*(scalar(i,j,k+1,l)-scalar(i,j,k,l)))/dzW(k)
+           n=n+1
+         endif
+        enddo
+       enddo
+       profscalflsgs(l,k)=S/max(n,1)
+      enddo
+     enddo
+    endif ! present(scalar)
+
+    called=1
   end subroutine BLProfiles
 
 
