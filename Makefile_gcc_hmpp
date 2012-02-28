@@ -13,8 +13,8 @@
 
 
 #### Compiler and tool definitions shared by all build targets #####
-FC = gfortran
-BASICOPTS =   -O5 -fprefetch-loop-arrays -finline-functions -funroll-loops -pg -ffpe-trap=zero,overflow -ffast-math
+FC = gfortran-4.7
+BASICOPTS =   -g -O5 -fprefetch-loop-arrays -finline-functions -funroll-loops -pg -ffpe-trap=zero,overflow -ffast-math
 FFLAGS = $(BASICOPTS)
 
 
