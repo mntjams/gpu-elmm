@@ -7,7 +7,7 @@ module SCALARS
 
 implicit none
   private
-  public Bound_Temp, Bound_Visc, Scalar, partdiam,partrho,percdistrib, AdvScalar,&
+  public Bound_Temp, Bound_Visc, Bound_PassScalar, Scalar, partdiam,partrho,percdistrib, AdvScalar,&
      DiffScalar, Deposition, GravSettling, ComputeTDiff, Prt, Rig, ScalFlSourc, VolScalSource
 
 
