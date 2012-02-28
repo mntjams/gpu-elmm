@@ -1079,7 +1079,7 @@ contains
 
        elseif (buoyancy==1) then
 
-         freetempgradient=0.1!0.0035 !K/m
+         freetempgradient=0.03!0.0035 !K/m
          !inversionTjump=2 !K
          do k=-2,Prnz+3
           do j=-2,Prny+3
@@ -1133,36 +1133,40 @@ contains
 
        if (Re>0) then
          if (buoyancy==1.or.computescalars>0) TDiff=1._KND/(Re*Prandtl)
-
-         call BoundU(1,U)
-         call BoundU(2,V)
-         call BoundU(3,W)
-         call Bound_Pr(Pr)
-         call Pr_Correct(U,V,W,Pr,1._KND)
-
-
-         if (sgstype==1) then
-                           call Smag(U,V,W)
-         elseif (sgstype==3) then
-                           call VREMAN(U,V,W)
-         else
-           if (Re>0) then
-             Visc=1._KND/Re
-           else
-             Visc=0
-           endif
-         endif
-
-         call Bound_Visc(Visc)
-
-         if (buoyancy>0) then
-           forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-             TDiff(i,j,k)=1.35*(Visc(i,j,k)-1._KND/Re)+(1._KND/(Re*Prt(i,j,k,U,V,temperature)))
-           endforall
-           call Bound_Visc(TDiff)
-         endif
        endif  !Re>0
 
+       call BoundU(1,U)
+       call BoundU(2,V)
+       call BoundU(3,W)
+       call Bound_Pr(Pr)
+       call Pr_Correct(U,V,W,Pr,1._KND)
+
+
+       if (sgstype==1) then
+                         call Smag(U,V,W)
+       elseif (sgstype==3) then
+                         call VREMAN(U,V,W)
+       else
+         if (Re>0) then
+           Visc=1._KND/Re
+         else
+           Visc=0
+         endif
+       endif
+
+       call Bound_Visc(Visc)
+
+       if (buoyancy>0) then
+         forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
+           TDiff(i,j,k)=1.35*(Visc(i,j,k)-1._KND/Re)+(1._KND/(Re*Prt(i,j,k,U,V,temperature)))
+         endforall
+         call Bound_Visc(TDiff)
+         call Bound_Temp(temperature)
+       endif
+
+       do i=1,computescalars
+         call Bound_PassScalar(Scalar(:,:,:,i))
+       enddo
 
        call InitTempFL
 
