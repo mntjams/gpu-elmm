@@ -32,15 +32,16 @@ contains
   integer,intent(in)      :: sctype
   integer nx,ny,nz,i,j,k
   real(KND) Ax,Ay,Az
+
         nx=Prnx
         ny=Prny
         nz=Prnz
 
-   if (sctype==1) then
-    call BOUND_Temp(SCAL)
-   else
-    call BOUND_PASSSCALAR(SCAL)
-   endif
+        if (sctype==1) then
+         call BOUND_Temp(SCAL)
+        else
+         call BOUND_PASSSCALAR(SCAL)
+        endif
 
         Ax=0.5_KND*coef*dt/dxmin
         Ay=0.5_KND*coef*dt/dymin
@@ -67,15 +68,16 @@ contains
   integer,intent(in) :: sctype
   integer nx,ny,nz,i,j,k
   real(KND) Ax,Ay,Az
+
         nx=Prnx
         ny=Prny
         nz=Prnz
 
-   if (sctype==1) then
-    call BOUND_Temp(SCAL)
-   else
-    call BOUND_PASSSCALAR(SCAL)
-   endif
+        if (sctype==1) then
+         call BOUND_Temp(SCAL)
+        else
+         call BOUND_PASSSCALAR(SCAL)
+        endif
 
         Ax=coef*dt/dxmin
         Ay=coef*dt/dymin
@@ -133,71 +135,71 @@ contains
   integer nx,ny,nz,i,j,k
   real(KND) Ax,Ay,Az,F
 
-   if (sctype==1) then
-    call BOUND_Temp(SCAL)
-   else
-    call BOUND_PASSSCALAR(SCAL)
-   endif
+    if (sctype==1) then
+     call BOUND_Temp(SCAL)
+    else
+     call BOUND_PASSSCALAR(SCAL)
+    endif
 
-   Ax=coef*dt/dxmin
-   Ay=coef*dt/dymin
-   Az=coef*dt/dzmin
-   SCAL2=SCAL
-   SCAL3=SCAL
-   do k=1,Prnz
-    do j=1,Prny
-     do i=0,Prnx
-       if (U(i,j,k)>0) then
-        F=Ax*U(i,j,k)*((6._KND/8._KND)*SCAL3(i,j,k)+(3._KND/8._KND)*SCAL3(i-1,j,k)-(1._KND/8._KND)*SCAL3(i-1,j,k))
-       else
-        F=Ax*U(i,j,k)*((6._KND/8._KND)*SCAL3(i+1,j,k)+(3._KND/8._KND)*SCAL3(i,j,k)-(1._KND/8._KND)*SCAL3(i+2,j,k))
-       endif
-       SCAL2(i,j,k)=SCAL2(i,j,k)-F
-       SCAL2(i+1,j,k)=SCAL2(i+1,j,k)+F
+    Ax=coef*dt/dxmin
+    Ay=coef*dt/dymin
+    Az=coef*dt/dzmin
+    SCAL2=SCAL
+    SCAL3=SCAL
+    do k=1,Prnz
+     do j=1,Prny
+      do i=0,Prnx
+        if (U(i,j,k)>0) then
+         F=Ax*U(i,j,k)*((6._KND/8._KND)*SCAL3(i,j,k)+(3._KND/8._KND)*SCAL3(i-1,j,k)-(1._KND/8._KND)*SCAL3(i-1,j,k))
+        else
+         F=Ax*U(i,j,k)*((6._KND/8._KND)*SCAL3(i+1,j,k)+(3._KND/8._KND)*SCAL3(i,j,k)-(1._KND/8._KND)*SCAL3(i+2,j,k))
+        endif
+        SCAL2(i,j,k)=SCAL2(i,j,k)-F
+        SCAL2(i+1,j,k)=SCAL2(i+1,j,k)+F
+      enddo
      enddo
     enddo
-   enddo
 
-   if (sctype==1) then
-    call BOUND_Temp(SCAL2)
-   else
-    call BOUND_PASSSCALAR(SCAL2)
-   endif
-   SCAL3=SCAL2
-   do k=1,Prnz
-    do j=0,Prny
-     do i=1,Prnx
-       if (V(i,j,k)>0) then
-        F=Ay*V(i,j,k)*((6._KND/8._KND)*SCAL3(i,j,k)+(3._KND/8._KND)*SCAL3(i,j-1,k)-(1._KND/8._KND)*SCAL3(i,j-1,k))
-       else
-        F=Ay*V(i,j,k)*((6._KND/8._KND)*SCAL3(i,j+1,k)+(3._KND/8._KND)*SCAL3(i,j,k)-(1._KND/8._KND)*SCAL3(i,j+1,k))
-       endif
-       SCAL2(i,j,k)=SCAL2(i,j,k)-F
-       SCAL2(i,j+1,k)=SCAL2(i,j+1,k)+F
+    if (sctype==1) then
+     call BOUND_Temp(SCAL2)
+    else
+     call BOUND_PASSSCALAR(SCAL2)
+    endif
+    SCAL3=SCAL2
+    do k=1,Prnz
+     do j=0,Prny
+      do i=1,Prnx
+        if (V(i,j,k)>0) then
+         F=Ay*V(i,j,k)*((6._KND/8._KND)*SCAL3(i,j,k)+(3._KND/8._KND)*SCAL3(i,j-1,k)-(1._KND/8._KND)*SCAL3(i,j-1,k))
+        else
+         F=Ay*V(i,j,k)*((6._KND/8._KND)*SCAL3(i,j+1,k)+(3._KND/8._KND)*SCAL3(i,j,k)-(1._KND/8._KND)*SCAL3(i,j+1,k))
+        endif
+        SCAL2(i,j,k)=SCAL2(i,j,k)-F
+        SCAL2(i,j+1,k)=SCAL2(i,j+1,k)+F
+      enddo
      enddo
     enddo
-   enddo
 
-   if (sctype==1) then
-    call BOUND_Temp(SCAL2)
-   else
-    call BOUND_PASSSCALAR(SCAL2)
-   endif
-   SCAL3=SCAL2
-   do k=0,Prnz
-    do j=1,Prny
-     do i=1,Prnx
-       if (W(i,j,k)>0) then
-        F=Az*W(i,j,k)*((6._KND/8._KND)*SCAL3(i,j,k)+(3._KND/8._KND)*SCAL3(i,j,k-1)-(1._KND/8._KND)*SCAL3(i,j,k-1))
-       else
-        F=Az*W(i,j,k)*((6._KND/8._KND)*SCAL3(i,j,k+1)+(3._KND/8._KND)*SCAL3(i,j,k)-(1._KND/8._KND)*SCAL3(i,j,k+1))
-       endif
-       SCAL2(i,j,k)=SCAL2(i,j,k)-F
-       SCAL2(i,j,k+1)=SCAL2(i,j,k+1)+F
+    if (sctype==1) then
+     call BOUND_Temp(SCAL2)
+    else
+     call BOUND_PASSSCALAR(SCAL2)
+    endif
+    SCAL3=SCAL2
+    do k=0,Prnz
+     do j=1,Prny
+      do i=1,Prnx
+        if (W(i,j,k)>0) then
+         F=Az*W(i,j,k)*((6._KND/8._KND)*SCAL3(i,j,k)+(3._KND/8._KND)*SCAL3(i,j,k-1)-(1._KND/8._KND)*SCAL3(i,j,k-1))
+        else
+         F=Az*W(i,j,k)*((6._KND/8._KND)*SCAL3(i,j,k+1)+(3._KND/8._KND)*SCAL3(i,j,k)-(1._KND/8._KND)*SCAL3(i,j,k+1))
+        endif
+        SCAL2(i,j,k)=SCAL2(i,j,k)-F
+        SCAL2(i,j,k+1)=SCAL2(i,j,k+1)+F
+      enddo
      enddo
     enddo
-   enddo
-   SCAL2=SCAL2-SCAL
+    SCAL2=SCAL2-SCAL
   end subroutine QUICKSCALAR
 
 
