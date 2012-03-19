@@ -235,6 +235,7 @@ module SMAGORINSKY
        dy2=dymin**2
        dz2=dzmin**2
 
+       !$omp parallel do private(aa,bb,a,b,i,j,k,ii,jj)
        do k=-1,Prnz+2
         do i=-1,Prnx+2
          do j=-1,Prny+2
@@ -284,7 +285,7 @@ module SMAGORINSKY
          enddo
         enddo
        enddo
-
+       !$omp end parallel do
    else !general grid
 
        do k=-1,Prnz+2
