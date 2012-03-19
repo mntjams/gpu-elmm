@@ -60,8 +60,10 @@ contains
   integer,intent(in):: level
   real(KND),dimension(-1:,-1:,-1:),intent(in):: ACoarse
   real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
-  integer:: i,j,k,nx,ny,nz
+  integer:: i,j,k,ii,jj,kk,nx,ny,nz
+  real(KND),dimension(-1:1,-1:1,-1:1),save:: Cf
   real(KND):: A1,A2,A4,A8
+  integer,save:: called=0
 
 
    nx=bnx*2**level !level means from which grid we interpolate
@@ -78,45 +80,83 @@ contains
                              Btype,level)
 
    else
-    do k=0,nz
-     do j=0,ny
-      do i=0,nx
-                      A1=ACoarse(i,j,k)
-                      A2=0.5_KND*A1
-                      A4=0.25_KND*A1
-                      A8=0.125*A1
-                      AFine(2*i,2*j,2*k)=AFine(2*i,2*j,2*k)+A1
-                      AFine(2*i+1,2*j,2*k)=AFine(2*i+1,2*j,2*k)+A2
-                      AFine(2*i-1,2*j,2*k)=AFine(2*i-1,2*j,2*k)+A2
-                      AFine(2*i,2*j+1,2*k)=AFine(2*i,2*j+1,2*k)+A2
-                      AFine(2*i,2*j-1,2*k)=AFine(2*i,2*j-1,2*k)+A2
-                      AFine(2*i,2*j,2*k+1)=AFine(2*i,2*j,2*k+1)+A2
-                      AFine(2*i,2*j,2*k-1)=AFine(2*i,2*j,2*k-1)+A2
-                      AFine(2*i+1,2*j+1,2*k)=AFine(2*i+1,2*j+1,2*k)+A4
-                      AFine(2*i+1,2*j,2*k+1)=AFine(2*i+1,2*j,2*k+1)+A4
-                      AFine(2*i,2*j+1,2*k+1)=AFine(2*i,2*j+1,2*k+1)+A4
-                      AFine(2*i-1,2*j-1,2*k)=AFine(2*i-1,2*j-1,2*k)+A4
-                      AFine(2*i-1,2*j,2*k-1)=AFine(2*i-1,2*j,2*k-1)+A4
-                      AFine(2*i,2*j-1,2*k-1)=AFine(2*i,2*j-1,2*k-1)+A4
-                      AFine(2*i-1,2*j+1,2*k)=AFine(2*i-1,2*j+1,2*k)+A4
-                      AFine(2*i-1,2*j,2*k+1)=AFine(2*i-1,2*j,2*k+1)+A4
-                      AFine(2*i+1,2*j-1,2*k)=AFine(2*i+1,2*j-1,2*k)+A4
-                      AFine(2*i,2*j-1,2*k+1)=AFine(2*i,2*j-1,2*k+1)+A4
-                      AFine(2*i+1,2*j,2*k-1)=AFine(2*i+1,2*j,2*k-1)+A4
-                      AFine(2*i,2*j+1,2*k-1)=AFine(2*i,2*j+1,2*k-1)+A4
-                      AFine(2*i+1,2*j+1,2*k+1)=AFine(2*i+1,2*j+1,2*k+1)+A8
-                      AFine(2*i-1,2*j+1,2*k+1)=AFine(2*i-1,2*j+1,2*k+1)+A8
-                      AFine(2*i+1,2*j-1,2*k+1)=AFine(2*i+1,2*j-1,2*k+1)+A8
-                      AFine(2*i+1,2*j+1,2*k-1)=AFine(2*i+1,2*j+1,2*k-1)+A8
-                      AFine(2*i-1,2*j-1,2*k+1)=AFine(2*i-1,2*j-1,2*k+1)+A8
-                      AFine(2*i-1,2*j+1,2*k-1)=AFine(2*i-1,2*j+1,2*k-1)+A8
-                      AFine(2*i+1,2*j-1,2*k-1)=AFine(2*i+1,2*j-1,2*k-1)+A8
-                      AFine(2*i-1,2*j-1,2*k-1)=AFine(2*i-1,2*j-1,2*k-1)+A8
+!      do k=0,nz
+!       do j=0,ny
+!        do i=0,nx
+!                        A1=ACoarse(i,j,k)
+!                        A2=0.5_KND*A1
+!                        A4=0.25_KND*A1
+!                        A8=0.125*A1
+!                        AFine(2*i,2*j,2*k)=AFine(2*i,2*j,2*k)+A1
+!                        AFine(2*i+1,2*j,2*k)=AFine(2*i+1,2*j,2*k)+A2
+!                        AFine(2*i-1,2*j,2*k)=AFine(2*i-1,2*j,2*k)+A2
+!                        AFine(2*i,2*j+1,2*k)=AFine(2*i,2*j+1,2*k)+A2
+!                        AFine(2*i,2*j-1,2*k)=AFine(2*i,2*j-1,2*k)+A2
+!                        AFine(2*i,2*j,2*k+1)=AFine(2*i,2*j,2*k+1)+A2
+!                        AFine(2*i,2*j,2*k-1)=AFine(2*i,2*j,2*k-1)+A2
+!                        AFine(2*i+1,2*j+1,2*k)=AFine(2*i+1,2*j+1,2*k)+A4
+!                        AFine(2*i+1,2*j,2*k+1)=AFine(2*i+1,2*j,2*k+1)+A4
+!                        AFine(2*i,2*j+1,2*k+1)=AFine(2*i,2*j+1,2*k+1)+A4
+!                        AFine(2*i-1,2*j-1,2*k)=AFine(2*i-1,2*j-1,2*k)+A4
+!                        AFine(2*i-1,2*j,2*k-1)=AFine(2*i-1,2*j,2*k-1)+A4
+!                        AFine(2*i,2*j-1,2*k-1)=AFine(2*i,2*j-1,2*k-1)+A4
+!                        AFine(2*i-1,2*j+1,2*k)=AFine(2*i-1,2*j+1,2*k)+A4
+!                        AFine(2*i-1,2*j,2*k+1)=AFine(2*i-1,2*j,2*k+1)+A4
+!                        AFine(2*i+1,2*j-1,2*k)=AFine(2*i+1,2*j-1,2*k)+A4
+!                        AFine(2*i,2*j-1,2*k+1)=AFine(2*i,2*j-1,2*k+1)+A4
+!                        AFine(2*i+1,2*j,2*k-1)=AFine(2*i+1,2*j,2*k-1)+A4
+!                        AFine(2*i,2*j+1,2*k-1)=AFine(2*i,2*j+1,2*k-1)+A4
+!                        AFine(2*i+1,2*j+1,2*k+1)=AFine(2*i+1,2*j+1,2*k+1)+A8
+!                        AFine(2*i-1,2*j+1,2*k+1)=AFine(2*i-1,2*j+1,2*k+1)+A8
+!                        AFine(2*i+1,2*j-1,2*k+1)=AFine(2*i+1,2*j-1,2*k+1)+A8
+!                        AFine(2*i+1,2*j+1,2*k-1)=AFine(2*i+1,2*j+1,2*k-1)+A8
+!                        AFine(2*i-1,2*j-1,2*k+1)=AFine(2*i-1,2*j-1,2*k+1)+A8
+!                        AFine(2*i-1,2*j+1,2*k-1)=AFine(2*i-1,2*j+1,2*k-1)+A8
+!                        AFine(2*i+1,2*j-1,2*k-1)=AFine(2*i+1,2*j-1,2*k-1)+A8
+!                        AFine(2*i-1,2*j-1,2*k-1)=AFine(2*i-1,2*j-1,2*k-1)+A8
+!        enddo
+!        enddo
+!      enddo
+
+    if (called==0) then
+      do kk=-1,1
+        do jj=-1,1
+         do ii=-1,1
+          if (ii==0.and.jj==0.and.kk==0) then
+              Cf(ii,jj,kk)=1._KND
+          else if (abs(ii)+abs(jj)+abs(kk)==1) then
+              Cf(ii,jj,kk)=1/2._KND
+          else if (abs(ii)+abs(jj)+abs(kk)==2) then
+              Cf(ii,jj,kk)=1/4._KND
+          else
+              Cf(ii,jj,kk)=1/8._KND
+          end if
+         enddo
+        enddo
+       enddo
+       called=0
+     endif
+
+     !$omp parallel private (i,j)
+     do kk=-1,1
+      do jj=-1,1
+       do ii=-1,1
+        !$omp do schedule(DYNAMIC)
+        do k=0,nz
+         do j=0,ny
+          do i=0,nx
+             AFine(2*i+ii,2*j+jj,2*k+kk) = AFine(2*i+ii,2*j+jj,2*k+kk) + Cf(ii,jj,kk) * ACoarse(i,j,k)
+          enddo
+         enddo
+        enddo
+        !$omp enddo
+       enddo
       enddo
-      enddo
-    enddo
+     enddo
+     !$omp end parallel
+
+     call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
    endif
-   call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
  endsubroutine Prolongate
 
 
@@ -1102,7 +1142,7 @@ real(KND),save:: p,Ap
                      Aw,Ae,As,An,Ab,At,&
                      Btype,R,level)
   else
-
+     !$omp parallel do private(p,Ap)
      do k=0,CoefMG(level)%nz
         do j=0,CoefMG(level)%ny
             do i=0,CoefMG(level)%nx
@@ -1156,6 +1196,7 @@ real(KND),save:: p,Ap
             enddo
         enddo
     enddo
+    !$omp end parallel do
     R=MAXVAL(ResMG(level)%Arr(0:CoefMG(level)%nx,0:CoefMG(level)%ny,0:CoefMG(level)%nz))
    endif
 endsubroutine MG_res
