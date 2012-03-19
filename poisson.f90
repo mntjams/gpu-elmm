@@ -247,12 +247,10 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
   S=0
   S2=0
-  maxI=-5
-  maxJ=-5
-  maxK=-5
   call BoundU(1,U)
   call BoundU(2,V)
   call BoundU(3,W)
+
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
@@ -261,105 +259,22 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
           S2=S2+abs(RHS(i,j,k)*dxPr(i)*dyPr(j)*dzPr(k))
           if (abs(RHS(i,j,k))>abs(S).and.i>1) then
                                       S=RHS(i,j,k)
-                                      maxI=i
-                                      maxJ=j
-                                      maxK=k
+
                                      endif
-          RHS(i,j,k)=RHS(i,j,k)/(dt2)
         else
           RHS(i,j,k)=(U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k))
           S2=S2+abs(RHS(i,j,k)*dxPr(i)*dyPr(j)*dzPr(k))
           if (abs(RHS(i,j,k))>abs(S).and.i>1) then
                                       S=RHS(i,j,k)
-                                      maxI=i
-                                      maxJ=j
-                                      maxK=k
+
                                      endif
-          RHS(i,j,k)=RHS(i,j,k)/(dt2)
         endif
     enddo
    enddo
   enddo
 
-  if ((maxI>-1).and.(maxJ>-1)) write (*,*) "maxRHS",maxI,maxJ,maxK,S
+  write (*,*) "maxRHS",S
   write (*,*) "avgRHS",S2/(lx*ly*lz)
-
-
-!     GOTO 30
-!   OPEN(11,file="Phi.vtk")
-!   write (11,"(A)") "# vtk DataFile Version 2.0"
-!   write (11,"(A)") "diplomka output file"
-!   write (11,"(A)") "ASCII"
-!   write (11,"(A)") "DATASET RECTILINEAR_GRID"
-!   str="DIMENSIONS"
-!   write (str(12:),*) Prnx,Prny,Prnz
-!   write (11,"(A)") str
-!   str="X_COORDINATES"
-!   write (str(15:),*) Prnx,"float"
-!   write (11,"(A)") str
-!   write (11,*) xPr(1:Prnx)
-!   str="Y_COORDINATES"
-!   write (str(15:),*) Prny,"float"
-!   write (11,"(A)") str
-!   write (11,*) yPr(1:Prny)
-!   str="Z_COORDINATES"
-!   write (str(15:),*) Prnz,"float"
-!   write (11,"(A)") str
-!   write (11,*) zPr(1:Prnz)
-!   str="POINT_DATA"
-!   write (str(12:),*) Prnx*Prny*Prnz
-!   write (11,"(A)") str
-!
-!
-!   write (11,"(A)") "SCALARS RHS float"
-!   write (11,"(A)") "LOOKUP_TABLE default"
-!   do k=1,Prnz
-!    do j=1,Prny
-!     do i=1,Prnx
-!       Write (11,*) Phi(i,j,k)
-!     enddo
-!    enddo
-!   enddo
-!   write (11,*)
-!   CLOSE(11)
-!   20 continue
-!   OPEN(11,file="RHS2.vtk")
-!   write (11,"(A)") "# vtk DataFile Version 2.0"
-!   write (11,"(A)") "diplomka output file"
-!   write (11,"(A)") "ASCII"
-!   write (11,"(A)") "DATASET RECTILINEAR_GRID"
-!   str="DIMENSIONS"
-!   write (str(12:),*) Prnx,Prny,Prnz
-!   write (11,"(A)") str
-!   str="X_COORDINATES"
-!   write (str(15:),*) Prnx,"float"
-!   write (11,"(A)") str
-!   write (11,*) xPr(1:Prnx)
-!   str="Y_COORDINATES"
-!   write (str(15:),*) Prny,"float"
-!   write (11,"(A)") str
-!   write (11,*) yPr(1:Prny)
-!   str="Z_COORDINATES"
-!   write (str(15:),*) Prnz,"float"
-!   write (11,"(A)") str
-!   write (11,*) zPr(1:Prnz)
-!   str="POINT_DATA"
-!   write (str(12:),*) Prnx*Prny*Prnz
-!   write (11,"(A)") str
-!
-!
-!   write (11,"(A)") "SCALARS RHS float"
-!   write (11,"(A)") "LOOKUP_TABLE default"
-!   do k=1,Prnz
-!    do j=1,Prny
-!     do i=1,Prnx
-!       Write (11,*) coef*RHS(i,j,k)*dt*3./(1./dxmin+1./dymin+1./dzmin)
-!     enddo
-!    enddo
-!   enddo
-!   write (11,*)
-!   CLOSE(11)
-!   30 continue
   endsubroutine PR_CORRECT
 
 
