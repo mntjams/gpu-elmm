@@ -600,8 +600,9 @@ contains
    ciline=PH%Planes(nearest)%a*PH%Planes(nearest2)%b-PH%Planes(nearest)%b*PH%Planes(nearest2)%a
 
    if (abs(ailine)<=epsilon(ailine).and.abs(biline)<=epsilon(biline).and.abs(ciline)<=epsilon(ciline)) then
-    write(*,*) PH%Planes(nearest)%c*PH%Planes(nearest2)%a,PH%Planes(nearest)%a*PH%Planes(nearest2)%c
     write(*,*) "cross product 0"
+    write(*,*) "numbers of planes",nearest,nearest2
+    write(*,*) "x,y,z",x,y,z
     write(*,*) "pl1",PH%Planes(nearest)%a,PH%Planes(nearest)%b,PH%Planes(nearest)%c,PH%Planes(nearest)%d
     write(*,*) "pl2",PH%Planes(nearest2)%a,PH%Planes(nearest2)%b,PH%Planes(nearest2)%c,PH%Planes(nearest2)%d
    endif
