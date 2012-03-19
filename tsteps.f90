@@ -1177,7 +1177,7 @@ contains
 
 
   !$hmpp <tsteps> PressureGrad codelet
-  pure subroutine PressureGrad(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxU,dyV,dzW,&
+  subroutine PressureGrad(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxU,dyV,dzW,&
                           Btype,prgradientx,prgradienty,&
                           Pr,U,V,W,&
                           dt,coef)
@@ -1201,6 +1201,8 @@ contains
    A=-coef*dt
    A=-coef*dt
 
+   !$omp parallel
+   !$omp do
    !$hmppcg grid blocksize 512x1
    !$hmppcg permute (k,i,j)
    do k=1,Unz
@@ -1210,6 +1212,8 @@ contains
      enddo
     enddo
    enddo
+   !$omp enddo nowait
+   !$omp do
    !$hmppcg grid blocksize 512x1
    !$hmppcg permute (k,i,j)
    do k=1,Vnz
@@ -1219,6 +1223,8 @@ contains
      enddo
     enddo
    enddo
+   !$omp enddo nowait
+   !$omp do
    !$hmppcg grid blocksize 512x1
    !$hmppcg permute (k,i,j)
    do k=1,Wnz
@@ -1228,6 +1234,8 @@ contains
      enddo
     enddo
    enddo
+   !$omp enddo nowait
+   !$omp end parallel
   end subroutine PressureGrad
 
 
