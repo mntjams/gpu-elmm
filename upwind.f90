@@ -10,7 +10,7 @@ module UPWIND
 
  use PARAMETERS
  use BOUNDARIES,only: BoundU, Bound_Pr
- use GEOMETRIC, only: TIBPoint,FirstIBPoint
+ use GEOMETRIC, only: UIBPoints, VIBPoints, WIBPoints
  use LIMITERS,  only: Limiter
 
  implicit none
@@ -217,9 +217,8 @@ module UPWIND
  subroutine Utim(U,V,W,Pr)
   real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND) Vloc,Wloc,Uyc,Uzc,dx2,dy2,dz2
-  integer i,j,k,x,y,z,nx,ny,nz
-  type(TIBPoint),pointer:: IBP
-     !!!!!!!!PORESIT IBM!!!!!!!!!!
+  integer i,j,k,xi,yj,zk,nx,ny,nz
+
   nx=Unx
   ny=Vny+1
   nz=Wnz+1
@@ -337,22 +336,14 @@ module UPWIND
    enddo
   endif
 
-  if (associated(FirstIBPoint)) then
-   IBP => FirstIBPoint
-   do
-    if (IBP%component==1) then
-     x=IBP%x
-     y=IBP%y
-     z=IBP%z
-     Ut(x,y,z)=Ut(x,y,z)+IBP%MSourc
-    endif
-    if (associated(IBP%next)) then
-     IBP=>IBP%next
-    else
-     exit
-    endif
-   enddo
-  endif
+
+  do i = 1,ubound(UIBPoints,1)
+      xi = UIBPoints(i)%xi
+      yj = UIBPoints(i)%yj
+      zk = UIBPoints(i)%zk
+      Ut(xi,yj,zk)=Ut(xi,yj,zk)+UIBPoints(i)%momsrc
+  enddo
+
 
   do k=1,nz
    do j=1,ny
@@ -389,8 +380,7 @@ module UPWIND
  subroutine Vtim(U,V,W,Pr)
   real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND) Vxc,Vzc,Uloc,Wloc,dx2,dy2,dz2
-  integer i,j,k,x,y,z,nx,ny,nz
-  type(TIBPoint),pointer:: IBP
+  integer i,j,k,xi,yj,zk,nx,ny,nz
 
   nx=Unx+1
   ny=Vny
@@ -517,22 +507,14 @@ module UPWIND
    enddo
   endif
 
-  if (associated(FirstIBPoint)) then
-   IBP => FirstIBPoint
-   do
-    if (IBP%component==2) then
-     x=IBP%x
-     y=IBP%y
-     z=IBP%z
-     Vt(x,y,z)=Vt(x,y,z)+IBP%MSourc
-    endif
-    if (associated(IBP%next)) then
-     IBP=>IBP%next
-    else
-     exit
-    endif
-   enddo
-  endif
+
+  do i = 1,ubound(VIBPoints,1)
+      xi = VIBPoints(i)%xi
+      yj = VIBPoints(i)%yj
+      zk = VIBPoints(i)%zk
+      Ut(xi,yj,zk)=Ut(xi,yj,zk)+VIBPoints(i)%momsrc
+  enddo
+
 
   do k=1,nz
    do j=1,ny
@@ -569,8 +551,7 @@ module UPWIND
  subroutine Wtim(U,V,W,Pr)
   real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   real(KND) Wxc,Wyc,Uloc,Vloc,dx2,dy2,dz2
-  integer i,j,k,x,y,z,nx,ny,nz
-  type(TIBPoint),pointer:: IBP
+  integer i,j,k,xi,yj,zk,nx,ny,nz
 
   nx=Unx+1
   ny=Vny+1
@@ -696,22 +677,14 @@ module UPWIND
    enddo
   endif
 
-  if (associated(FirstIBPoint)) then
-   IBP => FirstIBPoint
-   do
-    if (IBP%component==3) then
-     x=IBP%x
-     y=IBP%y
-     z=IBP%z
-     Wt(x,y,z)=Wt(x,y,z)+IBP%MSourc
-    endif
-    if (associated(IBP%next)) then
-     IBP=>IBP%next
-    else
-     exit
-    endif
-   enddo
-  endif
+
+  do i = 1,ubound(WIBPoints,1)
+      xi = WIBPoints(i)%xi
+      yj = WIBPoints(i)%yj
+      zk = WIBPoints(i)%zk
+      Wt(xi,yj,zk)=Wt(xi,yj,zk)+WIBPoints(i)%momsrc
+  enddo
+
 
   do k=1,nz
    do j=1,ny

@@ -1629,9 +1629,9 @@ contains
     if (Btype(We)==NOSLIP) then
       do k=1,Prnz
        do j=1,Prny
-         WMP%x=1
-         WMP%y=j
-         WMP%z=k
+         WMP%xi=1
+         WMP%yj=j
+         WMP%zk=k
          WMP%distx=(xPr(1)-xU(0))
          WMP%disty=0
          WMP%distz=0
@@ -1645,9 +1645,9 @@ contains
     if (Btype(Ea)==NOSLIP) then
       do k=1,Prnz
        do j=1,Prny
-         WMP%x=Prnx
-         WMP%y=j
-         WMP%z=k
+         WMP%xi=Prnx
+         WMP%yj=j
+         WMP%zk=k
          WMP%distx=(xPr(Prnx)-xU(Unx+1))
          WMP%disty=0
          WMP%distz=0
@@ -1661,9 +1661,9 @@ contains
     if (Btype(So)==NOSLIP) then
       do k=1,Prnz
        do i=1,Prnx
-         WMP%x=i
-         WMP%y=1
-         WMP%z=k
+         WMP%xi=i
+         WMP%yj=1
+         WMP%zk=k
          WMP%distx=0
          WMP%disty=(yPr(1)-yV(0))
          WMP%distz=0
@@ -1675,9 +1675,9 @@ contains
     elseif (Btype(So)==DIRICHLET) then
       do k=1,Prnz
        do i=1,Prnx
-         WMP%x=i
-         WMP%y=1
-         WMP%z=k
+         WMP%xi=i
+         WMP%yj=1
+         WMP%zk=k
          WMP%distx=0
          WMP%disty=(yPr(1)-yV(0))
          WMP%distz=0
@@ -1694,9 +1694,9 @@ contains
     if (Btype(No)==NOSLIP) then
       do k=1,Prnz
        do i=1,Prnx
-         WMP%x=i
-         WMP%y=Prny
-         WMP%z=k
+         WMP%xi=i
+         WMP%yj=Prny
+         WMP%zk=k
          WMP%distx=0
          WMP%disty=(yPr(Prny)-yV(Vny+1))
          WMP%distz=0
@@ -1708,9 +1708,9 @@ contains
     elseif (Btype(No)==DIRICHLET) then
       do k=1,Prnz
        do i=1,Prnx
-         WMP%x=i
-         WMP%y=Prny
-         WMP%z=k
+         WMP%xi=i
+         WMP%yj=Prny
+         WMP%zk=k
          WMP%distx=0
          WMP%disty=(yPr(Prny)-yV(Vny+1))
          WMP%distz=0
@@ -1729,9 +1729,9 @@ contains
        do i=1,Prnx
          if (Prtype(i,j,0)==0) then
 
-           WMP%x=i
-           WMP%y=j
-           WMP%z=1
+           WMP%xi=i
+           WMP%yj=j
+           WMP%zk=1
            WMP%distx=0
            WMP%disty=0
            WMP%distz=(zPr(1)-zW(0))
@@ -1759,9 +1759,9 @@ contains
       do j=1,Prny
        do i=1,Prnx
          if (Prtype(i,j,0)==0) then
-           WMP%x=i
-           WMP%y=j
-           WMP%z=1
+           WMP%xi=i
+           WMP%yj=j
+           WMP%zk=1
            WMP%distx=0
            WMP%disty=0
            WMP%distz=(zPr(1)-zW(0))
@@ -1792,9 +1792,9 @@ contains
 
       do j=1,Prny
        do i=1,Prnx
-         WMP%x=i
-         WMP%y=j
-         WMP%z=Prnz
+         WMP%xi=i
+         WMP%yj=j
+         WMP%zk=Prnz
          WMP%distx=0
          WMP%disty=0
          WMP%distz=(zPr(Prnz)-zW(Wnz+1))
@@ -1808,9 +1808,9 @@ contains
 
       do j=1,Prny
        do i=1,Prnx
-         WMP%x=i
-         WMP%y=j
-         WMP%z=Prnz
+         WMP%xi=i
+         WMP%yj=j
+         WMP%zk=Prnz
          WMP%distx=0
          WMP%disty=0
          WMP%distz=(zPr(Prnz)-zW(Wnz+1))

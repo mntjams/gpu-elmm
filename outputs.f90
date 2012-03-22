@@ -971,7 +971,7 @@ contains
           do
             if (allocated(WMP%depscalar)) then
               do i=1,computescalars
-              depos(WMP%x,WMP%y,i)=depos(WMP%x,WMP%y,i)+WMP%depscalar(i)
+              depos(WMP%xi,WMP%yj,i)=depos(WMP%xi,WMP%yj,i)+WMP%depscalar(i)
               enddo
             endif
 
@@ -1044,6 +1044,7 @@ contains
  character(70) :: str
  character(2) :: sc
  real(KND),dimension(:,:,:),allocatable :: Upat,Vpat,Wpat
+ character(8) ::  scalname="scalar00"
  integer i,j,k,l,m
 
   if (averaging==1.and.store%avg>0) then
@@ -1110,6 +1111,18 @@ contains
         write (11,*)
       endif
 
+      if (store%avg_U>0) then
+        write (11,"(A)") "VECTORS u float"
+        do k=1,Prnz
+         do j=1,Prny
+          do i=1,Prnx
+            write (11,*) (Uavg(i,j,k)+Uavg(i-1,j,k))/2._KND,(Vavg(i,j,k)+Vavg(i,j-1,k))/2._KND,(Wavg(i,j,k)+Wavg(i,j,k-1))/2._KND
+          enddo
+         enddo
+        enddo
+        close(11)
+      endif
+
       if (store%avg_vort>0) then
         write (11,"(A)") "VECTORS vort float"
         do k=1,Prnz
@@ -1125,18 +1138,6 @@ contains
          enddo
         enddo
         write (11,*)
-      endif
-
-      if (store%avg_U>0) then
-        write (11,"(A)") "VECTORS u float"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
-            write (11,*) (Uavg(i,j,k)+Uavg(i-1,j,k))/2._KND,(Vavg(i,j,k)+Vavg(i,j-1,k))/2._KND,(Wavg(i,j,k)+Wavg(i,j,k-1))/2._KND
-          enddo
-         enddo
-        enddo
-        close(11)
       endif
   endif !averaging
 
@@ -1167,8 +1168,8 @@ contains
           write (11,"(A)") str
 
           do l=1,computescalars
-            write(sc,"(I2.2)") l
-            write (11,"(A,1X,A,1X,A)") "SCALARS", sc , "float"
+            write(scalname(7:8),"(I2.2)") l
+            write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
             write (11,"(A)") "LOOKUP_TABLE default"
             do k=1,Prnz
              do j=1,Prny
@@ -1190,14 +1191,18 @@ contains
 
  subroutine OutputUVW(U,V,W)
  real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
- real(KND),dimension(1:Unx,1:Uny,1:Unz) :: Uinterp,Uinterpdir
- real(KND),dimension(1:Vnx,1:Vny,1:Vnz) :: Vinterp,Vinterpdir
- real(KND),dimension(1:Wnx,1:Wny,1:Wnz) :: Winterp,Winterpdir
- type(TIBPoint),pointer :: IBP
+ real(KND),dimension(:,:,:),allocatable :: Uinterp,Uinterpdir
+ real(KND),dimension(:,:,:),allocatable :: Vinterp,Vinterpdir
+ real(KND),dimension(:,:,:),allocatable :: Winterp,Winterpdir
  character(70) :: str
- integer i,j,k
+ integer i,j,k,l
 
   if ((store%U>0.or.store%V>0.or.store%W>0) .and. (store%U_interp>0.or.store%V_interp>0.or.store%W_interp>0)) then
+
+      allocate(Uinterp(1:Unx,1:Uny,1:Unz),Uinterpdir(1:Unx,1:Uny,1:Unz))
+      allocate(Vinterp(1:Vnx,1:Vny,1:Vnz),Vinterpdir(1:Vnx,1:Vny,1:Vnz))
+      allocate(Winterp(1:Wnx,1:Wny,1:Wnz),Winterpdir(1:Wnx,1:Wny,1:Wnz))
+
       Uinterp=-1
       Uinterpdir=-1
       Vinterp=-1
@@ -1205,37 +1210,40 @@ contains
       Winterp=-1
       Winterpdir=-1
 
-      if (associated(FirstIBPoint)) then
-        IBP => FirstIBPoint
-        do
-          i=IBP%x
-          j=IBP%y
-          k=IBP%z
 
-          if (IBP%component==1) then
-            Uinterp(i,j,k)=IBP%interp
-          elseif (IBP%component==2) then
-            Vinterp(i,j,k)=IBP%interp
-          elseif (IBP%component==3) then
-            Winterp(i,j,k)=IBP%interp
-          endif
+      do l = 1,ubound(UIBPoints,1)
 
-          if (IBP%component==1) then
-            Uinterpdir(i,j,k)=IBP%interpdir
-          elseif (IBP%component==2) then
-            Vinterpdir(i,j,k)=IBP%interpdir
-          elseif (IBP%component==3) then
-            Winterpdir(i,j,k)=IBP%interpdir
-          endif
+          i=UIBPoints(l)%xi
+          j=UIBPoints(l)%yj
+          k=UIBPoints(l)%zk
 
-          if (associated(IBP%next)) then
-            IBP=>IBP%next
-          else
-            exit
-          endif
+          Uinterp(i,j,k)=UIBPoints(l)%interp
+          Uinterpdir(i,j,k)=UIBPoints(l)%interpdir
 
-        enddo
-      endif
+      enddo
+
+      do l = 1,ubound(VIBPoints,1)
+
+          i=VIBPoints(l)%xi
+          j=VIBPoints(l)%yj
+          k=VIBPoints(l)%zk
+
+          Vinterp(i,j,k)=VIBPoints(l)%interp
+          Vinterpdir(i,j,k)=VIBPoints(l)%interpdir
+
+      enddo
+
+      do l = 1,ubound(WIBPoints,1)
+
+          i=WIBPoints(l)%xi
+          j=WIBPoints(l)%yj
+          k=WIBPoints(l)%zk
+
+          Winterp(i,j,k)=WIBPoints(l)%interp
+          Winterpdir(i,j,k)=WIBPoints(l)%interpdir
+
+      enddo
+
   endif ! U & interp
 
   if (store%U>0) then

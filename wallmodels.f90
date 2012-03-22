@@ -10,9 +10,9 @@ implicit none
 
  type WMpoint   !points in which we apply wall model
 
-  integer   :: x
-  integer   :: y
-  integer   :: z
+  integer   :: xi
+  integer   :: yj
+  integer   :: zk
 
   real(KND) :: distx
   real(KND) :: disty
@@ -125,9 +125,9 @@ implicit none
    real(KND) ustar,vel,dist,dp,dptrans,dpx,dpy,dpz
    type(WMPoint):: WMP
 
-    i=WMP%x
-    j=WMP%y
-    k=WMP%z
+    i=WMP%xi
+    j=WMP%yj
+    k=WMP%zk
 
     dist=sqrt(WMP%distx**2+WMP%disty**2+WMP%distz**2)
 
@@ -386,9 +386,9 @@ implicit none
    real(KND) ustar,vel,dist,z0,dp,dptrans,dpx,dpy,dpz
    type(WMPoint):: WMP
 
-   i=WMP%x
-   j=WMP%y
-   k=WMP%z
+   i=WMP%xi
+   j=WMP%yj
+   k=WMP%zk
 
    dist=sqrt(WMP%distx**2+WMP%disty**2+WMP%distz**2)
 
@@ -462,9 +462,9 @@ implicit none
    real(KND) ustar,vel,dist,z0
    type(WMPoint):: WMP
 
-   i=WMP%x
-   j=WMP%y
-   k=WMP%z
+   i=WMP%xi
+   j=WMP%yj
+   k=WMP%zk
 
    dist=sqrt(WMP%distx**2+WMP%disty**2+WMP%distz**2)
 
@@ -503,9 +503,9 @@ implicit none
    real(KND) ustar,vel,dist,z0,tempflux
    type(WMPoint):: WMP
 
-   i=WMP%x
-   j=WMP%y
-   k=WMP%z
+   i=WMP%xi
+   j=WMP%yj
+   k=WMP%zk
    !provizorni zpusob pro steny orientovane se stenami site
    dist=sqrt(WMP%distx**2+WMP%disty**2+WMP%distz**2)
 
@@ -584,8 +584,8 @@ implicit none
     if (associated(FirstWMPoint)) then
     WMP => FirstWMPoint
     do
-     if (WMP%z==1) WMP%tempfl=-TDiff(WMP%x,WMP%y,1)*&
-                    (temperature(WMP%x,WMP%y,1)-temperature(WMP%x,WMP%y,0))
+     if (WMP%zk==1) WMP%tempfl=-TDiff(WMP%xi,WMP%yj,1)*&
+                    (temperature(WMP%xi,WMP%yj,1)-temperature(WMP%xi,WMP%yj,0))
      if (associated(WMP%next)) then
       WMP=>WMP%next
      else
@@ -621,12 +621,12 @@ implicit none
       if (WMP%z0>0) then
 
         if (buoyancy==1.and.TBtype(Bo)==CONSTFLUX) then
-          Visc(WMP%x,WMP%y,WMP%z)=WM_MO_FLUX(WMP,U,V,W,Pr)
+          Visc(WMP%xi,WMP%yj,WMP%zk)=WM_MO_FLUX(WMP,U,V,W,Pr)
         else if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
-         if (WMP%z==1) WMP%temp=BsideTArr(WMP%x,WMP%y)
-         call WM_MO_DIRICHLET(Visc(WMP%x,WMP%y,WMP%z),WMP,U,V,W,Pr)
+         if (WMP%zk==1) WMP%temp=BsideTArr(WMP%xi,WMP%yj)
+         call WM_MO_DIRICHLET(Visc(WMP%xi,WMP%yj,WMP%zk),WMP,U,V,W,Pr)
         else
-          Visc(WMP%x,WMP%y,WMP%z)=WM2Visc(WMP,U,V,W,Pr)
+          Visc(WMP%xi,WMP%yj,WMP%zk)=WM2Visc(WMP,U,V,W,Pr)
         endif
 
       else
@@ -634,7 +634,7 @@ implicit none
         if (Re<=0) then
          stop "The wall model requires positive viscosity or roughness length."
         endif
-        Visc(WMP%x,WMP%y,WMP%z)=WM1Visc(WMP,U,V,W,Pr)
+        Visc(WMP%xi,WMP%yj,WMP%zk)=WM1Visc(WMP,U,V,W,Pr)
       endif
 
       if (associated(WMP%next)) then

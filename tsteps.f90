@@ -11,7 +11,6 @@ module TSTEPS
   use SCALARS, only:  Bound_Temp, Bound_Visc, Scalar, percdistrib, AdvScalar,&
      DiffScalar, ComputeTDiff, Deposition, GravSettling, ScalFlSourc, VolScalSource
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
-  use GEOMETRIC, only: IBLinInt,IBBiLinInt,IBTriLinInt
   use Wallmodels, only: ComputeViscsWM
 
   implicit none
@@ -43,12 +42,12 @@ contains
 
   integer i,j,k,l
   real(KND) p
-  integer,save:: called=0
+  integer,save:: called = 0
   real time1,time2
 
 
   if (called==0) then
-   called=1
+   called = 1
 
    allocate(U2(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)))
    allocate(V2(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)))
@@ -113,16 +112,16 @@ contains
 !
 !   if (buoyancy==1)  call Bound_Temp(temperature)
 
-  if ((Btype(We)==TurbulentInlet).or.(Btype(Ea)==TurbulentInlet)) then
+  if ((Btype(We) ==TurbulentInlet).or.(Btype(Ea) ==TurbulentInlet)) then
     call GetTurbInlet
     !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
-  else if (Btype(We)==InletFromFile) then
+  else if (Btype(We) ==InletFromFile) then
     call GetInletFromFile(time)
     !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
   endif
 
   !$hmpp <tsteps> advancedload, args[TimeStepEul::time]
-  !$hmpp <tsteps> TimeStepEul callsite, args[*].noupdate=true
+  !$hmpp <tsteps> TimeStepEul callsite, args[*].noupdate = true
   call TimeStepEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                dxmin,dxU,dyV,dzW,CFL,Uref,steady,time,endtime,&
                U,V,W,dt)
@@ -130,24 +129,24 @@ contains
 
   write (*,*) "time:",time,"dt: ",dt
 
-  temperature_adv=0
+  temperature_adv = 0
 
   do l=1,3
 
 
     if (debugparam>1) call cpu_time(time1)
 
-    !$hmpp <tsteps> BoundU callsite, args[*].noupdate=true
+    !$hmpp <tsteps> BoundU callsite, args[*].noupdate = true
     call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
                          Btype,sideU,&
                          Uin,U,0)
 
-    !$hmpp <tsteps> BoundV callsite, args[*].noupdate=true
+    !$hmpp <tsteps> BoundV callsite, args[*].noupdate = true
     call BoundU_GPU(2,Vnx,Vny,Vnz,Prny,Prnz,&
                          Btype,sideU,&
                          Vin,V,0)
 
-    !$hmpp <tsteps> BoundW callsite, args[*].noupdate=true
+    !$hmpp <tsteps> BoundW callsite, args[*].noupdate = true
     call BoundU_GPU(3,Wnx,Wny,Wnz,Prny,Prnz,&
                          Btype,sideU,&
                          Win,W,0)
@@ -158,7 +157,7 @@ contains
     !$hmpp <tsteps> advancedload, args[Convection::lev]
 
 
-    !$hmpp <tsteps> Convection callsite, args[*].noupdate=true
+    !$hmpp <tsteps> Convection callsite, args[*].noupdate = true
     call Convection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
                        dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
                        U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,l,dt)
@@ -167,7 +166,7 @@ contains
     if (debugparam>1) then
      call cpu_time(time2)
      write (*,*) "ET of part 1", (time2-time1)
-     time1=time2
+     time1 = time2
     endif
 
 
@@ -178,18 +177,18 @@ contains
     if (debugparam>1) then
      call cpu_time(time2)
      write (*,*) "ET of part 2", (time2-time1)
-     time1=time2
+     time1 = time2
     endif
 
 
-    if (Btype(To)==FreeSlipBuff)  then
-        !$hmpp <tsteps> AttenuateTop callsite, args[*].noupdate=true
+    if (Btype(To) ==FreeSlipBuff)  then
+        !$hmpp <tsteps> AttenuateTop callsite, args[*].noupdate = true
         call AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                           zPr,zW,U2,V2,W2,temperature,buoyancy)
     endif
 
-    if (Btype(Ea)==OutletBuff) then
-        !$hmpp <tsteps> AttenuateOut callsite, args[*].noupdate=true
+    if (Btype(Ea) ==OutletBuff) then
+        !$hmpp <tsteps> AttenuateOut callsite, args[*].noupdate = true
         call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                           xPr,xU,U2,V2,W2,temperature,buoyancy)
     endif
@@ -202,7 +201,7 @@ contains
 
 
     if (masssourc==1) then
-        call MASS_SOURC(Q,U2,V2,W2)
+        call IBMassSources(Q,U2,V2,W2)
         call BoundU(1,U2)
         call BoundU(2,V2)
         call BoundU(3,W2)
@@ -220,16 +219,16 @@ contains
     endif
 
 
-    if (l==1) delta=0
+    if (l==1) delta = 0
 !     if (debuglevel>0) then
-      delta=delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-      delta=delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
-      delta=delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
+      delta = delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
+      delta = delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
+      delta = delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
 !     endif
 
-    U=U2
-    V=V2
-    W=W2
+    U = U2
+    V = V2
+    W = W2
 
 
 
@@ -252,17 +251,17 @@ contains
     if (computescalars>0) then
       Scalar_2=0
       if (l>1) then
-       Scalar_2=Scalar_2+Scalar_adv*rho(l)
+       Scalar_2 = Scalar_2+Scalar_adv*rho(l)
       endif
-      Scalar_adv=0
+      Scalar_adv = 0
       do i=1,computescalars
        call AdvScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U,V,W,2,1._KND)
       enddo
-      Scalar_2=Scalar_2+Scalar_adv*beta(l)
+      Scalar_2 = Scalar_2+Scalar_adv*beta(l)
 
       if (scalsourcetype==pointsource) then
        do i=1,computescalars
-        Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)=Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
+        Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i) = Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
          percdistrib(i)*(rho(l)+beta(l))*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
        enddo
       elseif (scalsourcetype==volumesource) then
@@ -271,7 +270,7 @@ contains
        enddo
       endif
 
-      Scalar=Scalar+Scalar_2
+      Scalar = Scalar+Scalar_2
       if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
       call Bound_Visc(TDiff)
       do i=1,computescalars
@@ -279,7 +278,7 @@ contains
       enddo
       if (computedeposition>0) call Deposition(Scalar_2,2._KND*alpha(l))
       if (computegravsettling>0) call GravSettling(Scalar_2,2._KND*alpha(l))
-      Scalar=Scalar_2
+      Scalar = Scalar_2
     endif
 
     if (buoyancy>0) then
@@ -289,32 +288,32 @@ contains
       call Bound_Temp(temperature)
 
       if (l>1) then
-       temperature2=temperature2+temperature_adv*rho(l)
+       temperature2 = temperature2+temperature_adv*rho(l)
       endif
-      temperature_adv=0
+      temperature_adv = 0
       call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND)
-      temperature2=temperature2+temperature_adv*beta(l)
+      temperature2 = temperature2+temperature_adv*beta(l)
 
-      temperature=temperature+temperature2
+      temperature = temperature+temperature2
       call Bound_Temp(temperature)
        call DiffScalar(temperature2,temperature,1,2._KND*alpha(l))
-      temperature=temperature2
+      temperature = temperature2
     endif
 
     if (buoyancy==1) then
      !$hmpp <tsteps> advancedload, args[AttenuateOut2::temperature]
     endif
 
-    if (Btype(Ea)==OutletBuff) then
-     !$hmpp <tsteps> AttenuateOut2 callsite, args[*].noupdate=true
+    if (Btype(Ea) ==OutletBuff) then
+     !$hmpp <tsteps> AttenuateOut2 callsite, args[*].noupdate = true
       call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                         xPr,xU,U,V,W,temperature,buoyancy)
     endif
 
 
-    !$hmpp <tsteps> NullInterior callsite, args[*].noupdate=true
-    call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-                          nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
+!     !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
+!     call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+!                           nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
 
 
    enddo
@@ -334,7 +333,7 @@ contains
 !  subroutine UpdateU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,U,V,W,U2,V2,W2)
 !  implicit none
 ! #ifdef __HMPP
-!  integer,parameter :: KND=4
+!  integer,parameter :: KND = 4
 ! #endif
 !  integer,intent(in)   :: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
 !  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out)  :: U
@@ -350,7 +349,7 @@ contains
 !    do k=-2,Unz+3
 !     do j=-2,Uny+3
 !      do i=-2,Unx+3
-!       U(i,j,k)=U2(i,j,k)
+!       U(i,j,k) = U2(i,j,k)
 !      enddo
 !     enddo
 !    enddo
@@ -360,7 +359,7 @@ contains
 !    do k=-2,Vnz+3
 !     do j=-2,Vny+3
 !      do i=-2,Vnx+3
-!       V(i,j,k)=V2(i,j,k)
+!       V(i,j,k) = V2(i,j,k)
 !      enddo
 !     enddo
 !    enddo
@@ -370,7 +369,7 @@ contains
 !    do k=-2,Wnz+3
 !     do j=-2,Wny+3
 !      do i=-2,Wnx+3
-!       W(i,j,k)=W2(i,j,k)
+!       W(i,j,k) = W2(i,j,k)
 !      enddo
 !     enddo
 !    enddo
@@ -387,7 +386,7 @@ contains
                        U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev,dt)
   implicit none
 #ifdef __HMPP
-  integer,parameter :: KND=4
+  integer,parameter :: KND = 4
   intrinsic abs
 #endif
 
@@ -413,7 +412,7 @@ contains
         do k=1,Unz
          do j=1,Uny
           do i=1,Unx
-           U2(i,j,k)=Ustar(i,j,k)*rho(lev)
+           U2(i,j,k) = Ustar(i,j,k)*rho(lev)
           enddo
          enddo
         enddo
@@ -422,7 +421,7 @@ contains
         do k=1,Vnz
          do j=1,Vny
           do i=1,Vnx
-           V2(i,j,k)=Vstar(i,j,k)*rho(lev)
+           V2(i,j,k) = Vstar(i,j,k)*rho(lev)
           enddo
          enddo
         enddo
@@ -431,7 +430,7 @@ contains
         do k=1,Wnz
          do j=1,Wny
           do i=1,Wnx
-           W2(i,j,k)=Wstar(i,j,k)*rho(lev)
+           W2(i,j,k) = Wstar(i,j,k)*rho(lev)
           enddo
          enddo
         enddo
@@ -441,7 +440,7 @@ contains
         do k=1,Unz
          do j=1,Uny
           do i=1,Unx
-           Ustar(i,j,k)=0
+           Ustar(i,j,k) = 0
           enddo
          enddo
         enddo
@@ -450,7 +449,7 @@ contains
         do k=1,Vnz
          do j=1,Vny
           do i=1,Vnx
-           Vstar(i,j,k)=0
+           Vstar(i,j,k) = 0
           enddo
          enddo
         enddo
@@ -459,7 +458,7 @@ contains
         do k=1,Wnz
          do j=1,Wny
           do i=1,Wnx
-           Wstar(i,j,k)=0
+           Wstar(i,j,k) = 0
           enddo
          enddo
         enddo
@@ -469,7 +468,7 @@ contains
         do k=1,Unz
          do j=1,Uny
           do i=1,Unx
-           U2(i,j,k)=0
+           U2(i,j,k) = 0
           enddo
          enddo
         enddo
@@ -478,7 +477,7 @@ contains
         do k=1,Vnz
          do j=1,Vny
           do i=1,Vnx
-           V2(i,j,k)=0
+           V2(i,j,k) = 0
           enddo
          enddo
         enddo
@@ -487,7 +486,7 @@ contains
         do k=1,Wnz
          do j=1,Wny
           do i=1,Wnx
-           W2(i,j,k)=0
+           W2(i,j,k) = 0
           enddo
          enddo
         enddo
@@ -504,7 +503,7 @@ contains
         do k=1,Unz
          do j=1,Uny
           do i=1,Unx
-           Ustar(i,j,k)=0
+           Ustar(i,j,k) = 0
           enddo
          enddo
         enddo
@@ -513,7 +512,7 @@ contains
         do k=1,Vnz
          do j=1,Vny
           do i=1,Vnx
-           Vstar(i,j,k)=0
+           Vstar(i,j,k) = 0
           enddo
          enddo
         enddo
@@ -522,7 +521,7 @@ contains
         do k=1,Wnz
          do j=1,Wny
           do i=1,Wnx
-           Wstar(i,j,k)=0
+           Wstar(i,j,k) = 0
           enddo
          enddo
         enddo
@@ -542,7 +541,7 @@ contains
       do k=1,Unz
        do j=1,Uny
         do i=1,Unx
-         U2(i,j,k)=U2(i,j,k)+Ustar(i,j,k)*beta(lev)
+         U2(i,j,k) = U2(i,j,k)+Ustar(i,j,k)*beta(lev)
         enddo
        enddo
       enddo
@@ -551,7 +550,7 @@ contains
       do k=1,Vnz
        do j=1,Vny
         do i=1,Vnx
-         V2(i,j,k)=V2(i,j,k)+Vstar(i,j,k)*beta(lev)
+         V2(i,j,k) = V2(i,j,k)+Vstar(i,j,k)*beta(lev)
         enddo
        enddo
       enddo
@@ -560,7 +559,7 @@ contains
       do k=1,Wnz
        do j=1,Wny
         do i=1,Wnx
-         W2(i,j,k)=W2(i,j,k)+Wstar(i,j,k)*beta(lev)
+         W2(i,j,k) = W2(i,j,k)+Wstar(i,j,k)*beta(lev)
         enddo
        enddo
       enddo
@@ -579,7 +578,7 @@ contains
                        U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev,dt)
   implicit none
 #ifdef __HMPP
-  integer,parameter :: KND=4
+  integer,parameter :: KND = 4
   intrinsic abs
 #endif
 
@@ -608,56 +607,56 @@ contains
   subroutine Release
   real(KND) xc,yc,xs,xf,ys,yf,zs,zf,dxp,dyp,dzp,ct,cr,xp,yp,zp,p
   integer i,j,k,xi,yj,zk,nprobx,nproby,nprobz
-  ct=7
-  cr=1.5
-  xc=3*cos((xheading-70)*pi/180.)
-  yc=3*sin((xheading-70)*pi/180.)
-  xs=xc-cr
-  ys=yc-cr
-  zs=0
-  xf=xc+cr
-  yf=yc+cr
-  zf=ct
-  nprobx=100
-  nproby=100
-  nprobz=100
+  ct = 7
+  cr = 1.5
+  xc = 3*cos((xheading-70)*pi/180.)
+  yc = 3*sin((xheading-70)*pi/180.)
+  xs = xc-cr
+  ys = yc-cr
+  zs = 0
+  xf = xc+cr
+  yf = yc+cr
+  zf = ct
+  nprobx = 100
+  nproby = 100
+  nprobz = 100
   dxp=(xf-xs)/nprobx
   dyp=(yf-ys)/nproby
   dzp=(zf-zs)/nprobz
   if (computescalars>=4) then
    if (time>(endtime-starttime)/3._KND) then
-    Scalar=0
-    p=0
+    Scalar = 0
+    p = 0
     do k=0,nprobz
-     zp=zs+k*dzp
+     zp = zs+k*dzp
      do j=0,nproby
-      yp=ys+j*dyp
+      yp = ys+j*dyp
       do i=0,nprobx
-       xp=xs+i*dxp
+       xp = xs+i*dxp
         call GridCoords(xi,yj,zk,xp,yp,zp)
         if ((xp-xc)**2+(yp-yc)**2<cr**2) then
         if   (zp<ct*0.2) then
-         Scalar(xi,yj,zk,:)=Scalar(xi,yj,zk,:)+percdistrib(:)*0.2
-         p=p+1
+         Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:)*0.2
+         p = p+1
         elseif (zp<ct*0.4) then
-         Scalar(xi,yj,zk,:)=Scalar(xi,yj,zk,:)+percdistrib(:)*0.8
-         p=p+1
+         Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:)*0.8
+         p = p+1
         elseif (zp<ct*0.6) then
-         Scalar(xi,yj,zk,:)=Scalar(xi,yj,zk,:)+percdistrib(:)*1.25
-         p=p+1
+         Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:)*1.25
+         p = p+1
         elseif (zp<ct*0.8) then
-         Scalar(xi,yj,zk,:)=Scalar(xi,yj,zk,:)+percdistrib(:)*1.75
-         p=p+1
+         Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:)*1.75
+         p = p+1
         elseif (zp<=ct) then
-         Scalar(xi,yj,zk,:)=Scalar(xi,yj,zk,:)+percdistrib(:)*1.1
-         p=p+1
+         Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:)  +percdistrib(:)*1.1
+         p = p+1
         endif
        endif
       enddo
      enddo
     enddo
-    Scalar=totalscalsource*Scalar/p
-    Scalar=Scalar/(dxmin*dymin*dzmin)
+    Scalar = totalscalsource*Scalar/p
+    Scalar = Scalar/(dxmin*dymin*dzmin)
     released=.true.
    endif
   endif
@@ -670,282 +669,221 @@ contains
 
 
 
-  subroutine MomSourc(U,V,W)
-  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-  real(KND) intvel,p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7
-  type(TIBPoint),pointer:: IBP
-  integer x,y,z,dirx,diry,dirz,n
+  subroutine IBMomentumSources(IBPoints,U,xU,yU,zU)
+    use GEOMETRIC, only: IBLinInterpolation, IBBiLinInterpolation, IBTriLinInterpolation, TIBPoint
 
-        call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
-                             Btype,sideU,&
-                             Uin,U,0)
-        call BoundU_GPU(2,Vnx,Vny,Vnz,Prny,Prnz,&
-                             Btype,sideU,&
-                             Vin,V,0)
-        call BoundU_GPU(3,Wnx,Wny,Wnz,Prny,Prnz,&
-                             Btype,sideU,&
-                             Win,W,0)
+    type(TIBpoint),dimension(:),intent(inout) :: IBPoints
+    real(KND),intent(in)                      :: U(-2:,-2:,-2:)
+    real(KND),dimension(-2:),intent(in)       :: xU,yU,zU
+    real(KND) intvel,p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7
+    integer i,xi,yj,zk,dirx,diry,dirz
 
-  if (associated(FirstIBPoint)) then
-   IBP => FirstIBPoint
-   do
-    x=IBP%x
-    y=IBP%y
-    z=IBP%z
-    dirx=IBP%dirx
-    diry=IBP%diry
-    dirz=IBP%dirz
-    if (IBP%interp<=0) then
-     intvel=0
-    elseif (IBP%interp==1) then
-      n=0
-      if (dirx/=0)  n=n+1
-      if (diry/=0)  n=n+1
-      if (dirz/=0)  n=n+1
-      if (n/=1) then
-                 write (*,*) "Assert error, more directions.", dirx,diry,dirz
-                 stop
-       endif
+    !$omp parallel do default(private) shared(IBPoints,U,xU,yU,zU,dt)
+    do i=1,ubound(IBPoints,1)
+      xi = IBPoints(i)%xi
+      yj = IBPoints(i)%yj
+      zk = IBPoints(i)%zk
 
-     if (IBP%component==1) then
-      vel1=U(x+dirx,y+diry,z+dirz)
-      vel2=U(x+2*dirx,y+2*diry,z+2*dirz)
-      if (IBP%interpdir==1) then
-       p0=abs(IBP%distx)
-       p1=abs(xU(x+dirx)-xU(x))
-       p2=abs(xU(x+2*dirx)-xU(x))
-      elseif (IBP%interpdir==2) then
-       p0=abs(IBP%disty)
-       p1=abs(yPr(y+diry)-yPr(y))
-       p2=abs(yPr(y+2*diry)-yPr(y))
+      dirx = IBPoints(i)%dirx
+      diry = IBPoints(i)%diry
+      dirz = IBPoints(i)%dirz
+
+      if (IBPoints(i)%interp<=0) then
+
+
+          intvel = 0
+
+
+      elseif (IBPoints(i)%interp==1) then
+
+
+          vel1 = U(xi+dirx,yj+diry,zk+dirz)
+          vel2 = U(xi+2*dirx,yj+2*diry,zk+2*dirz)
+
+          if (IBPoints(i)%interpdir==1) then
+            p0 = abs(IBPoints(i)%distx)
+            p1 = abs(xU(xi+dirx)-xU(xi))
+            p2 = abs(xU(xi+2*dirx)-xU(xi))
+          elseif (IBPoints(i)%interpdir==2) then
+            p0 = abs(IBPoints(i)%disty)
+            p1 = abs(yU(yj+diry)-yU(yj))
+            p2 = abs(yU(yj+2*diry)-yU(yj))
+          else
+            p0 = abs(IBPoints(i)%distz)
+            p1 = abs(zU(zk+dirz)-zU(zk))
+            p2 = abs(zU(zk+2*dirz)-zU(zk))
+          endif
+
+          intvel = IBLinInterpolation(p0,p1,p2,vel1,vel2)
+
+
+      elseif (IBPoints(i)%interp==2) then
+
+
+          if (IBPoints(i)%interpdir==1) then
+            vel1 = U(xi,yj+diry,zk)
+            vel2 = U(xi,yj,zk+dirz)
+            vel3 = U(xi,yj+diry,zk+dirz)
+            p0 = abs(IBPoints(i)%disty)
+            p1 = abs(IBPoints(i)%distz)
+            p2 = abs(yU(yj+diry)-yU(yj))
+            p3 = abs(zU(zk+dirz)-zU(zk))
+          elseif (IBPoints(i)%interpdir==2) then
+            vel1 = U(xi,yj,zk+dirz)
+            vel2 = U(xi+dirx,yj,zk)
+            vel3 = U(xi+dirx,yj,zk+dirz)
+            p0 = abs(IBPoints(i)%distz)
+            p1 = abs(IBPoints(i)%distx)
+            p2 = abs(zU(zk+dirz)-zU(zk))
+            p3 = abs(xU(xi+dirx)-xU(xi))
+          else
+            vel1 = U(xi+dirx,yj,zk)
+            vel2 = U(xi,yj+diry,zk)
+            vel3 = U(xi+dirx,yj+diry,zk)
+            p0 = abs(IBPoints(i)%distx)
+            p1 = abs(IBPoints(i)%disty)
+            p2 = abs(xU(xi+dirx)-xU(xi))
+            p3 = abs(yU(yj+diry)-yU(yj))
+          endif
+
+          intvel = IBBiLinInterpolation(p0,p1,p2,p3,vel1,vel2,vel3)
+
+
+      elseif (IBPoints(i)%interp==3) then
+
+
+          vel1 = U(xi+dirx,yj,zk)
+          vel2 = U(xi,yj+diry,zk)
+          vel3 = U(xi+dirx,yj+diry,zk)
+          vel4 = U(xi,yj,zk+dirz)
+          vel5 = U(xi+dirx,yj,zk+dirz)
+          vel6 = U(xi,yj+diry,zk+dirz)
+          vel7 = U(xi+dirx,yj+diry,zk+dirz)
+          p0 = abs(IBPoints(i)%distx)
+          p1 = abs(IBPoints(i)%disty)
+          p2 = abs(IBPoints(i)%distz)
+          p3 = abs(xU(xi+dirx)-xU(xi))
+          p4 = abs(yU(yj+diry)-yU(yj))
+          p5 = abs(zU(zk+dirz)-zU(zk))
+
+          intvel = IBTriLinInterpolation(p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7)
+
       else
-       p0=abs(IBP%distz)
-       p1=abs(zPr(z+dirz)-zPr(z))
-       p2=abs(zPr(z+2*dirz)-zPr(z))
+
+
+          intvel = 0
+
+
       endif
-    elseif (IBP%component==2) then
-      vel1=V(x+dirx,y+diry,z+dirz)
-      vel2=V(x+2*dirx,y+2*diry,z+2*dirz)
-      if (IBP%interpdir==1) then
-       p0=abs(IBP%distx)
-       p1=abs(xPr(x+dirx)-xPr(x))
-       p2=abs(xPr(x+2*dirx)-xPr(x))
-      elseif (IBP%interpdir==2) then
-       p0=abs(IBP%disty)
-       p1=abs(yV(y+diry)-yV(y))
-       p2=abs(yV(y+2*diry)-yV(y))
-      else
-       p0=abs(IBP%distz)
-       p1=abs(zPr(z+dirz)-zPr(z))
-       p2=abs(zPr(z+2*dirz)-zPr(z))
-     endif
-     else
-      vel1=W(x+dirx,y+diry,z+dirz)
-      vel2=W(x+2*dirx,y+2*diry,z+2*dirz)
-      if (IBP%interpdir==1) then
-       p0=abs(IBP%distx)
-       p1=abs(xPr(x+dirx)-xPr(x))
-       p2=abs(xPr(x+2*dirx)-xPr(x))
-      elseif (IBP%interpdir==2) then
-       p0=abs(IBP%disty)
-       p1=abs(yPr(y+diry)-yPr(y))
-       p2=abs(yPr(y+2*diry)-yPr(y))
-      else
-       p0=abs(IBP%distz)
-       p1=abs(zW(z+dirz)-zW(z))
-       p2=abs(zW(z+2*dirz)-zW(z))
-      endif
-     endif
-
-     intvel=IBLinInt(p0,p1,p2,vel1,vel2)
-
-    elseif (IBP%interp==2) then
-     if (IBP%component==1) then
-      if (IBP%interpdir==1) then
-       vel1=U(x,y+diry,z)
-       vel2=U(x,y,z+dirz)
-       vel3=U(x,y+diry,z+dirz)
-       p0=abs(IBP%disty)
-       p1=abs(IBP%distz)
-       p2=abs(yPr(y+diry)-yPr(y))
-       p3=abs(zPr(z+dirz)-zPr(z))
-      elseif (IBP%interpdir==2) then
-       vel1=U(x,y,z+dirz)
-       vel2=U(x+dirx,y,z)
-       vel3=U(x+dirx,y,z+dirz)
-       p0=abs(IBP%distz)
-       p1=abs(IBP%distx)
-       p2=abs(zPr(z+dirz)-zPr(z))
-       p3=abs(xU(x+dirx)-xU(x))
-      else
-       vel1=U(x+dirx,y,z)
-       vel2=U(x,y+diry,z)
-       vel3=U(x+dirx,y+diry,z)
-       p0=abs(IBP%distx)
-       p1=abs(IBP%disty)
-       p2=abs(xU(x+dirx)-xU(x))
-       p3=abs(yPr(y+diry)-yPr(y))
-      endif
-     elseif (IBP%component==2) then
-      if (IBP%interpdir==1) then
-       vel1=V(x,y+diry,z)
-       vel2=V(x,y,z+dirz)
-       vel3=V(x,y+diry,z+dirz)
-       p0=abs(IBP%disty)
-       p1=abs(IBP%distz)
-       p2=abs(yV(y+diry)-yV(y))
-       p3=abs(zPr(z+dirz)-zPr(z))
-      elseif (IBP%interpdir==2) then
-       vel1=V(x,y,z+dirz)
-       vel2=V(x+dirx,y,z)
-       vel3=V(x+dirx,y,z+dirz)
-       p0=abs(IBP%distz)
-       p1=abs(IBP%distx)
-       p2=abs(zPr(z+dirz)-zPr(z))
-       p3=abs(xPr(x+dirx)-xPr(x))
-      else
-       vel1=V(x+dirx,y,z)
-       vel2=V(x,y+diry,z)
-       vel3=V(x+dirx,y+diry,z)
-       p0=abs(IBP%distx)
-       p1=abs(IBP%disty)
-       p2=abs(xPr(x+dirx)-xPr(x))
-       p3=abs(yV(y+diry)-yV(y))
-      endif
-     else
-      if (IBP%interpdir==1) then
-       vel1=W(x,y+diry,z)
-       vel2=W(x,y,z+dirz)
-       vel3=W(x,y+diry,z+dirz)
-       p0=abs(IBP%disty)
-       p1=abs(IBP%distz)
-       p2=abs(yPr(y+diry)-yPr(y))
-       p3=abs(zW(z+dirz)-zW(z))
-      elseif (IBP%interpdir==2) then
-       vel1=W(x,y,z+dirz)
-       vel2=W(x+dirx,y,z)
-       vel3=W(x+dirx,y,z+dirz)
-       p0=abs(IBP%distz)
-       p1=abs(IBP%distx)
-       p2=abs(zW(z+dirz)-zW(z))
-       p3=abs(xPr(x+dirx)-xPr(x))
-      else
-       vel1=W(x+dirx,y,z)
-       vel2=W(x,y+diry,z)
-       vel3=W(x+dirx,y+diry,z)
-       p0=abs(IBP%distx)
-       p1=abs(IBP%disty)
-       p2=abs(xPr(x+dirx)-xPr(x))
-       p3=abs(yPr(y+diry)-yPr(y))
-      endif
-     endif
-
-     intvel=IBBiLinInt(p0,p1,p2,p3,vel1,vel2,vel3)
 
 
-    elseif (IBP%interp==3) then
-     if (IBP%component==1) then
-       vel1=U(x+dirx,y,z)
-       vel2=U(x,y+diry,z)
-       vel3=U(x+dirx,y+diry,z)
-       vel4=U(x,y,z+dirz)
-       vel5=U(x+dirx,y,z+dirz)
-       vel6=U(x,y+diry,z+dirz)
-       vel7=U(x+dirx,y+diry,z+dirz)
-       p0=abs(IBP%distx)
-       p1=abs(IBP%disty)
-       p2=abs(IBP%distz)
-       p3=abs(xU(x+dirx)-xU(x))
-       p4=abs(yPr(y+diry)-yPr(y))
-       p5=abs(zPr(z+dirz)-zPr(z))
-     elseif (IBP%component==2) then
-       vel1=V(x+dirx,y,z)
-       vel2=V(x,y+diry,z)
-       vel3=V(x+dirx,y+diry,z)
-       vel4=V(x,y,z+dirz)
-       vel5=V(x+dirx,y,z+dirz)
-       vel6=V(x,y+diry,z+dirz)
-       vel7=V(x+dirx,y+diry,z+dirz)
-       p0=abs(IBP%distx)
-       p1=abs(IBP%disty)
-       p2=abs(IBP%distz)
-       p3=abs(xPr(x+dirx)-xPr(x))
-       p4=abs(yV(y+diry)-yV(y))
-       p5=abs(zPr(z+dirz)-zPr(z))
-     else
-       vel1=W(x+dirx,y,z)
-       vel2=W(x,y+diry,z)
-       vel3=W(x+dirx,y+diry,z)
-       vel4=W(x,y,z+dirz)
-       vel5=W(x+dirx,y,z+dirz)
-       vel6=W(x,y+diry,z+dirz)
-       vel7=W(x+dirx,y+diry,z+dirz)
-       p0=abs(IBP%distx)
-       p1=abs(IBP%disty)
-       p2=abs(IBP%distz)
-       p3=abs(xPr(x+dirx)-xPr(x))
-       p4=abs(yPr(y+diry)-yPr(y))
-       p5=abs(zW(z+dirz)-zW(z))
-     endif
 
-     intvel=IBTriLinInt(p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7)
+       IBPoints(i)%momsrc = (intvel-U(xi,yj,zk))/dt
 
-    else
-     intvel=0
-    endif
-
-    if (IBP%component==1) then
-     IBP%MSourc=(intvel-U(x,y,z))/dt
-    elseif (IBP%component==2) then
-     IBP%MSourc=(intvel-V(x,y,z))/dt
-    elseif (IBP%component==3) then
-     IBP%MSourc=(intvel-W(x,y,z))/dt
-    endif
-
-
-    if (associated(IBP%next)) then
-     IBP=>IBP%next
-    else
-     exit
-    endif
-   enddo
-  endif
-
-  end subroutine MomSourc
-
-
-  subroutine MASS_SOURC(Q,U,V,W)
-  real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
-  real(KND),intent(out):: Q(0:,0:,0:)
-  type(TIBPoint),pointer:: IBP
-  integer x,y,z
-
-   Q=0
-   if (associated(FirstIBPoint)) then
-    IBP => FirstIBPoint
-    do
-     x=IBP%x
-     y=IBP%y
-     z=IBP%z
-      if (IBP%component==1) then
-       Q(x,y,z)=Q(x,y,z)+U(x,y,z)/(dxPr(x))
-       Q(x+1,y,z)=Q(x+1,y,z)-U(x,y,z)/(dxPr(x+1))
-      elseif (IBP%component==2) then
-       Q(x,y,z)=Q(x,y,z)+V(x,y,z)/(dyPr(y))
-       Q(x,y+1,z)=Q(x,y+1,z)-V(x,y,z)/(dyPr(y+1))
-      elseif (IBP%component==3) then
-       Q(x,y,z)=Q(x,y,z)+W(x,y,z)/(dzPr(z))
-       Q(x,y,z+1)=Q(x,y,z+1)-W(x,y,z)/(dzPr(z+1))
-      endif
-     if (associated(IBP%next)) then
-      IBP=>IBP%next
-     else
-      exit
-     endif
     enddo
-   endif
-   call Bound_Q(Q)
-  end subroutine MASS_SOURC
+    !$omp end parallel do
+
+  end subroutine IBMomentumSources
+
+
+
+
+  subroutine IBMomentum(U2,V2,W2,U3,V3,W3)
+    use GEOMETRIC, only: UIBPoints, VIBPoints, WIBPoints
+
+    real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
+    integer :: i,xi,yj,zk
+
+
+     !$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
+     call BoundU(1,U3)
+     call BoundU(2,V3)
+     call BoundU(3,W3)
+
+     call IBMomentumSources(UIBPoints,U3,xU(-2:),yPr(-2:),zPr(-2:))
+
+     call IBMomentumSources(VIBPoints,V3,xPr(-2:),yV(-2:),zPr(-2:))
+
+     call IBMomentumSources(WIBPoints,W3,xPr(-2:),yPr(-2:),zW(-2:))
+
+
+     do i=1,ubound(UIBPoints,1)
+       xi = UIBPoints(i)%xi
+       yj = UIBPoints(i)%yj
+       zk = UIBPoints(i)%zk
+
+       U3(xi,yj,zk) = U3(xi,yj,zk) + UIBPoints(i)%momsrc * dt
+       U2(xi,yj,zk) = U2(xi,yj,zk) + UIBPoints(i)%momsrc * dt
+     enddo
+
+     do i=1,ubound(VIBPoints,1)
+       xi = VIBPoints(i)%xi
+       yj = VIBPoints(i)%yj
+       zk = VIBPoints(i)%zk
+
+       V3(xi,yj,zk) = V3(xi,yj,zk) + VIBPoints(i)%momsrc * dt
+       V2(xi,yj,zk) = V2(xi,yj,zk) + VIBPoints(i)%momsrc * dt
+     enddo
+
+     do i=1,ubound(WIBPoints,1)
+       xi = WIBPoints(i)%xi
+       yj = WIBPoints(i)%yj
+       zk = WIBPoints(i)%zk
+
+       W3(xi,yj,zk) = W3(xi,yj,zk) + WIBPoints(i)%momsrc * dt
+       W2(xi,yj,zk) = W2(xi,yj,zk) + WIBPoints(i)%momsrc * dt
+     enddo
+
+
+     !$hmpp <tsteps> advancedload, args[UnifRedBlack::U3,UnifRedBlack::V3,UnifRedBlack::W3]
+  end subroutine IBMomentum
+
+
+
+
+
+
+  subroutine IBMassSources(Q,U,V,W)
+    use GEOMETRIC, only: UIBPoints, VIBPoints, WIBPoints
+
+    real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+    real(KND),intent(out):: Q(0:,0:,0:)
+    integer i,xi,yj,zk
+
+    Q = 0
+
+    do i=1,ubound(UIBPoints,1)
+      xi = UIBPoints(i)%xi
+      yj = UIBPoints(i)%yj
+      zk = UIBPoints(i)%zk
+
+      Q(xi,yj,zk)   = Q(xi,yj,zk)   + U(xi,yj,zk)/dxPr(xi)
+      Q(xi+1,yj,zk) = Q(xi+1,yj,zk) - U(xi,yj,zk)/dxPr(xi+1)
+    enddo
+
+
+    do i=1,ubound(VIBPoints,1)
+      xi = VIBPoints(i)%xi
+      yj = VIBPoints(i)%yj
+      zk = VIBPoints(i)%zk
+
+      Q(xi,yj,zk)   = Q(xi,yj,zk)   + V(xi,yj,zk)/dyPr(yj)
+      Q(xi,yj+1,zk) = Q(xi,yj+1,zk) - V(xi,yj,zk)/dyPr(yj+1)
+    enddo
+
+
+    do i=1,ubound(WIBPoints,1)
+      xi = WIBPoints(i)%xi
+      yj = WIBPoints(i)%yj
+      zk = WIBPoints(i)%zk
+
+      Q(xi,yj,zk)   = Q(xi,yj,zk)   + W(xi,yj,zk)/dzPr(zk)
+      Q(xi,yj,zk+1) = Q(xi,yj,zk+1) - W(xi,yj,zk)/dzPr(zk+1)
+    enddo
+
+    call Bound_Q(Q)
+
+  end subroutine IBMassSources
 
 
 
@@ -955,7 +893,7 @@ contains
                U,V,W,dt)
   implicit none
 #ifdef __HMPP
-  integer,parameter :: KND=4,TIM=4
+  integer,parameter :: KND = 4,TIM = 4
   intrinsic min,max,abs
 #endif
   integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,steady
@@ -969,7 +907,7 @@ contains
   integer i,j,k
   real(KND) m,p
 
-    m=0
+    m = 0
 
    !$hmppcg grid blocksize 512x1
    !$hmppcg permute (k,i,j)
@@ -977,22 +915,22 @@ contains
    do k=1,Prnz
      do j=1,Prny
       do i=1,Prnx
-       p=MAX(abs(U(i,j,k)/dxU(i)),abs(U(i-1,j,k)/dxU(i-1)))
-       p=MAX(p,abs(V(i,j,k)/dyV(j)),abs(V(i,j-1,k)/dyV(j-1)))
-       p=MAX(p,abs(W(i,j,k)/dzW(k)),abs(W(i,j,k-1)/dzW(k-1)))
-       m=max(m,p)
+       p = MAX(abs(U(i,j,k)/dxU(i)),abs(U(i-1,j,k)/dxU(i-1)))
+       p = MAX(p,abs(V(i,j,k)/dyV(j)),abs(V(i,j-1,k)/dyV(j-1)))
+       p = MAX(p,abs(W(i,j,k)/dzW(k)),abs(W(i,j,k-1)/dzW(k-1)))
+       m = max(m,p)
       enddo
      enddo
     enddo
 
 
     if (m>0) then
-     dt=MIN(CFL/m,dxmin/Uref)
+     dt = MIN(CFL/m,dxmin/Uref)
     else
-     dt=dxmin/Uref
+     dt = dxmin/Uref
     endif
 
-    if (steady/=1.and.dt+time>endtime)  dt=endtime-time
+    if (steady/=1.and.dt+time>endtime)  dt = endtime-time
 
   endsubroutine TimeStepEul
 
@@ -1005,7 +943,7 @@ contains
   pure subroutine BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,grav_acc,temperature_ref,W2,theta,dt)
   implicit none
 #ifdef __HMPP
-  integer,parameter :: KND=4
+  integer,parameter :: KND = 4
 #endif
   integer,intent(in) :: Prnx,Prny,Prnz,Wnx,Wny,Wnz
   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W2
@@ -1014,13 +952,13 @@ contains
   real(KND) A
   integer i,j,k
 
-    A=grav_acc*dt/temperature_ref
+    A = grav_acc*dt/temperature_ref
     !$hmppcg grid blocksize 512x1
     !$hmppcg permute (k,i,j)
     do k=1,Wnz
      do j=1,Wny
       do i=1,Wnx
-            W2(i,j,k)=W2(i,j,k)+A*((theta(i,j,k+1)+theta(i,j,k))/2._KND-temperature_ref)
+            W2(i,j,k) = W2(i,j,k)+A*((theta(i,j,k+1)+theta(i,j,k))/2._KND-temperature_ref)
       enddo
      enddo
     enddo
@@ -1035,7 +973,7 @@ contains
                                  U2,V2,U,V,dt)
   implicit none
 #ifdef __HMPP
-  integer,parameter :: KND=4
+  integer,parameter :: KND = 4
 #endif
   integer,intent(in) :: Unx,Uny,Unz,Vnx,Vny,Vnz
   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
@@ -1053,7 +991,7 @@ contains
     do k=1,Unz
      do j=1,Uny
       do i=1,Unx
-           U2(i,j,k)=U2(i,j,k)-A*coriolisparam*(V(i,j-1,k)+V(i+1,j-1,k)+V(i,j,k)+V(i+1,j,k))/4._KND
+           U2(i,j,k) = U2(i,j,k)-A*coriolisparam*(V(i,j-1,k)+V(i+1,j-1,k)+V(i,j,k)+V(i+1,j,k))/4._KND
       enddo
      enddo
     enddo
@@ -1062,7 +1000,7 @@ contains
     do k=1,Vnz
      do j=1,Vny
       do i=1,Vnx
-           V2(i,j,k)=V2(i,j,k)+A*coriolisparam*(U(i-1,j,k)+U(i-1,j+1,k)+U(i,j,k)+U(i,j+1,k))/4._KND
+           V2(i,j,k) = V2(i,j,k)+A*coriolisparam*(U(i-1,j,k)+U(i-1,j+1,k)+U(i,j,k)+U(i,j+1,k))/4._KND
       enddo
      enddo
     enddo
@@ -1093,7 +1031,7 @@ contains
    !$hmpp <tsteps> advancedload, args[PressureGrad::coef]
 
    !Pressure gradient terms
-   !$hmpp <tsteps> PressureGrad callsite, args[*].noupdate=true
+   !$hmpp <tsteps> PressureGrad callsite, args[*].noupdate = true
    call PressureGrad(Prnx,Prny,Prnz,&
                      Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                      dxU,dyV,dzW,&
@@ -1111,14 +1049,14 @@ contains
 
      !$hmpp <tsteps> advancedload, args[ForwEul::Visc]
 
-     !$hmpp <tsteps> ForwEul callsite, args[*].noupdate=true
+     !$hmpp <tsteps> ForwEul callsite, args[*].noupdate = true
      call ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                   dxPr,dyPr,dzPr,dxU,dyV,dzW,&
                   U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
                   dt,coef)
 
 
-!      call IMboundU(U3,V3,W3)
+     call IBMomentum(U2,V2,W2,U3,V3,W3)
 
 
      if (gridtype==UNIFORMGRID.and.GPU>0) then                  !Performs the diffusion terms
@@ -1127,7 +1065,7 @@ contains
       !$hmpp <tsteps>  advancedload, args[UnifRedBlack::maxCNiter,UnifRedBlack::epsCN]
 
 
-      !$hmpp <tsteps> UNIFREDBLACK callsite, args[*].noupdate=true
+      !$hmpp <tsteps> UNIFREDBLACK callsite, args[*].noupdate = true
       call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,&
                             Btype,sideU,&
                             dt,dxmin,dymin,dzmin,&
@@ -1149,18 +1087,18 @@ contains
 
    else  Re_gt_0  !Re<=0
 
-    U2=U+U2
-    V2=V+V2
-    W2=W+W2
+    U2 = U+U2
+    V2 = V+V2
+    W2 = W+W2
 
    endif   Re_gt_0
 
    if (debuglevel>=2) then  !Compute and output the mean friction in the domain.
-    S=0
+    S = 0
     do k=1,Unz
      do j=1,Uny
       do i=1,Unx
-       S=S-((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
+       S = S-((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
        Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
          (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
          0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
@@ -1170,7 +1108,7 @@ contains
      enddo
     enddo
 
-    S=S/(Unx*Uny*Unz)
+    S = S/(Unx*Uny*Unz)
     write(*,*) "Mean friction:", S
    endif
   endsubroutine OtherTerms
@@ -1183,7 +1121,7 @@ contains
                           dt,coef)
   implicit none
 #ifdef __HMPP
-  integer,parameter :: KND=4
+  integer,parameter :: KND = 4
 #endif
   integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
   real(KND),intent(in)    :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2),prgradientx,prgradienty,dt,coef
@@ -1208,7 +1146,7 @@ contains
    do k=1,Unz
     do j=1,Uny
      do i=1,Unx
-          U(i,j,k)=U(i,j,k)+A*(Pr(i+1,j,k)-Pr(i,j,k))/dxU(i)+A*prgradientx
+          U(i,j,k) = U(i,j,k)+A*(Pr(i+1,j,k)-Pr(i,j,k))/dxU(i)+A*prgradientx
      enddo
     enddo
    enddo
@@ -1219,7 +1157,7 @@ contains
    do k=1,Vnz
     do j=1,Vny
      do i=1,Vnx
-          V(i,j,k)=V(i,j,k)+A*(Pr(i,j+1,k)-Pr(i,j,k))/dyV(j)+A*prgradienty
+          V(i,j,k) = V(i,j,k)+A*(Pr(i,j+1,k)-Pr(i,j,k))/dyV(j)+A*prgradienty
      enddo
     enddo
    enddo
@@ -1230,7 +1168,7 @@ contains
    do k=1,Wnz
     do j=1,Wny
      do i=1,Wnx
-          W(i,j,k)=W(i,j,k)+A*(Pr(i,j,k+1)-Pr(i,j,k))/dzW(k)
+          W(i,j,k) = W(i,j,k)+A*(Pr(i,j,k+1)-Pr(i,j,k))/dzW(k)
      enddo
     enddo
    enddo
@@ -1247,7 +1185,7 @@ contains
                     dt,coef)
   implicit none
 #ifdef __HMPP
-  integer,parameter :: KND=4
+  integer,parameter :: KND = 4
 #endif
   integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
 
@@ -1260,14 +1198,14 @@ contains
   real(KND) :: Ap
   integer i,j,k
 
-     Ap=coef*dt
+     Ap = coef*dt
 
      !$hmppcg grid blocksize 512x1
      !$hmppcg permute (k,i,j)
      do k=1,Unz    !Forward Euler for the first approximation
       do j=1,Uny
        do i=1,Unx
-        U3(i,j,k)=U(i,j,k)+U2(i,j,k)+Ap*(&
+        U3(i,j,k) = U(i,j,k)+U2(i,j,k)+Ap*(&
         ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
         Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
          0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
@@ -1282,7 +1220,7 @@ contains
      do k=1,Vnz
       do j=1,Vny
        do i=1,Vnx
-        V3(i,j,k)=V(i,j,k)+V2(i,j,k)+Ap*(&
+        V3(i,j,k) = V(i,j,k)+V2(i,j,k)+Ap*(&
         ((Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
          Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
          0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
@@ -1297,7 +1235,7 @@ contains
      do k=1,Wnz
       do j=1,Wny
        do i=1,Wnx
-        W3(i,j,k)=W(i,j,k)+W2(i,j,k)+Ap*(&
+        W3(i,j,k) = W(i,j,k)+W2(i,j,k)+Ap*(&
         ((0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
         (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
          ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
@@ -1310,71 +1248,6 @@ contains
   end subroutine ForwEul
 
 
-
-
-
-
-
-  subroutine IMboundU(U2,V2,W2,U3,V3,W3)
-   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
-
-   integer :: x,y,z
-
-   type(TIBPoint),pointer:: IBP
-
-     !$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
-     call MomSourc(U3,V3,W3)
-
-
-!      do i=1,NIBPointsU
-!       xi=IBPijkU(1,i)
-!       yj=IBPijkU(2,i)
-!       zk=IBPijkU(3,i)
-!       U3(xi,yj,zk)=U3(xi,yj,zk)+IBPsourcU*dt
-!       U2(xi,yj,zk)=U2(xi,yj,zk)+IBPsourcU*dt
-!      enddo
-!
-!      do i=1,NIBPointsV
-!       xi=IBPijkV(1,i)
-!       yj=IBPijkV(2,i)
-!       zk=IBPijkV(3,i)
-!       V3(xi,yj,zk)=V3(xi,yj,zk)+IBPsourcV*dt
-!       V2(xi,yj,zk)=V2(xi,yj,zk)+IBPsourcV*dt
-!      enddo
-!
-!      do i=1,NIBPointsW
-!       xi=IBPijkW(1,i)
-!       yj=IBPijkW(2,i)
-!       zk=IBPijkW(3,i)
-!       W3(xi,yj,zk)=W3(xi,yj,zk)+IBPsourcW*dt
-!       W2(xi,yj,zk)=W2(xi,yj,zk)+IBPsourcW*dt
-!      enddo
-
-     if (associated(FirstIBPoint)) then   !Immersed boundary terms, in the future should be in an array
-      IBP => FirstIBPoint
-      do
-       x=IBP%x
-       y=IBP%y
-       z=IBP%z
-        if (IBP%component==1) then
-         U3(x,y,z)=U3(x,y,z)+IBP%MSourc*dt
-         U2(x,y,z)=U2(x,y,z)+IBP%MSourc*dt
-        elseif (IBP%component==2) then
-         V3(x,y,z)=V3(x,y,z)+IBP%MSourc*dt
-         V2(x,y,z)=V2(x,y,z)+IBP%MSourc*dt
-        elseif (IBP%component==3) then
-         W3(x,y,z)=W3(x,y,z)+IBP%MSourc*dt
-         W2(x,y,z)=W2(x,y,z)+IBP%MSourc*dt
-        endif
-       if (associated(IBP%next)) then
-        IBP=>IBP%next
-       else
-        exit
-       endif
-      enddo
-     endif
-     !$hmpp <tsteps> advancedload, args[UnifRedBlack::U3,UnifRedBlack::V3,UnifRedBlack::W3]
-  end subroutine IMboundU
 
 
 
@@ -1400,9 +1273,9 @@ contains
    real(KND) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
    integer i,j,k,l
 
-       Ap=coef*dt/(2._KND)
-       S=0
-       l=0
+       Ap = coef*dt/(2._KND)
+       S = 0
+       l = 0
 
        recdxmin2=1./dxmin**2
        recdymin2=1./dymin**2
@@ -1411,7 +1284,7 @@ contains
        do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
         do j=1,Uny
          do i=1,Unx
-          U2(i,j,k)=U2(i,j,k)+Ap*(&
+          U2(i,j,k) = U2(i,j,k)+Ap*(&
           ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
           Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*recdxmin2+0.25_KND*(&
            ((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
@@ -1424,7 +1297,7 @@ contains
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
-          V2(i,j,k)=V2(i,j,k)+Ap*(&
+          V2(i,j,k) = V2(i,j,k)+Ap*(&
           (0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
           (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))*recdxmin2+&
            (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
@@ -1437,7 +1310,7 @@ contains
        do k=1,Wnz
        do j=1,Wny
         do i=1,Wnx
-         W2(i,j,k)=W2(i,j,k)+Ap*(&
+         W2(i,j,k) = W2(i,j,k)+Ap*(&
          (0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
          (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))*recdxmin2+&
           ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
@@ -1451,7 +1324,7 @@ contains
        do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
         do j=1,Uny
          do i=1,Unx
-          ApU(i,j,k)=((Visc(i+1,j,k)+&
+          ApU(i,j,k) = ((Visc(i+1,j,k)+&
                       Visc(i,j,k))*recdxmin2+&
                       0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
                       (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2+&
@@ -1461,12 +1334,12 @@ contains
         enddo
        enddo
 
-       ApU=1._KND/(1._KND+Ap*ApU)
+       ApU = 1._KND/(1._KND+Ap*ApU)
 
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
-          ApV(i,j,k)=((Visc(i,j+1,k)+&
+          ApV(i,j,k) = ((Visc(i,j+1,k)+&
                      Visc(i,j,k))*recdymin2+&
                      0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
                       (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k)))*recdxmin2+&
@@ -1476,12 +1349,12 @@ contains
         enddo
        enddo
 
-       ApV=1._KND/(1._KND+Ap*ApV)
+       ApV = 1._KND/(1._KND+Ap*ApV)
 
        do k=1,Wnz
         do j=1,Wny
          do i=1,Wnx
-          ApW(i,j,k)=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
+          ApW(i,j,k) = (0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
                       (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k)))*recdxmin2+&
                      ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))+&
                      (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2)+&
@@ -1491,15 +1364,15 @@ contains
         enddo
        enddo
 
-       ApW=1._KND/(1._KND+Ap*ApW)
+       ApW = 1._KND/(1._KND+Ap*ApW)
 
 
-       Suavg=abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
-       Svavg=abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
-       Swavg=abs(MAXVAL(W3(1:Wnx,1:Wny,1:Wnz)))
-       if (Suavg<=1e-3_KND) Suavg=1
-       if (Svavg<=1e-3_KND) Svavg=1
-       if (Swavg<=1e-3_KND) Swavg=1
+       Suavg = abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
+       Svavg = abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
+       Swavg = abs(MAXVAL(W3(1:Wnx,1:Wny,1:Wnz)))
+       if (Suavg<=1e-3_KND) Suavg = 1
+       if (Svavg<=1e-3_KND) Svavg = 1
+       if (Swavg<=1e-3_KND) Swavg = 1
 
 
 
@@ -1507,10 +1380,10 @@ contains
         call BoundU(1,U3)
         call BoundU(2,V3)
         call BoundU(3,W3)
-        S=0
-        Su=0
-        Sv=0
-        Sw=0
+        S = 0
+        Su = 0
+        Sv = 0
+        Sw = 0
         !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:Su,Sv,Sw)
         !$OMP DO
         do k=1,Unz
@@ -1522,12 +1395,12 @@ contains
              (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
              ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
              (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
-            p=Ap*p+U2(i,j,k)+U(i,j,k)
-            p=p*ApU(i,j,k)
+            p = Ap*p+U2(i,j,k)+U(i,j,k)
+            p = p*ApU(i,j,k)
 
 
-            Su=max(Su,abs(p-U3(i,j,k)))
-            U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+            Su = max(Su,abs(p-U3(i,j,k)))
+            U3(i,j,k) = U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
           enddo
          enddo
         enddo
@@ -1542,10 +1415,10 @@ contains
              (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
              ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
              (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
-            p=Ap*p+V2(i,j,k)+V(i,j,k)
-            p=p*ApV(i,j,k)
-            Sv=max(Sv,abs(p-V3(i,j,k)))
-            V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+            p = Ap*p+V2(i,j,k)+V(i,j,k)
+            p = p*ApV(i,j,k)
+            Sv = max(Sv,abs(p-V3(i,j,k)))
+            V3(i,j,k) = V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
           enddo
          enddo
         enddo
@@ -1560,10 +1433,10 @@ contains
              (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
              (Visc(i,j,k+1)*(W3(i,j,k+1))-&
              Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
-            p=Ap*p+W2(i,j,k)+W(i,j,k)
-            p=p*ApW(i,j,k)
-            Sw=max(Sw,abs(p-W3(i,j,k)))
-            W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+            p = Ap*p+W2(i,j,k)+W(i,j,k)
+            p = p*ApW(i,j,k)
+            Sw = max(Sw,abs(p-W3(i,j,k)))
+            W3(i,j,k) = W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
           enddo
          enddo
         enddo
@@ -1579,12 +1452,12 @@ contains
              (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
              ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
              (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
-            p=Ap*p+U2(i,j,k)+U(i,j,k)
-            p=p*ApU(i,j,k)
+            p = Ap*p+U2(i,j,k)+U(i,j,k)
+            p = p*ApU(i,j,k)
 
 
-            Su=max(Su,abs(p-U3(i,j,k)))
-            U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+            Su = max(Su,abs(p-U3(i,j,k)))
+            U3(i,j,k) = U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
           enddo
          enddo
         enddo
@@ -1599,10 +1472,10 @@ contains
              (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
              ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
              (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
-            p=Ap*p+V2(i,j,k)+V(i,j,k)
-            p=p*ApV(i,j,k)
-            Sv=max(Sv,abs(p-V3(i,j,k)))
-            V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+            p = Ap*p+V2(i,j,k)+V(i,j,k)
+            p = p*ApV(i,j,k)
+            Sv = max(Sv,abs(p-V3(i,j,k)))
+            V3(i,j,k) = V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
           enddo
          enddo
         enddo
@@ -1617,23 +1490,23 @@ contains
              (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
              (Visc(i,j,k+1)*(W3(i,j,k+1))-&
              Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
-            p=Ap*p+W2(i,j,k)+W(i,j,k)
-            p=p*ApW(i,j,k)
-            Sw=max(Sw,abs(p-W3(i,j,k)))
-            W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+            p = Ap*p+W2(i,j,k)+W(i,j,k)
+            p = p*ApW(i,j,k)
+            Sw = max(Sw,abs(p-W3(i,j,k)))
+            W3(i,j,k) = W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
           enddo
          enddo
         enddo
         !$OMP ENDDO
         !$OMP END PARALLEL
-        S=max(Su/Suavg,Sv/Svavg,Sw/Swavg)
+        S = max(Su/Suavg,Sv/Svavg,Sw/Swavg)
         write (*,*) "CN ",l,S
         if (S<=epsCN) exit
        enddo
 
-       U2=U3
-       V2=V3
-       W2=W3
+       U2 = U3
+       V2 = V3
+       W2 = W3
 
   endsubroutine UNIFREDBLACK
 
@@ -1651,15 +1524,15 @@ contains
    integer ind(3)
 
 
-       Ap=coef*dt/(2._KND)
-       S=0
-       l=0
+       Ap = coef*dt/(2._KND)
+       S = 0
+       l = 0
 
 
        do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
         do j=1,Uny
          do i=1,Unx
-          U2(i,j,k)=U2(i,j,k)+Ap*(&
+          U2(i,j,k) = U2(i,j,k)+Ap*(&
           ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
           Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
            (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
@@ -1672,7 +1545,7 @@ contains
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
-          V2(i,j,k)=V2(i,j,k)+Ap*(&
+          V2(i,j,k) = V2(i,j,k)+Ap*(&
           ((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
           0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
            (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
@@ -1685,7 +1558,7 @@ contains
        do k=1,Wnz
        do j=1,Wny
         do i=1,Wnx
-         W2(i,j,k)=W2(i,j,k)+Ap*(&
+         W2(i,j,k) = W2(i,j,k)+Ap*(&
          ((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
          0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
           (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
@@ -1699,7 +1572,7 @@ contains
        do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
         do j=1,Uny
          do i=1,Unx
-          ApU(i,j,k)=((Visc(i+1,j,k)/dxPr(i+1)+&
+          ApU(i,j,k) = ((Visc(i+1,j,k)/dxPr(i+1)+&
                       Visc(i,j,k)/dxPr(i))/dxU(i)+&
                       (0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))/dyV(j)+&
                       0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))/dyV(j-1))/dyPr(j)+&
@@ -1709,13 +1582,13 @@ contains
         enddo
        enddo
 
-      ApU=1._KND/(1._KND+Ap*ApU)
+      ApU = 1._KND/(1._KND+Ap*ApU)
 
 
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
-          ApV(i,j,k)= ((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))/dxU(i)+&
+          ApV(i,j,k) =  ((0.25_KND*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))/dxU(i)+&
                       0.25_KND*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))/dxU(i-1))/dxPr(i)+&
                      (Visc(i,j+1,k)/dyPr(j+1)+&
                      Visc(i,j,k)/dyPr(j))/dyV(j)+&
@@ -1725,13 +1598,13 @@ contains
         enddo
        enddo
 
-       ApV=1._KND/(1._KND+Ap*ApV)
+       ApV = 1._KND/(1._KND+Ap*ApV)
 
 
        do k=1,Wnz
         do j=1,Wny
          do i=1,Wnx
-          ApW(i,j,k)= ((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))/dxU(i)+&
+          ApW(i,j,k) =  ((0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))/dxU(i)+&
                       0.25_KND*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))/dxU(i-1))/dxPr(i)+&
                      (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))/dyV(j)+&
                      0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))/dyV(j-1))/dyPr(j)+&
@@ -1741,14 +1614,14 @@ contains
         enddo
        enddo
 
-       ApW=1._KND/(1._KND+Ap*ApW)
+       ApW = 1._KND/(1._KND+Ap*ApW)
 
-       Suavg=abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
-       Svavg=abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
-       Swavg=abs(MAXVAL(W3(1:Wnx,1:Wny,1:Wnz)))
-       if (Suavg<=1e-3_KND) Suavg=1
-       if (Svavg<=1e-3_KND) Svavg=1
-       if (Swavg<=1e-3_KND) Swavg=1
+       Suavg = abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
+       Svavg = abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
+       Swavg = abs(MAXVAL(W3(1:Wnx,1:Wny,1:Wnz)))
+       if (Suavg<=1e-3_KND) Suavg = 1
+       if (Svavg<=1e-3_KND) Svavg = 1
+       if (Swavg<=1e-3_KND) Swavg = 1
 
 
 
@@ -1756,10 +1629,10 @@ contains
         call BoundU(1,U3)
         call BoundU(2,V3)
         call BoundU(3,W3)
-        S=0
-        Su=0
-        Sv=0
-        Sw=0
+        S = 0
+        Su = 0
+        Sv = 0
+        Sw = 0
         !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:Su,Sv,Sw)
         !$OMP DO
         do k=1,Unz
@@ -1771,12 +1644,12 @@ contains
              0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
              (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))/dzW(k)-&
              0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
-            p=Ap*p+U2(i,j,k)+U(i,j,k)
-            p=p*ApU(i,j,k)
+            p = Ap*p+U2(i,j,k)+U(i,j,k)
+            p = p*ApU(i,j,k)
 
 
-            Su=max(Su,abs(p-U3(i,j,k)))
-            U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+            Su = max(Su,abs(p-U3(i,j,k)))
+            U3(i,j,k) = U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
           enddo
          enddo
         enddo
@@ -1791,10 +1664,10 @@ contains
              Visc(i,j,k)*(-V3(i,j-1,k))/dyPr(j))/dyV(j)+&
              (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))/dzW(k)-&
              0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
-            p=Ap*p+V2(i,j,k)+V(i,j,k)
-            p=p*ApV(i,j,k)
-            Sv=max(Sv,abs(p-V3(i,j,k)))
-            V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+            p = Ap*p+V2(i,j,k)+V(i,j,k)
+            p = p*ApV(i,j,k)
+            Sv = max(Sv,abs(p-V3(i,j,k)))
+            V3(i,j,k) = V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
           enddo
          enddo
         enddo
@@ -1809,10 +1682,10 @@ contains
              0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
              (Visc(i,j,k+1)*(W3(i,j,k+1))/dzPr(k+1)-&
              Visc(i,j,k)*(-W3(i,j,k-1))/dzPr(k))/dzW(k))
-            p=Ap*p+W2(i,j,k)+W(i,j,k)
-            p=p*ApW(i,j,k)
-            Sw=max(Sw,abs(p-W3(i,j,k)))
-            W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+            p = Ap*p+W2(i,j,k)+W(i,j,k)
+            p = p*ApW(i,j,k)
+            Sw = max(Sw,abs(p-W3(i,j,k)))
+            W3(i,j,k) = W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
           enddo
          enddo
         enddo
@@ -1828,12 +1701,12 @@ contains
              0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
              (0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))/dzW(k)-&
              0.25_KND*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
-            p=Ap*p+U2(i,j,k)+U(i,j,k)
-            p=p*ApU(i,j,k)
+            p = Ap*p+U2(i,j,k)+U(i,j,k)
+            p = p*ApU(i,j,k)
 
 
-            Su=max(Su,abs(p-U3(i,j,k)))
-            U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+            Su = max(Su,abs(p-U3(i,j,k)))
+            U3(i,j,k) = U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
           enddo
          enddo
         enddo
@@ -1848,10 +1721,10 @@ contains
              Visc(i,j,k)*(-V3(i,j-1,k))/dyPr(j))/dyV(j)+&
              (0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))/dzW(k)-&
              0.25_KND*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
-            p=Ap*p+V2(i,j,k)+V(i,j,k)
-            p=p*ApV(i,j,k)
-            Sv=max(Sv,abs(p-V3(i,j,k)))
-            V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+            p = Ap*p+V2(i,j,k)+V(i,j,k)
+            p = p*ApV(i,j,k)
+            Sv = max(Sv,abs(p-V3(i,j,k)))
+            V3(i,j,k) = V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
           enddo
          enddo
         enddo
@@ -1866,23 +1739,23 @@ contains
              0.25_KND*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
              (Visc(i,j,k+1)*(W3(i,j,k+1))/dzPr(k+1)-&
              Visc(i,j,k)*(-W3(i,j,k-1))/dzPr(k))/dzW(k))
-            p=Ap*p+W2(i,j,k)+W(i,j,k)
-            p=p*ApW(i,j,k)
-            Sw=max(Sw,abs(p-W3(i,j,k)))
-            W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+            p = Ap*p+W2(i,j,k)+W(i,j,k)
+            p = p*ApW(i,j,k)
+            Sw = max(Sw,abs(p-W3(i,j,k)))
+            W3(i,j,k) = W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
           enddo
          enddo
         enddo
         !$OMP ENDDO
         !$OMP END PARALLEL
-        S=max(Su/Suavg,Sv/Svavg,Sw/Swavg)
+        S = max(Su/Suavg,Sv/Svavg,Sw/Swavg)
         write (*,*) "CN ",l,S
         if (S<=epsCN) exit
        enddo
 
-       U2=U3
-       V2=V3
-       W2=W3
+       U2 = U3
+       V2 = V3
+       W2 = W3
 
    endsubroutine GENREDBLACK
 
@@ -1897,7 +1770,7 @@ contains
   subroutine AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,zPr,zW,U,V,W,temperature,buoyancy)
   implicit none
 #ifdef __HMPP
-   integer, parameter:: KND=4
+   integer, parameter:: KND = 4
 #endif
   integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
   real(KND),intent(in)    :: zPr(-2:Prnz+3)
@@ -1911,9 +1784,9 @@ contains
   real(KND),dimension(:),allocatable :: DF,avg
   intrinsic max,min
 
-    bufn=max(5,Prnz/4)
-    zs=zW(Prnz-bufn)
-    ze=zW(Prnz)
+    bufn = max(5,Prnz/4)
+    zs = zW(Prnz-bufn)
+    ze = zW(Prnz)
 
     allocate(DF(min(Unz,Vnz,Wnz)-bufn:max(Unz,Vnz,Wnz)))
     allocate(avg(min(Unz,Vnz,Wnz)-bufn:max(Unz,Vnz,Wnz)))
@@ -1921,28 +1794,28 @@ contains
 
 
     do k=Unz-bufn,Unz
-      avg(k)=0
+      avg(k) = 0
     enddo
 
     do k=Unz-bufn,Unz
-      p=0
+      p = 0
       !$hmppcg grid blocksize 512x1
       !$hmppcg gridify (j,i) global(p), reduce(+:p)
       do j=1,Uny
         do i=1,Unx
-          p=p+U(i,j,k)
+          p = p+U(i,j,k)
         enddo
       enddo
-      avg(k)=p
+      avg(k) = p
     enddo
 
     do k=Unz-bufn,Unz
-      avg(k)=avg(k)/(Unx*Uny)
+      avg(k) = avg(k)/(Unx*Uny)
     enddo
 
     do k=Unz-bufn,Unz
       zb=(zPr(k)-zs)/(ze-zs)
-      DF(k)=DampF(zb)
+      DF(k) = DampF(zb)
     enddo
 
     !$hmppcg grid blocksize 512x1
@@ -1951,7 +1824,7 @@ contains
     do k=Unz-bufn,Unz
       do j=-1,Uny+1
         do i=-1,Unx+1
-          U(i,j,k)=avg(k)+DF(k)*(U(i,j,k)-avg(k))
+          U(i,j,k) = avg(k)+DF(k)*(U(i,j,k)-avg(k))
         enddo
       enddo
     enddo
@@ -1959,25 +1832,25 @@ contains
 
 
     do k=Vnz-bufn,Vnz
-      avg(k)=0
+      avg(k) = 0
     enddo
     do k=Vnz-bufn,Vnz
-      p=0
+      p = 0
       !$hmppcg grid blocksize 512x1
       !$hmppcg gridify (j,i) global(p), reduce(+:p)
       do j=1,Vny
         do i=1,Vnx
-          p=p+V(i,j,k)
+          p = p+V(i,j,k)
         enddo
       enddo
-      avg(k)=p
+      avg(k) = p
     enddo
     do k=Vnz-bufn,Vnz
-      avg(k)=avg(k)/(Vnx*Vny)
+      avg(k) = avg(k)/(Vnx*Vny)
     enddo
     do k=Vnz-bufn,Vnz
       zb=(zPr(k)-zs)/(ze-zs)
-      DF(k)=DampF(zb)
+      DF(k) = DampF(zb)
     enddo
     !$hmppcg grid blocksize 512x1
     !$hmppcg permute(k,i,j)
@@ -1985,7 +1858,7 @@ contains
     do k=Vnz-bufn,Vnz
       do j=-1,Vny+1
         do i=-1,Vnx+1
-          V(i,j,k)=avg(k)+DF(k)*(V(i,j,k)-avg(k))
+          V(i,j,k) = avg(k)+DF(k)*(V(i,j,k)-avg(k))
         enddo
       enddo
     enddo
@@ -1993,28 +1866,28 @@ contains
 
 
     do k=Wnz-bufn,Wnz
-      avg(k)=0
+      avg(k) = 0
     enddo
 
     do k=Wnz-bufn,Wnz
-      p=0
+      p = 0
       !$hmppcg grid blocksize 512x1
       !$hmppcg gridify (j,i) global(p), reduce(+:p)
       do j=1,Wny
         do i=1,Wnx
-          p=p+W(i,j,k)
+          p = p+W(i,j,k)
         enddo
       enddo
-      avg(k)=p
+      avg(k) = p
     enddo
 
     do k=Wnz-bufn,Wnz
-      avg(k)=avg(k)/(Wnx*Wny)
+      avg(k) = avg(k)/(Wnx*Wny)
     enddo
 
     do k=Wnz-bufn,Wnz
       zb=(zW(k)-zs)/(ze-zs)
-      DF(k)=DampF(zb)
+      DF(k) = DampF(zb)
     enddo
 
     !$hmppcg grid blocksize 512x1
@@ -2023,7 +1896,7 @@ contains
     do k=Wnz-bufn,Wnz
       do j=-1,Wny+1
         do i=-1,Wnx+1
-          W(i,j,k)=avg(k)+DF(k)*(W(i,j,k)-avg(k))
+          W(i,j,k) = avg(k)+DF(k)*(W(i,j,k)-avg(k))
         enddo
       enddo
     enddo
@@ -2033,28 +1906,28 @@ contains
     if (buoyancy==1) then
 
       do k=Prnz-bufn,Prnz
-        avg(k)=0
+        avg(k) = 0
       enddo
 
       do k=Prnz-bufn,Prnz
-        p=0
+        p = 0
         !$hmppcg grid blocksize 512x1
         !$hmppcg gridify (j,i) global(p), reduce(+:p)
         do j=1,Prny
           do i=1,Prnx
-            p=p+temperature(i,j,k)
+            p = p+temperature(i,j,k)
           enddo
         enddo
-        avg(k)=p
+        avg(k) = p
       enddo
 
       do k=Prnz-bufn,Prnz
-        avg(k)=avg(k)/(Prnx*Prny)
+        avg(k) = avg(k)/(Prnx*Prny)
       enddo
 
       do k=Prnz-bufn,Prnz
         zb=(zPr(k)-zs)/(ze-zs)
-        DF(k)=DampF(zb)
+        DF(k) = DampF(zb)
       enddo
 
       !$hmppcg grid blocksize 512x1
@@ -2063,7 +1936,7 @@ contains
       do k=Prnz-bufn,Prnz
         do j=-1,Prny+1
           do i=-1,Prnx+1
-            temperature(i,j,k)=avg(k)+DF(k)*(temperature(i,j,k)-avg(k))
+            temperature(i,j,k) = avg(k)+DF(k)*(temperature(i,j,k)-avg(k))
           enddo
         enddo
       enddo
@@ -2079,7 +1952,7 @@ contains
   subroutine AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,xPr,xU,U,V,W,temperature,buoyancy)
   implicit none
 #ifdef __HMPP
-   integer, parameter:: KND=4
+   integer, parameter:: KND = 4
 #endif
   integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
   real(KND),intent(in)    :: xPr(-2:Prnx+3)
@@ -2092,23 +1965,23 @@ contains
   real(KND) p,xe,xs,xb,DF
   intrinsic max
 
-    bufn=max(10,Prnx/8)
-    xs=xU(Prnx-bufn)
-    xe=xU(Prnx)
+    bufn = max(10,Prnx/8)
+    xs = xU(Prnx-bufn)
+    xe = xU(Prnx)
 
     !$hmppcg grid blocksize 512x1
     !$hmppcg gridify (k,j) private(p,xb,DF)
     do k=1,Unz
       do j=1,Uny
-        p=0
+        p = 0
         do i=2*Unx/3,Unx-4
-          p=p+U(i,j,k)
+          p = p+U(i,j,k)
         enddo
-        p=p/(Unx-4-2*Unx/3+1)
+        p = p/(Unx-4-2*Unx/3+1)
         do i=Unx-bufn,Unx+1
           xb=(xU(i)-xs)/(xe-xs)
-          DF=DampF(xb)
-          U(i,j,k)=p+DF*(U(i,j,k)-p)
+          DF = DampF(xb)
+          U(i,j,k) = p+DF*(U(i,j,k)-p)
         enddo
       enddo
     enddo
@@ -2117,15 +1990,15 @@ contains
     !$hmppcg gridify (k,j) private(p,xb,DF)
     do k=1,Vnz
       do j=1,Vny
-        p=0
+        p = 0
         do i=2*Vnx/3,Vnx-4
-          p=p+V(i,j,k)
+          p = p+V(i,j,k)
         enddo
-        p=p/(Vnx-4-2*Vnx/3+1)
+        p = p/(Vnx-4-2*Vnx/3+1)
         do i=Vnx-bufn,Vnx+1
           xb=(xPr(i)-xs)/(xe-xs)
-          DF=DampF(xb)
-          V(i,j,k)=p+DF*(V(i,j,k)-p)
+          DF = DampF(xb)
+          V(i,j,k) = p+DF*(V(i,j,k)-p)
         enddo
       enddo
     enddo
@@ -2134,15 +2007,15 @@ contains
     !$hmppcg gridify (k,j) private(p,xb,DF)
     do k=1,Wnz
       do j=1,Wny
-        p=0
+        p = 0
         do i=2*Wnx/3,Wnx-4
-          p=p+W(i,j,k)
+          p = p+W(i,j,k)
         enddo
-        p=p/((Wnx-4-2*Wnx/3+1))
+        p = p/((Wnx-4-2*Wnx/3+1))
         do i=Wnx-bufn,Wnx+1
           xb=(xPr(i)-xs)/(xe-xs)
-          DF=DampF(xb)
-          W(i,j,k)=p+DF*(W(i,j,k)-p)
+          DF = DampF(xb)
+          W(i,j,k) = p+DF*(W(i,j,k)-p)
         enddo
       enddo
     enddo
@@ -2152,15 +2025,15 @@ contains
       !$hmppcg gridify (k,j) private(p,xb,DF)
       do k=1,Prnz
         do j=1,Prny
-          p=0
+          p = 0
           do i=2*Prnx/3,Prnx-4
-            p=p+temperature(i,j,k)
+            p = p+temperature(i,j,k)
           enddo
-          p=p/(Prnx-4-2*Prnx/3+1)
+          p = p/(Prnx-4-2*Prnx/3+1)
           do i=Prnx-bufn,Prnx+1
             xb=(xPr(i)-xs)/(xe-xs)
-            DF=DampF(xb)
-            temperature(i,j,k)=p+DF*(temperature(i,j,k)-p)
+            DF = DampF(xb)
+            temperature(i,j,k) = p+DF*(temperature(i,j,k)-p)
           enddo
         enddo
       enddo
@@ -2173,16 +2046,16 @@ contains
   pure function DampF(x)
   implicit none
 #ifdef __HMPP
-   integer, parameter:: KND=4,TIM=4
+   integer, parameter:: KND = 4,TIM = 4
 #endif
   real(KND) DampF
   real(KND),intent(in)::x
   intrinsic exp
 
   if (x<=0) then
-    DampF=1
+    DampF = 1
   elseif (x>=1) then
-    DampF=0
+    DampF = 0
   else
    DampF=(1-0.1_KND*x**2)*(1-(1-exp(10._KND*x**2))/(1-exp(10._KND)))
   endif
@@ -2194,7 +2067,7 @@ contains
                           nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
   implicit none
 #ifdef __HMPP
-   integer, parameter:: KND=4,TIM=4
+   integer, parameter:: KND = 4,TIM = 4
 #endif
   integer,intent(in)      :: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,nUnull,nVnull,nWnull
   integer,dimension(3,nUnull),intent(in)      :: Unull
@@ -2207,15 +2080,15 @@ contains
 
 
     do i=1,nUnull
-      U(Unull(1,i),Unull(2,i),Unull(3,i))=0
+      U(Unull(1,i),Unull(2,i),Unull(3,i)) = 0
     enddo
 
     do i=1,nVnull
-      V(Vnull(1,i),Vnull(2,i),Vnull(3,i))=0
+      V(Vnull(1,i),Vnull(2,i),Vnull(3,i)) = 0
     enddo
 
     do i=1,nWnull
-      W(Wnull(1,i),Wnull(2,i),Wnull(3,i))=0
+      W(Wnull(1,i),Wnull(2,i),Wnull(3,i)) = 0
     enddo
 
   endsubroutine NullInterior
@@ -2228,7 +2101,7 @@ contains
                        call Smag(U,V,W)
      elseif (sgstype==VremanModel) then
                        if (GPU>0.and.gridtype==uniformgrid.and. Prnx*Prny*Prnz > 50) then
-                           !$hmpp <tsteps> Vreman callsite, args[*].noupdate=true
+                           !$hmpp <tsteps> Vreman callsite, args[*].noupdate = true
                            call Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Re,U,V,W,Visc)
                            !$hmpp <tsteps> delegatedstore, args[Vreman::Visc]
                        else
@@ -2237,7 +2110,7 @@ contains
      elseif (sgstype==StabSmagorinskyModel) then
                        call StabSmag(U,V,W)
      else
-                       Visc=1._KND/Re
+                       Visc = 1._KND/Re
      endif
 
 
@@ -2281,7 +2154,7 @@ contains
 
  !GPU codelets
 
-!$hmpp <tsteps> group, target=CUDA
+!$hmpp <tsteps> group, target = CUDA
 
   !$hmpp <tsteps> mapbyname, Prnx,Prny,Prnz
   !$hmpp <tsteps> mapbyname, Btype,sideU,Re
