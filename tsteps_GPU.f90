@@ -24,8 +24,8 @@
    real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in):: Visc
    real(TIM),intent(in):: dt
    real(KND),intent(in):: dxmin,dymin,dzmin,coef,epsCN
-   integer(KND),intent(in):: maxCNiter
-   integer(KND),intent(out):: iters
+   integer,intent(in):: maxCNiter
+   integer,intent(out):: iters
    real(KND),intent(out):: residuum
 
    real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
