@@ -6,7 +6,7 @@ implicit none
   integer,parameter :: DBL=selected_real_kind(p=15,r=200),SNG=selected_real_kind(p=6,r=37)
   integer,parameter :: KND=SNG                                         !KND is default real kind for the whole program
 
-  integer,parameter :: TIM=SNG                                         !Kind for time variables, can be double for very small timesteps.
+  integer,parameter :: TIM=KND                                         !Kind for time variables, can be double for very small timesteps.
                                                                        !It may affect performance
 
   integer,parameter :: SINT=kind(1)!selected_int_kind(2)               !To save memory a smaller type can be used for some integer
@@ -62,7 +62,10 @@ implicit none
 
   real(KND) :: epsCN,epsPoisson,eps,debugparam
   real(TIM) :: time
-  real(TIM) :: timefram1,timefram2,framedimension,slicedir,slicex,timeavg1,timeavg2
+  real(TIM) :: timefram1,timefram2,timeavg1,timeavg2
+
+  integer   :: framedimension,slicedir
+  real(KND) :: slicex
 
   integer :: tempmet,poissmet,convmet,masssourc,frames,steady
   integer :: tasktype,averaging,projectiontype,impldiff,wallmodeltype,sgstype,fullstress
