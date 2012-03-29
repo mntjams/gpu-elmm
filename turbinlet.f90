@@ -33,7 +33,6 @@ contains
  integer,save:: filtnx,filtny,filtnz,bigNx,bigNy,bigNz
  real(KND) Ui,Vi,Wi,bx,by,bz,bxsum,bysum,bzsum
  real(KND),allocatable,dimension(:,:,:),save :: Ru,Rv,Rw !arrays of randoms
- real(KND),allocatable,dimension(:,:,:),save :: Psiu,Psiv,Psiw
  real(KND),allocatable,dimension(:,:,:),save :: bfilt !filter coefficients (ii,jj,kk,kz)
 
  if (.not. called) then
