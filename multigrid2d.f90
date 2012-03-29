@@ -364,7 +364,6 @@ real(KND),allocatable,dimension(:),save:: xge,bge,work,R,C,ferr,berr
 real(KND),allocatable,dimension(:,:),save:: age,af
 real(KND) Ap,rcond
 integer,save:: nx,nz,nulx,nulz,nxyz,called=0
-character(1),save:: equed
 
  if (called==0) then
   nx=CoefMG(level)%nx
@@ -785,7 +784,6 @@ integer,intent(in)::level
 real(KND),intent(out)::R
 integer i,k
 real(KND),save:: p,Ap
-character(70):: str
 
      call BOUND_Phi_MG(PhiMG(level)%Arr,CoefMG(level)%nx,CoefMG(level)%nz)
      do k=0,CoefMG(level)%nz
