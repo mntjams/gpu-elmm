@@ -1,14 +1,14 @@
 module SCALARS
  use PARAMETERS
  use WALLMODELS
- use GEOMETRIC
+ use GEOMETRIC, only: TIBPoint, ScalFlIBPoints,TIBPoint_ScalFlSource
  use LIMITERS
  use BOUNDARIES
 
 implicit none
   private
   public Bound_Temp, Bound_Visc, Bound_PassScalar, Scalar, partdiam,partrho,percdistrib, AdvScalar,&
-     DiffScalar, Deposition, GravSettling, ComputeTDiff, Prt, Rig, ScalFlSourc, VolScalSource
+     DiffScalar, Deposition, GravSettling, ComputeTDiff, Prt, Rig, VolScalSource
 
 
   real(KND),allocatable,dimension(:,:,:,:) :: SCALAR  !last index is number of scalar (because of paging)
@@ -777,13 +777,17 @@ contains
     enddo
    enddo
 
-   call ScalFlSourc(SCAL2,sctype)
+   if (sctype==1) then
+     call BOUND_Temp(SCAL2)
+   else
+     call BOUND_PASSSCALAR(SCAL2)
+   endif
 
    do i = 1,ubound(ScalFlIBPoints,1)
      xi = ScalFlIBPoints(i)%xi
      yj = ScalFlIBPoints(i)%yj
      zk = ScalFlIBPoints(i)%zk
-     p = ScalFlIBPoints(i)%scalsrc * dt
+     p = TIBPoint_ScalFlSource(ScalFlIBPoints(i),Scal2,sctype) * dt
      SCAL2(xi,yj,zk) = SCAL2(xi,yj,zk) + p
      SCAL3(xi,yj,zk) = SCAL3(xi,yj,zk) + p
    enddo
@@ -922,13 +926,17 @@ contains
 
    SCAL2 = SCAL
 
-   call ScalFlSOURC(SCAL2,sctype)
+   if (sctype==1) then
+     call BOUND_Temp(SCAL2)
+   else
+     call BOUND_PASSSCALAR(SCAL2)
+   endif
 
    do i = 1,ubound(ScalFlIBPoints,1)
      xi = ScalFlIBPoints(i)%xi
      yj = ScalFlIBPoints(i)%yj
      zk = ScalFlIBPoints(i)%zk
-     SCAL2(xi,yj,zk) = SCAL2(xi,yj,zk) + ScalFlIBPoints(i)%scalsrc * dt
+     SCAL2(xi,yj,zk) = SCAL2(xi,yj,zk) + TIBPoint_ScalFlSource(ScalFlIBPoints(i),Scal2,sctype) * dt
    enddo
 
 
@@ -1511,68 +1519,6 @@ contains
    enddo
   endif
   endsubroutine BOUND_Visc
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  subroutine ScalFlSourc(SCAL,sctype)  !Virtual scalar source for the Immersed Boundary Method with prescribed scalar flux on the boundary
-    real(KND),intent(inout) :: SCAL(-1:,-1:,-1:)
-    integer,intent(in) :: sctype
-    real(KND) intscal,intTDiff
-    integer xi,yj,zk,dirx,diry,dirz,n1,i,j
-
-    if (sctype==1) then
-      call BOUND_Temp(SCAL)
-    elseif (sctype==3) then
-      call BOUND_Visc(SCAL)
-    else
-      call BOUND_PASSSCALAR(SCAL)
-    endif
-
-
-    do j = 1,ubound(ScalFLIBPoints,1)
-      xi = ScalFlIBPoints(j)%xi
-      yj = ScalFlIBPoints(j)%yj
-      zk = ScalFlIBPoints(j)%zk
-      intscal = 0
-      intTDiff = 0
-      n1 = 0
-      do i = 1,ScalFlIBPoints(j)%interp
-        intscal = intscal + ScalFlIBPoints(j)%intcoef(i) * SCAL(ScalFlIBPoints(j)%intpointi(i),&
-                                                                ScalFlIBPoints(j)%intpointj(i),&
-                                                                ScalFlIBPoints(j)%intpointk(i))
-        if (sctype/=3.and.ScalFlIBPoints(j)%intcoef(i)/=0._KND) then
-                                    intTDiff = intTDiff + TDiff(ScalFlIBPoints(j)%intpointi(i),&
-                                                                ScalFlIBPoints(j)%intpointj(i),&
-                                                                ScalFlIBPoints(j)%intpointk(i))
-                                    n1 = n1+1
-        endif
-      enddo
-
-      if (sctype/=3) then
-        intTDiff = intTDiff+TDiff(xi,yj,zk)
-        intTDiff = intTDiff/(n1+1)
-
-        if (intTDiff>0)  intscal = intscal+ScalFlIBPoints(j)%Flux*ScalFlIBPoints(j)%dist/intTDiff
-      endif
-
-      ScalFlIBPoints(j)%scalsrc = (intscal-SCAL(xi,yj,zk))/dt
-
-    enddo
-  end subroutine ScalFlSOURC
 
 
 

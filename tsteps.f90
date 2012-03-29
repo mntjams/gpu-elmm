@@ -1,6 +1,5 @@
 module TSTEPS
 
-  use UPWIND
   use CDS, only: CDU, CDV, CDW, KappaU, KappaV, KappaW
   use LAXFRIED
   use LAXWEND
@@ -9,7 +8,7 @@ module TSTEPS
   use POISSON, only: Pr_Correct
   use SMAGORINSKY, only: Smag, StabSmag, Vreman
   use SCALARS, only:  Bound_Temp, Bound_Visc, Scalar, percdistrib, AdvScalar,&
-     DiffScalar, ComputeTDiff, Deposition, GravSettling, ScalFlSourc, VolScalSource
+     DiffScalar, ComputeTDiff, Deposition, GravSettling, VolScalSource
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
   use Wallmodels, only: ComputeViscsWM
 
@@ -40,8 +39,7 @@ contains
   real(KND),dimension(1:3),parameter:: beta  = (/ 8._KND/15._KND, 5._KND/12._KND, 3._KND/4._KND /)
   real(KND),dimension(1:3),parameter:: rho   = (/       0._KND, -17._KND/60._KND,-5._KND/12._KND/)
 
-  integer i,j,k,l
-  real(KND) p
+  integer i,l
   integer,save:: called = 0
   real time1,time2
 
@@ -201,10 +199,10 @@ contains
 
 
     if (masssourc==1) then
-        call IBMassSources(Q,U2,V2,W2)
         call BoundU(1,U2)
         call BoundU(2,V2)
         call BoundU(3,W2)
+        call IBMassSources(Q,U2,V2,W2)
     endif
 
 
@@ -666,224 +664,6 @@ contains
 
 
 
-
-
-
-  subroutine IBMomentumSources(IBPoints,U,xU,yU,zU)
-    use GEOMETRIC, only: IBLinInterpolation, IBBiLinInterpolation, IBTriLinInterpolation, TIBPoint
-
-    type(TIBpoint),dimension(:),intent(inout) :: IBPoints
-    real(KND),intent(in)                      :: U(-2:,-2:,-2:)
-    real(KND),dimension(-2:),intent(in)       :: xU,yU,zU
-    real(KND) intvel,p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7
-    integer i,xi,yj,zk,dirx,diry,dirz
-
-    !$omp parallel do default(private) shared(IBPoints,U,xU,yU,zU,dt)
-    do i=1,ubound(IBPoints,1)
-      xi = IBPoints(i)%xi
-      yj = IBPoints(i)%yj
-      zk = IBPoints(i)%zk
-
-      dirx = IBPoints(i)%dirx
-      diry = IBPoints(i)%diry
-      dirz = IBPoints(i)%dirz
-
-      if (IBPoints(i)%interp<=0) then
-
-
-          intvel = 0
-
-
-      elseif (IBPoints(i)%interp==1) then
-
-
-          vel1 = U(xi+dirx,yj+diry,zk+dirz)
-          vel2 = U(xi+2*dirx,yj+2*diry,zk+2*dirz)
-
-          if (IBPoints(i)%interpdir==1) then
-            p0 = abs(IBPoints(i)%distx)
-            p1 = abs(xU(xi+dirx)-xU(xi))
-            p2 = abs(xU(xi+2*dirx)-xU(xi))
-          elseif (IBPoints(i)%interpdir==2) then
-            p0 = abs(IBPoints(i)%disty)
-            p1 = abs(yU(yj+diry)-yU(yj))
-            p2 = abs(yU(yj+2*diry)-yU(yj))
-          else
-            p0 = abs(IBPoints(i)%distz)
-            p1 = abs(zU(zk+dirz)-zU(zk))
-            p2 = abs(zU(zk+2*dirz)-zU(zk))
-          endif
-
-          intvel = IBLinInterpolation(p0,p1,p2,vel1,vel2)
-
-
-      elseif (IBPoints(i)%interp==2) then
-
-
-          if (IBPoints(i)%interpdir==1) then
-            vel1 = U(xi,yj+diry,zk)
-            vel2 = U(xi,yj,zk+dirz)
-            vel3 = U(xi,yj+diry,zk+dirz)
-            p0 = abs(IBPoints(i)%disty)
-            p1 = abs(IBPoints(i)%distz)
-            p2 = abs(yU(yj+diry)-yU(yj))
-            p3 = abs(zU(zk+dirz)-zU(zk))
-          elseif (IBPoints(i)%interpdir==2) then
-            vel1 = U(xi,yj,zk+dirz)
-            vel2 = U(xi+dirx,yj,zk)
-            vel3 = U(xi+dirx,yj,zk+dirz)
-            p0 = abs(IBPoints(i)%distz)
-            p1 = abs(IBPoints(i)%distx)
-            p2 = abs(zU(zk+dirz)-zU(zk))
-            p3 = abs(xU(xi+dirx)-xU(xi))
-          else
-            vel1 = U(xi+dirx,yj,zk)
-            vel2 = U(xi,yj+diry,zk)
-            vel3 = U(xi+dirx,yj+diry,zk)
-            p0 = abs(IBPoints(i)%distx)
-            p1 = abs(IBPoints(i)%disty)
-            p2 = abs(xU(xi+dirx)-xU(xi))
-            p3 = abs(yU(yj+diry)-yU(yj))
-          endif
-
-          intvel = IBBiLinInterpolation(p0,p1,p2,p3,vel1,vel2,vel3)
-
-
-      elseif (IBPoints(i)%interp==3) then
-
-
-          vel1 = U(xi+dirx,yj,zk)
-          vel2 = U(xi,yj+diry,zk)
-          vel3 = U(xi+dirx,yj+diry,zk)
-          vel4 = U(xi,yj,zk+dirz)
-          vel5 = U(xi+dirx,yj,zk+dirz)
-          vel6 = U(xi,yj+diry,zk+dirz)
-          vel7 = U(xi+dirx,yj+diry,zk+dirz)
-          p0 = abs(IBPoints(i)%distx)
-          p1 = abs(IBPoints(i)%disty)
-          p2 = abs(IBPoints(i)%distz)
-          p3 = abs(xU(xi+dirx)-xU(xi))
-          p4 = abs(yU(yj+diry)-yU(yj))
-          p5 = abs(zU(zk+dirz)-zU(zk))
-
-          intvel = IBTriLinInterpolation(p0,p1,p2,p3,p4,p5,vel1,vel2,vel3,vel4,vel5,vel6,vel7)
-
-      else
-
-
-          intvel = 0
-
-
-      endif
-
-
-
-       IBPoints(i)%momsrc = (intvel-U(xi,yj,zk))/dt
-
-    enddo
-    !$omp end parallel do
-
-  end subroutine IBMomentumSources
-
-
-
-
-  subroutine IBMomentum(U2,V2,W2,U3,V3,W3)
-    use GEOMETRIC, only: UIBPoints, VIBPoints, WIBPoints
-
-    real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
-    integer :: i,xi,yj,zk
-
-
-     !$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
-     call BoundU(1,U3)
-     call BoundU(2,V3)
-     call BoundU(3,W3)
-
-     call IBMomentumSources(UIBPoints,U3,xU(-2:),yPr(-2:),zPr(-2:))
-
-     call IBMomentumSources(VIBPoints,V3,xPr(-2:),yV(-2:),zPr(-2:))
-
-     call IBMomentumSources(WIBPoints,W3,xPr(-2:),yPr(-2:),zW(-2:))
-
-
-     do i=1,ubound(UIBPoints,1)
-       xi = UIBPoints(i)%xi
-       yj = UIBPoints(i)%yj
-       zk = UIBPoints(i)%zk
-
-       U3(xi,yj,zk) = U3(xi,yj,zk) + UIBPoints(i)%momsrc * dt
-       U2(xi,yj,zk) = U2(xi,yj,zk) + UIBPoints(i)%momsrc * dt
-     enddo
-
-     do i=1,ubound(VIBPoints,1)
-       xi = VIBPoints(i)%xi
-       yj = VIBPoints(i)%yj
-       zk = VIBPoints(i)%zk
-
-       V3(xi,yj,zk) = V3(xi,yj,zk) + VIBPoints(i)%momsrc * dt
-       V2(xi,yj,zk) = V2(xi,yj,zk) + VIBPoints(i)%momsrc * dt
-     enddo
-
-     do i=1,ubound(WIBPoints,1)
-       xi = WIBPoints(i)%xi
-       yj = WIBPoints(i)%yj
-       zk = WIBPoints(i)%zk
-
-       W3(xi,yj,zk) = W3(xi,yj,zk) + WIBPoints(i)%momsrc * dt
-       W2(xi,yj,zk) = W2(xi,yj,zk) + WIBPoints(i)%momsrc * dt
-     enddo
-
-
-     !$hmpp <tsteps> advancedload, args[UnifRedBlack::U3,UnifRedBlack::V3,UnifRedBlack::W3]
-  end subroutine IBMomentum
-
-
-
-
-
-
-  subroutine IBMassSources(Q,U,V,W)
-    use GEOMETRIC, only: UIBPoints, VIBPoints, WIBPoints
-
-    real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
-    real(KND),intent(out):: Q(0:,0:,0:)
-    integer i,xi,yj,zk
-
-    Q = 0
-
-    do i=1,ubound(UIBPoints,1)
-      xi = UIBPoints(i)%xi
-      yj = UIBPoints(i)%yj
-      zk = UIBPoints(i)%zk
-
-      Q(xi,yj,zk)   = Q(xi,yj,zk)   + U(xi,yj,zk)/dxPr(xi)
-      Q(xi+1,yj,zk) = Q(xi+1,yj,zk) - U(xi,yj,zk)/dxPr(xi+1)
-    enddo
-
-
-    do i=1,ubound(VIBPoints,1)
-      xi = VIBPoints(i)%xi
-      yj = VIBPoints(i)%yj
-      zk = VIBPoints(i)%zk
-
-      Q(xi,yj,zk)   = Q(xi,yj,zk)   + V(xi,yj,zk)/dyPr(yj)
-      Q(xi,yj+1,zk) = Q(xi,yj+1,zk) - V(xi,yj,zk)/dyPr(yj+1)
-    enddo
-
-
-    do i=1,ubound(WIBPoints,1)
-      xi = WIBPoints(i)%xi
-      yj = WIBPoints(i)%yj
-      zk = WIBPoints(i)%zk
-
-      Q(xi,yj,zk)   = Q(xi,yj,zk)   + W(xi,yj,zk)/dzPr(zk)
-      Q(xi,yj,zk+1) = Q(xi,yj,zk+1) - W(xi,yj,zk)/dzPr(zk+1)
-    enddo
-
-    call Bound_Q(Q)
-
-  end subroutine IBMassSources
 
 
 
@@ -2095,7 +1875,10 @@ contains
 
 
   subroutine SubgridStresses(U,V,W,Pr)
+  use Geometric, only: ScalFlIBPoints, TIBPoint_Viscosity
+
   real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  integer i
 
      if (sgstype==SmagorinskyModel) then
                        call Smag(U,V,W)
@@ -2124,10 +1907,140 @@ contains
                      call ComputeViscsWM(U,V,W,Pr)
      endif
 
-     call ScalFlSourc(Visc,3)
+     do i=1,size(ScalFlIBPoints)
+       Visc(ScalFlIBPoints(i)%xi,ScalFlIBPoints(i)%yj,ScalFlIBPoints(i)%zk) = &
+                                               TIBPoint_Viscosity(ScalFlIBPoints(i),Visc)
+     enddo
+
   end subroutine SubgridStresses
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  subroutine IBMomentum(U2,V2,W2,U3,V3,W3)
+    use GEOMETRIC, only: UIBPoints, VIBPoints, WIBPoints, TIBPoint_MomentumSource
+
+    real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
+    integer   :: i,xi,yj,zk
+    real(KND) :: src
+
+
+     !$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
+     call BoundU(1,U3)
+     call BoundU(2,V3)
+     call BoundU(3,W3)
+
+    !$omp parallel
+     !$omp do private(xi,yj,zk,src)
+     do i=1,ubound(UIBPoints,1)
+       xi = UIBPoints(i)%xi
+       yj = UIBPoints(i)%yj
+       zk = UIBPoints(i)%zk
+
+       src = TIBPoint_MomentumSource(UIBPoints(i),U3)
+
+       U3(xi,yj,zk) = U3(xi,yj,zk) + src * dt
+       U2(xi,yj,zk) = U2(xi,yj,zk) + src * dt
+     enddo
+     !$omp enddo nowait
+
+     !$omp do private(xi,yj,zk,src)
+     do i=1,ubound(VIBPoints,1)
+       xi = VIBPoints(i)%xi
+       yj = VIBPoints(i)%yj
+       zk = VIBPoints(i)%zk
+
+       src = TIBPoint_MomentumSource(VIBPoints(i),V3)
+
+       V3(xi,yj,zk) = V3(xi,yj,zk) + src * dt
+       V2(xi,yj,zk) = V2(xi,yj,zk) + src * dt
+     enddo
+     !$omp enddo nowait
+
+     !$omp do private(xi,yj,zk,src)
+     do i=1,ubound(WIBPoints,1)
+       xi = WIBPoints(i)%xi
+       yj = WIBPoints(i)%yj
+       zk = WIBPoints(i)%zk
+
+       src = TIBPoint_MomentumSource(WIBPoints(i),W3)
+
+       W3(xi,yj,zk) = W3(xi,yj,zk) + src * dt
+       W2(xi,yj,zk) = W2(xi,yj,zk) + src * dt
+     enddo
+     !$omp enddo
+     !$omp end parallel
+
+     !$hmpp <tsteps> advancedload, args[UnifRedBlack::U3,UnifRedBlack::V3,UnifRedBlack::W3]
+  end subroutine IBMomentum
+
+
+
+
+
+
+  subroutine IBMassSources(Q,U,V,W)
+    use GEOMETRIC, only: UIBPoints, VIBPoints, WIBPoints
+
+    real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+    real(KND),intent(out):: Q(0:,0:,0:)
+    integer i,xi,yj,zk
+
+    Q = 0
+
+    do i=1,ubound(UIBPoints,1)
+      xi = UIBPoints(i)%xi
+      yj = UIBPoints(i)%yj
+      zk = UIBPoints(i)%zk
+
+      Q(xi,yj,zk)   = Q(xi,yj,zk)   + U(xi,yj,zk)/dxPr(xi)
+      Q(xi+1,yj,zk) = Q(xi+1,yj,zk) - U(xi,yj,zk)/dxPr(xi+1)
+    enddo
+
+
+    do i=1,ubound(VIBPoints,1)
+      xi = VIBPoints(i)%xi
+      yj = VIBPoints(i)%yj
+      zk = VIBPoints(i)%zk
+
+      Q(xi,yj,zk)   = Q(xi,yj,zk)   + V(xi,yj,zk)/dyPr(yj)
+      Q(xi,yj+1,zk) = Q(xi,yj+1,zk) - V(xi,yj,zk)/dyPr(yj+1)
+    enddo
+
+
+    do i=1,ubound(WIBPoints,1)
+      xi = WIBPoints(i)%xi
+      yj = WIBPoints(i)%yj
+      zk = WIBPoints(i)%zk
+
+      Q(xi,yj,zk)   = Q(xi,yj,zk)   + W(xi,yj,zk)/dzPr(zk)
+      Q(xi,yj,zk+1) = Q(xi,yj,zk+1) - W(xi,yj,zk)/dzPr(zk+1)
+    enddo
+
+    call Bound_Q(Q)
+
+  end subroutine IBMassSources
 
 
 

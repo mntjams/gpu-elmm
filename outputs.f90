@@ -1120,7 +1120,6 @@ contains
           enddo
          enddo
         enddo
-        close(11)
       endif
 
       if (store%avg_vort>0) then
@@ -1139,6 +1138,8 @@ contains
         enddo
         write (11,*)
       endif
+
+      close(11)
   endif !averaging
 
   if (averaging==1.and.store%scalarsavg>0) then
@@ -1191,60 +1192,9 @@ contains
 
  subroutine OutputUVW(U,V,W)
  real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
- real(KND),dimension(:,:,:),allocatable :: Uinterp,Uinterpdir
- real(KND),dimension(:,:,:),allocatable :: Vinterp,Vinterpdir
- real(KND),dimension(:,:,:),allocatable :: Winterp,Winterpdir
  character(70) :: str
  integer i,j,k,l
 
-  if ((store%U>0.or.store%V>0.or.store%W>0) .and. (store%U_interp>0.or.store%V_interp>0.or.store%W_interp>0)) then
-
-      allocate(Uinterp(1:Unx,1:Uny,1:Unz),Uinterpdir(1:Unx,1:Uny,1:Unz))
-      allocate(Vinterp(1:Vnx,1:Vny,1:Vnz),Vinterpdir(1:Vnx,1:Vny,1:Vnz))
-      allocate(Winterp(1:Wnx,1:Wny,1:Wnz),Winterpdir(1:Wnx,1:Wny,1:Wnz))
-
-      Uinterp=-1
-      Uinterpdir=-1
-      Vinterp=-1
-      Vinterpdir=-1
-      Winterp=-1
-      Winterpdir=-1
-
-
-      do l = 1,ubound(UIBPoints,1)
-
-          i=UIBPoints(l)%xi
-          j=UIBPoints(l)%yj
-          k=UIBPoints(l)%zk
-
-          Uinterp(i,j,k)=UIBPoints(l)%interp
-          Uinterpdir(i,j,k)=UIBPoints(l)%interpdir
-
-      enddo
-
-      do l = 1,ubound(VIBPoints,1)
-
-          i=VIBPoints(l)%xi
-          j=VIBPoints(l)%yj
-          k=VIBPoints(l)%zk
-
-          Vinterp(i,j,k)=VIBPoints(l)%interp
-          Vinterpdir(i,j,k)=VIBPoints(l)%interpdir
-
-      enddo
-
-      do l = 1,ubound(WIBPoints,1)
-
-          i=WIBPoints(l)%xi
-          j=WIBPoints(l)%yj
-          k=WIBPoints(l)%zk
-
-          Winterp(i,j,k)=WIBPoints(l)%interp
-          Winterpdir(i,j,k)=WIBPoints(l)%interpdir
-
-      enddo
-
-  endif ! U & interp
 
   if (store%U>0) then
       open(11,file="U.vtk")
@@ -1282,29 +1232,6 @@ contains
        enddo
       enddo
       write (11,*)
-
-      if (store%U_interp>0) then
-          write (11,"(A)") "SCALARS Uinterp float"
-          write (11,"(A)") "LOOKUP_TABLE default"
-          do k=1,Unz
-           do j=1,Uny
-            do i=1,Unx
-              write (11,*) Uinterp(i,j,k)
-            enddo
-           enddo
-          enddo
-          write (11,*)
-          write (11,"(A)") "SCALARS Uinterpdir float"
-          write (11,"(A)") "LOOKUP_TABLE default"
-          do k=1,Unz
-           do j=1,Uny
-            do i=1,Unx
-              write (11,*) Uinterpdir(i,j,k)
-            enddo
-           enddo
-          enddo
-          write (11,*)
-      endif
 
       close(11)
   endif
@@ -1346,29 +1273,6 @@ contains
       enddo
       write (11,*)
 
-      if (store%V_interp>0) then
-          write (11,"(A)") "SCALARS Vinterp float"
-          write (11,"(A)") "LOOKUP_TABLE default"
-          do k=1,Vnz
-           do j=1,Vny
-            do i=1,Vnx
-              write (11,*) Vinterp(i,j,k)
-            enddo
-           enddo
-          enddo
-          write (11,*)
-          write (11,"(A)") "SCALARS Vinterpdir float"
-          write (11,"(A)") "LOOKUP_TABLE default"
-          do k=1,Vnz
-           do j=1,Vny
-            do i=1,Vnx
-              write (11,*) Vinterpdir(i,j,k)
-            enddo
-           enddo
-          enddo
-          write (11,*)
-      endif
-
       close(11)
   endif !store%V
 
@@ -1409,31 +1313,61 @@ contains
       enddo
       write (11,*)
 
-      if (store%W_interp>0) then
-          write (11,"(A)") "SCALARS Winterp float"
-          write (11,"(A)") "LOOKUP_TABLE default"
-          do k=1,Wnz
-           do j=1,Wny
-            do i=1,Wnx
-              write (11,*) Winterp(i,j,k)
-            enddo
-           enddo
-          enddo
-          write (11,*)
-          write (11,"(A)") "SCALARS Winterpdir float"
-          write (11,"(A)") "LOOKUP_TABLE default"
-          do k=1,Wnz
-           do j=1,Wny
-            do i=1,Wnx
-              write (11,*) Winterpdir(i,j,k)
-            enddo
-           enddo
-          enddo
-          write (11,*)
       close(11)
-
-      endif
   endif !store%W
+
+  if (store%U_interp/=0) then
+    open(11,file="Uinterp.txt")
+    do i=1,size(UIBPoints)
+      write(11,*) "xi,yj,zk",UIBPoints(i)%xi,UIBPoints(i)%yj,UIBPoints(i)%zk
+      write(11,*) "interp",UIBPoints(i)%interp
+      write(11,*) "xi",UIBPoints(i)%IntPoints%xi
+      write(11,*) "yj",UIBPoints(i)%IntPoints%yj
+      write(11,*) "zk",UIBPoints(i)%IntPoints%zk
+      write(11,*) "coefs",UIBPoints(i)%IntPoints%coef
+    enddo
+    close(11)
+  endif
+
+  if (store%V_interp/=0) then
+    open(11,file="Vinterp.txt")
+    do i=1,size(VIBPoints)
+      write(11,*) "xi,yj,zk",VIBPoints(i)%xi,VIBPoints(i)%yj,VIBPoints(i)%zk
+      write(11,*) "interp",VIBPoints(i)%interp
+      write(11,*) "xi",VIBPoints(i)%IntPoints%xi
+      write(11,*) "yj",VIBPoints(i)%IntPoints%yj
+      write(11,*) "zk",VIBPoints(i)%IntPoints%zk
+      write(11,*) "coefs",VIBPoints(i)%IntPoints%coef
+    enddo
+    close(11)
+  endif
+
+  if (store%W_interp/=0) then
+    open(11,file="Winterp.txt")
+    do i=1,size(WIBPoints)
+      write(11,*) "xi,yj,zk",WIBPoints(i)%xi,WIBPoints(i)%yj,WIBPoints(i)%zk
+      write(11,*) "interp",WIBPoints(i)%interp
+      write(11,*) "xi",WIBPoints(i)%IntPoints%xi
+      write(11,*) "yj",WIBPoints(i)%IntPoints%yj
+      write(11,*) "zk",WIBPoints(i)%IntPoints%zk
+      write(11,*) "coefs",WIBPoints(i)%IntPoints%coef
+    enddo
+    close(11)
+  endif
+
+  if (store%U_interp/=0.and.store%V_interp/=0.and.store%W_interp/=0) then
+    open(11,file="Scinterp.txt")
+    do i=1,size(ScalFlIBPoints)
+      write(11,*) "xi,yj,zk",ScalFlIBPoints(i)%xi,ScalFlIBPoints(i)%yj,ScalFlIBPoints(i)%zk
+      write(11,*) "interp",ScalFlIBPoints(i)%interp
+      write(11,*) "xi",ScalFlIBPoints(i)%IntPoints%xi
+      write(11,*) "yj",ScalFlIBPoints(i)%IntPoints%yj
+      write(11,*) "zk",ScalFlIBPoints(i)%IntPoints%zk
+      write(11,*) "coefs",ScalFlIBPoints(i)%IntPoints%coef
+    enddo
+    close(11)
+  endif
+
  end subroutine OutputUVW
 
 
