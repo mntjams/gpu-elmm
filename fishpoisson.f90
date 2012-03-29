@@ -1,6 +1,7 @@
 module FISHPOISSON
 
  use PARAMETERS
+ implicit none
 
  contains
 
@@ -20,17 +21,17 @@ module FISHPOISSON
 
 
    write (*,*) "Computing Poisson using hw3crt"
-  if (BtypeE==PERIODIC) then
+  if (Btype(Ea)==PERIODIC) then
    nx=Prnx+1
   else
    nx=Prnx
   endif
-  if (BtypeN==PERIODIC) then
+  if (Btype(No)==PERIODIC) then
    ny=Prny+1
   else
    ny=Prny
   endif
-  if (BtypeT==PERIODIC) then
+  if (Btype(To)==PERIODIC) then
    nz=Prnz+1
   else
    nz=Prnz
@@ -43,17 +44,17 @@ module FISHPOISSON
    ZBC1=0
    ZBC2=0
 
-   if (BtypeW==PERIODIC) then
+   if (Btype(We)==PERIODIC) then
                            xb=0
    else
     xb=3
    endif
-   if (BtypeN==PERIODIC) then
+   if (Btype(No)==PERIODIC) then
                            yb=0
    else
     yb=3
    endif
-   if (BtypeT==PERIODIC) then
+   if (Btype(To)==PERIODIC) then
                            zb=0
    else
     zb=3
