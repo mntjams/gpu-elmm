@@ -13,8 +13,8 @@
 
 
 #### Compiler and tool definitions shared by all build targets  -fopenmp ,invalid#####
-FC = gfortran-4.6
-BASICOPTS = -C -fbacktrace -ggdb
+FC = gfortran-4.7
+BASICOPTS = -fbacktrace -ggdb
 ADVOPTS = -pedantic -Wall  -fcheck=all -ffpe-trap=zero,overflow
 FFLAGS = $(BASICOPTS)
 
@@ -45,7 +45,6 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/poisson.o \
 	$(TARGETDIR_CLMM)/initial.o \
 	$(TARGETDIR_CLMM)/cds.o \
-	$(TARGETDIR_CLMM)/upwind.o \
 	$(TARGETDIR_CLMM)/laxfried.o \
 	$(TARGETDIR_CLMM)/laxwend.o \
 	$(TARGETDIR_CLMM)/tsteps.o \
@@ -86,7 +85,7 @@ $(TARGETDIR_CLMM)/outputs.o: $(TARGETDIR_CLMM) outputs.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ outputs.f90
 
 $(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ poisson.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -cpp -o $@ poisson.f90
 
 $(TARGETDIR_CLMM)/fishpoisson.o: $(TARGETDIR_CLMM) fishpoisson.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ fishpoisson.f90
@@ -96,9 +95,6 @@ $(TARGETDIR_CLMM)/initial.o: $(TARGETDIR_CLMM) initial.f90
 
 $(TARGETDIR_CLMM)/cds.o: $(TARGETDIR_CLMM) cds.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ cds.f90
-
-$(TARGETDIR_CLMM)/upwind.o: $(TARGETDIR_CLMM) upwind.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ upwind.f90
 
 $(TARGETDIR_CLMM)/laxfried.o: $(TARGETDIR_CLMM) laxfried.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ laxfried.f90
@@ -110,7 +106,7 @@ $(TARGETDIR_CLMM)/wallmodels.o: $(TARGETDIR_CLMM) wallmodels.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ wallmodels.f90
 
 $(TARGETDIR_CLMM)/multigrid.o: $(TARGETDIR_CLMM) multigrid.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ multigrid.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -cpp -o $@ multigrid.f90
 
 $(TARGETDIR_CLMM)/multigrid2d.o: $(TARGETDIR_CLMM) multigrid2d.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ multigrid2d.f90
@@ -148,7 +144,6 @@ clean:
 		$(TARGETDIR_CLMM)/poisson.o \
 		$(TARGETDIR_CLMM)/initial.o \
 		$(TARGETDIR_CLMM)/cds.o \
-		$(TARGETDIR_CLMM)/upwind.o \
 		$(TARGETDIR_CLMM)/laxfried.o \
 		$(TARGETDIR_CLMM)/laxwend.o \
 		$(TARGETDIR_CLMM)/wallmodels.o \

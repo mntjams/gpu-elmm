@@ -44,7 +44,6 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/poisson.o \
 	$(TARGETDIR_CLMM)/initial.o \
 	$(TARGETDIR_CLMM)/cds.o \
-	$(TARGETDIR_CLMM)/upwind.o \
 	$(TARGETDIR_CLMM)/laxfried.o \
 	$(TARGETDIR_CLMM)/laxwend.o \
 	$(TARGETDIR_CLMM)/tsteps.o \

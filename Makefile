@@ -44,7 +44,6 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/poisson.o \
 	$(TARGETDIR_CLMM)/initial.o \
 	$(TARGETDIR_CLMM)/cds.o \
-	$(TARGETDIR_CLMM)/upwind.o \
 	$(TARGETDIR_CLMM)/laxfried.o \
 	$(TARGETDIR_CLMM)/laxwend.o \
 	$(TARGETDIR_CLMM)/tsteps.o \
@@ -79,7 +78,7 @@ $(TARGETDIR_CLMM)/scalars.o: $(TARGETDIR_CLMM) scalars.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ scalars.f90
 
 $(TARGETDIR_CLMM)/multigrid.o: $(TARGETDIR_CLMM) multigrid.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -fpp -xpp=cpp -o $@ multigrid.f90
 
 $(TARGETDIR_CLMM)/multigrid2d.o: $(TARGETDIR_CLMM) multigrid2d.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid2d.f90
@@ -94,16 +93,13 @@ $(TARGETDIR_CLMM)/fishpoisson.o: $(TARGETDIR_CLMM) fishpoisson.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ fishpoisson.f90
 
 $(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ poisson.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -fpp -xpp=cpp -o $@ poisson.f90
 
 $(TARGETDIR_CLMM)/initial.o: $(TARGETDIR_CLMM) initial.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ initial.f90
 
 $(TARGETDIR_CLMM)/cds.o: $(TARGETDIR_CLMM) cds.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ cds.f90
-
-$(TARGETDIR_CLMM)/upwind.o: $(TARGETDIR_CLMM) upwind.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ upwind.f90
 
 $(TARGETDIR_CLMM)/laxfried.o: $(TARGETDIR_CLMM) laxfried.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ laxfried.f90
@@ -124,7 +120,7 @@ $(TARGETDIR_CLMM)/smagorinsky.o: $(TARGETDIR_CLMM) smagorinsky.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ smagorinsky.f90
 
 $(TARGETDIR_CLMM)/tsteps.o: $(TARGETDIR_CLMM) tsteps.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -fpp -o $@ tsteps.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -fpp -xpp=cpp -o $@ tsteps.f90
 
 $(TARGETDIR_CLMM)/main.o: $(TARGETDIR_CLMM) main.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ main.f90
@@ -151,7 +147,6 @@ clean:
 		$(TARGETDIR_CLMM)/poisson.o \
 		$(TARGETDIR_CLMM)/initial.o \
 		$(TARGETDIR_CLMM)/cds.o \
-		$(TARGETDIR_CLMM)/upwind.o \
 		$(TARGETDIR_CLMM)/laxfried.o \
 		$(TARGETDIR_CLMM)/laxwend.o \
 		$(TARGETDIR_CLMM)/wallmodels.o \

@@ -16,7 +16,7 @@ contains
 subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   real(KND),dimension(-2:,-2:,-2:),intent(inout):: U,V,W !Phi is computed in Poisson eq. with div of U in RHS
   real(KND),dimension(1:,1:,1:),intent(inout):: Pr       !Depending on active projection method Phi becomes new pressure
-  real(KND),dimension(1:,1:,1:),optional,intent(in)::Q   !or is added to last pressure
+  real(KND),dimension(0:,0:,0:),optional,intent(in)::Q   !or is added to last pressure
   real(KND),intent(in):: coef
   real(KND),allocatable,dimension(:,:,:):: RHS,RHS2      !U,V,W velocity field for correction U(-2:Unx,-2:Uny,-2:Unz)
   real(KND),save,allocatable:: Phi(:,:,:)                !Pr(1:Prnx+1,1:Prny+1,Prnz+1) pressure
@@ -272,9 +272,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     enddo
    enddo
   enddo
-
   write (*,*) "maxRHS",S
   write (*,*) "avgRHS",S2/(lx*ly*lz)
+  if (present(Q)) write (*,*) "maxQ",maxval(Q)
   endsubroutine PR_CORRECT
 
 
@@ -340,9 +340,10 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
       !$hmpp <SOR> delegatedStore,Args[Res_GPU::Phi]
       !$hmpp <SOR> release
    else
-    l=1
+    l=0
     S=huge(1.0_KND)
-        do while (l<=maxPoissoniter.and.S>maxPoissoniter)
+        do while (l<=maxPoissoniter.and.S>epsPoisson)
+          l=l+1
           S=0
           !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
           !$OMP DO
@@ -863,9 +864,10 @@ subroutine GS_GPU(nx,ny,nz,nit,Phi,RHS,&
                      Aw,Ae,As,An,Ab,At,&
                      Btype)
    implicit none
-
+#ifdef __HMPP
    integer,parameter:: KND=4,PERIODIC=3
    integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#endif
 
    integer,intent(in)   :: nx,ny,nz,nit
    real(KND),dimension(0:nx+1,0:ny+1,0:nz+1),intent(inout)::Phi
@@ -873,7 +875,7 @@ subroutine GS_GPU(nx,ny,nz,nit,Phi,RHS,&
    real(KND),dimension(1:nx),intent(in) :: Aw,Ae
    real(KND),dimension(1:ny),intent(in) :: As,An
    real(KND),dimension(1:nz),intent(in) :: Ab,At
-   integer(KND),intent(in) :: Btype(6)
+   integer,intent(in) :: Btype(6)
    integer i,j,k,l
    real(KND) :: p,Ap
    intrinsic mod
@@ -1003,9 +1005,10 @@ subroutine Res_GPU(nx,ny,nz,Phi,RHS,&
    implicit none
    intrinsic mod, abs, max
 
-
+#ifdef __HMPP
    integer,parameter:: KND=4,PERIODIC=3
    integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#endif
 
    integer,intent(in)   :: nx,ny,nz
    real(KND),dimension(0:nx+1,0:ny+1,0:nz+1),intent(inout)::Phi
@@ -1013,7 +1016,7 @@ subroutine Res_GPU(nx,ny,nz,Phi,RHS,&
    real(KND),dimension(1:nx),intent(in) :: Aw,Ae
    real(KND),dimension(1:ny),intent(in) :: As,An
    real(KND),dimension(1:nz),intent(in) :: Ab,At
-   integer(KND),intent(in) :: Btype(6)
+   integer,intent(in) :: Btype(6)
    real(KND),intent(out) :: R
    integer i,j,k,l
    real(KND) :: p,Ap

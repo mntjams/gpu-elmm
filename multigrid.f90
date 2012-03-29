@@ -62,7 +62,6 @@ contains
   real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
   integer:: i,j,k,ii,jj,kk,nx,ny,nz
   real(KND),dimension(-1:1,-1:1,-1:1),save:: Cf
-  real(KND):: A1,A2,A4,A8
   integer,save:: called=0
 
 
@@ -80,43 +79,6 @@ contains
                              Btype,level)
 
    else
-!      do k=0,nz
-!       do j=0,ny
-!        do i=0,nx
-!                        A1=ACoarse(i,j,k)
-!                        A2=0.5_KND*A1
-!                        A4=0.25_KND*A1
-!                        A8=0.125*A1
-!                        AFine(2*i,2*j,2*k)=AFine(2*i,2*j,2*k)+A1
-!                        AFine(2*i+1,2*j,2*k)=AFine(2*i+1,2*j,2*k)+A2
-!                        AFine(2*i-1,2*j,2*k)=AFine(2*i-1,2*j,2*k)+A2
-!                        AFine(2*i,2*j+1,2*k)=AFine(2*i,2*j+1,2*k)+A2
-!                        AFine(2*i,2*j-1,2*k)=AFine(2*i,2*j-1,2*k)+A2
-!                        AFine(2*i,2*j,2*k+1)=AFine(2*i,2*j,2*k+1)+A2
-!                        AFine(2*i,2*j,2*k-1)=AFine(2*i,2*j,2*k-1)+A2
-!                        AFine(2*i+1,2*j+1,2*k)=AFine(2*i+1,2*j+1,2*k)+A4
-!                        AFine(2*i+1,2*j,2*k+1)=AFine(2*i+1,2*j,2*k+1)+A4
-!                        AFine(2*i,2*j+1,2*k+1)=AFine(2*i,2*j+1,2*k+1)+A4
-!                        AFine(2*i-1,2*j-1,2*k)=AFine(2*i-1,2*j-1,2*k)+A4
-!                        AFine(2*i-1,2*j,2*k-1)=AFine(2*i-1,2*j,2*k-1)+A4
-!                        AFine(2*i,2*j-1,2*k-1)=AFine(2*i,2*j-1,2*k-1)+A4
-!                        AFine(2*i-1,2*j+1,2*k)=AFine(2*i-1,2*j+1,2*k)+A4
-!                        AFine(2*i-1,2*j,2*k+1)=AFine(2*i-1,2*j,2*k+1)+A4
-!                        AFine(2*i+1,2*j-1,2*k)=AFine(2*i+1,2*j-1,2*k)+A4
-!                        AFine(2*i,2*j-1,2*k+1)=AFine(2*i,2*j-1,2*k+1)+A4
-!                        AFine(2*i+1,2*j,2*k-1)=AFine(2*i+1,2*j,2*k-1)+A4
-!                        AFine(2*i,2*j+1,2*k-1)=AFine(2*i,2*j+1,2*k-1)+A4
-!                        AFine(2*i+1,2*j+1,2*k+1)=AFine(2*i+1,2*j+1,2*k+1)+A8
-!                        AFine(2*i-1,2*j+1,2*k+1)=AFine(2*i-1,2*j+1,2*k+1)+A8
-!                        AFine(2*i+1,2*j-1,2*k+1)=AFine(2*i+1,2*j-1,2*k+1)+A8
-!                        AFine(2*i+1,2*j+1,2*k-1)=AFine(2*i+1,2*j+1,2*k-1)+A8
-!                        AFine(2*i-1,2*j-1,2*k+1)=AFine(2*i-1,2*j-1,2*k+1)+A8
-!                        AFine(2*i-1,2*j+1,2*k-1)=AFine(2*i-1,2*j+1,2*k-1)+A8
-!                        AFine(2*i+1,2*j-1,2*k-1)=AFine(2*i+1,2*j-1,2*k-1)+A8
-!                        AFine(2*i-1,2*j-1,2*k-1)=AFine(2*i-1,2*j-1,2*k-1)+A8
-!        enddo
-!        enddo
-!      enddo
 
     if (called==0) then
       do kk=-1,1
@@ -141,7 +103,7 @@ contains
      do kk=-1,1
       do jj=-1,1
        do ii=-1,1
-        !$omp do schedule(DYNAMIC)
+        !$omp do
         do k=0,nz
          do j=0,ny
           do i=0,nx
@@ -1566,8 +1528,10 @@ endsubroutine POISSMG
   subroutine Pr_GPU(nx,ny,nz,Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,Phi8,&
                                   Btype,level)
   implicit none
+#ifdef __HMPP
   integer,parameter:: KND=4,PERIODIC=3
   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#endif
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0
@@ -1609,8 +1573,10 @@ endsubroutine POISSMG
   subroutine Prolongate_GPU(nx,ny,nz,AFine,ACoarse,Btype)
 
   implicit none
+#ifdef __HMPP
   integer,parameter:: KND=4,PERIODIC=3
   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#endif
 
   integer,intent(in):: nx,ny,nz,Btype(6)
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in):: ACoarse
@@ -1747,8 +1713,10 @@ endsubroutine POISSMG
                              Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,Res8,&
                                   Btype,level)
   implicit none
+#ifdef __HMPP
   integer,parameter:: KND=4,PERIODIC=3
   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#endif
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Res0,RHS0
@@ -1791,8 +1759,10 @@ endsubroutine POISSMG
 
   subroutine Restrict_GPU(nx,ny,nz,ACoarse,AFine,Btype)
   implicit none
+#ifdef __HMPP
   integer,parameter:: KND=4,PERIODIC=3
   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#endif
 
   integer,intent(in):: nx,ny,nz,Btype(6)
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out):: ACoarse
@@ -2030,8 +2000,10 @@ endsubroutine POISSMG
                      Aw,Ae,As,An,Ab,At,&
                      Btype,level)
   implicit none
+#ifdef __HMPP
   integer,parameter:: KND=4
   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#endif
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   integer,intent(in) :: nit
@@ -2108,9 +2080,10 @@ endsubroutine POISSMG
                      Aw,Ae,As,An,Ab,At,&
                      Btype)
   implicit none
-
+#ifdef __HMPP
   integer,parameter:: KND=4,PERIODIC=3
   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#endif
 
   integer,intent(in)   :: nx,ny,nz,nit,Btype(6)
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::Phi
@@ -2244,8 +2217,10 @@ endsubroutine POISSMG
                      Aw,Ae,As,An,Ab,At,&
                      Btype,R,level)
   implicit none
+#ifdef __HMPP
   integer,parameter:: KND=4
   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#endif
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,Res0,RHS0
@@ -2326,10 +2301,10 @@ endsubroutine POISSMG
                              Btype,R)
 
   implicit none
-
-
+#ifdef __HMPP
   integer,parameter:: KND=4,PERIODIC=3
   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#endif
 
   integer,intent(in)   :: nx,ny,nz,Btype(6)
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::Phi
@@ -2419,7 +2394,9 @@ endsubroutine POISSMG
                              RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,&
                              Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,level,minmglevel)
   implicit none
+#ifdef __HMPP
   integer,parameter:: KND=4
+#endif
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,Res0,RHS0
@@ -2468,7 +2445,9 @@ endsubroutine POISSMG
 
   subroutine Clear_GPU(nx,ny,nz,Phi,RHS,Res)
   implicit none
+#ifdef __HMPP
   integer,parameter:: KND=4
+#endif
 
   integer,intent(in) :: nx,ny,nz
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Phi
