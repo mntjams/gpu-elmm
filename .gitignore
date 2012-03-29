@@ -1,0 +1,8 @@
+*.cu*
+*~
+*.mod
+*.hmd
+*.so
+.make.*
+custom*.f90
+
