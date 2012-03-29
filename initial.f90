@@ -1079,7 +1079,7 @@ contains
 
        elseif (buoyancy==1) then
 
-         freetempgradient=0.03!0.0035 !K/m
+         freetempgradient=0!0.03!0.0035 !K/m
          !inversionTjump=2 !K
          do k=-2,Prnz+3
           do j=-2,Prny+3
