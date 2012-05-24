@@ -181,7 +181,7 @@ contains
 
     if (Btype(To) ==FreeSlipBuff)  then
         !$hmpp <tsteps> AttenuateTop callsite, args[*].noupdate = true
-        call AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+        call AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,&
                           zPr,zW,U2,V2,W2,temperature,buoyancy)
     endif
 
@@ -309,9 +309,9 @@ contains
     endif
 
 
-!     !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
-!     call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-!                           nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
+    !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
+    call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                          nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
 
 
    enddo
@@ -1547,22 +1547,40 @@ contains
   !Slower using HMPP than CPU, but if we avoid memory transfer, it is still profitable.
 
   !$hmpp <tsteps> AttenuateTop codelet
-  subroutine AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,zPr,zW,U,V,W,temperature,buoyancy)
+  subroutine AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,zPr,zW,U,V,W,temperature,buoyancy)
   implicit none
 #ifdef __HMPP
    integer, parameter:: KND = 4
+   integer,parameter       :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
+                                TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
+   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
 #endif
   integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
+  integer,intent(in)      :: Btype(6)
   real(KND),intent(in)    :: zPr(-2:Prnz+3)
   real(KND),intent(in)    :: zW(-3:Prnz+3)
   real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
   real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
   real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
-  integer i,j,k,bufn
+  integer i,j,k,bufn,mini,maxi,maxUi
   real(KND) ze,zs,zb,p
   real(KND),dimension(:),allocatable :: DF,avg
   intrinsic max,min
+
+    if (Btype(We)==DIRICHLET.or.Btype(We)==TURBULENTINLET.or.Btype(We)==INLETFROMFILE) then
+      mini = min(5,Unx)
+    else
+      mini = 1
+    endif
+
+    if (Btype(Ea)==DIRICHLET.or.Btype(We)==TURBULENTINLET.or.Btype(We)==OUTLETBUFF) then
+      maxi = max(1,Prnx-5)
+      maxUi = max(1,Unx-5)
+    else
+      maxi = Prnx
+      maxUi = Unx
+    endif
 
     bufn = max(5,Prnz/4)
     zs = zW(Prnz-bufn)
@@ -1582,7 +1600,7 @@ contains
       !$hmppcg grid blocksize 512x1
       !$hmppcg gridify (j,i) global(p), reduce(+:p)
       do j=1,Uny
-        do i=1,Unx
+        do i=mini,maxUi
           p = p+U(i,j,k)
         enddo
       enddo
@@ -1590,7 +1608,7 @@ contains
     enddo
 
     do k=Unz-bufn,Unz
-      avg(k) = avg(k)/(Unx*Uny)
+      avg(k) = avg(k)/((maxUi-mini+1)*Uny)
     enddo
 
     do k=Unz-bufn,Unz
@@ -1619,14 +1637,14 @@ contains
       !$hmppcg grid blocksize 512x1
       !$hmppcg gridify (j,i) global(p), reduce(+:p)
       do j=1,Vny
-        do i=1,Vnx
+        do i=mini,maxi
           p = p+V(i,j,k)
         enddo
       enddo
       avg(k) = p
     enddo
     do k=Vnz-bufn,Vnz
-      avg(k) = avg(k)/(Vnx*Vny)
+      avg(k) = avg(k)/((maxi-mini+1)*Vny)
     enddo
     do k=Vnz-bufn,Vnz
       zb=(zPr(k)-zs)/(ze-zs)
@@ -1654,7 +1672,7 @@ contains
       !$hmppcg grid blocksize 512x1
       !$hmppcg gridify (j,i) global(p), reduce(+:p)
       do j=1,Wny
-        do i=1,Wnx
+        do i=mini,maxi
           p = p+W(i,j,k)
         enddo
       enddo
@@ -1662,7 +1680,7 @@ contains
     enddo
 
     do k=Wnz-bufn,Wnz
-      avg(k) = avg(k)/(Wnx*Wny)
+      avg(k) = avg(k)/((maxi-mini+1)*Wny)
     enddo
 
     do k=Wnz-bufn,Wnz
@@ -1694,7 +1712,7 @@ contains
         !$hmppcg grid blocksize 512x1
         !$hmppcg gridify (j,i) global(p), reduce(+:p)
         do j=1,Prny
-          do i=1,Prnx
+          do i=mini,maxi
             p = p+temperature(i,j,k)
           enddo
         enddo
@@ -1702,7 +1720,7 @@ contains
       enddo
 
       do k=Prnz-bufn,Prnz
-        avg(k) = avg(k)/(Prnx*Prny)
+        avg(k) = avg(k)/((maxi-mini+1)*Prny)
       enddo
 
       do k=Prnz-bufn,Prnz
