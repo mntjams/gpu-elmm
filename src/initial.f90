@@ -27,6 +27,7 @@ contains
  integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter,minGPUlevel
  real(KND) mgepsinnerGS
  integer   i,io
+ integer numframeslices
 
    open(11,file="main.conf",status="old",action="read")
    read(11,fmt='(/)')
@@ -423,14 +424,26 @@ contains
    read(11,*) store%frame_sumscalars
    read(11,fmt='(/)')
    read(11,*) store%frame_T
+   read(11,fmt='(/)')
+   read(11,*) store%frame_tempfl
+   read(11,fmt='(/)')
+   read(11,*) store%frame_scalfl
 
 
    read(11,fmt='(/)')
-   read(11,*) framedimension
-   read(11,fmt='(/)')
-   read(11,*) slicedir
-   read(11,fmt='(/)')
-   read(11,*) slicex
+   read(11,*) numframeslices
+
+   allocate(store%frame_domains(numframeslices))
+
+   do i=1,numframeslices
+     read(11,fmt='(/)')
+     read(11,*) store%frame_domains(i)%dimension
+     read(11,fmt='(/)')
+     read(11,*) store%frame_domains(i)%direction
+     read(11,fmt='(/)')
+     read(11,*) store%frame_domains(i)%position
+   enddo
+
    close(11)
 
    open(11,file="output.conf",status="old",action="read",iostat=io)
@@ -1000,9 +1013,45 @@ contains
       !     enddo
       !    enddo
 
+       elseif (Btype(We)==TURBULENTINLET.or.Btype(Ea)==TURBULENTINLET) then
+
+         do i=1,Prnx
+
+           call GetTurbInlet
+
+           do k=1,Unz
+            do j=1,Uny
+              if (Utype(i,j,k)==0) then
+                    U(i,j,k)=Uin(j,k)
+              else
+                 U(i,j,k)=0
+              endif
+            enddo
+           enddo
+           do k=1,Vnz
+            do j=1,Vny
+              if (Vtype(i,j,k)==0) then
+                    V(i,j,k)=Vin(j,k)
+              else
+                 V(i,j,k)=0
+              endif
+            enddo
+           enddo
+           do k=1,Wnz
+            do j=1,Wny
+              if (Wtype(i,j,k)==0) then
+                    W(i,j,k)=Win(j,k)
+              else
+                 W(i,j,k)=0
+              endif
+            enddo
+           enddo
+
+         enddo
+
        else
 
-         U(1:Unx,1:Uny,1:Unz)=Uin(1,1)
+
          do k=1,Unz
           do j=1,Uny
            do i=1,Unx
@@ -1043,6 +1092,8 @@ contains
 
 
 
+
+
        do i=1,computescalars
          SCALAR(1:Prnx,1:Prny,1:Prnz,i)=0
        enddo
@@ -1079,7 +1130,7 @@ contains
 
        elseif (buoyancy==1) then
 
-         freetempgradient=0!0.03!0.0035 !K/m
+         freetempgradient=0.02!0.03!0.0035 !K/m
          !inversionTjump=2 !K
          do k=-2,Prnz+3
           do j=-2,Prny+3

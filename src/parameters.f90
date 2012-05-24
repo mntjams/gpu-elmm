@@ -64,9 +64,6 @@ implicit none
   real(TIM) :: time
   real(TIM) :: timefram1,timefram2,timeavg1,timeavg2
 
-  integer   :: framedimension,slicedir
-  real(KND) :: slicex
-
   integer :: tempmet,poissmet,convmet,masssourc,frames,steady
   integer :: tasktype,averaging,projectiontype,impldiff,wallmodeltype,sgstype,fullstress
   integer :: buoyancy,computescalars,partdistrib,computedeposition,computegravsettling
