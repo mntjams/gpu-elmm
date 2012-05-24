@@ -1193,9 +1193,13 @@ contains
   recursive subroutine TVelIBPoint_DeallocateList(IBP)
     type(TVelIBPoint),pointer :: IBP
 
-    if (associated(IBP%next)) call TVelIBPoint_DeallocateList(IBP%next)
+    if (associated(IBP)) then
 
-    deallocate(IBP)
+      if (associated(IBP%next)) call TVelIBPoint_DeallocateList(IBP%next)
+
+      deallocate(IBP)
+
+    endif
 
   end subroutine TVelIBPoint_DeallocateList
 
@@ -1204,9 +1208,13 @@ contains
   recursive subroutine TScalFlIBPoint_DeallocateList(IBP)
     type(TScalFlIBPoint),pointer :: IBP
 
-    if (associated(IBP%next)) call TScalFlIBPoint_DeallocateList(IBP%next)
+    if (associated(IBP)) then
 
-    deallocate(IBP)
+      if (associated(IBP%next)) call TScalFlIBPoint_DeallocateList(IBP%next)
+
+      deallocate(IBP)
+
+    endif
 
   end subroutine TScalFlIBPoint_DeallocateList
 
