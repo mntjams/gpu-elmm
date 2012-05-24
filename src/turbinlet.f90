@@ -413,11 +413,15 @@ contains
          Psiw(j,k,2)=SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rw(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
     endforall
 
+    Psiu(:,:,1)=Psiu(:,:,1)*exp(-pi*dt/(2._KND*TLag))+Psiu(:,:,2)*sqrt(1-exp(-pi*dt/(TLag)))
+    Psiv(:,:,1)=Psiv(:,:,1)*exp(-pi*dt/(2._KND*TLag))+Psiv(:,:,2)*sqrt(1-exp(-pi*dt/(TLag)))
+    Psiw(:,:,1)=Psiw(:,:,1)*exp(-pi*dt/(2._KND*TLag))+Psiw(:,:,2)*sqrt(1-exp(-pi*dt/(TLag)))
+
     do k=1,Prnz
      do j=1,Prny
-      Ui=Psiu(j,k,1)*exp(-pi*dt/(2._KND*TLag))+Psiu(j,k,2)*sqrt(1-exp(-pi*dt/(TLag)))
-      Vi=Psiv(j,k,1)*exp(-pi*dt/(2._KND*TLag))+Psiv(j,k,2)*sqrt(1-exp(-pi*dt/(TLag)))
-      Wi=Psiw(j,k,1)*exp(-pi*dt/(2._KND*TLag))+Psiw(j,k,2)*sqrt(1-exp(-pi*dt/(TLag)))
+      Ui=Psiu(j,k,1)
+      Vi=Psiv(j,k,1)
+      Wi=Psiw(j,k,1)
 
       Uin(j,k)=Uinavg(j,k)+transformtensor(1,j,k)*Ui   !a12,a13,a23=0
 
@@ -435,10 +439,6 @@ contains
     Uin=Uin*p
     Vin=Vin*p
     Win=Win*p
-
-    Psiu(:,:,1)=Psiu(:,:,2)
-    Psiv(:,:,1)=Psiv(:,:,2)
-    Psiw(:,:,1)=Psiw(:,:,2)
 
     do k=-bigNz+1,Prnz+bigNz
      do j=-bigNy+1,Prny+bigNy
