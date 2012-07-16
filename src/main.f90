@@ -5,8 +5,8 @@ program CLMM
   use BOUNDARIES
   use INITIAL
   use OUTPUTS, only: AllocateOutputs, OutTStep, Output
-  use SCALARS
   use GEOMETRIC
+  use SCALARS
   use WALLMODELS
 
   implicit none
@@ -62,7 +62,7 @@ program CLMM
 
 
 
-      call TMarchRK3(U,V,W,Pr,delta)
+      call TMarchRK3(U,V,W,Pr,Temperature,Scalar,delta)
 
 
 

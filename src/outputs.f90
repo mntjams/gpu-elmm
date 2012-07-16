@@ -2,7 +2,7 @@ module OUTPUTS
   use PARAMETERS
   use BOUNDARIES
   use SCALARS
-  use WALLMODELS, only: WMPoint,FirstWMPoint
+  use WALLMODELS, only: GroundDeposition, GroundUstar
   use GEOMETRIC
   use TURBINLET, only: ustarinlet
 
@@ -11,7 +11,7 @@ module OUTPUTS
 
   private
   public OutTStep, Output, store, display, probes, NumProbes, AllocateOutputs,&
-         Tprobe, TOutputSwitches, TDisplaySwitches
+         Tprobe, TOutputSwitches, TDisplaySwitches, SetFrameDomain
 
   real(KND),dimension(:),allocatable :: profuavg,profuavg2,profvavg,profvavg2,profuuavg,profvvavg,profwwavg,&
                                          profU,profV,profuu,profvv,profww,proftauavg,proftau,proftausgs,proftausgsavg,&
@@ -50,6 +50,7 @@ module OUTPUTS
   type TFrameDomain
     integer   :: dimension,direction
     real(KND) :: position
+    integer   :: mini, maxi, minj, maxj, mink, maxk
   endtype TFrameDomain
 
 
@@ -129,7 +130,7 @@ contains
    if (computescalars>0) then
     if (averaging==1.and.store%scalarsavg>0) then
      allocate(Scalaravg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
-     Scalaravg=0
+     Scalaravg = 0
     endif
    else
     if (averaging==1) then
@@ -143,19 +144,19 @@ contains
      allocate(Uavg(-2:Unx+3,-2:Uny+3,-2:Unz+3))
      allocate(Vavg(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
      allocate(Wavg(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-     Uavg=0
-     Vavg=0
-     Wavg=0
+     Uavg = 0
+     Vavg = 0
+     Wavg = 0
    endif
 
    if (store%avg_Pr>0) then
      allocate(Pravg(1:Prnx,1:Prny,1:Prnz))
-     Pravg=0
+     Pravg = 0
    endif
 
    if (buoyancy==1.and.store%avg_T>0) then
     allocate(temperatureavg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-    temperatureavg=0
+    temperatureavg = 0
    endif
   endif
 
@@ -163,65 +164,65 @@ contains
 
   if (NumProbes>0) then
     allocate(Utime(NumProbes,0:nt),Vtime(NumProbes,0:nt),Wtime(NumProbes,0:nt),Prtime(NumProbes,0:nt))
-    times=huge(1.0_KND)
-    Utime=huge(1.0_KND)
-    Vtime=huge(1.0_KND)
-    Wtime=huge(1.0_KND)
-    Prtime=huge(1.0_KND)
+    times = huge(1.0_KND)
+    Utime = huge(1.0_KND)
+    Vtime = huge(1.0_KND)
+    Wtime = huge(1.0_KND)
+    Prtime = huge(1.0_KND)
   endif
 
   if (NumProbes>0.and.buoyancy==1) then
    allocate(temptime(NumProbes,0:nt))
-   temptime=huge(1.0_KND)
+   temptime = huge(1.0_KND)
   endif
 
   if (store%deltime>0) then
     allocate(deltime(0:nt))
-    deltime=huge(1.0_KND)
+    deltime = huge(1.0_KND)
   endif
 
   if (store%tke>0) then
     allocate(tke(0:nt))
-    tke=huge(1.0_KND)
+    tke = huge(1.0_KND)
   endif
 
   if (store%deltime>0) then
     allocate(dissip(0:nt))
-    dissip=huge(1.0_KND)
+    dissip = huge(1.0_KND)
     dissip(0)=0
   endif
 
-  if (wallmodeltype>0.and.display%ustar>0) then
+  if (wallmodeltype>0.and.(display%ustar>0.or.store%ustar>0)) then
     allocate(ustar(2,0:nt))
-    ustar=huge(1.0)
+    ustar = huge(1.0)
   endif
 
-  if (wallmodeltype>0.and.buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.store%tstar>0) then
+  if (wallmodeltype>0.and.buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.(display%tstar>0.or.store%tstar>0)) then
     allocate(tstar(2,0:nt))
-    tstar=huge(1.0)
+    tstar = huge(1.0)
   endif
 
   if (computescalars>0) then
     if (store%scalsumtime>0) then
       allocate(scalsumtime(1:computescalars,0:nt))
-      scalsumtime=huge(1.0_KND)
+      scalsumtime = huge(1.0_KND)
     endif
 
     if (NumProbes>0) then
       allocate(scalptime(1:computescalars,1:NumProbes,0:nt))
-      scalptime=huge(1.0_KND)
+      scalptime = huge(1.0_KND)
    endif
   endif
 
-  do k=1,NumProbes
+  do k = 1,NumProbes
     call GridCoords(probes(k)%i,probes(k)%j,probes(k)%k,probes(k)%x,probes(k)%y,probes(k)%z)
 
-    probes(k)%i=max(probes(k)%i,1)
-    probes(k)%j=max(probes(k)%j,1)
-    probes(k)%k=max(probes(k)%k,1)
-    probes(k)%i=min(probes(k)%i,Prnx)
-    probes(k)%j=min(probes(k)%j,Prny)
-    probes(k)%k=min(probes(k)%k,Prnz)
+    probes(k)%i = max(probes(k)%i,1)
+    probes(k)%j = max(probes(k)%j,1)
+    probes(k)%k = max(probes(k)%k,1)
+    probes(k)%i = min(probes(k)%i,Prnx)
+    probes(k)%j = min(probes(k)%j,Prny)
+    probes(k)%k = min(probes(k)%k,Prnz)
 
     call GridCoordsU(probes(k)%Ui,probes(k)%Uj,probes(k)%Uk,probes(k)%x,probes(k)%y,probes(k)%z)
     call GridCoordsV(probes(k)%Vi,probes(k)%Vj,probes(k)%Vk,probes(k)%x,probes(k)%y,probes(k)%z)
@@ -242,43 +243,43 @@ contains
     allocate(profscalflsgs(computescalars,0:Prnz),profscalflsgsavg(computescalars,0:Prnz))
     allocate(profss(computescalars,1:Prnz),profssavg(computescalars,1:Prnz))
 
-    profU=0
-    profV=0
-    profUavg=0
-    profVavg=0
-    profUavg2=0
-    profVavg2=0
-    profuu=0
-    profvv=0
-    profww=0
-    profuuavg=0
-    profvvavg=0
-    profwwavg=0
-    profuw=0
-    profvw=0
-    profuwavg=0
-    profvwavg=0
+    profU = 0
+    profV = 0
+    profUavg = 0
+    profVavg = 0
+    profUavg2 = 0
+    profVavg2 = 0
+    profuu = 0
+    profvv = 0
+    profww = 0
+    profuuavg = 0
+    profvvavg = 0
+    profwwavg = 0
+    profuw = 0
+    profvw = 0
+    profuwavg = 0
+    profvwavg = 0
 
-    proftemp=0
-    proftempavg=0
-    proftempavg2=0
-    proftempfl=0
-    proftempflavg=0
-    proftempflsgs=0
-    proftempflsgsavg=0
-    proftt=0
-    profttavg=0
+    proftemp = 0
+    proftempavg = 0
+    proftempavg2 = 0
+    proftempfl = 0
+    proftempflavg = 0
+    proftempflsgs = 0
+    proftempflsgsavg = 0
+    proftt = 0
+    profttavg = 0
 
     if (computescalars>0) then
-      profscal=0
-      profscalavg=0
-      profscalavg2=0
-      profscalfl=0
-      profscalflavg=0
-      profscalflsgs=0
-      profscalflsgsavg=0
-      profss=0
-      profssavg=0
+      profscal = 0
+      profscalavg = 0
+      profscalavg2 = 0
+      profscalfl = 0
+      profscalflavg = 0
+      profscalflsgs = 0
+      profscalflsgsavg = 0
+      profss = 0
+      profssavg = 0
     endif
   endif
 
@@ -303,17 +304,16 @@ contains
 
  integer :: l,i,j,k,nWM
  real(KND) :: S,S2
- type(WMPoint),pointer :: WMP
- integer, save :: fnum=0
+ integer, save :: fnum = 0
 
    times(step)=time
 
-   do l=1,computescalars
-      S=0
-      do k=1,Prnz
-       do j=1,Prny
-        do i=1,Prnx
-         if (Prtype(i,j,k)==0) S=S+scalar(i,j,k,l)*dxPr(i)*dyPr(j)*dzPr(k)
+   do l = 1,computescalars
+      S = 0
+      do k = 1,Prnz
+       do j = 1,Prny
+        do i = 1,Prnx
+         if (Prtype(i,j,k)==0) S = S+scalar(i,j,k,l)*dxPr(i)*dyPr(j)*dzPr(k)
         enddo
        enddo
       enddo
@@ -322,7 +322,7 @@ contains
 
 
 
-   do k=1,NumProbes
+   do k = 1,NumProbes
      Utime(k,step)=Trilinint((probes(k)%x-xU(probes(k)%Ui))/(xU(probes(k)%Ui+1)-xU(probes(k)%Ui)),&
                           (probes(k)%y-yPr(probes(k)%Uj))/(yPr(probes(k)%Uj+1)-yPr(probes(k)%Uj)),&
                           (probes(k)%z-zPr(probes(k)%Uk))/(zPr(probes(k)%Uk+1)-zPr(probes(k)%Uk)),&
@@ -370,7 +370,7 @@ contains
                           temperature(probes(k)%i+1,probes(k)%j+1,probes(k)%k+1))
      endif
 
-     do l=1,computescalars
+     do l = 1,computescalars
        scalptime(l,k,step)=Trilinint((probes(k)%x-xPr(probes(k)%i))/(xPr(probes(k)%i+1)-xPr(probes(k)%i)),&
                           (probes(k)%y-yPr(probes(k)%j))/(yPr(probes(k)%j+1)-yPr(probes(k)%j)),&
                           (probes(k)%z-zPr(probes(k)%k))/(zPr(probes(k)%k+1)-zPr(probes(k)%k)),&
@@ -397,7 +397,7 @@ contains
      deltime(step)=delta/dt
    endif
 
-   endstep=step
+   endstep = step
 
    if (display%delta>0) then
      write (*,*) "delta: ",delta
@@ -406,7 +406,7 @@ contains
    if (frames>0)then
       if ((time>=timefram1).and.(time<=timefram2+(timefram2-timefram1)/(frames-1))&
         .and.(time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
-       fnum=fnum+1
+       fnum = fnum+1
        call FRAME(U,V,W,Pr,fnum)
       endif
 !    call OUTINLET(U,V,W)
@@ -416,43 +416,31 @@ contains
    if ((averaging==1).and.((time>=timeavg1).and.(time<=timeavg2))) then
 
      if (store%avg_U>0) then
-       Uavg=Uavg+U*dt/(timeavg2-timeavg1)
-       Vavg=Vavg+V*dt/(timeavg2-timeavg1)
-       Wavg=Wavg+W*dt/(timeavg2-timeavg1)
+       Uavg = Uavg+U*dt/(timeavg2-timeavg1)
+       Vavg = Vavg+V*dt/(timeavg2-timeavg1)
+       Wavg = Wavg+W*dt/(timeavg2-timeavg1)
      endif
 
      if (store%avg_Pr>0) then
-       Pravg=Pravg+Pr(1:Prnx,1:Prny,1:Prnz)*dt/(timeavg2-timeavg1)
+       Pravg = Pravg+Pr(1:Prnx,1:Prny,1:Prnz)*dt/(timeavg2-timeavg1)
      endif
 
      if (buoyancy==1.and.store%avg_T>0) then
-       temperatureavg=temperatureavg+temperature*dt/(timeavg2-timeavg1)
+       temperatureavg = temperatureavg+temperature*dt/(timeavg2-timeavg1)
      endif
 
      if (computescalars>0.and.store%scalarsavg>0) then
-       SCALARavg=SCALARavg+SCALAR*dt/(timeavg2-timeavg1)
+       SCALARavg = SCALARavg+SCALAR*dt/(timeavg2-timeavg1)
      endif
 
   endif
 
 
   if (wallmodeltype>0.and.(display%ustar>0.or.store%ustar>0)) then
-    S=0
-    nWM=0
-    if (associated(FirstWMPoint)) then
-    WMP => FirstWMPoint
-    do
-     S=S+WMP%ustar
-     nWM=nWM+1
-     if (associated(WMP%next)) then
-      WMP=>WMP%next
-     else
-      exit
-     endif
-    enddo
-    endif
-    if (nWM>0) S=S/nWM
-    S2=S*Re
+
+    S = GroundUstar()
+
+    S2 = S*Re
 
     if (display%ustar>0) then
       if (allocated(ustarinlet)) then
@@ -468,7 +456,7 @@ contains
 
 
    if (wallmodeltype>0.and.buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.(display%tstar>0.or.store%tstar>0)) then
-    S2=SUM(BsideTFLArr(1:Prnx,1:Prny))/(Prnx*Prny)
+    S2 = SUM(BsideTFLArr(1:Prnx,1:Prny))/(Prnx*Prny)
     S=-S*S2
 
     if (display%tstar>0) then
@@ -487,35 +475,35 @@ contains
       if (buoyancy>0.and.computescalars>0) then
         call BLProfiles(U,V,W,temperature,scalar)
       elseif (buoyancy>0) then
-        call BLProfiles(U,V,W,temperature=temperature)
+        call BLProfiles(U,V,W,temperature = temperature)
       elseif (computescalars>0) then
-        call BLProfiles(U,V,W,scalar=scalar)
+        call BLProfiles(U,V,W,scalar = scalar)
       else
         call BLProfiles(U,V,W)
       endif
 
-      profuavg=profuavg+profu*dt/(timeavg2-timeavg1)
-      profvavg=profvavg+profv*dt/(timeavg2-timeavg1)
-      profuwavg=profuwavg+profuw*dt/(timeavg2-timeavg1)
-      profuwsgsavg=profuwsgsavg+profuwsgs*dt/(timeavg2-timeavg1)
-      profvwavg=profvwavg+profvw*dt/(timeavg2-timeavg1)
-      profvwsgsavg=profvwsgsavg+profvwsgs*dt/(timeavg2-timeavg1)
-      profuuavg=profuuavg+profuu*dt/(timeavg2-timeavg1)
-      profvvavg=profvvavg+profvv*dt/(timeavg2-timeavg1)
-      profwwavg=profwwavg+profww*dt/(timeavg2-timeavg1)
+      profuavg = profuavg+profu*dt/(timeavg2-timeavg1)
+      profvavg = profvavg+profv*dt/(timeavg2-timeavg1)
+      profuwavg = profuwavg+profuw*dt/(timeavg2-timeavg1)
+      profuwsgsavg = profuwsgsavg+profuwsgs*dt/(timeavg2-timeavg1)
+      profvwavg = profvwavg+profvw*dt/(timeavg2-timeavg1)
+      profvwsgsavg = profvwsgsavg+profvwsgs*dt/(timeavg2-timeavg1)
+      profuuavg = profuuavg+profuu*dt/(timeavg2-timeavg1)
+      profvvavg = profvvavg+profvv*dt/(timeavg2-timeavg1)
+      profwwavg = profwwavg+profww*dt/(timeavg2-timeavg1)
 
       if (buoyancy>0) then
-        proftempavg=proftempavg+proftemp*dt/(timeavg2-timeavg1)
-        proftempflavg=proftempflavg+proftempfl*dt/(timeavg2-timeavg1)
-        proftempflsgsavg=proftempflsgsavg+proftempflsgs*dt/(timeavg2-timeavg1)
-        profttavg=profttavg+proftt*dt/(timeavg2-timeavg1)
+        proftempavg = proftempavg+proftemp*dt/(timeavg2-timeavg1)
+        proftempflavg = proftempflavg+proftempfl*dt/(timeavg2-timeavg1)
+        proftempflsgsavg = proftempflsgsavg+proftempflsgs*dt/(timeavg2-timeavg1)
+        profttavg = profttavg+proftt*dt/(timeavg2-timeavg1)
       endif
 
       if (computescalars>0) then
-        profscalavg=profscalavg+profscal*dt/(timeavg2-timeavg1)
-        profscalflavg=profscalflavg+profscalfl*dt/(timeavg2-timeavg1)
-        profscalflsgsavg=profscalflsgsavg+profscalflsgs*dt/(timeavg2-timeavg1)
-        profssavg=profssavg+profss*dt/(timeavg2-timeavg1)
+        profscalavg = profscalavg+profscal*dt/(timeavg2-timeavg1)
+        profscalflavg = profscalflavg+profscalfl*dt/(timeavg2-timeavg1)
+        profscalflsgsavg = profscalflsgsavg+profscalflsgs*dt/(timeavg2-timeavg1)
+        profssavg = profssavg+profss*dt/(timeavg2-timeavg1)
       endif
     endif
  endif
@@ -534,37 +522,37 @@ contains
  real(KND) :: S,S2,nom,denom
  integer :: i,j,k
 
-  do k=1,NumProbes
+  do k = 1,NumProbes
 
     write(prob,"(i2.2)") k
 
     open(11,file="Prtimep"//prob//".txt")
-    do j=0,endstep
+    do j = 0,endstep
      write (11,*) times(j),Prtime(k,j)
     enddo
     close(11)
 
     open(11,file="Utimep"//prob//".txt")
-    do j=0,endstep
+    do j = 0,endstep
      write (11,*) times(j),Utime(k,j)
     enddo
     close(11)
 
     open(11,file="Vtimep"//prob//".txt")
-    do j=0,endstep
+    do j = 0,endstep
      write (11,*) times(j),Vtime(k,j)
     enddo
     close(11)
 
     open(11,file="Wtimep"//prob//".txt")
-    do j=0,endstep
+    do j = 0,endstep
      write (11,*) times(j),Wtime(k,j)
     enddo
     close(11)
 
     if (buoyancy==1) then
       open(11,file="temptimep"//prob//".txt")
-      do j=0,endstep
+      do j = 0,endstep
        write (11,*) times(j),temptime(k,j)
       enddo
       close(11)
@@ -572,7 +560,7 @@ contains
 
     if (computescalars>0) then
       open(11,file="scaltimep"//prob//".txt")
-      do j=1,endstep
+      do j = 1,endstep
        write (11,*) times(j),scalptime(:,k,j)
       enddo
       close(11)
@@ -582,7 +570,7 @@ contains
 
   if (store%deltime>0) then
     open(11,file="deltime.txt")
-    do j=1,endstep
+    do j = 1,endstep
      write (11,*) times(j),deltime(j)
     enddo
     close(11)
@@ -590,7 +578,7 @@ contains
 
   if (store%tke>0) then
     open(11,file="tke.txt")
-    do j=0,endstep
+    do j = 0,endstep
      write (11,*) times(j),tke(j)
     enddo
     close(11)
@@ -598,7 +586,7 @@ contains
 
   if (store%tke>0.and.store%dissip>0) then
    open(11,file="dissip.txt")
-    do j=1,endstep
+    do j = 1,endstep
      write (11,*) times(j),dissip(j)
     enddo
     close(11)
@@ -606,7 +594,7 @@ contains
 
   if (wallmodeltype>0.and.display%ustar>0) then
     open(11,file="Retau.txt")
-    do j=0,endstep
+    do j = 0,endstep
      write (11,*) times(j),ustar(:,j)
     enddo
     close(11)
@@ -614,7 +602,7 @@ contains
 
   if (wallmodeltype>0.and.buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.store%tstar>0) then
     open(11,file="tflux.txt")
-    do j=0,endstep
+    do j = 0,endstep
      write (11,*) times(j),tstar(:,j)
     enddo
     close(11)
@@ -623,7 +611,7 @@ contains
 
   if (computescalars>0.and.store%scalsumtime>0) then
     open(11,file="scalsumtime.txt")
-    do j=1,endstep
+    do j = 1,endstep
      write (11,*) times(j),scalsumtime(:,j)
     enddo
     close(11)
@@ -631,7 +619,7 @@ contains
 
   if (computescalars>0.and.store%scaltotsumtime>0) then
     open(11,file="scaltotsumtime.txt")
-    do j=1,endstep
+    do j = 1,endstep
      write (11,*) times(j),sum(scalsumtime(:,j))
     enddo
     close(11)
@@ -641,43 +629,43 @@ contains
   if (store%BLprofiles>0.and.averaging==1) then
 
      open(11,file="profu.txt")
-     do k=1,Unz
+     do k = 1,Unz
       write (11,*) zPr(k),profuavg(k)
      enddo
      close(11)
 
      open(11,file="profv.txt")
-     do k=1,Vnz
+     do k = 1,Vnz
       write (11,*) zPr(k),profvavg(k)
      enddo
      close(11)
 
      open(11,file="profuu.txt")
-     do k=1,Unz
+     do k = 1,Unz
       write (11,*) zPr(k),profuuavg(k)
      enddo
      close(11)
 
      open(11,file="profvv.txt")
-     do k=1,Vnz
+     do k = 1,Vnz
       write (11,*) zPr(k),profvvavg(k)
      enddo
      close(11)
 
      open(11,file="profww.txt")
-     do k=1,Wnz
+     do k = 1,Wnz
       write (11,*) zW(k),profwwavg(k)
      enddo
      close(11)
 
      open(11,file="profuw.txt")
-     do k=0,Prnz
+     do k = 0,Prnz
       write (11,*) zW(k),profuwavg(k),profuwsgsavg(k)
      enddo
      close(11)
 
      open(11,file="profvw.txt")
-     do k=0,Prnz
+     do k = 0,Prnz
       write (11,*) zW(k),profvwavg(k),profvwsgsavg(k)
      enddo
      close(11)
@@ -685,56 +673,56 @@ contains
      if (buoyancy>0) then
 
         open(11,file="proftemp.txt")
-        do k=1,Prnz
+        do k = 1,Prnz
          write (11,*) zPr(k),proftempavg(k)
         enddo
         close(11)
 
         open(11,file="proftempfl.txt")
-        do k=0,Prnz
+        do k = 0,Prnz
          write (11,*) zW(k),proftempflavg(k),proftempflsgsavg(k)
         enddo
         close(11)
 
         open(11,file="proftt.txt")
-        do k=1,Prnz
+        do k = 1,Prnz
          write (11,*) zPr(k),profttavg(k)
         enddo
         close(11)
 
         open(11,file="profRig.txt")
-        do k=1,Prnz
-         S=0
-         do j=1,Prny
-          do i=1,Prnx
-           S=S+Rig(i,j,k,Uavg,Vavg,temperatureavg)
+        do k = 1,Prnz
+         S = 0
+         do j = 1,Prny
+          do i = 1,Prnx
+           S = S+Rig(i,j,k,Uavg,Vavg,temperatureavg)
           enddo
          enddo
-         S=S/(Prnx*Prny)
+         S = S/(Prnx*Prny)
          write (11,*) zPr(k),S
         enddo
         close(11)
 
         open(11,file="profRf.txt")
-        do k=1,Prnz
-         S=0
-         S2=0
-         do j=1,Prny
-          do i=1,Prnx
-           S=S+(Uavg(i,j,k+1)+Uavg(i-1,j,k+1)-Uavg(i,j,k-1)-Uavg(i-1,j,k-1))/(2._KND*(zPr(k+1)-zPr(k-1)))
-           S2=S2+(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(2._KND*(zPr(k+1)-zPr(k-1)))
+        do k = 1,Prnz
+         S = 0
+         S2 = 0
+         do j = 1,Prny
+          do i = 1,Prnx
+           S = S+(Uavg(i,j,k+1)+Uavg(i-1,j,k+1)-Uavg(i,j,k-1)-Uavg(i-1,j,k-1))/(2._KND*(zPr(k+1)-zPr(k-1)))
+           S2 = S2+(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(2._KND*(zPr(k+1)-zPr(k-1)))
           enddo
          enddo
 
-         S=S/(Prnx*Prny)
-         S2=S2/(Prnx*Prny)
+         S = S/(Prnx*Prny)
+         S2 = S2/(Prnx*Prny)
          nom=(grav_acc/temperature_ref)*(proftempflavg(k)+proftempflsgsavg(k))
          denom=((profuwavg(k)+profuwsgsavg(k))*S+(profvwavg(k)+profvwsgsavg(k))*S2)
 
-         if (abs(denom)>=1E-5_KND*abs(nom).or.abs(denom)<=tiny(denom)) then
-           S=nom/denom
+         if (abs(denom)>1E-5_KND*abs(nom)) then
+           S = nom/denom
          else
-           S=100000._KND*sign(1.0_KND,nom)*sign(1.0_KND,denom)
+           S = 100000._KND*sign(1.0_KND,nom)*sign(1.0_KND,denom)
          endif
 
          write (11,*) zPr(k),S
@@ -747,20 +735,20 @@ contains
      if (computescalars>0) then
 
         open(11,file="profscal.txt")
-        do k=1,Prnz
-         write (11,*) zPr(k),(profscalavg(i,k), i=1,computescalars)
+        do k = 1,Prnz
+         write (11,*) zPr(k),(profscalavg(i,k), i = 1,computescalars)
         enddo
         close(11)
 
         open(11,file="profscalfl.txt")
-        do k=0,Prnz
-         write (11,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i=1,computescalars)
+        do k = 0,Prnz
+         write (11,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i = 1,computescalars)
         enddo
         close(11)
 
         open(11,file="profss.txt")
-        do k=1,Prnz
-         write (11,*) zPr(k),(profssavg(i,k), i=1,computescalars)
+        do k = 1,Prnz
+         write (11,*) zPr(k),(profssavg(i,k), i = 1,computescalars)
         enddo
         close(11)
 
@@ -810,9 +798,9 @@ contains
       if (store%out_Pr>0) then
         write (11,"(A)") "SCALARS p float"
         write (11,"(A)") "LOOKUP_TABLE default"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+         do j = 1,Prny
+          do i = 1,Prnx
             write (11,*) Pr(i,j,k)
           enddo
          enddo
@@ -823,9 +811,9 @@ contains
       if (buoyancy>0.and.store%out_T>0) then
         write (11,*) "SCALARS temperature float"
         write (11,*) "LOOKUP_TABLE default"
-        do k=1,Prnz
-          do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+          do j = 1,Prny
+          do i = 1,Prnx
             write (11,*) Temperature(i,j,k)
           enddo
           enddo
@@ -836,9 +824,9 @@ contains
       if (store%out_Prtype>0) then
         write (11,*) "SCALARS ptype float"
         write (11,*) "LOOKUP_TABLE default"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+         do j = 1,Prny
+          do i = 1,Prnx
             Write (11,*) Prtype(i,j,k)
           enddo
          enddo
@@ -849,9 +837,9 @@ contains
       if (store%out_div>0) then
         write (11,*) "SCALARS div float"
         write (11,*) "LOOKUP_TABLE default"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+         do j = 1,Prny
+          do i = 1,Prnx
             Write (11,*) (U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k))
           enddo
          enddo
@@ -862,9 +850,9 @@ contains
       if (store%out_lambda2>0) then
         write (11,*) "SCALARS lambda2 float"
         write (11,*) "LOOKUP_TABLE default"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+         do j = 1,Prny
+          do i = 1,Prnx
             write (11,*) Lambda2(i,j,k,U,V,W)
           enddo
          enddo
@@ -875,9 +863,9 @@ contains
       if (store%out_visc>0) then
         write (11,*) "SCALARS visc float"
         write (11,*) "LOOKUP_TABLE default"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+         do j = 1,Prny
+          do i = 1,Prnx
             Write (11,*) Visc(i,j,k)
           enddo
          enddo
@@ -887,9 +875,9 @@ contains
 
       if (store%out_U>0) then
         write (11,"(A)") "VECTORS u float"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+         do j = 1,Prny
+          do i = 1,Prnx
             write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
           enddo
          enddo
@@ -898,9 +886,9 @@ contains
 
       if (store%out_vort>0) then
         write (11,"(A)") "VECTORS vort float"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+         do j = 1,Prny
+          do i = 1,Prnx
             write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                             -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
                         (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
@@ -926,7 +914,6 @@ contains
  subroutine OutputScalars
  character(70) :: str
  real(KND),dimension(:,:,:),allocatable :: depos
- type(WMPoint),pointer :: WMP
  character(8) ::  scalname="scalar00"
  integer :: i,j,k,l
 
@@ -956,13 +943,13 @@ contains
         write (str(12:),*) Prnx*Prny*Prnz
         write (11,"(A)") str
 
-        do l=1,computescalars
+        do l = 1,computescalars
           write(scalname(7:8),"(I2.2)") l
           write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
           write (11,"(A)") "LOOKUP_TABLE default"
-          do k=1,Prnz
-           do j=1,Prny
-            do i=1,Prnx
+          do k = 1,Prnz
+           do j = 1,Prny
+            do i = 1,Prnx
               write (11,*) SCALAR(i,j,k,l)
             enddo
            enddo
@@ -973,26 +960,9 @@ contains
     endif !store%scalars
 
     if (computedeposition>0.and.store%deposition>0) then
+
         allocate(depos(1:Prnx,1:Prny,computescalars))
-        depos=0
-
-        if (associated(FirstWMPoint)) then
-          WMP => FirstWMPoint
-
-          do
-            if (allocated(WMP%depscalar)) then
-              do i=1,computescalars
-              depos(WMP%xi,WMP%yj,i)=depos(WMP%xi,WMP%yj,i)+WMP%depscalar(i)
-              enddo
-            endif
-
-            if (associated(WMP%next)) then
-              WMP=>WMP%next
-            else
-              exit
-            endif
-          enddo
-        endif
+        depos = GroundDeposition()
 
         open(11,file="deposition.vtk")
         write (11,"(A)") "# vtk DataFile Version 2.0"
@@ -1018,13 +988,13 @@ contains
         write (str(12:),*) Prnx*Prny
         write (11,"(A)") str
 
-        do l=1,computescalars
+        do l = 1,computescalars
           write(scalname(7:8),"(I2.2)") l
           write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
           write (11,"(A)") "LOOKUP_TABLE default"
 
-          do j=1,Prny
-            do i=1,Prnx
+          do j = 1,Prny
+            do i = 1,Prnx
               write (11,*) depos(i,j,l)
             enddo
           enddo
@@ -1086,9 +1056,9 @@ contains
       if (store%avg_Pr>0) then
         write (11,"(A)") "SCALARS p float"
         write (11,"(A)") "LOOKUP_TABLE default"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+         do j = 1,Prny
+          do i = 1,Prnx
             write (11,*) Pravg(i,j,k)
           enddo
          enddo
@@ -1099,9 +1069,9 @@ contains
       if (store%avg_Prtype>0) then
         write (11,*) "SCALARS ptype float"
         write (11,*) "LOOKUP_TABLE default"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+         do j = 1,Prny
+          do i = 1,Prnx
             write (11,*) Prtype(i,j,k)
           enddo
          enddo
@@ -1112,9 +1082,9 @@ contains
       if (buoyancy>0.and.store%avg_T>0) then
         write (11,*) "SCALARS temperature float"
         write (11,*) "LOOKUP_TABLE default"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+         do j = 1,Prny
+          do i = 1,Prnx
             write (11,*) Temperatureavg(i,j,k)
           enddo
          enddo
@@ -1124,9 +1094,9 @@ contains
 
       if (store%avg_U>0) then
         write (11,"(A)") "VECTORS u float"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+         do j = 1,Prny
+          do i = 1,Prnx
             write (11,*) (Uavg(i,j,k)+Uavg(i-1,j,k))/2._KND,(Vavg(i,j,k)+Vavg(i,j-1,k))/2._KND,(Wavg(i,j,k)+Wavg(i,j,k-1))/2._KND
           enddo
          enddo
@@ -1135,9 +1105,9 @@ contains
 
       if (store%avg_vort>0) then
         write (11,"(A)") "VECTORS vort float"
-        do k=1,Prnz
-         do j=1,Prny
-          do i=1,Prnx
+        do k = 1,Prnz
+         do j = 1,Prny
+          do i = 1,Prnx
             write (11,*) (Wavg(i,j+1,k)-Wavg(i,j-1,k)+Wavg(i,j+1,k-1)-Wavg(i,j-1,k-1))/(4*dxmin)&
                             -(Vavg(i,j,k+1)-Vavg(i,j,k-1)+Vavg(i,j-1,k+1)-Vavg(i,j-1,k-1))/(4*dymin),&
                         (Uavg(i,j,k+1)-Uavg(i,j,k-1)+Uavg(i-1,j,k+1)-Uavg(i-1,j,k-1))/(4*dxmin)&
@@ -1179,13 +1149,13 @@ contains
           write (str(12:),*) Prnx*Prny*Prnz
           write (11,"(A)") str
 
-          do l=1,computescalars
+          do l = 1,computescalars
             write(scalname(7:8),"(I2.2)") l
             write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
             write (11,"(A)") "LOOKUP_TABLE default"
-            do k=1,Prnz
-             do j=1,Prny
-              do i=1,Prnx
+            do k = 1,Prnz
+             do j = 1,Prny
+              do i = 1,Prnx
                 write (11,*) SCALARavg(i,j,k,l)
               enddo
              enddo
@@ -1235,9 +1205,9 @@ contains
 
       write (11,"(A)") "SCALARS U float"
       write (11,"(A)") "LOOKUP_TABLE default"
-      do k=1,Unz
-       do j=1,Uny
-        do i=1,Unx
+      do k = 1,Unz
+       do j = 1,Uny
+        do i = 1,Unx
           write (11,*) U(i,j,k)
         enddo
        enddo
@@ -1275,9 +1245,9 @@ contains
 
       write (11,"(A)") "SCALARS V float"
       write (11,"(A)") "LOOKUP_TABLE default"
-      do k=1,Vnz
-       do j=1,Vny
-        do i=1,Vnx
+      do k = 1,Vnz
+       do j = 1,Vny
+        do i = 1,Vnx
           write (11,*) V(i,j,k)
         enddo
        enddo
@@ -1315,9 +1285,9 @@ contains
 
       write (11,"(A)") "SCALARS W float"
       write (11,"(A)") "LOOKUP_TABLE default"
-      do k=1,Wnz
-       do j=1,Wny
-        do i=1,Wnx
+      do k = 1,Wnz
+       do j = 1,Wny
+        do i = 1,Wnx
           write (11,*) W(i,j,k)
         enddo
        enddo
@@ -1329,7 +1299,7 @@ contains
 
   if (store%U_interp/=0) then
     open(11,file="Uinterp.txt")
-    do i=1,size(UIBPoints)
+    do i = 1,size(UIBPoints)
       write(11,*) "xi,yj,zk",UIBPoints(i)%xi,UIBPoints(i)%yj,UIBPoints(i)%zk
       write(11,*) "interp",UIBPoints(i)%interp
       write(11,*) "xi",UIBPoints(i)%IntPoints%xi
@@ -1342,7 +1312,7 @@ contains
 
   if (store%V_interp/=0) then
     open(11,file="Vinterp.txt")
-    do i=1,size(VIBPoints)
+    do i = 1,size(VIBPoints)
       write(11,*) "xi,yj,zk",VIBPoints(i)%xi,VIBPoints(i)%yj,VIBPoints(i)%zk
       write(11,*) "interp",VIBPoints(i)%interp
       write(11,*) "xi",VIBPoints(i)%IntPoints%xi
@@ -1355,7 +1325,7 @@ contains
 
   if (store%W_interp/=0) then
     open(11,file="Winterp.txt")
-    do i=1,size(WIBPoints)
+    do i = 1,size(WIBPoints)
       write(11,*) "xi,yj,zk",WIBPoints(i)%xi,WIBPoints(i)%yj,WIBPoints(i)%zk
       write(11,*) "interp",WIBPoints(i)%interp
       write(11,*) "xi",WIBPoints(i)%IntPoints%xi
@@ -1368,7 +1338,7 @@ contains
 
   if (store%U_interp/=0.and.store%V_interp/=0.and.store%W_interp/=0) then
     open(11,file="Scinterp.txt")
-    do i=1,size(ScalFlIBPoints)
+    do i = 1,size(ScalFlIBPoints)
       write(11,*) "xi,yj,zk",ScalFlIBPoints(i)%xi,ScalFlIBPoints(i)%yj,ScalFlIBPoints(i)%zk
       write(11,*) "interp",ScalFlIBPoints(i)%interp
       write(11,*) "xi",ScalFlIBPoints(i)%IntPoints%xi
@@ -1394,8 +1364,6 @@ contains
   call BoundU(2,V)
   call BoundU(3,W)
 
-  if (time>=timeavg1) call OutputProfiles(U,V,W,Pr)
-
   call OutputOut(U,V,W,Pr)
 
   call OutputScalars
@@ -1403,6 +1371,8 @@ contains
   if (time>=timeavg1) call OutputAvg(U,V,W,Pr)
 
   call OutputUVW(U,V,W)
+
+  if (time>=timeavg1) call OutputProfiles(U,V,W,Pr)
 
   write (*,*) "saved"
  end subroutine OUTPUT
@@ -1430,6 +1400,62 @@ contains
   end function Vorticity
 
 
+  elemental subroutine SetFrameDomain(domain)
+    type(TFrameDomain),intent(inout) :: domain
+
+
+        if (domain%dimension==3) then
+
+          domain%mini = 1
+          domain%maxi = Prnx
+          domain%minj = 1
+          domain%maxj = Prny
+          domain%mink = 1
+          domain%maxk = Prnz
+
+        else
+
+          if (domain%direction==1) then
+
+            call Gridcoords(domain%mini, domain%minj, domain%mink, domain%position, &
+                            (yV(Prny+1)+yV(0))/2._KND, (zW(Prnz+1)+zW(0))/2._KND )
+
+            domain%maxi = domain%mini
+            domain%minj = 1
+            domain%maxj = Prny
+            domain%mink = 1
+            domain%maxk = Prnz
+
+          elseif (domain%direction==2) then
+
+            call Gridcoords(domain%mini, domain%minj, domain%mink, (xU(Prnx+1)+xU(0))/2._KND, &
+                            domain%position, (zW(Prnz+1)+zW(0))/2._KND )
+
+            domain%maxj = domain%minj
+            domain%mini = 1
+            domain%maxi = Prnx
+            domain%mink = 1
+            domain%maxk = Prnz
+
+          else
+
+            call Gridcoords(domain%mini, domain%minj, domain%mink, (xU(Prnx+1)+xU(0))/2._KND, &
+                            (yV(Prny+1)+yV(0))/2._KND, domain%position )
+
+            domain%maxk = domain%mink
+            domain%mini = 1
+            domain%maxi = Prnx
+            domain%minj = 1
+            domain%maxj = Prny
+
+          endif
+
+        endif
+
+  end subroutine SetFrameDomain
+
+
+
   subroutine FRAME(U,V,W,Pr,n)
     real(KND) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
     integer n,i,j,k,l,m
@@ -1437,516 +1463,457 @@ contains
     character(20) :: fsuffix
     character(70) :: str
     character(8) ::  scalname="scalar00"
-    character,parameter :: lf=char(10)
+    character,parameter :: lf = char(10)
     integer mini,maxi,minj,maxj,mink,maxk
+    integer unit
 
     fsuffix=".vtk"
 
-    do m=1,size(store%frame_domains)
+    !$omp parallel do default(private) shared(n,store,time,fsuffix,xPr,yPr,zPr,Prtype,Pr,U,V,W,&
+    !$omp                                          scalar,temperature,buoyancy,computescalars,vtkformat)
+    do m = 1,size(store%frame_domains)
 
       fname="frame-"//achar(iachar('a')+m-1)//"-"
       write(fnumber,"(I4.4)") n
       write(*,*) "Saving frame:",fnumber,"   time:",time
 
-      vtkformat=binaryvtk
+      unit = 100+m
+
+      vtkformat = binaryvtk
+
       if (vtkformat==textvtk) then
 
-        if (store%frame_domains(m)%dimension==3) then
+        mini = store%frame_domains(m)%mini
+        minj = store%frame_domains(m)%minj
+        mink = store%frame_domains(m)%mink
+        maxi = store%frame_domains(m)%maxi
+        maxj = store%frame_domains(m)%maxj
+        maxk = store%frame_domains(m)%maxk
 
-          mini=1
-          maxi=Prnx
-          mini=1
-          maxi=Prnx
-          mini=1
-          maxi=Prnx
+        open(unit,file = trim(fname)//trim(fnumber)//trim(fsuffix))
 
-        else
-
-          if (store%frame_domains(m)%direction==1) then
-            call Gridcoords(mini,minj,mink,store%frame_domains(m)%position,&
-                            (yV(Prny+1)+yV(0))/2._KND,(zW(Prnz+1)+zW(0))/2._KND)
-            maxi=mini
-            minj=1
-            maxj=Prny
-            mink=1
-            maxk=Prnz
-          elseif (store%frame_domains(m)%direction==2) then
-            call Gridcoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._KND,&
-                            store%frame_domains(m)%position,(zW(Prnz+1)+zW(0))/2._KND)
-            maxj=minj
-            mini=1
-            maxi=Prnx
-            mink=1
-            maxk=Prnz
-          else
-            call Gridcoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._KND,&
-                            (yV(Prny+1)+yV(0))/2._KND,store%frame_domains(m)%position)
-            maxk=mink
-            mini=1
-            maxi=Prnx
-            minj=1
-            maxj=Prny
-          endif
-
-        endif
-
-        open(11,file=trim(fname)//trim(fnumber)//trim(fsuffix))
-
-        write (11,"(A)") "# vtk DataFile Version 2.0"
-        write (11,"(A)") "CLMM output file"
-        write (11,"(A)") "ASCII"
-        write (11,"(A)") "DATASET RECTILINEAR_GRID"
+        write (unit,"(A)") "# vtk DataFile Version 2.0"
+        write (unit,"(A)") "CLMM output file"
+        write (unit,"(A)") "ASCII"
+        write (unit,"(A)") "DATASET RECTILINEAR_GRID"
         str="DIMENSIONS"
         write (str(12:),*) maxi-mini+1,maxj-minj+1,maxk-mink+1
-        write (11,"(A)") str
+        write (unit,"(A)") str
         str="X_COORDINATES"
         write (str(15:),'(i5,2x,a)') maxi-mini+1,"float"
-        write (11,"(A)") str
-        write (11,*) xPr(mini:maxi)
+        write (unit,"(A)") str
+        write (unit,*) xPr(mini:maxi)
         str="Y_COORDINATES"
         write (str(15:),'(i5,2x,a)') maxj-minj+1,"float"
-        write (11,"(A)") str
-        write (11,*) yPr(minj:maxj)
+        write (unit,"(A)") str
+        write (unit,*) yPr(minj:maxj)
         str="Z_COORDINATES"
         write (str(15:),'(i5,2x,a)') maxk-mink+1,"float"
-        write (11,"(A)") str
-        write (11,*) zPr(mink:maxk)
+        write (unit,"(A)") str
+        write (unit,*) zPr(mink:maxk)
         str="POINT_DATA"
         write (str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
-        write (11,"(A)") str
+        write (unit,"(A)") str
 
         if (store%frame_Pr>0) then
-          write (11,"(A)") "SCALARS p float"
-          write (11,"(A)") "LOOKUP_TABLE default"
-          do k=mink,maxk
-           do j=minj,maxj
-            do i=mini,maxi
+          write (unit,"(A)") "SCALARS p float"
+          write (unit,"(A)") "LOOKUP_TABLE default"
+          do k = mink,maxk
+           do j = minj,maxj
+            do i = mini,maxi
              if (Prtype(i,j,k)==0) then
-              write (11,*) Pr(i,j,k)
+              write (unit,*) Pr(i,j,k)
              else
-              write (11,*) 0.
+              write (unit,*) 0.
              endif
             enddo
            enddo
           enddo
-          write (11,*)
+          write (unit,*)
         endif
 
         if (store%frame_lambda2>0) then
-          write (11,*) "SCALARS lambda2 float"
-          write (11,*) "LOOKUP_TABLE default"
-          do k=mink,maxk
-           do j=minj,maxj
-            do i=mini,maxi
+          write (unit,*) "SCALARS lambda2 float"
+          write (unit,*) "LOOKUP_TABLE default"
+          do k = mink,maxk
+           do j = minj,maxj
+            do i = mini,maxi
              if (Prtype(i,j,k)==0) then
-              write (11,*) Lambda2(i,j,k,U,V,W)
+              write (unit,*) Lambda2(i,j,k,U,V,W)
              else
-              write (11,*) 0.
+              write (unit,*) 0.
              endif
             enddo
            enddo
           enddo
-          write (11,*)
+          write (unit,*)
         endif
 
         if (store%frame_scalars>0) then
           scalname(1:6)="scalar"
-          do l=1,computescalars
+          do l = 1,computescalars
             write(scalname(7:8),"(I2.2)") l
-            write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
-            write (11,"(A)") "LOOKUP_TABLE default"
-            do k=mink,maxk
-             do j=minj,maxj
-              do i=mini,maxi
+            write (unit,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
+            write (unit,"(A)") "LOOKUP_TABLE default"
+            do k = mink,maxk
+             do j = minj,maxj
+              do i = mini,maxi
                if (Prtype(i,j,k)==0) then
-                write (11,*) SCALAR(i,j,k,l)
+                write (unit,*) SCALAR(i,j,k,l)
                else
-                write (11,*) 0.
+                write (unit,*) 0.
                endif
               enddo
              enddo
             enddo
-            write (11,*)
+            write (unit,*)
           enddo
         elseif (store%frame_sumscalars>0.and.computescalars>0) then
-          write (11,"(A,1X,A,1X,A)") "SCALARS", "scalar" , "float"
-          write (11,"(A)") "LOOKUP_TABLE default"
-          do k=mink,maxk
-           do j=minj,maxj
-            do i=mini,maxi
+          write (unit,"(A,1X,A,1X,A)") "SCALARS", "scalar" , "float"
+          write (unit,"(A)") "LOOKUP_TABLE default"
+          do k = mink,maxk
+           do j = minj,maxj
+            do i = mini,maxi
              if (Prtype(i,j,k)==0) then
-              write (11,*) SUM(SCALAR(i,j,k,:))
+              write (unit,*) SUM(SCALAR(i,j,k,:))
              else
-              write (11,*) 0.
+              write (unit,*) 0.
              endif
             enddo
            enddo
           enddo
-          write (11,*)
+          write (unit,*)
         endif
 
         if (store%frame_T>0) then
           if (buoyancy>0) then
-            write (11,*) "SCALARS temperature float"
-            write (11,*) "LOOKUP_TABLE default"
-            do k=mink,maxk
-             do j=minj,maxj
-              do i=mini,maxi
+            write (unit,*) "SCALARS temperature float"
+            write (unit,*) "LOOKUP_TABLE default"
+            do k = mink,maxk
+             do j = minj,maxj
+              do i = mini,maxi
                if (Prtype(i,j,k)==0) then
-                write (11,*) Temperature(i,j,k)
+                write (unit,*) Temperature(i,j,k)
                else
-                write (11,*) temperature_ref
+                write (unit,*) temperature_ref
                endif
               enddo
              enddo
             enddo
-            write (11,*)
+            write (unit,*)
           endif
         endif
 
         if (buoyancy==1.and.store%frame_tempfl>0) then
-          write (11,*) "SCALARS tempfl float"
-          write (11,*) "LOOKUP_TABLE default"
-          do k=mink,maxk
-           do j=minj,maxj
-            do i=mini,maxi
+          write (unit,*) "SCALARS tempfl float"
+          write (unit,*) "LOOKUP_TABLE default"
+          do k = mink,maxk
+           do j = minj,maxj
+            do i = mini,maxi
              if (Prtype(i,j,k)==0) then
-              write (11,*) ScalarVerticalFlux(i,j,k,Temperature,W)
+              write (unit,*) ScalarVerticalFlux(i,j,k,Temperature,W)
              else
-              write (11,*) 0.
+              write (unit,*) 0.
              endif
             enddo
            enddo
           enddo
-          write (11,*)
+          write (unit,*)
         endif
 
         if (store%frame_scalfl>0) then
           if (store%frame_scalars>0) then
             scalname(1:6)="scalfl"
-            do l=1,computescalars
+            do l = 1,computescalars
               write(scalname(7:8),"(I2.2)") l
-              write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
-              write (11,"(A)") "LOOKUP_TABLE default"
-              do k=mink,maxk
-               do j=minj,maxj
-                do i=mini,maxi
+              write (unit,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
+              write (unit,"(A)") "LOOKUP_TABLE default"
+              do k = mink,maxk
+               do j = minj,maxj
+                do i = mini,maxi
                  if (Prtype(i,j,k)==0) then
-                  write (11,*) ScalarVerticalFlux(i,j,k,Scalar(:,:,:,l),W)
+                  write (unit,*) ScalarVerticalFlux(i,j,k,Scalar(:,:,:,l),W)
                  else
-                  write (11,*) 0.
+                  write (unit,*) 0.
                  endif
                 enddo
                enddo
               enddo
-              write (11,*)
+              write (unit,*)
             enddo
           elseif (store%frame_sumscalars>0.and.computescalars>0) then
-            write (11,"(A)") "SCALARS scalfl float"
-            write (11,"(A)") "LOOKUP_TABLE default"
-            do k=mink,maxk
-             do j=minj,maxj
-              do i=mini,maxi
+            write (unit,"(A)") "SCALARS scalfl float"
+            write (unit,"(A)") "LOOKUP_TABLE default"
+            do k = mink,maxk
+             do j = minj,maxj
+              do i = mini,maxi
                if (Prtype(i,j,k)==0) then
-                write (11,*) ScalarVerticalFlux(i,j,k,SUM(Scalar(:,:,:,:),4),W)
+                write (unit,*) ScalarVerticalFlux(i,j,k,SUM(Scalar(:,:,:,:),4),W)
                else
-                write (11,*) 0.
+                write (unit,*) 0.
                endif
               enddo
              enddo
             enddo
-            write (11,*)
+            write (unit,*)
           endif
         endif
 
         if (store%frame_U>0) then
-          write (11,"(A)") "VECTORS u float"
-          do k=mink,maxk
-           do j=minj,maxj
-            do i=mini,maxi
+          write (unit,"(A)") "VECTORS u float"
+          do k = mink,maxk
+           do j = minj,maxj
+            do i = mini,maxi
              if (Prtype(i,j,k)==0) then
-              write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,&
+              write (unit,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,&
                              (W(i,j,k)+W(i,j,k-1))/2._KND
              else
-              write (11,*) 0.,0.,0.
+              write (unit,*) 0.,0.,0.
              endif
             enddo
            enddo
           enddo
-          write (11,*)
+          write (unit,*)
         endif
 
         if (store%frame_vort>0) then
-          write (11,"(A)") "VECTORS vort float"
-          do k=mink,maxk
-           do j=minj,maxj
-            do i=mini,maxi
+          write (unit,"(A)") "VECTORS vort float"
+          do k = mink,maxk
+           do j = minj,maxj
+            do i = mini,maxi
              if (Prtype(i,j,k)==0) then
-              write (11,*) Vorticity(i,j,k,U,V,W)
+              write (unit,*) Vorticity(i,j,k,U,V,W)
              else
-              write (11,*) 0.,0.,0.
+              write (unit,*) 0.,0.,0.
              endif
             enddo
            enddo
           enddo
         endif
-        close(11)
+        close(unit)
 
 
       else  !Binary VTK format
 
+        mini = store%frame_domains(m)%mini
+        minj = store%frame_domains(m)%minj
+        mink = store%frame_domains(m)%mink
+        maxi = store%frame_domains(m)%maxi
+        maxj = store%frame_domains(m)%maxj
+        maxk = store%frame_domains(m)%maxk
 
 
-        if (store%frame_domains(m)%dimension==3) then
-
-          mini=1
-          maxi=Prnx
-          mini=1
-          maxi=Prnx
-          mini=1
-          maxi=Prnx
-
-        else
-
-         if (store%frame_domains(m)%direction==1) then
-           call Gridcoords(mini,minj,mink,store%frame_domains(m)%position,&
-                           (yV(Prny+1)+yV(0))/2._KND,(zW(Prnz+1)+zW(0))/2._KND)
-           maxi=mini
-           minj=1
-           maxj=Prny
-           mink=1
-           maxk=Prnz
-          elseif (store%frame_domains(m)%direction==2) then
-           call Gridcoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._KND,&
-                           store%frame_domains(m)%position,(zW(Prnz+1)+zW(0))/2._KND)
-           maxj=minj
-           mini=1
-           maxi=Prnx
-           mink=1
-           maxk=Prnz
-          else
-           call Gridcoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._KND,&
-                           (yV(Prny+1)+yV(0))/2._KND,store%frame_domains(m)%position)
-           maxk=mink
-           mini=1
-           maxi=Prnx
-           minj=1
-           maxj=Prny
-          endif
-
-        endif
-
-
-        open(20,file=trim(fname)//trim(fnumber)//trim(fsuffix),&
+        open(unit,file = trim(fname)//trim(fnumber)//trim(fsuffix),&
           access='stream',status='replace',form="unformatted",action="write")
 
-        write (20) "# vtk DataFile Version 2.0",lf
-        write (20) "CLMM output file",lf
-        write (20) "BINARY",lf
-        write (20) "DATASET RECTILINEAR_GRID",lf
+        write (unit) "# vtk DataFile Version 2.0",lf
+        write (unit) "CLMM output file",lf
+        write (unit) "BINARY",lf
+        write (unit) "DATASET RECTILINEAR_GRID",lf
         str="DIMENSIONS"
         write (str(12:),*) maxi-mini+1,maxj-minj+1,maxk-mink+1
-        write (20) str,lf
+        write (unit) str,lf
         str="X_COORDINATES"
         write (str(15:),'(i5,2x,a)') maxi-mini+1,"float"
-        write (20) str,lf
-        write (20) (BigEnd(real(xPr(i),SNG)),i=mini,maxi),lf
+        write (unit) str,lf
+        write (unit) (BigEnd(real(xPr(i),SNG)),i = mini,maxi),lf
         str="Y_COORDINATES"
         write (str(15:),'(i5,2x,a)') maxj-minj+1,"float"
-        write (20) str,lf
-        write (20) (BigEnd(real(yPr(j),SNG)),j=minj,maxj),lf
+        write (unit) str,lf
+        write (unit) (BigEnd(real(yPr(j),SNG)),j = minj,maxj),lf
         str="Z_COORDINATES"
         write (str(15:),'(i5,2x,a)') maxk-mink+1,"float"
-        write (20) str,lf
-        write (20) (BigEnd(real(zPr(k),SNG)),k=mink,maxk),lf
+        write (unit) str,lf
+        write (unit) (BigEnd(real(zPr(k),SNG)),k = mink,maxk),lf
         str="POINT_DATA"
         write (str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
-        write (20) str,lf
+        write (unit) str,lf
 
         if (store%frame_Pr>0) then
-         write (20) "SCALARS p float",lf
-         write (20) "LOOKUP_TABLE default",lf
-         do k=mink,maxk
-          do j=minj,maxj
-           do i=mini,maxi
+         write (unit) "SCALARS p float",lf
+         write (unit) "LOOKUP_TABLE default",lf
+         do k = mink,maxk
+          do j = minj,maxj
+           do i = mini,maxi
             if (Prtype(i,j,k)==0) then
-             write (20) BigEnd(real(Pr(i,j,k),SNG))
+             write (unit) BigEnd(real(Pr(i,j,k),SNG))
             else
-             write (20) BigEnd(0._SNG)
+             write (unit) BigEnd(0._SNG)
             endif
            enddo
           enddo
          enddo
-         write (20) lf
+         write (unit) lf
         endif
 
         if (store%frame_lambda2>0) then
-         write (20) "SCALARS lambda2 float",lf
-         write (20) "LOOKUP_TABLE default",lf
-         do k=mink,maxk
-          do j=minj,maxj
-           do i=mini,maxi
+         write (unit) "SCALARS lambda2 float",lf
+         write (unit) "LOOKUP_TABLE default",lf
+         do k = mink,maxk
+          do j = minj,maxj
+           do i = mini,maxi
             if (Prtype(i,j,k)==0) then
-             write (20) BigEnd(real(Lambda2(i,j,k,U,V,W),SNG))
+             write (unit) BigEnd(real(Lambda2(i,j,k,U,V,W),SNG))
             else
-             write (20) BigEnd(0._SNG)
+             write (unit) BigEnd(0._SNG)
             endif
            enddo
           enddo
          enddo
-         write (20) lf
+         write (unit) lf
         endif
 
         if (store%frame_scalars>0) then
          scalname(1:6)="scalar"
-         do l=1,computescalars
+         do l = 1,computescalars
           write(scalname(7:8),"(I2.2)") l
-          write (20) "SCALARS ", scalname , " float",lf
-          write (20) "LOOKUP_TABLE default",lf
-          do k=mink,maxk
-           do j=minj,maxj
-            do i=mini,maxi
+          write (unit) "SCALARS ", scalname , " float",lf
+          write (unit) "LOOKUP_TABLE default",lf
+          do k = mink,maxk
+           do j = minj,maxj
+            do i = mini,maxi
              if (Prtype(i,j,k)==0) then
-              write (20) BigEnd(real(SCALAR(i,j,k,l),SNG))
+              write (unit) BigEnd(real(SCALAR(i,j,k,l),SNG))
              else
-              write (20) BigEnd(0._SNG)
+              write (unit) BigEnd(0._SNG)
              endif
             enddo
            enddo
           enddo
-          write (20) lf
+          write (unit) lf
          enddo
         elseif (store%frame_sumscalars>0.and.computescalars>0) then
-          write (20) "SCALARS ", "scalar" , " float",lf
-          write (20) "LOOKUP_TABLE default",lf
-          do k=mink,maxk
-           do j=minj,maxj
-            do i=mini,maxi
+          write (unit) "SCALARS ", "scalar" , " float",lf
+          write (unit) "LOOKUP_TABLE default",lf
+          do k = mink,maxk
+           do j = minj,maxj
+            do i = mini,maxi
              if (Prtype(i,j,k)==0) then
-              write (20) BigEnd(real(SUM(SCALAR(i,j,k,:)),SNG))
+              write (unit) BigEnd(real(SUM(SCALAR(i,j,k,:)),SNG))
              else
-              write (20) BigEnd(0._SNG)
+              write (unit) BigEnd(0._SNG)
              endif
             enddo
            enddo
           enddo
-          write (20) lf
+          write (unit) lf
         endif
 
         if (store%frame_T>0) then
          if (buoyancy>0) then
-          write (20) "SCALARS temperature float",lf
-          write (20) "LOOKUP_TABLE default",lf
-          do k=mink,maxk
-           do j=minj,maxj
-            do i=mini,maxi
+          write (unit) "SCALARS temperature float",lf
+          write (unit) "LOOKUP_TABLE default",lf
+          do k = mink,maxk
+           do j = minj,maxj
+            do i = mini,maxi
              if (Prtype(i,j,k)==0) then
-              write (20) BigEnd(real(Temperature(i,j,k),SNG))
+              write (unit) BigEnd(real(Temperature(i,j,k),SNG))
              else
-              write (20) BigEnd(real(temperature_ref,SNG))
+              write (unit) BigEnd(real(temperature_ref,SNG))
              endif
             enddo
            enddo
           enddo
-          write (20) lf
+          write (unit) lf
          endif
         endif
 
         if (buoyancy==1.and.store%frame_tempfl>0) then
-          write (20) "SCALARS tempfl float", lf
-          write (20) "LOOKUP_TABLE default", lf
-          do k=mink,maxk
-           do j=minj,maxj
-            do i=mini,maxi
+          write (unit) "SCALARS tempfl float", lf
+          write (unit) "LOOKUP_TABLE default", lf
+          do k = mink,maxk
+           do j = minj,maxj
+            do i = mini,maxi
              if (Prtype(i,j,k)==0) then
-              write (20) BigEnd(real(ScalarVerticalFlux(i,j,k,Temperature,W),SNG))
+              write (unit) BigEnd(real(ScalarVerticalFlux(i,j,k,Temperature,W),SNG))
              else
-              write (20) BigEnd(0._SNG)
+              write (unit) BigEnd(0._SNG)
              endif
             enddo
            enddo
           enddo
-          write (20) lf
+          write (unit) lf
         endif
 
         if (store%frame_scalfl>0) then
           if (store%frame_scalars>0) then
             scalname(1:6)="scalfl"
-            do l=1,computescalars
+            do l = 1,computescalars
               write(scalname(7:8),"(I2.2)") l
-              write (20) "SCALARS ", scalname , " float", lf
-              write (20) "LOOKUP_TABLE default", lf
-              do k=mink,maxk
-               do j=minj,maxj
-                do i=mini,maxi
+              write (unit) "SCALARS ", scalname , " float", lf
+              write (unit) "LOOKUP_TABLE default", lf
+              do k = mink,maxk
+               do j = minj,maxj
+                do i = mini,maxi
                  if (Prtype(i,j,k)==0) then
-                  write (20) BigEnd(real(ScalarVerticalFlux(i,j,k,Scalar(:,:,:,l),W),SNG))
+                  write (unit) BigEnd(real(ScalarVerticalFlux(i,j,k,Scalar(:,:,:,l),W),SNG))
                  else
-                  write (20) BigEnd(0._SNG)
+                  write (unit) BigEnd(0._SNG)
                  endif
                 enddo
                enddo
               enddo
-              write (20) lf
+              write (unit) lf
             enddo
           elseif (store%frame_sumscalars>0.and.computescalars>0) then
-            write (20) "SCALARS scalfl float", lf
-            write (20) "LOOKUP_TABLE default", lf
-            do k=mink,maxk
-             do j=minj,maxj
-              do i=mini,maxi
+            write (unit) "SCALARS scalfl float", lf
+            write (unit) "LOOKUP_TABLE default", lf
+            do k = mink,maxk
+             do j = minj,maxj
+              do i = mini,maxi
                if (Prtype(i,j,k)==0) then
-                write (20) BigEnd(real(ScalarVerticalFlux(i,j,k,SUM(Scalar(:,:,:,:),4),W),SNG))
+                write (unit) BigEnd(real(ScalarVerticalFlux(i,j,k,SUM(Scalar(:,:,:,:),4),W),SNG))
                else
-                write (20) BigEnd(0._SNG)
+                write (unit) BigEnd(0._SNG)
                endif
               enddo
              enddo
             enddo
-            write (20) lf
+            write (unit) lf
           endif
         endif
 
         if (store%frame_U>0) then
-         write (20) "VECTORS u float",lf
-         do k=mink,maxk
-          do j=minj,maxj
-           do i=mini,maxi
+         write (unit) "VECTORS u float",lf
+         do k = mink,maxk
+          do j = minj,maxj
+           do i = mini,maxi
             if (Prtype(i,j,k)==0) then
-             write (20) BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG)),BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG))&
+             write (unit) BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG)),BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG))&
               ,BigEnd(real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG))
             else
-             write (20) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
+             write (unit) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
             endif
            enddo
           enddo
          enddo
-         write (20) lf
+         write (unit) lf
         endif
 
         if (store%frame_vort>0) then
-         write (20) "VECTORS vort float",lf
-         do k=mink,maxk
-          do j=minj,maxj
-           do i=mini,maxi
+         write (unit) "VECTORS vort float",lf
+         do k = mink,maxk
+          do j = minj,maxj
+           do i = mini,maxi
             if (Prtype(i,j,k)==0) then
-             write (20) BigEnd(real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+             write (unit) BigEnd(real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                              -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG)),&
                           BigEnd(real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
                             -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG)),&
                           BigEnd(real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
                             -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin),SNG))
             else
-             write (20) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
+             write (unit) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
             endif
            enddo
           enddo
          enddo
         endif
-        close(20)
+        close(unit)
 
       endif !textvtk/binaryvtk
     enddo   !frame_domains
+    !$omp end parallel do
   end subroutine FRAME
 
 
@@ -1959,30 +1926,30 @@ contains
   real(KND) :: Str(1:3,1:3)
   real(KND),allocatable,save ::fp(:),ht(:),gp(:)
   integer   :: i,j,k,l,n
-  integer,save :: called=0
+  integer,save :: called = 0
 
-    do k=0,Unz+1
-     S=0
-     n=0
-     do j=1,Uny
-      do i=1,Unx
+    do k = 0,Unz+1
+     S = 0
+     n = 0
+     do j = 1,Uny
+      do i = 1,Unx
        if (Utype(i,j,k)==0) then
-        S=S+U(i,j,k)
-        n=n+1
+        S = S+U(i,j,k)
+        n = n+1
        endif
       enddo
      enddo
      profU(k)=S/max(n,1)
     enddo
 
-    do k=1,Vnz+1
-     S=0
-     n=0
-     do j=1,Vny
-      do i=1,Vnx
+    do k = 1,Vnz+1
+     S = 0
+     n = 0
+     do j = 1,Vny
+      do i = 1,Vnx
        if (Vtype(i,j,k)==0) then
-        S=S+V(i,j,k)
-        n=n+1
+        S = S+V(i,j,k)
+        n = n+1
        endif
       enddo
      enddo
@@ -1990,14 +1957,14 @@ contains
     enddo
 
     if (present(temperature)) then
-     do k=1,Prnz
-      S=0
-      n=0
-      do j=1,Prny
-       do i=1,Prnx
+     do k = 1,Prnz
+      S = 0
+      n = 0
+      do j = 1,Prny
+       do i = 1,Prnx
         if (Prtype(i,j,k)==0) then
-         S=S+temperature(i,j,k)
-         n=n+1
+         S = S+temperature(i,j,k)
+         n = n+1
         endif
        enddo
       enddo
@@ -2006,15 +1973,15 @@ contains
     endif
 
     if (present(scalar)) then
-     do l=1,computescalars
-      do k=1,Prnz
-       S=0
-       n=0
-       do j=1,Prny
-        do i=1,Prnx
+     do l = 1,computescalars
+      do k = 1,Prnz
+       S = 0
+       n = 0
+       do j = 1,Prny
+        do i = 1,Prnx
          if (Prtype(i,j,k)==0) then
-          S=S+scalar(i,j,k,l)
-          n=n+1
+          S = S+scalar(i,j,k,l)
+          n = n+1
          endif
         enddo
        enddo
@@ -2025,103 +1992,103 @@ contains
 
     if (called==0) then
      allocate(fp(0:Prnx+1),ht(0:Prnz+1),gp(0:Prny+1))
-     forall (i=0:Prnx+1)      fp(i)=(xU(i)-xPr(i))/(xPr(i+1)-xPr(i))
-     forall (k=0:Prnz+1)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
-     forall (j=0:Prny+1)      gp(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
+     forall (i = 0:Prnx+1)      fp(i)=(xU(i)-xPr(i))/(xPr(i+1)-xPr(i))
+     forall (k = 0:Prnz+1)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
+     forall (j = 0:Prny+1)      gp(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
     endif
 
-    do k=0,Prnz
-     S=0
-     n=0
-     do j=1,Uny
-      do i=1,Unx
+    do k = 0,Prnz
+     S = 0
+     n = 0
+     do j = 1,Uny
+      do i = 1,Unx
        if ((Utype(i,j,k+1)==0.or.Utype(i,j,k)==0).and.(Wtype(i+1,j,k)==0.or.Wtype(i,j,k)==0)) then
-        S=S+((ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))-((1-ht(k))*profU(k)+ht(k)*profU(k+1)))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))
-        n=n+1
+        S = S+((ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))-((1-ht(k))*profU(k)+ht(k)*profU(k+1)))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))
+        n = n+1
        endif
       enddo
      enddo
      profuw(k)=S/max(n,1)
     enddo
 
-    do k=0,Prnz
-     S=0
-     n=0
-     do j=1,Vny
-      do i=1,Vnx
+    do k = 0,Prnz
+     S = 0
+     n = 0
+     do j = 1,Vny
+      do i = 1,Vnx
        if ((Vtype(i,j,k+1)==0.or.Vtype(i,j,k)==0).and.(Wtype(i,j+1,k)==0.or.Wtype(i,j,k)==0)) then
-        S=S+(ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)-(ht(k)*profV(k+1)+(1-ht(k))*profV(k)))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))
-        n=n+1
+        S = S+(ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)-(ht(k)*profV(k+1)+(1-ht(k))*profV(k)))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))
+        n = n+1
        endif
       enddo
      enddo
      profvw(k)=S/max(n,1)
     enddo
 
-    do k=0,Prnz
-     S=0
-     n=0
-     do j=1,Uny
-      do i=1,Unx
+    do k = 0,Prnz
+     S = 0
+     n = 0
+     do j = 1,Uny
+      do i = 1,Unx
        if (Utype(i,j,k+1)==0.or.Utype(i,j,k)==0) then
-        S=S-0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)
-        n=n+1
+        S = S-0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)
+        n = n+1
        endif
       enddo
      enddo
      profuwsgs(k)=S/max(n,1)
     enddo
 
-    do k=0,Prnz
-     S=0
-     n=0
-     do j=1,Vny
-      do i=1,Vnx
+    do k = 0,Prnz
+     S = 0
+     n = 0
+     do j = 1,Vny
+      do i = 1,Vnx
        if (Vtype(i,j,k+1)==0.or.Vtype(i,j,k)==0) then
-        S=S-0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)
-        n=n+1
+        S = S-0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)
+        n = n+1
        endif
       enddo
      enddo
      profvwsgs(k)=S/max(n,1)
     enddo
 
-    do k=1,Unz
-     S=0
-     n=0
-     do j=1,Uny
-      do i=1,Unx
+    do k = 1,Unz
+     S = 0
+     n = 0
+     do j = 1,Uny
+      do i = 1,Unx
        if (Utype(i,j,k)==0) then
-        S=S+(U(i,j,k)-profU(k))**2
-        n=n+1
+        S = S+(U(i,j,k)-profU(k))**2
+        n = n+1
        endif
       enddo
      enddo
      profuu(k)=S/max(n,1)
     enddo
 
-    do k=1,Vnz
-     S=0
-     n=0
-     do j=1,Vny
-      do i=1,Vnx
+    do k = 1,Vnz
+     S = 0
+     n = 0
+     do j = 1,Vny
+      do i = 1,Vnx
        if (Vtype(i,j,k)==0) then
-        S=S+(V(i,j,k)-profV(k))**2
-        n=n+1
+        S = S+(V(i,j,k)-profV(k))**2
+        n = n+1
        endif
       enddo
      enddo
      profvv(k)=S/max(n,1)
     enddo
 
-    do k=0,Wnz
-     S=0
-     n=0
-     do j=1,Wny
-      do i=1,Wnx
+    do k = 0,Wnz
+     S = 0
+     n = 0
+     do j = 1,Wny
+      do i = 1,Wnx
        if (Wtype(i,j,k)==0) then
-        S=S+(W(i,j,k))**2
-        n=n+1
+        S = S+(W(i,j,k))**2
+        n = n+1
        endif
       enddo
      enddo
@@ -2129,42 +2096,42 @@ contains
     enddo
 
     if (present(temperature)) then
-     do k=0,Prnz
-      S=0
-      n=0
-      do j=1,Prny
-       do i=1,Prnx
+     do k = 0,Prnz
+      S = 0
+      n = 0
+      do j = 1,Prny
+       do i = 1,Prnx
         if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
-         S=S+0.5_KND*(temperature(i,j,k+1)+temperature(i,j,k))*(W(i,j,k))
-         n=n+1
+         S = S+0.5_KND*(temperature(i,j,k+1)+temperature(i,j,k))*(W(i,j,k))
+         n = n+1
         endif
        enddo
       enddo
       proftempfl(k)=S/max(n,1)
      enddo
 
-     do k=1,Prnz
-      S=0
-      n=0
-      do j=1,Prny
-       do i=1,Prnx
+     do k = 1,Prnz
+      S = 0
+      n = 0
+      do j = 1,Prny
+       do i = 1,Prnx
         if (Prtype(i,j,k)==0) then
-         S=S+(temperature(i,j,k)-profTemp(k))**2
-         n=n+1
+         S = S+(temperature(i,j,k)-profTemp(k))**2
+         n = n+1
         endif
        enddo
       enddo
       proftt(k)=S/max(n,1)
      enddo
 
-     do k=0,Prnz
-      S=0
-      n=0
-      do j=1,Prny
-       do i=1,Prnx
+     do k = 0,Prnz
+      S = 0
+      n = 0
+      do j = 1,Prny
+       do i = 1,Prnx
         if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
-          S=S-(0.5_KND*(TDiff(i,j,k+1)+TDiff(i,j,k))*(temperature(i,j,k+1)-temperature(i,j,k)))/dzW(k)
-          n=n+1
+          S = S-(0.5_KND*(TDiff(i,j,k+1)+TDiff(i,j,k))*(temperature(i,j,k+1)-temperature(i,j,k)))/dzW(k)
+          n = n+1
         endif
        enddo
       enddo
@@ -2174,43 +2141,43 @@ contains
 
 
     if (present(scalar)) then
-     do l=1,computescalars
-      do k=0,Prnz
-       S=0
-       n=0
-       do j=1,Prny
-        do i=1,Prnx
+     do l = 1,computescalars
+      do k = 0,Prnz
+       S = 0
+       n = 0
+       do j = 1,Prny
+        do i = 1,Prnx
          if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
-          S=S+0.5_KND*(scalar(i,j,k+1,l)+scalar(i,j,k,l))*(W(i,j,k))
-          n=n+1
+          S = S+0.5_KND*(scalar(i,j,k+1,l)+scalar(i,j,k,l))*(W(i,j,k))
+          n = n+1
          endif
         enddo
        enddo
        profscalfl(l,k)=S/max(n,1)
       enddo
 
-      do k=1,Prnz
-       S=0
-       n=0
-       do j=1,Prny
-        do i=1,Prnx
+      do k = 1,Prnz
+       S = 0
+       n = 0
+       do j = 1,Prny
+        do i = 1,Prnx
          if (Prtype(i,j,k)==0) then
-          S=S+(scalar(i,j,k,l)-profscal(l,k))**2
-          n=n+1
+          S = S+(scalar(i,j,k,l)-profscal(l,k))**2
+          n = n+1
          endif
         enddo
        enddo
        profss(l,k)=S/max(n,1)
       enddo
 
-      do k=0,Prnz
-       S=0
-       n=0
-       do j=1,Prny
-        do i=1,Prnx
+      do k = 0,Prnz
+       S = 0
+       n = 0
+       do j = 1,Prny
+        do i = 1,Prnx
          if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
-           S=S-(0.5_KND*(TDiff(i,j,k+1)+TDiff(i,j,k))*(scalar(i,j,k+1,l)-scalar(i,j,k,l)))/dzW(k)
-           n=n+1
+           S = S-(0.5_KND*(TDiff(i,j,k+1)+TDiff(i,j,k))*(scalar(i,j,k+1,l)-scalar(i,j,k,l)))/dzW(k)
+           n = n+1
          endif
         enddo
        enddo
@@ -2219,7 +2186,7 @@ contains
      enddo
     endif ! present(scalar)
 
-    called=1
+    called = 1
   end subroutine BLProfiles
 
 
@@ -2227,20 +2194,20 @@ contains
   real(KND),dimension(-2:,-2:,-2:) :: U,V,W
   real(KND) Um,Vm,Wm
   integer i,j,k
-   TotKE=0
-   Um=0
-   Vm=0
-   Wm=0
-   do k=1,Prnz
-    do j=1,Prny
-     do i=1,Prnx
-      TotKE=TotKE+(((U(i-1,j,k)+U(i,j,k))/2._KND-Um)**2+&
+   TotKE = 0
+   Um = 0
+   Vm = 0
+   Wm = 0
+   do k = 1,Prnz
+    do j = 1,Prny
+     do i = 1,Prnx
+      TotKE = TotKE+(((U(i-1,j,k)+U(i,j,k))/2._KND-Um)**2+&
                     ((V(i,j-1,k)+V(i,j,k))/2._KND-Vm)**2+&
                     ((W(i,j,k-1)+W(i,j,k))/2._KND-Wm)**2)
      enddo
     enddo
    enddo
-   TotKE=TotKE*lx*lz*lz/2
+   TotKE = TotKE*lx*lz*lz/2
   end function TotKE
 
   pure real(KND) function VorticityMag(i,j,k,U,V,W) result(res)
@@ -2305,9 +2272,9 @@ contains
 
   write (11,"(A)") "SCALARS U float"
   write (11,"(A)") "LOOKUP_TABLE default"
-  do k=1,Unz
-   do j=1,Uny
-    do i=1,Unx
+  do k = 1,Unz
+   do j = 1,Uny
+    do i = 1,Unx
       write (11,*) U(i,j,k)
     enddo
    enddo
@@ -2343,9 +2310,9 @@ contains
 
   write (11,"(A)") "SCALARS V float"
   write (11,"(A)") "LOOKUP_TABLE default"
-  do k=1,Vnz
-   do j=1,Vny
-    do i=1,Vnx
+  do k = 1,Vnz
+   do j = 1,Vny
+    do i = 1,Vnx
       write (11,*) V(i,j,k)
     enddo
    enddo
@@ -2382,9 +2349,9 @@ contains
 
   write (11,"(A)") "SCALARS W float"
   write (11,"(A)") "LOOKUP_TABLE default"
-  do k=1,Wnz
-   do j=1,Wny
-    do i=1,Wnx
+  do k = 1,Wnz
+   do j = 1,Wny
+    do i = 1,Wnx
       write (11,*) W(i,j,k)
     enddo
    enddo
@@ -2399,7 +2366,7 @@ contains
   real(KND),dimension(-2:,-2:,-2:) :: U,V,W
   integer i,j,k
   integer,save ::fnum
-  integer,save :: called=0
+  integer,save :: called = 0
 
    if ((time>=timefram1).and.(time<=timefram2+(timefram2-timefram1)/(frames-1))&
        .and.(time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
@@ -2409,15 +2376,15 @@ contains
      write(101) Vny
      write(101) Wnz
      write(101) dxPr(0)
-     called=1
-     fnum=0
+     called = 1
+     fnum = 0
     endif
-    fnum=fnum+1
+    fnum = fnum+1
     write(101) time-timefram1
     call OUTINLETFRAME(U,V,W,fnum)
    elseif (time>timefram2+(timefram2-timefram1)/(frames-1).and.called==1) then
      close(101)
-     called=2
+     called = 2
    endif
 
   end subroutine OUTINLET
@@ -2430,11 +2397,11 @@ contains
     integer mini,maxi,minj,maxj,mink,maxk
 
     call Gridcoords(mini,minj,mink,store%frame_domains(1)%position,(yV(Prny+1)+yV(0))/2._KND,(zW(Prnz+1)+zW(0))/2._KND)
-    maxi=mini
-    minj=1
-    maxj=Prny
-    mink=1
-    maxk=Prnz
+    maxi = mini
+    minj = 1
+    maxj = Prny
+    mink = 1
+    maxk = Prnz
 
 
     fname(1:5)="frame"
@@ -2442,7 +2409,7 @@ contains
     fname(9:12)=".unf"
     write(*,*) "Saving frame:",fname(1:6),"   time:",time
 
-    open(11,file=fname,form='unformatted',access='sequential',status='replace',action='write')
+    open(11,file = fname,form='unformatted',access='sequential',status='replace',action='write')
 
 
     write(11) U(mini,1:Uny,1:Unz)
@@ -2474,26 +2441,145 @@ contains
 
   real(SNG) function BigEnd(x)
   real(SNG),intent(in)::x
-  integer,save:: called=0
+  integer,save:: called = 0
   logical,save:: littleendian !endianess of the machine
   integer(selected_int_kind(1)),dimension(4):: bytes !may not work on some processors
 
     if (called==0) then
-      bytes=transfer(1,bytes,4)
+      bytes = transfer(1,bytes,4)
       if (bytes(4)==1) then
        littleendian=.false.
       else
        littleendian=.true.
       endif
-      called=1
+      called = 1
     endif
 
     if (.not.littleendian) then
-     BigEnd=x
+     BigEnd = x
     else
-     bytes=transfer(x,bytes,4)
-     BigEnd=transfer(bytes(4:1:-1),x)
+     bytes = transfer(x,bytes,4)
+     BigEnd = transfer(bytes(4:1:-1),x)
     endif
   end function BigEnd
 
 end module OUTPUTS
+
+
+module vtkarray
+ !Simple module to output arrays for visualization. No physical coordinates are used, only the position in the array.
+ !Mostly only for debugging.
+
+!   use iso_fortran_env, only: real32, real64
+  implicit none
+
+  integer,parameter :: real32=selected_real_kind(p=6,r=37)
+  integer,parameter :: real64=selected_real_kind(p=15,r=200)
+
+  interface VtkArraySimple
+    module procedure SVtkArraySimple
+    module procedure DVtkArraySimple
+  end interface
+
+  contains
+
+    subroutine SVtkArraySimple(fname,A)
+      character(len=*)                 :: fname
+      real(real32),dimension(1:,1:,1:) :: A
+      integer                          :: nx,ny,nz
+      integer                          :: i,j,k
+      character(len=40)                :: str
+
+      nx=Ubound(A,1)
+      ny=Ubound(A,2)
+      nz=Ubound(A,3)
+
+      open(11,file=fname)
+      write (11,"(A)") "# vtk DataFile Version 2.0"
+      write (11,"(A)") "CLMM output file"
+      write (11,"(A)") "ASCII"
+      write (11,"(A)") "DATASET RECTILINEAR_GRID"
+      str="DIMENSIONS"
+      write (str(12:),'(i0,1x,i0,1x,i0)') nx,ny,nz
+      write (11,"(A)") trim(str)
+      str="X_COORDINATES"
+      write (str(15:),'(i5,2x,a)') nx,"float"
+      write (11,"(A)") str
+      write (11,*) (i, i=1,nx)
+      str="Y_COORDINATES"
+      write (str(15:),'(i5,2x,a)') ny,"float"
+      write (11,"(A)") trim(str)
+      write (11,*) (i, i=1,ny)
+      str="Z_COORDINATES"
+      write (str(15:),'(i5,2x,a)') nz,"float"
+      write (11,"(A)") trim(str)
+      write (11,*) (i, i=1,nz)
+      str="POINT_DATA"
+      write (str(12:),*) nx*ny*nz
+      write (11,"(A)") trim(str)
+
+
+      write (11,"(A)") "SCALARS array float"
+      write (11,"(A)") "LOOKUP_TABLE default"
+      do k=1,nz
+       do j=1,ny
+        do i=1,nx
+          write (11,*) A(i,j,k)
+        enddo
+        enddo
+      enddo
+      write (11,*)
+
+    end subroutine SVtkArraySimple
+
+    subroutine DVtkArraySimple(fname,A)
+      character(len=*)                 :: fname
+      real(real64),dimension(1:,1:,1:) :: A
+      integer                          :: nx,ny,nz
+      integer                          :: i,j,k
+      character(len=40)                :: str
+
+      nx=Ubound(A,1)
+      ny=Ubound(A,2)
+      nz=Ubound(A,3)
+
+      open(11,file=fname)
+      write (11,"(A)") "# vtk DataFile Version 2.0"
+      write (11,"(A)") "CLMM output file"
+      write (11,"(A)") "ASCII"
+      write (11,"(A)") "DATASET RECTILINEAR_GRID"
+      str="DIMENSIONS"
+      write (str(12:),'(i0,1x,i0,1x,i0)') nx,ny,nz
+      write (11,"(A)") trim(str)
+      str="X_COORDINATES"
+      write (str(15:),'(i5,2x,a)') nx,"float"
+      write (11,"(A)") str
+      write (11,*) (i, i=1,nx)
+      str="Y_COORDINATES"
+      write (str(15:),'(i5,2x,a)') ny,"float"
+      write (11,"(A)") trim(str)
+      write (11,*) (i, i=1,ny)
+      str="Z_COORDINATES"
+      write (str(15:),'(i5,2x,a)') nz,"float"
+      write (11,"(A)") trim(str)
+      write (11,*) (i, i=1,nz)
+      str="POINT_DATA"
+      write (str(12:),*) nx*ny*nz
+      write (11,"(A)") trim(str)
+
+
+      write (11,"(A)") "SCALARS array float"
+      write (11,"(A)") "LOOKUP_TABLE default"
+      do k=1,nz
+       do j=1,ny
+        do i=1,nx
+          write (11,*) A(i,j,k)
+        enddo
+        enddo
+      enddo
+      write (11,*)
+
+    end subroutine DVtkArraySimple
+end module vtkarray
+
+

@@ -6,7 +6,8 @@ use PARAMETERS
 implicit none
 
  private
- public WMPoint, AddWMPoint, FirstWMPoint, ComputeViscsWM, DeallWMP, InitTempFl
+ public WMPoint, AddWMPoint, FirstWMPoint, ComputeViscsWM, MoveWMPointsToArray,&
+        InitTempFl, GroundDeposition, GroundUstar
 
  type WMpoint   !points in which we apply wall model
 
@@ -34,25 +35,168 @@ implicit none
 
  type(WMpoint),pointer::FirstWMPoint=>null(), LastWMPoint=>null()
 
+ type(WMPoint),dimension(:),allocatable :: WMPoints
+
+ interface assignment(=)
+   module procedure WMPtoWMP
+ end interface
 
  contains
+
+
+  subroutine WMPtoWMP(ToWMP,FromWMP)
+    type(WMPoint),intent(out) :: ToWMP
+    type(WMPoint),intent(in)  :: FromWMP
+
+    ToWMP%xi = FromWMP%xi
+    ToWMP%yj = FromWMP%yj
+    ToWMP%zk = FromWMP%zk
+
+    ToWMP%distx = FromWMP%distx
+    ToWMP%disty = FromWMP%disty
+    ToWMP%distz = FromWMP%distz
+
+    ToWMP%z0     = FromWMP%z0
+    ToWMP%ustar  = FromWMP%ustar
+    ToWMP%temp   = FromWMP%temp
+    ToWMP%tempfl = FromWMP%tempfl
+    ToWMP%wallu  = FromWMP%wallu
+    ToWMP%wallv  = FromWMP%wallv
+    ToWMP%wallw  = FromWMP%wallw
+
+    allocate(ToWMP%depscalar(size(FromWMP%depscalar)))
+
+    ToWMP%depscalar = FromWMP%depscalar
+
+  end subroutine WMPtoWMP
 
 
   subroutine AddWMpoint(WMP)
   type(WMpoint),intent(in):: WMP
 
    if (.not.associated(LastWMPoint)) then
+
     allocate(FirstWMPoint)
-    if (computedeposition>0) allocate(FirstWMPoint%depscalar(SIZE(WMP%depscalar,1)))
+
+    if (computedeposition>0) then
+      allocate( FirstWMPoint%depscalar(size(WMP%depscalar)) )
+      FirstWMPoint%depscalar = 0
+    endif
+
     FirstWMPoint=WMP
     LastWMPoint=>FirstWMPoint
+
    else
+
     allocate(LastWMPoint%next)
-    if (computedeposition>0) allocate(LastWMPoint%next%depscalar(SIZE(WMP%depscalar,1)))
+
+    if (computedeposition>0) then
+      allocate( LastWMPoint%next%depscalar(size(WMP%depscalar)) )
+      LastWMPoint%next%depscalar = 0
+    endif
+
     LastWMPoint%next=WMP
     LastWMPoint=>LastWMPoint%next
+
    endif
   endsubroutine AddWMPoint
+
+
+  subroutine WMPoint_DeallocateList(WMP)
+    type(WMPoint),pointer,intent(inout) :: WMP
+    type(WMPoint),pointer :: Aux,Aux2
+
+    if (.not.associated(WMP)) return
+
+    Aux => WMP
+
+    do
+      if (allocated(Aux%depscalar)) deallocate(Aux%depscalar)
+      if (associated(Aux%next)) then
+        Aux => Aux%next
+      else
+        exit
+      endif
+    enddo
+
+
+    Aux =>WMP
+
+    do
+
+      if (associated(Aux%next)) then
+        Aux2 => Aux%next
+      else
+        Aux2 => null()
+      endif
+
+      deallocate(Aux)
+
+      if (associated(Aux2)) then
+        Aux => Aux2
+      else
+        exit
+      endif
+
+    enddo
+
+    WMP => null()
+
+  end subroutine WMPoint_DeallocateList
+
+
+
+  subroutine MoveWMPointsToArray
+    type(WMPoint),pointer :: CurrentWMPoint
+    integer :: i,nWMPoints
+
+    NWMPoints = 0
+
+
+    CurrentWMPoint => FirstWMPoint
+    do
+     if (associated(CurrentWMPoint)) then
+       NWMPoints = NWMPoints + 1
+     else
+       exit
+     endif
+     CurrentWMPoint => CurrentWMPoint%next
+    enddo
+
+
+    allocate(WMPoints(NWMPoints))
+
+
+    CurrentWMPoint => FirstWMPoint
+    i = 0
+    do
+     if (associated(CurrentWMPoint)) then
+       i = i + 1
+       WMPoints(i) = CurrentWMPoint
+     else
+       exit
+     endif
+     CurrentWMPoint => CurrentWMPoint%next
+    enddo
+
+
+    call WMPoint_DeallocateList(FirstWMPoint)
+
+  end subroutine MoveWMPointsToArray
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   real(KND) function WM1ustar(vel,dist,ustar0,dp,dptrans)
    real(KND),parameter :: eps=1e-4_KND
@@ -79,7 +223,7 @@ implicit none
       ustar2=ustar
       ustar=vel/(log(abs(ustar2*dist*Re))/0.41_KND+5.2_KND)
       if  (abs(ustar-ustar2)/abs(ustar)<eps) exit
-      if (i>=25) then
+      if (i>=50) then
                   ustar=0
                   exit
       endif
@@ -105,7 +249,7 @@ implicit none
       ustar2=ustar
       ustar=vel*(1._KND-Re*dp/0.41_KND)/(log(abs(ustar2*dist*Re))/0.41_KND+5.2_KND)
       if  (abs(ustar-ustar2)/abs(ustar)<eps) exit
-      if (i>=25) then
+      if (i>=50) then
                   ustar=0
                   exit
       endif
@@ -271,14 +415,14 @@ implicit none
   endfunction PsiH_MO
 
 
-  pure real(KND) function Obukhov_zL(ustar,tempfl,tempref,g,z)
+ pure real(KND) function Obukhov_zL(ustar,tempfl,tempref,g,z)
    real(KND),intent(in):: ustar,tempfl,tempref,g,z
 
    Obukhov_zL=z*(0.4_KND*(g/tempref)*tempfl)/(-ustar**3)
   endfunction Obukhov_zL
 
   real(KND) function WM_MO_FLUX_ustar(vel,dist,ustar0,z0,tempflux)
-   real(KND),parameter:: eps=1e-5
+   real(KND),parameter:: eps=1e-3
    real(KND),parameter:: yplcrit=11.225_KND
    real(KND),intent(in):: vel,dist,ustar0,z0,tempflux
    real(KND) ustar,ustar2,zL,Psi
@@ -287,35 +431,61 @@ implicit none
    if (dist<=z0) then
 
     if (Re>0) then
+
      if ((dist*ustar0*Re)<yplcrit) then
        ustar=sqrt(vel/(dist*Re))
      else
        ustar=vel/(log(abs(ustar0*dist*Re))/0.4_KND+5.2_KND)
      endif
+
     else
+
      stop "ERROR: The wall model needs positive viscosity under roughness length."
+
     endif
 
    else
+
     ustar=ustar0
     i=0
     zL=0
     Psi=0
+
     do
-    i=i+1
+     i=i+1
      ustar2=ustar
-     ustar=max(vel*0.4_KND/(log(dist/z0)-Psi),0._KND)
-     if (ustar<tiny(1._KND)*1000) then
+
+     if (((dist/z0)-Psi)<1E-5) then
+       write(*,*) "i", i
+       write(*,*) vel,dist,ustar0,z0,tempflux
+       write(*,*) Psi, "=", dist, "/", z0
+       STOP
+     endif
+
+     if (log((dist/z0)-Psi)<1E-5) then
+       write(*,*) "i", i
+       write(*,*) vel,dist,ustar0,z0,tempflux
+       write(*,*) Psi, "=", dist, "/", z0
+       STOP
+     endif
+
+     ustar=ustar+(max(vel*0.4_KND/(log(max((dist/z0)-Psi,1E-5))),0._KND)-ustar)/2
+
+     if (ustar<1E-4) then
       zL=-10000
      else
-      zL=Obukhov_zL(ustar,tempflux,temperature_ref,grav_acc,dist)
+      zL=zL+(Obukhov_zL(ustar,tempflux,temperature_ref,grav_acc,dist)-zL)/2
      endif
+
      Psi=PsiM_MO(zL)
+
      if  (abs(ustar-ustar2)/max(abs(ustar),1.e-3_KND)<eps) exit
-     if (i>=250) then
+
+     if (i>=50) then
                  ustar=0
                  exit
      endif
+
     enddo
 
    endif
@@ -325,7 +495,7 @@ implicit none
 
 
   subroutine WM_MO_DIRICHLET_ustar_tfl(vel,dist,z0,ustar,tempflux,tempdif)
-   real(KND),parameter:: eps=1e-5
+   real(KND),parameter:: eps=1e-3
    real(KND):: yplcrit=11.225
    real(KND) vel,dist,ustar,z0,tempflux,tempdif,ustar0,tempflux0,zL,zL0,Rib
    integer i
@@ -360,7 +530,7 @@ implicit none
        zL0=zL
        zL=Rib*(log(dist/z0)-PsiM_MO(zl))**2/(log(dist/z0)-PsiH_MO(zl))
        if  (abs(zL-zL0)/max(abs(zL),1.e-3_KND)<eps) exit
-       if (i>=250.or.zL>100) then
+       if (i>=50.or.zL>100) then
                    ustar=0
                    tempflux=0
                    return
@@ -578,22 +748,15 @@ implicit none
 
 
   subroutine InitTempFL
-   type(WMPoint),pointer:: WMP
+    integer i
 
-   if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
-    if (associated(FirstWMPoint)) then
-    WMP => FirstWMPoint
-    do
-     if (WMP%zk==1) WMP%tempfl=-TDiff(WMP%xi,WMP%yj,1)*&
-                    (temperature(WMP%xi,WMP%yj,1)-temperature(WMP%xi,WMP%yj,0))
-     if (associated(WMP%next)) then
-      WMP=>WMP%next
-     else
-      exit
-     endif
-    enddo
+    if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
+      do i=1,size(WMPoints)
+        if (WMPoints(i)%zk==1) WMPoints(i)%tempfl = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&
+                       (temperature(WMPoints(i)%xi,WMPoints(i)%yj,1) - temperature(WMPoints(i)%xi,WMPoints(i)%yj,0))
+      enddo
     endif
-   endif
+
   endsubroutine InitTempFL
 
 
@@ -602,31 +765,38 @@ implicit none
    real(KND),dimension(1:,1:,1:):: Pr
    type(WMPoint),pointer:: WMP
    integer i,j
-   real(DBL) t
+
+   !$omp parallel private(i,j)
 
    if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
-    do j=1,Prny
-     do i=1,Prnx
-      t=time+dt/2._KND
-      BsideTArr(i,j)=SurfTemperature(xPr(i),yPr(j),t)
-     enddo
-    enddo
+     !$omp do
+     do j=1,Prny
+       do i=1,Prnx
+         BsideTArr(i,j)=SurfTemperature(xPr(i),yPr(j), time+dt/2._TIM)
+       enddo
+      enddo
+     !$omp end do
    endif
 
-   if (associated(FirstWMPoint)) then
+   !$omp do
+   do i = 1,size(WMPoints)
 
-     WMP => FirstWMPoint
-     do
+      if (WMPoints(i)%z0>0) then
 
-      if (WMP%z0>0) then
+        if (buoyancy==1 .and. TBtype(Bo)==CONSTFLUX) then
 
-        if (buoyancy==1.and.TBtype(Bo)==CONSTFLUX) then
-          Visc(WMP%xi,WMP%yj,WMP%zk)=WM_MO_FLUX(WMP,U,V,W,Pr)
-        else if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
-         if (WMP%zk==1) WMP%temp=BsideTArr(WMP%xi,WMP%yj)
-         call WM_MO_DIRICHLET(Visc(WMP%xi,WMP%yj,WMP%zk),WMP,U,V,W,Pr)
+           Visc(WMPoints(i)%xi,WMPoints(i)%yj,WMPoints(i)%zk) = WM_MO_FLUX(WMPoints(i),U,V,W,Pr)
+
+        else if (buoyancy==1 .and. TBtype(Bo)==DIRICHLET) then
+
+          if (WMPoints(i)%zk==1) WMPoints(i)%temp = BsideTArr(WMPoints(i)%xi,WMPoints(i)%yj)
+
+          call WM_MO_DIRICHLET(Visc(WMPoints(i)%xi,WMPoints(i)%yj,WMPoints(i)%zk),WMPoints(i),U,V,W,Pr)
+
         else
-          Visc(WMP%xi,WMP%yj,WMP%zk)=WM2Visc(WMP,U,V,W,Pr)
+
+           Visc(WMPoints(i)%xi,WMPoints(i)%yj,WMPoints(i)%zk) = WM2Visc(WMPoints(i),U,V,W,Pr)
+
         endif
 
       else
@@ -634,38 +804,63 @@ implicit none
         if (Re<=0) then
          stop "The wall model requires positive viscosity or roughness length."
         endif
-        Visc(WMP%xi,WMP%yj,WMP%zk)=WM1Visc(WMP,U,V,W,Pr)
+
+        Visc(WMPoints(i)%xi,WMPoints(i)%yj,WMPoints(i)%zk) = WM1Visc(WMPoints(i),U,V,W,Pr)
+
       endif
 
-      if (associated(WMP%next)) then
-        WMP=>WMP%next
-      else
-        EXIT
-      endif
-
-     enddo
-
-   endif
+   enddo
+   !$omp end do
+   !$omp end parallel
 
    if (buoyancy==1.and. TBtype(Bo)==DIRICHLET) call Bound_tempfl(BsideTFLArr)
   endsubroutine ComputeViscsWM
 
+  pure real(KND) function GroundUstar()
+    if (any(WMPoints%zk == 1)) then
+      GroundUstar = sum(WMPoints%ustar, mask = (WMPoints%zk == 1)) / count(WMPoints%zk == 1)
+    else
+      GroundUstar = 0
+    endif
+  end function GroundUstar
+
+  pure real(KND) function TotalUstar()
+    if (size(WMPoints) > 0) then
+      TotalUstar = sum(WMPoints%ustar) / size(WMPoints%zk)
+    else
+      TotalUstar = 0
+    endif
+  end function TotalUstar
+
+  pure function GroundDeposition() result(depos)
+    real(KND), dimension(:) :: depos(1:Prnx,1:Prny,computescalars)
+
+    integer :: i, j
+
+    depos = 0
+
+    do j = 1, size(WMPoints)
+
+      if (allocated(WMPoints(j)%depscalar)) then
+
+        do i = 1, computescalars
+          depos(WMPoints(j)%xi,WMPoints(j)%yj,i) = depos(WMPoints(j)%xi,WMPoints(j)%yj,i) + WMPoints(j)%depscalar(i)
+        enddo
+
+      endif
+
+    enddo
+  endfunction GroundDeposition
 
 
-  real(KND) function SurfTemperature(x,y,t)
+
+  pure real(KND) function SurfTemperature(x,y,t)
    real(KND),intent(in):: x,y
-   real(DBL),intent(in):: t
+   real(TIM),intent(in):: t
 
    SurfTemperature=sideTemp(Bo)  ! Needs bet to allow time evolution somehow
   endfunction
 
-  recursive subroutine DeallWMP(WMP)
-   type(WMPoint),pointer:: WMP
-
-   if (associated(WMP%next)) call DeallWMP(WMP%next)
-   if (allocated(WMP%depscalar)) deallocate(WMP%depscalar)
-   deallocate(WMP)
-  endsubroutine DeallWMP
 
   real(KND) function LambertW(x)
    real(KND) x

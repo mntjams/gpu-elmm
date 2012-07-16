@@ -39,7 +39,7 @@ implicit none
   real(KND) :: Re,Prandtl !1/molecular viscosity, viscosity/thermal diffusivity
 
 
-  real(KND) :: prgradientx,prgradienty,temperature_ref,grav_acc,freetempgradient,coriolisparam
+  real(KND) :: prgradientx,prgradienty,temperature_ref,grav_acc,coriolisparam
 
   real(KND) :: SHEARG,Uinlet,ustarsurfin
 

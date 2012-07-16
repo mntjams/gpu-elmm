@@ -7,22 +7,179 @@ module SCALARS
 
 implicit none
   private
-  public Bound_Temp, Bound_Visc, Bound_PassScalar, Scalar, partdiam,partrho,percdistrib, AdvScalar,&
-     DiffScalar, Deposition, GravSettling, ComputeTDiff, Prt, Rig, VolScalSource
+  public Scalar, ScalarRK3, Prt, Rig, partdiam, partrho, percdistrib,&
+     Bound_Visc, Bound_Temp, Bound_PassScalar,&
+     TTemperatureProfileSection, TTemperatureProfile, TemperatureProfile,&
+     InitTemperatureProfile, InitTemperature
 
 
-  real(KND),allocatable,dimension(:,:,:,:) :: SCALAR  !last index is number of scalar (because of paging)
+  real(KND),allocatable,dimension(:,:,:,:) :: SCALAR  !last index is a number of scalar (because of paging)
   real(KND),dimension(:),allocatable :: partdiam,partrho,percdistrib !diameter of particles <=0 for gas
 
 
+  type TTemperatureProfileSection
+    real(KND) :: top, height
+    real(KND) :: jump
+    real(KND) :: gradient
+  end type TTemperatureProfileSection
+
+
+  type TTemperatureProfile
+    type(TTemperatureProfileSection), allocatable :: sections(:)
+    integer   :: randomize
+    real(KND) :: randomizeTop
+    real(KND) :: randomizeAmplitude
+  end type TTemperatureProfile
+
+  type(TTemperatureProfile) :: TemperatureProfile
+
 contains
+
+
+  subroutine ScalarRK3(U,V,W,Temperature,Scalar,RKstage)
+    real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(KND),intent(inout) :: Temperature(-1:,-1:,-1:),Scalar(-1:,-1:,-1:,-1:)
+    integer,intent(in)      :: RKstage
+
+    real(KND),dimension(:,:,:,:),allocatable,save ::Scalar_adv,Scalar_2
+    real(KND),dimension(:,:,:),allocatable,save   ::Temperature_adv,Temperature2
+
+    real(KND),dimension(1:3),parameter :: alpha = (/ 4._KND/15._KND, 1._KND/15._KND, 1._KND/6._KND /)
+    real(KND),dimension(1:3),parameter :: beta  = (/ 8._KND/15._KND, 5._KND/12._KND, 3._KND/4._KND /)
+    real(KND),dimension(1:3),parameter :: rho   = (/       0._KND, -17._KND/60._KND,-5._KND/12._KND/)
+
+    integer :: i
+    integer,save :: called = 0
+    logical,save :: released=.false.
+
+#ifdef __HMPP
+    integer iters
+    real(KND) res
+#endif
+
+    if (called==0) then
+      called = 1
+
+      allocate(Scalar_adv(lbound(Scalar,1):ubound(Scalar,1),lbound(Scalar,2):ubound(Scalar,2),&
+           lbound(Scalar,3):ubound(Scalar,3),lbound(Scalar,4):ubound(Scalar,4)))
+      allocate(Scalar_2(lbound(Scalar,1):ubound(Scalar,1),lbound(Scalar,2):ubound(Scalar,2),&
+           lbound(Scalar,3):ubound(Scalar,3),lbound(Scalar,4):ubound(Scalar,4)))
+
+      allocate(Temperature_adv(lbound(Temperature,1):ubound(Temperature,1),lbound(Temperature,2):ubound(Temperature,2),&
+           lbound(Temperature,3):ubound(Temperature,3)))
+      allocate(Temperature2(lbound(Temperature,1):ubound(Temperature,1),lbound(Temperature,2):ubound(Temperature,2),&
+           lbound(Temperature,3):ubound(Temperature,3)))
+    endif
+
+
+!     if (computescalars>0.and..not.released) call Release(Scalar,released)
+
+
+
+    if (RKstage == 1) then
+      temperature_adv = 0
+      Scalar_adv = 0
+    endif
+
+    if (computescalars>0) then
+
+      Scalar_2=0
+
+      if (RKstage>1) then
+        Scalar_2 = Scalar_2+Scalar_adv*rho(RKstage)
+      endif
+
+      Scalar_adv = 0
+      do i=1,computescalars
+        call AdvScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U,V,W,2,1._KND)
+      enddo
+
+      Scalar_2 = Scalar_2+Scalar_adv*beta(RKstage)
+
+      if (scalsourcetype==pointsource) then
+
+        do i=1,computescalars
+          Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i) = Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
+           percdistrib(i)*(rho(RKstage)+beta(RKstage))*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
+        enddo
+
+      elseif (scalsourcetype==volumesource) then
+
+        do i=1,computescalars
+          call VolScalSource(Scalar_2,rho(RKstage)+beta(RKstage))
+        enddo
+
+      endif
+
+      Scalar = Scalar+Scalar_2
+
+      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
+
+      call Bound_Visc(TDiff)
+
+      do i=1,computescalars
+         call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,2._KND*alpha(RKstage))
+      enddo
+
+      if (computedeposition>0) call Deposition(Scalar_2,2._KND*alpha(RKstage))
+
+      if (computegravsettling>0) call GravSettling(Scalar_2,2._KND*alpha(RKstage))
+
+      Scalar = Scalar_2
+
+    endif
+
+
+    if (buoyancy>0) then
+
+      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
+
+      call Bound_Visc(TDiff)
+
+      temperature2=0
+
+      call Bound_Temp(temperature)
+
+      if (RKstage>1) then
+        temperature2 = temperature2+temperature_adv*rho(RKstage)
+      endif
+
+      temperature_adv = 0
+      call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND)
+
+      temperature2 = temperature2+temperature_adv*beta(RKstage)
+
+      temperature = temperature+temperature2
+
+      call Bound_Temp(temperature)
+
+      if (GPU>0) then
+#ifdef __HMPP
+        !$hmpp DIFFSCALAR_GPU callsite
+        call DiffScalar_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
+                            ScalBtype,sideScal,TBtype,sideTemp,TempIn,BsideTFLArr,BsideTFLArr,TDiff,&
+                            temperature2,temperature,1,2._KND*alpha(RKstage),dt,iters,res)
+        write (*,*) "CNscalar ",iters,res
+#endif
+      else
+        call DiffScalar(temperature2,temperature,1,2._KND*alpha(RKstage))
+     endif
+
+      temperature = temperature2
+
+    endif
+
+  end subroutine ScalarRK3
+
+
+
 
   subroutine ADVSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
   real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
   real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in)      :: sctype
 
-   call KappaSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
+   call KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
 
   endsubroutine ADVSCALAR
 
@@ -1814,9 +1971,144 @@ contains
 !   if (buoyancy>0) then
 !    Prt = 0.8_KND+min(max(3._KND*Rig(i,j,k,U,V,temperature),0._KND),sqrt(huge(1._KND)))
 !   else
-   Prt = debugparam!0.6_KND
+   Prt = 0.6_KND
 !   endif
   endfunction Prt
+
+
+  subroutine InitTemperatureProfile(TempIn)
+    real(KND),intent(out) :: TempIn(-1:,-1:)
+    integer   :: SectionToUse(-1:ubound(TempIn,2))
+    integer   :: section,nSections,s
+    integer   :: i,j,k
+    real(KND) :: temp
+
+    nSections = size(TemperatureProfile%Sections)
+
+    if (nSections > 0) then
+
+       if (size(TemperatureProfile%Sections)>0) then
+         if (TemperatureProfile%Sections(1)%jump<=0) TemperatureProfile%Sections(1)%jump = temperature_ref
+       endif
+
+      TemperatureProfile%Sections(1)%height = TemperatureProfile%Sections(1)%top
+
+      do i = 2,nSections
+        if (TemperatureProfile%Sections(i)%top < TemperatureProfile%Sections(i-1)%top)&
+          TemperatureProfile%Sections(i)%top = TemperatureProfile%Sections(i-1)%top
+
+        TemperatureProfile%Sections(i)%height = TemperatureProfile%Sections(i)%top - TemperatureProfile%Sections(i-1)%top
+      enddo
+
+      if (TemperatureProfile%Sections(nSections)%top < zW(Prnz+2) )&
+          TemperatureProfile%Sections(nSections)%top = zW(Prnz+2)
+
+      section = 1
+
+      do k = -1, Prnz+2
+        do while (zPr(k) > TemperatureProfile%Sections(section)%top) !should be safe, because last top is adjusted above
+          section = section + 1
+        enddo
+        SectionToUse(k) = section
+      enddo
+
+    else
+
+      SectionToUse = 0
+
+    endif
+
+    do k=-1,Prnz+2
+
+      s = SectionToUse(k)
+
+      if (s==0) then
+
+        temp = temperature_ref
+
+      else
+
+        temp = 0
+
+        do i = 1, s-1
+          temp = temp + TemperatureProfile%Sections(i)%jump
+          temp = temp + TemperatureProfile%Sections(i)%height * TemperatureProfile%Sections(i)%gradient
+        enddo
+
+        temp = temp + TemperatureProfile%Sections(s)%jump
+
+        if (s>1) then
+          temp = temp + (zPr(k) - TemperatureProfile%Sections(s-1)%top) * TemperatureProfile%Sections(s)%gradient
+        else
+          temp = temp + zPr(k) * TemperatureProfile%Sections(s)%gradient
+        endif
+
+      endif
+
+      do j=-1,Prny+2
+          Tempin(j,k) = temp
+      enddo
+
+    enddo
+  end subroutine InitTemperatureProfile
+
+
+  subroutine InitTemperature(TempIn,Temperature)
+    real(KND),intent(out) :: TempIn(-1:,-1:)
+    real(KND),intent(out) :: Temperature(-1:,-1:,-1:)
+    real(KND) :: p_x,p_y,p_z,p
+    integer   :: i,j,k
+
+    if (TemperatureProfile%randomize==1) then
+
+!       p_x=0.5_KND
+!       p_y=0.5_KND
+!       p_z=0.5_KND
+
+      do k=0,Prnz+1
+
+!         if (zPr(k) <= TemperatureProfile%randomizeTop) then
+!           call RANDOM_NUMBER(p)
+!           p = p - 0.5
+!           p_z=(p_z+p)/2
+!         endif
+
+        do j=0,Prny+1
+
+!           if (zPr(k) <= TemperatureProfile%randomizeTop) then
+!             call RANDOM_NUMBER(p)
+!             p = p - 0.5
+!             p_y=(p_y+p)/2
+!           endif
+
+           do i=0,Prnx+1
+
+             if (zPr(k) <= TemperatureProfile%randomizeTop) then
+               call RANDOM_NUMBER(p)
+               p = p - 0.5
+!               p_x=(p_x+p)/2
+!               p=p_x+p_y+p_z
+             else
+               p=0
+             endif
+
+             Temperature(i,j,k)=Tempin(j,k) + TemperatureProfile%randomizeAmplitude * 2 * p
+
+           enddo
+        enddo
+      enddo
+
+    else
+
+      forall(i=0:Prnx+1) Temperature(i,:,:)=Tempin(:,:)
+
+    endif
+
+  end subroutine InitTemperature
+
+
+
+
 
 
   subroutine VolScalSource(Scal,coef)
@@ -1826,5 +2118,263 @@ contains
    include "customvolscalsource.f90"
   end subroutine VolScalSource
 
+
+
+!  !$hmpp <tsteps> ScalarConvection codelet
+ subroutine ScalarConvection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
+                       dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
+                       U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev,dt)
+  implicit none
+! #ifdef __HMPP
+!   integer,parameter :: KND = 4
+  intrinsic abs
+! #endif
+
+  integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,lev
+  real(KND),intent(in) :: dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref
+  real(KND),intent(in) :: dt
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out)   :: U2
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: Ustar
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)    :: V
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(out)   :: V2
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: Vstar
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)    :: W
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(out)   :: W2
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: Wstar
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: temperature
+  real(KND),dimension(1:3),intent(in) :: beta,rho
+  integer i,j,k
+
+
+
+
+  end subroutine ScalarConvection
+
+
+  subroutine Release(Scalar,released)
+    real(KND),intent(inout) :: Scalar(-1:,-1:,-1:,-1:)
+    logical,intent(inout)   :: released
+    real(KND) xc,yc,xs,xf,ys,yf,zs,zf,dxp,dyp,dzp,ct,cr,xp,yp,zp,p
+    integer i,j,k,xi,yj,zk,nprobx,nproby,nprobz
+    ct = 7
+    cr = 1.5
+    xc = 3*cos((xheading-70)*pi/180.)
+    yc = 3*sin((xheading-70)*pi/180.)
+    xs = xc-cr
+    ys = yc-cr
+    zs = 0
+    xf = xc+cr
+    yf = yc+cr
+    zf = ct
+    nprobx = 100
+    nproby = 100
+    nprobz = 100
+    dxp=(xf-xs)/nprobx
+    dyp=(yf-ys)/nproby
+    dzp=(zf-zs)/nprobz
+    if (computescalars>=4) then
+     if (time>(endtime-starttime)/3._KND) then
+      Scalar = 0
+      p = 0
+      do k=0,nprobz
+       zp = zs+k*dzp
+       do j=0,nproby
+        yp = ys+j*dyp
+        do i=0,nprobx
+         xp = xs+i*dxp
+          call GridCoords(xi,yj,zk,xp,yp,zp)
+          if ((xp-xc)**2+(yp-yc)**2<cr**2) then
+          if   (zp<ct*0.2) then
+           Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:)*0.2
+           p = p+1
+          elseif (zp<ct*0.4) then
+           Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:)*0.8
+           p = p+1
+          elseif (zp<ct*0.6) then
+           Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:)*1.25
+           p = p+1
+          elseif (zp<ct*0.8) then
+           Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:)*1.75
+           p = p+1
+          elseif (zp<=ct) then
+           Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:)  +percdistrib(:)*1.1
+           p = p+1
+          endif
+         endif
+        enddo
+       enddo
+      enddo
+      Scalar = totalscalsource*Scalar/p
+      Scalar = Scalar/(dxmin*dymin*dzmin)
+      released=.true.
+     endif
+    endif
+  endsubroutine Release
+
+
+
+#ifdef __HMPP
+  !$hmpp  DIFFSCALAR_GPU codelet, target=CUDA
+  subroutine DIFFSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
+                            ScalBtype,sideScal,TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
+                            TDiff,SCAL2,SCAL,&
+                            sctype,coef,dt,l,S)
+  implicit none
+  integer,parameter :: KND=4
+
+  real(KND),intent(out),dimension(-1:Prnx+1,-1:Prny+1,-1:Prnz+1) :: Scal2
+  real(KND),intent(in),dimension(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)  :: Scal
+
+  real(KND),intent(in)  :: dxmin,dymin,dzmin,epsCN,Re,coef,dt
+  real(KND),intent(in)  :: sideScal(6),sideTemp(6),Tempin(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(KND),intent(in),dimension(-1:Prnx+2,-1:Prny+2) :: BsideTArr,BsideTFLArr
+  integer,intent(in)    :: Prnx,Prny,Prnz,maxCNiter,sctype,ScalBtype(6),TBtype(6)
+  integer,intent(out)   :: l
+  real(KND),intent(out) :: S
+  real(KND) Scal3(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
+  integer nx,ny,nz,i,j,k,xi,yj,zk
+  real(KND) p
+  real(KND) A,Ax,Ay,Az,Ap(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
+
+  intrinsic max, abs, mod
+
+   nx = Prnx
+   ny = Prny
+   nz = Prnz
+
+
+  if (Re>0) then
+
+  !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+   do k = 1,Prnz  !initital value using forward Euler
+    do i = 1,Prnx
+     do j = 1,Prny
+      SCAL3(i,j,k) = (((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))/dxmin-&
+        (TDiff(i,j,k)+TDiff(i-1,j,k))*(SCAL(i,j,k)-SCAL(i-1,j,k))/dxmin)/(dxmin)+&
+       ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))/dymin-&
+        (TDiff(i,j,k)+TDiff(i,j-1,k))*(SCAL(i,j,k)-SCAL(i,j-1,k))/dymin)/(dymin)+&
+       ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))/dzmin-&
+        (TDiff(i,j,k)+TDiff(i,j,k-1))*(SCAL(i,j,k)-SCAL(i,j,k-1))/dzmin)/(dzmin))
+     enddo
+    enddo
+   enddo
+
+   A = dt*coef
+  !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+   do k = 1,Prnz
+    do i = 1,Prnx
+     do j = 1,Prny
+       SCAL2(i,j,k) = SCAL(i,j,k)+A*SCAL3(i,j,k)
+     enddo
+    enddo
+   enddo
+
+   if (sctype==1) then
+     call BOUND_Temp_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,SCAL2)
+   else
+     call BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2)
+   endif
+
+
+
+   Ax = 1._KND/(4._KND*dxmin**2)
+   Ay = 1._KND/(4._KND*dymin**2)
+   Az = 1._KND/(4._KND*dzmin**2)
+
+  !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+   do k = 1,Prnz
+    do i = 1,Prnx
+     do j = 1,Prny
+      Ap(i,j,k) = 1._KND/(1._KND/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))+&
+                           (TDiff(i,j,k)+TDiff(i-1,j,k)))*Ax+&
+                           ((TDiff(i,j+1,k)+TDiff(i,j,k))+&
+                           (TDiff(i,j,k)+TDiff(i,j-1,k)))*Ay+&
+                           ((TDiff(i,j,k+1)+TDiff(i,j,k))+&
+                           (TDiff(i,j,k)+TDiff(i,j,k-1)))*Az))
+     enddo
+    enddo
+   enddo
+
+   do l = 1,maxCNiter
+    S = 0
+    if (sctype==1) then
+     call BOUND_Temp_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,SCAL2)
+    else
+     call BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2)
+    endif
+
+
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i), reduce(max:S)
+    do k = 1,Prnz
+     do i = 1,Prnx
+      do j = 1+mod(i+k,2),Prny,2
+        p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
+         ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
+          (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
+         ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
+          (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
+         ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
+          (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
+         )
+         p = p*Ap(i,j,k)
+         S = max(S,abs(p-SCAL2(i,j,k)))
+         SCAL2(i,j,k) = p
+      enddo
+     enddo
+    enddo
+
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i), reduce(max:S)
+    do k = 1,Prnz
+     do i = 1,Prnx
+      do j = 1+mod(i+k+1,2),Prny,2
+        p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
+         ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
+          (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
+         ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
+          (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
+         ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
+          (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
+         )
+         p = p*Ap(i,j,k)
+         S = max(S,abs(p-SCAL2(i,j,k)))
+         SCAL2(i,j,k) = p
+      enddo
+     enddo
+    enddo
+
+
+    if (S<=epsCN) exit
+   enddo
+
+
+  else
+
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg gridify(k,i)
+   do k = 1,Prnz
+    do i = 1,Prnx
+     do j = 1,Prny
+       SCAL2(i,j,k) = SCAL(i,j,k)
+     enddo
+    enddo
+   enddo
+
+   if (sctype==1) then
+     call BOUND_Temp_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,SCAL2)
+   else
+     call BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2)
+   endif
+
+  endif
+  endsubroutine DIFFSCALAR_GPU
+#include "scalarsbound_GPU.f90"
+
+#endif
 
 end module SCALARS

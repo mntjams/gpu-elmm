@@ -6,7 +6,7 @@ module INITIAL
   use MULTIGRID2d, only: SetMGParams2d
   use POISSON
   use BOUNDARIES
-  use OUTPUTS, only: store, display, probes, NumProbes
+  use OUTPUTS, only: store, display, probes, NumProbes, SetFrameDomain
   use SCALARS
   use SMAGORINSKY
   use TURBINLET, only: GetTurbInlet, GetInletFromFile, TLag, Lturby, Lturbz, ustarinlet, transformtensor
@@ -26,7 +26,7 @@ contains
  subroutine ReadParams
  integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter,minGPUlevel
  real(KND) mgepsinnerGS
- integer   i,io
+ integer   i,io,itmp
  integer numframeslices
 
    open(11,file="main.conf",status="old",action="read")
@@ -225,6 +225,43 @@ contains
    read(11,fmt='(/)')
    read(11,*) sideTemp(To)
    close(11)
+
+   if (buoyancy==1) then
+
+     open(11,file="temp_profile.conf",status="old",action="read",iostat=io)
+
+     if (io==0) then
+       read(11,fmt='(/)')
+       read(11,*) TemperatureProfile%randomize
+       read(11,fmt='(/)')
+       read(11,*) TemperatureProfile%randomizeTop
+       read(11,fmt='(/)')
+       read(11,*) TemperatureProfile%randomizeAmplitude
+       read(11,fmt='(/)')
+       read(11,*) itmp
+
+       allocate(TemperatureProfile%Sections(max(itmp,0)))
+
+       do i = 1, size(TemperatureProfile%Sections)
+         read(11,fmt='(/)')
+         read(11,*) TemperatureProfile%Sections(i)%top
+         read(11,fmt='(/)')
+         read(11,*) TemperatureProfile%Sections(i)%jump
+         read(11,fmt='(/)')
+         read(11,*) TemperatureProfile%Sections(i)%gradient
+       enddo
+
+       close(11)
+
+     else
+
+       write(*,*) "Warning! Could not open file temp_profile.conf. Using defaults."
+       TemperatureProfile%randomize = 0
+
+       allocate(TemperatureProfile%Sections(0))
+
+     endif
+   endif
 
    open(11,file="inlet.conf",status="old",action="read")
    read(11,fmt='(/)')
@@ -1130,41 +1167,14 @@ contains
 
        elseif (buoyancy==1) then
 
-         freetempgradient=0.02!0.03!0.0035 !K/m
-         !inversionTjump=2 !K
-         do k=-2,Prnz+3
-          do j=-2,Prny+3
-      !         if (zPr(k)>(zW(Wnz+1)+zW(0))/4) then
-              Tempin(j,k)=(zPr(k)-zW(0))*freetempgradient+temperature_ref!(zPr(k)-(zW(Wnz+1)+zW(0))/4)*freetempgradient+265!
-      !         else
-      !          Tempin(j,k)=265!temperature_ref
-      !         endif
-      !        Tempin(j,k)=temperature_ref
-      !
-          enddo
-         enddo
-      !    Tempin(j,1)=temperature_ref*1.01
-         do k=0,Prnz+1
-          do j=0,Prny+1
-           do i=0,Prnx+1
-            if (zPr(k)<=lz/8._KND) then
-             call RANDOM_NUMBER(p)
-            else
-             p=0.5_KND
-            endif
-             temperature(i,j,k)=Tempin(j,k)!+0.2_KND*(p-0.5_KND)
-      !      if (yPr(j)<=yPr(Uny/2)) then
-      !        temperature(i,j,k)=0
-      !      else
-      !        temperature(i,j,k)=1
-      !      endif
-           enddo
-          enddo
-         enddo
-         Pr(1:Prnx,1:Prny,1)=0
+         call InitTemperatureProfile(TempIn)
+
+         call InitTemperature(TempIn,Temperature)
+
+         Pr(:,:,1)=0
          do k=2,Prnz
-          do j=1,Prny
-           do i=1,Prnx
+          do j=1,Vny+1
+           do i=1,Unx+1
             Pr(i,j,k)=Pr(i,j,k-1) + &
                    grav_acc*dzW(k-1) * &
                   ( (temperature(i,j,k-1)+temperature(i,j,k))/2._KND - temperature_ref )&
@@ -1631,7 +1641,7 @@ contains
 
     allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
 
-    if (buoyancy>0) allocate(Tempin(-2:Prny+3,-2:Prnz+3))
+    if (buoyancy>0) allocate(Tempin(-1:Prny+2,-1:Prnz+2))
 
     select case (inlettype)
       case (NOINLET)
@@ -1883,6 +1893,10 @@ contains
 
    call InitSolidBodies
    call GetSolidBodiesBC
+
+   call MoveWMPointsToArray
+
+   call SetFrameDomain(store%frame_domains)
 
     write (*,*) "set"
   end subroutine READBOUNDS

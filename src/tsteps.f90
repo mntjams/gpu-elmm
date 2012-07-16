@@ -6,9 +6,8 @@ module TSTEPS
   use PARAMETERS
   use BOUNDARIES, only: BoundU,Bound_Q
   use POISSON, only: Pr_Correct
+  use SCALARS, only: ScalarRK3
   use SMAGORINSKY, only: Smag, StabSmag, Vreman
-  use SCALARS, only:  Bound_Temp, Bound_Visc, Scalar, percdistrib, AdvScalar,&
-     DiffScalar, ComputeTDiff, Deposition, GravSettling, VolScalSource
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
   use Wallmodels, only: ComputeViscsWM
 
@@ -18,22 +17,19 @@ module TSTEPS
   private
   public TMarchRK3
 
-  logical:: released=.false.
-
 contains
 
 
 
- subroutine TMarchRK3(U,V,W,Pr,delta)
+ subroutine TMarchRK3(U,V,W,Pr,Temperature,Scalar,delta)
   real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(inout) :: Temperature(-1:,-1:,-1:),Scalar(-1:,-1:,-1:,-1:)
   real(KND),intent(out):: delta
 
   real(KND),dimension(:,:,:),allocatable,save   :: Q
   real(KND),dimension(:,:,:),allocatable,save   ::U2,Ustar
   real(KND),dimension(:,:,:),allocatable,save   ::V2,Vstar
   real(KND),dimension(:,:,:),allocatable,save   ::W2,Wstar
-  real(KND),dimension(:,:,:,:),allocatable,save ::Scalar_adv,Scalar_2
-  real(KND),dimension(:,:,:),allocatable,save   ::Temperature_adv,Temperature2
 
   real(KND),dimension(1:3),parameter:: alpha = (/ 4._KND/15._KND, 1._KND/15._KND, 1._KND/6._KND /)
   real(KND),dimension(1:3),parameter:: beta  = (/ 8._KND/15._KND, 5._KND/12._KND, 3._KND/4._KND /)
@@ -41,7 +37,8 @@ contains
 
   integer i,l
   integer,save:: called = 0
-  real time1,time2
+  integer(DBL), save :: trate
+  integer(DBL), save :: time1, time2
 
 
   if (called==0) then
@@ -55,17 +52,11 @@ contains
    allocate(Vstar(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)))
    allocate(Wstar(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)))
 
-   allocate(Scalar_adv(lbound(Scalar,1):ubound(Scalar,1),lbound(Scalar,2):ubound(Scalar,2),&
-        lbound(Scalar,3):ubound(Scalar,3),lbound(Scalar,4):ubound(Scalar,4)))
-   allocate(Scalar_2(lbound(Scalar,1):ubound(Scalar,1),lbound(Scalar,2):ubound(Scalar,2),&
-        lbound(Scalar,3):ubound(Scalar,3),lbound(Scalar,4):ubound(Scalar,4)))
-
-   allocate(Temperature_adv(lbound(Temperature,1):ubound(Temperature,1),lbound(Temperature,2):ubound(Temperature,2),&
-        lbound(Temperature,3):ubound(Temperature,3)))
-   allocate(Temperature2(lbound(Temperature,1):ubound(Temperature,1),lbound(Temperature,2):ubound(Temperature,2),&
-        lbound(Temperature,3):ubound(Temperature,3)))
 
    if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
+
+   if (debugparam>1) call system_clock(count_rate=trate)
+
     !$hmpp <tsteps> allocate
     !$hmpp <tsteps> advancedload, args[Vreman::Prnx,BoundU::Prny,BoundU::Prnz]
     !$hmpp <tsteps> advancedload, args[BoundU::nx,BoundU::ny,BoundU::nz,&
@@ -104,11 +95,7 @@ contains
     endif
   endif
 
-!   call BoundU(1,U)
-!   call BoundU(2,V)
-!   call BoundU(3,W)
-!
-!   if (buoyancy==1)  call Bound_Temp(temperature)
+
 
   if ((Btype(We) ==TurbulentInlet).or.(Btype(Ea) ==TurbulentInlet)) then
     call GetTurbInlet
@@ -127,12 +114,10 @@ contains
 
   write (*,*) "time:",time,"dt: ",dt
 
-  temperature_adv = 0
-
   do l=1,3
 
 
-    if (debugparam>1) call cpu_time(time1)
+    if (debugparam>1) call system_clock(count=time1)
 
     !$hmpp <tsteps> BoundU callsite, args[*].noupdate = true
     call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
@@ -161,22 +146,8 @@ contains
                        U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,l,dt)
 
 
-    if (debugparam>1) then
-     call cpu_time(time2)
-     write (*,*) "ET of part 1", (time2-time1)
-     time1 = time2
-    endif
-
-
     call OtherTerms(U,V,W,U2,V2,W2,Pr,2._KND*alpha(l))
 
-
-
-    if (debugparam>1) then
-     call cpu_time(time2)
-     write (*,*) "ET of part 2", (time2-time1)
-     time1 = time2
-    endif
 
 
     if (Btype(To) ==FreeSlipBuff)  then
@@ -195,6 +166,15 @@ contains
     !$hmpp <tsteps> delegatedstore, args[AttenuateOut::U,AttenuateOut::V,AttenuateOut::W]
     if (buoyancy==1) then
       !$hmpp <tsteps> delegatedstore, args[AttenuateOut::temperature]
+    endif
+
+
+
+
+    if (debugparam>1) then
+     call system_clock(count=time2)
+     write (*,*) "ET of part 1", (time2-time1)/real(trate)
+     time1 = time2
     endif
 
 
@@ -238,64 +218,17 @@ contains
 
 
 
-!     if (computescalars>0.and..not.released) call Release
-
-
-
-
-
    ! Visc should be in memory, as it is computed by CPU for now.
 
-    if (computescalars>0) then
-      Scalar_2=0
-      if (l>1) then
-       Scalar_2 = Scalar_2+Scalar_adv*rho(l)
-      endif
-      Scalar_adv = 0
-      do i=1,computescalars
-       call AdvScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U,V,W,2,1._KND)
-      enddo
-      Scalar_2 = Scalar_2+Scalar_adv*beta(l)
+    call ScalarRK3(U,V,W,Temperature,Scalar,l)
 
-      if (scalsourcetype==pointsource) then
-       do i=1,computescalars
-        Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i) = Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
-         percdistrib(i)*(rho(l)+beta(l))*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
-       enddo
-      elseif (scalsourcetype==volumesource) then
-       do i=1,computescalars
-        call VolScalSource(Scalar_2,rho(l)+beta(l))
-       enddo
-      endif
 
-      Scalar = Scalar+Scalar_2
-      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
-      call Bound_Visc(TDiff)
-      do i=1,computescalars
-         call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,2._KND*alpha(l))
-      enddo
-      if (computedeposition>0) call Deposition(Scalar_2,2._KND*alpha(l))
-      if (computegravsettling>0) call GravSettling(Scalar_2,2._KND*alpha(l))
-      Scalar = Scalar_2
-    endif
 
-    if (buoyancy>0) then
-      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
-      call Bound_Visc(TDiff)
-      temperature2=0
-      call Bound_Temp(temperature)
 
-      if (l>1) then
-       temperature2 = temperature2+temperature_adv*rho(l)
-      endif
-      temperature_adv = 0
-      call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND)
-      temperature2 = temperature2+temperature_adv*beta(l)
-
-      temperature = temperature+temperature2
-      call Bound_Temp(temperature)
-       call DiffScalar(temperature2,temperature,1,2._KND*alpha(l))
-      temperature = temperature2
+    if (debugparam>1) then
+     call system_clock(count=time2)
+     write (*,*) "ET of part 2", (time2-time1)/real(trate)
+     time1 = time2
     endif
 
     if (buoyancy==1) then
@@ -313,6 +246,14 @@ contains
     call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                           nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
 
+
+
+
+    if (debugparam>1) then
+     call system_clock(count=time2)
+     write (*,*) "ET of part 3", (time2-time1)/real(trate)
+     time1 = time2
+    endif
 
    enddo
    if (.false.) then
@@ -492,7 +433,7 @@ contains
 
       if (convmet>0) then
 
-        call CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Ustar,Vstar,Wstar,U,V,W)
+         call CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Ustar,Vstar,Wstar,U,V,W)
 
       else
 
@@ -568,99 +509,6 @@ contains
 
 
 
-
-
-!  !$hmpp <tsteps> ScalarConvection codelet
- subroutine ScalarConvection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
-                       dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
-                       U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev,dt)
-  implicit none
-#ifdef __HMPP
-  integer,parameter :: KND = 4
-  intrinsic abs
-#endif
-
-  integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,lev
-  real(KND),intent(in) :: dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref
-  real(KND),intent(in) :: dt
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out)   :: U2
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: Ustar
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)    :: V
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(out)   :: V2
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: Vstar
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)    :: W
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(out)   :: W2
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: Wstar
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: temperature
-  real(KND),dimension(1:3),intent(in) :: beta,rho
-  integer i,j,k
-
-
-
-
-  end subroutine ScalarConvection
-
-
-  subroutine Release
-  real(KND) xc,yc,xs,xf,ys,yf,zs,zf,dxp,dyp,dzp,ct,cr,xp,yp,zp,p
-  integer i,j,k,xi,yj,zk,nprobx,nproby,nprobz
-  ct = 7
-  cr = 1.5
-  xc = 3*cos((xheading-70)*pi/180.)
-  yc = 3*sin((xheading-70)*pi/180.)
-  xs = xc-cr
-  ys = yc-cr
-  zs = 0
-  xf = xc+cr
-  yf = yc+cr
-  zf = ct
-  nprobx = 100
-  nproby = 100
-  nprobz = 100
-  dxp=(xf-xs)/nprobx
-  dyp=(yf-ys)/nproby
-  dzp=(zf-zs)/nprobz
-  if (computescalars>=4) then
-   if (time>(endtime-starttime)/3._KND) then
-    Scalar = 0
-    p = 0
-    do k=0,nprobz
-     zp = zs+k*dzp
-     do j=0,nproby
-      yp = ys+j*dyp
-      do i=0,nprobx
-       xp = xs+i*dxp
-        call GridCoords(xi,yj,zk,xp,yp,zp)
-        if ((xp-xc)**2+(yp-yc)**2<cr**2) then
-        if   (zp<ct*0.2) then
-         Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:)*0.2
-         p = p+1
-        elseif (zp<ct*0.4) then
-         Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:)*0.8
-         p = p+1
-        elseif (zp<ct*0.6) then
-         Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:)*1.25
-         p = p+1
-        elseif (zp<ct*0.8) then
-         Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:)*1.75
-         p = p+1
-        elseif (zp<=ct) then
-         Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:)  +percdistrib(:)*1.1
-         p = p+1
-        endif
-       endif
-      enddo
-     enddo
-    enddo
-    Scalar = totalscalsource*Scalar/p
-    Scalar = Scalar/(dxmin*dymin*dzmin)
-    released=.true.
-   endif
-  endif
-
-
-  endsubroutine Release
 
 
 
@@ -1180,7 +1028,7 @@ contains
 
 
             Su = max(Su,abs(p-U3(i,j,k)))
-            U3(i,j,k) = U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+            U3(i,j,k) = p
           enddo
          enddo
         enddo
@@ -1198,7 +1046,7 @@ contains
             p = Ap*p+V2(i,j,k)+V(i,j,k)
             p = p*ApV(i,j,k)
             Sv = max(Sv,abs(p-V3(i,j,k)))
-            V3(i,j,k) = V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+            V3(i,j,k) = p
           enddo
          enddo
         enddo
@@ -1216,7 +1064,7 @@ contains
             p = Ap*p+W2(i,j,k)+W(i,j,k)
             p = p*ApW(i,j,k)
             Sw = max(Sw,abs(p-W3(i,j,k)))
-            W3(i,j,k) = W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+            W3(i,j,k) = p
           enddo
          enddo
         enddo
@@ -1237,7 +1085,7 @@ contains
 
 
             Su = max(Su,abs(p-U3(i,j,k)))
-            U3(i,j,k) = U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+            U3(i,j,k) = p
           enddo
          enddo
         enddo
@@ -1255,7 +1103,7 @@ contains
             p = Ap*p+V2(i,j,k)+V(i,j,k)
             p = p*ApV(i,j,k)
             Sv = max(Sv,abs(p-V3(i,j,k)))
-            V3(i,j,k) = V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+            V3(i,j,k) = p
           enddo
          enddo
         enddo
@@ -1273,7 +1121,7 @@ contains
             p = Ap*p+W2(i,j,k)+W(i,j,k)
             p = p*ApW(i,j,k)
             Sw = max(Sw,abs(p-W3(i,j,k)))
-            W3(i,j,k) = W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+            W3(i,j,k) = p
           enddo
          enddo
         enddo
