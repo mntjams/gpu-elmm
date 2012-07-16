@@ -1,10 +1,10 @@
 module POISSON
 
+ use VTKARRAY
  use PARAMETERS
  use BOUNDARIES
  use MULTIGRID,   only: POISSMG
  use MULTIGRID2d, only: POISSMG2d
- use FISHPOISSON
 
 implicit none
 
@@ -125,7 +125,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
    maxJ=-5
    maxK=-5
 
-
+   !$omp parallel do private(i,j,k) reduction(+:s2)
    do k=1,Prnz            !divergence of U -> RHS
     do j=1,Prny
      do i=1,Prnx
@@ -141,6 +141,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      enddo
     enddo
    enddo
+   !$omp end parallel do
    write (*,*) "avgRHS",S2/(lx*ly*lz)
 
 
@@ -150,52 +151,23 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
    elseif (poissmet==2) then
 
-       call POISSFISH(Phi,RHS)
+       call POISS_POISFFT(Phi,RHS)
 
    elseif (poissmet==3) then
 
-       RHS2=RHS
-       call POISSFISH(Phi,RHS)
-
-       Phiref=Phi(Prnx/2,Prny/2,Prnz/2)
-       do k=1,Prnz
-        do j=1,Prny
-         do i=1,Prnx
-          Phi(i,j,k)=Phi(i,j,k)-Phiref
-         enddo
-        enddo
-       enddo
-
-       RHS=RHS2
        if (Prny==1) then
         call POISSMG2d(Phi,RHS)
        else
         call POISSMG(Phi,RHS)
        endif
 
-   elseif (poissmet==4) then
-
-       if (Prny==1) then
-        call POISSMG2d(Phi,RHS)
-       else
-        call POISSMG(Phi,RHS)
-       endif
-
-   elseif (poissmet==5) then
-
-       write(*,*) "MUDPACK support disabled."
    endif
 
 
 
    Phiref=Phi(Prnx/2,Prny/2,Prnz/2)
-   do k=1,Prnz
-    do j=1,Prny
-     do i=1,Prnx
-      Phi(i,j,k)=Phi(i,j,k)-Phiref
-     enddo
-    enddo
-   enddo
+   Phi = Phi-Phiref
+
 
 
    call Bound_Phi(Phi)
@@ -251,31 +223,75 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   call BoundU(2,V)
   call BoundU(3,W)
 
+  !$omp parallel do private(i,j,k) reduction(max:S) reduction(+:S2)
   do k=1,Prnz
    do j=1,Prny
     do i=1,Prnx
         if (present(Q)) then
           RHS(i,j,k)=(U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k))-Q(i,j,k)
           S2=S2+abs(RHS(i,j,k)*dxPr(i)*dyPr(j)*dzPr(k))
-          if (abs(RHS(i,j,k))>abs(S).and.i>1) then
-                                      S=RHS(i,j,k)
 
-                                     endif
+          if (i>2) then
+            S=max(abs(RHS(i,j,k)),S)
+          endif
+
         else
           RHS(i,j,k)=(U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k))
           S2=S2+abs(RHS(i,j,k)*dxPr(i)*dyPr(j)*dzPr(k))
-          if (abs(RHS(i,j,k))>abs(S).and.i>1) then
-                                      S=RHS(i,j,k)
 
-                                     endif
+          if (i>2) then
+            S=max(abs(RHS(i,j,k)),S)
+          endif
+
         endif
     enddo
    enddo
   enddo
+  !$omp end parallel do
   write (*,*) "maxRHS",S
   write (*,*) "avgRHS",S2/(lx*ly*lz)
-  if (present(Q)) write (*,*) "maxQ",maxval(Q)
+!   if (present(Q)) write (*,*) "maxQ",maxval(Q)
   endsubroutine PR_CORRECT
+
+
+
+
+
+  subroutine POISS_POISFFT(Phi,RHS)
+    use poisfft
+    type(PoisFFT_Solver3D),save :: Solver
+    real(KND),dimension(0:,0:,0:),intent(inout):: Phi
+    real(KND),dimension(1:,1:,1:),intent(in)::RHS
+    integer i
+    logical, save :: called = .false.
+    integer bounds(6)
+    integer(DBL), save :: trate
+    integer(DBL)       :: t1, t2
+
+    do i=1,6
+      if (Btype(i)==PERIODIC) then
+        bounds(i) = PoisFFT_PERIODIC
+      else
+        bounds(i) = PoisFFT_NeumannStag
+      endif
+    enddo
+
+    if (.not.called) then
+      Solver = PoisFFT_Solver3D_New(Prnx,Prny,Prnz,dxmin,dymin,dzmin,bounds)
+      called = .true.
+      call system_clock(count_rate=trate)
+    endif
+
+    call system_clock(count=t1)
+
+    call PoisFFT_Solver3D_Execute(Solver,Phi,RHS)
+
+    call system_clock(count=t2)
+    write(*,*) "solver cpu time", real(t2-t1)/real(trate)
+
+  endsubroutine POISS_POISFFT
+
+
 
 
 
@@ -289,7 +305,7 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   real(KND),dimension(:),allocatable,save::Aw,Ae,As,An,Ab,At
 
 
-   write (*,*) "Computing poisson equation"
+   write (*,*) "Computing Poisson equation"
    S=0
    nx=Prnx
    ny=Prny
@@ -465,389 +481,6 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
         enddo
    endif
  end subroutine POISSSOR
-
-
-
-
-
-
-
-
-
-
-  subroutine  POISSVEL(Phi,RHS)      !Calls Bicgstab solver from LAPACK, does not work
-
-  real(KND),dimension(0:,0:,0:),intent(inout):: Phi
-  real(KND),dimension(1:,1:,1:),intent(in)::RHS
-  real(KND),dimension(1:Prnx+2,1:Prny+2,1:Prnz+2)::RHS2,Phi2
-  real(KND),dimension(1:Prnx+2)::x
-  real(KND),dimension(1:Prny+2)::y
-  real(KND),dimension(1:Prnz+2)::z
-  integer nx,ny,nz,i0,j0,k0,itmax,itol,np
-  real(KND) tol,err
-  logical,dimension(2):: dbcx,dbcy,dbcz
-
-  nx=Prnx+2
-  ny=Prny+2
-  nz=Prnz+2
-  np=1
-  rhs2=0
-  rhs2(2:Prnx+1,2:Prny+1,2:Prnz+1)=RHS(1:Prnx,1:Prny,1:Prnz)
-  x=xPR(0:Prnx+1)
-  y=yPR(0:Prny+1)
-  z=zPR(0:Prnz+1)
-  dbcx=.false.
-  dbcy=.false.
-  dbcz=.false.
-  i0=1
-  j0=1
-  k0=1
-  Phi2=Phi(0:Prnx+1,0:Prny+1,0:Prnz+1)
-  itmax=1000000
-  itol=1
-  tol=5.e-5
-
-
-    !call  poisson2(nx,ny,nz,np,x,y,z,rhs2,dbcx,dbcy,dbcz,i0,j0,k0,phi2,itmax,itol,tol,err)
-
-  Phi(0:Prnx+1,0:Prny+1,0:Prnz+1)=Phi2
-  endsubroutine POISSVEL
-
-
-
-
-  subroutine POISSADI(Phi,RHS)                      !Alternating direction implicit with tridiag solver from LINPACK
-  real(KND),dimension(0:,0:,0:),intent(inout):: Phi !does not converge
-  real(KND),dimension(1:,1:,1:),intent(in)::RHS
-  real(KND) Phi2(0:Prnx+2,0:Prny+2,0:Prnz+2)
-  real(KND),parameter:: adirelaxpar=10._KND
-  real(KND),allocatable,dimension(:),save:: bx,cx,dx,ex
-  real(KND),allocatable,dimension(:),save:: by,cy,dy,ey
-  real(KND),allocatable,dimension(:),save:: bz,cz,dz,ez
-  integer i,j,k,l,info,nx,ny,nz
-  real(KND),dimension(:),allocatable,save::Apx,Apy,Apz,Aw,Ae,As,An,Ab,At
-  integer,save:: called=0
-  real(KND) S
-
-
-  nx=Prnx
-  ny=Prny
-  nz=Prnz
-  if (called==0) then
-       allocate(Aw(1:nx),Ae(1:nx),Apx(1:nx))
-       allocate(As(1:ny),An(1:ny),Apy(1:ny))
-       allocate(Ab(1:nz),At(1:nz),Apz(1:nz))
-       allocate(bx(1:nx+2),cx(1:nx+2),dx(1:nx+2),ex(1:nx+2))
-       allocate(by(1:ny+2),cy(1:ny+2),dy(1:ny+2),ey(1:ny+2))
-       allocate(bz(1:nz+2),cz(1:nz+2),dz(1:nz+2),ez(1:nz+2))
-       forall(i=1:nx)
-        Ae(i)=1._KND/(dxU(i)*dxPr(i))
-        Aw(i)=1._KND/(dxU(i-1)*dxPr(i))
-        Apx(i)=(1._KND/dxU(i)+1._KND/dxU(i-1))/dxPr(i)
-       endforall
-       forall(j=1:ny)
-        An(j)=1._KND/(dyV(j)*dyPr(j))
-        As(j)=1._KND/(dyV(j-1)*dyPr(j))
-        Apy(j)=(1._KND/dyV(j)+1._KND/dyV(j-1))/dyPr(j)
-       endforall
-       forall(k=1:nz)
-        At(k)=1._KND/(dzW(k)*dzPr(k))
-        Ab(k)=1._KND/(dzW(k-1)*dzPr(k))
-        Apz(k)=(1._KND/dzW(k)+1._KND/dzW(k-1))/dzPr(k)
-       endforall
-       called=1
-
-  endif
-!  call POISSSOR(Phi,RHS)
-  do l=1,maxpoissoniter
-  S=0
-  Phi2=Phi
-   call Bound_Phi(Phi)
-   do k=1,nz
-    do j=1,ny
-       forall(i=2:nx+1)
-        dx(i)=-Apx(i-1)-adirelaxpar
-       endforall
-       forall(i=2:nx)
-        cx(i)=Aw(i)
-       endforall
-       forall(i=3:nx+1)
-        ex(i)=Ae(i-2)
-       endforall
-       if (Btype(We)==PERIODIC) then
-        dx(1)=1
-        dx(nx+2)=1
-        ex(2)=0
-        cx(nx+1)=0
-       else
-        dx(1)=1
-        dx(nx+2)=1
-        ex(2)=-1
-        cx(nx+1)=-1
-       endif
-     if (Btype(We)==PERIODIC) then
-      bx(1)=Phi(nx,j,k)
-      bx(nx+2)=Phi(1,j,k)
-     else
-      bx(1)=0
-      bx(nx+2)=0
-     endif
-     do i=1,nx
-      bx(i+1)=RHS(i,j,k)+(Apy(j)+Apz(k)-adirelaxpar)*Phi(i,j,k)-(Phi(i,j+1,k)*An(j)+Phi(i,j-1,k)*As(j)+&
-                      Phi(i,j,k+1)*At(k)+Phi(i,j,k-1)*Ab(k))
-     enddo
-!     call SGTSL(nx+2,cx,dx,ex,bx,info)
-     if (info/=0)  write (*,*) info
-
-     Phi(1:nx,j,k)=bx(2:nx+1)
-    enddo
-   enddo
-
-   call Bound_Phi(Phi)
-   do k=1,nz
-    do i=1,nx
-       forall(j=2:ny+1)
-        dy(j)=-Apy(j-1)-adirelaxpar
-       endforall
-       forall(j=2:ny)
-        cy(j)=As(j)
-       endforall
-       forall(j=3:ny+1)
-        ey(j)=An(j-2)
-       endforall
-       if (Btype(So)==PERIODIC) then
-        dy(1)=1
-        dy(ny+2)=1
-        ey(2)=0
-        cy(ny+1)=0
-       else
-        dy(1)=1
-        dy(ny+2)=1
-        ey(2)=-1
-        cy(ny+1)=-1
-       endif
-     if (Btype(So)==PERIODIC) then
-      by(1)=Phi(i,ny,k)
-      by(ny+2)=Phi(i,1,k)
-     else
-      by(1)=0
-      by(ny+2)=0
-     endif
-     do j=1,ny
-      by(j+1)=(Apy(j)-adirelaxpar)*Phi(i,j,k)+(Phi(i,j+1,k)*An(j)+Phi(i,j-1,k)*As(j))
-     enddo
-     ! call SGTSL(ny+2,cy,dy,ey,by,info)
-
-     if (info/=0)  write (*,*) "info",info
-    Phi(i,1:ny,k)=by(2:ny+1)
-    enddo
-   enddo
-
-
-   call Bound_Phi(Phi)
-   do j=1,ny
-    do i=1,nx
-       forall(k=2:nz+1)
-        dz(k)=-Apz(k-1)-adirelaxpar
-       endforall
-       forall(k=2:nz)
-        cz(k)=Ab(k)
-       endforall
-       forall(k=3:nz+1)
-        ez(k)=At(k-2)
-       endforall
-       if (Btype(Bo)==PERIODIC) then
-        dz(1)=1
-        dz(nz+2)=1
-        ez(2)=0
-        cz(nz+1)=0
-       else
-        dz(1)=1
-        dz(nz+2)=1
-        ez(2)=-1
-        cz(nz+1)=-1
-       endif
-     if (Btype(Bo)==PERIODIC) then
-      bz(1)=Phi(i,j,nz)
-      bz(nz+2)=Phi(i,j,1)
-     else
-      bz(1)=0
-      bz(nz+2)=0
-     endif
-     do k=1,nz
-      bz(k+1)=(Apz(k)-adirelaxpar)*Phi(i,j,k)+(Phi(i,j,k+1)*At(k)+Phi(i,j,k-1)*Ab(k))
-     enddo
-!     call SGTSL(nz+2,cz,dz,ez,bz,info)
-
-     if (info/=0) write (*,*) "info",info
-     Phi(i,j,1:nz)=bz(2:nz+1)
-    enddo
-   enddo
-   S=SUM(Abs(Phi(1:Prnx,1:Prny,1:Prnz)-Phi2(1:Prnx,1:Prny,1:Prnz)))/(Prnx*Prny*Prnz)
-   write (*,*) l,S
-   if (Abs(S)<epspoisson) exit
-  enddo
-
-  endsubroutine POISSADI
-
-
-
-
-
-
-
-  subroutine POISSADIGS(Phi,RHS)                    !Alternating direction implicit with Gauss-Seidel
-  real(KND),dimension(0:,0:,0:),intent(inout):: Phi !does not converge
-  real(KND),dimension(1:,1:,1:),intent(in)::RHS
-  real(KND) Phi2(0:Prnx+2,0:Prny+2,0:Prnz+2)
-  real(KND):: adirelaxpar=0.78_KND
-  real(KND),allocatable,dimension(:),save:: bx,cx,dx,ex
-  real(KND),allocatable,dimension(:),save:: by,cy,dy,ey
-  real(KND),allocatable,dimension(:),save:: bz,cz,dz,ez
-  integer i,j,k,l,nx,ny,nz
-  real(KND),dimension(:),allocatable,save::Apx,Apy,Apz,Aw,Ae,As,An,Ab,At
-  integer,save:: called=0
-  real(KND) S
-
-
-  nx=Prnx
-  ny=Prny
-  nz=Prnz
-  if (called==0) then
-       allocate(Aw(1:nx),Ae(1:nx),Apx(1:nx))
-       allocate(As(1:ny),An(1:ny),Apy(1:ny))
-       allocate(Ab(1:nz),At(1:nz),Apz(1:nz))
-       allocate(bx(1:nx+2),cx(1:nx+2),dx(1:nx+2),ex(1:nx+2))
-       allocate(by(1:ny+2),cy(1:ny+2),dy(1:ny+2),ey(1:ny+2))
-       allocate(bz(1:nz+2),cz(1:nz+2),dz(1:nz+2),ez(1:nz+2))
-       forall(i=1:nx)
-        Ae(i)=1._KND/(dxU(i)*dxPr(i))
-        Aw(i)=1._KND/(dxU(i-1)*dxPr(i))
-        Apx(i)=-(1._KND/dxU(i)+1._KND/dxU(i-1))/dxPr(i)
-       endforall
-       forall(j=1:ny)
-        An(j)=1._KND/(dyV(j)*dyPr(j))
-        As(j)=1._KND/(dyV(j-1)*dyPr(j))
-        Apy(j)=-(1._KND/dyV(j)+1._KND/dyV(j-1))/dyPr(j)
-       endforall
-       forall(k=1:nz)
-        At(k)=1._KND/(dzW(k)*dzPr(k))
-        Ab(k)=1._KND/(dzW(k-1)*dzPr(k))
-        Apz(k)=-(1._KND/dzW(k)+1._KND/dzW(k-1))/dzPr(k)
-       endforall
-       called=1
-
-  endif
- ! call POISSSOR(Phi,RHS)
-  write (*,*) "---------"
-  do l=1,maxpoissoniter
-  write (*,*) "l=",l
-  S=0
-   Phi2=Phi
-   call Bound_Phi(Phi)
-   do k=1,nz
-    do j=1,ny
-     do i=1,nx
-      cx(i)=2*RHS(i,j,k)-(Apx(i)+2*Apy(j)+2*Apz(k)+adirelaxpar)*Phi(i,j,k)-(Phi(i+1,j,k)*Ae(i)+Phi(i-1,j,k)*Aw(i)+&
-                                                                     2*Phi(i,j+1,k)*An(j)+2*Phi(i,j-1,k)*As(j)+&
-                                                                     2*Phi(i,j,k+1)*At(k)+2*Phi(i,j,k-1)*Ab(k))
-     enddo
-     bx(2:nx+1)=cx(1:nx)
-     dx(1:nx)=Apx(1:nx)-adirelaxpar
-!     write (*,*) "-",k,j
-     call TRIDAGGS(nx,Btype(We),Btype(Ea),Aw(1:nx),Ae(1:nx),dx(1:nx),bx(1:nx+2),cx(1:nx))
-      !write(*,*) "***"
-     !write(*,*) bx
-     S=S+sum(abs(Phi(1:nx,j,k)-bx(2:nx+1)))/(Prnx*Prny*Prnz)
-     Phi2(1:nx,j,k)=bx(2:nx+1)
-    enddo
-   enddo
-   write(*,*)"x", S
-
-   S=0
-   Phi=Phi2
-   call Bound_Phi(Phi)
-   do k=1,nz
-    do i=1,nx
-     do j=1,ny
-      cy(j)=(Apy(j)-adirelaxpar)*Phi(i,j,k)+(Phi(i,j+1,k)*An(j)+Phi(i,j-1,k)*As(j))
-     enddo
-     by(2:ny+1)=cy(1:ny)
-     dy(1:ny)=Apy(1:ny)-adirelaxpar
-
-     call TRIDAGGS(ny,Btype(So),Btype(No),As(1:ny),An(1:ny),dy(1:ny),by(1:ny+2),cy(1:ny))
-
-     S=S+sum(abs(Phi(i,1:ny,k)-by(2:ny+1)))/(Prnx*Prny*Prnz)
-     Phi2(i,1:ny,k)=by(2:ny+1)
-    enddo
-   enddo
-   write(*,*)"y", S
-
-
-   Phi=Phi2
-   call Bound_Phi(Phi)
-   do j=1,ny
-    do i=1,nx
-     do k=1,nz
-      cz(k)=(Apz(k)-adirelaxpar)*Phi(i,j,k)+(Phi(i,j,k+1)*At(k)+Phi(i,j,k-1)*Ab(k))
-     enddo
-     bz(2:nz+1)=cz(1:nz)
-     dz(1:nz)=Apz(1:nz)-adirelaxpar
-
-     call TRIDAGGS(nz,Btype(Bo),Btype(To),Ab(1:nz),At(1:nz),dz(1:nz),bz(1:nz+2),cz(1:nz))
-
-     S=S+sum(abs(Phi(i,j,1:nz)-bz(2:nz+1)))/(Prnx*Prny*Prnz)
-     Phi2(i,j,1:nz)=bz(2:nz+1)
-    enddo
-   enddo
-   Phi=Phi2
-   write (*,*) l,S
-
-  enddo
-
-  endsubroutine POISSADIGS
-
-
-  subroutine TRIDAGGS(n,btw,bte,aw,ae,ap,Phi,RHS)  !Solves tridiagonal system using Gauss Seidel
-  !tridiagonal system
-  integer,intent(in):: n,btw,bte
-  real(KND),dimension(1:),intent(in)::aw,ap,ae,RHS
-  real(KND),dimension(0:),intent(inout):: Phi
-  integer,parameter:: tridagiter=1000
-  real(KND),parameter::eps=1e-5
-  integer i,j
-  real(KND) S,p
-  do j=1,tridagiter
-   S=0
-   if (btw==PERIODIC) then
-               Phi(0)=Phi(n)
-   else
-               Phi(0)=Phi(1)
-   endif
-   if (bte==PERIODIC) then
-               Phi(n+1)=Phi(1)
-   else
-               Phi(n+1)=Phi(n)
-   endif
-   do i=1,n
-    p=(RHS(i)-aw(i)*Phi(i-1)-ae(i)*Phi(i+1))
-    p=p/ap(i)
-    S=S+(p-Phi(i))**2
-    p=Phi(i)
-   enddo
-  ! write (*,*) "tridag",j,S
-   if (S<eps) exit
-  enddo
-  endsubroutine TRIDAGGS
-
-
-
-
-
-
-
-
-
 
 
 
