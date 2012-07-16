@@ -1,6 +1,5 @@
 module POISSON
 
- use VTKARRAY
  use PARAMETERS
  use BOUNDARIES
  use MULTIGRID,   only: POISSMG
