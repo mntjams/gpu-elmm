@@ -36,9 +36,10 @@ implicit none
 contains
 
 
-  subroutine ScalarRK3(U,V,W,Temperature,Scalar,RKstage)
+  subroutine ScalarRK3(U,V,W,Temperature,Scalar,RKstage,fluxprofile)
     real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(KND),intent(inout) :: Temperature(-1:,-1:,-1:),Scalar(-1:,-1:,-1:,-1:)
+    real(KND),intent(out),optional   :: fluxprofile(0:)
     integer,intent(in)      :: RKstage
 
     real(KND),dimension(:,:,:,:),allocatable,save ::Scalar_adv,Scalar_2
@@ -145,7 +146,11 @@ contains
       endif
 
       temperature_adv = 0
-      call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND)
+      if (RKstage==3.and.present(fluxprofile)) then
+        call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,fluxprofile)
+      else
+        call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND)
+      end if
 
       temperature2 = temperature2+temperature_adv*beta(RKstage)
 
@@ -174,12 +179,17 @@ contains
 
 
 
-  subroutine ADVSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
+  subroutine ADVSCALAR(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile)
   real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
   real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in)      :: sctype
+  real(KND),intent(out),optional :: fluxprofile(0:)
 
-   call KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
+    if (present(fluxprofile)) then
+      call KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile)
+    else
+      call KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
+    endif
 
   endsubroutine ADVSCALAR
 
@@ -638,23 +648,34 @@ contains
 
 
 
-  subroutine KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
+  subroutine KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile) !Kappa scheme with flux limiter
   real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in) :: sctype
+  real(KND),intent(out),optional :: fluxprofile(0:)
+
 
    if (gridtype==uniformgrid) then
-    call KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef)
+     if (present(fluxprofile)) then
+       call KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile)
+     else
+       call KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef)
+     end if
    else
-    call KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef)
+     if (present(fluxprofile)) then
+       call KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile)
+     else
+       call KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef)
+     end if
    endif
   endsubroutine KAPPASCALAR
 
 
-  subroutine KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
+  subroutine KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile) !Kappa scheme with flux limiter
   real(KND),intent(inout) ::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in) :: sctype
+  real(KND),intent(out),optional :: fluxprofile(0:)
   integer i,j,k
   real(KND) A,Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
   real(KND) SL,SR,FLUX
@@ -753,6 +774,7 @@ contains
    enddo
   enddo
 
+  if (present(fluxprofile)) fluxprofile = 0
 
   do k = 0,Prnz
    do j = 1,Prny
@@ -763,19 +785,25 @@ contains
       FLUX = W(i,j,k)*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
      endif
 
+     if (present(fluxprofile)) fluxprofile(k) = fluxprofile(k) + FLUX
+
      SCAL2(i,j,k) = SCAL2(i,j,k)-Az*FLUX
      SCAL2(i,j,k+1) = SCAL2(i,j,k+1)+Az*FLUX
     enddo
    enddo
   enddo
+
+  if (present(fluxprofile)) fluxprofile = fluxprofile / (Prnx*Prny)
+
   endsubroutine KAPPASCALARUG
 
 
 
-  subroutine KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef) !Kappa scheme with flux limiter
+  subroutine KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile) !Kappa scheme with flux limiter
   real(KND),intent(inout) ::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in) :: sctype
+  real(KND),intent(out),optional :: fluxprofile(0:)
   integer i,j,k
   real(KND) A                       !Auxiliary variables to store muliplication constants for efficiency
   real(KND) SL,SR,FLUX
@@ -871,6 +899,7 @@ contains
    enddo
   enddo
 
+  if (present(fluxprofile)) fluxprofile = 0
 
   do k = 0,Prnz
    do j = 1,Prny
@@ -881,11 +910,16 @@ contains
       FLUX = W(i,j,k)*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
      endif
 
+     if (present(fluxprofile)) fluxprofile(k) = fluxprofile(k+1) + FLUX
+
      SCAL2(i,j,k) = SCAL2(i,j,k)-A*FLUX/dzPr(k)
      SCAL2(i,j,k+1) = SCAL2(i,j,k+1)+A*FLUX/dzPr(k+1)
     enddo
    enddo
   enddo
+
+  if (present(fluxprofile)) fluxprofile = fluxprofile/(Prnx * Prny)
+
   endsubroutine KAPPASCALARGG
 
 

@@ -6,6 +6,7 @@ module TSTEPS
   use PARAMETERS
   use BOUNDARIES, only: BoundU,Bound_Q
   use POISSON, only: Pr_Correct
+  use OUTPUTS, only: store,display,proftempfl
   use SCALARS, only: ScalarRK3
   use SMAGORINSKY, only: Smag, StabSmag, Vreman
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
@@ -220,7 +221,11 @@ contains
 
    ! Visc should be in memory, as it is computed by CPU for now.
 
-    call ScalarRK3(U,V,W,Temperature,Scalar,l)
+    if (store%BLprofiles>0.and.averaging==1) then
+      call ScalarRK3(U,V,W,Temperature,Scalar,l,proftempfl)
+    else
+      call ScalarRK3(U,V,W,Temperature,Scalar,l)
+    end if
 
 
 

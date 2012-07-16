@@ -11,7 +11,7 @@ module OUTPUTS
 
   private
   public OutTStep, Output, store, display, probes, NumProbes, AllocateOutputs,&
-         Tprobe, TOutputSwitches, TDisplaySwitches, SetFrameDomain
+         Tprobe, TOutputSwitches, TDisplaySwitches, SetFrameDomain, proftempfl
 
   real(KND),dimension(:),allocatable :: profuavg,profuavg2,profvavg,profvavg2,profuuavg,profvvavg,profwwavg,&
                                          profU,profV,profuu,profvv,profww,proftauavg,proftau,proftausgs,proftausgsavg,&
@@ -2096,19 +2096,19 @@ contains
     enddo
 
     if (present(temperature)) then
-     do k = 0,Prnz
-      S = 0
-      n = 0
-      do j = 1,Prny
-       do i = 1,Prnx
-        if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
-         S = S+0.5_KND*(temperature(i,j,k+1)+temperature(i,j,k))*(W(i,j,k))
-         n = n+1
-        endif
-       enddo
-      enddo
-      proftempfl(k)=S/max(n,1)
-     enddo
+!      do k = 0,Prnz
+!       S = 0
+!       n = 0
+!       do j = 1,Prny
+!        do i = 1,Prnx
+!         if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
+!          S = S+0.5_KND*(temperature(i,j,k+1)+temperature(i,j,k))*(W(i,j,k))
+!          n = n+1
+!         endif
+!        enddo
+!       enddo
+!       proftempfl(k)=S/max(n,1)
+!      enddo
 
      do k = 1,Prnz
       S = 0
