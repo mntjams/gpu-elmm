@@ -435,19 +435,19 @@ contains
     endif
 
 
-    if (abs(IBP%distx)<(xU(xi+1)-xU(xi-1))/100._KND) then      !if too close to the boundary, set the distance to 0
+    if (abs(IBP%distx)<(xU(xi+1)-xU(xi-1))/10._KND) then      !if too close to the boundary, set the distance to 0
       IBP%distx = 0
       dirx = 0
       IBP%dirx = 0
     endif
 
-    if (abs(IBP%disty)<(yU(yj+1)-yU(yj-1))/100._KND) then
+    if (abs(IBP%disty)<(yU(yj+1)-yU(yj-1))/10._KND) then
       IBP%disty = 0
       diry = 0
       IBP%diry = 0
     endif
 
-    if (abs(IBP%distz)<(zU(zk+1)-zU(zk-1))/100._KND) then
+    if (abs(IBP%distz)<(zU(zk+1)-zU(zk-1))/10._KND) then
       IBP%distz = 0
       dirz = 0
       IBP%dirz = 0
@@ -2322,7 +2322,7 @@ contains
 
     do
      if (associated(CurrentSB)) then
-      !$omp parallel do
+      !$omp parallel do private(i,j,k)
       do k = 0,Prnz+1
        do j = 0,Prny+1
         do i = 0,Prnx+1
@@ -2340,7 +2340,7 @@ contains
     CurrentSB => FirstSB
     do
      if (associated(CurrentSB)) then
-      !$omp parallel do
+      !$omp parallel do private(i,j,k)
       do k = 0,Unz+1
        do j = 0,Uny+1
          do i = 0,Unx+1
@@ -2359,7 +2359,7 @@ contains
     CurrentSB => FirstSB
     do
      if (associated(CurrentSB)) then
-      !$omp parallel do
+      !$omp parallel do private(i,j,k)
       do k = 0,Vnz+1
        do j = 0,Vny+1
         do i = 0,Vnx+1
@@ -2378,7 +2378,7 @@ contains
     CurrentSB => FirstSB
     do
      if (associated(CurrentSB)) then
-      !$omp parallel do
+      !$omp parallel do private(i,j,k)
       do k = 0,Wnz+1
        do j = 0,Wny+1
         do i = 0,Wnx+1
