@@ -1,10 +1,11 @@
 
 
     subroutine CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dx,dy,dz,dt,U2,V2,W2,U,V,W)
+
     implicit none
-#ifdef __HMPP
-    integer,parameter :: KND=4
-#endif
+
+#include "hmpp-include.f90"
+
     integer,intent(in)    :: Unx, Uny, Unz, Vnx, Vny, Vnz, Wnx, Wny, Wnz
     real(KND),intent(in)  :: dx, dy, dz, dt
     real(KND),intent(out) :: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3)

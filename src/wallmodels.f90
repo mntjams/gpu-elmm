@@ -1,6 +1,5 @@
 module Wallmodels
 use PARAMETERS
-! use SCALARS
 
 
 implicit none

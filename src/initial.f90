@@ -1921,7 +1921,7 @@ contains
 
     call SYSTEM_CLOCK(COUNT=clock)
 
-    seed=clock+37*(/(i-1,i=1,n)/)
+    seed=0!clock+37*(/(i-1,i=1,n)/)
     call RANDOM_SEED(PUT=seed)
 
     deallocate(seed)

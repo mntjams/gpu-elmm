@@ -19,7 +19,7 @@ program CLMM
 
   pi=2.0_KND*acos(0.0_KND)
 
-  !$hmpp enableGPU callsite
+!   !$hmpp enableGPU callsite
   call enableGPU(GPU)
 
 
@@ -145,10 +145,14 @@ program CLMM
 
 end program CLMM
 
-  !$hmpp enableGPU codelet, target=CUDA
+!   !$hmpp enableGPU codelet, target=CUDA
   subroutine enableGPU(GPU)
   implicit none
   integer,intent(out):: GPU
+#ifdef __HMPP
+   GPU = 1
+#else
    GPU = 0
-   !$hmppcg(CUDA) set GPU = 1
+#endif
+!    !$hmppcg set GPU = 1
   end subroutine enableGPU

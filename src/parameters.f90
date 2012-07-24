@@ -4,7 +4,7 @@ implicit none
   save
 
   integer,parameter :: DBL=selected_real_kind(p=15,r=200),SNG=selected_real_kind(p=6,r=37)
-  integer,parameter :: KND=SNG                                         !KND is default real kind for the whole program
+  integer,parameter :: KND=DBL                                         !KND is default real kind for the whole program
 
   integer,parameter :: TIM=KND                                         !Kind for time variables, can be double for very small timesteps.
                                                                        !It may affect performance

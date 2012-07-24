@@ -1,3 +1,71 @@
+module dummy
+  use PARAMETERS
+contains
+  !$hmpp <tsteps> PressureGrad codelet
+  subroutine PressureGrad(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxU,dyV,dzW,&
+                          Btype,prgradientx,prgradienty,&
+                          Pr,U,V,W,&
+                          dt,coef)
+  implicit none
+#ifdef __HMPP
+#include "hmpp-include.f90"
+#endif
+  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
+  real(KND),intent(in)    :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2),prgradientx,prgradienty,dt,coef
+  integer,intent(in)      :: Btype(6)
+  real(KND),intent(inout) :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
+  real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+  real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+  real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND) :: A
+  integer i,j,k
+
+   call BoundPr_GPU(Unx,Vny,Wnz,Prnx,Prny,Prnz,Btype,Pr)
+
+   A=-coef*dt
+   A=-coef*dt
+   A=-coef*dt
+
+   !$omp parallel
+   !$omp do
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg permute (k,i,j)
+   do k=1,Unz
+    do j=1,Uny
+     do i=1,Unx
+          U(i,j,k) = U(i,j,k)+A*(Pr(i+1,j,k)-Pr(i,j,k))/dxU(i)+A*prgradientx
+     enddo
+    enddo
+   enddo
+   !$omp enddo nowait
+   !$omp do
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg permute (k,i,j)
+   do k=1,Vnz
+    do j=1,Vny
+     do i=1,Vnx
+          V(i,j,k) = V(i,j,k)+A*(Pr(i,j+1,k)-Pr(i,j,k))/dyV(j)+A*prgradienty
+     enddo
+    enddo
+   enddo
+   !$omp enddo nowait
+   !$omp do
+   !$hmppcg grid blocksize 512x1
+   !$hmppcg permute (k,i,j)
+   do k=1,Wnz
+    do j=1,Wny
+     do i=1,Wnx
+          W(i,j,k) = W(i,j,k)+A*(Pr(i,j,k+1)-Pr(i,j,k))/dzW(k)
+     enddo
+    enddo
+   enddo
+   !$omp enddo nowait
+   !$omp end parallel
+  end subroutine PressureGrad
+#include "boundaries_GPU.f90"
+#include "tsteps_GPU.f90"
+end module dummy
+
 module TSTEPS
 
   use CDS, only: CDU, CDV, CDW, KappaU, KappaV, KappaW
@@ -11,6 +79,7 @@ module TSTEPS
   use SMAGORINSKY, only: Smag, StabSmag, Vreman
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
   use Wallmodels, only: ComputeViscsWM
+  use dummy
 
   implicit none
 
@@ -61,7 +130,7 @@ contains
     !$hmpp <tsteps> allocate
     !$hmpp <tsteps> advancedload, args[Vreman::Prnx,BoundU::Prny,BoundU::Prnz]
     !$hmpp <tsteps> advancedload, args[BoundU::nx,BoundU::ny,BoundU::nz,&
-    !$hmpp <tsteps>     BoundV::nx,BoundV::ny,BoundV::nz,BoundW::nx,BoundW::ny,BoundW::nz]
+    !$hmpp &     BoundV::nx,BoundV::ny,BoundV::nz,BoundW::nx,BoundW::ny,BoundW::nz]
 
     !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
 
@@ -117,6 +186,7 @@ contains
 
   do l=1,3
 
+write(*,*) "stage:",l
 
     if (debugparam>1) call system_clock(count=time1)
 
@@ -145,10 +215,14 @@ contains
     call Convection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
                        dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
                        U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,l,dt)
+!$hmpp <tsteps> delegatedstore, args[AttenuateOut::U,AttenuateOut::V,AttenuateOut::W]
+write(*,*) "probe-",U(Prnx/2,Prny/2,1),V(Prnx/2,Prny/2,1),W(Prnx/2,Prny/2,1)
 
 
     call OtherTerms(U,V,W,U2,V2,W2,Pr,2._KND*alpha(l))
 
+!$hmpp <tsteps> delegatedstore, args[AttenuateOut::U,AttenuateOut::V,AttenuateOut::W]
+write(*,*) "probe*",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
 
 
     if (Btype(To) ==FreeSlipBuff)  then
@@ -156,6 +230,8 @@ contains
         call AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,&
                           zPr,zW,U2,V2,W2,temperature,buoyancy)
     endif
+!$hmpp <tsteps> delegatedstore, args[AttenuateOut::U,AttenuateOut::V,AttenuateOut::W]
+write(*,*) "probe/",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
 
     if (Btype(Ea) ==OutletBuff) then
         !$hmpp <tsteps> AttenuateOut callsite, args[*].noupdate = true
@@ -169,6 +245,7 @@ contains
       !$hmpp <tsteps> delegatedstore, args[AttenuateOut::temperature]
     endif
 
+write(*,*) "probe+",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
 
 
 
@@ -186,6 +263,7 @@ contains
         call IBMassSources(Q,U2,V2,W2)
     endif
 
+write(*,*) "probe-",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
 
 
 
@@ -197,6 +275,7 @@ contains
      endif
     endif
 
+write(*,*) "probe*",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
 
     if (l==1) delta = 0
 !     if (debuglevel>0) then
@@ -246,6 +325,8 @@ contains
                         xPr,xU,U,V,W,temperature,buoyancy)
     endif
 
+!$hmpp <tsteps> delegatedstore, args[AttenuateOut2::U,AttenuateOut2::V,AttenuateOut2::W]
+write(*,*) "probe/",U(Prnx/2,Prny/2,1),V(Prnx/2,Prny/2,1),W(Prnx/2,Prny/2,1)
 
     !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
     call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
@@ -277,7 +358,7 @@ contains
 !  subroutine UpdateU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,U,V,W,U2,V2,W2)
 !  implicit none
 ! #ifdef __HMPP
-!  integer,parameter :: KND = 4
+! #include "hmpp-include.f90"
 ! #endif
 !  integer,intent(in)   :: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
 !  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out)  :: U
@@ -330,8 +411,7 @@ contains
                        U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev,dt)
   implicit none
 #ifdef __HMPP
-  integer,parameter :: KND = 4
-  intrinsic abs
+#include "hmpp-include.f90"
 #endif
 
   integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,lev
@@ -349,6 +429,7 @@ contains
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: temperature
   real(KND),dimension(1:3),intent(in) :: beta,rho
   integer i,j,k
+  intrinsic abs
 
       if (lev>1) then
         !$hmppcg grid blocksize 512x1
@@ -526,7 +607,7 @@ contains
                U,V,W,dt)
   implicit none
 #ifdef __HMPP
-  integer,parameter :: KND = 4,TIM = 4
+#include "hmpp-include.f90"
   intrinsic min,max,abs
 #endif
   integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,steady
@@ -576,7 +657,7 @@ contains
   pure subroutine BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,grav_acc,temperature_ref,W2,theta,dt)
   implicit none
 #ifdef __HMPP
-  integer,parameter :: KND = 4
+#include "hmpp-include.f90"
 #endif
   integer,intent(in) :: Prnx,Prny,Prnz,Wnx,Wny,Wnz
   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W2
@@ -606,7 +687,7 @@ contains
                                  U2,V2,U,V,dt)
   implicit none
 #ifdef __HMPP
-  integer,parameter :: KND = 4
+#include "hmpp-include.f90"
 #endif
   integer,intent(in) :: Unx,Uny,Unz,Vnx,Vny,Vnz
   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
@@ -671,7 +752,8 @@ contains
                      Btype,prgradientx,prgradienty,&
                      Pr,U2,V2,W2,&
                      dt,coef)
-
+!$hmpp <tsteps> delegatedstore, args[PressureGrad::U,PressureGrad::V,PressureGrad::W]
+write(*,*) "probe!+",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
 
    Re_gt_0: if (Re>0) then
 
@@ -687,6 +769,8 @@ contains
                   dxPr,dyPr,dzPr,dxU,dyV,dzW,&
                   U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
                   dt,coef)
+!$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
+write(*,*) "probe!-",U3(Prnx/2,Prny/2,1),V3(Prnx/2,Prny/2,1),W3(Prnx/2,Prny/2,1)
 
 
      call IBMomentum(U2,V2,W2,U3,V3,W3)
@@ -705,6 +789,8 @@ contains
                             Uin,Vin,Win,&
                             U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
                             coef,maxCNiter,epsCN,it,S)
+!$hmpp <tsteps> delegatedstore, args[PressureGrad::U,PressureGrad::V,PressureGrad::W]
+write(*,*) "probe!*",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
 
      !$hmpp <tsteps> delegatedstore, args[UnifRedBlack::iters,UnifRedBlack::residuum]
 
@@ -745,152 +831,6 @@ contains
     write(*,*) "Mean friction:", S
    endif
   endsubroutine OtherTerms
-
-
-  !$hmpp <tsteps> PressureGrad codelet
-  subroutine PressureGrad(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxU,dyV,dzW,&
-                          Btype,prgradientx,prgradienty,&
-                          Pr,U,V,W,&
-                          dt,coef)
-  implicit none
-#ifdef __HMPP
-  integer,parameter :: KND = 4
-#endif
-  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
-  real(KND),intent(in)    :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2),prgradientx,prgradienty,dt,coef
-  integer,intent(in)      :: Btype(6)
-  real(KND),intent(inout) :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
-  real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
-  real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
-  real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND) :: A
-  integer i,j,k
-
-   call BoundPr_GPU(Unx,Vny,Wnz,Prnx,Prny,Prnz,Btype,Pr)
-
-   A=-coef*dt
-   A=-coef*dt
-   A=-coef*dt
-
-   !$omp parallel
-   !$omp do
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg permute (k,i,j)
-   do k=1,Unz
-    do j=1,Uny
-     do i=1,Unx
-          U(i,j,k) = U(i,j,k)+A*(Pr(i+1,j,k)-Pr(i,j,k))/dxU(i)+A*prgradientx
-     enddo
-    enddo
-   enddo
-   !$omp enddo nowait
-   !$omp do
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg permute (k,i,j)
-   do k=1,Vnz
-    do j=1,Vny
-     do i=1,Vnx
-          V(i,j,k) = V(i,j,k)+A*(Pr(i,j+1,k)-Pr(i,j,k))/dyV(j)+A*prgradienty
-     enddo
-    enddo
-   enddo
-   !$omp enddo nowait
-   !$omp do
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg permute (k,i,j)
-   do k=1,Wnz
-    do j=1,Wny
-     do i=1,Wnx
-          W(i,j,k) = W(i,j,k)+A*(Pr(i,j,k+1)-Pr(i,j,k))/dzW(k)
-     enddo
-    enddo
-   enddo
-   !$omp enddo nowait
-   !$omp end parallel
-  end subroutine PressureGrad
-
-
-
-  !$hmpp <tsteps> ForwEul codelet
-  subroutine ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-                    dxPr,dyPr,dzPr,dxU,dyV,dzW,&
-                    U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
-                    dt,coef)
-  implicit none
-#ifdef __HMPP
-  integer,parameter :: KND = 4
-#endif
-  integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
-
-  real(KND),intent(in):: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),intent(in):: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3),V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),intent(out):: U3(-2:Unx+3,-2:Uny+3,-2:Unz+3),V3(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W3(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),intent(in):: Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-  real(KND),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
-  real(KND),intent(in) :: dxPr(-2:Prnx+3),dyPr(-2:Prny+3),dzPr(-2:Prnz+3),dt,coef
-  real(KND) :: Ap
-  integer i,j,k
-
-     Ap = coef*dt
-
-     !$hmppcg grid blocksize 512x1
-     !$hmppcg permute (k,i,j)
-     do k=1,Unz    !Forward Euler for the first approximation
-      do j=1,Uny
-       do i=1,Unx
-        U3(i,j,k) = U(i,j,k)+U2(i,j,k)+Ap*(&
-        ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
-        Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
-         0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
-         (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-         ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
-         (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))))
-       enddo
-      enddo
-     enddo
-     !$hmppcg grid blocksize 512x1
-     !$hmppcg permute (k,i,j)
-     do k=1,Vnz
-      do j=1,Vny
-       do i=1,Vnx
-        V3(i,j,k) = V(i,j,k)+V2(i,j,k)+Ap*(&
-        ((Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
-         Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
-         0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
-        (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-         ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
-         (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k))))
-       enddo
-      enddo
-     enddo
-     !$hmppcg grid blocksize 512x1
-     !$hmppcg permute (k,i,j)
-     do k=1,Wnz
-      do j=1,Wny
-       do i=1,Wnx
-        W3(i,j,k) = W(i,j,k)+W2(i,j,k)+Ap*(&
-        ((0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
-        (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-         ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
-         (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j))+&
-         (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))/dzPr(k+1)-&
-         Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k)))
-       enddo
-      enddo
-     enddo
-  end subroutine ForwEul
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1396,355 +1336,6 @@ contains
 
 
 
-
-  !Slower using HMPP than CPU, but if we avoid memory transfer, it is still profitable.
-
-  !$hmpp <tsteps> AttenuateTop codelet
-  subroutine AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,zPr,zW,U,V,W,temperature,buoyancy)
-  implicit none
-#ifdef __HMPP
-   integer, parameter:: KND = 4
-   integer,parameter       :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
-                                TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
-   integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
-#endif
-  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
-  integer,intent(in)      :: Btype(6)
-  real(KND),intent(in)    :: zPr(-2:Prnz+3)
-  real(KND),intent(in)    :: zW(-3:Prnz+3)
-  real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
-  real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
-  real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
-  integer i,j,k,bufn,mini,maxi,maxUi
-  real(KND) ze,zs,zb,p
-  real(KND),dimension(:),allocatable :: DF,avg
-  intrinsic max,min
-
-    if (Btype(We)==DIRICHLET.or.Btype(We)==TURBULENTINLET.or.Btype(We)==INLETFROMFILE) then
-      mini = min(5,Unx)
-    else
-      mini = 1
-    endif
-
-    if (Btype(Ea)==DIRICHLET.or.Btype(We)==TURBULENTINLET.or.Btype(We)==OUTLETBUFF) then
-      maxi = max(1,Prnx-5)
-      maxUi = max(1,Unx-5)
-    else
-      maxi = Prnx
-      maxUi = Unx
-    endif
-
-    bufn = max(5,Prnz/4)
-    zs = zW(Prnz-bufn)
-    ze = zW(Prnz)
-
-    allocate(DF(min(Unz,Vnz,Wnz)-bufn:max(Unz,Vnz,Wnz)))
-    allocate(avg(min(Unz,Vnz,Wnz)-bufn:max(Unz,Vnz,Wnz)))
-
-
-
-    do k=Unz-bufn,Unz
-      avg(k) = 0
-    enddo
-
-    do k=Unz-bufn,Unz
-      p = 0
-      !$hmppcg grid blocksize 512x1
-      !$hmppcg gridify (j,i) global(p), reduce(+:p)
-      do j=1,Uny
-        do i=mini,maxUi
-          p = p+U(i,j,k)
-        enddo
-      enddo
-      avg(k) = p
-    enddo
-
-    do k=Unz-bufn,Unz
-      avg(k) = avg(k)/((maxUi-mini+1)*Uny)
-    enddo
-
-    do k=Unz-bufn,Unz
-      zb=(zPr(k)-zs)/(ze-zs)
-      DF(k) = DampF(zb)
-    enddo
-
-    !$hmppcg grid blocksize 512x1
-    !$hmppcg permute(k,i,j)
-    !$hmppcg gridify (k,i)
-    do k=Unz-bufn,Unz
-      do j=-1,Uny+1
-        do i=-1,Unx+1
-          U(i,j,k) = avg(k)+DF(k)*(U(i,j,k)-avg(k))
-        enddo
-      enddo
-    enddo
-
-
-
-    do k=Vnz-bufn,Vnz
-      avg(k) = 0
-    enddo
-    do k=Vnz-bufn,Vnz
-      p = 0
-      !$hmppcg grid blocksize 512x1
-      !$hmppcg gridify (j,i) global(p), reduce(+:p)
-      do j=1,Vny
-        do i=mini,maxi
-          p = p+V(i,j,k)
-        enddo
-      enddo
-      avg(k) = p
-    enddo
-    do k=Vnz-bufn,Vnz
-      avg(k) = avg(k)/((maxi-mini+1)*Vny)
-    enddo
-    do k=Vnz-bufn,Vnz
-      zb=(zPr(k)-zs)/(ze-zs)
-      DF(k) = DampF(zb)
-    enddo
-    !$hmppcg grid blocksize 512x1
-    !$hmppcg permute(k,i,j)
-    !$hmppcg gridify (k,i)
-    do k=Vnz-bufn,Vnz
-      do j=-1,Vny+1
-        do i=-1,Vnx+1
-          V(i,j,k) = avg(k)+DF(k)*(V(i,j,k)-avg(k))
-        enddo
-      enddo
-    enddo
-
-
-
-    do k=Wnz-bufn,Wnz
-      avg(k) = 0
-    enddo
-
-    do k=Wnz-bufn,Wnz
-      p = 0
-      !$hmppcg grid blocksize 512x1
-      !$hmppcg gridify (j,i) global(p), reduce(+:p)
-      do j=1,Wny
-        do i=mini,maxi
-          p = p+W(i,j,k)
-        enddo
-      enddo
-      avg(k) = p
-    enddo
-
-    do k=Wnz-bufn,Wnz
-      avg(k) = avg(k)/((maxi-mini+1)*Wny)
-    enddo
-
-    do k=Wnz-bufn,Wnz
-      zb=(zW(k)-zs)/(ze-zs)
-      DF(k) = DampF(zb)
-    enddo
-
-    !$hmppcg grid blocksize 512x1
-    !$hmppcg permute(k,i,j)
-    !$hmppcg gridify (k,i)
-    do k=Wnz-bufn,Wnz
-      do j=-1,Wny+1
-        do i=-1,Wnx+1
-          W(i,j,k) = avg(k)+DF(k)*(W(i,j,k)-avg(k))
-        enddo
-      enddo
-    enddo
-
-
-
-    if (buoyancy==1) then
-
-      do k=Prnz-bufn,Prnz
-        avg(k) = 0
-      enddo
-
-      do k=Prnz-bufn,Prnz
-        p = 0
-        !$hmppcg grid blocksize 512x1
-        !$hmppcg gridify (j,i) global(p), reduce(+:p)
-        do j=1,Prny
-          do i=mini,maxi
-            p = p+temperature(i,j,k)
-          enddo
-        enddo
-        avg(k) = p
-      enddo
-
-      do k=Prnz-bufn,Prnz
-        avg(k) = avg(k)/((maxi-mini+1)*Prny)
-      enddo
-
-      do k=Prnz-bufn,Prnz
-        zb=(zPr(k)-zs)/(ze-zs)
-        DF(k) = DampF(zb)
-      enddo
-
-      !$hmppcg grid blocksize 512x1
-      !$hmppcg permute(k,i,j)
-      !$hmppcg gridify (k,i)
-      do k=Prnz-bufn,Prnz
-        do j=-1,Prny+1
-          do i=-1,Prnx+1
-            temperature(i,j,k) = avg(k)+DF(k)*(temperature(i,j,k)-avg(k))
-          enddo
-        enddo
-      enddo
-
-    endif
-
-  endsubroutine AttenuateTop
-
-
-
-  !$hmpp <tsteps> AttenuateOut codelet
-  !$hmpp <tsteps> AttenuateOut2 codelet
-  subroutine AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,xPr,xU,U,V,W,temperature,buoyancy)
-  implicit none
-#ifdef __HMPP
-   integer, parameter:: KND = 4
-#endif
-  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
-  real(KND),intent(in)    :: xPr(-2:Prnx+3)
-  real(KND),intent(in)    :: xU(-3:Prnx+3)
-  real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
-  real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
-  real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
-  integer i,j,k,bufn
-  real(KND) p,xe,xs,xb,DF
-  intrinsic max
-
-    bufn = max(10,Prnx/8)
-    xs = xU(Prnx-bufn)
-    xe = xU(Prnx)
-
-    !$hmppcg grid blocksize 512x1
-    !$hmppcg gridify (k,j) private(p,xb,DF)
-    do k=1,Unz
-      do j=1,Uny
-        p = 0
-        do i=2*Unx/3,Unx-4
-          p = p+U(i,j,k)
-        enddo
-        p = p/(Unx-4-2*Unx/3+1)
-        do i=Unx-bufn,Unx+1
-          xb=(xU(i)-xs)/(xe-xs)
-          DF = DampF(xb)
-          U(i,j,k) = p+DF*(U(i,j,k)-p)
-        enddo
-      enddo
-    enddo
-
-    !$hmppcg grid blocksize 512x1
-    !$hmppcg gridify (k,j) private(p,xb,DF)
-    do k=1,Vnz
-      do j=1,Vny
-        p = 0
-        do i=2*Vnx/3,Vnx-4
-          p = p+V(i,j,k)
-        enddo
-        p = p/(Vnx-4-2*Vnx/3+1)
-        do i=Vnx-bufn,Vnx+1
-          xb=(xPr(i)-xs)/(xe-xs)
-          DF = DampF(xb)
-          V(i,j,k) = p+DF*(V(i,j,k)-p)
-        enddo
-      enddo
-    enddo
-
-    !$hmppcg grid blocksize 512x1
-    !$hmppcg gridify (k,j) private(p,xb,DF)
-    do k=1,Wnz
-      do j=1,Wny
-        p = 0
-        do i=2*Wnx/3,Wnx-4
-          p = p+W(i,j,k)
-        enddo
-        p = p/((Wnx-4-2*Wnx/3+1))
-        do i=Wnx-bufn,Wnx+1
-          xb=(xPr(i)-xs)/(xe-xs)
-          DF = DampF(xb)
-          W(i,j,k) = p+DF*(W(i,j,k)-p)
-        enddo
-      enddo
-    enddo
-
-    if (buoyancy==1) then
-      !$hmppcg grid blocksize 512x1
-      !$hmppcg gridify (k,j) private(p,xb,DF)
-      do k=1,Prnz
-        do j=1,Prny
-          p = 0
-          do i=2*Prnx/3,Prnx-4
-            p = p+temperature(i,j,k)
-          enddo
-          p = p/(Prnx-4-2*Prnx/3+1)
-          do i=Prnx-bufn,Prnx+1
-            xb=(xPr(i)-xs)/(xe-xs)
-            DF = DampF(xb)
-            temperature(i,j,k) = p+DF*(temperature(i,j,k)-p)
-          enddo
-        enddo
-      enddo
-    endif
-
-  endsubroutine AttenuateOut
-
-
-
-  pure function DampF(x)
-  implicit none
-#ifdef __HMPP
-   integer, parameter:: KND = 4,TIM = 4
-#endif
-  real(KND) DampF
-  real(KND),intent(in)::x
-  intrinsic exp
-
-  if (x<=0) then
-    DampF = 1
-  elseif (x>=1) then
-    DampF = 0
-  else
-   DampF=(1-0.1_KND*x**2)*(1-(1-exp(10._KND*x**2))/(1-exp(10._KND)))
-  endif
-  endfunction Dampf
-
-
-  !$hmpp <tsteps> NullInterior codelet
-  subroutine NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-                          nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
-  implicit none
-#ifdef __HMPP
-   integer, parameter:: KND = 4,TIM = 4
-#endif
-  integer,intent(in)      :: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,nUnull,nVnull,nWnull
-  integer,dimension(3,nUnull),intent(in)      :: Unull
-  integer,dimension(3,nVnull),intent(in)      :: Vnull
-  integer,dimension(3,nWnull),intent(in)      :: Wnull
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: U
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: V
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W
-  integer i
-
-
-    do i=1,nUnull
-      U(Unull(1,i),Unull(2,i),Unull(3,i)) = 0
-    enddo
-
-    do i=1,nVnull
-      V(Vnull(1,i),Vnull(2,i),Vnull(3,i)) = 0
-    enddo
-
-    do i=1,nWnull
-      W(Wnull(1,i),Wnull(2,i),Wnull(3,i)) = 0
-    enddo
-
-  endsubroutine NullInterior
-
-
   subroutine SubgridStresses(U,V,W,Pr)
   use Geometric, only: ScalFlIBPoints, TIBPoint_Viscosity
 
@@ -1920,6 +1511,461 @@ contains
 
 
 
+end module TSTEPS
+
+
+
+
+
+
+  !$hmpp <tsteps> ForwEul codelet
+  subroutine ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                    dxPr,dyPr,dzPr,dxU,dyV,dzW,&
+                    U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
+                    dt,coef)
+
+  implicit none
+
+#include "hmpp-include.f90"
+
+  integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
+
+  real(KND),intent(in):: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND),intent(in):: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3),V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND),intent(out):: U3(-2:Unx+3,-2:Uny+3,-2:Unz+3),V3(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W3(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND),intent(in):: Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(KND),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
+  real(KND),intent(in) :: dxPr(-2:Prnx+3),dyPr(-2:Prny+3),dzPr(-2:Prnz+3),dt,coef
+  real(KND) :: Ap
+  integer i,j,k
+
+     Ap = coef*dt
+
+     !$hmppcg grid blocksize 512x1
+     !$hmppcg permute (k,i,j)
+     do k=1,Unz    !Forward Euler for the first approximation
+      do j=1,Uny
+       do i=1,Unx
+        U3(i,j,k) = U(i,j,k)+U2(i,j,k)+Ap*(&
+        ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
+        Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
+         0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
+         (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+         ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
+         (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))))
+       enddo
+      enddo
+     enddo
+     !$hmppcg grid blocksize 512x1
+     !$hmppcg permute (k,i,j)
+     do k=1,Vnz
+      do j=1,Vny
+       do i=1,Vnx
+        V3(i,j,k) = V(i,j,k)+V2(i,j,k)+Ap*(&
+        ((Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
+         Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
+         0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
+        (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+         ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
+         (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k))))
+       enddo
+      enddo
+     enddo
+     !$hmppcg grid blocksize 512x1
+     !$hmppcg permute (k,i,j)
+     do k=1,Wnz
+      do j=1,Wny
+       do i=1,Wnx
+        W3(i,j,k) = W(i,j,k)+W2(i,j,k)+Ap*(&
+        ((0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
+        (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+         ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
+         (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j))+&
+         (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))/dzPr(k+1)-&
+         Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k)))
+       enddo
+      enddo
+     enddo
+  end subroutine ForwEul
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  !Slower using HMPP than CPU, but if we avoid memory transfer, it is still profitable.
+
+  !$hmpp <tsteps> AttenuateTop codelet
+  subroutine AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,zPr,zW,U,V,W,temperature,buoyancy)
+
+  implicit none
+
+#include "hmpp-include.f90"
+
+  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
+  integer,intent(in)      :: Btype(6)
+  real(KND),intent(in)    :: zPr(-2:Prnz+3)
+  real(KND),intent(in)    :: zW(-3:Prnz+3)
+  real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+  real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+  real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
+  integer i,j,k,bufn,mini,maxi,maxUi
+  real(KND) ze,zs,zb,p
+  real(KND),dimension(:),allocatable :: DF,avg
+  real(KND) :: DampF
+  intrinsic max,min
+
+    if (Btype(We)==DIRICHLET.or.Btype(We)==TURBULENTINLET.or.Btype(We)==INLETFROMFILE) then
+      mini = min(5,Unx)
+    else
+      mini = 1
+    endif
+
+    if (Btype(Ea)==DIRICHLET.or.Btype(We)==TURBULENTINLET.or.Btype(We)==OUTLETBUFF) then
+      maxi = max(1,Prnx-5)
+      maxUi = max(1,Unx-5)
+    else
+      maxi = Prnx
+      maxUi = Unx
+    endif
+
+    bufn = max(5,Prnz/4)
+    zs = zW(Prnz-bufn)
+    ze = zW(Prnz)
+
+    allocate(DF(min(Unz,Vnz,Wnz)-bufn:max(Unz,Vnz,Wnz)))
+    allocate(avg(min(Unz,Vnz,Wnz)-bufn:max(Unz,Vnz,Wnz)))
+
+
+
+    do k=Unz-bufn,Unz
+      avg(k) = 0
+    enddo
+
+    do k=Unz-bufn,Unz
+      p = 0
+!       !$hmppcg grid blocksize 512x1
+!       !$hmppcg gridify (j,i) global(p), reduce(+:p)
+      do j=1,Uny
+        do i=mini,maxUi
+          p = p+U(i,j,k)
+        enddo
+      enddo
+      avg(k) = p
+    enddo
+
+    do k=Unz-bufn,Unz
+      avg(k) = avg(k)/((maxUi-mini+1)*Uny)
+    enddo
+
+    do k=Unz-bufn,Unz
+      zb=(zPr(k)-zs)/(ze-zs)
+      DF(k) = DampF(zb)
+    enddo
+
+    !$hmppcg grid blocksize 512x1
+    !$hmppcg permute(k,i,j)
+    !$hmppcg gridify (k,i)
+    do k=Unz-bufn,Unz
+      do j=-1,Uny+1
+        do i=-1,Unx+1
+          U(i,j,k) = avg(k)+DF(k)*(U(i,j,k)-avg(k))
+        enddo
+      enddo
+    enddo
+
+
+
+    do k=Vnz-bufn,Vnz
+      avg(k) = 0
+    enddo
+    do k=Vnz-bufn,Vnz
+      p = 0
+!       !$hmppcg grid blocksize 512x1
+!       !$hmppcg gridify (j,i) global(p), reduce(+:p)
+      do j=1,Vny
+        do i=mini,maxi
+          p = p+V(i,j,k)
+        enddo
+      enddo
+      avg(k) = p
+    enddo
+    do k=Vnz-bufn,Vnz
+      avg(k) = avg(k)/((maxi-mini+1)*Vny)
+    enddo
+    do k=Vnz-bufn,Vnz
+      zb=(zPr(k)-zs)/(ze-zs)
+      DF(k) = DampF(zb)
+    enddo
+    !$hmppcg grid blocksize 512x1
+    !$hmppcg permute(k,i,j)
+    !$hmppcg gridify (k,i)
+    do k=Vnz-bufn,Vnz
+      do j=-1,Vny+1
+        do i=-1,Vnx+1
+          V(i,j,k) = avg(k)+DF(k)*(V(i,j,k)-avg(k))
+        enddo
+      enddo
+    enddo
+
+
+
+    do k=Wnz-bufn,Wnz
+      avg(k) = 0
+    enddo
+
+    do k=Wnz-bufn,Wnz
+      p = 0
+!       !$hmppcg grid blocksize 512x1
+!       !$hmppcg gridify (j,i) global(p), reduce(+:p)
+      do j=1,Wny
+        do i=mini,maxi
+          p = p+W(i,j,k)
+        enddo
+      enddo
+      avg(k) = p
+    enddo
+
+    do k=Wnz-bufn,Wnz
+      avg(k) = avg(k)/((maxi-mini+1)*Wny)
+    enddo
+
+    do k=Wnz-bufn,Wnz
+      zb=(zW(k)-zs)/(ze-zs)
+      DF(k) = DampF(zb)
+    enddo
+
+    !$hmppcg grid blocksize 512x1
+    !$hmppcg permute(k,i,j)
+    !$hmppcg gridify (k,i)
+    do k=Wnz-bufn,Wnz
+      do j=-1,Wny+1
+        do i=-1,Wnx+1
+          W(i,j,k) = avg(k)+DF(k)*(W(i,j,k)-avg(k))
+        enddo
+      enddo
+    enddo
+
+
+
+    if (buoyancy==1) then
+
+      do k=Prnz-bufn,Prnz
+        avg(k) = 0
+      enddo
+
+      do k=Prnz-bufn,Prnz
+        p = 0
+!         !hmppcg grid blocksize 512x1
+!         !hmppcg gridify (j,i) global(p), reduce(+:p)
+        do j=1,Prny
+          do i=mini,maxi
+            p = p+temperature(i,j,k)
+          enddo
+        enddo
+        avg(k) = p
+      enddo
+
+      do k=Prnz-bufn,Prnz
+        avg(k) = avg(k)/((maxi-mini+1)*Prny)
+      enddo
+
+      do k=Prnz-bufn,Prnz
+        zb=(zPr(k)-zs)/(ze-zs)
+        DF(k) = DampF(zb)
+      enddo
+
+      !$hmppcg grid blocksize 512x1
+      !$hmppcg permute(k,i,j)
+      !$hmppcg gridify (k,i)
+      do k=Prnz-bufn,Prnz
+        do j=-1,Prny+1
+          do i=-1,Prnx+1
+            temperature(i,j,k) = avg(k)+DF(k)*(temperature(i,j,k)-avg(k))
+          enddo
+        enddo
+      enddo
+
+    endif
+
+  endsubroutine AttenuateTop
+
+
+
+  !$hmpp <tsteps> AttenuateOut codelet
+  !$hmpp <tsteps> AttenuateOut2 codelet
+  subroutine AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,xPr,xU,U,V,W,temperature,buoyancy)
+
+  implicit none
+
+#include "hmpp-include.f90"
+
+  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
+  real(KND),intent(in)    :: xPr(-2:Prnx+3)
+  real(KND),intent(in)    :: xU(-3:Prnx+3)
+  real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+  real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+  real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
+  integer i,j,k,bufn
+  real(KND) p,xe,xs,xb,DF
+  real(KND) :: DampF
+  intrinsic max
+
+    bufn = max(10,Prnx/8)
+    xs = xU(Prnx-bufn)
+    xe = xU(Prnx)
+
+    !$hmppcg grid blocksize 512x1
+    !$hmppcg gridify (k,j) private(p,xb,DF)
+    do k=1,Unz
+      do j=1,Uny
+        p = 0
+        do i=2*Unx/3,Unx-4
+          p = p+U(i,j,k)
+        enddo
+        p = p/(Unx-4-2*Unx/3+1)
+        do i=Unx-bufn,Unx+1
+          xb=(xU(i)-xs)/(xe-xs)
+          DF = DampF(xb)
+          U(i,j,k) = p+DF*(U(i,j,k)-p)
+        enddo
+      enddo
+    enddo
+
+    !$hmppcg grid blocksize 512x1
+    !$hmppcg gridify (k,j) private(p,xb,DF)
+    do k=1,Vnz
+      do j=1,Vny
+        p = 0
+        do i=2*Vnx/3,Vnx-4
+          p = p+V(i,j,k)
+        enddo
+        p = p/(Vnx-4-2*Vnx/3+1)
+        do i=Vnx-bufn,Vnx+1
+          xb=(xPr(i)-xs)/(xe-xs)
+          DF = DampF(xb)
+          V(i,j,k) = p+DF*(V(i,j,k)-p)
+        enddo
+      enddo
+    enddo
+
+    !$hmppcg grid blocksize 512x1
+    !$hmppcg gridify (k,j) private(p,xb,DF)
+    do k=1,Wnz
+      do j=1,Wny
+        p = 0
+        do i=2*Wnx/3,Wnx-4
+          p = p+W(i,j,k)
+        enddo
+        p = p/((Wnx-4-2*Wnx/3+1))
+        do i=Wnx-bufn,Wnx+1
+          xb=(xPr(i)-xs)/(xe-xs)
+          DF = DampF(xb)
+          W(i,j,k) = p+DF*(W(i,j,k)-p)
+        enddo
+      enddo
+    enddo
+
+    if (buoyancy==1) then
+      !$hmppcg grid blocksize 512x1
+      !$hmppcg gridify (k,j) private(p,xb,DF)
+      do k=1,Prnz
+        do j=1,Prny
+          p = 0
+          do i=2*Prnx/3,Prnx-4
+            p = p+temperature(i,j,k)
+          enddo
+          p = p/(Prnx-4-2*Prnx/3+1)
+          do i=Prnx-bufn,Prnx+1
+            xb=(xPr(i)-xs)/(xe-xs)
+            DF = DampF(xb)
+            temperature(i,j,k) = p+DF*(temperature(i,j,k)-p)
+          enddo
+        enddo
+      enddo
+    endif
+
+  endsubroutine AttenuateOut
+
+
+
+  pure function DampF(x)
+
+  implicit none
+
+#include "hmpp-include.f90"
+
+  real(KND) DampF
+  real(KND),intent(in)::x
+  intrinsic exp
+
+  if (x<=0) then
+    DampF = 1
+  elseif (x>=1) then
+    DampF = 0
+  else
+   DampF=(1-0.1_KND*x**2)*(1-(1-exp(10._KND*x**2))/(1-exp(10._KND)))
+  endif
+  endfunction Dampf
+
+
+  !$hmpp <tsteps> NullInterior codelet
+  subroutine NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                          nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
+
+  implicit none
+
+#include "hmpp-include.f90"
+
+  integer,intent(in)      :: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,nUnull,nVnull,nWnull
+  integer,dimension(3,nUnull),intent(in)      :: Unull
+  integer,dimension(3,nVnull),intent(in)      :: Vnull
+  integer,dimension(3,nWnull),intent(in)      :: Wnull
+  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: U
+  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: V
+  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W
+  integer i
+
+
+    do i=1,nUnull
+      U(Unull(1,i),Unull(2,i),Unull(3,i)) = 0
+    enddo
+
+    do i=1,nVnull
+      V(Vnull(1,i),Vnull(2,i),Vnull(3,i)) = 0
+    enddo
+
+    do i=1,nWnull
+      W(Wnull(1,i),Wnull(2,i),Wnull(3,i)) = 0
+    enddo
+
+  endsubroutine NullInterior
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1973,11 +2019,11 @@ contains
 
  !U,V,W
  !$hmpp <tsteps> map, args[Vreman::U,Convection::U,ForwEul::U,UnifRedBlack::U,TimeStepEul::U,&
-  !$hmpp <tsteps>   AttenuateOut2::U,NullInterior::U]
+  !$hmpp &   AttenuateOut2::U,NullInterior::U]
  !$hmpp <tsteps> map, args[Vreman::V,Convection::V,ForwEul::V,UnifRedBlack::V,TimeStepEul::V,&
-  !$hmpp  <tsteps>  AttenuateOut2::V,NullInterior::V]
+  !$hmpp  &  AttenuateOut2::V,NullInterior::V]
  !$hmpp <tsteps> map, args[Vreman::W,Convection::W,ForwEul::W,UnifRedBlack::W,TimeStepEul::W,&
-  !$hmpp  <tsteps>  AttenuateOut2::W,NullInterior::W]
+  !$hmpp  &  AttenuateOut2::W,NullInterior::W]
 
  !U2,V2,W2
  !$hmpp <tsteps> map, args[Convection::U2,PressureGrad::U,ForwEul::U2,UnifRedBlack::U2,AttenuateTop::U,AttenuateOut::U]
@@ -1991,12 +2037,10 @@ contains
 
  !$hmpp <tsteps> map, args[Convection::temperature,AttenuateTop::temperature,AttenuateOut::temperature,AttenuateOut2::temperature]
 
-#include "boundaries_GPU.f90"
+
 #include "cds_GPU.f90"
 #include "smagorinsky_GPU.f90"
-#include "tsteps_GPU.f90"
 
 
 
 
-end module TSTEPS
