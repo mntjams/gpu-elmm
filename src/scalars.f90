@@ -2255,7 +2255,7 @@ contains
                             TDiff,SCAL2,SCAL,&
                             sctype,coef,dt,l,S)
   implicit none
-  integer,parameter :: KND=4
+#include "hmpp-include.f90"
 
   real(KND),intent(out),dimension(-1:Prnx+1,-1:Prny+1,-1:Prnz+1) :: Scal2
   real(KND),intent(in),dimension(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)  :: Scal

@@ -336,14 +336,14 @@
      enddo
     enddo
 
-    call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
-                         Btype,sideU,&
-                         Uin,U2,0)
-    call BoundU_GPU(2,Vnx,Vny,Vnz,Prny,Prnz,&
-                         Btype,sideU,&
-                         Vin,V2,0)
-    call BoundU_GPU(3,Wnx,Wny,Wnz,Prny,Prnz,&
-                         Btype,sideU,&
-                         Win,W2,0)
+!     call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
+!                          Btype,sideU,&
+!                          Uin,U2,0)
+!     call BoundU_GPU(2,Vnx,Vny,Vnz,Prny,Prnz,&
+!                          Btype,sideU,&
+!                          Vin,V2,0)
+!     call BoundU_GPU(3,Wnx,Wny,Wnz,Prny,Prnz,&
+!                          Btype,sideU,&
+!                          Win,W2,0)
   endsubroutine UNIFREDBLACK_GPU
 

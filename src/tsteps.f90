@@ -216,13 +216,13 @@ write(*,*) "stage:",l
                        dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
                        U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,l,dt)
 !$hmpp <tsteps> delegatedstore, args[AttenuateOut::U,AttenuateOut::V,AttenuateOut::W]
-write(*,*) "probe-",U(Prnx/2,Prny/2,1),V(Prnx/2,Prny/2,1),W(Prnx/2,Prny/2,1)
+write(*,*) "probe-",U(Prnx/2,Prny/2,Vnz),V(Prnx/2,Prny/2,Vnz),W(Prnx/2,Prny/2,Wnz)
 
 
     call OtherTerms(U,V,W,U2,V2,W2,Pr,2._KND*alpha(l))
 
 !$hmpp <tsteps> delegatedstore, args[AttenuateOut::U,AttenuateOut::V,AttenuateOut::W]
-write(*,*) "probe*",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
+write(*,*) "probe*",U2(Prnx/2,Prny/2,Vnz),V2(Prnx/2,Prny/2,Vnz),W2(Prnx/2,Prny/2,Wnz)
 
 
     if (Btype(To) ==FreeSlipBuff)  then
@@ -231,7 +231,7 @@ write(*,*) "probe*",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
                           zPr,zW,U2,V2,W2,temperature,buoyancy)
     endif
 !$hmpp <tsteps> delegatedstore, args[AttenuateOut::U,AttenuateOut::V,AttenuateOut::W]
-write(*,*) "probe/",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
+write(*,*) "probe/",U2(Prnx/2,Prny/2,Vnz),V2(Prnx/2,Prny/2,Vnz),W2(Prnx/2,Prny/2,Wnz)
 
     if (Btype(Ea) ==OutletBuff) then
         !$hmpp <tsteps> AttenuateOut callsite, args[*].noupdate = true
@@ -245,7 +245,7 @@ write(*,*) "probe/",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
       !$hmpp <tsteps> delegatedstore, args[AttenuateOut::temperature]
     endif
 
-write(*,*) "probe+",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
+write(*,*) "probe+",U2(Prnx/2,Prny/2,Vnz),V2(Prnx/2,Prny/2,Vnz),W2(Prnx/2,Prny/2,Wnz)
 
 
 
@@ -263,7 +263,7 @@ write(*,*) "probe+",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
         call IBMassSources(Q,U2,V2,W2)
     endif
 
-write(*,*) "probe-",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
+write(*,*) "probe-",U2(Prnx/2,Prny/2,Vnz),V2(Prnx/2,Prny/2,Vnz),W2(Prnx/2,Prny/2,Wnz)
 
 
 
@@ -275,7 +275,7 @@ write(*,*) "probe-",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
      endif
     endif
 
-write(*,*) "probe*",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
+write(*,*) "probe*",U2(Prnx/2,Prny/2,Vnz),V2(Prnx/2,Prny/2,Vnz),W2(Prnx/2,Prny/2,Wnz)
 
     if (l==1) delta = 0
 !     if (debuglevel>0) then
@@ -326,7 +326,7 @@ write(*,*) "probe*",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
     endif
 
 !$hmpp <tsteps> delegatedstore, args[AttenuateOut2::U,AttenuateOut2::V,AttenuateOut2::W]
-write(*,*) "probe/",U(Prnx/2,Prny/2,1),V(Prnx/2,Prny/2,1),W(Prnx/2,Prny/2,1)
+write(*,*) "probe/",U(Prnx/2,Prny/2,Vnz),V(Prnx/2,Prny/2,Vnz),W(Prnx/2,Prny/2,Wnz)
 
     !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
     call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
@@ -753,7 +753,7 @@ write(*,*) "probe/",U(Prnx/2,Prny/2,1),V(Prnx/2,Prny/2,1),W(Prnx/2,Prny/2,1)
                      Pr,U2,V2,W2,&
                      dt,coef)
 !$hmpp <tsteps> delegatedstore, args[PressureGrad::U,PressureGrad::V,PressureGrad::W]
-write(*,*) "probe!+",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
+write(*,*) "probe!+2",U2(Prnx/2,Prny/2,Vnz),V2(Prnx/2,Prny/2,Vnz),W2(Prnx/2,Prny/2,Wnz)
 
    Re_gt_0: if (Re>0) then
 
@@ -770,7 +770,8 @@ write(*,*) "probe!+",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
                   U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
                   dt,coef)
 !$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
-write(*,*) "probe!-",U3(Prnx/2,Prny/2,1),V3(Prnx/2,Prny/2,1),W3(Prnx/2,Prny/2,1)
+write(*,*) "probe!-3",U3(Prnx/2,Prny/2,Vnz),V3(Prnx/2,Prny/2,Vnz),W3(Prnx/2,Prny/2,Wnz)
+!$hmpp <tsteps> advancedload, args[UnifRedBlack::U3,UnifRedBlack::V3,UnifRedBlack::W3]
 
 
      call IBMomentum(U2,V2,W2,U3,V3,W3)
@@ -781,6 +782,8 @@ write(*,*) "probe!-",U3(Prnx/2,Prny/2,1),V3(Prnx/2,Prny/2,1),W3(Prnx/2,Prny/2,1)
 
       !$hmpp <tsteps>  advancedload, args[UnifRedBlack::maxCNiter,UnifRedBlack::epsCN]
 
+write(*,*) "probe beforeUNIFU2:",U2(Prnx/2,Prny/2,Vnz),V2(Prnx/2,Prny/2,Vnz),W2(Prnx/2,Prny/2,Wnz)
+write(*,*) "probe beforeUNIFU3:",U3(Prnx/2,Prny/2,Vnz),V3(Prnx/2,Prny/2,Vnz),W3(Prnx/2,Prny/2,Wnz)
 
       !$hmpp <tsteps> UNIFREDBLACK callsite, args[*].noupdate = true
       call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,&
@@ -789,8 +792,8 @@ write(*,*) "probe!-",U3(Prnx/2,Prny/2,1),V3(Prnx/2,Prny/2,1),W3(Prnx/2,Prny/2,1)
                             Uin,Vin,Win,&
                             U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
                             coef,maxCNiter,epsCN,it,S)
-!$hmpp <tsteps> delegatedstore, args[PressureGrad::U,PressureGrad::V,PressureGrad::W]
-write(*,*) "probe!*",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
+!$hmpp <tsteps> delegatedstore, args[UnifRedBlack::U2,UnifRedBlack::V2,UnifRedBlack::W2]
+write(*,*) "probe!*",U2(Prnx/2,Prny/2,Vnz),V2(Prnx/2,Prny/2,Vnz),W2(Prnx/2,Prny/2,Wnz)
 
      !$hmpp <tsteps> delegatedstore, args[UnifRedBlack::iters,UnifRedBlack::residuum]
 
@@ -1412,7 +1415,7 @@ write(*,*) "probe!*",U2(Prnx/2,Prny/2,1),V2(Prnx/2,Prny/2,1),W2(Prnx/2,Prny/2,1)
      call BoundU(1,U3)
      call BoundU(2,V3)
      call BoundU(3,W3)
-
+write(*,*) "NIBpoints",ubound(UIBPoints,1),ubound(VIBPoints,1),ubound(WIBPoints,1)
     !$omp parallel
      !$omp do private(xi,yj,zk,src)
      do i=1,ubound(UIBPoints,1)
