@@ -134,9 +134,7 @@ contains
     if (buoyancy>0) then
 
       if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
-
       call Bound_Visc(TDiff)
-
       temperature2=0
 
       call Bound_Temp(temperature)
@@ -193,7 +191,7 @@ contains
 
   endsubroutine ADVSCALAR
 
-  pure subroutine CDSSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
+  subroutine CDSSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
   real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
   real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in)      :: sctype
@@ -229,7 +227,7 @@ contains
         enddo
   end subroutine CDSSCALAR
 
-  pure subroutine UDSSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
+  subroutine UDSSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
   real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in) :: sctype
@@ -294,7 +292,7 @@ contains
 
 
 
-  pure subroutine QUICKSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
+  subroutine QUICKSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
   real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in) :: sctype
@@ -552,7 +550,7 @@ contains
 
 
 
-  pure subroutine PLMSCALARNOSPLIT(SCAL2,SCAL,U,V,W,sctype,coef)
+  subroutine PLMSCALARNOSPLIT(SCAL2,SCAL,U,V,W,sctype,coef)
   real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in) :: sctype
@@ -1135,7 +1133,7 @@ contains
   endsubroutine DIFFSCALAR
 
 
-  pure subroutine BOUND_PASSSCALAR(SCAL)
+   subroutine BOUND_PASSSCALAR(SCAL)
   real(KND),intent(inout) :: SCAL(-1:,-1:,-1:)
   integer i,j,k,nx,ny,nz
 
@@ -1392,7 +1390,7 @@ contains
 
 
 
-  pure subroutine BOUND_TEMP(Theta)
+  subroutine BOUND_TEMP(Theta)
   real(KND),intent(inout) :: theta(-1:,-1:,-1:)
   integer i,j,k,nx,ny,nz
    nx = Prnx
@@ -2249,7 +2247,7 @@ contains
 
 
 #ifdef __HMPP
-  !$hmpp  DIFFSCALAR_GPU codelet, target=CUDA
+  !$hmpp DIFFSCALAR_GPU codelet, target=CUDA
   subroutine DIFFSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
                             ScalBtype,sideScal,TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
                             TDiff,SCAL2,SCAL,&
@@ -2257,19 +2255,19 @@ contains
   implicit none
 #include "hmpp-include.f90"
 
-  real(KND),intent(out),dimension(-1:Prnx+1,-1:Prny+1,-1:Prnz+1) :: Scal2
-  real(KND),intent(in),dimension(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)  :: Scal
+  integer,intent(in)    :: Prnx,Prny,Prnz,maxCNiter,sctype,ScalBtype(6),TBtype(6)
+  real(KND),intent(out),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: Scal2
+  real(KND),intent(in),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)  :: Scal
 
   real(KND),intent(in)  :: dxmin,dymin,dzmin,epsCN,Re,coef,dt
   real(KND),intent(in)  :: sideScal(6),sideTemp(6),Tempin(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
   real(KND),intent(in),dimension(-1:Prnx+2,-1:Prny+2) :: BsideTArr,BsideTFLArr
-  integer,intent(in)    :: Prnx,Prny,Prnz,maxCNiter,sctype,ScalBtype(6),TBtype(6)
   integer,intent(out)   :: l
   real(KND),intent(out) :: S
-  real(KND) Scal3(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
+  real(KND) Scal3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
   integer nx,ny,nz,i,j,k,xi,yj,zk
   real(KND) p
-  real(KND) A,Ax,Ay,Az,Ap(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
+  real(KND) A,Ax,Ay,Az,Ap(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
 
   intrinsic max, abs, mod
 
@@ -2313,7 +2311,6 @@ contains
    endif
 
 
-
    Ax = 1._KND/(4._KND*dxmin**2)
    Ay = 1._KND/(4._KND*dymin**2)
    Az = 1._KND/(4._KND*dzmin**2)
@@ -2340,7 +2337,6 @@ contains
     else
      call BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2)
     endif
-
 
    !$hmppcg grid blocksize 512x1
    !$hmppcg gridify(k,i), reduce(max:S)
@@ -2404,7 +2400,6 @@ contains
    else
      call BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2)
    endif
-
   endif
   endsubroutine DIFFSCALAR_GPU
 #include "scalarsbound_GPU.f90"

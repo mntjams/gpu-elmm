@@ -14,7 +14,7 @@
 
 #### Compiler and tool definitions shared by all build targets #####-g -O5 -fprefetch-loop-arrays -finline-functions -funroll-loops -pg -ffpe-trap=zero,overflow -ffast-math
 FC = gfortran-4.7
-BASICOPTS =  -fbacktrace -g -pedantic -Wall  -fcheck=all -ffpe-trap=zero,overflow
+BASICOPTS =  -fbacktrace -g  -fcheck=all -ffpe-trap=zero,overflow
 FFLAGS = $(BASICOPTS)
 
 
@@ -63,9 +63,12 @@ $(TARGETDIR_CLMM)/parameters.o: $(TARGETDIR_CLMM) parameters.f90
 $(TARGETDIR_CLMM)/limiters.o: $(TARGETDIR_CLMM) limiters.f90 $(TARGETDIR_CLMM)/parameters.o
 	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ limiters.f90
 
-$(TARGETDIR_CLMM)/scalars.o: $(TARGETDIR_CLMM) scalars.f90 $(TARGETDIR_CLMM)/parameters.o $(TARGETDIR_CLMM)/wallmodels.o \
+$(TARGETDIR_CLMM)/scalars-tmp.F90: scalars.f90 scalarsbound_GPU.f90 hmpp-include.f90
+	$(COMPILE.f) scalars.f90 -E -D__HMPP -cpp > $(TARGETDIR_CLMM)/scalars-tmp.F90
+
+$(TARGETDIR_CLMM)/scalars.o: $(TARGETDIR_CLMM) $(TARGETDIR_CLMM)/scalars-tmp.F90 $(TARGETDIR_CLMM)/parameters.o $(TARGETDIR_CLMM)/wallmodels.o \
 	$(TARGETDIR_CLMM)/geometric.o $(TARGETDIR_CLMM)/limiters.o $(TARGETDIR_CLMM)/boundaries.o
-	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -cpp -D__HMPP -o $@ scalars.f90
+	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ $(TARGETDIR_CLMM)/scalars-tmp.F90
 
 $(TARGETDIR_CLMM)/multigrid.o: $(TARGETDIR_CLMM) multigrid.f90 $(TARGETDIR_CLMM)/parameters.o
 	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -cpp -o $@ multigrid.f90

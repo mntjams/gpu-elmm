@@ -188,6 +188,8 @@ contains
 
 write(*,*) "stage:",l
 
+write(*,*) "probeTEMP",Temperature(Prnx/2,Prny/2,1),Temperature(1,1,3),Temperature(Prnx/2,Prny/2,Prnz)
+
     if (debugparam>1) call system_clock(count=time1)
 
     !$hmpp <tsteps> BoundU callsite, args[*].noupdate = true
@@ -327,6 +329,7 @@ write(*,*) "probe*",U2(Prnx/2,Prny/2,Vnz),V2(Prnx/2,Prny/2,Vnz),W2(Prnx/2,Prny/2
 
 !$hmpp <tsteps> delegatedstore, args[AttenuateOut2::U,AttenuateOut2::V,AttenuateOut2::W]
 write(*,*) "probe/",U(Prnx/2,Prny/2,Vnz),V(Prnx/2,Prny/2,Vnz),W(Prnx/2,Prny/2,Wnz)
+write(*,*) "probeTEMP",Temperature(Prnx/2,Prny/2,1),Temperature(1,1,3),Temperature(Prnx/2,Prny/2,Prnz)
 
     !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
     call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&

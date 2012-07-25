@@ -1,13 +1,10 @@
-  pure subroutine BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL)
+  subroutine BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL)
   implicit none
-  integer,parameter :: KND=4
-  integer,parameter       :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
-                               TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
-  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#include "hmpp-include.f90"
 
   integer, intent(in) :: Prnx,Prny,Prnz,ScalBtype(6)
   real(KND),intent(in) :: dxmin,dymin,dzmin,Re,sideScal(6),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-  real(KND),intent(inout) :: SCAL(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
+  real(KND),intent(inout) :: SCAL(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
   integer i,j,k,nx,ny,nz
 
    nx = Prnx
@@ -248,17 +245,14 @@
 
 
 
-  pure subroutine BOUND_TEMP_GPU(Prnx,Prny,Prnz,Re,dxmin,dymin,dzmin,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,Theta)
+  subroutine BOUND_TEMP_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,Theta)
   implicit none
-  integer,parameter :: KND=4
-  integer,parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
-                               TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
-  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+#include "hmpp-include.f90"
 
   integer, intent(in) :: Prnx,Prny,Prnz,TBtype(6)
   real(KND),intent(in) :: Re,dxmin,dymin,dzmin,sideTemp(6),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),TempIn(-1:Prny+2,-1:Prnz+2)
   real(KND),intent(in),dimension(-1:Prnx+2,-1:Prny+2) :: BsideTArr,BsideTFLArr
-  real(KND),intent(inout) :: theta(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
+  real(KND),intent(inout) :: theta(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
   integer i,j,k,nx,ny,nz
 
   intrinsic abs

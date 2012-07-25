@@ -193,8 +193,8 @@
         Su=0
         Sv=0
         Sw=0
-!         !$hmppcg grid blocksize 512x1
-!         !$hmppcg gridify(k,i), reduce(max:Su)
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify(k,i), reduce(max:Su)
         do k=1,Unz
          do i=1,Unx
           do j=1+mod(i+k,2),Uny,2
@@ -213,8 +213,8 @@
           enddo
          enddo
         enddo
-!         !$hmppcg grid blocksize 512x1
-!         !$hmppcg gridify(k,i), reduce(max:Sv)
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify(k,i), reduce(max:Sv)
         do k=1,Vnz
          do i=1,Vnx
           do j=1+mod(i+k,2),Vny,2
@@ -231,8 +231,8 @@
           enddo
          enddo
         enddo
-!         !$hmppcg grid blocksize 512x1
-!         !$hmppcg gridify(k,i), reduce(max:Sw)
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify(k,i), reduce(max:Sw)
         do k=1,Wnz
          do i=1,Wnx
           do j=1+mod(i+k,2),Wny,2
@@ -251,8 +251,8 @@
         enddo
 
 
-!         !$hmppcg grid blocksize 512x1
-!         !$hmppcg gridify(k,i), reduce(max:Su)
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify(k,i), reduce(max:Su)
         do k=1,Unz
          do i=1,Unx
           do j=1+mod(i+k+1,2),Uny,2
@@ -271,8 +271,8 @@
           enddo
          enddo
         enddo
-!         !$hmppcg grid blocksize 512x1
-!         !$hmppcg gridify(k,i), reduce(max:Sv)
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify(k,i), reduce(max:Sv)
         do k=1,Vnz
          do i=1,Vnx
           do j=1+mod(i+k+1,2),Vny,2
@@ -289,8 +289,8 @@
           enddo
          enddo
         enddo
-!         !$hmppcg grid blocksize 512x1
-!         !$hmppcg gridify(k,i), reduce(max:Sw)
+        !$hmppcg grid blocksize 512x1
+        !$hmppcg gridify(k,i), reduce(max:Sw)
         do k=1,Wnz
          do i=1,Wnx
           do j=1+mod(i+k+1,2),Wny,2
