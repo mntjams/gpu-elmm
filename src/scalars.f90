@@ -13,12 +13,15 @@ implicit none
   public Scalar, ScalarRK3, Prt, Rig, partdiam, partrho, percdistrib,&
      Bound_Visc, Bound_Temp, Bound_PassScalar,&
      TTemperatureProfileSection, TTemperatureProfile, TemperatureProfile,&
-     InitTemperatureProfile, InitTemperature
+     InitTemperatureProfile, InitTemperature,&
+     SubsidenceProfile, SubsidenceGradient, InitSubsidenceProfile
 
 
   real(KND),allocatable,dimension(:,:,:,:) :: SCALAR  !last index is a number of scalar (because of paging)
   real(KND),dimension(:),allocatable :: partdiam,partrho,percdistrib !diameter of particles <=0 for gas
 
+  real(KND),dimension(:),allocatable :: SubsidenceProfile
+  real(KND) :: SubsidenceGradient = 0
 
   type TTemperatureProfileSection
     real(KND) :: top, height
@@ -97,7 +100,7 @@ contains
 
       Scalar_adv = 0
       do i=1,computescalars
-        call AdvScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U,V,W,2,1._KND)
+        call AdvScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U,V,W,2,1._KND,SubsidenceProfile)
       enddo
 
       Scalar_2 = Scalar_2+Scalar_adv*beta(RKstage)
@@ -150,9 +153,9 @@ contains
 
       temperature_adv = 0
       if (RKstage==3.and.present(fluxprofile)) then
-        call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,fluxprofile)
+        call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,SubsidenceProfile,FluxProfile)
       else
-        call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND)
+        call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,SubsidenceProfile)
       end if
 
       temperature2 = temperature2+temperature_adv*beta(RKstage)
@@ -189,17 +192,24 @@ contains
 
 
 
-  subroutine ADVSCALAR(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile)
+  subroutine ADVSCALAR(SCAL2,SCAL,U,V,W,sctype,coef,SubsidenceProfile,fluxProfile)
   real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
   real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in)      :: sctype
-  real(KND),intent(out),optional :: fluxprofile(0:)
+  real(KND),intent(in),allocatable :: SubsidenceProfile(:)
+  real(KND),intent(out),optional :: fluxProfile(0:)
+  real(KND) :: SubsidenceProfileLoc(0:Prnz)
+  real(KND) :: fluxProfileLoc(0:Prnz)
 
-    if (present(fluxprofile)) then
-      call KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile)
-    else
-      call KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
-    endif
+   if (allocated(SubsidenceProfile)) SubsidenceProfileLoc = SubsidenceProfile(0:Prnz)
+
+   if (gridtype==uniformgrid) then
+       call KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef,SubsidenceProfileLoc,fluxProfileLoc)
+   else
+       call KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef,SubsidenceProfileLoc,fluxProfileLoc)
+   endif
+
+   if (present(fluxProfile)) fluxProfile(0:Prnz) = fluxProfileLoc
 
   endsubroutine ADVSCALAR
 
@@ -658,37 +668,24 @@ contains
 
 
 
-  subroutine KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile) !Kappa scheme with flux limiter
-  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in) :: sctype
-  real(KND),intent(out),optional :: fluxprofile(0:)
+!   subroutine KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef,fluxProfile,SubsidenceProfile) !Kappa scheme with flux limiter
+!   real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
+!   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+!   integer,intent(in) :: sctype
+!
+!
+!   endsubroutine KAPPASCALAR
 
 
-   if (gridtype==uniformgrid) then
-     if (present(fluxprofile)) then
-       call KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile)
-     else
-       call KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef)
-     end if
-   else
-     if (present(fluxprofile)) then
-       call KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile)
-     else
-       call KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef)
-     end if
-   endif
-  endsubroutine KAPPASCALAR
-
-
-  subroutine KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile) !Kappa scheme with flux limiter
+  subroutine KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef,SubsidenceProfile,fluxProfile) !Kappa scheme with flux limiter
   real(KND),intent(inout) ::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in) :: sctype
-  real(KND),intent(out),optional :: fluxprofile(0:)
+  real(KND),intent(in) :: SubsidenceProfile(0:)
+  real(KND),intent(out) :: fluxProfile(0:)
   integer i,j,k
   real(KND) A,Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
-  real(KND) SL,SR,FLUX
+  real(KND) vel,SL,SR,FLUX
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
   real(KND),parameter ::eps = 1e-8
 
@@ -784,18 +781,21 @@ contains
    enddo
   enddo
 
-  if (present(fluxprofile)) fluxprofile = 0
+  fluxprofile = 0
 
   do k = 0,Prnz
    do j = 1,Prny
     do i = 1,Prnx
-     if (W(i,j,k)>0) then
-      FLUX = W(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._KND)
+
+     vel = W(i,j,k) - SubsidenceProfile(k)
+
+     if (vel>0) then
+      FLUX = vel*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._KND)
      else
-      FLUX = W(i,j,k)*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
+      FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
      endif
 
-     if (present(fluxprofile)) fluxprofile(k) = fluxprofile(k) + FLUX
+     fluxprofile(k) = fluxprofile(k) + FLUX
 
      SCAL2(i,j,k) = SCAL2(i,j,k)-Az*FLUX
      SCAL2(i,j,k+1) = SCAL2(i,j,k+1)+Az*FLUX
@@ -803,20 +803,21 @@ contains
    enddo
   enddo
 
-  if (present(fluxprofile)) fluxprofile = fluxprofile / (Prnx*Prny)
+  fluxprofile = fluxprofile / (Prnx*Prny)
 
   endsubroutine KAPPASCALARUG
 
 
 
-  subroutine KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef,fluxprofile) !Kappa scheme with flux limiter
+  subroutine KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef,SubsidenceProfile,fluxProfile) !Kappa scheme with flux limiter
   real(KND),intent(inout) ::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer,intent(in) :: sctype
-  real(KND),intent(out),optional :: fluxprofile(0:)
+  real(KND),intent(in) :: SubsidenceProfile(0:)
+  real(KND),intent(out) :: fluxProfile(0:)
   integer i,j,k
   real(KND) A                       !Auxiliary variables to store muliplication constants for efficiency
-  real(KND) SL,SR,FLUX
+  real(KND) vel,SL,SR,FLUX
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
   real(KND),parameter::eps = 1e-8
 
@@ -909,18 +910,21 @@ contains
    enddo
   enddo
 
-  if (present(fluxprofile)) fluxprofile = 0
+  fluxprofile = 0
 
   do k = 0,Prnz
    do j = 1,Prny
     do i = 1,Prnx
-     if (W(i,j,k)>0) then
-      FLUX = W(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._KND)
+
+     vel = W(i,j,k) - SubsidenceProfile(k)
+
+     if (vel>0) then
+      FLUX = vel*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._KND)
      else
-      FLUX = W(i,j,k)*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
+      FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
      endif
 
-     if (present(fluxprofile)) fluxprofile(k) = fluxprofile(k+1) + FLUX
+     fluxprofile(k) = fluxprofile(k+1) + FLUX
 
      SCAL2(i,j,k) = SCAL2(i,j,k)-A*FLUX/dzPr(k)
      SCAL2(i,j,k+1) = SCAL2(i,j,k+1)+A*FLUX/dzPr(k+1)
@@ -928,7 +932,7 @@ contains
    enddo
   enddo
 
-  if (present(fluxprofile)) fluxprofile = fluxprofile/(Prnx * Prny)
+  fluxProfile = fluxProfile/(Prnx * Prny)
 
   endsubroutine KAPPASCALARGG
 
@@ -2152,6 +2156,13 @@ contains
 
 
 
+
+  subroutine InitSubsidenceProfile
+    integer k
+
+    allocate(SubsidenceProfile(0:Prnz))
+    SubsidenceProfile = (/ (zW(k)*SubsidenceGradient, k=0,Prnz) /)
+  end subroutine InitSubsidenceProfile
 
 
 
