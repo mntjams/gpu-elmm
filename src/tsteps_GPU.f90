@@ -47,6 +47,7 @@
 
        !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
+       !$hmppcg gridify(k,i)
        do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
         do j=1,Uny
          do i=1,Unx
@@ -62,6 +63,7 @@
        enddo
        !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
+       !$hmppcg gridify(k,i)
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
@@ -77,6 +79,7 @@
        enddo
        !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
+       !$hmppcg gridify(k,i)
        do k=1,Wnz
        do j=1,Wny
         do i=1,Wnx
@@ -93,6 +96,7 @@
 
        !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
+       !$hmppcg gridify(k,i)
        do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
         do j=1,Uny
          do i=1,Unx
@@ -110,6 +114,7 @@
 
        !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
+       !$hmppcg gridify(k,i)
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
@@ -127,6 +132,7 @@
 
        !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
+      !$hmppcg gridify(k,i)
        do k=1,Wnz
         do j=1,Wny
          do i=1,Wnx
@@ -143,43 +149,39 @@
 
 
        Suavg=0    !maximum values of velocities to norm the residues.
-       !$hmppcg grid blocksize 512x1
-       !$hmppcg gridify (k,i), reduce (max:Suavg)
-       do k=1,Unz
-        do i=1,Unx
-         do j=1,Uny
-          Suavg=max(Suavg,abs(U3(i,j,k)))
-         enddo
-        enddo
-       enddo
+!        !$hmppcg grid blocksize 512x1
+!        !$hmppcg gridify (k,i), reduce (max:Suavg)
+!        do k=1,Unz
+!         do i=1,Unx
+!          do j=1,Uny
+!           Suavg=max(Suavg,abs(U3(i,j,k)))
+!          enddo
+!         enddo
+!        enddo
        Svavg=0
-       !$hmppcg grid blocksize 512x1
-       !$hmppcg gridify (k,i), reduce (max:Svavg)
-       do k=1,Vnz
-        do i=1,Vnx
-         do j=1,Vny
-          Svavg=max(Svavg,abs(V3(i,j,k)))
-         enddo
-        enddo
-       enddo
+!        !$hmppcg grid blocksize 512x1
+!        !$hmppcg gridify (k,i), reduce (max:Svavg)
+!        do k=1,Vnz
+!         do i=1,Vnx
+!          do j=1,Vny
+!           Svavg=max(Svavg,abs(V3(i,j,k)))
+!          enddo
+!         enddo
+!        enddo
        Swavg=0
-       !$hmppcg grid blocksize 512x1
-       !$hmppcg gridify (k,i), reduce (max:Swavg)
-       do k=1,Wnz
-        do i=1,Wnx
-         do j=1,Wny
-          Swavg=max(Swavg,abs(W3(i,j,k)))
-         enddo
-        enddo
-       enddo
+!        !$hmppcg grid blocksize 512x1
+!        !$hmppcg gridify (k,i), reduce (max:Swavg)
+!        do k=1,Wnz
+!         do i=1,Wnx
+!          do j=1,Wny
+!           Swavg=max(Swavg,abs(W3(i,j,k)))
+!          enddo
+!         enddo
+!        enddo
        if (Suavg<=1e-3_KND) Suavg=1
        if (Svavg<=1e-3_KND) Svavg=1
        if (Swavg<=1e-3_KND) Swavg=1
 
-
-       l=1
-       S=epsCN+1.
-       do while (S>epsCN.and.l<=maxCNiter)          !Gauss-Seidel iteration for Crank-Nicolson result
         call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
                              Btype,sideU,&
                              Uin,U3,0)
@@ -189,12 +191,18 @@
         call BoundU_GPU(3,Wnx,Wny,Wnz,Prny,Prnz,&
                              Btype,sideU,&
                              Win,W3,0)
+
+       l=1
+       S=epsCN+1.
+       do while (S>epsCN.and.l<=maxCNiter)          !Gauss-Seidel iteration for Crank-Nicolson result
+
         S=0
         Su=0
         Sv=0
         Sw=0
         !$hmppcg grid blocksize 512x1
-        !$hmppcg gridify(k,i), reduce(max:Su)
+        !$hmppcg gridify(k,i), private(j,p)
+!         , reduce(max:Su)
         do k=1,Unz
          do i=1,Unx
           do j=1+mod(i+k,2),Uny,2
@@ -208,13 +216,14 @@
             p=p*ApU(i,j,k)
 
 
-            Su=max(Su,abs(p-U3(i,j,k)))
-            U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+!             Su=max(Su,abs(p-U3(i,j,k)))
+            U3(i,j,k)=p!*1.72_KND
           enddo
          enddo
         enddo
         !$hmppcg grid blocksize 512x1
-        !$hmppcg gridify(k,i), reduce(max:Sv)
+        !$hmppcg gridify(k,i), private(j,p)
+!         !, reduce(max:Sv)
         do k=1,Vnz
          do i=1,Vnx
           do j=1+mod(i+k,2),Vny,2
@@ -226,13 +235,14 @@
              (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
             p=Ap*p+V2(i,j,k)+V(i,j,k)
             p=p*ApV(i,j,k)
-            Sv=max(Sv,abs(p-V3(i,j,k)))
-            V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+!             Sv=max(Sv,abs(p-V3(i,j,k)))
+            V3(i,j,k)=p!*1.72_KND
           enddo
          enddo
         enddo
         !$hmppcg grid blocksize 512x1
-        !$hmppcg gridify(k,i), reduce(max:Sw)
+        !$hmppcg gridify(k,i), private(j,p)
+!         !, reduce(max:Sw)
         do k=1,Wnz
          do i=1,Wnx
           do j=1+mod(i+k,2),Wny,2
@@ -244,15 +254,16 @@
              Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
             p=Ap*p+W2(i,j,k)+W(i,j,k)
             p=p*ApW(i,j,k)
-            Sw=max(Sw,abs(p-W3(i,j,k)))
-            W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+!             Sw=max(Sw,abs(p-W3(i,j,k)))
+            W3(i,j,k)=p!*1.72_KND
           enddo
          enddo
         enddo
 
 
         !$hmppcg grid blocksize 512x1
-        !$hmppcg gridify(k,i), reduce(max:Su)
+        !$hmppcg gridify(k,i), private(j,p)
+!         !, reduce(max:Su)
         do k=1,Unz
          do i=1,Unx
           do j=1+mod(i+k+1,2),Uny,2
@@ -266,13 +277,14 @@
             p=p*ApU(i,j,k)
 
 
-            Su=max(Su,abs(p-U3(i,j,k)))
-            U3(i,j,k)=U3(i,j,k)+(p-U3(i,j,k))!*1.72_KND
+!             Su=max(Su,abs(p-U3(i,j,k)))
+            U3(i,j,k)=p!*1.72_KND
           enddo
          enddo
         enddo
         !$hmppcg grid blocksize 512x1
-        !$hmppcg gridify(k,i), reduce(max:Sv)
+        !$hmppcg gridify(k,i), private(j,p)
+!         !, reduce(max:Sv)
         do k=1,Vnz
          do i=1,Vnx
           do j=1+mod(i+k+1,2),Vny,2
@@ -284,13 +296,14 @@
              (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
             p=Ap*p+V2(i,j,k)+V(i,j,k)
             p=p*ApV(i,j,k)
-            Sv=max(Sv,abs(p-V3(i,j,k)))
-            V3(i,j,k)=V3(i,j,k)+(p-V3(i,j,k))!*1.72_KND
+!             Sv=max(Sv,abs(p-V3(i,j,k)))
+            V3(i,j,k)=p!*1.72_KND
           enddo
          enddo
         enddo
         !$hmppcg grid blocksize 512x1
-        !$hmppcg gridify(k,i), reduce(max:Sw)
+        !$hmppcg gridify(k,i), private(j,p)
+!         !, reduce(max:Sw)
         do k=1,Wnz
          do i=1,Wnx
           do j=1+mod(i+k+1,2),Wny,2
@@ -302,18 +315,21 @@
              Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
             p=Ap*p+W2(i,j,k)+W(i,j,k)
             p=p*ApW(i,j,k)
-            Sw=max(Sw,abs(p-W3(i,j,k)))
-            W3(i,j,k)=W3(i,j,k)+(p-W3(i,j,k))!*1.72_KND
+!             Sw=max(Sw,abs(p-W3(i,j,k)))
+            W3(i,j,k)=p!*1.72_KND
           enddo
          enddo
         enddo
-        S=max(Su/Suavg,Sv/Svavg,Sw/Swavg)
+        S=1000.!max(Su/Suavg,Sv/Svavg,Sw/Swavg)
         l=l+1
+
        enddo
     iters=l-1
     residuum=S
 
 
+    !$hmppcg permute (k,i,j)
+    !$hmppcg gridify(k,i)
     do k=1,Unz
      do j=1,Uny
       do i=1,Unx
@@ -321,16 +337,20 @@
       enddo
      enddo
     enddo
-    do k=1,Unz
-     do j=1,Uny
-      do i=1,Unx
+    !$hmppcg permute (k,i,j)
+    !$hmppcg gridify(k,i)
+    do k=1,Vnz
+     do j=1,Vny
+      do i=1,Vnx
        V2(i,j,k)=V3(i,j,k)
       enddo
      enddo
     enddo
-    do k=1,Unz
-     do j=1,Uny
-      do i=1,Unx
+    !$hmppcg permute (k,i,j)
+    !$hmppcg gridify(k,i)
+    do k=1,Wnz
+     do j=1,Wny
+      do i=1,Wnx
        W2(i,j,k)=W3(i,j,k)
       enddo
      enddo

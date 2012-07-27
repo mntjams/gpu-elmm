@@ -222,33 +222,33 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   call BoundU(2,V)
   call BoundU(3,W)
 
-  !$omp parallel do private(i,j,k) reduction(max:S) reduction(+:S2)
-  do k=1,Prnz
-   do j=1,Prny
-    do i=1,Prnx
-        if (present(Q)) then
-          RHS(i,j,k)=(U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k))-Q(i,j,k)
-          S2=S2+abs(RHS(i,j,k)*dxPr(i)*dyPr(j)*dzPr(k))
-
-          if (i>2) then
-            S=max(abs(RHS(i,j,k)),S)
-          endif
-
-        else
-          RHS(i,j,k)=(U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k))
-          S2=S2+abs(RHS(i,j,k)*dxPr(i)*dyPr(j)*dzPr(k))
-
-          if (i>2) then
-            S=max(abs(RHS(i,j,k)),S)
-          endif
-
-        endif
-    enddo
-   enddo
-  enddo
-  !$omp end parallel do
-  write (*,*) "maxRHS",S
-  write (*,*) "avgRHS",S2/(lx*ly*lz)
+!   !$omp parallel do private(i,j,k) reduction(max:S) reduction(+:S2)
+!   do k=1,Prnz
+!    do j=1,Prny
+!     do i=1,Prnx
+!         if (present(Q)) then
+!           RHS(i,j,k)=(U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k))-Q(i,j,k)
+!           S2=S2+abs(RHS(i,j,k)*dxPr(i)*dyPr(j)*dzPr(k))
+!
+!           if (i>2) then
+!             S=max(abs(RHS(i,j,k)),S)
+!           endif
+!
+!         else
+!           RHS(i,j,k)=(U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k))
+!           S2=S2+abs(RHS(i,j,k)*dxPr(i)*dyPr(j)*dzPr(k))
+!
+!           if (i>2) then
+!             S=max(abs(RHS(i,j,k)),S)
+!           endif
+!
+!         endif
+!     enddo
+!    enddo
+!   enddo
+!   !$omp end parallel do
+!   write (*,*) "maxRHS",S
+!   write (*,*) "avgRHS",S2/(lx*ly*lz)
 !   if (present(Q)) write (*,*) "maxQ",maxval(Q)
   endsubroutine PR_CORRECT
 

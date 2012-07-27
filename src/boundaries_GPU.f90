@@ -80,6 +80,8 @@
   endif
 
   if (Btype(Ea)==PERIODIC.and.Btype(No)==PERIODIC) then
+   !$hmppcg permute(k,i,j)
+   !$hmppcg gridify(k,i)
    do k=1,nz
     do j=ny+1,ny+3
      do i=nx+1,nx+3
@@ -87,6 +89,8 @@
      enddo
     enddo
    enddo
+   !$hmppcg permute(k,i,j)
+   !$hmppcg gridify(k,i)
    do k=1,nz
     do j=-2,0
      do i=nx+1,nx+3
@@ -94,6 +98,8 @@
      enddo
     enddo
    enddo
+   !$hmppcg permute(k,i,j)
+   !$hmppcg gridify(k,i)
    do k=1,nz
     do j=ny+1,ny+3
      do i=-2,0
@@ -101,6 +107,8 @@
      enddo
     enddo
    enddo
+   !$hmppcg permute(k,i,j)
+   !$hmppcg gridify(k,i)
    do k=1,nz
     do j=-2,0
      do i=-2,0
@@ -112,6 +120,8 @@
 
 
   if (Btype(Ea)==PERIODIC.and.Btype(To)==PERIODIC) then
+   !$hmppcg permute(k,i,j)
+   !$hmppcg gridify(k,i)
    do k=nz+1,nz+3
     do j=1,ny
      do i=nx+1,nx+3
@@ -119,6 +129,8 @@
      enddo
     enddo
    enddo
+   !$hmppcg permute(k,i,j)
+   !$hmppcg gridify(k,i)
    do k=-2,0
     do j=1,ny
      do i=nx+1,nx+3
@@ -126,6 +138,8 @@
      enddo
     enddo
    enddo
+   !$hmppcg permute(k,i,j)
+   !$hmppcg gridify(k,i)
    do k=nz+1,nz+3
     do j=1,ny
      do i=-2,0
@@ -133,6 +147,8 @@
      enddo
     enddo
    enddo
+   !$hmppcg permute(k,i,j)
+   !$hmppcg gridify(k,i)
    do k=-2,0
     do j=1,ny
      do i=-2,0
@@ -144,6 +160,8 @@
 
 
   if (Btype(No)==PERIODIC.and.Btype(To)==PERIODIC) then
+   !$hmppcg permute(k,i,j)
+   !$hmppcg gridify(k,i)
    do k=nz+1,nz+3
     do j=ny+1,ny+3
      do i=1,nx
@@ -151,6 +169,8 @@
      enddo
     enddo
    enddo
+   !$hmppcg permute(k,i,j)
+   !$hmppcg gridify(k,i)
    do k=-2,0
     do j=ny+1,ny+3
      do i=1,nx
@@ -165,6 +185,8 @@
      enddo
     enddo
    enddo
+   !$hmppcg permute(k,i,j)
+   !$hmppcg gridify(k,i)
    do k=-2,0
     do j=-2,0
      do i=1,nx
@@ -176,6 +198,7 @@
 
   if (Btype(We)==DIRICHLET) then
     if (component==1.and.regime/=interm) then
+       !$hmppcg gridify(k,j)
        do k=-2,nz+3
         do j=-2,ny+3                       !Dirichlet inlet
          U(0,j,k)=Uin(j,k)
@@ -184,6 +207,7 @@
         enddo
        enddo
     else
+       !$hmppcg gridify(k,j)
        do k=-2,nz+3
         do j=-2,ny+3                       !Dirichlet inlet
          U(0,j,k)=0
@@ -194,6 +218,7 @@
     endif
   elseif (Btype(We)==NOSLIP.or.(component==1.and.Btype(We)==FREESLIP)) then
     if (component==1) then
+       !$hmppcg gridify(k,j)
        do k=-2,nz+3
         do j=-2,ny+3                       !Solid wall
          U(0,j,k)=0
@@ -202,6 +227,7 @@
         enddo
        enddo
     else
+       !$hmppcg gridify(k,j)
        do k=-2,nz+3
         do j=-2,ny+3                       !Solid wall
          U(0,j,k)=-U(1,j,k)
@@ -212,6 +238,7 @@
     endif
   elseif (Btype(We)==NEUMANN.or.(component/=1.and.Btype(We)==FREESLIP)) then
     if (component==1) then
+       !$hmppcg gridify(k,j)
        do k=-2,nz+3
         do j=-2,ny+3                       !Neumann inlet
          U(0,j,k)=U(1,j,k)
@@ -220,6 +247,7 @@
         enddo
        enddo
     else
+       !$hmppcg gridify(k,j)
        do k=-2,nz+3
         do j=-2,ny+3                       !Neumann inlet
          U(0,j,k)=U(1,j,k)
@@ -229,6 +257,7 @@
        enddo
     endif
   elseif (Btype(We)==PERIODIC) then  !Periodic BC
+       !$hmppcg gridify(k,j)
     do k=-2,nz+3
      do j=-2,ny+3
       U(0,j,k)=U(nx,j,k)
@@ -238,6 +267,7 @@
     enddo
   elseif (Btype(We)==TURBULENTINLET.or.Btype(We)==INLETFROMFILE) then
     if (regime/=interm) then
+       !$hmppcg gridify(k,j)
       do k=1,Prnz
        do j=1,Prny                       !Dirichlet inlet
         U(0,j,k)=Uin(j,k)
@@ -246,6 +276,7 @@
        enddo
       enddo
     else
+       !$hmppcg gridify(k,j)
       do k=1,Prnz
        do j=1,Prny                       !Dirichlet inlet
         U(0,j,k)=0
@@ -259,6 +290,7 @@
 
   if (Btype(Ea)==DIRICHLET) then
     if (component==1.and.regime/=interm) then
+       !$hmppcg gridify(k,j)
       do k=-2,nz+3
        do j=-2,ny+3                       !Dirichlet inlet
         U(nx+1,j,k)=Uin(j,k)
@@ -267,6 +299,7 @@
        enddo
       enddo
     else
+       !$hmppcg gridify(k,j)
       do k=-2,nz+3
        do j=-2,ny+3                       !Dirichlet inlet
         U(nx+1,j,k)=0
@@ -277,6 +310,7 @@
     endif
   elseif (Btype(Ea)==NOSLIP.or.(component==1.and.Btype(Ea)==FREESLIP)) then
     if (component==1) then
+       !$hmppcg gridify(k,j)
       do k=-2,nz+3
        do j=-2,ny+3                       !Solid wall
         U(nx+1,j,k)=0
@@ -285,6 +319,7 @@
        enddo
       enddo
     else
+       !$hmppcg gridify(k,j)
       do k=-2,nz+3
        do j=-2,ny+3                       !Solid wall
         U(nx+1,j,k)=-U(nx,j,k)
@@ -294,6 +329,7 @@
       enddo
     endif
   elseif (Btype(Ea)==NEUMANN.or.Btype(Ea)==OUTLETBUFF.or.(component/=1.and.Btype(Ea)==FREESLIP)) then   !Neumann outlet
+       !$hmppcg gridify(k,j)
     do k=-2,nz+3
      do j=-2,ny+3
       U(nx+1,j,k)=U(nx,j,k)
@@ -302,6 +338,7 @@
      enddo
     enddo
   elseif (Btype(Ea)==PERIODIC) then  !Periodic BC
+       !$hmppcg gridify(k,j)
     do k=-2,nz+3
      do j=-2,ny+3
       U(nx+1,j,k)=U(1,j,k)
@@ -311,6 +348,7 @@
     enddo
   elseif (Btype(Ea)==TURBULENTINLET) then
     if (regime/=interm) then
+       !$hmppcg gridify(k,j)
       do k=-2,nz+3
        do j=-2,ny+3                       !Dirichlet inlet
         U(nx+1,j,k)=Uin(j,k)
@@ -319,6 +357,7 @@
        enddo
       enddo
     else
+       !$hmppcg gridify(k,j)
      do k=-2,nz+3
        do j=-2,ny+3                       !Dirichlet inlet
         U(nx+1,j,k)=0
@@ -331,6 +370,7 @@
 
   if (Btype(So)==DIRICHLET) then
     if (component==2.and.regime/=interm) then
+       !$hmppcg gridify(k,i)
       do k=-2,nz+3
        do i=-2,nx+3                       !Dirichlet inlet
         U(i,0,k)=sideU(component,So)
@@ -339,6 +379,7 @@
        enddo
       enddo
     else if (regime/=interm) then
+       !$hmppcg gridify(k,i)
       do k=-2,nz+3
        do i=-2,nx+3                       !Dirichlet inlet
         U(i,0,k)=sideU(component,So)+(sideU(component,So)-U(i,1,k))
@@ -347,6 +388,7 @@
        enddo
       enddo
     else
+       !$hmppcg gridify(k,i)
       do k=-2,nz+3
        do i=-2,nx+3                       !Dirichlet inlet
         U(i,0,k)=0
@@ -357,6 +399,7 @@
     endif
   elseif (Btype(So)==NOSLIP.or.(component==2.and.Btype(So)==FREESLIP)) then
     if (component==2) then
+       !$hmppcg gridify(k,i)
       do k=-2,nz+3
        do i=-2,nx+3                       !Solid wall
         U(i,0,k)=0
@@ -365,6 +408,7 @@
        enddo
       enddo
     else
+       !$hmppcg gridify(k,i)
       do k=-2,nz+3
        do i=-2,nx+3                       !Solid wall
         U(i,0,k)=-U(i,1,k)
@@ -374,6 +418,7 @@
       enddo
     endif
   elseif (Btype(So)==NEUMANN.or.(component/=2.and.Btype(So)==FREESLIP)) then
+     !$hmppcg gridify(k,i)
     do k=-2,nz+3
      do i=-2,nx+3                       !Neumann inlet
       U(i,0,k)=U(i,1,k)
@@ -382,6 +427,7 @@
      enddo
     enddo
   elseif (Btype(So)==PERIODIC) then  !Periodic BC
+    !$hmppcg gridify(k,i)
     do k=-2,nz+3
      do i=-2,nx+3
       U(i,0,k)=U(i,ny,k)
@@ -394,6 +440,7 @@
 
   if (Btype(No)==DIRICHLET) then
     if (component==2.and.regime/=interm) then
+       !$hmppcg gridify(k,i)
       do k=-2,nz+3
        do i=-2,nx+3                       !Dirichlet inlet
         U(i,ny+1,k)=sideU(component,No)
@@ -402,6 +449,7 @@
        enddo
       enddo
     elseif (regime/=interm) then
+       !$hmppcg gridify(k,i)
       do k=-2,nz+3
        do i=-2,nx+3                       !Dirichlet inlet
         U(i,ny+1,k)=sideU(component,No)+(sideU(component,No)-U(i,ny,k))
@@ -410,6 +458,7 @@
        enddo
       enddo
     else
+       !$hmppcg gridify(k,i)
       do k=-2,nz+3
        do i=-2,nx+3                       !Dirichlet inlet
         U(i,ny+1,k)=0
@@ -420,6 +469,7 @@
     endif
   elseif (Btype(No)==NOSLIP.or.(component==2.and.Btype(So)==FREESLIP)) then
     if (component==2) then
+       !$hmppcg gridify(k,i)
       do k=-2,nz+3
        do i=-2,nx+3                       !Solid wall
         U(i,ny+1,k)=0
@@ -428,6 +478,7 @@
        enddo
       enddo
     else
+       !$hmppcg gridify(k,i)
       do k=-2,nz+3
        do i=-2,nx+3                       !Solid wall
         U(i,ny+1,k)=-U(i,ny,k)
@@ -437,6 +488,7 @@
       enddo
     endif
   elseif (Btype(No)==NEUMANN.or.(component/=2.and.Btype(No)==FREESLIP)) then
+       !$hmppcg gridify(k,i)
     do k=-2,nz+3
      do i=-2,nx+3                       !Neumann inlet
       U(i,ny+1,k)=U(i,ny,k)
@@ -445,6 +497,7 @@
      enddo
     enddo
   elseif (Btype(No)==PERIODIC) then  !Periodic BC
+       !$hmppcg gridify(k,i)
     do k=-2,nz+3
      do i=-2,nx+3
       U(i,ny+1,k)=U(i,1,k)
@@ -457,6 +510,7 @@
 
   if (Btype(Bo)==DIRICHLET) then
     if (component==3.and.regime/=interm) then
+       !$hmppcg gridify(j,i)
       do j=-2,ny+3
        do i=-2,nx+3                       !Dirichlet inlet
         U(i,j,0)=sideU(component,Bo)
@@ -465,6 +519,7 @@
        enddo
       enddo
     elseif (regime/=interm) then
+       !$hmppcg gridify(j,i)
       do j=-2,ny+3
        do i=-2,nx+3                       !Dirichlet inlet
         U(i,j,0)=sideU(component,Bo)+(sideU(component,Bo)-U(i,j,1))
@@ -473,6 +528,7 @@
        enddo
       enddo
     else
+       !$hmppcg gridify(j,i)
       do j=-2,ny+3
        do i=-2,nx+3                       !Dirichlet inlet
         U(i,j,0)=0
@@ -483,6 +539,7 @@
     endif
   elseif (Btype(Bo)==NOSLIP.or.(component==3.and.Btype(Bo)==FREESLIP)) then
     if (component==3) then
+       !$hmppcg gridify(j,i)
       do j=-2,ny+3
        do i=-2,nx+3                       !Solid wall
         U(i,j,0)=0
@@ -491,6 +548,7 @@
        enddo
       enddo
     else
+       !$hmppcg gridify(j,i)
       do j=-2,ny+3
        do i=-2,nx+3                       !Solid wall
         U(i,j,0)=-U(i,j,1)
@@ -500,6 +558,7 @@
       enddo
     endif
   elseif (Btype(Bo)==NEUMANN.or.(component/=3.and.Btype(Bo)==FREESLIP)) then
+       !$hmppcg gridify(j,i)
     do j=-2,ny+3
      do i=-2,nx+3                       !Neumann inlet
       U(i,j,0)=U(i,j,1)
@@ -508,6 +567,7 @@
      enddo
     enddo
   elseif (Btype(Bo)==PERIODIC) then  !Periodic BC
+       !$hmppcg gridify(j,i)
    do j=-2,ny+3
     do i=-2,nx+3
      U(i,j,0)=U(i,j,nz)
@@ -519,6 +579,7 @@
 
   if (Btype(To)==DIRICHLET) then
     if (component==3.and.regime/=interm) then
+       !$hmppcg gridify(j,i)
       do j=-2,ny+3
        do i=-2,nx+3                       !Dirichlet inlet
         U(i,j,nz+1)=sideU(component,To)
@@ -527,6 +588,7 @@
        enddo
       enddo
     elseif (regime/=interm) then
+       !$hmppcg gridify(j,i)
       do j=-2,ny+3
        do i=-2,nx+3                       !Dirichlet inlet
         U(i,j,nz+1)=sideU(component,To)+(sideU(component,To)-U(i,j,nz))
@@ -535,6 +597,7 @@
        enddo
       enddo
     else
+       !$hmppcg gridify(j,i)
       do j=-2,ny+3
        do i=-2,nx+3                       !Dirichlet inlet
         U(i,j,nz+1)=0
@@ -545,6 +608,7 @@
     endif
   elseif (Btype(To)==NOSLIP.or.(component==3.and.(Btype(To)==FREESLIP.or.Btype(To)==FREESLIPBUFF))) then
     if (component==3) then
+       !$hmppcg gridify(j,i)
       do j=-2,ny+3
        do i=-2,nx+3                       !Solid wall
         U(i,j,nz+1)=0
@@ -553,6 +617,7 @@
        enddo
       enddo
     else
+       !$hmppcg gridify(j,i)
       do j=-2,ny+3
        do i=-2,nx+3                       !Solid wall
         U(i,j,nz+1)=-U(i,j,nz)
@@ -562,6 +627,7 @@
       enddo
     endif
   elseif (Btype(To)==NEUMANN.or.(component/=3.and.(Btype(To)==FREESLIP.or.Btype(To)==FREESLIPBUFF))) then
+       !$hmppcg gridify(j,i)
     do j=-2,ny+3
      do i=-2,nx+3                       !Neumann inlet
       U(i,j,nz+1)=U(i,j,nz)
@@ -570,6 +636,7 @@
      enddo
     enddo
   elseif (Btype(To)==PERIODIC) then  !Periodic BC
+       !$hmppcg gridify(j,i)
    do j=-2,ny+3
     do i=-2,nx+3
      U(i,j,nz+1)=U(i,j,1)
@@ -598,6 +665,7 @@
   nz=Prnz
 
   if (Btype(We)==PERIODIC) then
+   !$hmppcg gridify(k,j)
    do k=1,nz
     do j=1,ny
      Pr(nx+1,j,k)=Pr(1,j,k)
@@ -605,6 +673,7 @@
    enddo
   endif
   if (Btype(No)==PERIODIC) then
+   !$hmppcg gridify(k,i)
    do k=1,nz
     do i=1,nx
      Pr(i,ny+1,k)=Pr(i,1,k)
@@ -612,6 +681,7 @@
    enddo
   endif
   if (Btype(To)==PERIODIC) then
+   !$hmppcg gridify(j,i)
    do j=1,ny
     do i=1,nx
      Pr(i,j,nz+1)=Pr(i,j,1)
@@ -620,18 +690,21 @@
   endif
 
   if (Btype(We)==PERIODIC.and.Btype(No)==PERIODIC) then
+   !$hmppcg gridify(k)
    do k=1,nz
       Pr(nx+1,ny+1,k)=Pr(1,1,k)
    enddo
   endif
 
    if (Btype(We)==PERIODIC.and.Btype(To)==PERIODIC) then
+   !$hmppcg gridify(j)
    do j=1,ny
       Pr(nx+1,j,nz+1)=Pr(1,j,1)
    enddo
   endif
 
   if (Btype(No)==PERIODIC.and.Btype(To)==PERIODIC) then
+   !$hmppcg gridify(i)
    do i=1,nx
       Pr(i,ny+1,nz+1)=Pr(i,1,1)
    enddo

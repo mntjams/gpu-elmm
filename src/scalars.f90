@@ -4,6 +4,9 @@ module SCALARS
  use GEOMETRIC, only: TIBPoint, ScalFlIBPoints,TIBPoint_ScalFlSource
  use LIMITERS
  use BOUNDARIES
+#ifdef __HMPP
+ use HMPP_CODELETS
+#endif
 
 implicit none
   private
@@ -70,6 +73,8 @@ contains
            lbound(Temperature,3):ubound(Temperature,3)))
       allocate(Temperature2(lbound(Temperature,1):ubound(Temperature,1),lbound(Temperature,2):ubound(Temperature,2),&
            lbound(Temperature,3):ubound(Temperature,3)))
+      !$hmpp <tsteps> advancedload, args[DiffTemperature::TBtype,DiffTemperature::sideTemp,DiffTemperature::TempIn]
+      !$hmpp <tsteps> advancedload, args[DiffTemperature::epsCN,DiffTemperature::sideTemp,DiffTemperature::maxCNiter]
     endif
 
 
@@ -156,20 +161,27 @@ contains
 
       call Bound_Temp(temperature)
 
-      if (GPU>0) then
 #ifdef __HMPP
-        !$hmpp DIFFSCALAR_GPU callsite
-        call DiffScalar_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
-                            ScalBtype,sideScal,TBtype,sideTemp,TempIn,BsideTFLArr,BsideTFLArr,TDiff,&
-                            temperature2,temperature,1,2._KND*alpha(RKstage),dt,iters,res)
+        !$hmpp <tsteps> advancedload, args[DiffTemperature::coef]
+        if (size(BsideTArr)>0) then
+          !$hmpp <tsteps> advancedload, args[DiffTemperature::BsideTArr]
+        endif
+        if (size(BsideTFLArr)>0) then
+          !$hmpp <tsteps> advancedload, args[DiffTemperature::BsideTFLArr]
+        endif
+        !$hmpp <tsteps> advancedload, args[DiffTemperature::TDiff,DiffTemperature::Temperature]
+        !$hmpp <tsteps> DiffTemperature callsite, args[*].noupdate=true
+        call DiffTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
+                            TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,TDiff,&
+                            temperature2,temperature,2._KND*alpha(RKstage),dt,iters,res)
+        !$hmpp <tsteps> delegatedstore, args[DiffTemperature::l,DiffTemperature::res]
+        !$hmpp <tsteps> delegatedstore, args[DiffTemperature::Temperature2]
         write (*,*) "CNscalar ",iters,res
-#endif
-      else
+#else
         call DiffScalar(temperature2,temperature,1,2._KND*alpha(RKstage))
-     endif
+#endif
 
       temperature = temperature2
-
     endif
 
   end subroutine ScalarRK3
@@ -2147,7 +2159,7 @@ contains
   real(KND),intent(inout) :: Scal(-1:,-1:,-1:,:)
   real(KND),intent(in) :: coef
 
-   include "customvolscalsource.f90"
+#include "customvolscalsource.f90"
   end subroutine VolScalSource
 
 
@@ -2243,167 +2255,5 @@ contains
      endif
     endif
   endsubroutine Release
-
-
-
-#ifdef __HMPP
-  !$hmpp DIFFSCALAR_GPU codelet, target=CUDA
-  subroutine DIFFSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
-                            ScalBtype,sideScal,TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
-                            TDiff,SCAL2,SCAL,&
-                            sctype,coef,dt,l,S)
-  implicit none
-#include "hmpp-include.f90"
-
-  integer,intent(in)    :: Prnx,Prny,Prnz,maxCNiter,sctype,ScalBtype(6),TBtype(6)
-  real(KND),intent(out),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: Scal2
-  real(KND),intent(in),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)  :: Scal
-
-  real(KND),intent(in)  :: dxmin,dymin,dzmin,epsCN,Re,coef,dt
-  real(KND),intent(in)  :: sideScal(6),sideTemp(6),Tempin(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-  real(KND),intent(in),dimension(-1:Prnx+2,-1:Prny+2) :: BsideTArr,BsideTFLArr
-  integer,intent(out)   :: l
-  real(KND),intent(out) :: S
-  real(KND) Scal3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-  integer nx,ny,nz,i,j,k,xi,yj,zk
-  real(KND) p
-  real(KND) A,Ax,Ay,Az,Ap(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-
-  intrinsic max, abs, mod
-
-   nx = Prnx
-   ny = Prny
-   nz = Prnz
-
-
-  if (Re>0) then
-
-  !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i)
-   do k = 1,Prnz  !initital value using forward Euler
-    do i = 1,Prnx
-     do j = 1,Prny
-      SCAL3(i,j,k) = (((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))/dxmin-&
-        (TDiff(i,j,k)+TDiff(i-1,j,k))*(SCAL(i,j,k)-SCAL(i-1,j,k))/dxmin)/(dxmin)+&
-       ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))/dymin-&
-        (TDiff(i,j,k)+TDiff(i,j-1,k))*(SCAL(i,j,k)-SCAL(i,j-1,k))/dymin)/(dymin)+&
-       ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))/dzmin-&
-        (TDiff(i,j,k)+TDiff(i,j,k-1))*(SCAL(i,j,k)-SCAL(i,j,k-1))/dzmin)/(dzmin))
-     enddo
-    enddo
-   enddo
-
-   A = dt*coef
-  !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i)
-   do k = 1,Prnz
-    do i = 1,Prnx
-     do j = 1,Prny
-       SCAL2(i,j,k) = SCAL(i,j,k)+A*SCAL3(i,j,k)
-     enddo
-    enddo
-   enddo
-
-   if (sctype==1) then
-     call BOUND_Temp_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,SCAL2)
-   else
-     call BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2)
-   endif
-
-
-   Ax = 1._KND/(4._KND*dxmin**2)
-   Ay = 1._KND/(4._KND*dymin**2)
-   Az = 1._KND/(4._KND*dzmin**2)
-
-  !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i)
-   do k = 1,Prnz
-    do i = 1,Prnx
-     do j = 1,Prny
-      Ap(i,j,k) = 1._KND/(1._KND/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))+&
-                           (TDiff(i,j,k)+TDiff(i-1,j,k)))*Ax+&
-                           ((TDiff(i,j+1,k)+TDiff(i,j,k))+&
-                           (TDiff(i,j,k)+TDiff(i,j-1,k)))*Ay+&
-                           ((TDiff(i,j,k+1)+TDiff(i,j,k))+&
-                           (TDiff(i,j,k)+TDiff(i,j,k-1)))*Az))
-     enddo
-    enddo
-   enddo
-
-   do l = 1,maxCNiter
-    S = 0
-    if (sctype==1) then
-     call BOUND_Temp_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,SCAL2)
-    else
-     call BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2)
-    endif
-
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i), reduce(max:S)
-    do k = 1,Prnz
-     do i = 1,Prnx
-      do j = 1+mod(i+k,2),Prny,2
-        p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
-         ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
-          (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
-         ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
-          (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
-         ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
-          (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
-         )
-         p = p*Ap(i,j,k)
-         S = max(S,abs(p-SCAL2(i,j,k)))
-         SCAL2(i,j,k) = p
-      enddo
-     enddo
-    enddo
-
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i), reduce(max:S)
-    do k = 1,Prnz
-     do i = 1,Prnx
-      do j = 1+mod(i+k+1,2),Prny,2
-        p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
-         ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
-          (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
-         ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
-          (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
-         ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
-          (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
-         )
-         p = p*Ap(i,j,k)
-         S = max(S,abs(p-SCAL2(i,j,k)))
-         SCAL2(i,j,k) = p
-      enddo
-     enddo
-    enddo
-
-
-    if (S<=epsCN) exit
-   enddo
-
-
-  else
-
-   !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(k,i)
-   do k = 1,Prnz
-    do i = 1,Prnx
-     do j = 1,Prny
-       SCAL2(i,j,k) = SCAL(i,j,k)
-     enddo
-    enddo
-   enddo
-
-   if (sctype==1) then
-     call BOUND_Temp_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,SCAL2)
-   else
-     call BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2)
-   endif
-  endif
-  endsubroutine DIFFSCALAR_GPU
-#include "scalarsbound_GPU.f90"
-
-#endif
 
 end module SCALARS

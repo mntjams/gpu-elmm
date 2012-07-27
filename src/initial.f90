@@ -1680,6 +1680,9 @@ contains
         endif
     endif
 
+    if (.not.allocated(BsideTArr))  allocate(BsideTArr(0,0))
+    if (.not.allocated(BsideTFLArr))  allocate(BsideTFLArr(0,0))
+
 
 
 

@@ -37,7 +37,7 @@ module CDS
         do k=1,nz
             do j=1,ny
                 do i=1,nx
-                    U2(i,j,k)=U2(i,j,k) - coef*((Ax*(U(i+1,j,k)+U(i,j,k))*(U(i+1,j,k)+U(i,j,k))&
+                    U2(i,j,k)= - coef*((Ax*(U(i+1,j,k)+U(i,j,k))*(U(i+1,j,k)+U(i,j,k))&
                     -Ax*(U(i,j,k)+U(i-1,j,k))*(U(i,j,k)+U(i-1,j,k)))&
                     +(Ay*(U(i,j+1,k)+U(i,j,k))*(V(i+1,j,k)+V(i,j,k))&
                     -Ay*(U(i,j,k)+U(i,j-1,k))*(V(i+1,j-1,k)+V(i,j-1,k)))&
@@ -65,7 +65,7 @@ module CDS
                       -(gn(j-1)*U(i,j,k)+(1-gn(j-1))*U(i,j-1,k))*(fp(i)*V(i+1,j-1,k)+(1-fp(i))*V(i,j-1,k)))/dyPr(j)
            Utmp=Utmp+( (ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))&
                       -(ht(k-1)*U(i,j,k)+(1-ht(k-1))*U(i,j,k-1))*(fp(i)*W(i+1,j,k-1)+(1-fp(i))*W(i,j,k-1)))/dzPr(k)
-           U2(i,j,k)=U2(i,j,k)-dt*coef*Utmp
+           U2(i,j,k)=-dt*coef*Utmp
           enddo
          enddo
         enddo
@@ -101,7 +101,7 @@ module CDS
         do k=1,nz
             do j=1,ny
                 do i=1,nx
-                    V2(i,j,k)=V2(i,j,k) - coef*((Ay*(V(i,j+1,k)+V(i,j,k))*(V(i,j+1,k)+V(i,j,k))&
+                    V2(i,j,k)= - coef*((Ay*(V(i,j+1,k)+V(i,j,k))*(V(i,j+1,k)+V(i,j,k))&
                     -Ay*(V(i,j,k)+V(i,j-1,k))*(V(i,j,k)+V(i,j-1,k)))&
                     +(Ax*(V(i+1,j,k)+V(i,j,k))*(U(i,j+1,k)+U(i,j,k))&
                     -Ax*(V(i,j,k)+V(i-1,j,k))*(U(i-1,j+1,k)+U(i-1,j,k)))&
@@ -129,7 +129,7 @@ module CDS
                       -(fe(i-1)*V(i,j,k)+(1-fe(i-1))*V(i-1,j,k))*(gp(j)*U(i-1,j+1,k)+(1-gp(j))*U(i-1,j,k)))/dxPr(i)
            Vtmp=Vtmp+( (ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))&
                       -(ht(k-1)*V(i,j,k)+(1-ht(k-1))*V(i,j,k-1))*(gp(j)*W(i,j+1,k-1)+(1-gp(j))*W(i,j,k-1)))/dzPr(k)
-           V2(i,j,k)=V2(i,j,k)-dt*coef*Vtmp
+           V2(i,j,k)=-dt*coef*Vtmp
           enddo
          enddo
         enddo
@@ -163,7 +163,7 @@ module CDS
         do k=1,nz
             do j=1,ny
                 do i=1,nx
-                    W2(i,j,k)=W2(i,j,k) - coef*((Az*(W(i,j,k+1)+W(i,j,k))*(W(i,j,k+1)+W(i,j,k))&
+                    W2(i,j,k)= - coef*((Az*(W(i,j,k+1)+W(i,j,k))*(W(i,j,k+1)+W(i,j,k))&
                     -Az*(W(i,j,k)+W(i,j,k-1))*(W(i,j,k)+W(i,j,k-1)))&
                     +(Ay*(W(i,j+1,k)+W(i,j,k))*(V(i,j,k+1)+V(i,j,k))&
                     -Ay*(W(i,j,k)+W(i,j-1,k))*(V(i,j-1,k)+V(i,j-1,k+1)))&
@@ -191,7 +191,7 @@ module CDS
                       -(fe(i-1)*W(i,j,k)+(1-fe(i-1))*W(i-1,j,k))*(hp(k)*U(i-1,j,k+1)+(1-hp(k))*U(i-1,j,k)))/dxPr(i)
            Wtmp=Wtmp+( (gn(j)*W(i,j+1,k)+(1-gn(j))*W(i,j,k))*(hp(k)*V(i,j,k+1)+(1-hp(k))*V(i,j,k))&
                       -(gn(j-1)*W(i,j,k)+(1-gn(j-1))*W(i,j-1,k))*(hp(k)*V(i,j-1,k+1)+(1-hp(k))*V(i,j-1,k)))/dzPr(k)
-           W2(i,j,k)=W2(i,j,k)-dt*coef*Wtmp
+           W2(i,j,k)=-dt*coef*Wtmp
           enddo
          enddo
         enddo
@@ -200,14 +200,13 @@ module CDS
 
 
   subroutine KAPPAU(U2,U,V,W,coef)
-  real(KND),intent(inout)::U2(-2:,-2:,-2:),U(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(in):: V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  real(KND),intent(out)::U2(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer i,j,k
   real(KND) A,SL,SR,FLUX
   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3):: SLOPE
   real(KND),parameter::eps=1e-8
 
-  call BoundU(1,U)
 
   A=coef*dt/2._KND
 
@@ -236,7 +235,7 @@ module CDS
       FLUX=(U(i,j,k)+U(i+1,j,k))*(U(i+1,j,k)+(U(i+1,j,k)-U(i+2,j,k))*SLOPE(i,j,k)/2._KND)
      endif
 
-     U2(i,j,k)=U2(i,j,k)-A*FLUX/dxPr(i)
+     U2(i,j,k)=-A*FLUX/dxPr(i)
      U2(i+1,j,k)=U2(i+1,j,k)+A*FLUX/dxPr(i+1)
     enddo
    enddo
@@ -309,14 +308,13 @@ module CDS
 
 
   pure subroutine KAPPAV(V2,U,V,W,coef) !Kappa scheme with flux limiter
-  real(KND),intent(inout)::V2(-2:,-2:,-2:),V(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(in):: U(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  real(KND),intent(out)::V2(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer i,j,k
   real(KND) A,SL,SR,FLUX
   real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3):: SLOPE
   real(KND),parameter::eps=1e-8
 
-  call BoundU(2,V)
 
   A=coef*dt/2._KND
 
@@ -345,7 +343,7 @@ module CDS
      else
       FLUX=(U(i,j,k)+U(i,j+1,k))*(V(i+1,j,k)+(V(i+1,j,k)-V(i+2,j,k))*SLOPE(i,j,k)/2._KND)
      endif
-     V2(i,j,k)=V2(i,j,k)-A*FLUX/dxPr(i)
+     V2(i,j,k)=-A*FLUX/dxPr(i)
      V2(i+1,j,k)=V2(i+1,j,k)+A*FLUX/dxPr(i+1)
     enddo
    enddo
@@ -416,14 +414,13 @@ module CDS
   endsubroutine KAPPAV
 
   pure subroutine KAPPAW(W2,U,V,W,coef) !Kappa scheme with flux limiter
-  real(KND),intent(inout)::W2(-2:,-2:,-2:),W(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),coef
+  real(KND),intent(out)::W2(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   integer i,j,k
   real(KND) A,SL,SR,FLUX
   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3):: SLOPE
   real(KND),parameter::eps=1e-8
 
-  call BoundU(3,W)
 
   A=coef*dt/2._KND
 
@@ -452,7 +449,7 @@ module CDS
      else
       FLUX=(U(i,j,k)+U(i,j,k+1))*(W(i+1,j,k)+(W(i+1,j,k)-W(i+2,j,k))*SLOPE(i,j,k)/2._KND)
      endif
-     W2(i,j,k)=W2(i,j,k)-A*FLUX/dxPr(i)
+     W2(i,j,k)=-A*FLUX/dxPr(i)
      W2(i+1,j,k)=W2(i+1,j,k)+A*FLUX/dxPr(i+1)
     enddo
    enddo

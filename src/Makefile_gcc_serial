@@ -14,7 +14,7 @@
 
 #### Compiler and tool definitions shared by all build targets #####
 FC = gfortran-4.7
-BASICOPTS = -O5 -g -fbacktrace -fprefetch-loop-arrays -finline-functions -funroll-all-loops -g -ffpe-trap=zero,overflow -ffast-math
+BASICOPTS = -O5 -g -fbacktrace -fprefetch-loop-arrays -finline-functions -funroll-loops -pg -ffpe-trap=zero,overflow -ffast-math -flto
 FFLAGS = $(BASICOPTS)
 
 
@@ -46,7 +46,7 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/main.o
 USERLIBS_CLMM = $(SYSLIBS_CLMM)
 DEPLIBS_CLMM =
-LDLIBS_CLMM = $(USERLIBS_CLMM) -llapack -L/usr/local/poisfft_gcc/sp -lpoisfft_omp -L/usr/local/fftw-gcc/lib -lfftw3 -lfftw3f -lfftw3_omp -lfftw3f_omp
+LDLIBS_CLMM = $(USERLIBS_CLMM) -llapack -L/usr/local/poisfft_gcc/sp -lpoisfft -L/usr/local/fftw-gcc/lib -lfftw3 -lfftw3f -lfftw3_omp -lfftw3f_omp
 
 
 # Link or archive
@@ -62,7 +62,7 @@ $(TARGETDIR_CLMM)/limiters.o: $(TARGETDIR_CLMM) limiters.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ limiters.f90
 
 $(TARGETDIR_CLMM)/scalars.o: $(TARGETDIR_CLMM) scalars.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ scalars.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -cpp -o $@ scalars.f90
 
 $(TARGETDIR_CLMM)/multigrid.o: $(TARGETDIR_CLMM) multigrid.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -cpp -o $@ multigrid.f90
@@ -107,7 +107,7 @@ $(TARGETDIR_CLMM)/tsteps.o: $(TARGETDIR_CLMM) tsteps.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -cpp -o $@ tsteps.f90
 
 $(TARGETDIR_CLMM)/main.o: $(TARGETDIR_CLMM) main.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -o $@ main.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(ADVOPTS) $(CPPFLAGS_CLMM) -cpp -o $@ main.f90
 
 
 
