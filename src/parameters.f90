@@ -4,7 +4,7 @@ implicit none
   save
 
   integer,parameter :: DBL=selected_real_kind(p=15,r=200),SNG=selected_real_kind(p=6,r=37)
-  integer,parameter :: KND=DBL                                         !KND is default real kind for the whole program
+  integer,parameter :: KND=SNG                                         !KND is default real kind for the whole program
 
   integer,parameter :: TIM=KND                                         !Kind for time variables, can be double for very small timesteps.
                                                                        !It may affect performance
@@ -36,10 +36,10 @@ implicit none
   real(KND) :: dxmin,dymin,dzmin,lx,ly,lz,CFL,Uref  !minimum grid spacing, dimensions of the domain
 
 
-  real(KND) :: Re,Prandtl !1/molecular viscosity, viscosity/thermal diffusivity
+  real(KND) :: Re = 70000, Prandtl = 0.7!1/molecular viscosity, viscosity/thermal diffusivity
 
 
-  real(KND) :: prgradientx,prgradienty,temperature_ref,grav_acc,coriolisparam
+  real(KND) :: prgradientx = 0, prgradienty = 0, temperature_ref = 295, grav_acc = 0, coriolisparam = 0
 
   real(KND) :: SHEARG,Uinlet,ustarsurfin
 

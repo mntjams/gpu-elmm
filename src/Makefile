@@ -107,7 +107,7 @@ $(TARGETDIR_CLMM)/tsteps.o: $(TARGETDIR_CLMM) tsteps.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -fpp -xpp=cpp -o $@ tsteps.f90
 
 $(TARGETDIR_CLMM)/main.o: $(TARGETDIR_CLMM) main.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ main.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -fpp -xpp=cpp -o $@ main.f90
 
 
 

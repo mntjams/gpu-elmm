@@ -46,7 +46,7 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/main.o
 USERLIBS_CLMM = $(SYSLIBS_CLMM)
 DEPLIBS_CLMM =
-LDLIBS_CLMM = $(USERLIBS_CLMM) -llapack -L/usr/local/poisfft_gcc/dp -lpoisfft -lfftw3 -lfftw3f -lfftw3_threads -lfftw3f_threads
+LDLIBS_CLMM = $(USERLIBS_CLMM) -llapack -L/usr/local/poisfft_gcc/sp -lpoisfft -lfftw3 -lfftw3f -lfftw3_threads -lfftw3f_threads
 
 
 # Link or archive
@@ -77,7 +77,7 @@ $(TARGETDIR_CLMM)/outputs.o: $(TARGETDIR_CLMM) outputs.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ outputs.f90
 
 $(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -cpp -I/usr/local/poisfft_gcc/dp -o $@ poisson.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -cpp -I/usr/local/poisfft_gcc/sp -o $@ poisson.f90
 
 $(TARGETDIR_CLMM)/initial.o: $(TARGETDIR_CLMM) initial.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ initial.f90
