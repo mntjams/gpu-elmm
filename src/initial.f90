@@ -18,8 +18,6 @@ module INITIAL
   private
   public  ReadParams, Initconds, ReadBounds
 
-
-
 contains
 
 
@@ -64,15 +62,6 @@ contains
    read(11,fmt='(/)')
    read(11,*) Re
    write(*,*) "Re=",Re
-   read(11,fmt='(/)')
-   read(11,*) coriolisparam
-   write(*,*) "coriolisparam=",coriolisparam
-   read(11,fmt='(/)')
-   read(11,*) prgradientx
-   write(*,*) "prgradientx=",prgradientx
-   read(11,fmt='(/)')
-   read(11,*) prgradienty
-   write(*,*) "prgradienty=",prgradienty
    read(11,fmt='(/)')
    read(11,*) starttime
    write(*,*) "starttime=",starttime
@@ -189,6 +178,29 @@ contains
    read(11,fmt='(/)')
    read(11,*) z0T
    close(11)
+
+   open(11,file="large_scale.conf",status="old",action="read",iostat=io)
+
+   if (io==0) then
+     read(11,fmt='(/)')
+     read(11,*) CoriolisParam
+     write(*,*) "coriolisparam=",CoriolisParam
+     read(11,fmt='(/)')
+     read(11,*) PrGradientX
+     write(*,*) "prgradientx=",PrGradientX
+     read(11,fmt='(/)')
+     read(11,*) PrGradientY
+     write(*,*) "prgradienty=",PrGradientY
+     read(11,fmt='(/)')
+     read(11,*) SubsidenceGradient
+     write(*,*) "SubsidenceGradient=",SubsidenceGradient
+     close(11)
+
+   else
+
+     write(*,*) "Warning! Could not open file large_scale.conf. Using defaults."
+
+   endif
 
 
    open(11,file="thermal.conf",status="old",action="read")
@@ -1684,7 +1696,7 @@ contains
     if (.not.allocated(BsideTFLArr))  allocate(BsideTFLArr(0,0))
 
 
-
+    call InitSubsidenceProfile
 
 
     allocate(WMP%depscalar(computescalars))
