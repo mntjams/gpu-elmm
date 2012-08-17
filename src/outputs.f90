@@ -1,3 +1,61 @@
+module BigEndian
+!   use iso_fortran_env
+  implicit none
+
+  private
+  public :: GetEndianess, BigEnd
+
+  integer,parameter :: int8=selected_int_kind(1),int32=kind(1)
+  integer,parameter :: real64=KIND(1.0D0),real32=KIND(1.0E0)
+  logical,save :: littleendian
+
+  interface BigEnd
+    module procedure BigEnd32
+    module procedure BigEnd64
+  end interface
+
+  contains
+
+    subroutine GetEndianess
+      integer(int8),dimension(4):: bytes !may not work on some processors
+
+      bytes=transfer(1_int32,bytes,4)
+      if (bytes(4)==1) then
+        littleendian=.false.
+      else
+        littleendian=.true.
+      endif
+    end subroutine GetEndianess
+
+    elemental function BigEnd32(x) result(res)
+      real(real32) :: res
+      real(real32),intent(in)::x
+      integer(int8),dimension(4):: bytes !may not work on some processors
+
+      if (.not.littleendian) then
+        res = x
+      else
+        bytes = transfer(x,bytes,4)
+        res = transfer(bytes(4:1:-1),x)
+      endif
+    end function BigEnd32
+
+    elemental function BigEnd64(x) result(res)
+      real(real32) :: res
+      real(real64),intent(in)::x
+      integer(int8),dimension(8):: bytes !may not work on some processors
+
+      if (.not.littleendian) then
+        res = x
+      else
+        bytes = transfer(x,bytes,8)
+        res = transfer(bytes(8:1:-1),x)
+      endif
+    end function BigEnd64
+
+end module BigEndian
+
+
 module OUTPUTS
   use PARAMETERS
   use BOUNDARIES
@@ -5,6 +63,7 @@ module OUTPUTS
   use WALLMODELS, only: GroundDeposition, GroundUstar
   use GEOMETRIC
   use TURBINLET, only: ustarinlet
+  use BigEndian
 
   implicit none
 
@@ -282,6 +341,8 @@ contains
       profssavg = 0
     endif
   endif
+
+  call GetEndianess
 
  end subroutine AllocateOutputs
 
@@ -1648,7 +1709,7 @@ contains
              do j = minj,maxj
               do i = mini,maxi
                if (Prtype(i,j,k)==0) then
-                write (unit,*) ScalarVerticalFlux(i,j,k,SUM(Scalar(:,:,:,:),4),W)
+                write (unit,*) ScalarVerticalFlux(i,j,k,SUM(Scalar,4),W)
                else
                 write (unit,*) 0.
                endif
@@ -2178,24 +2239,27 @@ contains
   end subroutine BLProfiles
 
 
-  real(KND) function TotKE(U,V,W)
+  function TotKE(U,V,W) result(res)
+  real(KND) :: res
   real(KND),dimension(-2:,-2:,-2:) :: U,V,W
   real(KND) Um,Vm,Wm
   integer i,j,k
-   TotKE = 0
+   res = 0
    Um = 0
    Vm = 0
    Wm = 0
+   !$omp parallel do private(i,j,k) reduction(+:res)
    do k = 1,Prnz
     do j = 1,Prny
      do i = 1,Prnx
-      TotKE = TotKE+(((U(i-1,j,k)+U(i,j,k))/2._KND-Um)**2+&
-                    ((V(i,j-1,k)+V(i,j,k))/2._KND-Vm)**2+&
-                    ((W(i,j,k-1)+W(i,j,k))/2._KND-Wm)**2)
+      res = res + (((U(i-1,j,k)+U(i,j,k))/2._KND-Um)**2+&
+                      ((V(i,j-1,k)+V(i,j,k))/2._KND-Vm)**2+&
+                      ((W(i,j,k-1)+W(i,j,k))/2._KND-Wm)**2)
      enddo
     enddo
    enddo
-   TotKE = TotKE*lx*lz*lz/2
+   !$omp end parallel do
+   res = res*lx*lz*lz/2
   end function TotKE
 
   pure real(KND) function VorticityMag(i,j,k,U,V,W) result(res)
@@ -2426,30 +2490,6 @@ contains
 
   end function TriLinInt
 
-
-  real(SNG) function BigEnd(x)
-  real(SNG),intent(in)::x
-  integer,save:: called = 0
-  logical,save:: littleendian !endianess of the machine
-  integer(selected_int_kind(1)),dimension(4):: bytes !may not work on some processors
-
-    if (called==0) then
-      bytes = transfer(1,bytes,4)
-      if (bytes(4)==1) then
-       littleendian=.false.
-      else
-       littleendian=.true.
-      endif
-      called = 1
-    endif
-
-    if (.not.littleendian) then
-     BigEnd = x
-    else
-     bytes = transfer(x,bytes,4)
-     BigEnd = transfer(bytes(4:1:-1),x)
-    endif
-  end function BigEnd
 
 end module OUTPUTS
 

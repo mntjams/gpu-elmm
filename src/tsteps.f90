@@ -212,15 +212,22 @@ write(*,*) "stage:",l
 
 
     if (l==1) delta = 0
-!     if (debuglevel>0) then
+
+    !$omp parallel
+    if (debuglevel>0) then
+      !$omp workshare
       delta = delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
       delta = delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
       delta = delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
-!     endif
+      !$omp end workshare
+    endif
 
+    !$omp workshare
     U = U2
     V = V2
     W = W2
+    !$omp end workshare
+    !$omp end parallel
 
 
 
@@ -464,6 +471,8 @@ write(*,*) "stage:",l
        recdymin2=1./dymin**2
        recdzmin2=1./dzmin**2
 
+       !$omp parallel private(i,j,k,Suavg,Svavg,Swavg)
+       !$omp do
        do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
         do j=1,Uny
          do i=1,Unx
@@ -477,6 +486,8 @@ write(*,*) "stage:",l
          enddo
         enddo
        enddo
+       !$omp end do nowait
+       !$omp do
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
@@ -490,20 +501,24 @@ write(*,*) "stage:",l
          enddo
         enddo
        enddo
+       !$omp end do nowait
+       !$omp do
        do k=1,Wnz
-       do j=1,Wny
-        do i=1,Wnx
-         W2(i,j,k) = W2(i,j,k)+Ap*(&
-         (0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
-         (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))*recdxmin2+&
-          ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
-          (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))*recdymin2)+&
-          (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
-          Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*recdzmin2))
+        do j=1,Wny
+         do i=1,Wnx
+          W2(i,j,k) = W2(i,j,k)+Ap*(&
+          (0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
+          (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))*recdxmin2+&
+           ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
+           (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))*recdymin2)+&
+           (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
+           Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*recdzmin2))
+         enddo
         enddo
        enddo
-      enddo
+       !$omp end do nowait
 
+       !$omp do
        do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
         do j=1,Uny
          do i=1,Unx
@@ -516,9 +531,13 @@ write(*,*) "stage:",l
          enddo
         enddo
        enddo
+       !$omp end do
 
+       !$omp workshare
        ApU = 1._KND/(1._KND+Ap*ApU)
+       !$omp end workshare nowait
 
+       !$omp do
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
@@ -531,9 +550,13 @@ write(*,*) "stage:",l
          enddo
         enddo
        enddo
+       !$omp end do
 
+       !$omp workshare
        ApV = 1._KND/(1._KND+Ap*ApV)
+       !$omp end workshare nowait
 
+       !$omp do
        do k=1,Wnz
         do j=1,Wny
          do i=1,Wnx
@@ -546,13 +569,20 @@ write(*,*) "stage:",l
          enddo
         enddo
        enddo
+       !$omp end do
 
+       !$omp workshare
        ApW = 1._KND/(1._KND+Ap*ApW)
+       !$omp end workshare nowait
 
 
+       !$omp workshare
        Suavg = abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
        Svavg = abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
        Swavg = abs(MAXVAL(W3(1:Wnx,1:Wny,1:Wnz)))
+       !$omp end workshare
+       !$omp end parallel
+
        if (Suavg<=1e-3_KND) Suavg = 1
        if (Svavg<=1e-3_KND) Svavg = 1
        if (Swavg<=1e-3_KND) Swavg = 1
@@ -689,9 +719,13 @@ write(*,*) "stage:",l
         if (S<=epsCN) exit
        enddo
 
+       !$omp parallel
+       !$omp workshare
        U2 = U3
        V2 = V3
        W2 = W3
+       !$omp end workshare
+       !$omp end parallel
 
   endsubroutine UNIFREDBLACK
 

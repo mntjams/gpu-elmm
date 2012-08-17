@@ -34,6 +34,7 @@ module CDS
         Ay=0.25*coef*dt/dymin
         Az=0.25*coef*dt/dzmin
 
+        !$omp parallel do private(i,j,k)
         do k=1,nz
             do j=1,ny
                 do i=1,nx
@@ -46,6 +47,7 @@ module CDS
                 enddo
             enddo
         enddo
+        !$omp end parallel do
      else
         if (called==0) then
          allocate(fe(0:nx),fp(1:nx),gn(0:ny),ht(0:nz))
@@ -56,6 +58,7 @@ module CDS
          forall (k=0:nz)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
         endif
 
+        !$omp parallel do private(i,j,k)
         do k=1,nz
          do j=1,ny
           do i=1,nx
@@ -69,6 +72,7 @@ module CDS
           enddo
          enddo
         enddo
+        !$omp end parallel do
      endif
     end subroutine CDU
 
@@ -98,6 +102,7 @@ module CDS
         Ay=0.25*coef*dt/dymin
         Az=0.25*coef*dt/dzmin
 
+        !$omp parallel do private(i,j,k)
         do k=1,nz
             do j=1,ny
                 do i=1,nx
@@ -110,6 +115,7 @@ module CDS
                 enddo
             enddo
         enddo
+        !$omp end parallel do
      else
         if (called==0) then
          allocate(gn(0:ny),gp(1:ny),fe(0:nx),ht(0:nz))
@@ -120,6 +126,7 @@ module CDS
          forall (k=0:nz)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
         endif
 
+        !$omp parallel do private(i,j,k)
         do k=1,nz
          do j=1,ny
           do i=1,nx
@@ -133,6 +140,7 @@ module CDS
           enddo
          enddo
         enddo
+        !$omp end parallel do
      endif
     end subroutine CDV
 
@@ -160,6 +168,7 @@ module CDS
         Ay=0.25*coef*dt/dymin
         Az=0.25*coef*dt/dzmin
 
+        !$omp parallel do private(i,j,k)
         do k=1,nz
             do j=1,ny
                 do i=1,nx
@@ -172,6 +181,7 @@ module CDS
                 enddo
             enddo
         enddo
+        !$omp end parallel do
      else
         if (called==0) then
          allocate(ht(0:nz),hp(1:nz),fe(0:nx),gn(0:ny))
@@ -182,6 +192,7 @@ module CDS
          forall (j=0:ny)      gn(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
         endif
 
+        !$omp parallel do private(i,j,k)
         do k=1,nz
          do j=1,ny
           do i=1,nx
@@ -195,6 +206,7 @@ module CDS
           enddo
          enddo
         enddo
+        !$omp end parallel do
      endif
     end subroutine CDW
 

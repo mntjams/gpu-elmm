@@ -39,8 +39,10 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
    called=1
   endif
 
-  Phi=lastcoef*Phi/coef
-  lastcoef=coef
+  if (poissmet==1) then
+    Phi=lastcoef*Phi/coef
+    lastcoef=coef
+  end if
 
   projectiontype=1
 
@@ -70,6 +72,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
   if (projectiontype==2) then
    Apr=coef*dt
    !Subtract pressure gradient terms in case of pressure correction method no. 2
+
+   !$omp parallel
+   !$omp do private(k,j,i)
    do k=1,Unz
     do j=1,Uny
      do i=1,Unx
@@ -77,6 +82,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      enddo
     enddo
    enddo
+   !$omp end do nowait
+   !$omp do private(k,j,i)
    do k=1,Vnz
     do j=1,Vny
      do i=1,Vnx
@@ -84,6 +91,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      enddo
     enddo
    enddo
+   !$omp end do nowait
+   !$omp do private(k,j,i)
    do k=1,Wnz
     do j=1,Wny
      do i=1,Wnx
@@ -91,6 +100,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      enddo
     enddo
    enddo
+   !$omp end do
+   !$omp end parallel
   endif
 
 
@@ -106,17 +117,24 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
    call BoundU(3,W)
 
    S=0
+   !$omp parallel do private(i,j,k) reduction(+:S)
    do k=1,Prnz
     do j=1,Prny
      do i=1,Prnx
-      S=S-((U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k)))*dxPr(i)*dyPr(j)*dzPr(k)
+      S = S + (-((U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))&
+                   /(dzPr(k)))*dxPr(i)*dyPr(j)*dzPr(k))
      enddo
     enddo
    enddo
+   !$omp end parallel do
 
    S=S/(ly*lz)
    write(*,*) "Compatibility correction",S
+   !$omp parallel
+   !$omp workshare
    U(Unx+1,:,:)=U(Unx+1,:,:)+S
+   !$omp end workshare
+   !$omp end parallel
 
    S=0
    S2=0
@@ -165,7 +183,12 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
 
    Phiref=Phi(Prnx/2,Prny/2,Prnz/2)
+
+   !$omp parallel
+   !$omp workshare
    Phi = Phi-Phiref
+   !$omp end workshare
+   !$omp end parallel
 
 
 
@@ -173,14 +196,17 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
 
 
-
- do k=1,Unz
-  do j=1,Uny
+  !$omp parallel
+  !$omp do private(k,j,i)
+  do k=1,Unz
+   do j=1,Uny
     do i=1,Unx
       U(i,j,k)=U(i,j,k)-dt2*(Phi(i+1,j,k)-Phi(i,j,k))/dxU(i)
     enddo
    enddo
   enddo
+  !$omp end do nowait
+  !$omp do private(k,j,i)
   do k=1,Vnz
    do j=1,Vny
     do i=1,Vnx
@@ -188,6 +214,8 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     enddo
    enddo
   enddo
+  !$omp end do nowait
+  !$omp do private(k,j,i)
   do k=1,Wnz
    do j=1,Wny
     do i=1,Wnx
@@ -195,7 +223,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
     enddo
    enddo
   enddo
+  !$omp end do nowait
   if (projectiontype==1) then
+   !$omp do private(k,j,i)
    do k=1,Prnz
     do j=1,Prny
      do i=1,Prnx
@@ -205,7 +235,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      enddo
     enddo
    enddo
+   !$omp end do
   elseif (projectiontype==2) then
+   !$omp do private(k,j,i)
    do k=1,Prnz
     do j=1,Prny
      do i=1,Prnx
@@ -213,8 +245,9 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
      enddo
     enddo
    enddo
+   !$omp end do
   endif
-
+  !$omp end parallel
 
   S=0
   S2=0

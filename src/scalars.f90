@@ -86,24 +86,41 @@ contains
 
 
     if (RKstage == 1) then
+      !$omp parallel
+      !$omp workshare
       temperature_adv = 0
       Scalar_adv = 0
+      !$omp end workshare
+      !$omp end parallel
     endif
 
     if (computescalars>0) then
 
+      !$omp parallel
+      !$omp workshare
       Scalar_2=0
+      !$omp end workshare
 
       if (RKstage>1) then
+        !$omp workshare
         Scalar_2 = Scalar_2+Scalar_adv*rho(RKstage)
+        !$omp end workshare
       endif
 
+      !$omp workshare
       Scalar_adv = 0
+      !$omp end workshare
+      !$omp end parallel
+
       do i=1,computescalars
         call AdvScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U,V,W,2,1._KND,SubsidenceProfile)
       enddo
 
+      !$omp parallel
+      !$omp workshare
       Scalar_2 = Scalar_2+Scalar_adv*beta(RKstage)
+      !$omp end workshare
+      !$omp end parallel
 
       if (scalsourcetype==pointsource) then
 
@@ -120,7 +137,11 @@ contains
 
       endif
 
+      !$omp parallel
+      !$omp workshare
       Scalar = Scalar+Scalar_2
+      !$omp end workshare
+      !$omp end parallel
 
       if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
 
@@ -134,7 +155,11 @@ contains
 
       if (computegravsettling>0) call GravSettling(Scalar_2,2._KND*alpha(RKstage))
 
+      !$omp parallel
+      !$omp workshare
       Scalar = Scalar_2
+      !$omp end workshare
+      !$omp end parallel
 
     endif
 
@@ -143,24 +168,39 @@ contains
 
       if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
       call Bound_Visc(TDiff)
+      !$omp parallel
+      !$omp workshare
       temperature2=0
+      !$omp end workshare
+      !$omp end parallel
 
       call Bound_Temp(temperature)
 
+      !$omp parallel
       if (RKstage>1) then
+        !$omp workshare
         temperature2 = temperature2+temperature_adv*rho(RKstage)
+        !$omp end workshare
       endif
 
+      !$omp workshare
       temperature_adv = 0
+      !$omp end workshare
+      !$omp end parallel
+
       if (RKstage==3.and.present(fluxprofile)) then
         call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,SubsidenceProfile,FluxProfile)
       else
         call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,SubsidenceProfile)
       end if
 
+      !$omp parallel
+      !$omp workshare
       temperature2 = temperature2+temperature_adv*beta(RKstage)
 
       temperature = temperature+temperature2
+      !$omp end workshare
+      !$omp end parallel
 
       call Bound_Temp(temperature)
 
@@ -184,7 +224,11 @@ contains
         call DiffScalar(temperature2,temperature,1,2._KND*alpha(RKstage))
 #endif
 
+      !$omp parallel
+      !$omp workshare
       temperature = temperature2
+      !$omp end workshare
+      !$omp end parallel
     endif
 
   end subroutine ScalarRK3
@@ -201,7 +245,11 @@ contains
   real(KND) :: SubsidenceProfileLoc(0:Prnz)
   real(KND) :: fluxProfileLoc(0:Prnz)
 
-   if (allocated(SubsidenceProfile)) SubsidenceProfileLoc = SubsidenceProfile(0:Prnz)
+   if (allocated(SubsidenceProfile)) then
+     SubsidenceProfileLoc = SubsidenceProfile(0:Prnz)
+   else
+     SubsidenceProfileLoc = 0
+   endif
 
    if (gridtype==uniformgrid) then
        call KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef,SubsidenceProfileLoc,fluxProfileLoc)
@@ -700,7 +748,12 @@ contains
   Ay = coef*dt/dymin
   Az = coef*dt/dzmin
 
+  !$omp parallel private(i,j,k,vel,SL,SR,FLUX)
+
+  !$omp workshare
   SLOPE = 0
+  !$omp end workshare
+  !$omp do
   do k = 1,Prnz
    do j = 1,Prny
     do i = 0,Prnx
@@ -715,8 +768,9 @@ contains
     enddo
    enddo
   enddo
+  !$omp end do
 
-
+  !$omp do
   do k = 1,Prnz
    do j = 1,Prny
     do i = 0,Prnx
@@ -730,9 +784,13 @@ contains
     enddo
    enddo
   enddo
+  !$omp end do nowait
 
 
+  !$omp workshare
   SLOPE = 0
+  !$omp end workshare
+  !$omp do
   do k = 1,Prnz
    do j = 0,Prny
     do i = 1,Prnx
@@ -747,8 +805,10 @@ contains
     enddo
    enddo
   enddo
+  !$omp end do
 
 
+  !$omp do
   do k = 1,Prnz
    do j = 0,Prny
     do i = 1,Prnx
@@ -763,9 +823,13 @@ contains
     enddo
    enddo
   enddo
+  !$omp end do nowait
 
 
+  !$omp workshare
   SLOPE = 0
+  !$omp end workshare
+  !$omp do
   do k = 0,Prnz
    do j = 1,Prny
     do i = 1,Prnx
@@ -780,9 +844,13 @@ contains
     enddo
    enddo
   enddo
+  !$omp end do nowait
 
+  !$omp workshare
   fluxprofile = 0
+  !$omp end workshare
 
+  !$omp do
   do k = 0,Prnz
    do j = 1,Prny
     do i = 1,Prnx
@@ -795,15 +863,20 @@ contains
       FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
      endif
 
-     fluxprofile(k) = fluxprofile(k) + FLUX
+     if (vel>=1e-6) fluxprofile(k) = fluxprofile(k) + FLUX/vel*W(i,j,k)
 
-     SCAL2(i,j,k) = SCAL2(i,j,k)-Az*FLUX
-     SCAL2(i,j,k+1) = SCAL2(i,j,k+1)+Az*FLUX
+     SCAL2(i,j,k) = SCAL2(i,j,k) - Az*FLUX
+     SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + Az*FLUX
     enddo
    enddo
   enddo
+  !$omp end do
 
+  !$omp workshare
   fluxprofile = fluxprofile / (Prnx*Prny)
+  !$omp end workshare
+
+  !$omp end parallel
 
   endsubroutine KAPPASCALARUG
 
@@ -829,7 +902,12 @@ contains
 
   A = coef*dt
 
+  !$omp parallel private(i,j,k,vel,SL,SR,FLUX)
+
+  !$omp workshare
   SLOPE = 0
+  !$omp end workshare
+  !$omp do
   do k = 1,Prnz
    do j = 1,Prny
     do i = 0,Prnx
@@ -844,8 +922,10 @@ contains
     enddo
    enddo
   enddo
+  !$omp end do
 
 
+  !$omp do
   do k = 1,Prnz
    do j = 1,Prny
     do i = 0,Prnx
@@ -859,9 +939,13 @@ contains
     enddo
    enddo
   enddo
+  !$omp end do nowait
 
 
+  !$omp workshare
   SLOPE = 0
+  !$omp end workshare
+  !$omp do
   do k = 1,Prnz
    do j = 0,Prny
     do i = 1,Prnx
@@ -876,8 +960,10 @@ contains
     enddo
    enddo
   enddo
+  !$omp end do
 
 
+  !$omp do
   do k = 1,Prnz
    do j = 0,Prny
     do i = 1,Prnx
@@ -892,9 +978,13 @@ contains
     enddo
    enddo
   enddo
+  !$omp end do nowait
 
 
+  !$omp workshare
   SLOPE = 0
+  !$omp end workshare
+  !$omp do
   do k = 0,Prnz
    do j = 1,Prny
     do i = 1,Prnx
@@ -909,9 +999,13 @@ contains
     enddo
    enddo
   enddo
+  !$omp end do nowait
 
+  !$omp workshare
   fluxprofile = 0
+  !$omp end workshare
 
+  !$omp do
   do k = 0,Prnz
    do j = 1,Prny
     do i = 1,Prnx
@@ -924,15 +1018,20 @@ contains
       FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
      endif
 
-     fluxprofile(k) = fluxprofile(k+1) + FLUX
+     if (vel>=1e-6) fluxprofile(k) = fluxprofile(k+1) + FLUX/vel*W(i,j,k)
 
-     SCAL2(i,j,k) = SCAL2(i,j,k)-A*FLUX/dzPr(k)
-     SCAL2(i,j,k+1) = SCAL2(i,j,k+1)+A*FLUX/dzPr(k+1)
+     SCAL2(i,j,k) = SCAL2(i,j,k) - A*FLUX/dzPr(k)
+     SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + A*FLUX/dzPr(k+1)
     enddo
    enddo
   enddo
+  !$omp end do
 
+  !$omp workshare
   fluxProfile = fluxProfile/(Prnx * Prny)
+  !$omp end workshare
+
+  !$omp end parallel
 
   endsubroutine KAPPASCALARGG
 
@@ -960,6 +1059,13 @@ contains
     call BOUND_PASSSCALAR(SCAL)
    endif
 
+   A = dt*coef
+   Ax = 1._KND/(4._KND*dxmin**2)
+   Ay = 1._KND/(4._KND*dymin**2)
+   Az = 1._KND/(4._KND*dzmin**2)
+
+   !$omp parallel private (i,j,k)
+   !$omp do
    do k = 1,Prnz  !initital value using forward Euler
     do j = 1,Prny
      do i = 1,Prnx
@@ -972,8 +1078,9 @@ contains
      enddo
     enddo
    enddo
+   !$omp end do
 
-   A = dt*coef
+   !$omp do
    do k = 1,Prnz
     do j = 1,Prny
      do i = 1,Prnx
@@ -981,6 +1088,8 @@ contains
      enddo
     enddo
    enddo
+   !$omp end do
+   !$omp end parallel
 
    if (sctype==1) then
      call BOUND_Temp(SCAL2)
@@ -988,6 +1097,8 @@ contains
      call BOUND_PASSSCALAR(SCAL2)
    endif
 
+   !$omp parallel private(i,j,k,p,xi,yj,zk)
+   !$omp do
    do i = 1,ubound(ScalFlIBPoints,1)
      xi = ScalFlIBPoints(i)%xi
      yj = ScalFlIBPoints(i)%yj
@@ -996,13 +1107,10 @@ contains
      SCAL2(xi,yj,zk) = SCAL2(xi,yj,zk) + p
      SCAL3(xi,yj,zk) = SCAL3(xi,yj,zk) + p
    enddo
-
-
-   Ax = 1._KND/(4._KND*dxmin**2)
-   Ay = 1._KND/(4._KND*dymin**2)
-   Az = 1._KND/(4._KND*dzmin**2)
+   !$omp end do nowait
 
    if (gridtype==uniformgrid) then
+    !$omp do
     do k = 1,Prnz
      do j = 1,Prny
       do i = 1,Prnx
@@ -1015,7 +1123,9 @@ contains
       enddo
      enddo
     enddo
+    !$omp end do
    else
+    !$omp do
     do k = 1,Prnz
      do j = 1,Prny
       do i = 1,Prnx
@@ -1028,7 +1138,9 @@ contains
       enddo
      enddo
     enddo
+    !$omp end do
    endif
+   !$omp end parallel
 
    do l = 1,maxCNiter
     S = 0
@@ -2000,13 +2112,25 @@ contains
   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer:: i,j,k
    if (Re>0) then
-    forall(k = 1:Prnz,j = 1:Prny,i = 1:Prnx)
-     TDiff(i,j,k) = (Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
-    end forall
+    !$omp parallel do private(i,j,k)
+    do k = 1,Prnz
+      do j = 1,Prny
+        do i = 1,Prnx
+          TDiff(i,j,k) = (Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
+        end do
+      end do
+    end do
+    !$omp end parallel do
    else
-    forall(k = 1:Prnz,j = 1:Prny,i = 1:Prnx)
-     TDiff(i,j,k) = Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
-    end forall
+    !$omp parallel do private(i,j,k)
+    do k = 1,Prnz
+      do j = 1,Prny
+        do i = 1,Prnx
+          TDiff(i,j,k) = Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
+       end do
+      end do
+    end do
+    !$omp end parallel do
    endif
   end subroutine ComputeTDiff
 
