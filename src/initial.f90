@@ -22,10 +22,13 @@ contains
 
 
  subroutine ReadParams
- integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter,minGPUlevel
- real(KND) mgepsinnerGS
- integer   i,io,itmp
- integer numframeslices
+   integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter,minGPUlevel
+   real(KND) mgepsinnerGS
+   integer   i,io,io2,itmp
+   integer numframeslices
+   namelist /cmd/ cachesize, debugparam, debuglevel, windangle, projectiontype, Prnx, Prny, Prnz
+   character(len=1024) :: commandline,msg
+   integer :: exenamelength
 
    open(11,file="main.conf",status="old",action="read")
    read(11,fmt='(/)')
@@ -604,6 +607,29 @@ contains
 
    fullstress=0
 
+#ifndef NO_INTERNAL_NML
+   !Parsing of command line uses namelist input on an internal file (Fortran 2003).
+   !If not supported by the processor yet, define macro NO_INTERNAL_NML.
+   call get_command(command=commandline,status=io)
+   call get_command_argument(0,length=exenamelength,status=io2)
+   if (io2==0) then
+     commandline="&cmd "//adjustl(trim(commandline(exenamelength+1:)))//" /"
+   else
+     commandline="&cmd "//adjustl(trim(commandline))//" /"
+   end if
+
+   if (io==0) then
+     read(commandline,nml=cmd,iostat=io,iomsg=msg)
+     if (io/=0) then
+       write(*,*) io,"Error parsing command line."
+       write(*,*) msg
+       write(*,*) commandline
+     end if
+   else
+     write(*,*) io,"Error getting command line."
+   end if
+#endif
+
    if (CFL<=0)  CFL=0.5
 
 
@@ -775,6 +801,9 @@ contains
 
    write(*,*) "set"
  end subroutine ReadParams
+
+
+
 
  subroutine ReadIC(U,V,W,Pr)
  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)

@@ -119,6 +119,8 @@ implicit none
   integer,parameter :: SmagorinskyModel=1,DynSmagorinskyModel=2,VremanModel=3,StabSmagorinskyModel=4
   integer,parameter :: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4
 
-  integer :: debuglevel !amount of information to write out
+  integer :: debuglevel = 0 !amount of information to write out
+
+  integer :: cachesize = 2**15 !L1 cache size in bytes to optimize for
 
 endmodule PARAMETERS

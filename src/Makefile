@@ -14,7 +14,7 @@
 
 #### Compiler and tool definitions shared by all build targets #####
 FC = f90
-BASICOPTS = -C -g -dalign
+BASICOPTS = -fpp -xpp=cpp -DNO_INTERNAL_NML -C -g -dalign
 FFLAGS = $(BASICOPTS)
 
 
@@ -62,10 +62,10 @@ $(TARGETDIR_CLMM)/limiters.o: $(TARGETDIR_CLMM) limiters.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ limiters.f90
 
 $(TARGETDIR_CLMM)/scalars.o: $(TARGETDIR_CLMM) scalars.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -fpp -xpp=cpp -o $@ scalars.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ scalars.f90
 
 $(TARGETDIR_CLMM)/multigrid.o: $(TARGETDIR_CLMM) multigrid.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -fpp -xpp=cpp -o $@ multigrid.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ multigrid.f90
 
 $(TARGETDIR_CLMM)/multigrid2d.o: $(TARGETDIR_CLMM) multigrid2d.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ multigrid2d.f90
@@ -77,7 +77,7 @@ $(TARGETDIR_CLMM)/outputs.o: $(TARGETDIR_CLMM) outputs.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ outputs.f90
 
 $(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -fpp -xpp=cpp -M /usr/local/poisfft_sun/sp -o $@ poisson.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -M /usr/local/poisfft_sun/sp -o $@ poisson.f90
 
 $(TARGETDIR_CLMM)/initial.o: $(TARGETDIR_CLMM) initial.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ initial.f90
@@ -104,10 +104,10 @@ $(TARGETDIR_CLMM)/smagorinsky.o: $(TARGETDIR_CLMM) smagorinsky.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ smagorinsky.f90
 
 $(TARGETDIR_CLMM)/tsteps.o: $(TARGETDIR_CLMM) tsteps.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -fpp -xpp=cpp -o $@ tsteps.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ tsteps.f90
 
 $(TARGETDIR_CLMM)/main.o: $(TARGETDIR_CLMM) main.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -fpp -xpp=cpp -o $@ main.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ main.f90
 
 
 
