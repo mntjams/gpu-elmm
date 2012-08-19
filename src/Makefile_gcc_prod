@@ -13,8 +13,8 @@
 
 
 #### Compiler and tool definitions shared by all build targets #####
-FC = scalasca -instrument gfortran-4.7
-BASICOPTS = -cpp -O5 -g -fbacktrace -fopenmp -ftree-parallelize-loops=8 -floop-parallelize-all -fprefetch-loop-arrays -finline-functions -funroll-loops -ffast-math -flto
+FC = gfortran-4.7
+BASICOPTS = -cpp -O5 -g -fbacktrace -fopenmp -ftree-parallelize-loops=8 -floop-parallelize-all -fprefetch-loop-arrays -finline-functions -funroll-loops -ffast-math  -flto
 FFLAGS = $(BASICOPTS)
 
 

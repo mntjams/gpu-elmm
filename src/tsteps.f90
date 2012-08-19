@@ -7,7 +7,7 @@ module TSTEPS
   use BOUNDARIES, only: BoundU,Bound_Q
   use POISSON, only: Pr_Correct
   use OUTPUTS, only: store,display,proftempfl
-  use SCALARS, only: ScalarRK3
+  use SCALARS, only: ScalarRK3, Bound_Visc
   use SMAGORINSKY, only: Smag, StabSmag, Vreman
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
   use Wallmodels, only: ComputeViscsWM
@@ -1023,6 +1023,8 @@ write(*,*) "stage:",l
        Visc(ScalFlIBPoints(i)%xi,ScalFlIBPoints(i)%yj,ScalFlIBPoints(i)%zk) = &
                                                TIBPoint_Viscosity(ScalFlIBPoints(i),Visc)
      enddo
+
+     call Bound_Visc(Visc)
 
   end subroutine SubgridStresses
 

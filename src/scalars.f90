@@ -65,6 +65,7 @@ contains
 #endif
 
     if (called==0) then
+
       called = 1
 
       allocate(Scalar_adv(lbound(Scalar,1):ubound(Scalar,1),lbound(Scalar,2):ubound(Scalar,2),&
@@ -82,7 +83,6 @@ contains
 
 
 !     if (computescalars>0.and..not.released) call Release(Scalar,released)
-
 
 
     if (RKstage == 1) then
@@ -167,22 +167,26 @@ contains
     if (buoyancy>0) then
 
       if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
+
       call Bound_Visc(TDiff)
-      !$omp parallel
-      !$omp workshare
-      temperature2=0
-      !$omp end workshare
-      !$omp end parallel
 
       call Bound_Temp(temperature)
 
-      !$omp parallel
       if (RKstage>1) then
+        !$omp parallel
         !$omp workshare
-        temperature2 = temperature2+temperature_adv*rho(RKstage)
+        temperature2 = temperature_adv*rho(RKstage)
         !$omp end workshare
+        !$omp end parallel
+      else
+        !$omp parallel
+        !$omp workshare
+        temperature2=0
+        !$omp end workshare
+        !$omp end parallel
       endif
 
+      !$omp parallel
       !$omp workshare
       temperature_adv = 0
       !$omp end workshare
@@ -830,8 +834,8 @@ contains
   SLOPE = 0
   !$omp end workshare
   !$omp do
-  do k = 0,Prnz
-   do j = 1,Prny
+  do j = 1,Prny
+   do k = 0,Prnz
     do i = 1,Prnx
      if (W(i,j,k)>0) then
       SR = (SCAL(i,j,k+1)-SCAL(i,j,k))
@@ -1788,38 +1792,6 @@ contains
   ny = Prny
   nz = Prnz
 
-  if (Btype(Ea)==PERIODIC) then
-   do k = 1,nz
-    do j = 1,ny
-      Nu(0,j,k) = Nu(nx,j,k)
-      Nu(nx+1,j,k) = Nu(1,j,k)
-    enddo
-   enddo
-  else
-   do k = 1,nz
-    do j = 1,ny
-      Nu(0,j,k) = Nu(1,j,k)
-      Nu(nx+1,j,k) = Nu(nx,j,k)
-    enddo
-   enddo
-  endif
-
-  if (Btype(No)==PERIODIC) then
-   do k = 1,nz
-    do i = 1,nx
-      Nu(i,0,k) = Nu(i,ny,k)
-      Nu(i,ny+1,k) = Nu(i,1,k)
-    enddo
-   enddo
-  else
-   do k = 1,nz
-    do i = 1,nx
-      Nu(i,0,k) = Nu(i,1,k)
-      Nu(i,ny+1,k) = Nu(i,ny,k)
-    enddo
-   enddo
-  endif
-
   if (Btype(To)==PERIODIC) then
    do j = 1,ny
     do i = 1,nx
@@ -1835,6 +1807,39 @@ contains
     enddo
    enddo
   endif
+
+  if (Btype(Ea)==PERIODIC) then
+   do k = 0,nz+1
+    do j = 1,ny
+      Nu(0,j,k) = Nu(nx,j,k)
+      Nu(nx+1,j,k) = Nu(1,j,k)
+    enddo
+   enddo
+  else
+   do k = 0,nz+1
+    do j = 1,ny
+      Nu(0,j,k) = Nu(1,j,k)
+      Nu(nx+1,j,k) = Nu(nx,j,k)
+    enddo
+   enddo
+  endif
+
+  if (Btype(No)==PERIODIC) then
+   do k = 0,nz+1
+    do i = 0,nx+1
+      Nu(i,0,k) = Nu(i,ny,k)
+      Nu(i,ny+1,k) = Nu(i,1,k)
+    enddo
+   enddo
+  else
+   do k = 0,nz+1
+    do i = 0,nx+1
+      Nu(i,0,k) = Nu(i,1,k)
+      Nu(i,ny+1,k) = Nu(i,ny,k)
+    enddo
+   enddo
+  endif
+
   endsubroutine BOUND_Visc
 
 

@@ -234,11 +234,11 @@ module SMAGORINSKY
        dx2=dxmin**2
        dy2=dymin**2
        dz2=dzmin**2
-
+Visc=huge(1.)
        !$omp parallel do private(aa,bb,a,b,i,j,k,ii,jj)
-       do k=-1,Prnz+2
-        do i=-1,Prnx+2
-         do j=-1,Prny+2
+       do k=1,Prnz
+        do i=1,Prnx
+         do j=1,Prny
           a(1,1)=(U(i,j,k)-U(i-1,j,k))/dxmin
           a(2,1)=(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._KND*dymin)
           a(3,1)=(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._KND*dzmin)

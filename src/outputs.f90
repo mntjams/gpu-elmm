@@ -5,8 +5,8 @@ module BigEndian
   private
   public :: GetEndianess, BigEnd
 
-  integer,parameter :: int8=selected_int_kind(1),int32=kind(1)
-  integer,parameter :: real64=KIND(1.0D0),real32=KIND(1.0E0)
+  integer,parameter :: int8=selected_int_kind(1),int32=selected_int_kind(9),int64=selected_int_kind(10)
+  integer,parameter :: real32=selected_real_kind(p=15,r=200),real64=selected_real_kind(p=6,r=37)
   logical,save :: littleendian
 
   interface BigEnd
@@ -36,12 +36,12 @@ module BigEndian
         res = x
       else
         bytes = transfer(x,bytes,4)
-        res = transfer(bytes(4:1:-1),x)
+        res = transfer(bytes(4:1:-1),res)
       endif
     end function BigEnd32
 
     elemental function BigEnd64(x) result(res)
-      real(real32) :: res
+      real(real64) :: res
       real(real64),intent(in)::x
       integer(int8),dimension(8):: bytes !may not work on some processors
 
@@ -49,7 +49,7 @@ module BigEndian
         res = x
       else
         bytes = transfer(x,bytes,8)
-        res = transfer(bytes(8:1:-1),x)
+        res = transfer(bytes(8:1:-1),res)
       endif
     end function BigEnd64
 
@@ -751,44 +751,46 @@ contains
         enddo
         close(11)
 
-        open(11,file="profRig.txt")
-        do k = 1,Prnz
-         S = 0
-         do j = 1,Prny
-          do i = 1,Prnx
-           S = S+Rig(i,j,k,Uavg,Vavg,temperatureavg)
+        if (allocated(Uavg).and.allocated(Vavg).and.allocated(temperatureavg)) then
+          open(11,file="profRig.txt")
+          do k = 1,Prnz
+           S = 0
+           do j = 1,Prny
+            do i = 1,Prnx
+             S = S+Rig(i,j,k,Uavg,Vavg,temperatureavg)
+            enddo
+           enddo
+           S = S/(Prnx*Prny)
+           write (11,*) zPr(k),S
           enddo
-         enddo
-         S = S/(Prnx*Prny)
-         write (11,*) zPr(k),S
-        enddo
-        close(11)
+          close(11)
 
-        open(11,file="profRf.txt")
-        do k = 1,Prnz
-         S = 0
-         S2 = 0
-         do j = 1,Prny
-          do i = 1,Prnx
-           S = S+(Uavg(i,j,k+1)+Uavg(i-1,j,k+1)-Uavg(i,j,k-1)-Uavg(i-1,j,k-1))/(2._KND*(zPr(k+1)-zPr(k-1)))
-           S2 = S2+(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(2._KND*(zPr(k+1)-zPr(k-1)))
+          open(11,file="profRf.txt")
+          do k = 1,Prnz
+           S = 0
+           S2 = 0
+           do j = 1,Prny
+            do i = 1,Prnx
+             S = S+(Uavg(i,j,k+1)+Uavg(i-1,j,k+1)-Uavg(i,j,k-1)-Uavg(i-1,j,k-1))/(2._KND*(zPr(k+1)-zPr(k-1)))
+             S2 = S2+(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(2._KND*(zPr(k+1)-zPr(k-1)))
+            enddo
+           enddo
+
+           S = S/(Prnx*Prny)
+           S2 = S2/(Prnx*Prny)
+           nom=(grav_acc/temperature_ref)*(proftempflavg(k)+proftempflsgsavg(k))
+           denom=((profuwavg(k)+profuwsgsavg(k))*S+(profvwavg(k)+profvwsgsavg(k))*S2)
+
+           if (abs(denom)>1E-5_KND*abs(nom)) then
+             S = nom/denom
+           else
+             S = 100000._KND*sign(1.0_KND,nom)*sign(1.0_KND,denom)
+           endif
+
+           write (11,*) zPr(k),S
           enddo
-         enddo
-
-         S = S/(Prnx*Prny)
-         S2 = S2/(Prnx*Prny)
-         nom=(grav_acc/temperature_ref)*(proftempflavg(k)+proftempflsgsavg(k))
-         denom=((profuwavg(k)+profuwsgsavg(k))*S+(profvwavg(k)+profvwsgsavg(k))*S2)
-
-         if (abs(denom)>1E-5_KND*abs(nom)) then
-           S = nom/denom
-         else
-           S = 100000._KND*sign(1.0_KND,nom)*sign(1.0_KND,denom)
-         endif
-
-         write (11,*) zPr(k),S
-        enddo
-        close(11)
+          close(11)
+        endif !allocated avgs
 
      endif !buoyancy>0
 
