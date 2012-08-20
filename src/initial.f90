@@ -12,6 +12,7 @@ module INITIAL
   use TURBINLET, only: GetTurbInlet, GetInletFromFile, TLag, Lturby, Lturbz, ustarinlet, transformtensor
   use GEOMETRIC
   use WALLMODELS
+  use TILING, only: tilesize,InitTiles
 
   implicit none
 
@@ -26,7 +27,7 @@ contains
    real(KND) mgepsinnerGS
    integer   i,io,io2,itmp
    integer numframeslices
-   namelist /cmd/ cachesize, debugparam, debuglevel, windangle, projectiontype, Prnx, Prny, Prnz
+   namelist /cmd/ tilesize, debugparam, debuglevel, windangle, projectiontype, Prnx, Prny, Prnz
    character(len=1024) :: commandline,msg
    integer :: exenamelength
 
@@ -1934,6 +1935,8 @@ contains
    if (computescalars>0.and.scalsourcetype==pointsource) then
         call Gridcoords(scalsrci(:),scalsrcj(:),scalsrck(:),scalsrcx(:),scalsrcy(:),scalsrcz(:))
    endif
+
+   call InitTiles(Prnx,Prny,Prnz)
 
    call InitSolidBodies
    call GetSolidBodiesBC

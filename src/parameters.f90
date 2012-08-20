@@ -1,18 +1,33 @@
+module KINDS
+!   use iso_fortran_env
+  implicit none
+
+  integer,parameter :: int8   = selected_int_kind(1)
+  integer,parameter :: int32  = selected_int_kind(9)
+  integer,parameter :: int64  = selected_int_kind(10)
+  integer,parameter :: real32 = selected_real_kind(p=6,r=37)
+  integer,parameter :: real64 = selected_real_kind(p=15,r=200)
+
+  integer,parameter :: DBL = real64, SNG = real32
+  integer,parameter :: KND = SNG                                       !KND is default real kind for the whole program
+
+  integer,parameter :: TIM = KND                                       !Kind for time variables, can be double for very small timesteps.
+                                                                       !It may affect performance
+
+  integer,parameter :: SINT = kind(1)                                  !To save memory a smaller type can be used for some integer
+  integer,parameter :: SLOG = SINT                                     ! and logical arrays. Note the same KIND value is guaranteed
+                                                                       ! the default intrinsic types.
+                                                                       !This can have some negative effect on speed however
+end module KINDS
+
 module PARAMETERS
-implicit none
+
+  use KINDS
+
+  implicit none
 
   save
 
-  integer,parameter :: DBL=selected_real_kind(p=15,r=200),SNG=selected_real_kind(p=6,r=37)
-  integer,parameter :: KND=SNG                                         !KND is default real kind for the whole program
-
-  integer,parameter :: TIM=KND                                         !Kind for time variables, can be double for very small timesteps.
-                                                                       !It may affect performance
-
-  integer,parameter :: SINT=kind(1)!selected_int_kind(2)               !To save memory a smaller type can be used for some integer
-  integer,parameter :: SLOG=SINT                                       ! and logical arrays. Note the same KIND value is guaranteed
-                                                                       ! the default intrinsic types.
-                                                                       !This can have some negative effect on speed however
   real(KND)           :: pi !computed at the first line of main
   real(KND),parameter :: Karman=0.41_KND
   real(KND),parameter :: BoltzC=1.3806503e-23_KND
@@ -120,7 +135,5 @@ implicit none
   integer,parameter :: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4
 
   integer :: debuglevel = 0 !amount of information to write out
-
-  integer :: cachesize = 2**15 !L1 cache size in bytes to optimize for
 
 endmodule PARAMETERS

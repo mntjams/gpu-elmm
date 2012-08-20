@@ -16,16 +16,16 @@ module SMAGORINSKY
    integer i,j,k
    real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
 
-   do k=-1,Prnz+2
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
+   do k=1,Prnz
+    do j=1,Prny
+     do i=1,Prnx
        Visc(i,j,k)=NuSmag(i,j,k,U,V,W)
-     enddo
-    enddo
-   enddo
+     end do
+    end do
+   end do
    if (Re>0) then
      Visc=Visc+1._KND/Re
-   endif
+   end if
   endsubroutine Smag
 
 
@@ -34,17 +34,17 @@ module SMAGORINSKY
    real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
    integer i,j,k
 
-   do k=-1,Prnz+2
-    do j=-1,Prny+2
-     do i=-1,Prnx+2
+   do k=1,Prnz
+    do j=1,Prny
+     do i=1,Prnx
       if (Re>0) then
        Visc(i,j,k)=1._KND/Re+NuSmag2(i,j,k,U,V,W,width*2+1)
       else
        Visc(i,j,k)=NuSmag2(i,j,k,U,V,W,width*2+1)
-      endif
-     enddo
-    enddo
-   enddo
+      end if
+     end do
+    end do
+   end do
   endsubroutine Smag2
 
 
@@ -86,9 +86,9 @@ module SMAGORINSKY
    real(KND),parameter:: CS=0.17_KND
    real(KND) S(1:3,1:3)
 
-   do k=0,Prnz+1
-    do j=0,Prny+1
-     do i=0,Prnx+1
+   do k=1,Prnz
+    do j=1,Prny
+     do i=1,Prnx
        width=(dxPr(i)*dyPr(j)*dzPr(k))**(1._KND/3._KND)
 
        call StrainIJ(i,j,k,U,V,W,S)
@@ -102,13 +102,13 @@ module SMAGORINSKY
 
        Visc(i,j,k)=Sbar*Fm(Ri)*l
        TDiff(i,j,k)=Sbar*Fh(Ri)*l
-     enddo
-    enddo
-   enddo
+     end do
+    end do
+   end do
    if (Re>0) then
      Visc=Visc+1._KND/Re
      TDiff=TDiff+1._KND/(Re*Prandtl)
-   endif
+   end if
   endsubroutine StabSmag
 
 
@@ -122,7 +122,7 @@ module SMAGORINSKY
     Fm  =  (1._KND-Ri/Ric)**4
    else
     Fm  =  sqrt(1._KND - 16._KND*Ri)
-   endif
+   end if
   end function Fm
 
   pure real(KND) function Fh(Ri)       !Adjustment function for stability
@@ -135,7 +135,7 @@ module SMAGORINSKY
     Fh  =  (1./0.7_KND)  *  (1._KND - Ri/Ric)**4  *  (1._KND - 1.2_KND*Ri)
    else
     Fh  =  sqrt(1._KND - 40._KND*Ri) / 0.7_KND
-   endif
+   end if
   end function Fh
 
   pure real(KND) function WallDamp(l0,z0,z) !Wall damping for Smagorinsky model
@@ -160,7 +160,7 @@ module SMAGORINSKY
     Rig=num/denom
    else
     Rig=0
-   endif
+   end if
   endfunction Rig
 
 
@@ -176,8 +176,8 @@ module SMAGORINSKY
    do jj=1,3
     do ii=1,3
      Strainu=Strainu+S(ii,jj)*S(ii,jj)
-    enddo
-   enddo
+    end do
+   end do
    Strainu=SQRT(2._KND*Strainu)
   endfunction Strainu
 
@@ -211,8 +211,8 @@ module SMAGORINSKY
    do jj=1,3
     do ii=1,3
      S(ii,jj)=(D(ii,jj)+D(jj,ii))
-    enddo
-   enddo
+    end do
+   end do
    S=S/2._KND
   endsubroutine StrainIJ
 
@@ -220,25 +220,29 @@ module SMAGORINSKY
 
 
   subroutine Vreman(U,V,W)   !Vreman subgrid model (Physics of Fluids, 2004)
+   use Tiling, only: tilenx, tileny, tilenz
    real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
-   integer i,j,k,ii,jj
-   real(KND)::aa,bb
+   integer i,j,k,bi,bj,bk,ii,jj
+   real(KND) :: aa,bb
    real(KND),dimension(1:3,1:3)::a,b
    real(KND) :: dx2,dy2,dz2
    real(KND),parameter::c=0.05
-
+   integer,parameter :: narr = 4
 
    if (gridtype==uniformgrid) then
 
 
-       dx2=dxmin**2
-       dy2=dymin**2
-       dz2=dzmin**2
-Visc=huge(1.)
-       !$omp parallel do private(aa,bb,a,b,i,j,k,ii,jj)
-       do k=1,Prnz
-        do i=1,Prnx
-         do j=1,Prny
+    dx2=dxmin**2
+    dy2=dymin**2
+    dz2=dzmin**2
+
+    !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj)
+    do bk = 1,Prnz,tilenz(narr)
+     do bj = 1,Prny,tileny(narr)
+      do bi = 1,Prnx,tilenx(narr)
+       do k = bk,min(bk+tilenz(narr)-1,Prnz)
+        do j = bj,min(bj+tileny(narr)-1,Prny)
+         do i = bi,min(bi+tilenx(narr)-1,Prnx)
           a(1,1)=(U(i,j,k)-U(i-1,j,k))/dxmin
           a(2,1)=(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._KND*dymin)
           a(3,1)=(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._KND*dzmin)
@@ -256,8 +260,8 @@ Visc=huge(1.)
             b(ii,jj)=dx2*a(1,ii)*a(1,jj)+&
                      dy2*a(2,ii)*a(2,jj)+&
                      dz2*a(3,ii)*a(3,jj)
-           enddo
-          enddo
+           end do
+          end do
 
           bb=          b(1,1)*b(2,2)-b(1,2)**2
           bb=bb+b(1,1)*b(3,3)-b(1,3)**2
@@ -265,32 +269,38 @@ Visc=huge(1.)
 
           aa=0
 
-
-
-          Visc(i,j,k)=0._KND
-
           do jj=1,3
            do ii=1,3
             aa=aa+(a(ii,jj)**2)
-           enddo
-          enddo
+           end do
+          end do
 
 
-
-          if (abs(aa)>1e-5.and.bb>0)  Visc(i,j,k)=c*sqrt(bb/aa)
-
+          if (abs(aa)>1e-5.and.bb>0)  then
+            Visc(i,j,k)=c*sqrt(bb/aa)
+          else
+            Visc(i,j,k) = 0
+          end if
 
           if (Re>0)  Visc(i,j,k)=Visc(i,j,k)+1._KND/Re
 
-         enddo
-        enddo
-       enddo
-       !$omp end parallel do
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end parallel do
+
    else !general grid
 
-       do k=-1,Prnz+2
-        do j=-1,Prny+2
-         do i=-1,Prnx+2
+    !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj)
+    do bk = 1,Prnz,tilenz(narr)
+     do bj = 1,Prny,tileny(narr)
+      do bi = 1,Prnx,tilenx(narr)
+       do k = bk,min(bk+tilenz(narr)-1,Prnz)
+        do j = bj,min(bj+tileny(narr)-1,Prny)
+         do i = bi,min(bi+tilenx(narr)-1,Prnx)
           a(1,1)=(U(i,j,k)-U(i-1,j,k))/dxPr(i)
           a(2,1)=(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(2._KND*(dyV(j)+dyV(j-1)))
           a(3,1)=(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(2._KND*(dzW(k)+dzW(k-1)))
@@ -321,11 +331,15 @@ Visc=huge(1.)
 
           if (Re>0)  Visc(i,j,k)=Visc(i,j,k)+1._KND/Re
 
-         enddo
-        enddo
-       enddo
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end parallel do
 
-   endif !general grid
+   end if !general grid
   endsubroutine Vreman
 
 
@@ -351,9 +365,9 @@ Visc=huge(1.)
    do j=-1,ny+2
     do i=-1,nx+2
      U2(i,j,k)=(U1(i-1,j,k)+U1(i+1,j,k)+U1(i,j-1,k)+U1(i,j-1,k)+U1(i,j,k-1)+U1(i,j,k+1)+6*U1(i,j,k))/12._KND
-    enddo
-   enddo
-  enddo
+    end do
+   end do
+  end do
 
  endsubroutine TrapesField
 
@@ -374,9 +388,9 @@ Visc=huge(1.)
    do jj=-1,1
     do ii=-1,1
      S1=S1+F(ii)*F(jj)*F(kk)
-    enddo
-   enddo
-  enddo
+    end do
+   end do
+  end do
   do k=-1,nz+2
    do j=-1,ny+2
     do i=-1,nx+2
@@ -385,13 +399,13 @@ Visc=huge(1.)
       do jj=-1,1
        do ii=-1,1
         S=S+F(ii)*F(jj)*F(kk)*U1(i+ii,j+jj,k+kk)
-       enddo
-      enddo
-     enddo
+       end do
+      end do
+     end do
      U2(i,j,k)=S/S1
-    enddo
-   enddo
-  enddo
+    end do
+   end do
+  end do
  endsubroutine TrapesField2
 
 
