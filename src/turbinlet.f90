@@ -59,9 +59,9 @@ contains
     do k=-bigNz+1,Prnz+bigNz
      do j=-bigNy+1,Prny+bigNy
       do i=-bigNx,bigNx
-       Ru(i,j,k)=RANDOMGAUSS()
-       Rv(i,j,k)=RANDOMGAUSS()
-       Rw(i,j,k)=RANDOMGAUSS()
+       call RandomGauss(Ru(i,j,k))
+       call RandomGauss(Rv(i,j,k))
+       call RandomGauss(Rw(i,j,k))
       enddo
      enddo
     enddo
@@ -190,9 +190,9 @@ contains
 
     do k=-bigNz+1,Prnz+bigNz
      do j=-bigNy+1,Prny+bigNy
-       Ru(bigNx,j,k)=RANDOMGAUSS()
-       Rv(bigNx,j,k)=RANDOMGAUSS()
-       Rw(bigNx,j,k)=RANDOMGAUSS()
+       call RandomGauss(Ru(bigNx,j,k))
+       call RandomGauss(Rv(bigNx,j,k))
+       call RandomGauss(Rw(bigNx,j,k))
       enddo
      enddo
 
@@ -326,23 +326,27 @@ contains
     allocate(Psiv(1:Prny,1:Prnz,1:2))
     allocate(Psiw(1:Prny,1:Prnz,1:2))
 
+
     do k=-bigNz+1,Prnz+bigNz
      do j=-bigNy+1,Prny+bigNy
-       Ru(j,k,1)=RANDOMGAUSS()
-       Rv(j,k,1)=RANDOMGAUSS()
-       Rw(j,k,1)=RANDOMGAUSS()
+       call RandomGauss(Ru(j,k,1))
+       call RandomGauss(Rv(j,k,1))
+       call RandomGauss(Rw(j,k,1))
      enddo
     enddo
+
     do k=-bigNz+1,Prnz+bigNz
      do j=-bigNy+1,Prny+bigNy
-       Ru(j,k,2)=RANDOMGAUSS()
-       Rv(j,k,2)=RANDOMGAUSS()
-       Rw(j,k,2)=RANDOMGAUSS()
+       call RandomGauss(Ru(j,k,2))
+       call RandomGauss(Rv(j,k,2))
+       call RandomGauss(Rw(j,k,2))
      enddo
     enddo
+
 
 
     if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
+      !$omp parallel workshare
       forall(k=-bigNz+1:Prnz+bigNz,j=-bigNy+1:0)
          Ru(j,k,1:2)=Ru(j+Prny,k,1:2)
          Rv(j,k,1:2)=Rv(j+Prny,k,1:2)
@@ -353,8 +357,10 @@ contains
          Rv(j,k,1:2)=Rv(j-Prny,k,1:2)
          Rw(j,k,1:2)=Rw(j-Prny,k,1:2)
       endforall
+      !$omp end parallel workshare
     endif
     if  ((Btype(Bo)==PERIODIC).or.(Btype(To)==PERIODIC)) then
+      !$omp parallel workshare
       forall(k=-bigNz+1:0,j=-bigNy+1:Prny+bigNy)
          Ru(j,k,1:2)=Ru(j,k+Prnz,1:2)
          Rv(j,k,1:2)=Rv(j,k+Prnz,1:2)
@@ -365,6 +371,7 @@ contains
          Rv(j,k,1:2)=Rv(j,k-Prnz,1:2)
          Rw(j,k,1:2)=Rw(j,k-Prnz,1:2)
       endforall
+      !$omp end parallel workshare
     endif
 
 
@@ -388,12 +395,15 @@ contains
     bzsum=SQRT(bzsum)
     expsz=expsz/bzsum
 
+    !$omp parallel private(j,k)
+    !$omp do
     do k=-bigNz,bigNz
       do j=-bigNy,bigNy
          bfilt(j,k,1)=expsy(j)*expsz(k)
       enddo
     enddo
-
+    !$omp end do
+    !$omp workshare
     forall(k=1:Prnz,j=1:Prny)
          Psiu(j,k,1)=SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Ru(j-bigNy:j+bigNy,k-bigNz:k+bigNz,1))
          Psiv(j,k,1)=SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rv(j-bigNy:j+bigNy,k-bigNz:k+bigNz,1))
@@ -401,12 +411,16 @@ contains
     endforall
 
     compat=SUM(Uinavg(1:Prny,1:Prnz))
+    !$omp end workshare
+    !$omp end parallel
 
     called=.true.
 
  endif
 
+    !$omp parallel private(i,j,k,Ui,Vi,Wi)
 
+    !$omp workshare
     forall(k=1:Prnz,j=1:Prny)
          Psiu(j,k,2)=SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Ru(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
          Psiv(j,k,2)=SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rv(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
@@ -416,7 +430,9 @@ contains
     Psiu(:,:,1)=Psiu(:,:,1)*exp(-pi*dt/(2._KND*TLag))+Psiu(:,:,2)*sqrt(1-exp(-pi*dt/(TLag)))
     Psiv(:,:,1)=Psiv(:,:,1)*exp(-pi*dt/(2._KND*TLag))+Psiv(:,:,2)*sqrt(1-exp(-pi*dt/(TLag)))
     Psiw(:,:,1)=Psiw(:,:,1)*exp(-pi*dt/(2._KND*TLag))+Psiw(:,:,2)*sqrt(1-exp(-pi*dt/(TLag)))
+    !$omp end workshare
 
+    !$omp do
     do k=1,Prnz
      do j=1,Prny
       Ui=Psiu(j,k,1)
@@ -433,23 +449,56 @@ contains
                             +transformtensor(6,j,k)*Wi
      enddo
     enddo
+    !$omp end do
 
+    !$omp workshare
     p=compat/SUM(Uin(1:Prny,1:Prnz))                  !To ensure the compatibility condition.
+    !$omp end workshare
 
-    Uin=Uin*p
-    Vin=Vin*p
-    Win=Win*p
+    !gfortran-4.7 signaled SIGFPE here when array assignments were used - compiler bug?
+    !$omp do
+    do k=1,Prnz
+     do j=1,Prny
+       Uin(j,k)=Uin(j,k)*p
+     end do
+    end do
+    !$omp end do
+    !$omp do
+    do k=1,Prnz
+     do j=1,Prny
+       Vin(j,k)=Vin(j,k)*p
+     end do
+    end do
+    !$omp end do
+    !$omp do
+    do k=1,Prnz
+     do j=1,Prny
+       Win(j,k)=Win(j,k)*p
+     end do
+    end do
+    !$omp end do
+
+    !$omp sections
+    !$omp section
+    call BoundUin(1,Uin)
+    !$omp section
+    call BoundUin(1,Vin)
+    !$omp section
+    call BoundUin(1,Win)
+    !$omp end sections
+    !$omp end parallel
 
     do k=-bigNz+1,Prnz+bigNz
      do j=-bigNy+1,Prny+bigNy
-       Ru(j,k,2)=RANDOMGAUSS()
-       Rv(j,k,2)=RANDOMGAUSS()
-       Rw(j,k,2)=RANDOMGAUSS()
+       call RandomGauss(Ru(j,k,2))
+       call RandomGauss(Rv(j,k,2))
+       call RandomGauss(Rw(j,k,2))
      enddo
     enddo
 
 
     if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
+      !$omp parallel workshare
       forall(k=-bigNz+1:Prnz+bigNz,j=-bigNy+1:0)
          Ru(j,k,1:2)=Ru(j+Prny,k,1:2)
          Rv(j,k,1:2)=Rv(j+Prny,k,1:2)
@@ -460,8 +509,10 @@ contains
          Rv(j,k,1:2)=Rv(j-Prny,k,1:2)
          Rw(j,k,1:2)=Rw(j-Prny,k,1:2)
       endforall
+      !$omp end parallel workshare
     endif
     if  ((Btype(Bo)==PERIODIC).or.(Btype(To)==PERIODIC)) then
+      !$omp parallel workshare
       forall(k=-bigNz+1:0,j=-bigNy+1:Prny+bigNy)
          Ru(j,k,1:2)=Ru(j,k+Prnz,1:2)
          Rv(j,k,1:2)=Rv(j,k+Prnz,1:2)
@@ -472,8 +523,8 @@ contains
          Rv(j,k,1:2)=Rv(j,k-Prnz,1:2)
          Rw(j,k,1:2)=Rw(j,k-Prnz,1:2)
       endforall
+      !$omp end parallel workshare
     endif
-
 
  endsubroutine GETTURBINLETXIE
 
@@ -568,7 +619,8 @@ contains
   endif
   endsubroutine INITMEANPROFILES
 
-  real(KND) function RANDOMGAUSS()  !more effective way: http://www.taygeta.com/random/gaussian.html
+  subroutine RANDOMGAUSS(res)  !more effective way: http://www.taygeta.com/random/gaussian.html
+  real(KND), intent(out) :: res
   real(KND) p,S
   integer,parameter:: n=6
   integer i
@@ -580,9 +632,9 @@ contains
   enddo
   S=S-0.5*n
   S=S/SQRT(n/12._KND)
-  RANDOMGAUSS=(p-0.5)*sqrt(12._KND)!S
+  res=(p-0.5)*sqrt(12._KND)!S
 
-  endfunction RANDOMGAUSS
+  end subroutine RANDOMGAUSS
 
 
   subroutine GETINLETFROMFILE(t)
@@ -709,6 +761,125 @@ contains
        read(unitnum) In%temperature
   endif
   endsubroutine READINLETFROMFILE
+
+
+  pure subroutine BoundUin(component,Uin)
+    integer,  intent(in)    :: component
+    real(KND),intent(inout) :: Uin(-2:,-2:)
+    integer :: nx, ny, nz
+
+    if (component==1) then
+      nx=Unx
+      ny=Uny
+      nz=Unz
+    elseif (component==2) then
+      nx=Vnx
+      ny=Vny
+      nz=Vnz
+    else
+      nx=Wnx
+      ny=Wny
+      nz=Wnz
+    endif
+
+    if (Btype(Bo)==DIRICHLET) then
+      if (component==3) then
+        Uin(1:ny,0) = sideU(component,Bo)
+        Uin(1:ny,-1) = sideU(component,Bo)+(sideU(component,Bo)-Uin(1:ny,1))
+      else
+        Uin(1:ny,0) = sideU(component,Bo)+(sideU(component,Bo)-Uin(1:ny,1))
+        Uin(1:ny,-1) = sideU(component,Bo)+(sideU(component,Bo)-Uin(1:ny,2))
+      end if
+    else if (Btype(Bo)==PERIODIC) then
+        Uin(1:ny,-1:0) = Uin(1:ny,nz-1:nz)
+    elseif (Btype(Bo)==NOSLIP.or.(component==3.and.Btype(Bo)==FREESLIP)) then
+      if (component==3) then
+        Uin(1:ny,0)=0
+        Uin(1:ny,-1)=-Uin(1:ny,1)
+      else
+        Uin(1:ny,-1:0)=-Uin(1:ny,2:1:-1)
+      endif
+    elseif (Btype(Bo)==NEUMANN.or.(component/=3.and.Btype(Bo)==FREESLIP)) then
+        Uin(1:ny,0)=Uin(1:ny,1)
+        Uin(1:ny,-1)=Uin(1:ny,1)
+    elseif (Btype(Bo)==PERIODIC) then
+        Uin(1:ny,-1:0) = Uin(1:ny,nz-1:nz)
+    endif
+
+    if (Btype(To)==DIRICHLET) then
+      if (component==3) then
+        Uin(1:ny,nz+1) = sideU(component,To)
+        Uin(1:ny,nz+2) = sideU(component,To)+(sideU(component,To)-Uin(1:ny,nz))
+      else
+        Uin(1:ny,nz+1) = sideU(component,To)+(sideU(component,To)-Uin(1:ny,nz))
+        Uin(1:ny,nz+2) = sideU(component,To)+(sideU(component,To)-Uin(1:ny,nz-1))
+      end if
+    else if (Btype(To)==PERIODIC) then
+        Uin(1:ny,nz+1:nz+2) = Uin(1:ny,nz-1:nz)
+    elseif (Btype(To)==NOSLIP.or.(component==3.and.(Btype(To)==FREESLIP.or.Btype(To)==FREESLIPBUFF))) then
+      if (component==3) then
+        Uin(1:ny,nz+1)=0
+        Uin(1:ny,nz+2)=-Uin(1:ny,nz)
+      else
+        Uin(1:ny,nz+1:nz+2)=-Uin(1:ny,nz:nz-1:-1)
+      endif
+    elseif (Btype(To)==NEUMANN.or.(component/=3.and.(Btype(To)==FREESLIP.or.Btype(To)==FREESLIPBUFF))) then
+        Uin(1:ny,nz+1)=Uin(1:ny,nz)
+        Uin(1:ny,nz+2)=Uin(1:ny,nz)
+    elseif (Btype(To)==PERIODIC) then
+        Uin(1:ny,nz+1:nz+2) = Uin(1:ny,1:2)
+    endif
+
+    if (Btype(So)==DIRICHLET) then
+      if (component==2) then
+        Uin(0,-1:nz+2)=sideU(component,So)
+        Uin(-1,-1:nz+2)=sideU(component,So)+(sideU(component,So)-Uin(1,-1:nz+2))
+      else
+        Uin(0,-1:nz+2)=sideU(component,So)+(sideU(component,So)-Uin(1,-1:nz+2))
+        Uin(-1,-1:nz+2)=sideU(component,So)+(sideU(component,So)-Uin(2,-1:nz+2))
+      endif
+    elseif (Btype(So)==NOSLIP.or.(component==2.and.Btype(So)==FREESLIP)) then
+      if (component==2) then
+        Uin(0,-1:nz+2)=0
+        Uin(-1,-1:nz+2)=-Uin(1,-1:nz+2)
+      else
+        Uin(0,-1:nz+2)=-Uin(1,-1:nz+2)
+        Uin(-1,-1:nz+2)=-Uin(2,-1:nz+2)
+      endif
+    elseif (Btype(So)==NEUMANN.or.(component/=2.and.Btype(So)==FREESLIP)) then
+        Uin(0,-1:nz+2)=Uin(1,-1:nz+2)
+        Uin(-1,-1:nz+2)=Uin(1,-1:nz+2)
+    elseif (Btype(So)==PERIODIC) then  !Periodic BC
+        Uin(0,-1:nz+2)=Uin(ny,-1:nz+2)
+        Uin(-1,-1:nz+2)=Uin(ny-1,-1:nz+2)
+    endif
+
+    if (Btype(No)==DIRICHLET) then
+      if (component==2) then
+        Uin(ny+1,-1:nz+2)=sideU(component,No)
+        Uin(ny+2,-1:nz+2)=sideU(component,No)+(sideU(component,No)-Uin(ny,-1:nz+2))
+      else
+        Uin(ny+1,-1:nz+2)=sideU(component,No)+(sideU(component,No)-Uin(ny,-1:nz+2))
+        Uin(ny+2,-1:nz+2)=sideU(component,No)+(sideU(component,No)-Uin(ny-1,-1:nz+2))
+      endif
+    elseif (Btype(No)==NOSLIP.or.(component==2.and.Btype(So)==FREESLIP)) then
+      if (component==2) then
+        Uin(ny+1,-1:nz+2)=0
+        Uin(ny+2,-1:nz+2)=-Uin(ny,-1:nz+2)
+      else
+        Uin(ny+1:ny+2,-1:nz+2)=-Uin(ny:ny-1:-1,-1:nz+2)
+      endif
+    elseif (Btype(No)==NEUMANN.or.(component/=2.and.Btype(No)==FREESLIP)) then
+        Uin(ny+1,-1:nz+2)=Uin(ny,-1:nz+2)
+        Uin(ny+2,-1:nz+2)=Uin(ny,-1:nz+2)
+    elseif (Btype(No)==PERIODIC) then  !Periodic BC
+        Uin(ny+1:ny+2,-1:nz+2)=Uin(1:2,-1:nz+2)
+    endif
+
+  end subroutine BoundUin
+
+
+
 
 
 end module TURBINLET

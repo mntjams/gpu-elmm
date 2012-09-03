@@ -11,6 +11,7 @@ module TSTEPS
   use SMAGORINSKY, only: Smag, StabSmag, Vreman
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
   use Wallmodels, only: ComputeViscsWM
+  use Tiling, only: tilenx, tileny, tilenz
 #ifdef __HMPP
   use HMPP_CODELETS
 #endif
@@ -144,9 +145,16 @@ write(*,*) "stage:",l
                          Btype,sideU,&
                          Win,W,0)
 #else
+!$omp parallel
+!$omp sections
+!$omp section
         call BoundU(1,U)
+!$omp section
         call BoundU(2,V)
+!$omp section
         call BoundU(3,W)
+!$omp end sections
+!$omp end parallel
 #endif
 
     call SubgridStresses(U,V,W,Pr)
@@ -165,13 +173,13 @@ write(*,*) "stage:",l
 
 
 
-    if (Btype(To) ==FreeSlipBuff)  then
+    if ((Btype(To) ==FreeSlipBuff) .and. (Prnz>15))  then
         !$hmpp <tsteps> AttenuateTop callsite, args[*].noupdate = true
         call AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,&
                           zPr,zW,U2,V2,W2,temperature,buoyancy)
     endif
 
-    if (Btype(Ea) ==OutletBuff) then
+    if ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) then
         !$hmpp <tsteps> AttenuateOut callsite, args[*].noupdate = true
         call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                           xPr,xU,U2,V2,W2,temperature,buoyancy)
@@ -260,7 +268,7 @@ write(*,*) "stage:",l
      !$hmpp <tsteps> advancedload, args[AttenuateOut2::temperature]
     endif
 
-    if (Btype(Ea) ==OutletBuff) then
+    if ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) then
      !$hmpp <tsteps> AttenuateOut2 callsite, args[*].noupdate = true
       call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                         xPr,xU,U,V,W,temperature,buoyancy)
@@ -461,7 +469,8 @@ write(*,*) "stage:",l
    real(KND),dimension(1:Wnx,1:Wny,1:Wnz):: ApW
    real(KND) recdxmin2,recdymin2,recdzmin2                                                               !reciprocal values of dx**2
    real(KND) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
-   integer i,j,k,l
+   integer i,j,k,bi,bj,bk,l
+   integer,parameter :: narr = 3, narr2 = 5 !number of arrays in the loop
 
        Ap = coef*dt/(2._KND)
        S = 0
@@ -471,63 +480,90 @@ write(*,*) "stage:",l
        recdymin2=1./dymin**2
        recdzmin2=1./dzmin**2
 
-       !$omp parallel private(i,j,k,Suavg,Svavg,Swavg)
+       !$omp parallel private(i,j,k,bi,bj,bk,Suavg,Svavg,Swavg)
+
+       !The explicit part, which doesn't have to be changed inside the loop
        !$omp do
-       do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
-        do j=1,Uny
-         do i=1,Unx
-          U2(i,j,k) = U2(i,j,k)+Ap*(&
-          ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
-          Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*recdxmin2+0.25_KND*(&
-           ((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
-           (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))*recdymin2+&
-           ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
-           (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))*recdzmin2)))
+       do bk = 1,Unz,tilenz(narr)
+        do bj = 1,Uny,tileny(narr)
+         do bi = 1,Unx,tilenx(narr)
+          do k = bk,min(bk+tilenz(narr)-1,Unz)
+           do j = bj,min(bj+tileny(narr)-1,Uny)
+            do i = bi,min(bi+tilenx(narr)-1,Unx)
+              U2(i,j,k) = U2(i,j,k)+Ap*(&
+              ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
+              Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*recdxmin2+0.25_KND*(&
+               ((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
+               (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))*recdymin2+&
+               ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
+               (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))*recdzmin2)))
+            enddo
+           enddo
+          enddo
          enddo
         enddo
        enddo
        !$omp end do nowait
        !$omp do
-       do k=1,Vnz
-        do j=1,Vny
-         do i=1,Vnx
-          V2(i,j,k) = V2(i,j,k)+Ap*(&
-          (0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
-          (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))*recdxmin2+&
-           (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
-           Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*recdymin2+&
-           0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
-           (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))*recdzmin2))
+       do bk = 1,Vnz,tilenz(narr)
+        do bj = 1,Vny,tileny(narr)
+         do bi = 1,Vnx,tilenx(narr)
+          do k = bk,min(bk+tilenz(narr)-1,Vnz)
+           do j = bj,min(bj+tileny(narr)-1,Vny)
+            do i = bi,min(bi+tilenx(narr)-1,Vnx)
+              V2(i,j,k) = V2(i,j,k)+Ap*(&
+            (0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
+            (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))*recdxmin2+&
+             (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
+             Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*recdymin2+&
+             0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
+             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))*recdzmin2))
+            enddo
+           enddo
+          enddo
          enddo
         enddo
        enddo
        !$omp end do nowait
        !$omp do
-       do k=1,Wnz
-        do j=1,Wny
-         do i=1,Wnx
-          W2(i,j,k) = W2(i,j,k)+Ap*(&
-          (0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
-          (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))*recdxmin2+&
-           ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
-           (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))*recdymin2)+&
-           (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
-           Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*recdzmin2))
+       do bk = 1,Wnz,tilenz(narr)
+        do bj = 1,Wny,tileny(narr)
+         do bi = 1,Wnx,tilenx(narr)
+          do k = bk,min(bk+tilenz(narr)-1,Wnz)
+           do j = bj,min(bj+tileny(narr)-1,Wny)
+            do i = bi,min(bi+tilenx(narr)-1,Wnx)
+              W2(i,j,k) = W2(i,j,k)+Ap*(&
+            (0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
+            (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))*recdxmin2+&
+             ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
+             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))*recdymin2)+&
+             (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
+             Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*recdzmin2))
+            enddo
+           enddo
+          enddo
          enddo
         enddo
        enddo
        !$omp end do nowait
 
+       !Auxiliary coefficients to better efficiency in loops
        !$omp do
-       do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
-        do j=1,Uny
-         do i=1,Unx
-          ApU(i,j,k) = ((Visc(i+1,j,k)+&
-                      Visc(i,j,k))*recdxmin2+&
-                      0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
-                      (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2+&
-                      ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
-                      (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))*recdzmin2))
+       do bk = 1,Unz,tilenz(narr)
+        do bj = 1,Uny,tileny(narr)
+         do bi = 1,Unx,tilenx(narr)
+          do k = bk,min(bk+tilenz(narr)-1,Unz)
+           do j = bj,min(bj+tileny(narr)-1,Uny)
+            do i = bi,min(bi+tilenx(narr)-1,Unx)
+              ApU(i,j,k) = ((Visc(i+1,j,k)+&
+                          Visc(i,j,k))*recdxmin2+&
+                          0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
+                          (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2+&
+                          ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
+                          (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))*recdzmin2))
+            enddo
+           enddo
+          enddo
          enddo
         enddo
        enddo
@@ -538,15 +574,21 @@ write(*,*) "stage:",l
        !$omp end workshare nowait
 
        !$omp do
-       do k=1,Vnz
-        do j=1,Vny
-         do i=1,Vnx
-          ApV(i,j,k) = ((Visc(i,j+1,k)+&
-                     Visc(i,j,k))*recdymin2+&
-                     0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
-                      (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k)))*recdxmin2+&
-                     ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
-                     (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))*recdzmin2))
+       do bk = 1,Vnz,tilenz(narr)
+        do bj = 1,Vny,tileny(narr)
+         do bi = 1,Vnx,tilenx(narr)
+          do k = bk,min(bk+tilenz(narr)-1,Vnz)
+           do j = bj,min(bj+tileny(narr)-1,Vny)
+            do i = bi,min(bi+tilenx(narr)-1,Vnx)
+              ApV(i,j,k) = ((Visc(i,j+1,k)+&
+                         Visc(i,j,k))*recdymin2+&
+                         0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
+                          (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k)))*recdxmin2+&
+                         ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
+                         (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))*recdzmin2))
+            enddo
+           enddo
+          enddo
          enddo
         enddo
        enddo
@@ -557,15 +599,21 @@ write(*,*) "stage:",l
        !$omp end workshare nowait
 
        !$omp do
-       do k=1,Wnz
-        do j=1,Wny
-         do i=1,Wnx
-          ApW(i,j,k) = (0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
-                      (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k)))*recdxmin2+&
-                     ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))+&
-                     (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2)+&
-                     (Visc(i,j,k+1)+&
-                     Visc(i,j,k))*recdzmin2)
+       do bk = 1,Wnz,tilenz(narr)
+        do bj = 1,Wny,tileny(narr)
+         do bi = 1,Wnx,tilenx(narr)
+          do k = bk,min(bk+tilenz(narr)-1,Wnz)
+           do j = bj,min(bj+tileny(narr)-1,Wny)
+            do i = bi,min(bi+tilenx(narr)-1,Wnx)
+              ApW(i,j,k) = (0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
+                          (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k)))*recdxmin2+&
+                         ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))+&
+                         (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2)+&
+                         (Visc(i,j,k+1)+&
+                         Visc(i,j,k))*recdzmin2)
+            enddo
+           enddo
+          enddo
          enddo
         enddo
        enddo
@@ -574,19 +622,22 @@ write(*,*) "stage:",l
        !$omp workshare
        ApW = 1._KND/(1._KND+Ap*ApW)
        !$omp end workshare nowait
-
-
-       !$omp workshare
-       Suavg = abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
-       Svavg = abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
-       Swavg = abs(MAXVAL(W3(1:Wnx,1:Wny,1:Wnz)))
-       !$omp end workshare
        !$omp end parallel
+
+
+!        !$omp workshare   !problem with gfortran-4.7 - valgrind sees uninitialized values
+!        Suavg = abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
+!        Svavg = abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
+!        Swavg = abs(MAXVAL(W3(1:Wnx,1:Wny,1:Wnz)))
+!        !$omp end workshare
+
+       Suavg=0
+       Svavg=0
+       Swavg=0
 
        if (Suavg<=1e-3_KND) Suavg = 1
        if (Svavg<=1e-3_KND) Svavg = 1
        if (Swavg<=1e-3_KND) Swavg = 1
-
 
 
        do l=1,maxCNiter               !Gauss-Seidel iteration for Crank-Nicolson result
@@ -600,114 +651,148 @@ write(*,*) "stage:",l
         Sw = 0
         !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:Su,Sv,Sw)
         !$OMP DO
-        do k=1,Unz
-         do j=1,Uny
-          do i=1+mod(j+k,2),Unx,2
-            p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
-             Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
-             0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
-             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
-             ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
-             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
-            p = Ap*p+U2(i,j,k)+U(i,j,k)
-            p = p*ApU(i,j,k)
-
-
-            Su = max(Su,abs(p-U3(i,j,k)))
-            U3(i,j,k) = p
+        do bk = 1,Unz,tilenz(narr2)
+         do bj = 1,Uny,tileny(narr2)
+          do bi = 1,Unx,tilenx(narr2)
+           do k = bk,min(bk+tilenz(narr2)-1,Unz)
+            do j = bj,min(bj+tileny(narr2)-1,Uny)
+             do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Unx),2
+               p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
+                Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
+                0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
+                (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
+                ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
+                (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
+               p = Ap*p+U2(i,j,k)+U(i,j,k)
+               p = p*ApU(i,j,k)
+               Su = max(Su,abs(p-U3(i,j,k)))
+               U3(i,j,k) = p
+             enddo
+            enddo
+           enddo
           enddo
          enddo
         enddo
         !$OMP ENDDO NOWAIT
         !$OMP DO
-        do k=1,Vnz
-         do j=1,Vny
-          do i=1+mod(j+k,2),Vnx,2
-            p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
-             Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
-             0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
-             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
-             ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
-             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
-            p = Ap*p+V2(i,j,k)+V(i,j,k)
-            p = p*ApV(i,j,k)
-            Sv = max(Sv,abs(p-V3(i,j,k)))
-            V3(i,j,k) = p
+        do bk = 1,Vnz,tilenz(narr2)
+         do bj = 1,Vny,tileny(narr2)
+          do bi = 1,Vnx,tilenx(narr2)
+           do k = bk,min(bk+tilenz(narr2)-1,Vnz)
+            do j = bj,min(bj+tileny(narr2)-1,Vny)
+             do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Vnx),2
+               p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
+                Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
+                0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
+                (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
+                ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
+                (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
+               p = Ap*p+V2(i,j,k)+V(i,j,k)
+               p = p*ApV(i,j,k)
+               Sv = max(Sv,abs(p-V3(i,j,k)))
+               V3(i,j,k) = p
+             enddo
+            enddo
+           enddo
           enddo
          enddo
         enddo
         !$OMP ENDDO NOWAIT
         !$OMP DO
-        do k=1,Wnz
-         do j=1,Wny
-          do i=1+mod(j+k,2),Wnx,2
-            p=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
-             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
-             ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
-             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
-             (Visc(i,j,k+1)*(W3(i,j,k+1))-&
-             Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
-            p = Ap*p+W2(i,j,k)+W(i,j,k)
-            p = p*ApW(i,j,k)
-            Sw = max(Sw,abs(p-W3(i,j,k)))
-            W3(i,j,k) = p
+        do bk = 1,Wnz,tilenz(narr2)
+         do bj = 1,Wny,tileny(narr2)
+          do bi = 1,Wnx,tilenx(narr2)
+           do k = bk,min(bk+tilenz(narr2)-1,Wnz)
+            do j = bj,min(bj+tileny(narr2)-1,Wny)
+             do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Wnx),2
+               p=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
+                (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
+                ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
+                (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
+                (Visc(i,j,k+1)*(W3(i,j,k+1))-&
+                Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
+               p = Ap*p+W2(i,j,k)+W(i,j,k)
+               p = p*ApW(i,j,k)
+               Sw = max(Sw,abs(p-W3(i,j,k)))
+               W3(i,j,k) = p
+             enddo
+            enddo
+           enddo
           enddo
          enddo
         enddo
         !$OMP ENDDO
 
         !$OMP DO
-        do k=1,Unz
-         do j=1,Uny
-          do i=1+mod(j+k+1,2),Unx,2
-            p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
-             Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
-             0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
-             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
-             ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
-             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
-            p = Ap*p+U2(i,j,k)+U(i,j,k)
-            p = p*ApU(i,j,k)
+        do bk = 1,Unz,tilenz(narr2)
+         do bj = 1,Uny,tileny(narr2)
+          do bi = 1,Unx,tilenx(narr2)
+           do k = bk,min(bk+tilenz(narr2)-1,Unz)
+            do j = bj,min(bj+tileny(narr2)-1,Uny)
+             do i = bi+mod(bi+j+k,2),min(bi+tilenx(narr2)-1,Unx),2
+               p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
+                 Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
+                 0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
+                 (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
+                 ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
+                 (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
+                p = Ap*p+U2(i,j,k)+U(i,j,k)
+                p = p*ApU(i,j,k)
 
 
-            Su = max(Su,abs(p-U3(i,j,k)))
-            U3(i,j,k) = p
+                Su = max(Su,abs(p-U3(i,j,k)))
+                U3(i,j,k) = p
+             enddo
+            enddo
+           enddo
           enddo
          enddo
         enddo
         !$OMP ENDDO NOWAIT
         !$OMP DO
-        do k=1,Vnz
-         do j=1,Vny
-          do i=1+mod(j+k+1,2),Vnx,2
-            p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
-             Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
-             0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
-             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
-             ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
-             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
-            p = Ap*p+V2(i,j,k)+V(i,j,k)
-            p = p*ApV(i,j,k)
-            Sv = max(Sv,abs(p-V3(i,j,k)))
-            V3(i,j,k) = p
+        do bk = 1,Vnz,tilenz(narr2)
+         do bj = 1,Vny,tileny(narr2)
+          do bi = 1,Vnx,tilenx(narr2)
+           do k = bk,min(bk+tilenz(narr2)-1,Vnz)
+            do j = bj,min(bj+tileny(narr2)-1,Vny)
+             do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Vnx),2
+               p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
+                Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
+                0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
+                (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
+                ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
+                (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
+               p = Ap*p+V2(i,j,k)+V(i,j,k)
+               p = p*ApV(i,j,k)
+               Sv = max(Sv,abs(p-V3(i,j,k)))
+               V3(i,j,k) = p
+             enddo
+            enddo
+           enddo
           enddo
          enddo
         enddo
         !$OMP ENDDO NOWAIT
         !$OMP DO
-        do k=1,Wnz
-         do j=1,Wny
-          do i=1+mod(j+k+1,2),Wnx,2
-            p=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
-             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
-             ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
-             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
-             (Visc(i,j,k+1)*(W3(i,j,k+1))-&
-             Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
-            p = Ap*p+W2(i,j,k)+W(i,j,k)
-            p = p*ApW(i,j,k)
-            Sw = max(Sw,abs(p-W3(i,j,k)))
-            W3(i,j,k) = p
+        do bk = 1,Wnz,tilenz(narr2)
+         do bj = 1,Wny,tileny(narr2)
+          do bi = 1,Wnx,tilenx(narr2)
+           do k = bk,min(bk+tilenz(narr2)-1,Wnz)
+            do j = bj,min(bj+tileny(narr2)-1,Wny)
+             do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Wnx),2
+               p=(0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
+                (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
+                ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
+                (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
+                (Visc(i,j,k+1)*(W3(i,j,k+1))-&
+                Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
+               p = Ap*p+W2(i,j,k)+W(i,j,k)
+               p = p*ApW(i,j,k)
+               Sw = max(Sw,abs(p-W3(i,j,k)))
+               W3(i,j,k) = p
+             enddo
+            enddo
+           enddo
           enddo
          enddo
         enddo

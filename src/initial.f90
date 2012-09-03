@@ -877,16 +877,16 @@ contains
 
   subroutine INITCONDS(U,V,W,Pr)
   real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  integer i,j,k,n
+  integer i,j,k
   real(KND) p,x,y,z,x1,x2,y1,y2,z1,z2
 
     call init_random_seed
 
     Pr(1:Prnx,1:Prny,1:Prnz)=0
 
-    U=100000
-    V=100000
-    W=100000
+    U=huge(1._KND)
+    V=huge(1._KND)
+    W=huge(1._KND)
 
     V(1:Vnx,1:Vny,1:Vnz)=0
     W(1:Wnx,1:Wny,1:Wnz)=0
@@ -1097,7 +1097,8 @@ contains
          do i=1,Prnx
 
            call GetTurbInlet
-
+           !$omp parallel private(j,k)
+           !$omp do
            do k=1,Unz
             do j=1,Uny
               if (Utype(i,j,k)==0) then
@@ -1107,6 +1108,8 @@ contains
               endif
             enddo
            enddo
+           !$omp end do nowait
+           !$omp do
            do k=1,Vnz
             do j=1,Vny
               if (Vtype(i,j,k)==0) then
@@ -1116,6 +1119,8 @@ contains
               endif
             enddo
            enddo
+           !$omp end do nowait
+           !$omp do
            do k=1,Wnz
             do j=1,Wny
               if (Wtype(i,j,k)==0) then
@@ -1125,12 +1130,14 @@ contains
               endif
             enddo
            enddo
-
+           !$omp end do
+           !$omp end parallel
          enddo
 
        else
 
-
+!          !$omp parallel private(i,j,k)
+!          !$omp do
          do k=1,Unz
           do j=1,Uny
            do i=1,Unx
@@ -1143,6 +1150,8 @@ contains
            enddo
           enddo
          enddo
+!          !$omp end do
+!          !$omp do
          do k=1,Vnz
           do j=1,Vny
            do i=1,Vnx
@@ -1155,6 +1164,8 @@ contains
            enddo
           enddo
          enddo
+!          !$omp end do
+!          !$omp do
          do k=1,Wnz
           do j=1,Wny
            do i=1,Wnx
@@ -1167,15 +1178,19 @@ contains
            enddo
           enddo
          enddo
+!          !$omp end do
+!          !$omp end parallel
        endif  !tasktype
 
 
 
-
-
-       do i=1,computescalars
-         SCALAR(1:Prnx,1:Prny,1:Prnz,i)=0
-       enddo
+       if (computescalars>0) then
+         !$omp parallel
+         !$omp workshare
+         SCALAR(1:Prnx,1:Prny,1:Prnz,:)=0
+         !$omp end workshare
+         !$omp end parallel
+       end if
 
        if (buoyancy==1.and.tasktype==2) then
 
@@ -1213,8 +1228,14 @@ contains
 
          call InitTemperature(TempIn,Temperature)
 
+         !$omp parallel private(i,j,k)
+         !$omp workshare
          Pr(:,:,1)=0
+         !$omp end workshare
+         !$omp end parallel
          do k=2,Prnz
+          !$omp parallel
+          !$omp do
           do j=1,Vny+1
            do i=1,Unx+1
             Pr(i,j,k)=Pr(i,j,k-1) + &
@@ -1223,25 +1244,48 @@ contains
                   / temperature_ref
            enddo
           enddo
+          !$omp end do
+          !$omp end parallel
          enddo
 
        endif !byoyancy and tasktype
 
-
        if (Re>0) then
+         !$omp parallel
+         !$omp workshare
          Visc=1._KND/Re
+         !$omp end workshare
+         !$omp end parallel
        else
+         !$omp parallel
+         !$omp workshare
          Visc=0
+         !$omp end workshare
+         !$omp end parallel
        endif
 
-       if (Re>0) then
-         if (buoyancy==1.or.computescalars>0) TDiff=1._KND/(Re*Prandtl)
+       if (Re>0.and.(buoyancy==1.or.computescalars>0)) then
+         !$omp parallel
+         !$omp workshare
+         TDiff=1._KND/(Re*Prandtl)
+         !$omp end workshare
+         !$omp end parallel
        endif  !Re>0
 
+       !$omp parallel
+       !$omp sections
+       !$omp section
        call BoundU(1,U)
+       !$omp section
        call BoundU(2,V)
+       !$omp section
        call BoundU(3,W)
+       !$omp section
        call Bound_Pr(Pr)
+       !$omp end sections
+       !$omp end parallel
+
+
        call Pr_Correct(U,V,W,Pr,1._KND)
 
 
@@ -1260,9 +1304,14 @@ contains
        call Bound_Visc(Visc)
 
        if (buoyancy>0) then
+         !$omp parallel
+         !$omp workshare
          forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-           TDiff(i,j,k)=1.35*(Visc(i,j,k)-1._KND/Re)+(1._KND/(Re*Prt(i,j,k,U,V,temperature)))
+           TDiff(i,j,k)=1.35*(Visc(i,j,k)-1._KND/Re)+(1._KND/(Re*constPrt))
          endforall
+         !$omp end workshare
+         !$omp end parallel
+
          call Bound_Visc(TDiff)
          call Bound_Temp(temperature)
        endif
@@ -1286,6 +1335,7 @@ contains
 
     nUnull=0
 
+    !$omp parallel do reduction(+:nUnull)
     do k=1,Unz
      do j=1,Uny
       do i=1,Unx
@@ -1295,87 +1345,8 @@ contains
       enddo
      enddo
     enddo
+    !$omp end parallel do
 
-    allocate(Unull(3,nUnull))
-
-    n=0
-
-    do k=1,Unz
-     do j=1,Uny
-      do i=1,Unx
-       if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
-           .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
-           .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  then
-
-            n=n+1
-            Unull(:,n)=(/ i,j,k /)
-
-       endif
-      enddo
-     enddo
-    enddo
-
-    nVnull=0
-
-    do k=1,Vnz
-     do j=1,Vny
-      do i=1,Vnx
-       if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
-           .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
-           .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  nVnull=nVnull+1
-      enddo
-     enddo
-    enddo
-
-    allocate(Vnull(3,nVnull))
-
-    n=0
-
-    do k=1,Vnz
-     do j=1,Vny
-      do i=1,Vnx
-       if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
-           .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
-           .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  then
-
-            n=n+1
-            Vnull(:,n)=(/ i,j,k /)
-
-       endif
-      enddo
-     enddo
-    enddo
-
-    nWnull=0
-
-    do k=1,Wnz
-     do j=1,Wny
-      do i=1,Wnx
-       if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
-           .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
-           .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  nWnull=nWnull+1
-      enddo
-     enddo
-    enddo
-
-    allocate(Wnull(3,nWnull))
-
-    n=0
-
-    do k=1,Wnz
-     do j=1,Wny
-      do i=1,Wnx
-       if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
-           .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
-           .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  then
-
-            n=n+1
-            Wnull(:,n)=(/ i,j,k /)
-
-       endif
-      enddo
-     enddo
-    enddo
 
     write(*,*) "set"
   endsubroutine INITCONDS
@@ -1389,7 +1360,6 @@ contains
   real(KND),allocatable:: xU2(:),yV2(:),zW2(:)
   integer i,j,k,nx,ny,nz,nxup,nxdown,nyup,nydown,nzup,nzdown,io
   real(KND) P
-  type(WMPoint):: WMP
 
 
     nx=Prnx-1
@@ -1673,15 +1643,11 @@ contains
     Wtype=0
     Prtype=0
 
-  !   write (*,*) Prnx
-  !   write (*,*) Prny
-  !   write (*,*) Prnz
-  !   write (*,*) Unx
-  !   write (*,*) Uny
-  !   write (*,*) Unz
-
 
     allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
+    Uin=huge(1._KND)
+    Vin=huge(1._KND)
+    Win=huge(1._KND)
 
     if (buoyancy>0) allocate(Tempin(-1:Prny+2,-1:Prnz+2))
 
@@ -1729,209 +1695,6 @@ contains
     call InitSubsidenceProfile
 
 
-    allocate(WMP%depscalar(computescalars))
-    WMP%depscalar=0
-
-    if (Btype(We)==NOSLIP) then
-      do k=1,Prnz
-       do j=1,Prny
-         WMP%xi=1
-         WMP%yj=j
-         WMP%zk=k
-         WMP%distx=(xPr(1)-xU(0))
-         WMP%disty=0
-         WMP%distz=0
-         WMP%ustar=1
-         WMP%z0=z0W
-         call AddWMPoint(WMP)
-       enddo
-      enddo
-    endif
-
-    if (Btype(Ea)==NOSLIP) then
-      do k=1,Prnz
-       do j=1,Prny
-         WMP%xi=Prnx
-         WMP%yj=j
-         WMP%zk=k
-         WMP%distx=(xPr(Prnx)-xU(Unx+1))
-         WMP%disty=0
-         WMP%distz=0
-         WMP%ustar=1
-         WMP%z0=z0E
-         call AddWMPoint(WMP)
-       enddo
-      enddo
-    endif
-
-    if (Btype(So)==NOSLIP) then
-      do k=1,Prnz
-       do i=1,Prnx
-         WMP%xi=i
-         WMP%yj=1
-         WMP%zk=k
-         WMP%distx=0
-         WMP%disty=(yPr(1)-yV(0))
-         WMP%distz=0
-         WMP%ustar=1
-         WMP%z0=z0S
-         call AddWMPoint(WMP)
-       enddo
-      enddo
-    elseif (Btype(So)==DIRICHLET) then
-      do k=1,Prnz
-       do i=1,Prnx
-         WMP%xi=i
-         WMP%yj=1
-         WMP%zk=k
-         WMP%distx=0
-         WMP%disty=(yPr(1)-yV(0))
-         WMP%distz=0
-         WMP%ustar=1
-         WMP%wallu=sideU(1,So)
-         WMP%wallv=sideU(2,So)
-         WMP%wallw=sideU(3,So)
-         WMP%z0=z0S
-         call AddWMPoint(WMP)
-       enddo
-      enddo
-    endif
-
-    if (Btype(No)==NOSLIP) then
-      do k=1,Prnz
-       do i=1,Prnx
-         WMP%xi=i
-         WMP%yj=Prny
-         WMP%zk=k
-         WMP%distx=0
-         WMP%disty=(yPr(Prny)-yV(Vny+1))
-         WMP%distz=0
-         WMP%ustar=1
-         WMP%z0=z0N
-         call AddWMPoint(WMP)
-       enddo
-      enddo
-    elseif (Btype(No)==DIRICHLET) then
-      do k=1,Prnz
-       do i=1,Prnx
-         WMP%xi=i
-         WMP%yj=Prny
-         WMP%zk=k
-         WMP%distx=0
-         WMP%disty=(yPr(Prny)-yV(Vny+1))
-         WMP%distz=0
-         WMP%ustar=1
-         WMP%wallu=sideU(1,No)
-         WMP%wallv=sideU(2,No)
-         WMP%wallw=sideU(3,No)
-         WMP%z0=z0N
-         call AddWMPoint(WMP)
-       enddo
-      enddo
-    endif
-
-    if (Btype(Bo)==NOSLIP) then
-      do j=1,Prny
-       do i=1,Prnx
-         if (Prtype(i,j,0)==0) then
-
-           WMP%xi=i
-           WMP%yj=j
-           WMP%zk=1
-           WMP%distx=0
-           WMP%disty=0
-           WMP%distz=(zPr(1)-zW(0))
-           WMP%ustar=1
-           WMP%z0=z0B
-
-           if (TBtype(Bo)==CONSTFLUX) then
-             WMP%tempfl=sideTemp(Bo)
-           else
-             WMP%temp=0
-           endif
-
-           if (TBtype(Bo)==DIRICHLET) then
-             WMP%temp=sideTemp(Bo)
-           endif
-
-           call AddWMPoint(WMP)
-
-         endif
-       enddo
-      enddo
-
-    elseif (Btype(Bo)==DIRICHLET) then
-
-      do j=1,Prny
-       do i=1,Prnx
-         if (Prtype(i,j,0)==0) then
-           WMP%xi=i
-           WMP%yj=j
-           WMP%zk=1
-           WMP%distx=0
-           WMP%disty=0
-           WMP%distz=(zPr(1)-zW(0))
-           WMP%ustar=1
-           WMP%wallu=sideU(1,Bo)
-           WMP%wallv=sideU(2,Bo)
-           WMP%wallw=sideU(3,Bo)
-           WMP%z0=z0B
-
-           if (TBtype(Bo)==CONSTFLUX) then
-             WMP%tempfl=sideTemp(Bo)
-           else
-             WMP%temp=0
-           endif
-
-           if (TBtype(Bo)==DIRICHLET) then
-             WMP%temp=sideTemp(Bo)
-           endif
-
-           call AddWMPoint(WMP)
-         endif
-       enddo
-      enddo
-
-    endif
-
-    if (Btype(To)==NOSLIP) then
-
-      do j=1,Prny
-       do i=1,Prnx
-         WMP%xi=i
-         WMP%yj=j
-         WMP%zk=Prnz
-         WMP%distx=0
-         WMP%disty=0
-         WMP%distz=(zPr(Prnz)-zW(Wnz+1))
-         WMP%ustar=1
-         WMP%z0=z0T
-         call AddWMPoint(WMP)
-       enddo
-      enddo
-
-    elseif (Btype(To)==DIRICHLET) then
-
-      do j=1,Prny
-       do i=1,Prnx
-         WMP%xi=i
-         WMP%yj=j
-         WMP%zk=Prnz
-         WMP%distx=0
-         WMP%disty=0
-         WMP%distz=(zPr(Prnz)-zW(Wnz+1))
-         WMP%ustar=1
-         WMP%wallu=sideU(1,To)
-         WMP%wallv=sideU(2,To)
-         WMP%wallw=sideU(3,To)
-         WMP%z0=z0T
-         call AddWMPoint(WMP)
-       enddo
-      enddo
-
-    endif
-
-
    if (computescalars>0.and.scalsourcetype==pointsource) then
         call Gridcoords(scalsrci(:),scalsrcj(:),scalsrck(:),scalsrcx(:),scalsrcy(:),scalsrcz(:))
    endif
@@ -1939,9 +1702,14 @@ contains
    call InitTiles(Prnx,Prny,Prnz)
 
    call InitSolidBodies
+
    call GetSolidBodiesBC
 
+   call GetOutsideBoundariesWM(computescalars)
+
    call MoveWMPointsToArray
+
+   call SetNullifiedPoints
 
    call SetFrameDomain(store%frame_domains)
 
@@ -1951,10 +1719,108 @@ contains
 
 
 
+  subroutine SetNullifiedPoints
+    integer i,j,k,n
+
+    !$omp parallel do reduction(+:nUnull)
+    do k=1,Unz
+     do j=1,Uny
+      do i=1,Unx
+       if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
+           .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
+           .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  nUnull=nUnull+1
+      enddo
+     enddo
+    enddo
+    !$omp end parallel do
+
+    allocate(Unull(3,nUnull))
+
+    n=0
+
+    do k=1,Unz
+     do j=1,Uny
+      do i=1,Unx
+       if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
+           .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
+           .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  then
+            !$omp atomic
+            n=n+1
+            Unull(:,n)=(/ i,j,k /)
+
+       endif
+      enddo
+     enddo
+    enddo
+
+    nVnull=0
+
+    !$omp parallel do reduction(+:nVnull)
+    do k=1,Vnz
+     do j=1,Vny
+      do i=1,Vnx
+       if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
+           .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
+           .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  nVnull=nVnull+1
+      enddo
+     enddo
+    enddo
+    !$omp end parallel do
+
+    allocate(Vnull(3,nVnull))
+
+    n=0
+
+    do k=1,Vnz
+     do j=1,Vny
+      do i=1,Vnx
+       if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
+           .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
+           .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  then
+
+            n=n+1
+            Vnull(:,n)=(/ i,j,k /)
+
+       endif
+      enddo
+     enddo
+    enddo
+
+    nWnull=0
+
+    !$omp parallel do reduction(+:nWnull)
+    do k=1,Wnz
+     do j=1,Wny
+      do i=1,Wnx
+       if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
+           .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
+           .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  nWnull=nWnull+1
+      enddo
+     enddo
+    enddo
+    !$omp end parallel do
+
+    allocate(Wnull(3,nWnull))
+
+    n=0
 
 
+    do k=1,Wnz
+     do j=1,Wny
+      do i=1,Wnx
+       if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
+           .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
+           .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  then
 
+            n=n+1
+            Wnull(:,n)=(/ i,j,k /)
 
+       endif
+      enddo
+     enddo
+    enddo
+
+  end subroutine SetNullifiedPoints
 
 
 

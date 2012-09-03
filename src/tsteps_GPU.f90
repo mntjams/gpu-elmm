@@ -45,10 +45,12 @@
        recdymin2=1./dymin**2
        recdzmin2=1./dzmin**2
 
+       !The explicit part, which doesn't have to be changed inside the loop
+
        !$hmppcg grid blocksize 512x1
        !$hmppcg permute (k,i,j)
        !$hmppcg gridify(k,i)
-       do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
+       do k=1,Unz
         do j=1,Uny
          do i=1,Unx
           U2(i,j,k)=U2(i,j,k)+Ap*(&
@@ -214,8 +216,6 @@
              (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
             p=Ap*p+U2(i,j,k)+U(i,j,k)
             p=p*ApU(i,j,k)
-
-
 !             Su=max(Su,abs(p-U3(i,j,k)))
             U3(i,j,k)=p!*1.72_KND
           enddo

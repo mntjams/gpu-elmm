@@ -130,11 +130,10 @@ subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                   !Pressure correction
 
    S=S/(ly*lz)
    write(*,*) "Compatibility correction",S
-   !$omp parallel
-   !$omp workshare
+
+   !$omp parallel workshare
    U(Unx+1,:,:)=U(Unx+1,:,:)+S
-   !$omp end workshare
-   !$omp end parallel
+   !$omp end parallel workshare
 
    S=0
    S2=0

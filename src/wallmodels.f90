@@ -5,8 +5,8 @@ use PARAMETERS
 implicit none
 
  private
- public WMPoint, AddWMPoint, FirstWMPoint, ComputeViscsWM, MoveWMPointsToArray,&
-        InitTempFl, GroundDeposition, GroundUstar
+ public WMPoint, AddWMPoint, FirstWMPoint, ComputeViscsWM, MoveWMPointsToArray, GetOutsideBoundariesWM,&
+        InitTempFl, GroundDeposition, GroundUstar, WMPoints, ListLength
 
  type WMpoint   !points in which we apply wall model
 
@@ -35,6 +35,10 @@ implicit none
  type(WMpoint),pointer::FirstWMPoint=>null(), LastWMPoint=>null()
 
  type(WMPoint),dimension(:),allocatable :: WMPoints
+
+ interface ListLength
+   module procedure WMPoint_ListLength
+ end interface
 
  interface assignment(=)
    module procedure WMPtoWMP
@@ -147,24 +151,9 @@ implicit none
 
   subroutine MoveWMPointsToArray
     type(WMPoint),pointer :: CurrentWMPoint
-    integer :: i,nWMPoints
+    integer :: i
 
-    NWMPoints = 0
-
-
-    CurrentWMPoint => FirstWMPoint
-    do
-     if (associated(CurrentWMPoint)) then
-       NWMPoints = NWMPoints + 1
-     else
-       exit
-     endif
-     CurrentWMPoint => CurrentWMPoint%next
-    enddo
-
-
-    allocate(WMPoints(NWMPoints))
-
+    allocate(WMPoints(WMPoint_ListLength(FirstWMPoint)))
 
     CurrentWMPoint => FirstWMPoint
     i = 0
@@ -178,10 +167,280 @@ implicit none
      CurrentWMPoint => CurrentWMPoint%next
     enddo
 
+    call RemoveDuplicateWMPoints(WMPoints)
 
     call WMPoint_DeallocateList(FirstWMPoint)
 
   end subroutine MoveWMPointsToArray
+
+
+
+  function WMPoint_ListLength(WMP) result(nWMP)
+    integer :: nWMP
+    type(WMPoint),pointer :: WMP
+    type(WMPoint),pointer :: CurrentWMPoint
+
+    nWMP = 0
+
+    if (associated(WMP)) then
+
+      CurrentWMPoint => WMP
+
+      do
+        nWMP = nWMP + 1
+
+        if (associated(CurrentWMPoint%next)) then
+          CurrentWMPoint => CurrentWMPoint%next
+        else
+          exit
+        end if
+      end do
+
+    end if
+
+  end function WMPoint_ListLength
+
+
+  subroutine RemoveDuplicateWMPoints(WMPoints)
+    type(WMPoint),allocatable,dimension(:),intent(inout)  :: WMPoints !Requires f95TS
+    type(WMPoint),allocatable,dimension(:) :: TMP
+    integer i,n
+
+    !Choose the one closer to a wall. If of the same distance, choose the later one.
+    !For wider compatibility we do not use MOLD= or SOURCE= in allocate.
+
+    allocate(TMP(size(WMPoints)))
+
+    n = 0
+    do i = size(WMPoints),1,-1
+        if (NoDuplicate(i,WMPoints)) then !if the point is not a duplicate of another point with higher priority, use it
+          n=n+1
+          TMP(n) = WMPoints(i)
+        end if
+    end do
+
+    deallocate(WMPoints) !would not be needed in Fortran 2003
+    allocate(WMPoints(n))!
+
+    WMPoints = TMP(1:n)
+
+  end subroutine RemoveDuplicateWMPoints
+
+
+  pure logical function NoDuplicate(pos,WMPoints) result(res) !true if no duplicate with higher priority
+    integer,intent(in)        :: pos
+    type(WMPoint),intent(in) :: WMPoints(:)
+    integer j
+
+    res = .true.
+
+    do j=1,size(WMPoints)
+
+      if (pos==j) cycle
+
+      if ( IsDuplicate(WMPoints(pos),WMPoints(j),j<pos) ) then
+        res = .false.
+        exit
+      end if
+
+    end do
+  end function NoDuplicate
+
+
+  pure logical function IsDuplicate(A,B,priority) result(res)  !true, if B is duplicate with smaller distance or equal distance and higher priority
+    type(WMPoint),intent(in) :: A,B
+    logical,      intent(in) :: priority !if B has higher priority
+
+    res = .false.
+    if (A%xi==B%xi .and. A%yj==B%yj .and. A%zk==B%zk) then
+      if (A%distx**2+A%disty**2+A%distz**2>B%distx**2+B%disty**2+B%distz**2) then
+        res=.true.
+      else if ((A%distx**2+A%disty**2+A%distz**2==B%distx**2+B%disty**2+B%distz**2) .and. priority) then
+        res=.true.
+      end if
+    end if
+  end function IsDuplicate
+
+
+
+
+  subroutine GetOutsideBoundariesWM(nscalars)
+    integer, intent(in) :: nscalars
+    integer       :: i,j,k
+    type(WMPoint) :: WMP
+
+    allocate(WMP%depscalar(nscalars))
+    WMP%depscalar=0
+
+    if (Btype(We)==NOSLIP) then
+      do k=1,Prnz
+       do j=1,Prny
+         if (Prtype(1,j,k)==0) then
+           WMP%xi=1
+           WMP%yj=j
+           WMP%zk=k
+           WMP%distx=(xPr(1)-xU(0))
+           WMP%disty=0
+           WMP%distz=0
+           WMP%ustar=1
+
+           WMP%z0=z0W
+           call AddWMPoint(WMP)
+         end if
+       enddo
+      enddo
+    endif
+
+    if (Btype(Ea)==NOSLIP) then
+      do k=1,Prnz
+       do j=1,Prny
+         if (Prtype(Prnx,j,k)==0) then
+           WMP%xi=Prnx
+           WMP%yj=j
+           WMP%zk=k
+           WMP%distx=(xPr(Prnx)-xU(Unx+1))
+           WMP%disty=0
+           WMP%distz=0
+           WMP%ustar=1
+
+           WMP%z0=z0E
+           call AddWMPoint(WMP)
+         end if
+       enddo
+      enddo
+    endif
+
+    if (Btype(So)==NOSLIP.or.(Btype(So)==DIRICHLET.and.sideU(2,So)==0)) then
+      do k=1,Prnz
+       do i=1,Prnx
+         if (Prtype(i,1,k)==0) then
+           WMP%xi=i
+           WMP%yj=1
+           WMP%zk=k
+           WMP%distx=0
+           WMP%disty=(yPr(1)-yV(0))
+           WMP%distz=0
+           WMP%ustar=1
+
+           if (Btype(So)==DIRICHLET) then
+             WMP%wallu=sideU(1,So)
+             WMP%wallv=0
+             WMP%wallw=sideU(3,So)
+           endif
+
+           WMP%z0=z0S
+           call AddWMPoint(WMP)
+         endif
+       enddo
+      enddo
+    endif
+
+    if (Btype(No)==NOSLIP.or.(Btype(No)==DIRICHLET.and.sideU(2,No)==0)) then
+      do k=1,Prnz
+       do i=1,Prnx
+         if (Prtype(i,Prny,k)==0) then
+           WMP%xi=i
+           WMP%yj=Prny
+           WMP%zk=k
+           WMP%distx=0
+           WMP%disty=(yPr(Prny)-yV(Vny+1))
+           WMP%distz=0
+           WMP%ustar=1
+
+           if (Btype(No)==DIRICHLET) then
+             WMP%wallu=sideU(1,No)
+             WMP%wallv=0
+             WMP%wallw=sideU(3,No)
+           endif
+
+           WMP%z0=z0N
+           call AddWMPoint(WMP)
+         endif
+       enddo
+      enddo
+    endif
+
+    if (Btype(Bo)==NOSLIP.or.(Btype(Bo)==DIRICHLET.and.sideU(3,Bo)==0)) then
+      do j=1,Prny
+       do i=1,Prnx
+         if (Prtype(i,j,1)==0) then
+
+           WMP%xi=i
+           WMP%yj=j
+           WMP%zk=1
+           WMP%distx=0
+           WMP%disty=0
+           WMP%distz=(zPr(1)-zW(0))
+           WMP%ustar=1
+
+           if (Btype(Bo)==DIRICHLET) then
+             WMP%wallu=sideU(1,Bo)
+             WMP%wallv=sideU(2,Bo)
+             WMP%wallw=0
+           endif
+
+           WMP%z0=z0B
+
+           if (TBtype(Bo)==CONSTFLUX) then
+             WMP%tempfl=sideTemp(Bo)
+           else
+             WMP%temp=0
+           endif
+
+           if (TBtype(Bo)==DIRICHLET) then
+             WMP%temp=sideTemp(Bo)
+           endif
+
+           call AddWMPoint(WMP)
+
+         endif
+       enddo
+      enddo
+    endif
+
+    if (Btype(To)==NOSLIP.or.(Btype(To)==DIRICHLET.and.sideU(3,To)==0)) then
+
+      do j=1,Prny
+       do i=1,Prnx
+         if (Prtype(i,j,Prnz)==0) then
+           WMP%xi=i
+           WMP%yj=j
+           WMP%zk=Prnz
+           WMP%distx=0
+           WMP%disty=0
+           WMP%distz=(zPr(Prnz)-zW(Wnz+1))
+           WMP%ustar=1
+
+           if (Btype(To)==DIRICHLET) then
+             WMP%wallu=sideU(1,To)
+             WMP%wallv=sideU(2,To)
+             WMP%wallw=0
+           endif
+
+           WMP%z0=z0T
+           call AddWMPoint(WMP)
+         endif
+       enddo
+      enddo
+    endif
+
+  end subroutine GetOutsideBoundariesWM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -273,7 +532,7 @@ implicit none
     k=WMP%zk
 
     dist=sqrt(WMP%distx**2+WMP%disty**2+WMP%distz**2)
-
+if (dist<1E-8) STOP
     vel=0
     ustar=0
     dp=0
@@ -319,6 +578,7 @@ implicit none
        dptrans=0
       endif
       ustar=WMP%ustar
+
       ustar=WM1ustar(vel,dist,ustar,dp,dptrans)
       WMP%ustar=ustar
     endif
@@ -765,9 +1025,9 @@ implicit none
    type(WMPoint),pointer:: WMP
    integer i,j
 
-   !$omp parallel private(i,j)
 
    if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
+     !$omp parallel private(i,j)
      !$omp do
      do j=1,Prny
        do i=1,Prnx
@@ -775,9 +1035,10 @@ implicit none
        enddo
       enddo
      !$omp end do
+     !$omp end parallel
    endif
 
-   !$omp do
+!    !$omp parallel do private(i)
    do i = 1,size(WMPoints)
 
       if (WMPoints(i)%z0>0) then
@@ -809,8 +1070,7 @@ implicit none
       endif
 
    enddo
-   !$omp end do
-   !$omp end parallel
+!    !$omp end parallel do
 
    if (buoyancy==1.and. TBtype(Bo)==DIRICHLET) call Bound_tempfl(BsideTFLArr)
   endsubroutine ComputeViscsWM

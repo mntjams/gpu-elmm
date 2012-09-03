@@ -2,15 +2,16 @@ module SCALARS
  use PARAMETERS
  use WALLMODELS
  use GEOMETRIC, only: TIBPoint, ScalFlIBPoints,TIBPoint_ScalFlSource
- use LIMITERS
+ use LIMITERS, only: Limiter, limparam
  use BOUNDARIES
+ use TILING, only: tilenx, tileny, tilenz
 #ifdef __HMPP
  use HMPP_CODELETS
 #endif
 
 implicit none
   private
-  public Scalar, ScalarRK3, Prt, Rig, partdiam, partrho, percdistrib,&
+  public Scalar, ScalarRK3, constPrt, Rig, partdiam, partrho, percdistrib,&
      Bound_Visc, Bound_Temp, Bound_PassScalar,&
      TTemperatureProfileSection, TTemperatureProfile, TemperatureProfile,&
      InitTemperatureProfile, InitTemperature,&
@@ -38,6 +39,8 @@ implicit none
   end type TTemperatureProfile
 
   type(TTemperatureProfile) :: TemperatureProfile
+
+  real(KND),parameter :: constPrt = 0.6 !constant value of Prt, which may be refined further in this module
 
 contains
 
@@ -740,17 +743,21 @@ contains
   real(KND) vel,SL,SR,FLUX
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
   real(KND),parameter ::eps = 1e-8
+  real(KND) :: FluxLimiter,r
 
-   if (sctype==1) then
+  FluxLimiter(r)=max(0._KND,min(2._KND*r,min(limparam,(1+2._KND*r)/3._KND)))
+
+  if (sctype==1) then
     call BOUND_Temp(SCAL)
-   else
+  else
     call BOUND_PASSSCALAR(SCAL)
-   endif
+  endif
 
   A = coef*dt
   Ax = coef*dt/dxmin
   Ay = coef*dt/dymin
   Az = coef*dt/dzmin
+
 
   !$omp parallel private(i,j,k,vel,SL,SR,FLUX)
 
@@ -834,8 +841,8 @@ contains
   SLOPE = 0
   !$omp end workshare
   !$omp do
-  do j = 1,Prny
-   do k = 0,Prnz
+  do k = 0,Prnz
+   do j = 1,Prny
     do i = 1,Prnx
      if (W(i,j,k)>0) then
       SR = (SCAL(i,j,k+1)-SCAL(i,j,k))
@@ -854,9 +861,9 @@ contains
   fluxprofile = 0
   !$omp end workshare
 
-  !$omp do
-  do k = 0,Prnz
-   do j = 1,Prny
+  !$omp do reduction(+:fluxprofile)
+  do j = 1,Prny  !loop order due to avoid race condition
+   do k = 0,Prnz
     do i = 1,Prnx
 
      vel = W(i,j,k) - SubsidenceProfile(k)
@@ -897,12 +904,15 @@ contains
   real(KND) vel,SL,SR,FLUX
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
   real(KND),parameter::eps = 1e-8
+  real(KND) :: FluxLimiter,r
 
-   if (sctype==1) then
-    call BOUND_Temp(SCAL)
-   else
-    call BOUND_PASSSCALAR(SCAL)
-   endif
+  FluxLimiter(r)=max(0._KND,min(2._KND*r,min(limparam,(1+2._KND*r)/3._KND)))
+
+  if (sctype==1) then
+   call BOUND_Temp(SCAL)
+  else
+   call BOUND_PASSSCALAR(SCAL)
+  endif
 
   A = coef*dt
 
@@ -1009,9 +1019,9 @@ contains
   fluxprofile = 0
   !$omp end workshare
 
-  !$omp do
-  do k = 0,Prnz
-   do j = 1,Prny
+  !$omp do reduction(+:fluxprofile)
+  do j = 1,Prny  !loop order due to avoid race condition
+   do k = 0,Prnz
     do i = 1,Prnx
 
      vel = W(i,j,k) - SubsidenceProfile(k)
@@ -1047,9 +1057,10 @@ contains
   real(KND),intent(in) :: coef
   integer,intent(in) :: sctype
   real(KND) Scal3(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
-  integer nx,ny,nz,i,j,k,l,xi,yj,zk
+  integer nx,ny,nz,i,j,k,bi,bj,bk,l,xi,yj,zk
   real(KND) p,S
   real(KND) A,Ax,Ay,Az,Ap(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
+  integer,parameter :: narr = 3, narr2 = 5
 
    nx = Prnx
    ny = Prny
@@ -1068,31 +1079,33 @@ contains
    Ay = 1._KND/(4._KND*dymin**2)
    Az = 1._KND/(4._KND*dzmin**2)
 
-   !$omp parallel private (i,j,k)
+   !$omp parallel private (i,j,k,bi,bj,bk)
+
+   !initital value using forward Euler
    !$omp do
-   do k = 1,Prnz  !initital value using forward Euler
-    do j = 1,Prny
-     do i = 1,Prnx
-      SCAL3(i,j,k) = (((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))/dxU(i)-&
-        (TDiff(i,j,k)+TDiff(i-1,j,k))*(SCAL(i,j,k)-SCAL(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
-       ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))/dyV(j)-&
-        (TDiff(i,j,k)+TDiff(i,j-1,k))*(SCAL(i,j,k)-SCAL(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
-       ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))/dzW(k)-&
-        (TDiff(i,j,k)+TDiff(i,j,k-1))*(SCAL(i,j,k)-SCAL(i,j,k-1))/dzW(k-1))/(dzPr(k)))
+   do bk = 1,Prnz,tilenz(narr)
+    do bj = 1,Prny,tileny(narr)
+     do bi = 1,Prnx,tilenx(narr)
+      do k = bk,min(bk+tilenz(narr)-1,Prnz)
+       do j = bj,min(bj+tileny(narr)-1,Prny)
+        do i = bi,min(bi+tilenx(narr)-1,Prnx)
+          SCAL3(i,j,k) = (((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))/dxU(i)-&
+            (TDiff(i,j,k)+TDiff(i-1,j,k))*(SCAL(i,j,k)-SCAL(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
+           ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))/dyV(j)-&
+            (TDiff(i,j,k)+TDiff(i,j-1,k))*(SCAL(i,j,k)-SCAL(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
+           ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))/dzW(k)-&
+            (TDiff(i,j,k)+TDiff(i,j,k-1))*(SCAL(i,j,k)-SCAL(i,j,k-1))/dzW(k-1))/(dzPr(k)))
+        enddo
+       enddo
+      enddo
      enddo
     enddo
    enddo
    !$omp end do
 
-   !$omp do
-   do k = 1,Prnz
-    do j = 1,Prny
-     do i = 1,Prnx
-       SCAL2(i,j,k) = SCAL(i,j,k)+A*SCAL3(i,j,k)
-     enddo
-    enddo
-   enddo
-   !$omp end do
+   !$omp workshare
+   SCAL2(1:Prnx,1:Prny,1:Prnz) = SCAL(1:Prnx,1:Prny,1:Prnz) + A * SCAL3(1:Prnx,1:Prny,1:Prnz)
+   !$omp end workshare
    !$omp end parallel
 
    if (sctype==1) then
@@ -1101,7 +1114,7 @@ contains
      call BOUND_PASSSCALAR(SCAL2)
    endif
 
-   !$omp parallel private(i,j,k,p,xi,yj,zk)
+   !$omp parallel private(i,j,k,bi,bj,bk,p,xi,yj,zk)
    !$omp do
    do i = 1,ubound(ScalFlIBPoints,1)
      xi = ScalFlIBPoints(i)%xi
@@ -1115,30 +1128,42 @@ contains
 
    if (gridtype==uniformgrid) then
     !$omp do
-    do k = 1,Prnz
-     do j = 1,Prny
-      do i = 1,Prnx
-       Ap(i,j,k) = 1._KND/(1._KND/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))+&
-                            (TDiff(i,j,k)+TDiff(i-1,j,k)))*Ax+&
-                            ((TDiff(i,j+1,k)+TDiff(i,j,k))+&
-                            (TDiff(i,j,k)+TDiff(i,j-1,k)))*Ay+&
-                            ((TDiff(i,j,k+1)+TDiff(i,j,k))+&
-                            (TDiff(i,j,k)+TDiff(i,j,k-1)))*Az))
+    do bk = 1,Prnz,tilenz(narr)
+     do bj = 1,Prny,tileny(narr)
+      do bi = 1,Prnx,tilenx(narr)
+       do k = bk,min(bk+tilenz(narr)-1,Prnz)
+        do j = bj,min(bj+tileny(narr)-1,Prny)
+         do i = bi,min(bi+tilenx(narr)-1,Prnx)
+           Ap(i,j,k) = 1._KND/(1._KND/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))+&
+                                (TDiff(i,j,k)+TDiff(i-1,j,k)))*Ax+&
+                                ((TDiff(i,j+1,k)+TDiff(i,j,k))+&
+                                (TDiff(i,j,k)+TDiff(i,j-1,k)))*Ay+&
+                                ((TDiff(i,j,k+1)+TDiff(i,j,k))+&
+                                (TDiff(i,j,k)+TDiff(i,j,k-1)))*Az))
+         enddo
+        enddo
+       enddo
       enddo
      enddo
     enddo
     !$omp end do
    else
     !$omp do
-    do k = 1,Prnz
-     do j = 1,Prny
-      do i = 1,Prnx
-       Ap(i,j,k) = 1._KND/(1._KND/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))/dxU(i)+&
-                            (TDiff(i,j,k)+TDiff(i-1,j,k))/dxU(i-1))/(4._KND*dxPr(i))+&
-                            ((TDiff(i,j+1,k)+TDiff(i,j,k))/dyV(j)+&
-                            (TDiff(i,j,k)+TDiff(i,j-1,k))/dyV(j-1))/(4._KND*dyPr(j))+&
-                            ((TDiff(i,j,k+1)+TDiff(i,j,k))/dzW(k)+&
-                            (TDiff(i,j,k)+TDiff(i,j,k-1))/dzW(k-1))/(4._KND*dzPr(k))))
+    do bk = 1,Prnz,tilenz(narr)
+     do bj = 1,Prny,tileny(narr)
+      do bi = 1,Prnx,tilenx(narr)
+       do k = bk,min(bk+tilenz(narr)-1,Prnz)
+        do j = bj,min(bj+tileny(narr)-1,Prny)
+         do i = bi,min(bi+tilenx(narr)-1,Prnx)
+           Ap(i,j,k) = 1._KND/(1._KND/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))/dxU(i)+&
+                                (TDiff(i,j,k)+TDiff(i-1,j,k))/dxU(i-1))/(4._KND*dxPr(i))+&
+                                ((TDiff(i,j+1,k)+TDiff(i,j,k))/dyV(j)+&
+                                (TDiff(i,j,k)+TDiff(i,j-1,k))/dyV(j-1))/(4._KND*dyPr(j))+&
+                                ((TDiff(i,j,k+1)+TDiff(i,j,k))/dzW(k)+&
+                                (TDiff(i,j,k)+TDiff(i,j,k-1))/dzW(k-1))/(4._KND*dzPr(k))))
+         enddo
+        enddo
+       enddo
       enddo
      enddo
     enddo
@@ -1155,87 +1180,111 @@ contains
     endif
 
     if (gridtype==uniformgrid) then
-     !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
-     !$OMP DO
-     do k = 1,Prnz
-      do j = 1,Prny
-       do i = 1+mod(j+k,2),Prnx,2
-         p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
-          ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
-           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
-          ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
-           (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
-          ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
-           (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
-          )
-          p = p*Ap(i,j,k)
-          S = max(S,abs(p-SCAL2(i,j,k)))
-          SCAL2(i,j,k) = p
+     !$omp parallel private(i,j,k,p) reduction(max:S)
+     !$omp do
+     do bk = 1,Prnz,tilenz(narr2)
+      do bj = 1,Prny,tileny(narr2)
+       do bi = 1,Prnx,tilenx(narr2)
+        do k = bk,min(bk+tilenz(narr2)-1,Prnz)
+         do j = bj,min(bj+tileny(narr2)-1,Prny)
+          do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Prnx),2
+            p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
+             ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
+              (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
+             ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
+              (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
+             ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
+              (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
+             )
+             p = p*Ap(i,j,k)
+             S = max(S,abs(p-SCAL2(i,j,k)))
+             SCAL2(i,j,k) = p
+          enddo
+         enddo
+        enddo
        enddo
       enddo
      enddo
-     !$OMP ENDDO
-     !$OMP DO
-     do k = 1,Prnz
-      do j = 1,Prny
-       do i = 1+mod(j+k+1,2),Prnx,2
-         p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
-          ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
-           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
-          ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
-           (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
-          ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
-           (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
-          )
-          p = p*Ap(i,j,k)
-          S = max(S,abs(p-SCAL2(i,j,k)))
-          SCAL2(i,j,k) = p
+     !$omp enddo
+     !$omp do
+     do bk = 1,Prnz,tilenz(narr2)
+      do bj = 1,Prny,tileny(narr2)
+       do bi = 1,Prnx,tilenx(narr2)
+        do k = bk,min(bk+tilenz(narr2)-1,Prnz)
+         do j = bj,min(bj+tileny(narr2)-1,Prny)
+          do i = bi+mod(bi+j+k,2),min(bi+tilenx(narr2)-1,Prnx),2
+            p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._KND+&
+             ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
+              (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
+             ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
+              (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
+             ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
+              (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
+             )
+             p = p*Ap(i,j,k)
+             S = max(S,abs(p-SCAL2(i,j,k)))
+             SCAL2(i,j,k) = p
+          enddo
+         enddo
+        enddo
        enddo
       enddo
      enddo
-     !$OMP ENDDO
-     !$OMP ENDPARALLEL
+     !$omp enddo
+     !$omp endparallel
     else
-     !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
-     !$OMP DO
-     do k = 1,Prnz
-      do j = 1,Prny
-       do i = 1+mod(j+k,2),Prnx,2
-         p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)+&
-          ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
-           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
-          ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))/dyV(j)-&
-           (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
-          ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))/dzW(k)-&
-           (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1))/dzW(k-1))/(dzPr(k))&
-          )/4._KND
-          p = p*Ap(i,j,k)
-          S = max(S,abs(p-SCAL2(i,j,k)))
-          SCAL2(i,j,k) = p
+     !$omp parallel private(i,j,k,p) reduction(max:S)
+     !$omp do
+     do bk = 1,Prnz,tilenz(narr2)
+      do bj = 1,Prny,tileny(narr2)
+       do bi = 1,Prnx,tilenx(narr2)
+        do k = bk,min(bk+tilenz(narr2)-1,Prnz)
+         do j = bj,min(bj+tileny(narr2)-1,Prny)
+          do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Prnx),2
+            p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)+&
+             ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
+              (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
+             ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))/dyV(j)-&
+              (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
+             ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))/dzW(k)-&
+              (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1))/dzW(k-1))/(dzPr(k))&
+             )/4._KND
+             p = p*Ap(i,j,k)
+             S = max(S,abs(p-SCAL2(i,j,k)))
+             SCAL2(i,j,k) = p
+          enddo
+         enddo
+        enddo
        enddo
       enddo
      enddo
-     !$OMP ENDDO
-     !$OMP DO
-     do k = 1,Prnz
-      do j = 1,Prny
-       do i = 1+mod(j+k+1,2),Prnx,2
-         p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)+&
-          ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
-           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
-          ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))/dyV(j)-&
-           (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
-          ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))/dzW(k)-&
-           (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1))/dzW(k-1))/(dzPr(k))&
-          )/4._KND
-          p = p*Ap(i,j,k)
-          S = max(S,abs(p-SCAL2(i,j,k)))
-          SCAL2(i,j,k) = p
+     !$omp enddo
+     !$omp do
+     do bk = 1,Prnz,tilenz(narr2)
+      do bj = 1,Prny,tileny(narr2)
+       do bi = 1,Prnx,tilenx(narr2)
+        do k = bk,min(bk+tilenz(narr2)-1,Prnz)
+         do j = bj,min(bj+tileny(narr2)-1,Prny)
+          do i = bi+mod(bi+j+k,2),min(bi+tilenx(narr2)-1,Prnx),2
+            p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)+&
+             ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
+              (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
+             ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))/dyV(j)-&
+              (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
+             ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))/dzW(k)-&
+              (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1))/dzW(k-1))/(dzPr(k))&
+             )/4._KND
+             p = p*Ap(i,j,k)
+             S = max(S,abs(p-SCAL2(i,j,k)))
+             SCAL2(i,j,k) = p
+          enddo
+         enddo
+        enddo
        enddo
       enddo
      enddo
-     !$OMP ENDDO
-     !$OMP ENDPARALLEL
+     !$omp enddo
+     !$omp endparallel
     endif
     write (*,*) "CNscalar ",l,S
     if (S<=epsCN) exit
@@ -1253,12 +1302,14 @@ contains
      call BOUND_PASSSCALAR(SCAL2)
    endif
 
+   !$omp parallel do private(i,j,k,bi,bj,bk,p,xi,yj,zk)
    do i = 1,ubound(ScalFlIBPoints,1)
      xi = ScalFlIBPoints(i)%xi
      yj = ScalFlIBPoints(i)%yj
      zk = ScalFlIBPoints(i)%zk
      SCAL2(xi,yj,zk) = SCAL2(xi,yj,zk) + TIBPoint_ScalFlSource(ScalFlIBPoints(i),Scal2,sctype) * dt
    enddo
+   !$omp end parallel do
 
 
   endif
@@ -2116,41 +2167,21 @@ contains
   subroutine ComputeTDiff(U,V,W)
   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer:: i,j,k
+  real(KND),parameter :: Prt = constPrt !if variable, then implement as a statement function due to problems with inlining
+
    if (Re>0) then
-    !$omp parallel do private(i,j,k)
-    do k = 1,Prnz
-      do j = 1,Prny
-        do i = 1,Prnx
-          TDiff(i,j,k) = (Visc(i,j,k)-1._KND/Re)/Prt(i,j,k,U,V,temperature)+(1._KND/(Re*Prandtl))
-        end do
-      end do
-    end do
-    !$omp end parallel do
+    !$omp workshare
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+          TDiff(i,j,k) = (Visc(i,j,k)-1._KND/Re)/Prt + (1._KND/(Re*Prandtl))
+    !$omp end workshare
    else
-    !$omp parallel do private(i,j,k)
-    do k = 1,Prnz
-      do j = 1,Prny
-        do i = 1,Prnx
-          TDiff(i,j,k) = Visc(i,j,k)/Prt(i,j,k,U,V,temperature)
-       end do
-      end do
-    end do
-    !$omp end parallel do
+    !$omp workshare
+    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+          TDiff(i,j,k) = Visc(i,j,k)/Prt
+    !$omp end workshare
    endif
   end subroutine ComputeTDiff
 
-
-  pure real(KND) function Prt(i,j,k,U,V,temperature)
-  integer,intent(in) :: i,j,k
-  real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V
-  real(KND),dimension(-1:,-1:,-1:),intent(in) :: temperature
-
-!   if (buoyancy>0) then
-!    Prt = 0.8_KND+min(max(3._KND*Rig(i,j,k,U,V,temperature),0._KND),sqrt(huge(1._KND)))
-!   else
-   Prt = 0.6_KND
-!   endif
-  endfunction Prt
 
 
   subroutine InitTemperatureProfile(TempIn)
@@ -2245,7 +2276,7 @@ contains
       do k=0,Prnz+1
 
 !         if (zPr(k) <= TemperatureProfile%randomizeTop) then
-!           call RANDOM_NUMBER(p)
+!           call RANdoM_NUMBER(p)
 !           p = p - 0.5
 !           p_z=(p_z+p)/2
 !         endif
@@ -2253,7 +2284,7 @@ contains
         do j=0,Prny+1
 
 !           if (zPr(k) <= TemperatureProfile%randomizeTop) then
-!             call RANDOM_NUMBER(p)
+!             call RANdoM_NUMBER(p)
 !             p = p - 0.5
 !             p_y=(p_y+p)/2
 !           endif
@@ -2261,7 +2292,7 @@ contains
            do i=0,Prnx+1
 
              if (zPr(k) <= TemperatureProfile%randomizeTop) then
-               call RANDOM_NUMBER(p)
+               call RANdoM_NUMBER(p)
                p = p - 0.5
 !               p_x=(p_x+p)/2
 !               p=p_x+p_y+p_z

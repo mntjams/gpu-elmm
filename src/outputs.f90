@@ -6,7 +6,7 @@ module BigEndian
   public :: GetEndianess, BigEnd
 
   integer,parameter :: int8=selected_int_kind(1),int32=selected_int_kind(9),int64=selected_int_kind(10)
-  integer,parameter :: real32=selected_real_kind(p=15,r=200),real64=selected_real_kind(p=6,r=37)
+  integer,parameter :: real32=selected_real_kind(p=6,r=37),real64=selected_real_kind(p=15,r=200)
   logical,save :: littleendian
 
   interface BigEnd
@@ -60,7 +60,7 @@ module OUTPUTS
   use PARAMETERS
   use BOUNDARIES
   use SCALARS
-  use WALLMODELS, only: GroundDeposition, GroundUstar
+  use WALLMODELS, only: GroundDeposition, GroundUstar, WMPoints
   use GEOMETRIC
   use TURBINLET, only: ustarinlet
   use BigEndian

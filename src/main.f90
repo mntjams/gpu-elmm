@@ -109,9 +109,9 @@ program CLMM
      allocate(V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
      allocate(W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
      allocate(Pr(1:Unx+1,1:Vny+1,1:Wnz+1))
-     U=100000
-     V=100000
-     W=100000
+     U=huge(1._KND)
+     V=huge(1._KND)
+     W=huge(1._KND)
      Pr=0000
 
 
