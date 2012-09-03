@@ -12,14 +12,15 @@
 .SUFFIXES: .o .c .c~ .cc .cc~ .y .y~ .l .l~ .s .s~ .sh .sh~ .S .S~ .ln .h .h~ .f .f~ .F .F~ .p .p~ .r .r~ .f90 .f90~ .ftn .ftn~ .cps .cps~ .C .C~ .Y .Y~ .L .L~ .java .java~ .class
 
 
-#### Compiler and tool definitions shared by all build targets #####
-FC = scalasca -instrument gfortran-4.7
-BASICOPTS = -cpp -O5 -g -fbacktrace -fopenmp -ftree-parallelize-loops=8 -floop-parallelize-all -fprefetch-loop-arrays -finline-functions -funroll-loops -ffast-math  -flto
-FFLAGS = $(BASICOPTS)
-
-
 # Define the target directories.
 TARGETDIR_CLMM=../bin/gcc/release
+
+
+#### Compiler and tool definitions shared by all build targets #####
+FC = gfortran-4.7
+BASICOPTS = -cpp -O5 -g -fbacktrace -fopenmp - -fprefetch-loop-arrays -finline-functions -funroll-loops -ffast-math  -flto -Warray-temporaries\
+	-I $(TARGETDIR_CLMM) -J $(TARGETDIR_CLMM)
+FFLAGS = $(BASICOPTS)
 
 
 all: $(TARGETDIR_CLMM)/CLMM

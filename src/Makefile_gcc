@@ -12,14 +12,15 @@
 .SUFFIXES: .o .c .c~ .cc .cc~ .y .y~ .l .l~ .s .s~ .sh .sh~ .S .S~ .ln .h .h~ .f .f~ .F .F~ .p .p~ .r .r~ .f90 .f90~ .ftn .ftn~ .cps .cps~ .C .C~ .Y .Y~ .L .L~ .java .java~ .class
 
 
-#### Compiler and tool definitions shared by all build targets  -fopenmp ,invalid#####
-FC = gfortran-4.7
-BASICOPTS = -cpp -fbacktrace -g -pedantic -Wall -Werror=implicit-procedure -fcheck=all -ffpe-trap=zero,overflow
-FFLAGS = $(BASICOPTS)
-
-
 # Define the target directories.
 TARGETDIR_CLMM=../bin/gcc/debug
+
+
+#### Compiler and tool definitions shared by all build targets  -fopenmp ,invalid#####
+FC = gfortran-4.7
+BASICOPTS = -cpp -fbacktrace -g -pedantic -Wall -Werror=implicit-procedure -fcheck=all -ffpe-trap=zero,overflow,invalid\
+	-I $(TARGETDIR_CLMM) -J $(TARGETDIR_CLMM)
+FFLAGS = $(BASICOPTS)
 
 
 all: $(TARGETDIR_CLMM)/CLMM
