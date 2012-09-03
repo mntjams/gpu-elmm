@@ -1725,9 +1725,6 @@ contains
   end function TSolidBody_Inside
 
 
-
-
-
   subroutine TPlane_Nearest(PL,xnear,ynear,znear,x,y,z)
     type(TPlane),intent(in) :: PL
     real(KND),intent(out) :: xnear,ynear,znear
@@ -2310,11 +2307,12 @@ contains
 
   subroutine GetSolidBodiesBC
     use WallModels, only: WMPoint, AddWMPoint
-    integer i,j,k,m,n,o
+    integer i,j,k,m,n,o,p
     integer(SINT) nb
     real(KND) dist,nearx,neary,nearz
     type(TSolidBody),pointer :: CurrentSB => null()
     type(WMPOINT) :: WMP
+    integer :: neighbours(3,6)
 
     !find if the gridpoints lie ins a solid body and write it's number
     !do not nullify the .type arrays, they could have been made nonzero by other unit
@@ -2399,17 +2397,26 @@ contains
 
     allocate(WMP%depscalar(computescalars))
 
+    neighbours = 0
+    neighbours(1,1) =  1
+    neighbours(1,2) = -1
+    neighbours(2,3) =  1
+    neighbours(2,4) = -1
+    neighbours(3,5) =  1
+    neighbours(3,6) = -1
+
     do k = 1,Prnz
      do j = 1,Prny
       do i = 1,Prnx
        if (Prtype(i,j,k)==0) then
         dist = huge(dist)
         nb = 0
-        do o = -1,1
-         do n = -1,1
-          do m = -1,1
-           if ((m/=0.or.n/=0.or.o/=0).and.i+m>0.and.j+n>0.and.k+o>0.and.i+m<=Prnx.and.j+n<=Prny.and.k+o<=Prnz.and.&
-            (Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb) then
+
+        do p=1,6
+           m=neighbours(1,p)
+           n=neighbours(2,p)
+           o=neighbours(3,p)
+           if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs((/m,n,o/)))==1)) then
              call SetCurrentSB(CurrentSB,Prtype(i+m,j+n,k+o))
              call Nearest(CurrentSB,nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
              if (SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
@@ -2417,8 +2424,6 @@ contains
               nb = Prtype(i+m,j+n,k+o)
              endif
            endif
-          enddo
-         enddo
         enddo
 
         if (nb>0) then
