@@ -1316,7 +1316,7 @@ contains
   endsubroutine DIFFSCALAR
 
 
-   subroutine BOUND_PASSSCALAR(SCAL)
+  subroutine BOUND_PASSSCALAR(SCAL)
   real(KND),intent(inout) :: SCAL(-1:,-1:,-1:)
   integer i,j,k,nx,ny,nz
 
@@ -2170,15 +2170,25 @@ contains
   real(KND),parameter :: Prt = constPrt !if variable, then implement as a statement function due to problems with inlining
 
    if (Re>0) then
-    !$omp workshare
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    !$omp parallel do private(i,j,k)
+    do k=1,Prnz
+      do j=1,Prny
+        do i=1,Prnx
           TDiff(i,j,k) = (Visc(i,j,k)-1._KND/Re)/Prt + (1._KND/(Re*Prandtl))
-    !$omp end workshare
+        end do
+      end do
+    end do
+    !$omp end parallel do
    else
-    !$omp workshare
-    forall(k=1:Prnz,j=1:Prny,i=1:Prnx)&
+    !$omp parallel do private(i,j,k)
+    do k=1,Prnz
+      do j=1,Prny
+        do i=1,Prnx
           TDiff(i,j,k) = Visc(i,j,k)/Prt
-    !$omp end workshare
+        end do
+      end do
+    end do
+    !$omp end parallel do
    endif
   end subroutine ComputeTDiff
 

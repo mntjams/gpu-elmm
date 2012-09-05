@@ -60,7 +60,7 @@ module OUTPUTS
   use PARAMETERS
   use BOUNDARIES
   use SCALARS
-  use WALLMODELS, only: GroundDeposition, GroundUstar, WMPoints
+  use WALLMODELS, only: GroundDeposition, GroundUstar
   use GEOMETRIC
   use TURBINLET, only: ustarinlet
   use BigEndian
@@ -1991,6 +1991,8 @@ contains
   integer   :: i,j,k,l,n
   integer,save :: called = 0
 
+    !$omp parallel private(i,j,k,n,S)
+    !$omp do
     do k = 0,Unz+1
      S = 0
      n = 0
@@ -2004,7 +2006,9 @@ contains
      enddo
      profU(k)=S/max(n,1)
     enddo
+    !$omp end do nowait
 
+    !$omp do
     do k = 1,Vnz+1
      S = 0
      n = 0
@@ -2018,8 +2022,11 @@ contains
      enddo
      profV(k)=S/max(n,1)
     enddo
+    !$omp end do nowait
+    !$omp end parallel
 
     if (present(temperature)) then
+     !$omp parallel do private(i,j,k,n,S)
      do k = 1,Prnz
       S = 0
       n = 0
@@ -2033,10 +2040,12 @@ contains
       enddo
       proftemp(k)=S/max(n,1)
      enddo
+     !$omp end parallel do
     endif
 
     if (present(scalar)) then
      do l = 1,computescalars
+      !$omp parallel do private(i,j,k,n,S)
       do k = 1,Prnz
        S = 0
        n = 0
@@ -2050,16 +2059,21 @@ contains
        enddo
        profscal(l,k)=S/max(n,1)
       enddo
+     !$omp end parallel do
      enddo
     endif
 
     if (called==0) then
      allocate(fp(0:Prnx+1),ht(0:Prnz+1),gp(0:Prny+1))
+     !$omp parallel workshare
      forall (i = 0:Prnx+1)      fp(i)=(xU(i)-xPr(i))/(xPr(i+1)-xPr(i))
      forall (k = 0:Prnz+1)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
      forall (j = 0:Prny+1)      gp(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
+     !$omp end parallel workshare
     endif
 
+    !$omp parallel private(i,j,k,n,S)
+    !$omp do
     do k = 0,Prnz
      S = 0
      n = 0
@@ -2073,7 +2087,9 @@ contains
      enddo
      profuw(k)=S/max(n,1)
     enddo
+    !$omp end do nowait
 
+    !$omp do
     do k = 0,Prnz
      S = 0
      n = 0
@@ -2087,7 +2103,9 @@ contains
      enddo
      profvw(k)=S/max(n,1)
     enddo
+    !$omp end do nowait
 
+    !$omp do
     do k = 0,Prnz
      S = 0
      n = 0
@@ -2101,7 +2119,9 @@ contains
      enddo
      profuwsgs(k)=S/max(n,1)
     enddo
+    !$omp end do nowait
 
+    !$omp do
     do k = 0,Prnz
      S = 0
      n = 0
@@ -2115,7 +2135,9 @@ contains
      enddo
      profvwsgs(k)=S/max(n,1)
     enddo
+    !$omp end do nowait
 
+    !$omp do
     do k = 1,Unz
      S = 0
      n = 0
@@ -2129,7 +2151,9 @@ contains
      enddo
      profuu(k)=S/max(n,1)
     enddo
+    !$omp end do nowait
 
+    !$omp do
     do k = 1,Vnz
      S = 0
      n = 0
@@ -2143,7 +2167,9 @@ contains
      enddo
      profvv(k)=S/max(n,1)
     enddo
+    !$omp end do nowait
 
+    !$omp do
     do k = 0,Wnz
      S = 0
      n = 0
@@ -2157,10 +2183,14 @@ contains
      enddo
      profww(k)=S/max(n,1)
     enddo
+    !$omp end do
+    !$omp end parallel
 
     if (present(temperature)) then
      !proftempfl is computed directly during advection step
 
+     !$omp parallel private(i,j,k,n,S)
+     !$omp do
      do k = 1,Prnz
       S = 0
       n = 0
@@ -2174,7 +2204,9 @@ contains
       enddo
       proftt(k)=S/max(n,1)
      enddo
+     !$omp end do nowait
 
+     !$omp do
      do k = 0,Prnz
       S = 0
       n = 0
@@ -2188,11 +2220,15 @@ contains
       enddo
       proftempflsgs(k)=S/max(n,1)
      enddo
+     !$omp end do
+     !$omp end parallel
     endif ! present(temperature)
 
 
     if (present(scalar)) then
      do l = 1,computescalars
+      !$omp parallel private(i,j,k,n,S)
+      !$omp do
       do k = 0,Prnz
        S = 0
        n = 0
@@ -2206,7 +2242,9 @@ contains
        enddo
        profscalfl(l,k)=S/max(n,1)
       enddo
+      !$omp end do nowait
 
+      !$omp do
       do k = 1,Prnz
        S = 0
        n = 0
@@ -2220,7 +2258,9 @@ contains
        enddo
        profss(l,k)=S/max(n,1)
       enddo
+      !$omp end do nowait
 
+      !$omp do
       do k = 0,Prnz
        S = 0
        n = 0
@@ -2234,6 +2274,8 @@ contains
        enddo
        profscalflsgs(l,k)=S/max(n,1)
       enddo
+      !$omp end do
+      !$omp end parallel
      enddo
     endif ! present(scalar)
 
