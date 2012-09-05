@@ -2306,13 +2306,8 @@ contains
 
 
   subroutine GetSolidBodiesBC
-    use WallModels, only: WMPoint, AddWMPoint
-    integer i,j,k,m,n,o,p
-    integer(SINT) nb
-    real(KND) dist,nearx,neary,nearz
+    integer i,j,k
     type(TSolidBody),pointer :: CurrentSB => null()
-    type(WMPOINT) :: WMP
-    integer :: neighbours(3,6)
 
     !find if the gridpoints lie ins a solid body and write it's number
     !do not nullify the .type arrays, they could have been made nonzero by other unit
@@ -2395,65 +2390,7 @@ contains
 
     call InitImBoundaries
 
-    allocate(WMP%depscalar(computescalars))
-
-    neighbours = 0
-    neighbours(1,1) =  1
-    neighbours(1,2) = -1
-    neighbours(2,3) =  1
-    neighbours(2,4) = -1
-    neighbours(3,5) =  1
-    neighbours(3,6) = -1
-
-    do k = 1,Prnz
-     do j = 1,Prny
-      do i = 1,Prnx
-       if (Prtype(i,j,k)==0) then
-        dist = huge(dist)
-        nb = 0
-
-        do p=1,6
-           m=neighbours(1,p)
-           n=neighbours(2,p)
-           o=neighbours(3,p)
-           if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs((/m,n,o/)))==1)) then
-             call SetCurrentSB(CurrentSB,Prtype(i+m,j+n,k+o))
-             call Nearest(CurrentSB,nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
-             if (SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
-              dist = SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
-              nb = Prtype(i+m,j+n,k+o)
-             endif
-           endif
-        enddo
-
-        if (nb>0) then
-          call SetCurrentSB(CurrentSB,nb)
-          WMP%xi = i
-          WMP%yj = j
-          WMP%zk = k
-          WMP%distx = nearx-xPr(i)
-          WMP%disty = neary-yPr(j)
-          WMP%distz = nearz-zPr(k)
-          WMP%ustar = 1
-          if (CurrentSB%typeofbody==4) then
-           if (CurrentSB%Terrain%PrPoints(i,j)%rough) then
-             WMP%z0 = CurrentSB%Terrain%PrPoints(i,j)%z0
-           else
-             WMP%z0 = 0
-           endif
-          else
-           if (CurrentSB%rough) then
-             WMP%z0 = CurrentSB%z0
-           else
-             WMP%z0 = 0
-           endif
-          endif
-          call AddWMPoint(WMP)
-        endif
-       endif
-      enddo
-     enddo
-    enddo
+    call GetSolidBodiesWM
 
   end subroutine GetSolidBodiesBC
 
@@ -2543,10 +2480,76 @@ contains
 
 
 
+  subroutine GetSolidBodiesWM
+    use WallModels, only: WMPoint, AddWMPoint
+    type(WMPOINT)            :: WMP
+    type(TSolidBody),pointer :: CurrentSB => null()
+    integer                  :: neighbours(3,6)
+    real(KND)     :: dist,nearx,neary,nearz
+    integer       :: i,j,k,m,n,o,p
+    integer(SINT) :: nb
 
+    allocate(WMP%depscalar(computescalars))
 
+    neighbours = 0
+    neighbours(1,1) =  1
+    neighbours(1,2) = -1
+    neighbours(2,3) =  1
+    neighbours(2,4) = -1
+    neighbours(3,5) =  1
+    neighbours(3,6) = -1
 
+    do k = 1,Prnz
+     do j = 1,Prny
+      do i = 1,Prnx
+       if (Prtype(i,j,k)==0) then
+        dist = huge(dist)
+        nb = 0
 
+        do p=1,6
+           m=neighbours(1,p)
+           n=neighbours(2,p)
+           o=neighbours(3,p)
+           if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs((/m,n,o/)))==1)) then
+             call SetCurrentSB(CurrentSB,Prtype(i+m,j+n,k+o))
+             call Nearest(CurrentSB,nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
+             if (SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
+              dist = SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
+              nb = Prtype(i+m,j+n,k+o)
+             endif
+           endif
+        enddo
+
+        if (nb>0) then
+          call SetCurrentSB(CurrentSB,nb)
+          WMP%xi = i
+          WMP%yj = j
+          WMP%zk = k
+          WMP%distx = nearx-xPr(i)
+          WMP%disty = neary-yPr(j)
+          WMP%distz = nearz-zPr(k)
+          WMP%ustar = 1
+          if (CurrentSB%typeofbody==4) then
+           if (CurrentSB%Terrain%PrPoints(i,j)%rough) then
+             WMP%z0 = CurrentSB%Terrain%PrPoints(i,j)%z0
+           else
+             WMP%z0 = 0
+           endif
+          else
+           if (CurrentSB%rough) then
+             WMP%z0 = CurrentSB%z0
+           else
+             WMP%z0 = 0
+           endif
+          endif
+          call AddWMPoint(WMP)
+        endif
+       endif
+      enddo
+     enddo
+    enddo
+
+  end subroutine GetSolidBodiesWM
 
 
 

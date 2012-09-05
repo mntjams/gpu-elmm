@@ -1,3 +1,21 @@
+module Sort
+  use iso_c_binding
+
+  implicit none
+
+  interface
+    subroutine qsort(array,elem_count,elem_size,compare) bind(C,name="qsort")
+      import
+      type(c_ptr),value       :: array
+      integer(c_size_t),value :: elem_count
+      integer(c_size_t),value :: elem_size
+      type(c_funptr),value    :: compare !int(*compare)(const void *, const void *)
+    end subroutine qsort !standard C library qsort
+  end interface
+end module Sort
+
+
+
 module Wallmodels
 use PARAMETERS
 
@@ -202,7 +220,9 @@ implicit none
 
 
   subroutine RemoveDuplicateWMPoints(WMPoints)
-    type(WMPoint),allocatable,dimension(:),intent(inout)  :: WMPoints !Requires f95TS
+    use iso_c_binding
+    use Sort
+    type(WMPoint),allocatable,dimension(:),target,intent(inout)  :: WMPoints !Requires f95TS
     type(WMPoint),allocatable,dimension(:) :: TMP
     integer i,n
 
@@ -211,11 +231,21 @@ implicit none
 
     allocate(TMP(size(WMPoints)))
 
-    n = 0
-    do i = size(WMPoints),1,-1
-        if (NoDuplicate(i,WMPoints)) then !if the point is not a duplicate of another point with higher priority, use it
-          n=n+1
-          TMP(n) = WMPoints(i)
+    call qsort(c_loc(WMPoints(1)),&
+               size(WMPoints,kind=c_size_t),&
+               int(storage_size(WMPoints)/storage_size('a'),c_size_t),& !c_sizeof not supported by Solaris Studio 12.3
+               c_funloc(CompareWMPoints))
+
+    TMP(1) = WMPoints(1)
+    n = 1
+    do i = 2,size(WMPoints)
+        if (WMPoints(i-1)%xi/=WMPoints(i)%xi .or.&
+            WMPoints(i-1)%yj/=WMPoints(i)%yj .or.&
+            WMPoints(i-1)%zk/=WMPoints(i)%zk) then !if the point is not duplicate of previous one
+
+              n=n+1
+              TMP(n) = WMPoints(i)
+
         end if
     end do
 
@@ -227,39 +257,45 @@ implicit none
   end subroutine RemoveDuplicateWMPoints
 
 
-  pure logical function NoDuplicate(pos,WMPoints) result(res) !true if no duplicate with higher priority
-    integer,intent(in)        :: pos
-    type(WMPoint),intent(in) :: WMPoints(:)
-    integer j
-
-    res = .true.
-
-    do j=1,size(WMPoints)
-
-      if (pos==j) cycle
-
-      if ( IsDuplicate(WMPoints(pos),WMPoints(j),j<pos) ) then
-        res = .false.
-        exit
-      end if
-
-    end do
-  end function NoDuplicate
 
 
-  pure logical function IsDuplicate(A,B,priority) result(res)  !true, if B is duplicate with smaller distance or equal distance and higher priority
-    type(WMPoint),intent(in) :: A,B
-    logical,      intent(in) :: priority !if B has higher priority
 
-    res = .false.
-    if (A%xi==B%xi .and. A%yj==B%yj .and. A%zk==B%zk) then
-      if (A%distx**2+A%disty**2+A%distz**2>B%distx**2+B%disty**2+B%distz**2) then
-        res=.true.
-      else if ((A%distx**2+A%disty**2+A%distz**2==B%distx**2+B%disty**2+B%distz**2) .and. priority) then
-        res=.true.
-      end if
+
+  function CompareWMPoints(Aptr,Bptr) bind(C,name="CompareWMPoints") result(res)
+    use iso_c_binding
+    integer(c_int)         :: res
+    type(c_ptr),value :: Aptr,Bptr
+    type(WMPoint),pointer  :: A,B
+
+    call c_f_pointer(Aptr,A)
+    call c_f_pointer(Bptr,B)
+
+    if ((A%xi+(A%yj-1)*Prnx+(A%zk-1)*Prnx*Prny) < (B%xi+(B%yj-1)*Prnx+(B%zk-1)*Prnx*Prny)) then
+      res = -1_c_int
+    else if ((A%xi+(A%yj-1)*Prnx+(A%zk-1)*Prnx*Prny) > (B%xi+(B%yj-1)*Prnx+(B%zk-1)*Prnx*Prny)) then
+      res =  1_c_int
+    else if (A%distx**2+A%disty**2+A%distz**2 < B%distx**2+B%disty**2+B%distz**2) then
+      res = -1_c_int
+    else if (A%distx**2+A%disty**2+A%distz**2 > B%distx**2+B%disty**2+B%distz**2) then
+      res =  1_c_int
+    else
+      res =  0_C_int
     end if
-  end function IsDuplicate
+
+  end function CompareWMPoints
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
