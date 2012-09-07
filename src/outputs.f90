@@ -1532,6 +1532,8 @@ contains
 
     fsuffix=".vtk"
 
+    vtkformat = binaryvtk
+
     !$omp parallel do default(private) shared(n,store,time,fsuffix,xPr,yPr,zPr,Prtype,Pr,U,V,W,&
     !$omp                                          scalar,temperature,buoyancy,computescalars,vtkformat)
     do m = 1,size(store%frame_domains)
@@ -1541,8 +1543,6 @@ contains
       write(*,*) "Saving frame:",fnumber,"   time:",time
 
       unit = 100+m
-
-      vtkformat = binaryvtk
 
       if (vtkformat==textvtk) then
 
