@@ -33,7 +33,7 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/parameters.o \
 	$(TARGETDIR_CLMM)/tiling.o \
 	$(TARGETDIR_CLMM)/limiters.o \
-	$(TARGETDIR_CLMM)/hmpp_codelets.o \
+	$(TARGETDIR_CLMM)/hmpp-codelets.o \
 	$(TARGETDIR_CLMM)/wallmodels.o \
 	$(TARGETDIR_CLMM)/multigrid.o \
 	$(TARGETDIR_CLMM)/multigrid2d.o \
@@ -70,8 +70,8 @@ $(TARGETDIR_CLMM)/tiling.o: $(TARGETDIR_CLMM) tiling.f90 parameters.o
 $(TARGETDIR_CLMM)/limiters.o: $(TARGETDIR_CLMM) limiters.f90 $(TARGETDIR_CLMM)/parameters.o
 	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ limiters.f90
 
-$(TARGETDIR_CLMM)/hmpp_codelets.o: $(TARGETDIR_CLMM) hmpp_codelets.F90
-	hmpp  $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ hmpp_codelets.F90
+$(TARGETDIR_CLMM)/hmpp-codelets.o: $(TARGETDIR_CLMM) hmpp-codelets.F90
+	hmpp  $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ hmpp-codelets.F90
 
 $(TARGETDIR_CLMM)/scalars-tmp.F90: scalars.f90 scalarsbound_GPU.f90 hmpp-include.f90
 	$(COMPILE.f) scalars.f90 -E -D__HMPP > $(TARGETDIR_CLMM)/scalars-tmp.F90
