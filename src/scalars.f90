@@ -738,7 +738,7 @@ contains
   integer,intent(in) :: sctype
   real(KND),intent(in) :: SubsidenceProfile(0:)
   real(KND),intent(out) :: fluxProfile(0:)
-  integer i,j,k
+  integer i,j,k,l
   real(KND) A,Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
   real(KND) vel,SL,SR,FLUX
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
@@ -860,34 +860,35 @@ contains
   !$omp workshare
   fluxprofile = 0
   !$omp end workshare
-
-  !$omp do reduction(+:fluxprofile)
-  do j = 1,Prny  !loop order due to avoid race condition
-   do k = 0,Prnz
-    do i = 1,Prnx
-
-     vel = W(i,j,k) - SubsidenceProfile(k)
-
-     if (vel>0) then
-      FLUX = vel*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._KND)
-     else
-      FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
-     endif
-
-     if (vel>=1e-6) fluxprofile(k) = fluxprofile(k) + FLUX/vel*W(i,j,k)
-
-     SCAL2(i,j,k) = SCAL2(i,j,k) - Az*FLUX
-     SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + Az*FLUX
-    enddo
-   enddo
-  enddo
-  !$omp end do
-
-  !$omp workshare
-  fluxprofile = fluxprofile / (Prnx*Prny)
-  !$omp end workshare
-
   !$omp end parallel
+
+  do l=0,1  !odd-even separation to avoid race condition
+    !$omp do reduction(+:fluxprofile)
+    do k = 0+l,Prnz,2
+     do j = 1,Prny
+      do i = 1,Prnx
+
+       vel = W(i,j,k) - SubsidenceProfile(k)
+
+       if (vel>0) then
+        FLUX = vel*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._KND)
+       else
+        FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
+       endif
+
+       if (vel>=1e-6) fluxprofile(k) = fluxprofile(k) + FLUX/vel*W(i,j,k)
+
+       SCAL2(i,j,k) = SCAL2(i,j,k) - Az*FLUX
+       SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + Az*FLUX
+      enddo
+     enddo
+    enddo
+    !$omp end do
+  end do
+
+  !$omp parallel workshare
+  fluxprofile = fluxprofile / (Prnx*Prny)
+  !$omp end parallel workshare
 
   endsubroutine KAPPASCALARUG
 
