@@ -1532,7 +1532,6 @@ contains
 
     fsuffix=".vtk"
 
-    vtkformat = binaryvtk
 
     !$omp parallel do default(private) shared(n,store,time,fsuffix,xPr,yPr,zPr,Prtype,Pr,U,V,W,&
     !$omp                                          scalar,temperature,buoyancy,computescalars,vtkformat)
@@ -1544,388 +1543,158 @@ contains
 
       unit = 100+m
 
-      if (vtkformat==textvtk) then
+      mini = store%frame_domains(m)%mini
+      minj = store%frame_domains(m)%minj
+      mink = store%frame_domains(m)%mink
+      maxi = store%frame_domains(m)%maxi
+      maxj = store%frame_domains(m)%maxj
+      maxk = store%frame_domains(m)%maxk
 
-        mini = store%frame_domains(m)%mini
-        minj = store%frame_domains(m)%minj
-        mink = store%frame_domains(m)%mink
-        maxi = store%frame_domains(m)%maxi
-        maxj = store%frame_domains(m)%maxj
-        maxk = store%frame_domains(m)%maxk
 
-        open(unit,file = trim(fname)//trim(fnumber)//trim(fsuffix))
+      open(unit,file = trim(fname)//trim(fnumber)//trim(fsuffix),&
+        access='stream',status='replace',form="unformatted",action="write")
 
-        write (unit,"(A)") "# vtk DataFile Version 2.0"
-        write (unit,"(A)") "CLMM output file"
-        write (unit,"(A)") "ASCII"
-        write (unit,"(A)") "DATASET RECTILINEAR_GRID"
-        str="DIMENSIONS"
-        write (str(12:),*) maxi-mini+1,maxj-minj+1,maxk-mink+1
-        write (unit,"(A)") str
-        str="X_COORDINATES"
-        write (str(15:),'(i5,2x,a)') maxi-mini+1,"float"
-        write (unit,"(A)") str
-        write (unit,*) xPr(mini:maxi)
-        str="Y_COORDINATES"
-        write (str(15:),'(i5,2x,a)') maxj-minj+1,"float"
-        write (unit,"(A)") str
-        write (unit,*) yPr(minj:maxj)
-        str="Z_COORDINATES"
-        write (str(15:),'(i5,2x,a)') maxk-mink+1,"float"
-        write (unit,"(A)") str
-        write (unit,*) zPr(mink:maxk)
-        str="POINT_DATA"
-        write (str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
-        write (unit,"(A)") str
+      write (unit) "# vtk DataFile Version 2.0",lf
+      write (unit) "CLMM output file",lf
+      write (unit) "BINARY",lf
+      write (unit) "DATASET RECTILINEAR_GRID",lf
+      str="DIMENSIONS"
+      write (str(12:),*) maxi-mini+1,maxj-minj+1,maxk-mink+1
+      write (unit) str,lf
+      str="X_COORDINATES"
+      write (str(15:),'(i5,2x,a)') maxi-mini+1,"float"
+      write (unit) str,lf
+      write (unit) (BigEnd(real(xPr(i),SNG)),i = mini,maxi),lf
+      str="Y_COORDINATES"
+      write (str(15:),'(i5,2x,a)') maxj-minj+1,"float"
+      write (unit) str,lf
+      write (unit) (BigEnd(real(yPr(j),SNG)),j = minj,maxj),lf
+      str="Z_COORDINATES"
+      write (str(15:),'(i5,2x,a)') maxk-mink+1,"float"
+      write (unit) str,lf
+      write (unit) (BigEnd(real(zPr(k),SNG)),k = mink,maxk),lf
+      str="POINT_DATA"
+      write (str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
+      write (unit) str,lf
 
-        if (store%frame_Pr>0) then
-          write (unit,"(A)") "SCALARS p float"
-          write (unit,"(A)") "LOOKUP_TABLE default"
-          do k = mink,maxk
-           do j = minj,maxj
-            do i = mini,maxi
-             if (Prtype(i,j,k)==0) then
-              write (unit,*) Pr(i,j,k)
-             else
-              write (unit,*) 0.
-             endif
-            enddo
-           enddo
+      if (store%frame_Pr>0) then
+       write (unit) "SCALARS p float",lf
+       write (unit) "LOOKUP_TABLE default",lf
+       do k = mink,maxk
+        do j = minj,maxj
+         do i = mini,maxi
+          if (Prtype(i,j,k)==0) then
+           write (unit) BigEnd(real(Pr(i,j,k),SNG))
+          else
+           write (unit) BigEnd(0._SNG)
+          endif
+         enddo
+        enddo
+       enddo
+       write (unit) lf
+      endif
+
+      if (store%frame_lambda2>0) then
+       write (unit) "SCALARS lambda2 float",lf
+       write (unit) "LOOKUP_TABLE default",lf
+       do k = mink,maxk
+        do j = minj,maxj
+         do i = mini,maxi
+          if (Prtype(i,j,k)==0) then
+           write (unit) BigEnd(real(Lambda2(i,j,k,U,V,W),SNG))
+          else
+           write (unit) BigEnd(0._SNG)
+          endif
+         enddo
+        enddo
+       enddo
+       write (unit) lf
+      endif
+
+      if (store%frame_scalars>0) then
+       scalname(1:6)="scalar"
+       do l = 1,computescalars
+        write(scalname(7:8),"(I2.2)") l
+        write (unit) "SCALARS ", scalname , " float",lf
+        write (unit) "LOOKUP_TABLE default",lf
+        do k = mink,maxk
+         do j = minj,maxj
+          do i = mini,maxi
+           if (Prtype(i,j,k)==0) then
+            write (unit) BigEnd(real(SCALAR(i,j,k,l),SNG))
+           else
+            write (unit) BigEnd(0._SNG)
+           endif
           enddo
-          write (unit,*)
-        endif
-
-        if (store%frame_lambda2>0) then
-          write (unit,*) "SCALARS lambda2 float"
-          write (unit,*) "LOOKUP_TABLE default"
-          do k = mink,maxk
-           do j = minj,maxj
-            do i = mini,maxi
-             if (Prtype(i,j,k)==0) then
-              write (unit,*) Lambda2(i,j,k,U,V,W)
-             else
-              write (unit,*) 0.
-             endif
-            enddo
-           enddo
+         enddo
+        enddo
+        write (unit) lf
+       enddo
+      elseif (store%frame_sumscalars>0.and.computescalars>0) then
+        write (unit) "SCALARS ", "scalar" , " float",lf
+        write (unit) "LOOKUP_TABLE default",lf
+        do k = mink,maxk
+         do j = minj,maxj
+          do i = mini,maxi
+           if (Prtype(i,j,k)==0) then
+            write (unit) BigEnd(real(SUM(SCALAR(i,j,k,:)),SNG))
+           else
+            write (unit) BigEnd(0._SNG)
+           endif
           enddo
-          write (unit,*)
-        endif
+         enddo
+        enddo
+        write (unit) lf
+      endif
 
+      if (store%frame_T>0) then
+       if (buoyancy>0) then
+        write (unit) "SCALARS temperature float",lf
+        write (unit) "LOOKUP_TABLE default",lf
+        do k = mink,maxk
+         do j = minj,maxj
+          do i = mini,maxi
+           if (Prtype(i,j,k)==0) then
+            write (unit) BigEnd(real(Temperature(i,j,k),SNG))
+           else
+            write (unit) BigEnd(real(temperature_ref,SNG))
+           endif
+          enddo
+         enddo
+        enddo
+        write (unit) lf
+       endif
+      endif
+
+      if (buoyancy==1.and.store%frame_tempfl>0) then
+        write (unit) "SCALARS tempfl float", lf
+        write (unit) "LOOKUP_TABLE default", lf
+        do k = mink,maxk
+         do j = minj,maxj
+          do i = mini,maxi
+           if (Prtype(i,j,k)==0) then
+            write (unit) BigEnd(real(ScalarVerticalFlux(i,j,k,Temperature,W),SNG))
+           else
+            write (unit) BigEnd(0._SNG)
+           endif
+          enddo
+         enddo
+        enddo
+        write (unit) lf
+      endif
+
+      if (store%frame_scalfl>0) then
         if (store%frame_scalars>0) then
-          scalname(1:6)="scalar"
+          scalname(1:6)="scalfl"
           do l = 1,computescalars
             write(scalname(7:8),"(I2.2)") l
-            write (unit,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
-            write (unit,"(A)") "LOOKUP_TABLE default"
-            do k = mink,maxk
-             do j = minj,maxj
-              do i = mini,maxi
-               if (Prtype(i,j,k)==0) then
-                write (unit,*) SCALAR(i,j,k,l)
-               else
-                write (unit,*) 0.
-               endif
-              enddo
-             enddo
-            enddo
-            write (unit,*)
-          enddo
-        elseif (store%frame_sumscalars>0.and.computescalars>0) then
-          write (unit,"(A,1X,A,1X,A)") "SCALARS", "scalar" , "float"
-          write (unit,"(A)") "LOOKUP_TABLE default"
-          do k = mink,maxk
-           do j = minj,maxj
-            do i = mini,maxi
-             if (Prtype(i,j,k)==0) then
-              write (unit,*) SUM(SCALAR(i,j,k,:))
-             else
-              write (unit,*) 0.
-             endif
-            enddo
-           enddo
-          enddo
-          write (unit,*)
-        endif
-
-        if (store%frame_T>0) then
-          if (buoyancy>0) then
-            write (unit,*) "SCALARS temperature float"
-            write (unit,*) "LOOKUP_TABLE default"
-            do k = mink,maxk
-             do j = minj,maxj
-              do i = mini,maxi
-               if (Prtype(i,j,k)==0) then
-                write (unit,*) Temperature(i,j,k)
-               else
-                write (unit,*) temperature_ref
-               endif
-              enddo
-             enddo
-            enddo
-            write (unit,*)
-          endif
-        endif
-
-        if (buoyancy==1.and.store%frame_tempfl>0) then
-          write (unit,*) "SCALARS tempfl float"
-          write (unit,*) "LOOKUP_TABLE default"
-          do k = mink,maxk
-           do j = minj,maxj
-            do i = mini,maxi
-             if (Prtype(i,j,k)==0) then
-              write (unit,*) ScalarVerticalFlux(i,j,k,Temperature,W)
-             else
-              write (unit,*) 0.
-             endif
-            enddo
-           enddo
-          enddo
-          write (unit,*)
-        endif
-
-        if (store%frame_scalfl>0) then
-          if (store%frame_scalars>0) then
-            scalname(1:6)="scalfl"
-            do l = 1,computescalars
-              write(scalname(7:8),"(I2.2)") l
-              write (unit,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
-              write (unit,"(A)") "LOOKUP_TABLE default"
-              do k = mink,maxk
-               do j = minj,maxj
-                do i = mini,maxi
-                 if (Prtype(i,j,k)==0) then
-                  write (unit,*) ScalarVerticalFlux(i,j,k,Scalar(:,:,:,l),W)
-                 else
-                  write (unit,*) 0.
-                 endif
-                enddo
-               enddo
-              enddo
-              write (unit,*)
-            enddo
-          elseif (store%frame_sumscalars>0.and.computescalars>0) then
-            write (unit,"(A)") "SCALARS scalfl float"
-            write (unit,"(A)") "LOOKUP_TABLE default"
-            do k = mink,maxk
-             do j = minj,maxj
-              do i = mini,maxi
-               if (Prtype(i,j,k)==0) then
-                write (unit,*) ScalarVerticalFlux(i,j,k,SUM(Scalar,4),W)
-               else
-                write (unit,*) 0.
-               endif
-              enddo
-             enddo
-            enddo
-            write (unit,*)
-          endif
-        endif
-
-        if (store%frame_U>0) then
-          write (unit,"(A)") "VECTORS u float"
-          do k = mink,maxk
-           do j = minj,maxj
-            do i = mini,maxi
-             if (Prtype(i,j,k)==0) then
-              write (unit,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,&
-                             (W(i,j,k)+W(i,j,k-1))/2._KND
-             else
-              write (unit,*) 0.,0.,0.
-             endif
-            enddo
-           enddo
-          enddo
-          write (unit,*)
-        endif
-
-        if (store%frame_vort>0) then
-          write (unit,"(A)") "VECTORS vort float"
-          do k = mink,maxk
-           do j = minj,maxj
-            do i = mini,maxi
-             if (Prtype(i,j,k)==0) then
-              write (unit,*) Vorticity(i,j,k,U,V,W)
-             else
-              write (unit,*) 0.,0.,0.
-             endif
-            enddo
-           enddo
-          enddo
-        endif
-        close(unit)
-
-
-      else  !Binary VTK format
-
-        mini = store%frame_domains(m)%mini
-        minj = store%frame_domains(m)%minj
-        mink = store%frame_domains(m)%mink
-        maxi = store%frame_domains(m)%maxi
-        maxj = store%frame_domains(m)%maxj
-        maxk = store%frame_domains(m)%maxk
-
-
-        open(unit,file = trim(fname)//trim(fnumber)//trim(fsuffix),&
-          access='stream',status='replace',form="unformatted",action="write")
-
-        write (unit) "# vtk DataFile Version 2.0",lf
-        write (unit) "CLMM output file",lf
-        write (unit) "BINARY",lf
-        write (unit) "DATASET RECTILINEAR_GRID",lf
-        str="DIMENSIONS"
-        write (str(12:),*) maxi-mini+1,maxj-minj+1,maxk-mink+1
-        write (unit) str,lf
-        str="X_COORDINATES"
-        write (str(15:),'(i5,2x,a)') maxi-mini+1,"float"
-        write (unit) str,lf
-        write (unit) (BigEnd(real(xPr(i),SNG)),i = mini,maxi),lf
-        str="Y_COORDINATES"
-        write (str(15:),'(i5,2x,a)') maxj-minj+1,"float"
-        write (unit) str,lf
-        write (unit) (BigEnd(real(yPr(j),SNG)),j = minj,maxj),lf
-        str="Z_COORDINATES"
-        write (str(15:),'(i5,2x,a)') maxk-mink+1,"float"
-        write (unit) str,lf
-        write (unit) (BigEnd(real(zPr(k),SNG)),k = mink,maxk),lf
-        str="POINT_DATA"
-        write (str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
-        write (unit) str,lf
-
-        if (store%frame_Pr>0) then
-         write (unit) "SCALARS p float",lf
-         write (unit) "LOOKUP_TABLE default",lf
-         do k = mink,maxk
-          do j = minj,maxj
-           do i = mini,maxi
-            if (Prtype(i,j,k)==0) then
-             write (unit) BigEnd(real(Pr(i,j,k),SNG))
-            else
-             write (unit) BigEnd(0._SNG)
-            endif
-           enddo
-          enddo
-         enddo
-         write (unit) lf
-        endif
-
-        if (store%frame_lambda2>0) then
-         write (unit) "SCALARS lambda2 float",lf
-         write (unit) "LOOKUP_TABLE default",lf
-         do k = mink,maxk
-          do j = minj,maxj
-           do i = mini,maxi
-            if (Prtype(i,j,k)==0) then
-             write (unit) BigEnd(real(Lambda2(i,j,k,U,V,W),SNG))
-            else
-             write (unit) BigEnd(0._SNG)
-            endif
-           enddo
-          enddo
-         enddo
-         write (unit) lf
-        endif
-
-        if (store%frame_scalars>0) then
-         scalname(1:6)="scalar"
-         do l = 1,computescalars
-          write(scalname(7:8),"(I2.2)") l
-          write (unit) "SCALARS ", scalname , " float",lf
-          write (unit) "LOOKUP_TABLE default",lf
-          do k = mink,maxk
-           do j = minj,maxj
-            do i = mini,maxi
-             if (Prtype(i,j,k)==0) then
-              write (unit) BigEnd(real(SCALAR(i,j,k,l),SNG))
-             else
-              write (unit) BigEnd(0._SNG)
-             endif
-            enddo
-           enddo
-          enddo
-          write (unit) lf
-         enddo
-        elseif (store%frame_sumscalars>0.and.computescalars>0) then
-          write (unit) "SCALARS ", "scalar" , " float",lf
-          write (unit) "LOOKUP_TABLE default",lf
-          do k = mink,maxk
-           do j = minj,maxj
-            do i = mini,maxi
-             if (Prtype(i,j,k)==0) then
-              write (unit) BigEnd(real(SUM(SCALAR(i,j,k,:)),SNG))
-             else
-              write (unit) BigEnd(0._SNG)
-             endif
-            enddo
-           enddo
-          enddo
-          write (unit) lf
-        endif
-
-        if (store%frame_T>0) then
-         if (buoyancy>0) then
-          write (unit) "SCALARS temperature float",lf
-          write (unit) "LOOKUP_TABLE default",lf
-          do k = mink,maxk
-           do j = minj,maxj
-            do i = mini,maxi
-             if (Prtype(i,j,k)==0) then
-              write (unit) BigEnd(real(Temperature(i,j,k),SNG))
-             else
-              write (unit) BigEnd(real(temperature_ref,SNG))
-             endif
-            enddo
-           enddo
-          enddo
-          write (unit) lf
-         endif
-        endif
-
-        if (buoyancy==1.and.store%frame_tempfl>0) then
-          write (unit) "SCALARS tempfl float", lf
-          write (unit) "LOOKUP_TABLE default", lf
-          do k = mink,maxk
-           do j = minj,maxj
-            do i = mini,maxi
-             if (Prtype(i,j,k)==0) then
-              write (unit) BigEnd(real(ScalarVerticalFlux(i,j,k,Temperature,W),SNG))
-             else
-              write (unit) BigEnd(0._SNG)
-             endif
-            enddo
-           enddo
-          enddo
-          write (unit) lf
-        endif
-
-        if (store%frame_scalfl>0) then
-          if (store%frame_scalars>0) then
-            scalname(1:6)="scalfl"
-            do l = 1,computescalars
-              write(scalname(7:8),"(I2.2)") l
-              write (unit) "SCALARS ", scalname , " float", lf
-              write (unit) "LOOKUP_TABLE default", lf
-              do k = mink,maxk
-               do j = minj,maxj
-                do i = mini,maxi
-                 if (Prtype(i,j,k)==0) then
-                  write (unit) BigEnd(real(ScalarVerticalFlux(i,j,k,Scalar(:,:,:,l),W),SNG))
-                 else
-                  write (unit) BigEnd(0._SNG)
-                 endif
-                enddo
-               enddo
-              enddo
-              write (unit) lf
-            enddo
-          elseif (store%frame_sumscalars>0.and.computescalars>0) then
-            write (unit) "SCALARS scalfl float", lf
+            write (unit) "SCALARS ", scalname , " float", lf
             write (unit) "LOOKUP_TABLE default", lf
             do k = mink,maxk
              do j = minj,maxj
               do i = mini,maxi
                if (Prtype(i,j,k)==0) then
-                write (unit) BigEnd(real(ScalarVerticalFlux(i,j,k,SUM(Scalar(:,:,:,:),4),W),SNG))
+                write (unit) BigEnd(real(ScalarVerticalFlux(i,j,k,Scalar(:,:,:,l),W),SNG))
                else
                 write (unit) BigEnd(0._SNG)
                endif
@@ -1933,48 +1702,63 @@ contains
              enddo
             enddo
             write (unit) lf
+          enddo
+        elseif (store%frame_sumscalars>0.and.computescalars>0) then
+          write (unit) "SCALARS scalfl float", lf
+          write (unit) "LOOKUP_TABLE default", lf
+          do k = mink,maxk
+           do j = minj,maxj
+            do i = mini,maxi
+             if (Prtype(i,j,k)==0) then
+              write (unit) BigEnd(real(ScalarVerticalFlux(i,j,k,SUM(Scalar(:,:,:,:),4),W),SNG))
+             else
+              write (unit) BigEnd(0._SNG)
+             endif
+            enddo
+           enddo
+          enddo
+          write (unit) lf
+        endif
+      endif
+
+      if (store%frame_U>0) then
+       write (unit) "VECTORS u float",lf
+       do k = mink,maxk
+        do j = minj,maxj
+         do i = mini,maxi
+          if (Prtype(i,j,k)==0) then
+           write (unit) BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG)),BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG))&
+            ,BigEnd(real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG))
+          else
+           write (unit) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
           endif
-        endif
-
-        if (store%frame_U>0) then
-         write (unit) "VECTORS u float",lf
-         do k = mink,maxk
-          do j = minj,maxj
-           do i = mini,maxi
-            if (Prtype(i,j,k)==0) then
-             write (unit) BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG)),BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG))&
-              ,BigEnd(real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG))
-            else
-             write (unit) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
-            endif
-           enddo
-          enddo
          enddo
-         write (unit) lf
-        endif
+        enddo
+       enddo
+       write (unit) lf
+      endif
 
-        if (store%frame_vort>0) then
-         write (unit) "VECTORS vort float",lf
-         do k = mink,maxk
-          do j = minj,maxj
-           do i = mini,maxi
-            if (Prtype(i,j,k)==0) then
-             write (unit) BigEnd(real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
-                             -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG)),&
-                          BigEnd(real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
-                            -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG)),&
-                          BigEnd(real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
-                            -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin),SNG))
-            else
-             write (unit) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
-            endif
-           enddo
-          enddo
+      if (store%frame_vort>0) then
+       write (unit) "VECTORS vort float",lf
+       do k = mink,maxk
+        do j = minj,maxj
+         do i = mini,maxi
+          if (Prtype(i,j,k)==0) then
+           write (unit) BigEnd(real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+                           -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG)),&
+                        BigEnd(real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
+                          -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),SNG)),&
+                        BigEnd(real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
+                          -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin),SNG))
+          else
+           write (unit) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
+          endif
          enddo
-        endif
-        close(unit)
+        enddo
+       enddo
+      endif
+      close(unit)
 
-      endif !textvtk/binaryvtk
     enddo   !frame_domains
     !$omp end parallel do
   end subroutine FRAME

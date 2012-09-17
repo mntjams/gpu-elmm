@@ -124,13 +124,10 @@ module PARAMETERS
 
   real(KND),dimension(6) :: sideScal  !scalars or scalar fluxes on boundaries
 
-  integer :: vtkformat
-
   integer,parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
                         TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
   integer,parameter :: NOINLET=0,CONSTANT=1,SHEAR=2,PARABOLIC=3,CONSTPROF=1,LOGPROF=2,POWERPROF=3  !inlet profile types
   integer,parameter :: GENERALGRID=1,UNIFORMGRID=2
-  integer,parameter :: textvtk=1,binaryvtk=2
   integer,parameter :: SmagorinskyModel=1,DynSmagorinskyModel=2,VremanModel=3,StabSmagorinskyModel=4
   integer,parameter :: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4
 
