@@ -80,8 +80,8 @@ contains
            lbound(Temperature,3):ubound(Temperature,3)))
       allocate(Temperature2(lbound(Temperature,1):ubound(Temperature,1),lbound(Temperature,2):ubound(Temperature,2),&
            lbound(Temperature,3):ubound(Temperature,3)))
-      !$hmpp <tsteps> advancedload, args[DiffTemperature::TBtype,DiffTemperature::sideTemp,DiffTemperature::TempIn]
-      !$hmpp <tsteps> advancedload, args[DiffTemperature::epsCN,DiffTemperature::sideTemp,DiffTemperature::maxCNiter]
+!       !$hmpp <tsteps> advancedload, args[DiffTemperature::TBtype,DiffTemperature::sideTemp,DiffTemperature::TempIn]
+!       !$hmpp <tsteps> advancedload, args[DiffTemperature::epsCN,DiffTemperature::sideTemp,DiffTemperature::maxCNiter]
     endif
 
 
@@ -195,11 +195,18 @@ contains
       !$omp end workshare
       !$omp end parallel
 
+#ifdef __HMPP
+!       call KappaTemperature_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+!                             dxmin,dymin,dzmin,maxCNiter,epsCN,Re,limparam,&
+!                             TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,TDiff,&
+!                             temperature_adv,temperature,U,V,W,1._KND,dt,SubsidenceProfile,fluxProfile)
+#else
       if (RKstage==3.and.present(fluxprofile)) then
         call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,SubsidenceProfile,FluxProfile)
       else
         call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,SubsidenceProfile)
       end if
+#endif
 
       !$omp parallel
       !$omp workshare
@@ -212,21 +219,21 @@ contains
       call Bound_Temp(temperature)
 
 #ifdef __HMPP
-        !$hmpp <tsteps> advancedload, args[DiffTemperature::coef]
-        if (size(BsideTArr)>0) then
-          !$hmpp <tsteps> advancedload, args[DiffTemperature::BsideTArr]
-        endif
-        if (size(BsideTFLArr)>0) then
-          !$hmpp <tsteps> advancedload, args[DiffTemperature::BsideTFLArr]
-        endif
-        !$hmpp <tsteps> advancedload, args[DiffTemperature::TDiff,DiffTemperature::Temperature]
-        !$hmpp <tsteps> DiffTemperature callsite, args[*].noupdate=true
-        call DiffTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
-                            TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,TDiff,&
-                            temperature2,temperature,2._KND*alpha(RKstage),dt,iters,res)
-        !$hmpp <tsteps> delegatedstore, args[DiffTemperature::l,DiffTemperature::res]
-        !$hmpp <tsteps> delegatedstore, args[DiffTemperature::Temperature2]
-        write (*,*) "CNscalar ",iters,res
+!         !$hmpp <tsteps> advancedload, args[DiffTemperature::coef]
+!         if (size(BsideTArr)>0) then
+!           !$hmpp <tsteps> advancedload, args[DiffTemperature::BsideTArr]
+!         endif
+!         if (size(BsideTFLArr)>0) then
+!           !$hmpp <tsteps> advancedload, args[DiffTemperature::BsideTFLArr]
+!         endif
+!         !$hmpp <tsteps> advancedload, args[DiffTemperature::TDiff,DiffTemperature::Temperature]
+!         !$hmpp <tsteps> DiffTemperature callsite, args[*].noupdate=true
+!         call DiffTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
+!                             TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,TDiff,&
+!                             temperature2,temperature,2._KND*alpha(RKstage),dt,iters,res)
+!         !$hmpp <tsteps> delegatedstore, args[DiffTemperature::l,DiffTemperature::res]
+!         !$hmpp <tsteps> delegatedstore, args[DiffTemperature::Temperature2]
+!         write (*,*) "CNscalar ",iters,res
 #else
         call DiffScalar(temperature2,temperature,1,2._KND*alpha(RKstage))
 #endif
@@ -304,432 +311,6 @@ contains
         enddo
   end subroutine CDSSCALAR
 
-  subroutine UDSSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
-  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in) :: sctype
-  integer nx,ny,nz,i,j,k
-  real(KND) Ax,Ay,Az
-
-        nx = Prnx
-        ny = Prny
-        nz = Prnz
-
-        if (sctype==1) then
-         call BOUND_Temp(SCAL)
-        else
-         call BOUND_PASSSCALAR(SCAL)
-        endif
-
-        Ax = coef*dt/dxmin
-        Ay = coef*dt/dymin
-        Az = coef*dt/dzmin
-
-        do k = 1,nz
-            do j = 1,ny
-                do i = 1,nx
-                    if (U(i,j,k)>0) then
-                     SCAL2(i,j,k) = SCAL2(i,j,k)-Ax*SCAL(i,j,k)*(U(i,j,k))
-                    else
-                     SCAL2(i,j,k) = SCAL2(i,j,k)-Ax*SCAL(i+1,j,k)*(U(i,j,k))
-                    endif
-                    if (U(i-1,j,k)>0) then
-                     SCAL2(i,j,k) = SCAL2(i,j,k)+Ax*SCAL(i-1,j,k)*(U(i-1,j,k))
-                    else
-                     SCAL2(i,j,k) = SCAL2(i,j,k)+Ax*SCAL(i,j,k)*(U(i-1,j,k))
-                    endif
-
-                     if (V(i,j,k)>0) then
-                      SCAL2(i,j,k) = SCAL2(i,j,k)-Ay*SCAL(i,j,k)*(V(i,j,k))
-                     else
-                      SCAL2(i,j,k) = SCAL2(i,j,k)-Ay*SCAL(i,j+1,k)*(V(i,j,k))
-                     endif
-                     if (V(i,j-1,k)>0) then
-                     SCAL2(i,j,k) = SCAL2(i,j,k)+Ay*SCAL(i,j-1,k)*(V(i,j-1,k))
-                    else
-                     SCAL2(i,j,k) = SCAL2(i,j,k)+Ay*SCAL(i,j,k)*(V(i,j-1,k))
-                    endif
-
-
-                    if (W(i,j,k)>0) then
-                     SCAL2(i,j,k) = SCAL2(i,j,k)-Az*SCAL(i,j,k)*(W(i,j,k))
-                    else
-                     SCAL2(i,j,k) = SCAL2(i,j,k)-Az*SCAL(i,j,k+1)*(W(i,j,k))
-                    endif
-                    if (W(i,j,k-1)>0) then
-                     SCAL2(i,j,k) = SCAL2(i,j,k)+Az*SCAL(i,j,k-1)*(W(i,j,k-1))
-                    else
-                     SCAL2(i,j,k) = SCAL2(i,j,k)+Az*SCAL(i,j,k)*(W(i,j,k-1))
-                    endif
-
-                enddo
-            enddo
-        enddo
-  end subroutine UDSSCALAR
-
-
-
-  subroutine QUICKSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
-  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in) :: sctype
-  real(KND) :: Scal3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-  integer nx,ny,nz,i,j,k
-  real(KND) Ax,Ay,Az,F
-
-    if (sctype==1) then
-     call BOUND_Temp(SCAL)
-    else
-     call BOUND_PASSSCALAR(SCAL)
-    endif
-
-    Ax = coef*dt/dxmin
-    Ay = coef*dt/dymin
-    Az = coef*dt/dzmin
-    SCAL2 = SCAL
-    SCAL3 = SCAL
-    do k = 1,Prnz
-     do j = 1,Prny
-      do i = 0,Prnx
-        if (U(i,j,k)>0) then
-         F = Ax*U(i,j,k)*((6._KND/8._KND)*SCAL3(i,j,k)+(3._KND/8._KND)*SCAL3(i-1,j,k)-(1._KND/8._KND)*SCAL3(i-1,j,k))
-        else
-         F = Ax*U(i,j,k)*((6._KND/8._KND)*SCAL3(i+1,j,k)+(3._KND/8._KND)*SCAL3(i,j,k)-(1._KND/8._KND)*SCAL3(i+2,j,k))
-        endif
-        SCAL2(i,j,k) = SCAL2(i,j,k)-F
-        SCAL2(i+1,j,k) = SCAL2(i+1,j,k)+F
-      enddo
-     enddo
-    enddo
-
-    if (sctype==1) then
-     call BOUND_Temp(SCAL2)
-    else
-     call BOUND_PASSSCALAR(SCAL2)
-    endif
-    SCAL3 = SCAL2
-    do k = 1,Prnz
-     do j = 0,Prny
-      do i = 1,Prnx
-        if (V(i,j,k)>0) then
-         F = Ay*V(i,j,k)*((6._KND/8._KND)*SCAL3(i,j,k)+(3._KND/8._KND)*SCAL3(i,j-1,k)-(1._KND/8._KND)*SCAL3(i,j-1,k))
-        else
-         F = Ay*V(i,j,k)*((6._KND/8._KND)*SCAL3(i,j+1,k)+(3._KND/8._KND)*SCAL3(i,j,k)-(1._KND/8._KND)*SCAL3(i,j+1,k))
-        endif
-        SCAL2(i,j,k) = SCAL2(i,j,k)-F
-        SCAL2(i,j+1,k) = SCAL2(i,j+1,k)+F
-      enddo
-     enddo
-    enddo
-
-    if (sctype==1) then
-     call BOUND_Temp(SCAL2)
-    else
-     call BOUND_PASSSCALAR(SCAL2)
-    endif
-    SCAL3 = SCAL2
-    do k = 0,Prnz
-     do j = 1,Prny
-      do i = 1,Prnx
-        if (W(i,j,k)>0) then
-         F = Az*W(i,j,k)*((6._KND/8._KND)*SCAL3(i,j,k)+(3._KND/8._KND)*SCAL3(i,j,k-1)-(1._KND/8._KND)*SCAL3(i,j,k-1))
-        else
-         F = Az*W(i,j,k)*((6._KND/8._KND)*SCAL3(i,j,k+1)+(3._KND/8._KND)*SCAL3(i,j,k)-(1._KND/8._KND)*SCAL3(i,j,k+1))
-        endif
-        SCAL2(i,j,k) = SCAL2(i,j,k)-F
-        SCAL2(i,j,k+1) = SCAL2(i,j,k+1)+F
-      enddo
-     enddo
-    enddo
-    SCAL2 = SCAL2-SCAL
-  end subroutine QUICKSCALAR
-
-
-
-
-
-  subroutine PLMSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
-  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in) :: sctype
-  integer i,j,k
-  real(KND) SL,SR,FLUX,A
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
-  logical,save :: direction=.true.
-
-   if (sctype==1) then
-    call BOUND_Temp(SCAL)
-   else
-    call BOUND_PASSSCALAR(SCAL)
-   endif
-
-  A = coef*dt
-  SCAL2 = SCAL2+SCAL
-
-  if (direction) then
-   SLOPE = 0
-   do i = 0,Prnx+1
-    do j = 0,Prny+1
-     do k = 0,Prnz+1
-      SR = (SCAL2(i+1,j,k)-SCAL2(i,j,k))/dxU(i)
-      SL = (SCAL2(i,j,k)-SCAL2(i-1,j,k))/dxU(i-1)
-      SLOPE(i,j,k) = LIMITER(SL,SR)*dxPr(i)
-     enddo
-    enddo
-   enddo
-
-
-   do i = 0,Prnx
-    do j = 1,Prny
-     do k = 1,Prnz
-      if (U(i,j,k)>0) then
-       FLUX = U(i,j,k)*SCAL2(i,j,k)+U(i,j,k)*(1-U(i,j,k)*A/dxPr(i))*SLOPE(i,j,k)/2._KND
-      else
-       FLUX = U(i,j,k)*SCAL2(i+1,j,k)-U(i,j,k)*(1+U(i,j,k)*A/dxPr(i+1))*SLOPE(i+1,j,k)/2._KND
-      endif
-      SCAL2(i,j,k) = SCAL2(i,j,k)-A*FLUX/dxPr(i)
-      SCAL2(i+1,j,k) = SCAL2(i+1,j,k)+A*FLUX/dxPr(i+1)
-     enddo
-    enddo
-   enddo
-
-   SLOPE = 0
-   do i = 0,Prnx+1
-    do j = 0,Prny+1
-     do k = 0,Prnz+1
-      SR = (SCAL2(i,j+1,k)-SCAL2(i,j,k))/dyV(j)
-      SL = (SCAL2(i,j,k)-SCAL2(i,j-1,k))/dyV(j-1)
-      SLOPE(i,j,k) = LIMITER(SL,SR)*dyPr(j)
-     enddo
-    enddo
-   enddo
-
-
-   do i = 1,Prnx
-    do j = 0,Prny
-     do k = 1,Prnz
-      if (V(i,j,k)>0) then
-       FLUX = V(i,j,k)*SCAL2(i,j,k)+V(i,j,k)*(1-V(i,j,k)*A/dyPr(j))*SLOPE(i,j,k)/2._KND
-      else
-       FLUX = V(i,j,k)*SCAL2(i,j+1,k)-V(i,j,k)*(1+V(i,j,k)*A/dyPr(j+1))*SLOPE(i,j+1,k)/2._KND
-      endif
-      SCAL2(i,j,k) = SCAL2(i,j,k)-A*FLUX/dyPr(j)
-      SCAL2(i,j+1,k) = SCAL2(i,j+1,k)+A*FLUX/dyPr(j+1)
-     enddo
-    enddo
-   enddo
-
-   SLOPE = 0
-   do i = 0,Prnx+1
-    do j = 0,Prny+1
-     do k = 0,Prnz+1
-      SR = (SCAL2(i,j,k+1)-SCAL2(i,j,k))/dzW(k)
-      SL = (SCAL2(i,j,k)-SCAL2(i,j,k-1))/dzW(k-1)
-      SLOPE(i,j,k) = LIMITER(SL,SR)*dzPr(k)
-     enddo
-    enddo
-   enddo
-
-   do i = 1,Prnx
-    do j = 1,Prny
-     do k = 0,Prnz
-      if (W(i,j,k)>0) then
-       FLUX = W(i,j,k)*SCAL2(i,j,k)+W(i,j,k)*(1-W(i,j,k)*A/dzPr(k))*SLOPE(i,j,k)/2._KND
-      else
-       FLUX = W(i,j,k)*SCAL2(i,j,k+1)-W(i,j,k)*(1+W(i,j,k)*A/dzPr(k+1))*SLOPE(i,j,k+1)/2._KND
-      endif
-      SCAL2(i,j,k) = SCAL2(i,j,k)-A*FLUX/dzPr(k)
-      SCAL2(i,j,k+1) = SCAL2(i,j,k+1)+A*FLUX/dzPr(k+1)
-     enddo
-    enddo
-   enddo
-  else
-   SLOPE = 0
-   do i = 0,Prnx+1
-    do j = 0,Prny+1
-     do k = 0,Prnz+1
-      SR = (SCAL2(i,j,k+1)-SCAL2(i,j,k))/dzW(k)
-      SL = (SCAL2(i,j,k)-SCAL2(i,j,k-1))/dzW(k-1)
-      SLOPE(i,j,k) = LIMITER(SL,SR)*dzPr(k)
-     enddo
-    enddo
-   enddo
-
-   do i = 1,Prnx
-    do j = 1,Prny
-     do k = 0,Prnz
-      if (W(i,j,k)>0) then
-       FLUX = W(i,j,k)*SCAL2(i,j,k)+W(i,j,k)*(1-W(i,j,k)*A/dzPr(k))*SLOPE(i,j,k)/2._KND
-      else
-       FLUX = W(i,j,k)*SCAL2(i,j,k+1)-W(i,j,k)*(1+W(i,j,k)*A/dzPr(k+1))*SLOPE(i,j,k+1)/2._KND
-      endif
-      SCAL2(i,j,k) = SCAL2(i,j,k)-A*FLUX/dzPr(k)
-      SCAL2(i,j,k+1) = SCAL2(i,j,k+1)+A*FLUX/dzPr(k+1)
-     enddo
-    enddo
-   enddo
-
-   SLOPE = 0
-   do i = 0,Prnx+1
-    do j = 0,Prny+1
-     do k = 0,Prnz+1
-      SR = (SCAL2(i,j+1,k)-SCAL2(i,j,k))/dyV(j)
-      SL = (SCAL2(i,j,k)-SCAL2(i,j-1,k))/dyV(j-1)
-      SLOPE(i,j,k) = LIMITER(SL,SR)*dyPr(j)
-     enddo
-    enddo
-   enddo
-
-
-   do i = 1,Prnx
-    do j = 0,Prny
-     do k = 1,Prnz
-      if (V(i,j,k)>0) then
-       FLUX = V(i,j,k)*SCAL2(i,j,k)+V(i,j,k)*(1-V(i,j,k)*A/dyPr(j))*SLOPE(i,j,k)/2._KND
-      else
-       FLUX = V(i,j,k)*SCAL2(i,j+1,k)-V(i,j,k)*(1+V(i,j,k)*A/dyPr(j+1))*SLOPE(i,j+1,k)/2._KND
-      endif
-      SCAL2(i,j,k) = SCAL2(i,j,k)-A*FLUX/dyPr(j)
-      SCAL2(i,j+1,k) = SCAL2(i,j+1,k)+A*FLUX/dyPr(j+1)
-     enddo
-    enddo
-   enddo
-
-   SLOPE = 0
-   do i = 0,Prnx+1
-    do j = 0,Prny+1
-     do k = 0,Prnz+1
-      SR = (SCAL2(i+1,j,k)-SCAL2(i,j,k))/dxU(i)
-      SL = (SCAL2(i,j,k)-SCAL2(i-1,j,k))/dxU(i-1)
-      SLOPE(i,j,k) = LIMITER(SL,SR)*dxPr(i)
-     enddo
-    enddo
-   enddo
-
-
-   do i = 0,Prnx
-    do j = 1,Prny
-     do k = 1,Prnz
-      if (U(i,j,k)>0) then
-       FLUX = U(i,j,k)*SCAL2(i,j,k)+U(i,j,k)*(1-U(i,j,k)*A/dxPr(i))*SLOPE(i,j,k)/2._KND
-      else
-       FLUX = U(i,j,k)*SCAL2(i+1,j,k)-U(i,j,k)*(1+U(i,j,k)*A/dxPr(i+1))*SLOPE(i+1,j,k)/2._KND
-      endif
-      SCAL2(i,j,k) = SCAL2(i,j,k)-A*FLUX/dxPr(i)
-      SCAL2(i+1,j,k) = SCAL2(i+1,j,k)+A*FLUX/dxPr(i+1)
-     enddo
-    enddo
-   enddo
-  endif
-
-  SCAL2 = SCAL2-SCAL
-  endsubroutine PLMSCALAR
-
-
-
-  subroutine PLMSCALARNOSPLIT(SCAL2,SCAL,U,V,W,sctype,coef)
-  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in) :: sctype
-  integer i,j,k
-  real(KND) SL,SR,FLUX,A
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
-
-   if (sctype==1) then
-    call BOUND_Temp(SCAL)
-   else
-    call BOUND_PASSSCALAR(SCAL)
-   endif
-
-  A = coef*dt
-
-  SLOPE = 0
-  do i = 0,Prnx+1
-   do j = 0,Prny+1
-    do k = 0,Prnz+1
-     SR = (SCAL(i+1,j,k)-SCAL(i,j,k))/dxU(i)
-     SL = (SCAL(i,j,k)-SCAL(i-1,j,k))/dxU(i-1)
-     SLOPE(i,j,k) = LIMITER(SL,SR)*dxPr(i)
-    enddo
-   enddo
-  enddo
-
-
-  do i = 0,Prnx
-   do j = 1,Prny
-    do k = 1,Prnz
-     if (U(i,j,k)>0) then
-      FLUX = U(i,j,k)*SCAL(i,j,k)+U(i,j,k)*(1-U(i,j,k)*A/dxPr(i))*SLOPE(i,j,k)/2._KND
-     else
-      FLUX = U(i,j,k)*SCAL(i+1,j,k)-U(i,j,k)*(1+U(i,j,k)*A/dxPr(i+1))*SLOPE(i+1,j,k)/2._KND
-     endif
-     SCAL2(i,j,k) = SCAL2(i,j,k)-A*FLUX/dxPr(i)
-     SCAL2(i+1,j,k) = SCAL2(i+1,j,k)+A*FLUX/dxPr(i+1)
-    enddo
-   enddo
-  enddo
-
-  SLOPE = 0
-  do i = 0,Prnx+1
-   do j = 0,Prny+1
-    do k = 0,Prnz+1
-     SR = (SCAL(i,j+1,k)-SCAL(i,j,k))/dyV(j)
-     SL = (SCAL(i,j,k)-SCAL(i,j-1,k))/dyV(j-1)
-     SLOPE(i,j,k) = LIMITER(SL,SR)*dyPr(j)
-    enddo
-   enddo
-  enddo
-
-
-  do i = 1,Prnx
-   do j = 0,Prny
-    do k = 1,Prnz
-     if (V(i,j,k)>0) then
-      FLUX = V(i,j,k)*SCAL(i,j,k)+V(i,j,k)*(1-V(i,j,k)*A/dyPr(j))*SLOPE(i,j,k)/2._KND
-     else
-      FLUX = V(i,j,k)*SCAL(i,j+1,k)-V(i,j,k)*(1+V(i,j,k)*A/dyPr(j+1))*SLOPE(i,j+1,k)/2._KND
-     endif
-     SCAL2(i,j,k) = SCAL2(i,j,k)-A*FLUX/dyPr(j)
-     SCAL2(i,j+1,k) = SCAL2(i,j+1,k)+A*FLUX/dyPr(j+1)
-    enddo
-   enddo
-  enddo
-
-  SLOPE = 0
-  do i = 0,Prnx+1
-   do j = 0,Prny+1
-    do k = 0,Prnz+1
-     SR = (SCAL(i,j,k+1)-SCAL(i,j,k))/dzW(k)
-     SL = (SCAL(i,j,k)-SCAL(i,j,k-1))/dzW(k-1)
-     SLOPE(i,j,k) = LIMITER(SL,SR)*dzPr(k)
-    enddo
-   enddo
-  enddo
-
-  do i = 1,Prnx
-   do j = 1,Prny
-    do k = 0,Prnz
-     if (W(i,j,k)>0) then
-      FLUX = W(i,j,k)*SCAL(i,j,k)+W(i,j,k)*(1-W(i,j,k)*A/dzPr(k))*SLOPE(i,j,k)/2._KND
-     else
-      FLUX = W(i,j,k)*SCAL(i,j,k+1)-W(i,j,k)*(1+W(i,j,k)*A/dzPr(k+1))*SLOPE(i,j,k+1)/2._KND
-     endif
-     SCAL2(i,j,k) = SCAL2(i,j,k)-A*FLUX/dzPr(k)
-     SCAL2(i,j,k+1) = SCAL2(i,j,k+1)+A*FLUX/dzPr(k+1)
-    enddo
-   enddo
-  enddo
-  endsubroutine PLMSCALARNOSPLIT
-
-
-
-!   subroutine KAPPASCALAR(SCAL2,SCAL,U,V,W,sctype,coef,fluxProfile,SubsidenceProfile) !Kappa scheme with flux limiter
-!   real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
-!   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-!   integer,intent(in) :: sctype
-!
-!
-!   endsubroutine KAPPASCALAR
 
 
   subroutine KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef,SubsidenceProfile,fluxProfile) !Kappa scheme with flux limiter
@@ -759,7 +340,7 @@ contains
   Az = coef*dt/dzmin
 
 
-  !$omp parallel private(i,j,k,vel,SL,SR,FLUX)
+  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX)
 
   !$omp workshare
   SLOPE = 0
@@ -860,9 +441,8 @@ contains
   !$omp workshare
   fluxprofile = 0
   !$omp end workshare
-  !$omp end parallel
 
-  do l=0,1  !odd-even separation to avoid race condition
+  do l=0,1  !odd-even separation to avoid a race condition
     !$omp do reduction(+:fluxprofile)
     do k = 0+l,Prnz,2
      do j = 1,Prny
@@ -884,11 +464,13 @@ contains
      enddo
     enddo
     !$omp end do
-  end do
+  enddo
 
-  !$omp parallel workshare
+  !$omp workshare
   fluxprofile = fluxprofile / (Prnx*Prny)
-  !$omp end parallel workshare
+  !$omp end workshare
+
+  !$omp end parallel
 
   endsubroutine KAPPASCALARUG
 
@@ -1020,27 +602,29 @@ contains
   fluxprofile = 0
   !$omp end workshare
 
-  !$omp do reduction(+:fluxprofile)
-  do j = 1,Prny  !loop order due to avoid race condition
-   do k = 0,Prnz
-    do i = 1,Prnx
+  do l=0,1  !odd-even separation to avoid a race condition
+    !$omp do reduction(+:fluxprofile)
+    do j = 1,Prny  !loop order due to avoid race condition
+     do k = 0,Prnz
+      do i = 1,Prnx
 
-     vel = W(i,j,k) - SubsidenceProfile(k)
+       vel = W(i,j,k) - SubsidenceProfile(k)
 
-     if (vel>0) then
-      FLUX = vel*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._KND)
-     else
-      FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
-     endif
+       if (vel>0) then
+        FLUX = vel*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._KND)
+       else
+        FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
+       endif
 
-     if (vel>=1e-6) fluxprofile(k) = fluxprofile(k+1) + FLUX/vel*W(i,j,k)
+       if (vel>=1e-6) fluxprofile(k) = fluxprofile(k+1) + FLUX/vel*W(i,j,k)
 
-     SCAL2(i,j,k) = SCAL2(i,j,k) - A*FLUX/dzPr(k)
-     SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + A*FLUX/dzPr(k+1)
+       SCAL2(i,j,k) = SCAL2(i,j,k) - A*FLUX/dzPr(k)
+       SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + A*FLUX/dzPr(k+1)
+      enddo
+     enddo
     enddo
-   enddo
+    !$omp end do
   enddo
-  !$omp end do
 
   !$omp workshare
   fluxProfile = fluxProfile/(Prnx * Prny)
@@ -2345,37 +1929,6 @@ contains
   end subroutine VolScalSource
 
 
-
-!  !$hmpp <tsteps> ScalarConvection codelet
- subroutine ScalarConvection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
-                       dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
-                       U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev,dt)
-  implicit none
-! #ifdef __HMPP
-!   integer,parameter :: KND = 4
-  intrinsic abs
-! #endif
-
-  integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,lev
-  real(KND),intent(in) :: dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref
-  real(KND),intent(in) :: dt
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out)   :: U2
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: Ustar
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)    :: V
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(out)   :: V2
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: Vstar
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)    :: W
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(out)   :: W2
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: Wstar
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: temperature
-  real(KND),dimension(1:3),intent(in) :: beta,rho
-  integer i,j,k
-
-
-
-
-  end subroutine ScalarConvection
 
 
   subroutine Release(Scalar,released)
