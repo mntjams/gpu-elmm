@@ -854,12 +854,10 @@ contains
   subroutine TScalFlIBPoint_Create(IBP,xi,yj,zk)
     type(TScalFlIBPoint),intent(out) :: IBP
     integer,intent(in) :: xi,yj,zk               !grid coordinates of the forcing point
-
     type(TSolidBody),pointer :: SB
-    integer dirx,diry,dirz,dirx2,diry2,dirz2,n1,n2,i
+    integer dirx,diry,dirz,dirx2,diry2,dirz2,nfreedirs,ndirs,i
     real(KND) x,y,z,xnear,ynear,znear,distx,disty,distz,t,tx,ty,tz
     logical freep00,free0p0,free00p,freem00,free0m0,free00m
-
 
     x = xPr(xi)                                   !physical coordinates of the forcing point
     y = yPr(yj)
@@ -902,21 +900,21 @@ contains
     free00p = (Prtype(xi,yj,zk+1)==0)
     free00m = (Prtype(xi,yj,zk-1)==0)
 
-    n1 = 0
-    n2 = 0
+    nfreedirs = 0
+    ndirs = 0
 
-    if (freep00) n1 = n1+1
-    if (free0p0) n1 = n1+1
-    if (free00p) n1 = n1+1
-    if (freem00) n1 = n1+1
-    if (free0m0) n1 = n1+1
-    if (free00m) n1 = n1+1
+    if (freep00) nfreedirs = nfreedirs+1
+    if (free0p0) nfreedirs = nfreedirs+1
+    if (free00p) nfreedirs = nfreedirs+1
+    if (freem00) nfreedirs = nfreedirs+1
+    if (free0m0) nfreedirs = nfreedirs+1
+    if (free00m) nfreedirs = nfreedirs+1
 
-    if (dirx/=0) n2 = n2+1
-    if (diry/=0) n2 = n2+1
-    if (dirz/=0) n2 = n2+1
+    if (dirx/=0) ndirs = ndirs+1
+    if (diry/=0) ndirs = ndirs+1
+    if (dirz/=0) ndirs = ndirs+1
 
-    if (n1>n2.or.(freep00.and.freem00).or.(free0p0.and.free0m0).or.(free00p.and.free00m)) then
+    if (nfreedirs>ndirs.or.(freep00.and.freem00).or.(free0p0.and.free0m0).or.(free00p.and.free00m)) then
       IBP%interp = 0    !If more free spaces than directions, or free space in both oposite directions,
       distx = 0         !Assume is an unresolvably small feature and treat as on the boundary.
       disty = 0
@@ -944,43 +942,43 @@ contains
 
       if (dirx2==0.and.diry2==0.and.dirz2==0) then  !probably a very thin body, just average free points around
 
-        IBP%interp = n1
+        IBP%interp = nfreedirs
 
-        allocate(IBP%IntPoints(n1))
+        allocate(IBP%IntPoints(nfreedirs))
 
         i = 1
         IBP%dist = 0
         if (freep00) then
-          IBP%IntPoints(i) = TInterpolationPoint(xi + 1, yj, zk, 1._KND / n1)
+          IBP%IntPoints(i) = TInterpolationPoint(xi + 1, yj, zk, 1._KND / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + xPr(xi+1)-xPr(xi)
         endif
         if (freem00) then
-          IBP%IntPoints(i) = TInterpolationPoint(xi - 1, yj, zk, 1._KND / n1)
+          IBP%IntPoints(i) = TInterpolationPoint(xi - 1, yj, zk, 1._KND / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + xPr(xi)-xPr(xi-1)
         endif
         if (free0p0) then
-          IBP%IntPoints(i) = TInterpolationPoint(xi, yj + 1, zk, 1._KND / n1)
+          IBP%IntPoints(i) = TInterpolationPoint(xi, yj + 1, zk, 1._KND / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + yPr(yj+1)-yPr(yj)
         endif
         if (free0m0) then
-          IBP%IntPoints(i) = TInterpolationPoint(xi, yj - 1, zk, 1._KND / n1)
+          IBP%IntPoints(i) = TInterpolationPoint(xi, yj - 1, zk, 1._KND / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + yPr(yj)-yPr(yj-1)
         endif
         if (free00p) then
-          IBP%IntPoints(i) = TInterpolationPoint(xi, yj, zk + 1, 1._KND / n1)
+          IBP%IntPoints(i) = TInterpolationPoint(xi, yj, zk + 1, 1._KND / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + zPr(zk+1)-zPr(zk)
         endif
         if (free00m) then
-          IBP%IntPoints(i) = TInterpolationPoint(xi, yj, zk - 1, 1._KND / n1)
+          IBP%IntPoints(i) = TInterpolationPoint(xi, yj, zk - 1, 1._KND / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + zPr(zk)-zPr(zk-1)
         endif
-        IBP%dist = IBP%dist / n1
+        IBP%dist = IBP%dist / nfreedirs
 
       else  !some edge
 
@@ -995,9 +993,13 @@ contains
 
       endif
 
-    elseif (n2==1) then     !Only one free point outside, interpolate from there.
+    elseif (nfreedirs==1.or.ndirs==1) then     !Only one free point outside, interpolate from there.
 
       allocate(IBP%IntPoints(1))
+
+      if (.not.(freep00.or.freem00)) dirx = 0
+      if (.not.(free0p0.or.free0m0)) diry = 0
+      if (.not.(free00p.or.free00m)) dirz = 0
 
       IBP%IntPoints(1)%xi = IBP%xi+dirx
       IBP%IntPoints(1)%yj = IBP%yj+diry
@@ -1006,9 +1008,13 @@ contains
       IBP%interp = 1
       IBP%dist = sqrt((x-xPr(IBP%xi+dirx))**2+(y-yPr(IBP%yj+diry))**2+(z-zPr(IBP%zk+dirz))**2)
 
-    elseif (n2==2) then    !Two free directions, use bilinear interpolation in the plane contaning these two neigbours.
+    elseif (nfreedirs==2.or.ndirs==2) then    !Two free directions, use bilinear interpolation in the plane contaning these two neigbours.
 
       allocate(IBP%IntPoints(2))
+
+      if (.not.(freep00.or.freem00)) dirx = 0
+      if (.not.(free0p0.or.free0m0)) diry = 0
+      if (.not.(free00p.or.free00m)) dirz = 0
 
       if (dirx==0) then     !plane yz
 
@@ -2337,7 +2343,7 @@ contains
       do k = 0,Unz+1
        do j = 0,Uny+1
          do i = 0,Unx+1
-            if (Inside(CurrentSB,xU(i),yPr(j),zPr(k),max(dxU(i),dyPr(j),dzPr(k))/5._KND))&
+            if (Inside(CurrentSB,xU(i),yPr(j),zPr(k),max(dxU(i),dyPr(j),dzPr(k))/3._KND))&
                      Utype(i,j,k) = CurrentSB%numofbody
          enddo
         enddo
@@ -2356,7 +2362,7 @@ contains
       do k = 0,Vnz+1
        do j = 0,Vny+1
         do i = 0,Vnx+1
-           if (Inside(CurrentSB,xPr(i),yV(j),zPr(k),max(dxPr(i),dyV(j),dzPr(k))/5._KND))&
+           if (Inside(CurrentSB,xPr(i),yV(j),zPr(k),max(dxPr(i),dyV(j),dzPr(k))/3._KND))&
                      Vtype(i,j,k) = CurrentSB%numofbody
         enddo
        enddo
@@ -2375,7 +2381,7 @@ contains
       do k = 0,Wnz+1
        do j = 0,Wny+1
         do i = 0,Wnx+1
-           if (Inside(CurrentSB,xPr(i),yPr(j),zW(k),max(dxPr(i),dyPr(j),dzW(k))/5._KND))&
+           if (Inside(CurrentSB,xPr(i),yPr(j),zW(k),max(dxPr(i),dyPr(j),dzW(k))/3._KND))&
                      Wtype(i,j,k) = CurrentSB%numofbody
         enddo
        enddo
@@ -2411,7 +2417,7 @@ contains
   subroutine InitImBoundaries
     type(TVelIBPoint) IBP
     type(TScalFlIBPoint) SIBP
-    integer i,j,k
+    integer i,j,k,l
 
 
     do k = 1,Unz
