@@ -447,11 +447,6 @@ contains
                            lmgncgc=mgncgc,lmgnpre=mgnpre,lmgnpost=mgnpost,&
                            lmgmaxinnerGSiter=mgmaxinnerGSiter,lmgepsinnerGS=mgepsinnerGS)
        endif
-     elseif (poissmet==5) then
-       MUDbnx=bnx
-       MUDbny=bny
-       MUDbnz=bnz
-       MUDlmg=MUDlmg
      endif
    endif
 
@@ -1313,7 +1308,7 @@ contains
          !$omp end parallel
 
          call Bound_Visc(TDiff)
-         call Bound_Temp(temperature)
+         call BoundTemperature(temperature)
        endif
 
        do i=1,computescalars

@@ -19,10 +19,6 @@ program CLMM
 
   pi=2.0_KND*acos(0.0_KND)
 
-!   !$hmpp enableGPU callsite
-  call enableGPU(GPU)
-
-
 
   write (*,*) "Reading parameters..."
   call ReadParams
@@ -92,6 +88,17 @@ program CLMM
 
   endif
 
+#ifdef __HMPP
+  call GetDataFromGPU(.true.,.true.,.true.,.true.,buoyancy==1,&
+                      U,     V,     W,     Pr,    Temperature)
+#endif
+
+write(*,*) maxval(U(1:Unx,1:Uny,1:Unz)),maxval(V(1:Vnx,1:Vny,1:Vnz)),maxval(W(1:Wnx,1:Wny,1:Wnz)),&
+maxval(temperature(1:Prnx,1:Prny,1:Prnz))
+write(*,*) sum(U(1:Unx,1:Uny,1:Unz)),sum(V(1:Vnx,1:Vny,1:Vnz)),sum(W(1:Wnx,1:Wny,1:Wnz)),&
+sum(temperature(1:Prnx,1:Prny,1:Prnz))
+write(*,*) U(Unx/2,Uny/2,1),V(Vnx/2,Vny/2,1),W(Wnx/2,Wny/2,1),&
+temperature(Prnx/2,Prny/2,1)
 
 
 
@@ -145,14 +152,3 @@ program CLMM
 
 end program CLMM
 
-!   !$hmpp enableGPU codelet, target=CUDA
-  subroutine enableGPU(GPU)
-  implicit none
-  integer,intent(out):: GPU
-#ifdef __HMPP
-   GPU = 1
-#else
-   GPU = 0
-#endif
-!    !$hmppcg set GPU = 1
-  end subroutine enableGPU

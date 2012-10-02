@@ -26,7 +26,7 @@
    dx2=dx**2
    dy2=dy**2
    dz2=dz**2
-   !$hmppcg grid blocksize 512x1
+   !$hmppcg grid blocksize myblocksize2
    !$hmppcg gridify (k,i)  private(aa,bb,a,b,i,j,k,ii,jj)
    do k=0,Prnz+1
     do i=0,Prnx+1
@@ -43,6 +43,7 @@
       a(1,3)=(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4._KND*dx)
       a(2,3)=(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4._KND*dy)
 
+      !$hmppcg unroll jj:3, ii:3, noremainder
       do jj=1,3
        do ii=1,3
         b(ii,jj)=dx2*a(1,ii)*a(1,jj)+&
@@ -61,6 +62,7 @@
 
       Visc(i,j,k)=0._KND
 
+      !$hmppcg unroll jj:3, ii:3, noremainder
       do jj=1,3
        do ii=1,3
         aa=aa+(a(ii,jj)**2)

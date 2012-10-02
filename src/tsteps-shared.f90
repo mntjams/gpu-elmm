@@ -13,7 +13,7 @@
   integer,intent(in)      :: Btype(6)
 #ifdef __HMPP
   real(KND),intent(in)    :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
-  real(KND),intent(inout) :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
+  real(KND),intent(in)    :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
   real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
   real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
   real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
@@ -25,19 +25,13 @@
   real(KND) :: A
   integer i,j,k
 
-#ifdef __HMPP
-   call BoundPr_GPU(Unx,Vny,Wnz,Prnx,Prny,Prnz,Btype,Pr)
-#else
-   call Bound_Pr(Pr)
-#endif
-
    A=-coef*dt
    A=-coef*dt
    A=-coef*dt
 
    !$omp parallel
    !$omp do
-   !$hmppcg grid blocksize 512x1
+   !$hmppcg grid blocksize myblocksize
    !$hmppcg permute (k,i,j)
    !$hmppcg gridify(k,i)
    do k=1,Unz
@@ -49,7 +43,7 @@
    enddo
    !$omp enddo nowait
    !$omp do
-   !$hmppcg grid blocksize 512x1
+   !$hmppcg grid blocksize myblocksize
    !$hmppcg permute (k,i,j)
    !$hmppcg gridify(k,i)
    do k=1,Vnz
@@ -61,7 +55,7 @@
    enddo
    !$omp enddo nowait
    !$omp do
-   !$hmppcg grid blocksize 512x1
+   !$hmppcg grid blocksize myblocksize
    !$hmppcg permute (k,i,j)
    !$hmppcg gridify(k,i)
    do k=1,Wnz
@@ -117,7 +111,7 @@
       if (lev>1) then
         !$omp parallel private(i,j,k)
         !$omp do
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg permute (k,i,j)
         !$hmppcg gridify(k,i)
         do k=1,Unz
@@ -129,7 +123,7 @@
         enddo
         !$omp end do nowait
         !$omp do
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg permute (k,i,j)
         !$hmppcg gridify(k,i)
         do k=1,Vnz
@@ -141,7 +135,7 @@
         enddo
         !$omp end do nowait
         !$omp do
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg permute (k,i,j)
         !$hmppcg gridify(k,i)
         do k=1,Wnz
@@ -156,7 +150,7 @@
       else
         !$omp parallel private(i,j,k)
         !$omp do
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg permute (k,i,j)
         !$hmppcg gridify(k,i)
         do k=1,Unz
@@ -168,7 +162,7 @@
         enddo
         !$omp end do nowait
         !$omp do
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg permute (k,i,j)
         !$hmppcg gridify(k,i)
         do k=1,Vnz
@@ -180,7 +174,7 @@
         enddo
         !$omp end do nowait
         !$omp do
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg permute (k,i,j)
         !$hmppcg gridify(k,i)
         do k=1,Wnz
@@ -193,7 +187,7 @@
         !$omp end do nowait
 
         !$omp do
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg permute (k,i,j)
         !$hmppcg gridify(k,i)
         do k=1,Unz
@@ -205,7 +199,7 @@
         enddo
         !$omp end do nowait
         !$omp do
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg permute (k,i,j)
         !$hmppcg gridify(k,i)
         do k=1,Vnz
@@ -217,7 +211,7 @@
         enddo
         !$omp end do nowait
         !$omp do
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg permute (k,i,j)
         !$hmppcg gridify(k,i)
         do k=1,Wnz
@@ -245,7 +239,7 @@
 
         !$omp parallel private(i,j,k)
         !$omp do
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg permute (k,i,j)
         !$hmppcg gridify(k,i)
         do k=1,Unz
@@ -257,7 +251,7 @@
         enddo
         !$omp end do nowait
         !$omp do
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg permute (k,i,j)
         !$hmppcg gridify(k,i)
         do k=1,Vnz
@@ -269,7 +263,7 @@
         enddo
         !$omp end do nowait
         !$omp do
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg permute (k,i,j)
         !$hmppcg gridify(k,i)
         do k=1,Wnz
@@ -295,7 +289,7 @@
 
       !$omp parallel private(i,j,k)
       !$omp do
-      !$hmppcg grid blocksize 512x1
+      !$hmppcg grid blocksize myblocksize
       !$hmppcg permute (k,i,j)
       !$hmppcg gridify(k,i)
       do k=1,Unz
@@ -307,7 +301,7 @@
       enddo
       !$omp end do nowait
       !$omp do
-      !$hmppcg grid blocksize 512x1
+      !$hmppcg grid blocksize myblocksize
       !$hmppcg permute (k,i,j)
       !$hmppcg gridify(k,i)
       do k=1,Vnz
@@ -319,7 +313,7 @@
       enddo
       !$omp end do nowait
       !$omp do
-      !$hmppcg grid blocksize 512x1
+      !$hmppcg grid blocksize myblocksize
       !$hmppcg permute (k,i,j)
       !$hmppcg gridify(k,i)
       do k=1,Wnz
@@ -372,7 +366,7 @@
 
     m = 0
    !$omp parallel do private(i,j,k,p) reduction(max:m)
-   !$hmppcg grid blocksize 512x1
+   !$hmppcg grid blocksize myblocksize2
    !$hmppcg permute (k,i,j)
    !$hmppcg gridify (k,i), private(p), reduce (max:m)
    do k=1,Prnz
@@ -422,7 +416,7 @@
 
     A = grav_acc*dt/temperature_ref
     !$omp parallel do private(i,j,k)
-    !$hmppcg grid blocksize 512x1
+    !$hmppcg grid blocksize myblocksize
     !$hmppcg permute (k,i,j)
     !$hmppcg gridify(k,i)
     do k=1,Wnz
@@ -464,7 +458,7 @@
    if (coriolisparam>0) then
    !$omp parallel private(i,j,k)
    !$omp do
-   !$hmppcg grid blocksize 512x1
+   !$hmppcg grid blocksize myblocksize
    !$hmppcg permute (k,i,j)
    !$hmppcg gridify(k,i)
     do k=1,Unz
@@ -477,7 +471,7 @@
     !$omp end do nowait
 
     !$omp do
-    !$hmppcg grid blocksize 512x1
+    !$hmppcg grid blocksize myblocksize
     !$hmppcg permute (k,i,j)
     !$hmppcg gridify(k,i)
     do k=1,Vnz
@@ -493,6 +487,13 @@
   endsubroutine CoriolisForce
 
 
+
+
+
+
+
+
+#ifdef __HMPP
   !$hmpp <tsteps> ForwEul codelet
   subroutine ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                     dxPr,dyPr,dzPr,dxU,dyV,dzW,&
@@ -504,15 +505,135 @@
 #include "hmpp-include.f90"
 
   integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
-
-#ifdef __HMPP
   real(KND),intent(in):: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
   real(KND),intent(in):: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3),V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
   real(KND),intent(out):: U3(-2:Unx+3,-2:Uny+3,-2:Unz+3),V3(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W3(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
   real(KND),intent(in):: Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
   real(KND),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
   real(KND),intent(in) :: dxPr(-2:Prnx+3),dyPr(-2:Prny+3),dzPr(-2:Prnz+3),dt,coef
+  real(KND) :: Ap,Ax,Ay,Az,dxmin,dymin,dzmin
+  integer i,j,k
+
+
+     dxmin = dxPr(1)
+     dymin = dyPr(1)
+     dzmin = dzPr(1)
+
+     Ap = coef*dt
+
+     Ax = 1._KND/(dxmin**2)
+     Ay = 1._KND/(dymin**2)
+     Az = 1._KND/(dzmin**2)
+
+
+     !$hmppcg grid blocksize myblocksize
+     !$hmppcg permute (k,i,j)
+     !$hmppcg gridify(k,i)
+     do k=1,Unz
+      do j=1,Uny
+       do i=1,Unx
+         U3(i,j,k) =&
+             (Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
+             Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*Ax
+         U3(i,j,k) = U3(i,j,k) +&
+             Ay*0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
+             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))
+         U3(i,j,k) = U3(i,j,k) +&
+             Az*0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
+             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))
+         U3(i,j,k) = U3(i,j,k) * Ap
+       enddo
+      enddo
+     enddo
+     !$hmppcg grid blocksize myblocksize
+     !$hmppcg permute (k,i,j)
+     !$hmppcg gridify(k,i)
+     do k=1,Unz    !Forward Euler for the first approximation
+      do j=1,Uny
+       do i=1,Unx
+         U3(i,j,k) = U3(i,j,k) + U(i,j,k) + U2(i,j,k)
+       enddo
+      enddo
+     enddo
+
+     !$hmppcg grid blocksize myblocksize
+     !$hmppcg permute (k,i,j)
+     !$hmppcg gridify(k,i)
+     do k=1,Vnz
+      do j=1,Vny
+       do i=1,Vnx
+         V3(i,j,k) =&
+             (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
+             Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*Ay
+         V3(i,j,k) = V3(i,j,k) +&
+             Ax*0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
+             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))
+         V3(i,j,k) = V3(i,j,k) +&
+             Az*0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
+             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))
+         V3(i,j,k) = V3(i,j,k) * Ap
+       enddo
+      enddo
+     enddo
+     !$hmppcg grid blocksize myblocksize
+     !$hmppcg permute (k,i,j)
+     !$hmppcg gridify(k,i)
+     do k=1,Vnz
+      do j=1,Vny
+       do i=1,Vnx
+         V3(i,j,k) = V3(i,j,k) + V(i,j,k) + V2(i,j,k)
+       enddo
+      enddo
+     enddo
+
+     !$hmppcg grid blocksize myblocksize
+     !$hmppcg permute (k,i,j)
+     !$hmppcg gridify(k,i)
+     do k=1,Wnz
+      do j=1,Wny
+       do i=1,Wnx
+         W3(i,j,k) =&
+             Ax*0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
+             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))
+         W3(i,j,k) = W3(i,j,k) +&
+             Ay*0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
+             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))
+         W3(i,j,k) = W3(i,j,k) +&
+             (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
+             Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*Az
+         W3(i,j,k) = W3(i,j,k) * Ap
+       enddo
+      enddo
+     enddo
+     !$hmppcg grid blocksize myblocksize
+     !$hmppcg permute (k,i,j)
+     !$hmppcg gridify(k,i)
+     do k=1,Wnz
+      do j=1,Wny
+       do i=1,Wnx
+         W3(i,j,k) = W3(i,j,k) + W(i,j,k) + W2(i,j,k)
+       enddo
+      enddo
+     enddo
+
+  end subroutine ForwEul
+
+
+
 #else
+
+
+
+  subroutine ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                    dxPr,dyPr,dzPr,dxU,dyV,dzW,&
+                    U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
+                    dt,coef)
+
+  implicit none
+
+  integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
+
+
   real(KND),intent(in),dimension(-2:,-2:,-2:) :: U,V,W
   real(KND),intent(in),dimension(-2:,-2:,-2:) :: U2,V2,W2
   real(KND),intent(out),dimension(-2:,-2:,-2:):: U3,V3,W3
@@ -520,80 +641,164 @@
   real(KND),intent(in),dimension(-2:) :: dxU,dyV,dzW
   real(KND),intent(in),dimension(-2:) :: dxPr,dyPr,dzPr
   real(KND),intent(in) :: dt,coef
-#endif
-  real(KND) :: Ap
+
+  real(KND) :: Ap,Ax,Ay,Az
   integer i,j,k
+
 
      Ap = coef*dt
 
-     !$omp parallel private(i,j,k)
+     Ax = 1._KND/(dxmin**2)
+     Ay = 1._KND/(dymin**2)
+     Az = 1._KND/(dzmin**2)
 
-     !$omp do
-#ifdef __HMPP
-     !$hmppcg grid blocksize 512x1
-     !$hmppcg permute (k,i,j)
-     !$hmppcg gridify(k,i)
-#endif
-     do k=1,Unz    !Forward Euler for the first approximation
-      do j=1,Uny
-       do i=1,Unx
-        U3(i,j,k) = U(i,j,k)+U2(i,j,k)+Ap*(&
-        ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
-        Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
-         0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
-         (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-         ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
-         (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))))
-       enddo
-      enddo
-     enddo
-     !$omp end do nowait
-     !$omp do
-#ifdef __HMPP
-     !$hmppcg grid blocksize 512x1
-     !$hmppcg permute (k,i,j)
-     !$hmppcg gridify(k,i)
-#endif
-     do k=1,Vnz
-      do j=1,Vny
-       do i=1,Vnx
-        V3(i,j,k) = V(i,j,k)+V2(i,j,k)+Ap*(&
-        ((Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
-         Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
-         0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
-        (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-         ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
-         (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k))))
-       enddo
-      enddo
-     enddo
-     !$omp end do nowait
-     !$omp do
-#ifdef __HMPP
-     !$hmppcg grid blocksize 512x1
-     !$hmppcg permute (k,i,j)
-     !$hmppcg gridify(k,i)
-#endif
-     do k=1,Wnz
-      do j=1,Wny
-       do i=1,Wnx
-        W3(i,j,k) = W(i,j,k)+W2(i,j,k)+Ap*(&
-        ((0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
-        (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-         ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
-         (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j))+&
-         (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))/dzPr(k+1)-&
-         Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k)))
-       enddo
-      enddo
-     enddo
-     !$omp end do
+     if (gridtype==uniformgrid) then
+       !$omp parallel private(i,j,k)
 
-     !$omp end parallel
+       !$omp do
+       do k=1,Unz
+        do j=1,Uny
+         do i=1,Unx
+           U3(i,j,k) =&
+               (Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
+               Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*Ax
+           U3(i,j,k) = U3(i,j,k) +&
+               Ay*0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
+               (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))
+           U3(i,j,k) = U3(i,j,k) +&
+               Az*0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
+               (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))
+           U3(i,j,k) = U3(i,j,k) * Ap
+         enddo
+        enddo
+       enddo
+       !$omp end do
+       !$omp do
+       do k=1,Unz
+        do j=1,Uny
+         do i=1,Unx
+           U3(i,j,k) = U3(i,j,k) + U(i,j,k) + U2(i,j,k)
+         enddo
+        enddo
+       enddo
+       !$omp end do nowait
+
+
+       !$omp do
+       do k=1,Vnz
+        do j=1,Vny
+         do i=1,Vnx
+           V3(i,j,k) =&
+               (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
+               Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*Ay
+           V3(i,j,k) = V3(i,j,k) +&
+               Ax*0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
+               (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))
+           V3(i,j,k) = V3(i,j,k) +&
+               Az*0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
+               (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))
+           V3(i,j,k) = V3(i,j,k) * Ap
+         enddo
+        enddo
+       enddo
+       !$omp end do
+       !$omp do
+       do k=1,Vnz
+        do j=1,Vny
+         do i=1,Vnx
+           V3(i,j,k) = V3(i,j,k) + V(i,j,k) + V2(i,j,k)
+         enddo
+        enddo
+       enddo
+       !$omp end do nowait
+
+
+       !$omp do
+       do k=1,Wnz
+        do j=1,Wny
+         do i=1,Wnx
+           W3(i,j,k) =+&
+               Ax*0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
+               (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))
+           W3(i,j,k) = W3(i,j,k) +&
+               Ay*0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
+               (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))
+           W3(i,j,k) = W3(i,j,k) +&
+               (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
+               Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*Az
+           W3(i,j,k) = W3(i,j,k) * Ap
+         enddo
+        enddo
+       enddo
+       !$omp end do
+       !$omp do
+       do k=1,Wnz
+        do j=1,Wny
+         do i=1,Wnx
+           W3(i,j,k) = W3(i,j,k) + W(i,j,k) + W2(i,j,k)
+         enddo
+        enddo
+       enddo
+       !$omp end do
+
+       !$omp end parallel
+     else
+       !$omp parallel private(i,j,k)
+
+       !$omp do
+       do k=1,Unz    !Forward Euler for the first approximation
+        do j=1,Uny
+         do i=1,Unx
+          U3(i,j,k) = U(i,j,k)+U2(i,j,k)+Ap*(&
+          ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
+          Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
+           0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
+           (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+           ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
+           (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))))
+         enddo
+        enddo
+       enddo
+       !$omp end do nowait
+       !$omp do
+       do k=1,Vnz
+        do j=1,Vny
+         do i=1,Vnx
+          V3(i,j,k) = V(i,j,k)+V2(i,j,k)+Ap*(&
+          ((Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
+           Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
+           0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
+          (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+           ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
+           (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k))))
+         enddo
+        enddo
+       enddo
+       !$omp end do nowait
+       !$omp do
+       do k=1,Wnz
+        do j=1,Wny
+         do i=1,Wnx
+          W3(i,j,k) = W(i,j,k)+W2(i,j,k)+Ap*(&
+          0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
+          (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+           ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
+           (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j))+&
+           (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))/dzPr(k+1)-&
+           Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k))
+         enddo
+        enddo
+       enddo
+       !$omp end do
+
+       !$omp end parallel
+     end if
   end subroutine ForwEul
 
 
 
+
+#endif
 
 
 
@@ -672,7 +877,7 @@
     !$omp do
     do k=Unz-bufn,Unz
       p = 0
-      !$hmppcg grid blocksize 512x1
+      !$hmppcg grid blocksize myblocksize
       !$hmppcg gridify (j,i) global(p), reduce(+:p)
       do j=1,Uny
         do i=mini,maxUi
@@ -697,7 +902,7 @@
     !$omp end do
 
     !$omp do
-    !$hmppcg grid blocksize 512x1
+    !$hmppcg grid blocksize myblocksize
     !$hmppcg permute(k,i,j)
     !$hmppcg gridify (k,i)
     do k=Unz-bufn,Unz
@@ -719,7 +924,7 @@
     !$omp do
     do k=Vnz-bufn,Vnz
       p = 0
-      !$hmppcg grid blocksize 512x1
+      !$hmppcg grid blocksize myblocksize
       !$hmppcg gridify (j,i) global(p), reduce(+:p)
       do j=1,Vny
         do i=mini,maxi
@@ -744,7 +949,7 @@
     !$omp end do
 
     !$omp do
-    !$hmppcg grid blocksize 512x1
+    !$hmppcg grid blocksize myblocksize
     !$hmppcg permute(k,i,j)
     !$hmppcg gridify (k,i)
     do k=Vnz-bufn,Vnz
@@ -766,7 +971,7 @@
     !$omp do
     do k=Wnz-bufn,Wnz
       p = 0
-      !$hmppcg grid blocksize 512x1
+      !$hmppcg grid blocksize myblocksize
       !$hmppcg gridify (j,i) global(p), reduce(+:p)
       do j=1,Wny
         do i=mini,maxi
@@ -791,7 +996,7 @@
     !$omp end do
 
     !$omp do
-    !$hmppcg grid blocksize 512x1
+    !$hmppcg grid blocksize myblocksize
     !$hmppcg permute(k,i,j)
     !$hmppcg gridify (k,i)
     do k=Wnz-bufn,Wnz
@@ -816,7 +1021,7 @@
       !$omp do
       do k=Prnz-bufn,Prnz
         p = 0
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg gridify (j,i) global(p), reduce(+:p)
         do j=1,Prny
           do i=mini,maxi
@@ -841,7 +1046,7 @@
       !$omp end do
 
       !$omp do
-      !$hmppcg grid blocksize 512x1
+      !$hmppcg grid blocksize myblocksize
       !$hmppcg permute(k,i,j)
       !$hmppcg gridify (k,i)
       do k=Prnz-bufn,Prnz
@@ -893,7 +1098,7 @@
     !$omp parallel private(i,j,k,p,xb,DF)
 
     !$omp do
-    !$hmppcg grid blocksize 512x1
+    !$hmppcg grid blocksize myblocksize
     !$hmppcg gridify (k,j) private(p,xb,DF)
     do k=1,Unz
       do j=1,Uny
@@ -912,7 +1117,7 @@
     !$omp end do
 
     !$omp do
-    !$hmppcg grid blocksize 512x1
+    !$hmppcg grid blocksize myblocksize
     !$hmppcg gridify (k,j) private(p,xb,DF)
     do k=1,Vnz
       do j=1,Vny
@@ -931,7 +1136,7 @@
     !$omp end do
 
     !$omp do
-    !$hmppcg grid blocksize 512x1
+    !$hmppcg grid blocksize myblocksize
     !$hmppcg gridify (k,j) private(p,xb,DF)
     do k=1,Wnz
       do j=1,Wny
@@ -951,7 +1156,7 @@
 
     if (buoyancy==1) then
       !$omp do
-      !$hmppcg grid blocksize 512x1
+      !$hmppcg grid blocksize myblocksize
       !$hmppcg gridify (k,j) private(p,xb,DF)
       do k=1,Prnz
         do j=1,Prny

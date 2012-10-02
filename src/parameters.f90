@@ -32,9 +32,6 @@ module PARAMETERS
   real(KND),parameter :: Karman=0.41_KND
   real(KND),parameter :: BoltzC=1.3806503e-23_KND
 
-  integer :: GPU = 0   !HMPP support
-
-
   integer :: Unx,Uny,Unz     !dimensions of grid for velocity component U
 
   integer :: Vnx,Vny,Vnz     !dimensions of grid for velocity component V
@@ -80,10 +77,10 @@ module PARAMETERS
   real(TIM) :: timefram1,timefram2,timeavg1,timeavg2
 
   integer :: tempmet,poissmet,convmet,masssourc,frames,steady
-  integer :: tasktype,averaging,projectiontype,impldiff,wallmodeltype,sgstype,fullstress
+  integer :: tasktype,averaging,impldiff,wallmodeltype,sgstype,fullstress
   integer :: buoyancy,computescalars,partdistrib,computedeposition,computegravsettling
   integer :: maxCNiter,maxPOISSONiter,maxiter,endstep
-
+  integer :: projectiontype,correctcompatibility = 0
 
   integer :: inlettype,gridtype,profiletype
 
@@ -132,5 +129,26 @@ module PARAMETERS
   integer,parameter :: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4
 
   integer :: debuglevel = 0 !amount of information to write out
+
+! #ifdef __HMPP
+ integer :: GPU = 0   !If the GPU is allocated
+
+ type hmppWMpoint   !points in which we apply wall model
+
+  integer   :: xi
+  integer   :: yj
+  integer   :: zk
+
+  real(KND) :: distx
+  real(KND) :: disty
+  real(KND) :: distz
+
+  real(KND) :: z0=0
+  real(KND) :: ustar=1
+  real(KND) :: temp=0
+  real(KND) :: tempfl=0
+
+ endtype hmppWMpoint
+! #endif
 
 endmodule PARAMETERS

@@ -19,7 +19,7 @@ TARGETDIR_CLMM=../bin/gcc/debug
 #### Compiler and tool definitions shared by all build targets  -fopenmp ,invalid#####
 FC = gfortran-4.7
 BASICOPTS = -cpp -fbacktrace -g -pedantic -Wall -Werror=implicit-procedure -fcheck=all -ffpe-trap=zero,overflow,invalid\
-	-I $(TARGETDIR_CLMM) -J $(TARGETDIR_CLMM)
+	-I $(TARGETDIR_CLMM) -J $(TARGETDIR_CLMM) -fstack-arrays
 FFLAGS = $(BASICOPTS)
 
 
@@ -48,7 +48,7 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/main.o
 USERLIBS_CLMM = $(SYSLIBS_CLMM)
 DEPLIBS_CLMM =
-LDLIBS_CLMM = $(USERLIBS_CLMM) -llapack -L/usr/local/poisfft_gcc/sp -lpoisfft -lfftw3 -lfftw3f -lfftw3_threads -lfftw3f_threads
+LDLIBS_CLMM = $(USERLIBS_CLMM) -llapack -L/usr/local/poisfft_gcc/sp -lpoisfft -L/usr/local/fftw-gcc/lib -lfftw3 -lfftw3f -lfftw3_threads -lfftw3f_threads
 
 
 # Link or archive
@@ -81,8 +81,8 @@ $(TARGETDIR_CLMM)/boundaries.o: $(TARGETDIR_CLMM) boundaries.f90
 $(TARGETDIR_CLMM)/outputs.o: $(TARGETDIR_CLMM) outputs.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ outputs.f90
 
-$(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.f90
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -I/usr/local/poisfft_gcc/sp -o $@ poisson.f90
+$(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.F90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -I/usr/local/poisfft_gcc/sp -o $@ poisson.F90
 
 $(TARGETDIR_CLMM)/initial.o: $(TARGETDIR_CLMM) initial.f90
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ initial.f90
@@ -121,8 +121,8 @@ clean:
 	rm -f \
 		$(TARGETDIR_CLMM)/CLMM \
 		$(TARGETDIR_CLMM)/*.o
-	rm -f *.mod
-	#rm -f -r $(TARGETDIR_CLMM)
+	rm -f $(TARGETDIR_CLMM)/.mod
+	rm -f -r $(TARGETDIR_CLMM)
 
 
 # Create the target directory (if needed)

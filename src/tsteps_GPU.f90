@@ -47,7 +47,7 @@
 
        !The explicit part, which doesn't have to be changed inside the loop
 
-       !$hmppcg grid blocksize 512x1
+       !$hmppcg grid blocksize myblocksize2
        !$hmppcg permute (k,i,j)
        !$hmppcg gridify(k,i)
        do k=1,Unz
@@ -63,7 +63,7 @@
          enddo
         enddo
        enddo
-       !$hmppcg grid blocksize 512x1
+       !$hmppcg grid blocksize myblocksize2
        !$hmppcg permute (k,i,j)
        !$hmppcg gridify(k,i)
        do k=1,Vnz
@@ -79,7 +79,7 @@
          enddo
         enddo
        enddo
-       !$hmppcg grid blocksize 512x1
+       !$hmppcg grid blocksize myblocksize2
        !$hmppcg permute (k,i,j)
        !$hmppcg gridify(k,i)
        do k=1,Wnz
@@ -96,7 +96,7 @@
        enddo
       enddo
 
-       !$hmppcg grid blocksize 512x1
+       !$hmppcg grid blocksize myblocksize2
        !$hmppcg permute (k,i,j)
        !$hmppcg gridify(k,i)
        do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
@@ -114,7 +114,7 @@
        enddo
 
 
-       !$hmppcg grid blocksize 512x1
+       !$hmppcg grid blocksize myblocksize2
        !$hmppcg permute (k,i,j)
        !$hmppcg gridify(k,i)
        do k=1,Vnz
@@ -132,7 +132,7 @@
        enddo
 
 
-       !$hmppcg grid blocksize 512x1
+       !$hmppcg grid blocksize myblocksize2
        !$hmppcg permute (k,i,j)
       !$hmppcg gridify(k,i)
        do k=1,Wnz
@@ -151,7 +151,7 @@
 
 
        Suavg=0    !maximum values of velocities to norm the residues.
-!        !$hmppcg grid blocksize 512x1
+!        !$hmppcg grid blocksize myblocksize2
 !        !$hmppcg gridify (k,i), reduce (max:Suavg)
 !        do k=1,Unz
 !         do i=1,Unx
@@ -161,7 +161,7 @@
 !         enddo
 !        enddo
        Svavg=0
-!        !$hmppcg grid blocksize 512x1
+!        !$hmppcg grid blocksize myblocksize2
 !        !$hmppcg gridify (k,i), reduce (max:Svavg)
 !        do k=1,Vnz
 !         do i=1,Vnx
@@ -171,7 +171,7 @@
 !         enddo
 !        enddo
        Swavg=0
-!        !$hmppcg grid blocksize 512x1
+!        !$hmppcg grid blocksize myblocksize2
 !        !$hmppcg gridify (k,i), reduce (max:Swavg)
 !        do k=1,Wnz
 !         do i=1,Wnx
@@ -202,7 +202,7 @@
         Su=0
         Sv=0
         Sw=0
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg gridify(k,i), private(j,p)
 !         , reduce(max:Su)
         do k=1,Unz
@@ -221,7 +221,7 @@
           enddo
          enddo
         enddo
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg gridify(k,i), private(j,p)
 !         !, reduce(max:Sv)
         do k=1,Vnz
@@ -240,7 +240,7 @@
           enddo
          enddo
         enddo
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg gridify(k,i), private(j,p)
 !         !, reduce(max:Sw)
         do k=1,Wnz
@@ -261,7 +261,7 @@
         enddo
 
 
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg gridify(k,i), private(j,p)
 !         !, reduce(max:Su)
         do k=1,Unz
@@ -282,7 +282,7 @@
           enddo
          enddo
         enddo
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg gridify(k,i), private(j,p)
 !         !, reduce(max:Sv)
         do k=1,Vnz
@@ -301,7 +301,7 @@
           enddo
          enddo
         enddo
-        !$hmppcg grid blocksize 512x1
+        !$hmppcg grid blocksize myblocksize
         !$hmppcg gridify(k,i), private(j,p)
 !         !, reduce(max:Sw)
         do k=1,Wnz
@@ -328,6 +328,7 @@
     residuum=S
 
 
+    !$hmppcg grid blocksize myblocksize
     !$hmppcg permute (k,i,j)
     !$hmppcg gridify(k,i)
     do k=1,Unz
@@ -337,6 +338,7 @@
       enddo
      enddo
     enddo
+    !$hmppcg grid blocksize myblocksize
     !$hmppcg permute (k,i,j)
     !$hmppcg gridify(k,i)
     do k=1,Vnz
@@ -346,6 +348,7 @@
       enddo
      enddo
     enddo
+    !$hmppcg grid blocksize myblocksize
     !$hmppcg permute (k,i,j)
     !$hmppcg gridify(k,i)
     do k=1,Wnz
@@ -367,3 +370,49 @@
 !                          Win,W2,0)
   endsubroutine UNIFREDBLACK_GPU
 
+
+
+  !$hmpp <tsteps> UpdateU codelet
+  subroutine UpdateU_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,U,V,W,U2,V2,W2)
+    implicit none
+#include "hmpp-include.f90"
+    integer,intent(in):: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
+    real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out):: U
+    real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(out):: V
+    real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(out):: W
+    real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in):: U2
+    real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in):: V2
+    real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in):: W2
+    integer i,j,k
+
+    !$hmppcg grid blocksize myblocksize
+    !$hmppcg permute (k,i,j)
+    !$hmppcg gridify(k,i)
+    do k=-2,Unz+3
+     do j=-2,Uny+3
+      do i=-2,Unx+3
+       U(i,j,k) = U2(i,j,k)
+      end do
+     end do
+    end do
+    !$hmppcg grid blocksize myblocksize
+    !$hmppcg permute (k,i,j)
+    !$hmppcg gridify(k,i)
+    do k=-2,Vnz+3
+     do j=-2,Vny+3
+      do i=-2,Vnx+3
+       V(i,j,k) = V2(i,j,k)
+      end do
+     end do
+    end do
+    !$hmppcg grid blocksize myblocksize
+    !$hmppcg permute (k,i,j)
+    !$hmppcg gridify(k,i)
+    do k=-2,Wnz+3
+     do j=-2,Wny+3
+      do i=-2,Wnx+3
+       W(i,j,k) = W2(i,j,k)
+      end do
+     end do
+    end do
+  end subroutine UpdateU_GPU

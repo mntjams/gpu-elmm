@@ -18,7 +18,7 @@ TARGETDIR_CLMM=../bin/gcc/serial
 
 #### Compiler and tool definitions shared by all build targets #####
 FC = gfortran-4.7
-BASICOPTS =  -cpp -O5 -g -fbacktrace -fprefetch-loop-arrays -finline-functions -funroll-loops -pg -ffpe-trap=zero,overflow -ffast-math -flto\
+BASICOPTS =  -cpp -Ofast -g -fbacktrace -fprefetch-loop-arrays -finline-functions -funroll-loops -pg -ffpe-trap=zero,overflow -ffast-math -flto\
 	-I $(TARGETDIR_CLMM) -J $(TARGETDIR_CLMM)
 FFLAGS = $(BASICOPTS)
 

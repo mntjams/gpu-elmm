@@ -7,12 +7,13 @@ module SCALARS
  use TILING, only: tilenx, tileny, tilenz
 #ifdef __HMPP
  use HMPP_CODELETS
+ use HMPP_SCALARS
 #endif
 
 implicit none
   private
   public Scalar, ScalarRK3, constPrt, Rig, partdiam, partrho, percdistrib,&
-     Bound_Visc, Bound_Temp, Bound_PassScalar,&
+     Bound_Visc, BoundTemperature, Bound_PassScalar, ComputeTDiff,&
      TTemperatureProfileSection, TTemperatureProfile, TemperatureProfile,&
      InitTemperatureProfile, InitTemperature,&
      SubsidenceProfile, SubsidenceGradient, InitSubsidenceProfile
@@ -48,7 +49,7 @@ contains
   subroutine ScalarRK3(U,V,W,Temperature,Scalar,RKstage,fluxprofile)
     real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(KND),intent(inout) :: Temperature(-1:,-1:,-1:),Scalar(-1:,-1:,-1:,-1:)
-    real(KND),intent(out),optional   :: fluxprofile(0:)
+    real(KND),intent(out)   :: fluxprofile(:)
     integer,intent(in)      :: RKstage
 
     real(KND),dimension(:,:,:,:),allocatable,save ::Scalar_adv,Scalar_2
@@ -62,10 +63,6 @@ contains
     integer,save :: called = 0
     logical,save :: released=.false.
 
-#ifdef __HMPP
-    integer iters
-    real(KND) res
-#endif
 
     if (called==0) then
 
@@ -80,50 +77,35 @@ contains
            lbound(Temperature,3):ubound(Temperature,3)))
       allocate(Temperature2(lbound(Temperature,1):ubound(Temperature,1),lbound(Temperature,2):ubound(Temperature,2),&
            lbound(Temperature,3):ubound(Temperature,3)))
-!       !$hmpp <tsteps> advancedload, args[DiffTemperature::TBtype,DiffTemperature::sideTemp,DiffTemperature::TempIn]
-!       !$hmpp <tsteps> advancedload, args[DiffTemperature::epsCN,DiffTemperature::sideTemp,DiffTemperature::maxCNiter]
     endif
 
 
 !     if (computescalars>0.and..not.released) call Release(Scalar,released)
 
 
-    if (RKstage == 1) then
-      !$omp parallel
-      !$omp workshare
-      temperature_adv = 0
-      Scalar_adv = 0
-      !$omp end workshare
-      !$omp end parallel
-    endif
-
     if (computescalars>0) then
 
-      !$omp parallel
-      !$omp workshare
+      !$omp parallel workshare
       Scalar_2=0
-      !$omp end workshare
+      !$omp end parallel workshare
 
       if (RKstage>1) then
-        !$omp workshare
+        !$omp parallel workshare
         Scalar_2 = Scalar_2+Scalar_adv*rho(RKstage)
-        !$omp end workshare
+        !$omp end parallel workshare
       endif
 
-      !$omp workshare
-      Scalar_adv = 0
-      !$omp end workshare
-      !$omp end parallel
-
       do i=1,computescalars
+
+        call Bound_PassScalar(Scalar(:,:,:,i))
+
         call AdvScalar(Scalar_adv(:,:,:,i),Scalar(:,:,:,i),U,V,W,2,1._KND,SubsidenceProfile)
+
       enddo
 
-      !$omp parallel
-      !$omp workshare
+      !$omp parallel workshare
       Scalar_2 = Scalar_2+Scalar_adv*beta(RKstage)
-      !$omp end workshare
-      !$omp end parallel
+      !$omp end parallel workshare
 
       if (scalsourcetype==pointsource) then
 
@@ -146,10 +128,6 @@ contains
       !$omp end workshare
       !$omp end parallel
 
-      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
-
-      call Bound_Visc(TDiff)
-
       do i=1,computescalars
          call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,2._KND*alpha(RKstage))
       enddo
@@ -169,11 +147,16 @@ contains
 
     if (buoyancy>0) then
 
-      if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
+#ifdef __HMPP
 
-      call Bound_Visc(TDiff)
+      call HMPP_RKstage_Temperature(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                            dxmin,dymin,dzmin,maxCNiter,epsCN,Re,limparam,&
+                            TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
+                            TDiff,Temperature2,Temperature,Temperature_adv,U,V,W,&
+                            SubsidenceProfile,fluxProfile,dt,RKstage,alpha,beta,rho)
 
-      call Bound_Temp(temperature)
+#else
+      call BoundTemperature(temperature)
 
       if (RKstage>1) then
         !$omp parallel
@@ -189,24 +172,14 @@ contains
         !$omp end parallel
       endif
 
-      !$omp parallel
-      !$omp workshare
-      temperature_adv = 0
-      !$omp end workshare
-      !$omp end parallel
-
-#ifdef __HMPP
-!       call KappaTemperature_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-!                             dxmin,dymin,dzmin,maxCNiter,epsCN,Re,limparam,&
-!                             TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,TDiff,&
-!                             temperature_adv,temperature,U,V,W,1._KND,dt,SubsidenceProfile,fluxProfile)
-#else
-      if (RKstage==3.and.present(fluxprofile)) then
-        call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,SubsidenceProfile,FluxProfile)
-      else
-        call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,SubsidenceProfile)
-      end if
-#endif
+! #ifdef __HMPP
+!       call HMPP_KappaTemperature(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+!                             dxmin,dymin,dzmin,limparam,&
+!                             temperature_adv,temperature,U,V,W,&
+!                             1._KND,dt,SubsidenceProfile,fluxProfile)
+! #else
+      call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,SubsidenceProfile,fluxProfile)
+! #endif
 
       !$omp parallel
       !$omp workshare
@@ -216,33 +189,22 @@ contains
       !$omp end workshare
       !$omp end parallel
 
-      call Bound_Temp(temperature)
+      call BoundTemperature(temperature)
 
-#ifdef __HMPP
-!         !$hmpp <tsteps> advancedload, args[DiffTemperature::coef]
-!         if (size(BsideTArr)>0) then
-!           !$hmpp <tsteps> advancedload, args[DiffTemperature::BsideTArr]
-!         endif
-!         if (size(BsideTFLArr)>0) then
-!           !$hmpp <tsteps> advancedload, args[DiffTemperature::BsideTFLArr]
-!         endif
-!         !$hmpp <tsteps> advancedload, args[DiffTemperature::TDiff,DiffTemperature::Temperature]
-!         !$hmpp <tsteps> DiffTemperature callsite, args[*].noupdate=true
-!         call DiffTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
-!                             TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,TDiff,&
-!                             temperature2,temperature,2._KND*alpha(RKstage),dt,iters,res)
-!         !$hmpp <tsteps> delegatedstore, args[DiffTemperature::l,DiffTemperature::res]
-!         !$hmpp <tsteps> delegatedstore, args[DiffTemperature::Temperature2]
-!         write (*,*) "CNscalar ",iters,res
-#else
-        call DiffScalar(temperature2,temperature,1,2._KND*alpha(RKstage))
-#endif
+! #ifdef __HMPP
+!       call HMPP_DiffTemperature(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
+!                              TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,TDiff,&
+!                              temperature2,temperature,2._KND*alpha(RKstage),dt)
+! #else
+      call DiffScalar(temperature2,temperature,1,2._KND*alpha(RKstage))
+! #endif
 
       !$omp parallel
       !$omp workshare
       temperature = temperature2
       !$omp end workshare
       !$omp end parallel
+#endif
     endif
 
   end subroutine ScalarRK3
@@ -251,46 +213,50 @@ contains
 
 
   subroutine ADVSCALAR(SCAL2,SCAL,U,V,W,sctype,coef,SubsidenceProfile,fluxProfile)
-  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in)      :: sctype
-  real(KND),intent(in),allocatable :: SubsidenceProfile(:)
+  real(KND),intent(out)      :: Scal2(-1:,-1:,-1:)
+  real(KND),intent(in)       :: Scal(-1:,-1:,-1:)
+  real(KND),intent(in)       :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  integer,intent(in)         :: sctype
+  real(KND),intent(in)       :: SubsidenceProfile(0:)
   real(KND),intent(out),optional :: fluxProfile(0:)
-  real(KND) :: SubsidenceProfileLoc(0:Prnz)
-  real(KND) :: fluxProfileLoc(0:Prnz)
+  real(KND),allocatable,save :: SubsidenceProfileLoc(:),fluxProfileLoc(:)
+  integer,save :: called=0
 
-   if (allocated(SubsidenceProfile)) then
-     SubsidenceProfileLoc = SubsidenceProfile(0:Prnz)
-   else
-     SubsidenceProfileLoc = 0
-   endif
+    if (called==0) then
+      allocate(SubsidenceProfileLoc(0:Prnz))
+      allocate(fluxProfileLoc(0:Prnz))
+      called = 1
+    end if
 
-   if (gridtype==uniformgrid) then
-       call KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef,SubsidenceProfileLoc,fluxProfileLoc)
-   else
-       call KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef,SubsidenceProfileLoc,fluxProfileLoc)
-   endif
+    if (size(SubsidenceProfile)==size(SubsidenceProfileLoc)) then
+      SubsidenceProfileLoc = SubsidenceProfile
+    else
+      SubsidenceProfileLoc = 0
+    endif
 
-   if (present(fluxProfile)) fluxProfile(0:Prnz) = fluxProfileLoc
+    if (gridtype==uniformgrid) then
+      call KAPPASCALARUG(SCAL2,SCAL,U,V,W,coef,SubsidenceProfileLoc,fluxProfileLoc)
+    else
+      call KAPPASCALARGG(SCAL2,SCAL,U,V,W,coef,SubsidenceProfileLoc,fluxProfileLoc)
+    endif
+
+    if (present(fluxProfile).and.(size(fluxProfile)==size(fluxProfileLoc)) )&
+      fluxProfile(0:Prnz) = fluxProfileLoc
 
   endsubroutine ADVSCALAR
 
-  subroutine CDSSCALAR(SCAL2,SCAL,U,V,W,sctype,coef)
-  real(KND),intent(inout) :: Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
-  real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in)      :: sctype
-  integer nx,ny,nz,i,j,k
-  real(KND) Ax,Ay,Az
+  subroutine CDSSCALAR(SCAL2,SCAL,U,V,W,coef)
+    real(KND),intent(out) :: Scal2(-1:,-1:,-1:)
+    real(KND),intent(in)  :: Scal(-1:,-1:,-1:)
+    real(KND),intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+    integer nx,ny,nz,i,j,k
+    real(KND) Ax,Ay,Az
 
         nx = Prnx
         ny = Prny
         nz = Prnz
 
-        if (sctype==1) then
-         call BOUND_Temp(SCAL)
-        else
-         call BOUND_PASSSCALAR(SCAL)
-        endif
+        SCAL2 = 0
 
         Ax = 0.5_KND*coef*dt/dxmin
         Ay = 0.5_KND*coef*dt/dymin
@@ -313,11 +279,11 @@ contains
 
 
 
-  subroutine KAPPASCALARUG(SCAL2,SCAL,U,V,W,sctype,coef,SubsidenceProfile,fluxProfile) !Kappa scheme with flux limiter
-  real(KND),intent(inout) ::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in) :: sctype
-  real(KND),intent(in) :: SubsidenceProfile(0:)
+  subroutine KAPPASCALARUG(SCAL2,SCAL,U,V,W,coef,SubsidenceProfile,fluxProfile) !Kappa scheme with flux limiter
+  real(KND),intent(out) :: Scal2(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in)  :: Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  real(KND),intent(in)  :: SubsidenceProfile(0:)
   real(KND),intent(out) :: fluxProfile(0:)
   integer i,j,k,l
   real(KND) A,Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
@@ -328,12 +294,6 @@ contains
 
   FluxLimiter(r)=max(0._KND,min(2._KND*r,min(limparam,(1+2._KND*r)/3._KND)))
 
-  if (sctype==1) then
-    call BOUND_Temp(SCAL)
-  else
-    call BOUND_PASSSCALAR(SCAL)
-  endif
-
   A = coef*dt
   Ax = coef*dt/dxmin
   Ay = coef*dt/dymin
@@ -343,6 +303,7 @@ contains
   !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX)
 
   !$omp workshare
+  SCAL2 = 0
   SLOPE = 0
   !$omp end workshare
   !$omp do
@@ -456,7 +417,7 @@ contains
         FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
        endif
 
-       if (vel>=1e-6) fluxprofile(k) = fluxprofile(k) + FLUX/vel*W(i,j,k)
+       if (abs(vel)>=1e-6) fluxprofile(k) = fluxprofile(k) + FLUX/vel*W(i,j,k)
 
        SCAL2(i,j,k) = SCAL2(i,j,k) - Az*FLUX
        SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + Az*FLUX
@@ -476,13 +437,13 @@ contains
 
 
 
-  subroutine KAPPASCALARGG(SCAL2,SCAL,U,V,W,sctype,coef,SubsidenceProfile,fluxProfile) !Kappa scheme with flux limiter
-  real(KND),intent(inout) ::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
-  integer,intent(in) :: sctype
-  real(KND),intent(in) :: SubsidenceProfile(0:)
+  subroutine KAPPASCALARGG(SCAL2,SCAL,U,V,W,coef,SubsidenceProfile,fluxProfile) !Kappa scheme with flux limiter
+  real(KND),intent(out) :: Scal2(-1:,-1:,-1:)                                   !Hunsdorfer et al. 1995, JCP
+  real(KND),intent(in)  :: Scal(-1:,-1:,-1:)
+  real(KND),intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  real(KND),intent(in)  :: SubsidenceProfile(0:)
   real(KND),intent(out) :: fluxProfile(0:)
-  integer i,j,k
+  integer i,j,k,l
   real(KND) A                       !Auxiliary variables to store muliplication constants for efficiency
   real(KND) vel,SL,SR,FLUX
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
@@ -491,17 +452,13 @@ contains
 
   FluxLimiter(r)=max(0._KND,min(2._KND*r,min(limparam,(1+2._KND*r)/3._KND)))
 
-  if (sctype==1) then
-   call BOUND_Temp(SCAL)
-  else
-   call BOUND_PASSSCALAR(SCAL)
-  endif
 
   A = coef*dt
 
   !$omp parallel private(i,j,k,vel,SL,SR,FLUX)
 
   !$omp workshare
+  SCAL2 = 0
   SLOPE = 0
   !$omp end workshare
   !$omp do
@@ -616,7 +573,7 @@ contains
         FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._KND)
        endif
 
-       if (vel>=1e-6) fluxprofile(k) = fluxprofile(k+1) + FLUX/vel*W(i,j,k)
+       if (abs(vel)>=1e-6) fluxprofile(k) = fluxprofile(k+1) + FLUX/vel*W(i,j,k)
 
        SCAL2(i,j,k) = SCAL2(i,j,k) - A*FLUX/dzPr(k)
        SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + A*FLUX/dzPr(k+1)
@@ -654,39 +611,70 @@ contains
 
   if (Re>0) then
    if (sctype==1) then
-    call BOUND_Temp(SCAL)
+    call BoundTemperature(SCAL)
    else
     call BOUND_PASSSCALAR(SCAL)
    endif
 
    A = dt*coef
-   Ax = 1._KND/(4._KND*dxmin**2)
-   Ay = 1._KND/(4._KND*dymin**2)
-   Az = 1._KND/(4._KND*dzmin**2)
+   Ax = 1._KND/(dxmin**2)
+   Ay = 1._KND/(dymin**2)
+   Az = 1._KND/(dzmin**2)
 
    !$omp parallel private (i,j,k,bi,bj,bk)
 
    !initital value using forward Euler
-   !$omp do
-   do bk = 1,Prnz,tilenz(narr)
-    do bj = 1,Prny,tileny(narr)
-     do bi = 1,Prnx,tilenx(narr)
-      do k = bk,min(bk+tilenz(narr)-1,Prnz)
-       do j = bj,min(bj+tileny(narr)-1,Prny)
-        do i = bi,min(bi+tilenx(narr)-1,Prnx)
-          SCAL3(i,j,k) = (((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))/dxU(i)-&
-            (TDiff(i,j,k)+TDiff(i-1,j,k))*(SCAL(i,j,k)-SCAL(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
-           ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))/dyV(j)-&
-            (TDiff(i,j,k)+TDiff(i,j-1,k))*(SCAL(i,j,k)-SCAL(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
-           ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))/dzW(k)-&
-            (TDiff(i,j,k)+TDiff(i,j,k-1))*(SCAL(i,j,k)-SCAL(i,j,k-1))/dzW(k-1))/(dzPr(k)))
+   if (gridtype==uniformgrid) then
+     !$omp do
+     do bk = 1,Prnz,tilenz(narr)
+      do bj = 1,Prny,tileny(narr)
+       do bi = 1,Prnx,tilenx(narr)
+        do k = bk,min(bk+tilenz(narr)-1,Prnz)
+         do j = bj,min(bj+tileny(narr)-1,Prny)
+          do i = bi,min(bi+tilenx(narr)-1,Prnx)
+            SCAL3(i,j,k) = ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))-&
+              (TDiff(i,j,k)+TDiff(i-1,j,k))*(SCAL(i,j,k)-SCAL(i-1,j,k)))*Ax
+
+            SCAL3(i,j,k) = SCAL3(i,j,k) +&
+              ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))-&
+              (TDiff(i,j,k)+TDiff(i,j-1,k))*(SCAL(i,j,k)-SCAL(i,j-1,k)))*Ay
+
+            SCAL3(i,j,k) = SCAL3(i,j,k) +&
+              ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))-&
+              (TDiff(i,j,k)+TDiff(i,j,k-1))*(SCAL(i,j,k)-SCAL(i,j,k-1)))*Az
+          enddo
+         enddo
         enddo
        enddo
       enddo
      enddo
-    enddo
-   enddo
-   !$omp end do
+     !$omp end do
+   else
+     !$omp do
+     do bk = 1,Prnz,tilenz(narr)
+      do bj = 1,Prny,tileny(narr)
+       do bi = 1,Prnx,tilenx(narr)
+        do k = bk,min(bk+tilenz(narr)-1,Prnz)
+         do j = bj,min(bj+tileny(narr)-1,Prny)
+          do i = bi,min(bi+tilenx(narr)-1,Prnx)
+            SCAL3(i,j,k) = (((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))/dxU(i)-&
+              (TDiff(i,j,k)+TDiff(i-1,j,k))*(SCAL(i,j,k)-SCAL(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
+             ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))/dyV(j)-&
+              (TDiff(i,j,k)+TDiff(i,j-1,k))*(SCAL(i,j,k)-SCAL(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
+             ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))/dzW(k)-&
+              (TDiff(i,j,k)+TDiff(i,j,k-1))*(SCAL(i,j,k)-SCAL(i,j,k-1))/dzW(k-1))/(dzPr(k)))
+          enddo
+         enddo
+        enddo
+       enddo
+      enddo
+     enddo
+     !$omp end do
+   endif
+
+   Ax = 1._KND/(4._KND*dxmin**2)
+   Ay = 1._KND/(4._KND*dymin**2)
+   Az = 1._KND/(4._KND*dzmin**2)
 
    !$omp workshare
    SCAL2(1:Prnx,1:Prny,1:Prnz) = SCAL(1:Prnx,1:Prny,1:Prnz) + A * SCAL3(1:Prnx,1:Prny,1:Prnz)
@@ -694,7 +682,7 @@ contains
    !$omp end parallel
 
    if (sctype==1) then
-     call BOUND_Temp(SCAL2)
+     call BoundTemperature(SCAL2)
    else
      call BOUND_PASSSCALAR(SCAL2)
    endif
@@ -759,7 +747,7 @@ contains
    do l = 1,maxCNiter
     S = 0
     if (sctype==1) then
-     call BOUND_Temp(SCAL2)
+     call BoundTemperature(SCAL2)
     else
      call BOUND_PASSSCALAR(SCAL2)
     endif
@@ -882,7 +870,7 @@ contains
    SCAL2 = SCAL
 
    if (sctype==1) then
-     call BOUND_Temp(SCAL2)
+     call BoundTemperature(SCAL2)
    else
      call BOUND_PASSSCALAR(SCAL2)
    endif
@@ -1158,7 +1146,7 @@ contains
 
 
 
-  subroutine BOUND_TEMP(Theta)
+  subroutine BoundTemperature(Theta)
   real(KND),intent(inout) :: theta(-1:,-1:,-1:)
   integer i,j,k,nx,ny,nz
    nx = Prnx
@@ -1414,7 +1402,7 @@ contains
      enddo
     enddo
    endif
-  endsubroutine BOUND_TEMP
+  endsubroutine BoundTemperature
 
 
 
@@ -1915,8 +1903,12 @@ contains
   subroutine InitSubsidenceProfile
     integer k
 
-    allocate(SubsidenceProfile(0:Prnz))
-    SubsidenceProfile = (/ (zW(k)*SubsidenceGradient, k=0,Prnz) /)
+    if (SubsidenceGradient/=0) then
+      allocate(SubsidenceProfile(0:Prnz))
+      SubsidenceProfile = (/ (zW(k)*SubsidenceGradient, k=0,Prnz) /)
+    else
+      allocate(SubsidenceProfile(0))
+    endif
   end subroutine InitSubsidenceProfile
 
 

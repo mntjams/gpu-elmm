@@ -5,12 +5,12 @@ module TSTEPS
   use LAXWEND
   use PARAMETERS
   use BOUNDARIES, only: BoundU,Bound_Q
-  use POISSON, only: Pr_Correct
+  use POISSON !it exports Pr_Correct and GetPrFromGPU
   use OUTPUTS, only: store,display,proftempfl
-  use SCALARS, only: ScalarRK3, Bound_Visc
+  use SCALARS, only: ScalarRK3, Bound_Visc, ComputeTDiff, BoundTemperature
   use SMAGORINSKY, only: Smag, StabSmag, Vreman
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
-  use Wallmodels, only: ComputeViscsWM
+  use Wallmodels
   use Tiling, only: tilenx, tileny, tilenz
 #ifdef __HMPP
   use HMPP_CODELETS
@@ -21,6 +21,12 @@ module TSTEPS
 
   private
   public TMarchRK3
+
+#ifdef __HMPP
+  public GetDataFromGPU
+  type(hmppWMPoint),allocatable,save :: hmppWMPoints(:)
+  integer,save :: nWMPoints = 0
+#endif
 
 contains
 
@@ -48,7 +54,6 @@ contains
   integer(DBL), save :: trate
   integer(DBL), save :: time1, time2
 
-
   if (called==0) then
    called = 1
 
@@ -61,9 +66,35 @@ contains
    allocate(Wstar(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)))
 
 
+   !$omp parallel
+   !$omp sections
+   !$omp section
+   call BoundU(1,U)
+   !$omp section
+   call BoundU(2,V)
+   !$omp section
+   call BoundU(3,W)
+   !$omp section
+   if (buoyancy==1) call BoundTemperature(temperature)
+   !$omp end sections
+   !$omp end parallel
+
+
    if (masssourc==1) allocate(Q(0:Prnx+1,0:Prny+1,0:Prnz+1))
 
    if (debugparam>1) call system_clock(count_rate=trate)
+
+#ifdef __HMPP
+   if (allocated(WMPoints)) then
+     nWMPoints = size(WMPoints)
+   else
+     nWMPoints = 0
+   end if
+write(*,*) "nhWMPointsHMPP:",nWMPoints
+   allocate(hmppWMPoints(nWMPoints))
+
+   if (allocated(WMPoints)) call WMPtoHMPP(hmppWMPoints,WMPoints)
+
 
     !$hmpp <tsteps> allocate
     !$hmpp <tsteps> advancedload, args[Vreman::Prnx,BoundU::Prny,BoundU::Prnz]
@@ -83,10 +114,10 @@ contains
     !$hmpp <tsteps> advancedload, args[BoundU::Btype]
 
     !$hmpp <tsteps> advancedload, args[ForwEul::dxPr,ForwEul::dyPr,ForwEul::dzPr]
-    !$hmpp <tsteps> advancedload, args[AttenuateOut::xPr,AttenuateTop::zPr]
+!     !$hmpp <tsteps> advancedload, args[AttenuateOut::xPr,AttenuateTop::zPr]
 
     !$hmpp <tsteps> advancedload, args[PressureGrad::dxU,PressureGrad::dyV,PressureGrad::dzW]
-    !$hmpp <tsteps> advancedload, args[AttenuateOut::xU,AttenuateTop::zW]
+!     !$hmpp <tsteps> advancedload, args[AttenuateOut::xU,AttenuateTop::zW]
 
     !$hmpp <tsteps> advancedload, args[PressureGrad::Pr]
 
@@ -95,12 +126,19 @@ contains
 
     !$hmpp <tsteps> advancedload, args[TimeStepEul::CFL,TimeStepEul::Uref,TimeStepEul::steady,TimeStepEul::dxmin,TimeStepEul::endtime]
 
+    !$hmpp <tsteps>  advancedload, args[UnifRedBlack::maxCNiter,UnifRedBlack::epsCN]
 
     !$hmpp <tsteps> advancedload, args[TimeStepEul::U,TimeStepEul::V,TimeStepEul::W]
 
     if (buoyancy==1) then
      !$hmpp <tsteps> advancedload, args[Convection::temperature]
     endif
+
+    !$hmpp <tsteps> advancedload, args[ComputeViscWM::nWMPoints,ComputeViscWM::WMPoints]
+    !$hmpp <tsteps> advancedload, args[Bound_Visc_TDiff::Prandtl]
+
+    GPU = 1
+#endif
   endif
 
 
@@ -128,6 +166,117 @@ write(*,*) "stage:",l
 
 
     if (debugparam>1) call system_clock(count=time1)
+
+
+    call SubgridStresses(U,V,W,Pr)
+
+
+    !$hmpp <tsteps> advancedload, args[Convection::lev]
+
+
+    !$hmpp <tsteps> Convection callsite, args[*].noupdate = true
+    call Convection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
+                       dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
+                       U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,l,dt)
+
+
+    call OtherTerms(U,V,W,U2,V2,W2,Pr,2._KND*alpha(l))
+
+
+    !download U2 V2 and W2 to main memory Attenuates below are to slow on GPU, waiting for HMPP update
+!     !$hmpp <tsteps> delegatedstore, args[UnifRedblack::U2,UnifRedblack::V2,UnifRedblack::W2]
+
+!     !this will havr no effect when doing HMPP
+!     if ((Btype(To) ==FreeSlipBuff) .and. (Prnz>15))  then
+!         !$hmpp <tsteps> AttenuateTop callsite, args[*].noupdate = true
+!         call AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,&
+!                           zPr,zW,U2,V2,W2,temperature,buoyancy)
+!     endif
+!
+!     if ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) then
+!         !$hmpp <tsteps> AttenuateOut callsite, args[*].noupdate = true
+!         call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+!                           xPr,xU,U2,V2,W2,temperature,buoyancy)
+!     endif
+
+
+!     if ( ((Btype(To) ==FreeSlipBuff) .and.&
+!          (Prnz>15)) .or. ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) ) then
+!
+!              call BoundU(1,U2)
+!              call BoundU(2,V2)
+!              call BoundU(3,W2)
+!              !Not for temperature, it will be taken care of in ScalarRK3
+!     endif
+
+    if (masssourc==1) then
+        call IBMassSources(Q,U2,V2,W2)
+    endif
+
+
+    if (poissmet>0) then
+     if (masssourc==1) then
+       call Pr_Correct(U2,V2,W2,Pr,2._KND*alpha(l),Q)
+     else
+       call Pr_Correct(U2,V2,W2,Pr,2._KND*alpha(l))
+     endif
+    endif
+
+
+#ifdef __HMPP
+    !$hmpp <tsteps> UpdateU callsite, args[*].noupdate=true
+    call UpdateU_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,U,V,W,U2,V2,W2)
+#else
+    if (l==1) delta = 0
+    !$omp parallel
+    if (debuglevel>0) then
+      !$omp workshare
+      delta = delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
+      delta = delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
+      delta = delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
+      !$omp end workshare
+    endif
+
+    !$omp workshare
+    U = U2
+    V = V2
+    W = W2
+    !$omp end workshare
+    !$omp end parallel
+#endif
+
+
+
+    !Upload the new values from Pr_Correct to GPU
+
+!     !$hmpp <tsteps> advancedload, args[PressureGrad::Pr]
+!     !$hmpp <tsteps> advancedload, args[AttenuateOut2::U,AttenuateOut2::V,AttenuateOut2::W]
+
+
+    call ScalarRK3(U,V,W,Temperature,Scalar,l,proftempfl)
+
+
+
+
+    if ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) then
+     !$hmpp <tsteps> AttenuateOut2 callsite, args[*].noupdate = true
+      call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                        xPr,xU,U,V,W,temperature,buoyancy)
+!       if (buoyancy==1) then
+! #ifdef __HMPP
+! !              !$hmpp <tsteps> BoundTemperature callsite
+!              call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,temperature)
+! #else
+!              call BoundTemperature(temperature)
+! #endif
+!       endif
+    endif
+
+
+    !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
+    call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                          nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
+
 
 #ifdef __HMPP
     !$hmpp <tsteps> BoundU callsite, args[*].noupdate = true
@@ -157,41 +306,6 @@ write(*,*) "stage:",l
 !$omp end parallel
 #endif
 
-    call SubgridStresses(U,V,W,Pr)
-
-
-    !$hmpp <tsteps> advancedload, args[Convection::lev]
-
-
-    !$hmpp <tsteps> Convection callsite, args[*].noupdate = true
-    call Convection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
-                       dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
-                       U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,l,dt)
-
-
-    call OtherTerms(U,V,W,U2,V2,W2,Pr,2._KND*alpha(l))
-
-
-
-    if ((Btype(To) ==FreeSlipBuff) .and. (Prnz>15))  then
-        !$hmpp <tsteps> AttenuateTop callsite, args[*].noupdate = true
-        call AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,&
-                          zPr,zW,U2,V2,W2,temperature,buoyancy)
-    endif
-
-    if ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) then
-        !$hmpp <tsteps> AttenuateOut callsite, args[*].noupdate = true
-        call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-                          xPr,xU,U2,V2,W2,temperature,buoyancy)
-    endif
-
-    !download U2 V2 and W2 to main memory
-    !$hmpp <tsteps> delegatedstore, args[AttenuateOut::U,AttenuateOut::V,AttenuateOut::W]
-    if (buoyancy==1) then
-      !$hmpp <tsteps> delegatedstore, args[AttenuateOut::temperature]
-    endif
-
-
 
     if (debugparam>1) then
      call system_clock(count=time2)
@@ -199,153 +313,13 @@ write(*,*) "stage:",l
      time1 = time2
     endif
 
-
-    if (masssourc==1) then
-        call BoundU(1,U2)
-        call BoundU(2,V2)
-        call BoundU(3,W2)
-        call IBMassSources(Q,U2,V2,W2)
-    endif
-
-
-
-
-    if (poissmet>0) then
-     if (masssourc==1) then
-       call Pr_Correct(U2,V2,W2,Pr,2._KND*alpha(l),Q)
-     else
-       call Pr_Correct(U2,V2,W2,Pr,2._KND*alpha(l))
-     endif
-    endif
-
-
-    if (l==1) delta = 0
-
-    !$omp parallel
-    if (debuglevel>0) then
-      !$omp workshare
-      delta = delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-      delta = delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
-      delta = delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
-      !$omp end workshare
-    endif
-
-    !$omp workshare
-    U = U2
-    V = V2
-    W = W2
-    !$omp end workshare
-    !$omp end parallel
-
-
-
-    !Upload the new values from Pr_Correct to GPU
-
-    !$hmpp <tsteps> advancedload, args[PressureGrad::Pr]
-    !$hmpp <tsteps> advancedload, args[AttenuateOut2::U,AttenuateOut2::V,AttenuateOut2::W]
-
-
-
-
-   ! Visc should be in memory, as it is computed by CPU for now.
-
-    if (store%BLprofiles>0.and.averaging==1) then
-      call ScalarRK3(U,V,W,Temperature,Scalar,l,proftempfl)
-    else
-      call ScalarRK3(U,V,W,Temperature,Scalar,l)
-    end if
-
-
-
-
-    if (debugparam>1) then
-     call system_clock(count=time2)
-     write (*,*) "ET of part 2", (time2-time1)/real(trate)
-     time1 = time2
-    endif
-
-    if (buoyancy==1) then
-     !$hmpp <tsteps> advancedload, args[AttenuateOut2::temperature]
-    endif
-
-    if ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) then
-     !$hmpp <tsteps> AttenuateOut2 callsite, args[*].noupdate = true
-      call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-                        xPr,xU,U,V,W,temperature,buoyancy)
-    endif
-
-
-    !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
-    call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-                          nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
-
-
-
-
-    if (debugparam>1) then
-     call system_clock(count=time2)
-     write (*,*) "ET of part 3", (time2-time1)/real(trate)
-     time1 = time2
-    endif
-
    enddo
    if (.false.) then
    !$hmpp <tsteps> release
    endif
- end subroutine TMarchRK3
 
+end subroutine TMarchRK3
 
-
-
-
-
-
-
-!  !$hmpp <tsteps> UpdateU codelet
-!  subroutine UpdateU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,U,V,W,U2,V2,W2)
-!  implicit none
-! #ifdef __HMPP
-! #include "hmpp-include.f90"
-! #endif
-!  integer,intent(in)   :: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
-!  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out)  :: U
-!  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)   :: U2
-!  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(out)  :: V
-!  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)   :: V2
-!  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(out)  :: W
-!  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)   :: W2
-!  integer i,j,k
-!
-!    !$hmppcg grid blocksize 512x1
-!    !$hmppcg permute (k,i,j)
-!    do k=-2,Unz+3
-!     do j=-2,Uny+3
-!      do i=-2,Unx+3
-!       U(i,j,k) = U2(i,j,k)
-!      enddo
-!     enddo
-!    enddo
-!
-!    !$hmppcg grid blocksize 512x1
-!    !$hmppcg permute (k,i,j)
-!    do k=-2,Vnz+3
-!     do j=-2,Vny+3
-!      do i=-2,Vnx+3
-!       V(i,j,k) = V2(i,j,k)
-!      enddo
-!     enddo
-!    enddo
-!
-!    !$hmppcg grid blocksize 512x1
-!    !$hmppcg permute (k,i,j)
-!    do k=-2,Wnz+3
-!     do j=-2,Wny+3
-!      do i=-2,Wnx+3
-!       W(i,j,k) = W2(i,j,k)
-!      enddo
-!     enddo
-!    enddo
-!  end subroutine UpdateU
 
 
 
@@ -362,12 +336,18 @@ write(*,*) "stage:",l
    real(KND),intent(inout):: U2(-2:,-2:,-2:),V2(-2:,-2:,-2:),W2(-2:,-2:,-2:)
    real(KND),intent(in):: coef
 
-   real(KND),dimension(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)):: U3
-   real(KND),dimension(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)):: V3
-   real(KND),dimension(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)):: W3
+   real(KND),dimension(:,:,:),allocatable,save:: U3,V3,W3
    real(KND) Ap,Apre,Aprn,Aprt,S
 
    integer i,j,k,it
+   integer,save:: called=0
+
+   if (called==0) then
+     allocate(U3(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)))
+     allocate(V3(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)))
+     allocate(W3(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)))
+     called=1
+   end if
 
    write(*,*) "Otherterms:"
 
@@ -389,7 +369,7 @@ write(*,*) "stage:",l
      !iteration SOR or Gauss-Seidel
 
 
-     !$hmpp <tsteps> advancedload, args[ForwEul::Visc]
+!      !$hmpp <tsteps> advancedload, args[ForwEul::Visc]
 
      !$hmpp <tsteps> ForwEul callsite, args[*].noupdate = true
      call ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
@@ -400,12 +380,9 @@ write(*,*) "stage:",l
 
      call IBMomentum(U2,V2,W2,U3,V3,W3)
 
-
+     !Performs the diffusion terms
 #ifdef __HMPP
-     if (gridtype==UNIFORMGRID.and.GPU>0) then                  !Performs the diffusion terms
-      write (*,*) "GPU CN call"
-
-      !$hmpp <tsteps>  advancedload, args[UnifRedBlack::maxCNiter,UnifRedBlack::epsCN]
+!       !$hmpp <tsteps>  advancedload, args[UnifRedBlack::maxCNiter,UnifRedBlack::epsCN]
 
       !$hmpp <tsteps> UNIFREDBLACK callsite, args[*].noupdate=true
       call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,&
@@ -419,15 +396,13 @@ write(*,*) "stage:",l
 
       write(*,*) "back from GPU CN", it,S
 
-
-     else&
-#endif
+#else
      if (gridtype==UNIFORMGRID) then
       call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
      else
       call GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
      endif
-
+#endif
 
    else  Re_gt_0  !Re<=0
 
@@ -1070,23 +1045,44 @@ write(*,*) "stage:",l
   subroutine SubgridStresses(U,V,W,Pr)
   use Geometric, only: ScalFlIBPoints, TIBPoint_Viscosity
 
+
   real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   integer i
+
+#ifdef __HMPP
+
+     !$hmpp <tsteps> Vreman callsite, args[*].noupdate = true
+     call Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Re,U,V,W,Visc)
+!      !$hmpp <tsteps> delegatedstore, args[Vreman::Visc]
+
+
+     if (wallmodeltype>0) then
+
+!        !$hmpp <tsteps> delegatedstore, args[AttenuateTop::Temperature],&
+!        !$hmpp & args[AttenuateTop::Temperature].section={-1:Prnx+2,-1:Prny+2,1:1} of {-1:Prnx+2,-1:Prny+2,-1:Prnz+2}
+
+       !$hmpp <tsteps> ComputeViscWM callsite, args[*].noupdate = true
+       call ComputeViscsWM_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                                nWMPoints,hmppWMPoints,&
+                                TBtype,Re,temperature_ref,grav_acc,&
+                                U,V,W,Visc)
+     endif
+
+
+     !boundaries to Visc, compute TDiff and boundaries to TDiff
+
+      !$hmpp <tsteps> Bound_Visc_TDiff callsite, args[*].noupdate = true
+      call Bound_Visc_TDiff(Prnx,Prny,Prnz,buoyancy,Btype,Re,Prandtl,Visc,TDiff)
+
+
+
+#else
+
 
      if (sgstype==SmagorinskyModel) then
                        call Smag(U,V,W)
      elseif (sgstype==VremanModel) then
-#ifdef __HMPP
-                       if (GPU>0.and.gridtype==uniformgrid.and. Prnx*Prny*Prnz > 50) then
-                           !$hmpp <tsteps> Vreman callsite, args[*].noupdate = true
-                           call Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Re,U,V,W,Visc)
-                           !$hmpp <tsteps> delegatedstore, args[Vreman::Visc]
-                       else
-                           call Vreman(U,V,W)
-                       endif
-#else
                        call Vreman(U,V,W)
-#endif
      elseif (sgstype==StabSmagorinskyModel) then
                        call StabSmag(U,V,W)
      else
@@ -1110,6 +1106,11 @@ write(*,*) "stage:",l
      enddo
 
      call Bound_Visc(Visc)
+
+     if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
+
+     call Bound_Visc(TDiff)
+#endif
 
   end subroutine SubgridStresses
 
@@ -1144,54 +1145,55 @@ write(*,*) "stage:",l
     integer   :: i,xi,yj,zk
     real(KND) :: src
 
+    if (size(UIBPoints)+size(UIBPoints)+size(UIBPoints)>0) then
+      !$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
+      call BoundU(1,U3)
+      call BoundU(2,V3)
+      call BoundU(3,W3)
 
-     !$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
-     call BoundU(1,U3)
-     call BoundU(2,V3)
-     call BoundU(3,W3)
+     !$omp parallel
+      !$omp do private(xi,yj,zk,src)
+      do i=1,ubound(UIBPoints,1)
+        xi = UIBPoints(i)%xi
+        yj = UIBPoints(i)%yj
+        zk = UIBPoints(i)%zk
 
-    !$omp parallel
-     !$omp do private(xi,yj,zk,src)
-     do i=1,ubound(UIBPoints,1)
-       xi = UIBPoints(i)%xi
-       yj = UIBPoints(i)%yj
-       zk = UIBPoints(i)%zk
+        src = TIBPoint_MomentumSource(UIBPoints(i),U3)
 
-       src = TIBPoint_MomentumSource(UIBPoints(i),U3)
+        U3(xi,yj,zk) = U3(xi,yj,zk) + src * dt
+        U2(xi,yj,zk) = U2(xi,yj,zk) + src * dt
+      enddo
+      !$omp enddo nowait
 
-       U3(xi,yj,zk) = U3(xi,yj,zk) + src * dt
-       U2(xi,yj,zk) = U2(xi,yj,zk) + src * dt
-     enddo
-     !$omp enddo nowait
+      !$omp do private(xi,yj,zk,src)
+      do i=1,ubound(VIBPoints,1)
+        xi = VIBPoints(i)%xi
+        yj = VIBPoints(i)%yj
+        zk = VIBPoints(i)%zk
 
-     !$omp do private(xi,yj,zk,src)
-     do i=1,ubound(VIBPoints,1)
-       xi = VIBPoints(i)%xi
-       yj = VIBPoints(i)%yj
-       zk = VIBPoints(i)%zk
+        src = TIBPoint_MomentumSource(VIBPoints(i),V3)
 
-       src = TIBPoint_MomentumSource(VIBPoints(i),V3)
+        V3(xi,yj,zk) = V3(xi,yj,zk) + src * dt
+        V2(xi,yj,zk) = V2(xi,yj,zk) + src * dt
+      enddo
+      !$omp enddo nowait
 
-       V3(xi,yj,zk) = V3(xi,yj,zk) + src * dt
-       V2(xi,yj,zk) = V2(xi,yj,zk) + src * dt
-     enddo
-     !$omp enddo nowait
+      !$omp do private(xi,yj,zk,src)
+      do i=1,ubound(WIBPoints,1)
+        xi = WIBPoints(i)%xi
+        yj = WIBPoints(i)%yj
+        zk = WIBPoints(i)%zk
 
-     !$omp do private(xi,yj,zk,src)
-     do i=1,ubound(WIBPoints,1)
-       xi = WIBPoints(i)%xi
-       yj = WIBPoints(i)%yj
-       zk = WIBPoints(i)%zk
+        src = TIBPoint_MomentumSource(WIBPoints(i),W3)
 
-       src = TIBPoint_MomentumSource(WIBPoints(i),W3)
+        W3(xi,yj,zk) = W3(xi,yj,zk) + src * dt
+        W2(xi,yj,zk) = W2(xi,yj,zk) + src * dt
+      enddo
+      !$omp enddo
+      !$omp end parallel
 
-       W3(xi,yj,zk) = W3(xi,yj,zk) + src * dt
-       W2(xi,yj,zk) = W2(xi,yj,zk) + src * dt
-     enddo
-     !$omp enddo
-     !$omp end parallel
-
-     !$hmpp <tsteps> advancedload, args[UnifRedBlack::U3,UnifRedBlack::V3,UnifRedBlack::W3]
+      !$hmpp <tsteps> advancedload, args[UnifRedBlack::U3,UnifRedBlack::V3,UnifRedBlack::W3]
+    end if
   end subroutine IBMomentum
 
 
@@ -1244,9 +1246,34 @@ write(*,*) "stage:",l
 
 
 
+#ifdef __HMPP
+  subroutine GetDataFromGPU(getU,getV,getW,getPr,getTemperature,U,V,W,Pr,Temperature)
+    use HMPP_SCALARS, only:GetTemperatureFromGPU
+    logical,intent(in) :: getU,getV,getW,getPr,getTemperature
+    real(KND),intent(inout) :: U(-2:,-2:,-2:)
+    real(KND),intent(inout) :: V(-2:,-2:,-2:)
+    real(KND),intent(inout) :: W(-2:,-2:,-2:)
+    real(KND),intent(inout) :: Pr(1:,1:,1:)
+    real(KND),intent(inout) :: Temperature(-1:,-1:,-1:)
 
 
-
+    if (getU) then
+      !$hmpp <tsteps> delegatedstore, args[UpdateU::U]
+    end if
+    if (getV) then
+      !$hmpp <tsteps> delegatedstore, args[UpdateU::V]
+    end if
+    if (getW) then
+      !$hmpp <tsteps> delegatedstore, args[UpdateU::W]
+    end if
+    if (getPr) then
+      call GetPrFromGPU(Pr)
+    end if
+    if (getTemperature) then
+      call GetTemperatureFromGPU(Temperature)
+    end if
+  end subroutine GetDataFromGPU
+#endif
 
 end module TSTEPS
 

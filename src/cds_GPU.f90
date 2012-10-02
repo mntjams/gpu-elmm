@@ -21,8 +21,9 @@
         Ax=0.25_KND*dt/dx
         Ay=0.25_KND*dt/dy
         Az=0.25_KND*dt/dz
-       !$hmppcg grid blocksize 512x1
+       !$hmppcg grid blocksize myblocksize2
        !$hmppcg permute (k,i,j)
+       !$hmppcg gridify(k,i)
         do k=1,Unz
             do j=1,Uny
                 do i=1,Unx
@@ -36,8 +37,9 @@
             enddo
         enddo
 
-       !$hmppcg grid blocksize 512x1
+       !$hmppcg grid blocksize myblocksize2
        !$hmppcg permute (k,i,j)
+       !$hmppcg gridify(k,i)
         do k=1,Vnz
             do j=1,Vny
                 do i=1,Vnx
@@ -51,8 +53,9 @@
             enddo
         enddo
 
-       !$hmppcg grid blocksize 512x1
+       !$hmppcg grid blocksize myblocksize2
        !$hmppcg permute (k,i,j)
+       !$hmppcg gridify(k,i)
         do k=1,Wnz
             do j=1,Wny
                 do i=1,Wnx

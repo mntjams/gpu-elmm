@@ -340,6 +340,10 @@ contains
       profss = 0
       profssavg = 0
     endif
+  else
+
+    allocate(proftempfl(0)) !to avoid the necessity of an allocatable dummy argument
+
   endif
 
   call GetEndianess

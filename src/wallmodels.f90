@@ -25,6 +25,9 @@ implicit none
  private
  public WMPoint, AddWMPoint, FirstWMPoint, ComputeViscsWM, MoveWMPointsToArray, GetOutsideBoundariesWM,&
         InitTempFl, GroundDeposition, GroundUstar, WMPoints, ListLength
+#ifdef __HMPP
+ public hmppWMpoint,WMPtoHMPP
+#endif
 
  type WMpoint   !points in which we apply wall model
 
@@ -64,6 +67,26 @@ implicit none
 
  contains
 
+#ifdef __HMPP
+  elemental subroutine WMPtoHMPP(ToWMP,FromWMP)
+    type(hmppWMPoint),intent(out) :: ToWMP
+    type(WMPoint),intent(in)  :: FromWMP
+
+    ToWMP%xi = FromWMP%xi
+    ToWMP%yj = FromWMP%yj
+    ToWMP%zk = FromWMP%zk
+
+    ToWMP%distx = FromWMP%distx
+    ToWMP%disty = FromWMP%disty
+    ToWMP%distz = FromWMP%distz
+
+    ToWMP%z0     = FromWMP%z0
+    ToWMP%ustar  = FromWMP%ustar
+    ToWMP%temp   = FromWMP%temp
+    ToWMP%tempfl = FromWMP%tempfl
+
+  end subroutine WMPtoHMPP
+#endif
 
   subroutine WMPtoWMP(ToWMP,FromWMP)
     type(WMPoint),intent(out) :: ToWMP
@@ -1058,7 +1081,6 @@ if (dist<1E-8) STOP
   subroutine ComputeViscsWM(U,V,W,Pr)
    real(KND),dimension(-2:,-2:,-2:):: U,V,W
    real(KND),dimension(1:,1:,1:):: Pr
-   type(WMPoint),pointer:: WMP
    integer i,j
 
 
