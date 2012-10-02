@@ -277,6 +277,11 @@ contains
        allocate(TemperatureProfile%Sections(0))
 
      endif
+
+   else
+
+     TBtype = 0
+
    endif
 
    open(11,file="inlet.conf",status="old",action="read")

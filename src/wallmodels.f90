@@ -943,43 +943,41 @@ if (dist<1E-8) STOP
 
 
 
-  real(KND) function WM_MO_FLUX(WMP,U,V,W,Pr)
-   real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
-   real(KND),dimension(1:,1:,1:),intent(in):: Pr
-   integer i,j,k
-   real(KND) ustar,vel,dist,z0
-   type(WMPoint):: WMP
+  subroutine WM_MO_FLUX_GPU(visc,i,j,k,distx,disty,distz,z0,tempfl,ustar,u,v,w)
+   implicit none
+#include "hmpp-include.f90"
+   real(KND),intent(out) :: visc
 
-   i=WMP%xi
-   j=WMP%yj
-   k=WMP%zk
+   integer,intent(in)      :: i,j,k
+   real(KND),intent(inout) :: ustar
+   real(KND),intent(in)    :: distx,disty,distz,z0,tempfl
+   real(KND),intent(in)    :: u,v,w
+   real(KND) vel,dist
 
-   dist=sqrt(WMP%distx**2+WMP%disty**2+WMP%distz**2)
+
+   dist=sqrt(distx**2+disty**2+distz**2)
 
    vel=0
-   if (abs(WMP%distx)/dymin<0.9_KND*dist) vel=vel+((U(i,j,k)+U(i-1,j,k))/2._KND-WMP%wallu)**2
-   if (abs(WMP%disty)/dymin<0.9_KND*dist) vel=vel+((V(i,j,k)+V(i,j-1,k))/2._KND-WMP%wallv)**2
-   if (abs(WMP%distz)/dymin<0.9_KND*dist) vel=vel+((W(i,j,k)+W(i,j,k-1))/2._KND-WMP%wallw)**2
+   vel=vel+(u)**2 !(U(i,j,k)+U(i-1,j,k))/2._KND
+   vel=vel+(v)**2 !(V(i,j,k)+V(i,j-1,k))/2._KND
+!    if (abs(distz)/dymin<0.9_KND*dist) vel=vel+(w)**2 !(W(i,j,k)+W(i,j,k-1))/2._KND
 
    vel=sqrt(vel)
 
    if (vel/=0) then
-     ustar=WMP%ustar
-     z0=WMP%z0
-     ustar=WM_MO_FLUX_ustar(vel,dist,ustar,z0,WMP%tempfl)
+     call WM_MO_FLUX_ustar(vel,dist,ustar,z0,tempfl,Re,temperature_ref,grav_acc)
      if (ustar<0) ustar=0
-     WMP%ustar=ustar
    endif
 
    if (vel>0.and.ustar*ustar*dist/vel>1._KND/Re) then
-     WM_MO_FLUX=ustar*ustar*dist/vel
+     visc=ustar*ustar*dist/vel
    elseif (Re>0) then
-     WM_MO_FLUX=1._KND/Re
+     visc=1._KND/Re
    else
-     WM_MO_FLUX=0
+     visc=0
    endif
 
-  endfunction WM_MO_FLUX
+  endsubroutine WM_MO_FLUX_GPU
 
 
 
@@ -1096,14 +1094,27 @@ if (dist<1E-8) STOP
      !$omp end parallel
    endif
 
+
+
 !    !$omp parallel do private(i)
    do i = 1,size(WMPoints)
 
-      if (WMPoints(i)%z0>0) then
+      xi = WMPoints(i)%xi
+      yj = WMPoints(i)%yj
+      zk = WMPoints(i)%zk
+      up = (U(xi,yj,zk)+U(xi-1,yj,zk))/2._KND
+      vp = (V(xi,yj,zk)+V(xi,yj-1,zk))/2._KND
+      wp = (W(xi,yj,zk)+W(xi,yj,zk-1))/2._KND
+
+     if (WMPoints(i)%z0>0) then
 
         if (buoyancy==1 .and. TBtype(Bo)==CONSTFLUX) then
 
-           Visc(WMPoints(i)%xi,WMPoints(i)%yj,WMPoints(i)%zk) = WM_MO_FLUX(WMPoints(i),U,V,W,Pr)
+          call WM_MO_FLUX_GPU(Visc(xi, yj, zk) ,&
+                             xi, j, zk,&
+                             WMPoints(i)%distx, WMPoints(i)%disty, WMPoints(i)%distz,&
+                             WMPoints(i)%z0, WMPoints(i)%tempfl ,WMPoints(i)%ustar,&
+                             up,vp,wp)
 
         else if (buoyancy==1 .and. TBtype(Bo)==DIRICHLET) then
 

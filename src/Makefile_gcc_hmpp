@@ -73,7 +73,7 @@ $(TARGETDIR_CLMM)/limiters.o: $(TARGETDIR_CLMM) limiters.f90 $(TARGETDIR_CLMM)/p
 
 $(TARGETDIR_CLMM)/hmpp-codelets.o: $(TARGETDIR_CLMM) hmpp-codelets.F90 tsteps-shared.f90 boundaries_GPU.f90 tsteps_GPU.f90\
 	cds_GPU.f90 smagorinsky_GPU.f90 scalars_GPU.f90 scalarsbound_GPU.f90
-	NVCCFLAGS='--use_fast_math' hmpp --codelet-off $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ hmpp-codelets.F90
+	NVCCFLAGS='--use_fast_math' hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM)  -o $@ hmpp-codelets.F90
 
 $(TARGETDIR_CLMM)/hmpp-scalars.o: $(TARGETDIR_CLMM)/parameters.o $(TARGETDIR_CLMM)/hmpp-codelets.o hmpp-scalars.f90
 	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(PARFLAGS) $(CPPFLAGS_CLMM) -o $@ hmpp-scalars.f90
