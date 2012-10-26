@@ -1538,7 +1538,7 @@ contains
 
 
     !$omp parallel do default(private) shared(n,store,time,fsuffix,xPr,yPr,zPr,Prtype,Pr,U,V,W,&
-    !$omp                                          scalar,temperature,buoyancy,computescalars)
+    !$omp                      scalar,temperature,buoyancy,computescalars,dxmin,dymin,dzmin,temperature_ref)
     do m = 1,size(store%frame_domains)
 
       fname="frame-"//achar(iachar('a')+m-1)//"-"

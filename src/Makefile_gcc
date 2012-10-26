@@ -19,7 +19,7 @@ TARGETDIR_CLMM=../bin/gcc/debug
 #### Compiler and tool definitions shared by all build targets  -fopenmp ,invalid#####
 FC = gfortran-4.7
 BASICOPTS = -cpp -fbacktrace -g -pedantic -Wall -Werror=implicit-procedure -fcheck=all -ffpe-trap=zero,overflow,invalid\
-	-I $(TARGETDIR_CLMM) -J $(TARGETDIR_CLMM) -fstack-arrays
+	-I $(TARGETDIR_CLMM) -J $(TARGETDIR_CLMM) -fstack-arrays -fopenmp
 FFLAGS = $(BASICOPTS)
 
 

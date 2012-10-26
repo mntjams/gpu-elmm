@@ -1,6 +1,6 @@
 module TSTEPS
 
-  use CDS, only: CDU, CDV, CDW, KappaU, KappaV, KappaW
+  use CDS, only: CDU, CDV, CDW, CDS4U, CDS4V, CDS4W, KappaU, KappaV, KappaW
   use LAXFRIED
   use LAXWEND
   use PARAMETERS
@@ -229,10 +229,10 @@ write(*,*) "stage:",l
 #else
     if (l==1) delta = 0
     !$omp parallel
-    if (debuglevel>0) then
+    if (debuglevel>0.or.steady==1) then
       !$omp workshare
       delta = delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-      delta = delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
+!       delta = delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
       delta = delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
       !$omp end workshare
     endif
@@ -439,13 +439,20 @@ end subroutine TMarchRK3
    real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
    real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
    real(KND),intent(in):: coef
-   real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
-   real(KND),dimension(1:Vnx,1:Vny,1:Vnz):: ApV
-   real(KND),dimension(1:Wnx,1:Wny,1:Wnz):: ApW
    real(KND) recdxmin2,recdymin2,recdzmin2                                                               !reciprocal values of dx**2
    real(KND) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
    integer i,j,k,bi,bj,bk,l
    integer,parameter :: narr = 3, narr2 = 5 !number of arrays in the loop
+   real(KND),allocatable,save:: Apu(:,:,:),ApV(:,:,:),ApW(:,:,:)
+   integer,save :: called = 0
+
+       if (called==0) then
+         allocate(Apu(1:Unx,1:Uny,1:Unz))
+         allocate(ApV(1:Vnx,1:Vny,1:Vnz))
+         allocate(ApW(1:Wnx,1:Wny,1:Wnz))
+         called = 1
+       end if
+
 
        Ap = coef*dt/(2._KND)
        S = 0
@@ -624,7 +631,7 @@ end subroutine TMarchRK3
         Su = 0
         Sv = 0
         Sw = 0
-        !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:Su,Sv,Sw)
+        !$OMP PARALLEL PRIVATE(i,j,k,bi,bj,bk,p) REDUCTION(max:Su,Sv,Sw)
         !$OMP DO
         do bk = 1,Unz,tilenz(narr2)
          do bj = 1,Uny,tileny(narr2)
@@ -795,12 +802,19 @@ end subroutine TMarchRK3
    real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
    real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
    real(KND),intent(in):: coef
-   real(KND),dimension(1:Unx,1:Uny,1:Unz):: Apu
-   real(KND),dimension(1:Vnx,1:Vny,1:Vnz):: ApV
-   real(KND),dimension(1:Wnx,1:Wny,1:Wnz):: ApW
    real(KND) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
    integer i,j,k,l
    integer ind(3)
+   real(KND),allocatable,save:: Apu(:,:,:),ApV(:,:,:),ApW(:,:,:)
+   integer,save :: called = 0
+
+       if (called==0) then
+         allocate(Apu(1:Unx,1:Uny,1:Unz))
+         allocate(ApV(1:Vnx,1:Vny,1:Vnz))
+         allocate(ApW(1:Wnx,1:Wny,1:Wnz))
+         called = 1
+       end if
+
 
 
        Ap = coef*dt/(2._KND)
@@ -1107,9 +1121,9 @@ end subroutine TMarchRK3
 
      call Bound_Visc(Visc)
 
-     if (sgstype/=StabSmagorinskyModel)  call ComputeTDiff(U,V,W)
+     if (sgstype/=StabSmagorinskyModel.and.buoyancy==1)  call ComputeTDiff(U,V,W)
 
-     call Bound_Visc(TDiff)
+     if (buoyancy==1) call Bound_Visc(TDiff)
 #endif
 
   end subroutine SubgridStresses
@@ -1247,7 +1261,7 @@ end subroutine TMarchRK3
 
 
 #ifdef __HMPP
-  subroutine GetDataFromGPU(getU,getV,getW,getPr,getTemperature,U,V,W,Pr,Temperature)
+  subroutine GetDataFromGPU(getU,getV,getW,getPr,getTemperature,getVisc,getTDiff,U,V,W,Pr,Temperature)
     use HMPP_SCALARS, only:GetTemperatureFromGPU
     logical,intent(in) :: getU,getV,getW,getPr,getTemperature
     real(KND),intent(inout) :: U(-2:,-2:,-2:)
@@ -1257,23 +1271,48 @@ end subroutine TMarchRK3
     real(KND),intent(inout) :: Temperature(-1:,-1:,-1:)
 
 
-    if (getU) then
-      !$hmpp <tsteps> delegatedstore, args[UpdateU::U]
-    end if
-    if (getV) then
-      !$hmpp <tsteps> delegatedstore, args[UpdateU::V]
-    end if
-    if (getW) then
-      !$hmpp <tsteps> delegatedstore, args[UpdateU::W]
-    end if
-    if (getPr) then
-      call GetPrFromGPU(Pr)
-    end if
-    if (getTemperature) then
-      call GetTemperatureFromGPU(Temperature)
-    end if
+    if (getU) call GetUFromGPU(U)
+
+    if (getV) call GetVFromGPU(V)
+
+    if (getW) call GetWFromGPU(W)
+
+    if (getPr) call GetPrFromGPU(Pr)
+
+    if (getTemperature) call GetTemperatureFromGPU(Temperature)
+
+    if (getVisc) call GetViscFromGPU
+
+    if (getTDiff) call GetTDiffFromGPU
+
   end subroutine GetDataFromGPU
 #endif
+
+
+  subroutine GetUFromGPU(U)
+    real(KND),intent(inout) :: U(-2:,-2:,-2:)
+      !$hmpp <tsteps> delegatedstore, args[UpdateU::U]
+  end subroutine GetUFromGPU
+
+  subroutine GetVFromGPU(V)
+    real(KND),intent(inout) :: V(-2:,-2:,-2:)
+      !$hmpp <tsteps> delegatedstore, args[UpdateU::V]
+  end subroutine GetVFromGPU
+
+  subroutine GetWFromGPU(W)
+    real(KND),intent(inout) :: W(-2:,-2:,-2:)
+      !$hmpp <tsteps> delegatedstore, args[UpdateU::W]
+  end subroutine GetWFromGPU
+
+  subroutine GetViscFromGPU
+      !$hmpp <tsteps> delegatedstore, args[Bound_Visc_TDiff::Visc]
+  end subroutine GetViscFromGPU
+
+
+  subroutine GetTDiffFromGPU
+      !$hmpp <tsteps> delegatedstore, args[Bound_Visc_TDiff::TDiff]
+  end subroutine GetTDiffFromGPU
+
 
 end module TSTEPS
 

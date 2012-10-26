@@ -230,9 +230,18 @@
 #ifdef __HMPP
           call CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Ustar,Vstar,Wstar,U,V,W)
 #else
-          call CDU(Ustar,U,V,W,1._KND)
-          call CDV(Vstar,U,V,W,1._KND)
-          call CDW(Wstar,U,V,W,1._KND)
+        if (convmet==2) then
+          call CDU(Ustar,U,V,W)
+          call CDV(Vstar,U,V,W)
+          call CDW(Wstar,U,V,W)
+        else if (convmet==4) then
+          call CDS4U(Ustar,U,V,W)
+          call CDS4V(Vstar,U,V,W)
+          call CDS4W(Wstar,U,V,W)
+        end if
+        write(*,*) "U,V,Wstar",Ustar(Unx/2,Uny,Unz),Wstar(Wnx/2,Wny,Wnz)
+        write(*,*) "U,V,Wstar",maxval(Ustar(1:Unx,Uny,Unz)),maxval(Wstar(1:Wnx,Wny,Wnz))
+        write(*,*) "U,V,Wstar",maxloc(Ustar(1:Unx,Uny,Unz)),maxloc(Wstar(1:Wnx,Wny,Wnz))
 #endif
 
       else

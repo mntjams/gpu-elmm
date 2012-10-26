@@ -105,6 +105,12 @@ module Tiling
       end do
       !$omp end do
 
+      !$omp workshare
+      where (tilenx<1) tilenx=1
+      where (tileny<1) tileny=1
+      where (tilenz<1) tilenz=1
+      !$omp end workshare
+
       !$omp end parallel
 
     end subroutine InitTiles

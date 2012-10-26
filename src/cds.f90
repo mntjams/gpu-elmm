@@ -6,7 +6,7 @@ module CDS
     implicit none
 
     private
-    public CDU, CDV, CDW, KAPPAU, KAPPAV, KAPPAW
+    public CDU, CDV, CDW, CDS4U, CDS4V, CDS4W, KAPPAU, KAPPAV, KAPPAW
 
     contains
 
@@ -14,9 +14,8 @@ module CDS
 
 
 
-    subroutine CDU(U2,U,V,W,coef)
+    subroutine CDU(U2,U,V,W)
     real(KND) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(KND) coef
     integer nx,ny,nz,i,j,k
     real(KND) Ax,Ay,Az,Utmp
     real(KND),allocatable,dimension(:),save:: fe,fp,gn,ht
@@ -25,20 +24,17 @@ module CDS
      nx=Unx
      ny=Uny
      nz=Unz
-     call BoundU(1,U)
-     call BoundU(2,V)
-     call BoundU(3,W)
 
      if (gridtype==UNIFORMGRID) then
-        Ax=0.25*coef*dt/dxmin
-        Ay=0.25*coef*dt/dymin
-        Az=0.25*coef*dt/dzmin
+        Ax=0.25*dt/dxmin
+        Ay=0.25*dt/dymin
+        Az=0.25*dt/dzmin
 
         !$omp parallel do private(i,j,k)
         do k=1,nz
             do j=1,ny
                 do i=1,nx
-                    U2(i,j,k)= - coef*((Ax*(U(i+1,j,k)+U(i,j,k))*(U(i+1,j,k)+U(i,j,k))&
+                    U2(i,j,k)= - ((Ax*(U(i+1,j,k)+U(i,j,k))*(U(i+1,j,k)+U(i,j,k))&
                     -Ax*(U(i,j,k)+U(i-1,j,k))*(U(i,j,k)+U(i-1,j,k)))&
                     +(Ay*(U(i,j+1,k)+U(i,j,k))*(V(i+1,j,k)+V(i,j,k))&
                     -Ay*(U(i,j,k)+U(i,j-1,k))*(V(i+1,j-1,k)+V(i,j-1,k)))&
@@ -68,7 +64,7 @@ module CDS
                       -(gn(j-1)*U(i,j,k)+(1-gn(j-1))*U(i,j-1,k))*(fp(i)*V(i+1,j-1,k)+(1-fp(i))*V(i,j-1,k)))/dyPr(j)
            Utmp=Utmp+( (ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))&
                       -(ht(k-1)*U(i,j,k)+(1-ht(k-1))*U(i,j,k-1))*(fp(i)*W(i+1,j,k-1)+(1-fp(i))*W(i,j,k-1)))/dzPr(k)
-           U2(i,j,k)=-dt*coef*Utmp
+           U2(i,j,k)=-dt*Utmp
           enddo
          enddo
         enddo
@@ -81,9 +77,8 @@ module CDS
 
 
 
-    subroutine CDV(V2,U,V,W,coef)
+    subroutine CDV(V2,U,V,W)
     real(KND) :: V2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(KND) coef
     integer nx,ny,nz,i,j,k
     real(KND) Ax,Ay,Az,Vtmp
     real(KND),allocatable,dimension(:),save:: gn,gp,fe,ht
@@ -93,20 +88,17 @@ module CDS
      nx=Vnx
      ny=Vny
      nz=Vnz
-     call BoundU(1,U)
-     call BoundU(2,V)
-     call BoundU(3,W)
 
      if (gridtype==UNIFORMGRID) then
-        Ax=0.25*coef*dt/dxmin
-        Ay=0.25*coef*dt/dymin
-        Az=0.25*coef*dt/dzmin
+        Ax=0.25*dt/dxmin
+        Ay=0.25*dt/dymin
+        Az=0.25*dt/dzmin
 
         !$omp parallel do private(i,j,k)
         do k=1,nz
             do j=1,ny
                 do i=1,nx
-                    V2(i,j,k)= - coef*((Ay*(V(i,j+1,k)+V(i,j,k))*(V(i,j+1,k)+V(i,j,k))&
+                    V2(i,j,k)= - ((Ay*(V(i,j+1,k)+V(i,j,k))*(V(i,j+1,k)+V(i,j,k))&
                     -Ay*(V(i,j,k)+V(i,j-1,k))*(V(i,j,k)+V(i,j-1,k)))&
                     +(Ax*(V(i+1,j,k)+V(i,j,k))*(U(i,j+1,k)+U(i,j,k))&
                     -Ax*(V(i,j,k)+V(i-1,j,k))*(U(i-1,j+1,k)+U(i-1,j,k)))&
@@ -136,7 +128,7 @@ module CDS
                       -(fe(i-1)*V(i,j,k)+(1-fe(i-1))*V(i-1,j,k))*(gp(j)*U(i-1,j+1,k)+(1-gp(j))*U(i-1,j,k)))/dxPr(i)
            Vtmp=Vtmp+( (ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))&
                       -(ht(k-1)*V(i,j,k)+(1-ht(k-1))*V(i,j,k-1))*(gp(j)*W(i,j+1,k-1)+(1-gp(j))*W(i,j,k-1)))/dzPr(k)
-           V2(i,j,k)=-dt*coef*Vtmp
+           V2(i,j,k)=-dt*Vtmp
           enddo
          enddo
         enddo
@@ -148,9 +140,8 @@ module CDS
 
 
 
-    subroutine CDW(W2,U,V,W,coef)
+    subroutine CDW(W2,U,V,W)
     real(KND) :: W2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(KND) coef
     integer nx,ny,nz,i,j,k
     real(KND) Ax,Ay,Az,Wtmp
     real(KND),allocatable,dimension(:),save:: ht,hp,fe,gn
@@ -159,20 +150,17 @@ module CDS
      nx=Wnx
      ny=Wny
      nz=Wnz
-     call BoundU(1,U)
-     call BoundU(2,V)
-     call BoundU(3,W)
 
      if (gridtype==UNIFORMGRID) then
-        Ax=0.25*coef*dt/dxmin
-        Ay=0.25*coef*dt/dymin
-        Az=0.25*coef*dt/dzmin
+        Ax=0.25*dt/dxmin
+        Ay=0.25*dt/dymin
+        Az=0.25*dt/dzmin
 
         !$omp parallel do private(i,j,k)
         do k=1,nz
             do j=1,ny
                 do i=1,nx
-                    W2(i,j,k)= - coef*((Az*(W(i,j,k+1)+W(i,j,k))*(W(i,j,k+1)+W(i,j,k))&
+                    W2(i,j,k)= - ((Az*(W(i,j,k+1)+W(i,j,k))*(W(i,j,k+1)+W(i,j,k))&
                     -Az*(W(i,j,k)+W(i,j,k-1))*(W(i,j,k)+W(i,j,k-1)))&
                     +(Ay*(W(i,j+1,k)+W(i,j,k))*(V(i,j,k+1)+V(i,j,k))&
                     -Ay*(W(i,j,k)+W(i,j-1,k))*(V(i,j-1,k)+V(i,j-1,k+1)))&
@@ -202,7 +190,7 @@ module CDS
                       -(fe(i-1)*W(i,j,k)+(1-fe(i-1))*W(i-1,j,k))*(hp(k)*U(i-1,j,k+1)+(1-hp(k))*U(i-1,j,k)))/dxPr(i)
            Wtmp=Wtmp+( (gn(j)*W(i,j+1,k)+(1-gn(j))*W(i,j,k))*(hp(k)*V(i,j,k+1)+(1-hp(k))*V(i,j,k))&
                       -(gn(j-1)*W(i,j,k)+(1-gn(j-1))*W(i,j-1,k))*(hp(k)*V(i,j-1,k+1)+(1-hp(k))*V(i,j-1,k)))/dzPr(k)
-           W2(i,j,k)=-dt*coef*Wtmp
+           W2(i,j,k)=-dt*Wtmp
           enddo
          enddo
         enddo
@@ -211,16 +199,197 @@ module CDS
     end subroutine CDW
 
 
-  subroutine KAPPAU(U2,U,V,W,coef)
+
+    subroutine CDS4U(U2,U,V,W)
+      real(KND),dimension(-2:,-2:,-2:),intent(out) :: U2
+      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      integer,parameter :: mask(4) = (/ -1, 9, 9, -1 /)
+      integer,parameter :: divcoef = 256
+      real(KND),parameter :: mask2(2) = (/ 0.5_KND, 0.5_KND /)
+      integer   :: i,j,k,l
+      real(KND) :: flux
+
+      !$omp parallel private(i,j,k,l,flux)
+      !$omp workshare
+      U2 = 0
+      !$omp end workshare
+
+      !$omp do
+      do k=1,Unz
+        do j=1,Uny
+          do i=1,Unx+1
+            flux = ( ( sum(mask * U(i-2:i+1,j,k)) )**2 ) / dxmin
+            U2(i-1,j,k) = U2(i-1,j,k) - flux
+            U2(i,j,k)   = U2(i,j,k)   + flux
+          enddo
+        enddo
+      enddo
+      !$omp end do
+
+      !$omp do
+      do k=1,Unz
+        do j=1,Uny+1
+          do i=1,Unx
+            flux = ( sum(mask * U(i,j-2:j+1,k)) * sum(mask * V(i-1:i+2,j-1,k)) ) / dymin
+            U2(i,j-1,k) = U2(i,j-1,k) - flux
+            U2(i,j,k)   = U2(i,j,k)   + flux
+          enddo
+        enddo
+      enddo
+      !$omp end do
+
+      do l=1,2
+        !$omp do
+        do k=l,Unz+1,2
+          do j=1,Uny
+            do i=1,Unx
+              flux = ( sum(mask * U(i,j,k-2:k+1))) * sum(mask * W(i-1:i+2,j,k-1)) / dzmin
+              U2(i,j,k-1) = U2(i,j,k-1) - flux
+              U2(i,j,k)   = U2(i,j,k)   + flux
+            enddo
+          enddo
+        enddo
+        !$omp end do
+      end do
+
+      !$omp workshare
+      U2 = U2 * dt / divcoef
+      !$omp end workshare
+      !$omp end parallel
+
+    end subroutine CDS4U
+
+
+    subroutine CDS4V(V2,U,V,W)
+      real(KND),dimension(-2:,-2:,-2:),intent(out) :: V2
+      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      integer,parameter :: mask(4) = (/ -1, 9, 9, -1 /)
+      integer,parameter :: divcoef = 256
+      real(KND),parameter :: mask2(2) = (/ 0.5_KND, 0.5_KND /)
+      integer   :: i,j,k,l
+      real(KND) :: flux
+
+      !$omp parallel private(i,j,k,l,flux)
+      !$omp workshare
+      V2 = 0
+      !$omp end workshare
+
+      !$omp do
+      do k=1,Vnz
+        do j=1,Vny
+          do i=1,Vnx+1
+            flux = ( sum(mask * V(i-2:i+1,j,k)) * sum(mask * U(i-1,j-1:j+2,k)) ) / dxmin
+            V2(i-1,j,k) = V2(i-1,j,k) - flux
+            V2(i,j,k)   = V2(i,j,k)   + flux
+          enddo
+        enddo
+      enddo
+      !$omp end do
+
+      !$omp do
+      do k=1,Vnz
+        do j=1,Vny+1
+          do i=1,Vnx
+            flux = ( ( sum(mask * V(i,j-2:j+1,k)) )**2 ) / dymin
+            V2(i,j-1,k) = V2(i,j-1,k) - flux
+            V2(i,j,k)   = V2(i,j,k)   + flux
+          enddo
+        enddo
+      enddo
+      !$omp end do
+
+      do l=1,2
+        !$omp do
+        do k=l,Vnz+1,2
+          do j=1,Vny
+            do i=1,Vnx
+              flux = ( sum(mask * V(i,j,k-2:k+1)) * sum(mask * W(i,j-1:j+2,k-1)) ) / dzmin
+              V2(i,j,k-1) = V2(i,j,k-1) - flux
+              V2(i,j,k)   = V2(i,j,k)   + flux
+            enddo
+          enddo
+        enddo
+        !$omp end do
+      end do
+
+      !$omp workshare
+      V2 = V2 * dt / divcoef
+      !$omp end workshare
+      !$omp end parallel
+
+    end subroutine CDS4V
+
+
+    subroutine CDS4W(W2,U,V,W)
+      real(KND),dimension(-2:,-2:,-2:),intent(out) :: W2
+      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      integer,parameter :: mask(4) = (/ -1, 9, 9, -1 /)
+      integer,parameter :: divcoef = 256
+      real(KND),parameter :: mask2(2) = (/  0.5_KND, 0.5_KND/)
+      integer   :: i,j,k,l
+      real(KND) :: flux
+
+      !$omp parallel private(i,j,k,l,flux)
+      !$omp workshare
+      W2 = 0
+      !$omp end workshare
+
+      !$omp do
+      do k=1,Wnz
+        do j=1,Wny
+          do i=1,Wnx+1
+            flux = ( sum(mask * W(i-2:i+1,j,k)) * sum(mask * U(i-1,j,k-1:k+2)) ) / dxmin
+            W2(i-1,j,k) = W2(i-1,j,k) - flux
+            W2(i,j,k)   = W2(i,j,k)   + flux
+          enddo
+        enddo
+      enddo
+      !$omp end do
+
+      !$omp do
+      do k=1,Wnz
+        do j=1,Wny+1
+          do i=1,Wnx
+            flux = ( sum(mask * W(i,j-2:j+1,k)) * sum(mask * V(i,j-1,k-1:k+2)) ) / dymin
+            W2(i,j-1,k) = W2(i,j-1,k) - flux
+            W2(i,j,k)   = W2(i,j,k)   + flux
+          enddo
+        enddo
+      enddo
+      !$omp end do
+
+      do l=1,2
+        !$omp do
+        do k=l,Wnz+1,2
+          do j=1,Wny
+            do i=1,Wnx
+              flux = ( ( sum(mask * W(i,j,k-2:k+1)) )**2 ) / dzmin
+              W2(i,j,k-1) = W2(i,j,k-1) - flux
+              W2(i,j,k)   = W2(i,j,k)   + flux
+            enddo
+          enddo
+        enddo
+        !$omp end do
+      end do
+
+      !$omp workshare
+      W2 = W2 * dt / divcoef
+      !$omp end workshare
+      !$omp end parallel
+
+    end subroutine CDS4W
+
+
+  subroutine KAPPAU(U2,U,V,W)
   real(KND),intent(out)::U2(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer i,j,k
   real(KND) A,SL,SR,FLUX
   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3):: SLOPE
   real(KND),parameter::eps=1e-8
 
 
-  A=coef*dt/2._KND
+  A=dt/2._KND
 
   SLOPE=0
   do i=0,Unx
@@ -319,16 +488,16 @@ module CDS
 
 
 
-  pure subroutine KAPPAV(V2,U,V,W,coef) !Kappa scheme with flux limiter
+  pure subroutine KAPPAV(V2,U,V,W) !Kappa scheme with flux limiter
   real(KND),intent(out)::V2(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer i,j,k
   real(KND) A,SL,SR,FLUX
   real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3):: SLOPE
   real(KND),parameter::eps=1e-8
 
 
-  A=coef*dt/2._KND
+  A=dt/2._KND
 
   SLOPE=0
   do i=0,Vnx
@@ -425,16 +594,16 @@ module CDS
   enddo
   endsubroutine KAPPAV
 
-  pure subroutine KAPPAW(W2,U,V,W,coef) !Kappa scheme with flux limiter
+  pure subroutine KAPPAW(W2,U,V,W) !Kappa scheme with flux limiter
   real(KND),intent(out)::W2(-2:,-2:,-2:) !Hunsdorfer et al. 1995, JCP
-  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
+  real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer i,j,k
   real(KND) A,SL,SR,FLUX
   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3):: SLOPE
   real(KND),parameter::eps=1e-8
 
 
-  A=coef*dt/2._KND
+  A=dt/2._KND
 
   SLOPE=0
   do i=0,Wnx

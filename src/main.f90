@@ -93,14 +93,6 @@ program CLMM
                       U,     V,     W,     Pr,    Temperature)
 #endif
 
-write(*,*) maxval(U(1:Unx,1:Uny,1:Unz)),maxval(V(1:Vnx,1:Vny,1:Vnz)),maxval(W(1:Wnx,1:Wny,1:Wnz)),&
-maxval(temperature(1:Prnx,1:Prny,1:Prnz))
-write(*,*) sum(U(1:Unx,1:Uny,1:Unz)),sum(V(1:Vnx,1:Vny,1:Vnz)),sum(W(1:Wnx,1:Wny,1:Wnz)),&
-sum(temperature(1:Prnx,1:Prny,1:Prnz))
-write(*,*) U(Unx/2,Uny/2,1),V(Vnx/2,Vny/2,1),W(Wnx/2,Wny/2,1),&
-temperature(Prnx/2,Prny/2,1)
-
-
 
   write (*,*) "Saving results..."
 
@@ -142,6 +134,8 @@ temperature(Prnx/2,Prny/2,1)
      if (buoyancy>0.or.computescalars>0) then
        allocate(TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
        TDiff=huge(1.0_KND)
+     else
+       allocate(TDiff(0,0,0))
      endif
 
      if (fullstress==1) then
