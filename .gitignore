@@ -3,6 +3,9 @@
 *.mod
 *.hmd
 *.so
+*.o
+*.bak
+*.hmg
 .make.*
 custom*.f90
 
