@@ -101,9 +101,7 @@ module PARAMETERS
 
   integer   :: nUnull,nVnull,nWnull  !second dimension of arrays above (number of points)
 
-  real(KND) :: x0,y0,z0
   integer   :: step
-  integer   :: deb !for debugging purposes
 
   logical   :: xgridfromfile,ygridfromfile,zgridfromfile
   integer   :: initcondsfromfile
@@ -125,7 +123,7 @@ module PARAMETERS
                         TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
   integer,parameter :: NOINLET=0,CONSTANT=1,SHEAR=2,PARABOLIC=3,CONSTPROF=1,LOGPROF=2,POWERPROF=3  !inlet profile types
   integer,parameter :: GENERALGRID=1,UNIFORMGRID=2
-  integer,parameter :: SmagorinskyModel=1,DynSmagorinskyModel=2,VremanModel=3,StabSmagorinskyModel=4
+  integer,parameter :: SmagorinskyModel=1,SigmaModel=2,VremanModel=3,StabSmagorinskyModel=4
   integer,parameter :: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4
 
   integer :: debuglevel = 0 !amount of information to write out

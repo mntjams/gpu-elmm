@@ -238,10 +238,11 @@
           call CDS4U(Ustar,U,V,W)
           call CDS4V(Vstar,U,V,W)
           call CDS4W(Wstar,U,V,W)
+        else if (convmet==5) then
+          call CDS4_2U(Ustar,U,V,W)
+          call CDS4_2V(Vstar,U,V,W)
+          call CDS4_2W(Wstar,U,V,W)
         end if
-        write(*,*) "U,V,Wstar",Ustar(Unx/2,Uny,Unz),Wstar(Wnx/2,Wny,Wnz)
-        write(*,*) "U,V,Wstar",maxval(Ustar(1:Unx,Uny,Unz)),maxval(Wstar(1:Wnx,Wny,Wnz))
-        write(*,*) "U,V,Wstar",maxloc(Ustar(1:Unx,Uny,Unz)),maxloc(Wstar(1:Wnx,Wny,Wnz))
 #endif
 
       else
@@ -334,6 +335,11 @@
       enddo
       !$omp end do
       !$omp end parallel
+
+
+      Where (Utype>0) U2=0
+      Where (Vtype>0) V2=0
+      Where (Wtype>0) W2=0
 
   end subroutine Convection
 
@@ -833,11 +839,10 @@
 
   implicit none
 
-#include "hmpp-include.f90"
-
   integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
   integer,intent(in)      :: Btype(6)
 #ifdef __HMPP
+#include "hmpp-include.f90"
   real(KND),intent(in)    :: zPr(-2:Prnz+3)
   real(KND),intent(in)    :: zW(-3:Prnz+3)
   real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
@@ -1080,10 +1085,9 @@
 
   implicit none
 
-#include "hmpp-include.f90"
-
   integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
 #ifdef __HMPP
+#include "hmpp-include.f90"
   real(KND),intent(in)    :: xPr(-2:Prnx+3)
   real(KND),intent(in)    :: xU(-3:Prnx+3)
   real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
@@ -1192,9 +1196,9 @@
   pure function DampF(x)
 
   implicit none
-
+#ifdef __HMPP
 #include "hmpp-include.f90"
-
+#endif
   real(KND) DampF
   real(KND),intent(in)::x
   intrinsic exp
@@ -1215,10 +1219,9 @@
 
   implicit none
 
-#include "hmpp-include.f90"
-
   integer,intent(in)      :: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,nUnull,nVnull,nWnull
 #ifdef __HMPP
+#include "hmpp-include.f90"
   integer,dimension(3,nUnull),intent(in)      :: Unull
   integer,dimension(3,nVnull),intent(in)      :: Vnull
   integer,dimension(3,nWnull),intent(in)      :: Wnull

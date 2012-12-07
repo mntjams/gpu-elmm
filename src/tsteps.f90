@@ -1,6 +1,6 @@
 module TSTEPS
 
-  use CDS, only: CDU, CDV, CDW, CDS4U, CDS4V, CDS4W, KappaU, KappaV, KappaW
+  use CDS!, only: CDU, CDV, CDW, CDS4U, CDS4V, CDS4W, CDS4_2U, CDS4_2V, CDS4_2W
   use LAXFRIED
   use LAXWEND
   use PARAMETERS
@@ -8,7 +8,7 @@ module TSTEPS
   use POISSON !it exports Pr_Correct and GetPrFromGPU
   use OUTPUTS, only: store,display,proftempfl
   use SCALARS, only: ScalarRK3, Bound_Visc, ComputeTDiff, BoundTemperature
-  use SMAGORINSKY, only: Smag, StabSmag, Vreman
+  use SMAGORINSKY, only: SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma, SGS_Filter
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
   use Wallmodels
   use Tiling, only: tilenx, tileny, tilenz
@@ -168,6 +168,7 @@ write(*,*) "stage:",l
     if (debugparam>1) call system_clock(count=time1)
 
 
+
     call SubgridStresses(U,V,W,Pr)
 
 
@@ -215,11 +216,7 @@ write(*,*) "stage:",l
 
 
     if (poissmet>0) then
-     if (masssourc==1) then
-       call Pr_Correct(U2,V2,W2,Pr,2._KND*alpha(l),Q)
-     else
-       call Pr_Correct(U2,V2,W2,Pr,2._KND*alpha(l))
-     endif
+       call Pr_Correct(U2,V2,W2,Pr,Q,2._KND*alpha(l))
     endif
 
 
@@ -273,9 +270,9 @@ write(*,*) "stage:",l
     endif
 
 
-    !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
-    call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-                          nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
+!     !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
+!     call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+!                           nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
 
 
 #ifdef __HMPP
@@ -351,6 +348,8 @@ end subroutine TMarchRK3
 
    write(*,*) "Otherterms:"
 
+   call FilterU2
+
    !$hmpp <tsteps> advancedload, args[PressureGrad::coef]
 
    !Pressure gradient terms
@@ -361,6 +360,7 @@ end subroutine TMarchRK3
                      Btype,prgradientx,prgradienty,&
                      Pr,U2,V2,W2,&
                      dt,coef)
+
 
    Re_gt_0: if (Re>0) then
 
@@ -430,6 +430,35 @@ end subroutine TMarchRK3
     S = S/(Unx*Uny*Unz)
     write(*,*) "Mean friction:", S
    endif
+
+
+   contains
+
+     subroutine FilterU2
+
+       call BoundU(1,U2,2)
+       call BoundU(2,V2,2)
+       call BoundU(3,W2,2)
+
+! print *,sum(U2(1:Unx,1:Uny,1:Unz))
+       call SGS_Filter(U3,U2)
+! print *,sum(U3(1:Unx,1:Uny,1:Unz))
+! print *,sum(V2(1:Vnx,1:Vny,1:Vnz))
+       call SGS_Filter(V3,V2)
+! print *,sum(V3(1:Vnx,1:Vny,1:Vnz))
+! print *,sum(W2(1:Wnx,1:Wny,1:Wnz))
+       call SGS_Filter(W3,W2)
+! print *,sum(W3(1:Wnx,1:Wny,1:Wnz))
+
+       U2(1:Unx,1:Uny,1:Unz) = U3(1:Unx,1:Uny,1:Unz)
+       V2(1:Vnx,1:Vny,1:Vnz) = V3(1:Vnx,1:Vny,1:Vnz)
+       W2(1:Wnx,1:Wny,1:Wnz) = W3(1:Wnx,1:Wny,1:Wnz)
+
+       call BoundU(1,U2,2)
+       call BoundU(2,V2,2)
+       call BoundU(3,W2,2)
+
+     end subroutine
   endsubroutine OtherTerms
 
 
@@ -1094,13 +1123,19 @@ end subroutine TMarchRK3
 
 
      if (sgstype==SmagorinskyModel) then
-                       call Smag(U,V,W)
+                       call SGS_Smag(U,V,W,2._KND)
+     elseif (sgstype==SigmaModel) then
+                       call SGS_Sigma(U,V,W,2._KND)
      elseif (sgstype==VremanModel) then
-                       call Vreman(U,V,W)
+                       call SGS_Vreman(U,V,W,2._KND)
      elseif (sgstype==StabSmagorinskyModel) then
-                       call StabSmag(U,V,W)
+                       call SGS_StabSmag(U,V,W,2._KND)
      else
-                       Visc = 1._KND/Re
+         if (Re>0) then
+           Visc=1._KND/Re
+         else
+           Visc=0
+         endif
      endif
 
 

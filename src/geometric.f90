@@ -6,10 +6,15 @@ module GEOMETRIC
 
   private
 
-  public TIBPoint,TIBPoint_MomentumSource,TIBPoint_ScalFlSource,TIBPoint_Viscosity,&
-         UIBPoints,VIBPoints,WIBPoints,ScalFlIBPoints,&
-         InitSolidBodies,GetSolidBodiesBC
-
+  public TIBPoint, TIBPoint_MomentumSource, TIBPoint_ScalFlSource, TIBPoint_Viscosity, &
+         UIBPoints, VIBPoints, WIBPoints, ScalFlIBPoints, &
+         InitSolidBodies,GetSolidBodiesBC, &
+         obstaclefile
+#ifdef CUSTOMSB
+  public TLine, TPlane, TPolyhedron, TBall, TCylJacket, TCylinder, TTerrainPoint, TTerrain, TSolidBody, &
+         NoneBody, Polyhedron, Ball, Cylinder, Terrain, &
+         AddSolidBody
+#endif
 
   type TLine                            !These object could be implemented using Fortran's 2003 inheritance.
     real(KND) xc,yc,zc                  !This approach using pointers is more portable and less safe.
@@ -111,8 +116,6 @@ module GEOMETRIC
 
 
   integer, parameter :: NoneBody = 0, Polyhedron = 1, Ball = 2, Cylinder = 3, Terrain = 4
-
-
 
   interface Inside
     module procedure TPlane_Inside
@@ -231,6 +234,8 @@ module GEOMETRIC
   type(TIBPoint),dimension(:),allocatable,save :: ScalFlIBPoints
 
   integer, save :: NUIBPoints = 0 ,NVIBPoints = 0, NWIBPoints = 0, NScalFlIBPoints = 0
+
+  character(80) :: obstaclefile = ''
 
   interface assignment (=)
     module procedure VelIBPtoIBP
@@ -435,19 +440,19 @@ contains
     endif
 
 
-    if (abs(IBP%distx)<(xU(xi+1)-xU(xi-1))/10._KND) then      !if too close to the boundary, set the distance to 0
+    if (abs(IBP%distx)<(xU(xi+1)-xU(xi-1))/1000._KND) then      !if too close to the boundary, set the distance to 0
       IBP%distx = 0
       dirx = 0
       IBP%dirx = 0
     endif
 
-    if (abs(IBP%disty)<(yU(yj+1)-yU(yj-1))/10._KND) then
+    if (abs(IBP%disty)<(yU(yj+1)-yU(yj-1))/1000._KND) then
       IBP%disty = 0
       diry = 0
       IBP%diry = 0
     endif
 
-    if (abs(IBP%distz)<(zU(zk+1)-zU(zk-1))/10._KND) then
+    if (abs(IBP%distz)<(zU(zk+1)-zU(zk-1))/1000._KND) then
       IBP%distz = 0
       dirz = 0
       IBP%dirz = 0
@@ -479,32 +484,32 @@ contains
     n1 = 0                                                          ! n1 number of neighbouring cells free of solid bodies
     n2 = 0                                                          ! n2 number of nonzero coordinate directions to boundary
 
-    if (Utype(xi+1,yj,zk)==0) then
+    if (Utype(xi+1,yj,zk)<=0) then
       n1 = n1+1
       nx = nx+1
     endif
 
-    if (Utype(xi-1,yj,zk)==0) then
+    if (Utype(xi-1,yj,zk)<=0) then
       n1 = n1+1
       nx = nx+1
     endif
 
-    if (Utype(xi,yj+1,zk)==0) then
+    if (Utype(xi,yj+1,zk)<=0) then
       n1 = n1+1
       ny = ny+1
     endif
 
-    if (Utype(xi,yj-1,zk)==0) then
+    if (Utype(xi,yj-1,zk)<=0) then
       n1 = n1+1
       ny = ny+1
     endif
 
-    if (Utype(xi,yj,zk+1)==0) then
+    if (Utype(xi,yj,zk+1)<=0) then
       n1 = n1+1
       nz = nz+1
     endif
 
-    if (Utype(xi,yj,zk-1)==0) then
+    if (Utype(xi,yj,zk-1)<=0) then
       n1 = n1+1
       nz = nz+1
     endif
@@ -560,12 +565,12 @@ contains
 
     elseif ((free100.and.dirx==1).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then !Three free directions,
 
-      IBP%interp = 7                                                                           !use trilinear interpolation.
+      IBP%interp = 9                                                                           !use trilinear interpolation.
       IBP%interpdir = 0
 
     elseif ((.not.free100).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then !Two free directions y and z,
                                                                                      !use bilinear interpolation normal to x.
-      IBP%interp = 3
+      IBP%interp = 6
       IBP%interpdir = 1
 
       if (dirx==1) then                                       !If dirx /= 0 then forget the x component of dist vector
@@ -579,7 +584,7 @@ contains
 
     elseif ((.not.free010).and.(free100.and.dirx==1).and.(free001.and.dirz==1)) then  !the same normal to y
 
-      IBP%interp = 3
+      IBP%interp = 6
       IBP%interpdir = 2
 
       if (diry==1) then
@@ -593,7 +598,7 @@ contains
 
     elseif ((.not.free001).and.(free100.and.dirx==1).and.(free010.and.diry==1)) then  !the same normal to z
 
-      IBP%interp = 3
+      IBP%interp = 6
       IBP%interpdir = 3
 
       if (dirz==1) then
@@ -607,7 +612,7 @@ contains
 
     elseif (free100.and.dirx==1) then  !Only one free direction, use linear interpolation in direction x.
 
-      IBP%interp = 2
+      IBP%interp = 3
       IBP%interpdir = 1
 
       if (diry==1.or.dirz==1) then                   !If other dir components nonzero, delete them and
@@ -623,7 +628,7 @@ contains
 
     elseif (free010.and.diry==1) then               !the same in y
 
-      IBP%interp = 2
+      IBP%interp = 3
       IBP%interpdir = 2
 
       if (dirx==1.or.dirz==1) then
@@ -639,7 +644,7 @@ contains
 
     elseif (free001.and.dirz==1) then               !the same in z
 
-      IBP%interp = 2
+      IBP%interp = 3
       IBP%interpdir = 3
 
       if (dirx==1.or.diry==1) then
@@ -687,11 +692,205 @@ contains
 
 
 
+!
+!   subroutine TVelIBPoint_InterpolationCoefs(IBP,xU,yU,zU)
+!     type(TVelIBpoint),intent(inout)     :: IBP
+!     real(KND),dimension(-2:),intent(in) :: xU,yU,zU
+!     real(KND) p0,p1,p2,p3,p4,p5
+!     integer xi,yj,zk,dirx,diry,dirz
+!
+!     xi = IBP%xi
+!     yj = IBP%yj
+!     zk = IBP%zk
+!
+!     dirx = IBP%dirx
+!     diry = IBP%diry
+!     dirz = IBP%dirz
+!
+!     if (IBP%interp==2) then
+!
+!
+!         IBP%IntPoints(1)%xi = xi+dirx
+!         IBP%IntPoints(1)%yj = yj+diry
+!         IBP%IntPoints(1)%zk = zk+dirz
+!
+!         IBP%IntPoints(2)%xi = xi+2*dirx
+!         IBP%IntPoints(2)%yj = yj+2*diry
+!         IBP%IntPoints(2)%zk = zk+2*dirz
+!
+!         if (IBP%interpdir==1) then
+!           p0 = abs(IBP%distx)
+!           p1 = abs(xU(xi+dirx)-xU(xi))
+!           p2 = abs(xU(xi+2*dirx)-xU(xi))
+!         elseif (IBP%interpdir==2) then
+!           p0 = abs(IBP%disty)
+!           p1 = abs(yU(yj+diry)-yU(yj))
+!           p2 = abs(yU(yj+2*diry)-yU(yj))
+!         else
+!           p0 = abs(IBP%distz)
+!           p1 = abs(zU(zk+dirz)-zU(zk))
+!           p2 = abs(zU(zk+2*dirz)-zU(zk))
+!         endif
+!
+!         call IBLinInterpolationCoefs(IBP%IntPoints%coef,p0,p1,p2)
+!
+!
+!     elseif (IBP%interp==4) then
+!
+!
+!         if (IBP%interpdir==1) then
+!
+!           IBP%IntPoints(1)%xi = xi
+!           IBP%IntPoints(1)%yj = yj + diry
+!           IBP%IntPoints(1)%zk = zk
+!
+!           IBP%IntPoints(2)%xi = xi
+!           IBP%IntPoints(2)%yj = yj + 2*diry
+!           IBP%IntPoints(2)%zk = zk
+!
+!           IBP%IntPoints(3)%xi = xi
+!           IBP%IntPoints(3)%yj = yj
+!           IBP%IntPoints(3)%zk = zk + dirz
+!
+!           IBP%IntPoints(4)%xi = xi
+!           IBP%IntPoints(4)%yj = yj
+!           IBP%IntPoints(4)%zk = zk + 2*dirz
+!
+!           p0 = abs(IBP%disty)
+!           p1 = abs(yU(yj+diry)-yU(yj))
+!           p2 = abs(yU(yj+2*diry)-yU(yj))
+!
+!           p3 = abs(IBP%distz)
+!           p4 = abs(zU(zk+dirz)-zU(zk))
+!           p5 = abs(zU(zk+2*dirz)-zU(zk))
+!
+!
+!         elseif (IBP%interpdir==2) then
+!
+!           IBP%IntPoints(1)%xi = xi
+!           IBP%IntPoints(1)%yj = yj
+!           IBP%IntPoints(1)%zk = zk + dirz
+!
+!           IBP%IntPoints(2)%xi = xi
+!           IBP%IntPoints(2)%yj = yj
+!           IBP%IntPoints(2)%zk = zk + 2*dirz
+!
+!           IBP%IntPoints(3)%xi = xi + dirx
+!           IBP%IntPoints(3)%yj = yj
+!           IBP%IntPoints(3)%zk = zk
+!
+!           IBP%IntPoints(4)%xi = xi + 2*dirx
+!           IBP%IntPoints(4)%yj = yj
+!           IBP%IntPoints(4)%zk = zk
+!
+!           p0 = abs(IBP%distz)
+!           p1 = abs(zU(zk+dirz)-zU(zk))
+!           p2 = abs(zU(zk+2*dirz)-zU(zk))
+!
+!           p3 = abs(IBP%distx)
+!           p4 = abs(xU(xi+dirx)-xU(xi))
+!           p5 = abs(xU(xi+2*dirx)-xU(xi))
+!
+!         else
+!
+!           IBP%IntPoints(1)%xi = xi + dirx
+!           IBP%IntPoints(1)%yj = yj
+!           IBP%IntPoints(1)%zk = zk
+!
+!           IBP%IntPoints(2)%xi = xi + 2*dirx
+!           IBP%IntPoints(2)%yj = yj
+!           IBP%IntPoints(2)%zk = zk
+!
+!           IBP%IntPoints(3)%xi = xi
+!           IBP%IntPoints(3)%yj = yj + diry
+!           IBP%IntPoints(3)%zk = zk
+!
+!           IBP%IntPoints(4)%xi = xi
+!           IBP%IntPoints(4)%yj = yj + 2*diry
+!           IBP%IntPoints(4)%zk = zk
+!
+!           p0 = abs(IBP%distx)
+!           p1 = abs(xU(xi+dirx)-xU(xi))
+!           p2 = abs(xU(xi+2*dirx)-xU(xi))
+!
+!           p3 = abs(IBP%disty)
+!           p4 = abs(yU(yj+diry)-yU(yj))
+!           p5 = abs(yU(yj+2*diry)-yU(yj))
+!
+!         endif
+!
+!         call IBLinInterpolationCoefs(IBP%IntPoints(1:2)%coef,p0,p1,p2)
+!
+!         call IBLinInterpolationCoefs(IBP%IntPoints(3:4)%coef,p3,p4,p5)
+!
+!         !beta 1 and  2 in Peller et al., doi:1.1002/fld.1227
+!         p1 = p3/p0
+!         p2 = p0/p3
+!         !sum of betas
+!         p4 = p1 + p2
+!
+!         IBP%IntPoints(1:2)%coef = IBP%IntPoints(1:2)%coef * p1/p4
+!
+!         IBP%IntPoints(3:4)%coef = IBP%IntPoints(3:4)%coef * p2/p4
+!
+!     elseif (IBP%interp==7) then
+!
+!
+!         IBP%IntPoints(1)%xi = xi+dirx
+!         IBP%IntPoints(1)%xi = yj
+!         IBP%IntPoints(1)%xi = zk
+!
+!         IBP%IntPoints(2)%xi = xi
+!         IBP%IntPoints(2)%xi = yj+diry
+!         IBP%IntPoints(2)%xi = zk
+!
+!         IBP%IntPoints(3)%xi = xi+dirx
+!         IBP%IntPoints(3)%xi = yj+diry
+!         IBP%IntPoints(3)%xi = zk
+!
+!         IBP%IntPoints(4)%xi = xi
+!         IBP%IntPoints(4)%xi = yj
+!         IBP%IntPoints(4)%xi = zk+dirz
+!
+!         IBP%IntPoints(5)%xi = xi+dirx
+!         IBP%IntPoints(5)%xi = yj
+!         IBP%IntPoints(5)%xi = zk+dirz
+!
+!         IBP%IntPoints(6)%xi = xi
+!         IBP%IntPoints(6)%xi = yj+diry
+!         IBP%IntPoints(6)%xi = zk+dirz
+!
+!         IBP%IntPoints(7)%xi = xi+dirx
+!         IBP%IntPoints(7)%xi = yj+diry
+!         IBP%IntPoints(7)%xi = zk+dirz
+!
+!         p0 = abs(IBP%distx)
+!         p1 = abs(IBP%disty)
+!         p2 = abs(IBP%distz)
+!         p3 = abs(xU(xi+dirx)-xU(xi))
+!         p4 = abs(yU(yj+diry)-yU(yj))
+!         p5 = abs(zU(zk+dirz)-zU(zk))
+!
+!         call IBTriLinInterpolationCoefs(IBP%IntPoints%coef,p0,p1,p2,p3,p4,p5)
+!
+!     endif
+!
+!     IBP%Intpoints%coef = 0
+!   end subroutine TVelIBPoint_InterpolationCoefs
+
+
+
+
+
+
+
+
 
   subroutine TVelIBPoint_InterpolationCoefs(IBP,xU,yU,zU)
     type(TVelIBpoint),intent(inout)     :: IBP
     real(KND),dimension(-2:),intent(in) :: xU,yU,zU
-    real(KND) p0,p1,p2,p3,p4,p5
+    real(KND) xr, yr, zr, x(0:3), y(0:3), z(0:3)
+    real(KND) b1, b2, b3, c
     integer xi,yj,zk,dirx,diry,dirz
 
     xi = IBP%xi
@@ -702,7 +901,7 @@ contains
     diry = IBP%diry
     dirz = IBP%dirz
 
-    if (IBP%interp==2) then
+    if (IBP%interp==3) then
 
 
         IBP%IntPoints(1)%xi = xi+dirx
@@ -713,131 +912,207 @@ contains
         IBP%IntPoints(2)%yj = yj+2*diry
         IBP%IntPoints(2)%zk = zk+2*dirz
 
+        IBP%IntPoints(3)%xi = xi+3*dirx
+        IBP%IntPoints(3)%yj = yj+3*diry
+        IBP%IntPoints(3)%zk = zk+3*dirz
+
         if (IBP%interpdir==1) then
-          p0 = abs(IBP%distx)
-          p1 = abs(xU(xi+dirx)-xU(xi))
-          p2 = abs(xU(xi+2*dirx)-xU(xi))
+          xr = xU(xi) + IBP%distx
+          x  = (/ xU(xi), xU(xi+dirx), xU(xi+2*dirx), xU(xi+3*dirx)  /)
         elseif (IBP%interpdir==2) then
-          p0 = abs(IBP%disty)
-          p1 = abs(yU(yj+diry)-yU(yj))
-          p2 = abs(yU(yj+2*diry)-yU(yj))
+          xr = yU(yj) + IBP%disty
+          x  = (/ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  /)
         else
-          p0 = abs(IBP%distz)
-          p1 = abs(zU(zk+dirz)-zU(zk))
-          p2 = abs(zU(zk+2*dirz)-zU(zk))
+          xr = zU(zk) + IBP%distz
+          x  = (/ zU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  /)
         endif
 
-        call IBLinInterpolationCoefs(IBP%IntPoints%coef,p0,p1,p2)
+        call IBLeastSquare2InterpolationCoefs(IBP%IntPoints%coef,xr,x)
 
 
-    elseif (IBP%interp==3) then
+    elseif (IBP%interp==6) then
 
 
         if (IBP%interpdir==1) then
 
           IBP%IntPoints(1)%xi = xi
-          IBP%IntPoints(1)%yj = yj+diry
+          IBP%IntPoints(1)%yj = yj + diry
           IBP%IntPoints(1)%zk = zk
 
           IBP%IntPoints(2)%xi = xi
-          IBP%IntPoints(2)%yj = yj
-          IBP%IntPoints(2)%zk = zk+dirz
+          IBP%IntPoints(2)%yj = yj + 2*diry
+          IBP%IntPoints(2)%zk = zk
 
           IBP%IntPoints(3)%xi = xi
-          IBP%IntPoints(3)%yj = yj+diry
-          IBP%IntPoints(3)%zk = zk+dirz
+          IBP%IntPoints(3)%yj = yj + 3*diry
+          IBP%IntPoints(3)%zk = zk
 
-          p0 = abs(IBP%disty)
-          p1 = abs(IBP%distz)
-          p2 = abs(yU(yj+diry)-yU(yj))
-          p3 = abs(zU(zk+dirz)-zU(zk))
+          IBP%IntPoints(4)%xi = xi
+          IBP%IntPoints(4)%yj = yj
+          IBP%IntPoints(4)%zk = zk + dirz
+
+          IBP%IntPoints(5)%xi = xi
+          IBP%IntPoints(5)%yj = yj
+          IBP%IntPoints(5)%zk = zk + 2*dirz
+
+          IBP%IntPoints(6)%xi = xi
+          IBP%IntPoints(6)%yj = yj
+          IBP%IntPoints(6)%zk = zk + 3*dirz
+
+          xr = yU(yj) + IBP%disty
+          x  = (/ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  /)
+
+          yr = zU(zk) + IBP%distz
+          y  = (/ zU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  /)
+
 
         elseif (IBP%interpdir==2) then
 
           IBP%IntPoints(1)%xi = xi
           IBP%IntPoints(1)%yj = yj
-          IBP%IntPoints(1)%zk = zk+dirz
+          IBP%IntPoints(1)%zk = zk + dirz
 
-          IBP%IntPoints(2)%xi = xi+dirx
+          IBP%IntPoints(2)%xi = xi
           IBP%IntPoints(2)%yj = yj
-          IBP%IntPoints(2)%zk = zk
+          IBP%IntPoints(2)%zk = zk + 2*dirz
 
-          IBP%IntPoints(3)%xi = xi+dirx
+          IBP%IntPoints(3)%xi = xi
           IBP%IntPoints(3)%yj = yj
-          IBP%IntPoints(3)%zk = zk+dirz
+          IBP%IntPoints(3)%zk = zk + 3*dirz
 
-          p0 = abs(IBP%distz)
-          p1 = abs(IBP%distx)
-          p2 = abs(zU(zk+dirz)-zU(zk))
-          p3 = abs(xU(xi+dirx)-xU(xi))
+          IBP%IntPoints(4)%xi = xi + dirx
+          IBP%IntPoints(4)%yj = yj
+          IBP%IntPoints(4)%zk = zk
+
+          IBP%IntPoints(5)%xi = xi + 2*dirx
+          IBP%IntPoints(5)%yj = yj
+          IBP%IntPoints(5)%zk = zk
+
+          IBP%IntPoints(6)%xi = xi + 3*dirx
+          IBP%IntPoints(6)%yj = yj
+          IBP%IntPoints(6)%zk = zk
+
+          xr = zU(zk) + IBP%distz
+          x  = (/ zU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  /)
+
+          yr = xU(xi) + IBP%distx
+          y  = (/ xU(xi), xU(xi+dirx), xU(xi+2*dirx), xU(xi+3*dirx)  /)
 
         else
 
-          IBP%IntPoints(1)%xi = xi+dirx
+          IBP%IntPoints(1)%xi = xi + dirx
           IBP%IntPoints(1)%yj = yj
           IBP%IntPoints(1)%zk = zk
 
-          IBP%IntPoints(2)%xi = xi
-          IBP%IntPoints(2)%yj = yj+diry
+          IBP%IntPoints(2)%xi = xi + 2*dirx
+          IBP%IntPoints(2)%yj = yj
           IBP%IntPoints(2)%zk = zk
 
-          IBP%IntPoints(3)%xi = xi+dirx
-          IBP%IntPoints(3)%yj = yj+diry
+          IBP%IntPoints(3)%xi = xi + 3*dirx
+          IBP%IntPoints(3)%yj = yj
           IBP%IntPoints(3)%zk = zk
 
-          p0 = abs(IBP%distx)
-          p1 = abs(IBP%disty)
-          p2 = abs(xU(xi+dirx)-xU(xi))
-          p3 = abs(yU(yj+diry)-yU(yj))
+          IBP%IntPoints(4)%xi = xi
+          IBP%IntPoints(4)%yj = yj + diry
+          IBP%IntPoints(4)%zk = zk
+
+          IBP%IntPoints(5)%xi = xi
+          IBP%IntPoints(5)%yj = yj + 2*diry
+          IBP%IntPoints(5)%zk = zk
+
+          IBP%IntPoints(6)%xi = xi
+          IBP%IntPoints(6)%yj = yj + 3*diry
+          IBP%IntPoints(6)%zk = zk
+
+          xr = xU(xi) + IBP%distx
+          x  = (/ xU(xi), xU(xi+dirx), xU(xi+2*dirx), xU(xi+3*dirx)  /)
+
+          yr = yU(yj) + IBP%disty
+          y  = (/ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  /)
 
         endif
 
-        call IBBiLinInterpolationCoefs(IBP%IntPoints%coef,p0,p1,p2,p3)
+        call IBLeastSquare2InterpolationCoefs(IBP%IntPoints(1:3)%coef,xr,x)
 
+        call IBLeastSquare2InterpolationCoefs(IBP%IntPoints(4:6)%coef,yr,y)
 
-    elseif (IBP%interp==7) then
+        !beta 1 and  2 in eq. 17-19 in Peller et al., doi:1.1002/fld.1227
+        b1 = abs(y(0)-yr)/abs(x(0)-xr)
+        b2 = 1/b1
+        !sum of betas
+        c = b1 + b2
 
+        IBP%IntPoints(1:3)%coef = IBP%IntPoints(1:3)%coef * b1/c
 
-        IBP%IntPoints(1)%xi = xi+dirx
-        IBP%IntPoints(1)%xi = yj
-        IBP%IntPoints(1)%xi = zk
+        IBP%IntPoints(4:6)%coef = IBP%IntPoints(4:6)%coef * b2/c
 
-        IBP%IntPoints(2)%xi = xi
-        IBP%IntPoints(2)%xi = yj+diry
-        IBP%IntPoints(2)%xi = zk
+    elseif (IBP%interp==9) then
 
-        IBP%IntPoints(3)%xi = xi+dirx
-        IBP%IntPoints(3)%xi = yj+diry
-        IBP%IntPoints(3)%xi = zk
+        IBP%IntPoints(1)%xi = xi + dirx
+        IBP%IntPoints(1)%yj = yj
+        IBP%IntPoints(1)%zk = zk
+
+        IBP%IntPoints(2)%xi = xi + 2*dirx
+        IBP%IntPoints(2)%yj = yj
+        IBP%IntPoints(2)%zk = zk
+
+        IBP%IntPoints(3)%xi = xi + 3*dirx
+        IBP%IntPoints(3)%yj = yj
+        IBP%IntPoints(3)%zk = zk
 
         IBP%IntPoints(4)%xi = xi
-        IBP%IntPoints(4)%xi = yj
-        IBP%IntPoints(4)%xi = zk+dirz
+        IBP%IntPoints(4)%yj = yj + diry
+        IBP%IntPoints(4)%zk = zk
 
-        IBP%IntPoints(5)%xi = xi+dirx
-        IBP%IntPoints(5)%xi = yj
-        IBP%IntPoints(5)%xi = zk+dirz
+        IBP%IntPoints(5)%xi = xi
+        IBP%IntPoints(5)%yj = yj + 2*diry
+        IBP%IntPoints(5)%zk = zk
 
         IBP%IntPoints(6)%xi = xi
-        IBP%IntPoints(6)%xi = yj+diry
-        IBP%IntPoints(6)%xi = zk+dirz
+        IBP%IntPoints(6)%yj = yj + 3*diry
+        IBP%IntPoints(6)%zk = zk
 
-        IBP%IntPoints(7)%xi = xi+dirx
-        IBP%IntPoints(7)%xi = yj+diry
-        IBP%IntPoints(7)%xi = zk+dirz
+        IBP%IntPoints(7)%xi = xi
+        IBP%IntPoints(7)%yj = yj
+        IBP%IntPoints(7)%zk = zk + dirz
 
-        p0 = abs(IBP%distx)
-        p1 = abs(IBP%disty)
-        p2 = abs(IBP%distz)
-        p3 = abs(xU(xi+dirx)-xU(xi))
-        p4 = abs(yU(yj+diry)-yU(yj))
-        p5 = abs(zU(zk+dirz)-zU(zk))
+        IBP%IntPoints(8)%xi = xi
+        IBP%IntPoints(8)%yj = yj
+        IBP%IntPoints(8)%zk = zk + 2*dirz
 
-        call IBTriLinInterpolationCoefs(IBP%IntPoints%coef,p0,p1,p2,p3,p4,p5)
+        IBP%IntPoints(9)%xi = xi
+        IBP%IntPoints(9)%yj = yj
+        IBP%IntPoints(9)%zk = zk + 3*dirz
+
+        xr = xU(xi) + IBP%distx
+        x  = (/ xU(xi), xU(xi+dirx), xU(xi+2*dirx), xU(xi+3*dirx)  /)
+
+        yr = yU(yj) + IBP%disty
+        y  = (/ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  /)
+
+        zr = zU(zk) + IBP%distz
+        z  = (/ yU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  /)
+
+        call IBLeastSquare2InterpolationCoefs(IBP%IntPoints(1:3)%coef,xr,x)
+
+        call IBLeastSquare2InterpolationCoefs(IBP%IntPoints(4:6)%coef,yr,y)
+
+        !beta 1 and  2 in eq. 17-19 in Peller et al., doi:1.1002/fld.1227
+        b1 = abs(y(0)-yr)*abs(z(0)-zr)/abs(x(0)-xr)
+        b2 = abs(z(0)-zr)*abs(x(0)-xr)/abs(y(0)-yr)
+        b3 = abs(x(0)-xr)*abs(y(0)-yr)/abs(z(0)-zr)
+        !sum of betas
+        c = b1 + b2 + b3
+
+        IBP%IntPoints(1:3)%coef = IBP%IntPoints(1:3)%coef * b1/c
+
+        IBP%IntPoints(4:6)%coef = IBP%IntPoints(4:6)%coef * b2/c
+
+        IBP%IntPoints(7:9)%coef = IBP%IntPoints(7:9)%coef * b3/c
 
     endif
 
-
+    IBP%Intpoints%coef = 0
   end subroutine TVelIBPoint_InterpolationCoefs
 
 
@@ -893,12 +1168,27 @@ contains
     endif
 
 
-    freep00 = (Prtype(xi+1,yj,zk)==0)   !logicals denoting if the cell in plus x direction is free of SB
-    freem00 = (Prtype(xi-1,yj,zk)==0)
-    free0p0 = (Prtype(xi,yj+1,zk)==0)
-    free0m0 = (Prtype(xi,yj-1,zk)==0)
-    free00p = (Prtype(xi,yj,zk+1)==0)
-    free00m = (Prtype(xi,yj,zk-1)==0)
+    freep00 = (Prtype(xi+1,yj,zk)<=0)   !logicals denoting if the cell in plus x direction is free of SB
+    freem00 = (Prtype(xi-1,yj,zk)<=0)
+    free0p0 = (Prtype(xi,yj+1,zk)<=0)
+    free0m0 = (Prtype(xi,yj-1,zk)<=0)
+    free00p = (Prtype(xi,yj,zk+1)<=0)
+    free00m = (Prtype(xi,yj,zk-1)<=0)
+
+
+
+    if (.not.(freep00.or.freem00)) then
+      dirx = 0
+      distx = 0
+    end if
+    if (.not.(free0p0.or.free0m0)) then
+      diry = 0
+      disty = 0
+    end if
+    if (.not.(free00p.or.free00m)) then
+      dirz = 0
+      distz = 0
+    end if
 
     nfreedirs = 0
     ndirs = 0
@@ -997,10 +1287,6 @@ contains
 
       allocate(IBP%IntPoints(1))
 
-      if (.not.(freep00.or.freem00)) dirx = 0
-      if (.not.(free0p0.or.free0m0)) diry = 0
-      if (.not.(free00p.or.free00m)) dirz = 0
-
       IBP%IntPoints(1)%xi = IBP%xi+dirx
       IBP%IntPoints(1)%yj = IBP%yj+diry
       IBP%IntPoints(1)%zk = IBP%zk+dirz
@@ -1011,10 +1297,6 @@ contains
     elseif (nfreedirs==2.or.ndirs==2) then    !Two free directions, use bilinear interpolation in the plane contaning these two neigbours.
 
       allocate(IBP%IntPoints(2))
-
-      if (.not.(freep00.or.freem00)) dirx = 0
-      if (.not.(free0p0.or.free0m0)) diry = 0
-      if (.not.(free00p.or.free00m)) dirz = 0
 
       if (dirx==0) then     !plane yz
 
@@ -1196,31 +1478,37 @@ contains
 
 
 
-  recursive subroutine TVelIBPoint_DeallocateList(IBP)
-    type(TVelIBPoint),pointer :: IBP
+  subroutine TVelIBPoint_DeallocateList(first)
+    type(TVelIBPoint),pointer :: first,node,tmp
 
-    if (associated(IBP)) then
+    node => first
 
-      if (associated(IBP%next)) call TVelIBPoint_DeallocateList(IBP%next)
+    if (associated(node)) then
+      tmp => node
+      node => node%next
 
-      deallocate(IBP)
-
+      deallocate(node)
     endif
+
+    node => null()
 
   end subroutine TVelIBPoint_DeallocateList
 
 
 
-  recursive subroutine TScalFlIBPoint_DeallocateList(IBP)
-    type(TScalFlIBPoint),pointer :: IBP
+  subroutine TScalFlIBPoint_DeallocateList(first)
+    type(TScalFlIBPoint),pointer ::first,node,tmp
 
-    if (associated(IBP)) then
+    node => first
 
-      if (associated(IBP%next)) call TScalFlIBPoint_DeallocateList(IBP%next)
+    if (associated(node)) then
+      tmp => node
+      node => node%next
 
-      deallocate(IBP)
-
+      deallocate(node)
     endif
+
+    node => null()
 
   end subroutine TScalFlIBPoint_DeallocateList
 
@@ -1566,7 +1854,7 @@ contains
 
 
 
-  pure subroutine TTerrain_GridCoords(x2,y2,xi,yj,comp)
+   subroutine TTerrain_GridCoords(x2,y2,xi,yj,comp)
     real(KND),intent(in) :: x2,y2
     integer,intent(out) :: xi,yj,comp
     real(KND) x,y,distPr,distU,distV
@@ -1577,13 +1865,13 @@ contains
 
     if (gridtype==uniformgrid) then
 
-        xPri = min(max(nint( (x-xU(0)) / (xU(Prnx+1)-xU(0)) * real(Prnx,KND) + 0.5_KND ),1),Prnx)
+        xPri = min(max(nint( (x - xU(0))/dxmin + 0.5_KND ),1),Prnx+1)
 
-        yPrj = min(max(nint( (y-yV(0)) / (yV(Prny+1)-yV(0)) * real(Prny,KND) + 0.5_KND ),1),Prny)
+        yPrj = min(max(nint( (y - yV(0))/dymin + 0.5_KND ),1),Prny+1)
 
-        xUi = min(max(nint( (x-xU(0)) / (xU(Prnx+1)-xU(0)) * real(Prnx,KND) ),0), Prnx+1)
+        xUi = min(max(nint( (x-xU(0))/dxmin ),0), Unx+1)
 
-        yVj = min(max(nint( (y-yV(0)) / (yV(Prny+1)-yV(0)) * real(Prny,KND) ),0),Prny+1)
+        yVj = min(max(nint( (y-yV(0))/dymin ),0), Vny+1)
     else
 
 
@@ -1642,7 +1930,7 @@ contains
 
 
 
-  pure logical function TTerrain_Inside(T,x,y,z,eps)
+   logical function TTerrain_Inside(T,x,y,z,eps)
     type(TTerrain),intent(in) :: T
     real(KND),intent(in) :: x,y,z
     real(KND),intent(in),optional ::eps
@@ -1658,6 +1946,7 @@ contains
 
     ins = .false.
     call TTerrain_GridCoords(x,y,xi,yj,comp)
+
     if (comp==1) then
      if (z<=T%UPoints(xi,yj)%elev+eps2) ins = .true.
     elseif (comp==2) then
@@ -1671,7 +1960,7 @@ contains
 
 
 
-  pure logical function TSolidBody_Inside(SB,x,y,z,eps)
+   logical function TSolidBody_Inside(SB,x,y,z,eps)
     type(TSolidBody),intent(in) :: SB
     real(KND),intent(in) :: x,y,z
     real(KND),intent(in),optional :: eps
@@ -1925,6 +2214,18 @@ contains
      write(*,*) "x,y,z",x,y,z
      write(*,*) "pl1",PH%Planes(inearest)%a,PH%Planes(inearest)%b,PH%Planes(inearest)%c,PH%Planes(inearest)%d
      write(*,*) "pl2",PH%Planes(inearest2)%a,PH%Planes(inearest2)%b,PH%Planes(inearest2)%c,PH%Planes(inearest2)%d
+
+     call Nearest(PH%Planes(inearest),xln,yln,zln,x,y,z)
+     call Nearest(PH%Planes(inearest2),xnear,ynear,znear,x,y,z)
+
+     if ((xln-x)**2+(yln-y)**2+(zln-z)**2<(xln-x)**2+(yln-y)**2+(zln-z)**2) then
+       xnear = xln
+       ynear = yln
+       znear = zln
+     end if
+
+     return
+
     endif
 
     p = SQRT(ailine**2+biline**2+ciline**2)
@@ -2032,7 +2333,7 @@ contains
     real(KND)   :: a,b,zloc
     xnear = x
     ynear = y
-    znear = z0
+    znear = z
 
     call TTerrain_GridCoords(x,y,xi,yj,comp)
 
@@ -2071,7 +2372,7 @@ contains
      Pl%a = a
      Pl%b = b
      Pl%c = -1._KND
-     Pl%d = -a*x-b*y+zloc
+     Pl%d = - a*x - b*y + zloc
 
      call Nearest(Pl,xnear,ynear,znear,x,y,z)
 
@@ -2312,6 +2613,19 @@ contains
 
 
   subroutine GetSolidBodiesBC
+
+    call FindInsideCells
+
+    call InitImBoundaries
+
+    call GetSolidBodiesWM
+
+  end subroutine GetSolidBodiesBC
+
+
+
+
+  subroutine FindInsideCells
     integer i,j,k
     type(TSolidBody),pointer :: CurrentSB => null()
 
@@ -2343,7 +2657,7 @@ contains
       do k = 0,Unz+1
        do j = 0,Uny+1
          do i = 0,Unx+1
-            if (Inside(CurrentSB,xU(i),yPr(j),zPr(k),max(dxU(i),dyPr(j),dzPr(k))/3._KND))&
+            if (Inside(CurrentSB,xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._KND/3)/1000))&
                      Utype(i,j,k) = CurrentSB%numofbody
          enddo
         enddo
@@ -2362,7 +2676,7 @@ contains
       do k = 0,Vnz+1
        do j = 0,Vny+1
         do i = 0,Vnx+1
-           if (Inside(CurrentSB,xPr(i),yV(j),zPr(k),max(dxPr(i),dyV(j),dzPr(k))/3._KND))&
+           if (Inside(CurrentSB,xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._KND/3)/1000))&
                      Vtype(i,j,k) = CurrentSB%numofbody
         enddo
        enddo
@@ -2381,7 +2695,7 @@ contains
       do k = 0,Wnz+1
        do j = 0,Wny+1
         do i = 0,Wnx+1
-           if (Inside(CurrentSB,xPr(i),yPr(j),zW(k),max(dxPr(i),dyPr(j),dzW(k))/3._KND))&
+           if (Inside(CurrentSB,xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._KND/3)/1000))&
                      Wtype(i,j,k) = CurrentSB%numofbody
         enddo
        enddo
@@ -2393,23 +2707,7 @@ contains
      CurrentSB => CurrentSB%next
     enddo
 
-
-    call InitImBoundaries
-
-    call GetSolidBodiesWM
-
-  end subroutine GetSolidBodiesBC
-
-
-
-  ! File customBC.f90 should contain user generated subroutine InitSolidBodies that inicializes
-  ! the linked list of solid bodies objects. This is to avoid unnecessary changes in the history
-  ! of this file, when only boundary conditions changes, until a runtime BC generation is developed.
-  subroutine InitSolidBodies
-    include "customBC.f90"
-  end subroutine InitSolidBodies
-
-
+  end subroutine FindInsideCells
 
 
 
@@ -2417,15 +2715,15 @@ contains
   subroutine InitImBoundaries
     type(TVelIBPoint) IBP
     type(TScalFlIBPoint) SIBP
-    integer i,j,k,l
+    integer i,j,k
 
 
     do k = 1,Unz
      do j = 1,Uny
       do i = 1,Unx
        if (Utype(i,j,k)>0) then
-        if (Utype(i+1,j,k)==0.or.Utype(i-1,j,k)==0.or.Utype(i,j+1,k)==0&
-          .or.Utype(i,j-1,k)==0.or.Utype(i,j,k+1)==0.or.Utype(i,j,k-1)==0)  then
+        if (Utype(i+1,j,k)<=0.or.Utype(i-1,j,k)<=0.or.Utype(i,j+1,k)<=0&
+          .or.Utype(i,j-1,k)<=0.or.Utype(i,j,k+1)<=0.or.Utype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xU(-2:),yPr(-2:),zPr(-2:),Utype,1)
             call  AddToList(IBP)
         endif
@@ -2438,8 +2736,8 @@ contains
      do j = 1,Vny
       do i = 1,Vnx
        if (Vtype(i,j,k)>0) then
-        if (Vtype(i+1,j,k)==0.or.Vtype(i-1,j,k)==0.or.Vtype(i,j+1,k)==0&
-          .or.Vtype(i,j-1,k)==0.or.Vtype(i,j,k+1)==0.or.Vtype(i,j,k-1)==0)  then
+        if (Vtype(i+1,j,k)<=0.or.Vtype(i-1,j,k)<=0.or.Vtype(i,j+1,k)<=0&
+          .or.Vtype(i,j-1,k)<=0.or.Vtype(i,j,k+1)<=0.or.Vtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yV(-2:),zPr(-2:),Vtype,2)
             call  AddToList(IBP)
         endif
@@ -2452,8 +2750,8 @@ contains
      do j = 1,Wny
       do i = 1,Wnx
        if (Wtype(i,j,k)>0) then
-        if (Wtype(i+1,j,k)==0.or.Wtype(i-1,j,k)==0.or.Wtype(i,j+1,k)==0&
-          .or.Wtype(i,j-1,k)==0.or.Wtype(i,j,k+1)==0.or.Wtype(i,j,k-1)==0)  then
+        if (Wtype(i+1,j,k)<=0.or.Wtype(i-1,j,k)<=0.or.Wtype(i,j+1,k)<=0&
+          .or.Wtype(i,j-1,k)<=0.or.Wtype(i,j,k+1)<=0.or.Wtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yPr(-2:),zW(-2:),Wtype,3)
             call  AddToList(IBP)
         endif
@@ -2466,8 +2764,8 @@ contains
      do j = 1,Prny
       do i = 1,Prnx
        if (Prtype(i,j,k)>0) then
-        if (Prtype(i+1,j,k)==0.or.Prtype(i-1,j,k)==0.or.Prtype(i,j+1,k)==0&
-          .or.Prtype(i,j-1,k)==0.or.Prtype(i,j,k+1)==0.or.Prtype(i,j,k-1)==0)  then
+        if (Prtype(i+1,j,k)<=0.or.Prtype(i-1,j,k)<=0.or.Prtype(i,j+1,k)<=0&
+          .or.Prtype(i,j-1,k)<=0.or.Prtype(i,j,k+1)<=0.or.Prtype(i,j,k-1)<=0)  then
             call  Create(SIBP,i,j,k)
             call  AddToList(SIBP)
         endif
@@ -2508,7 +2806,7 @@ contains
     do k = 1,Prnz
      do j = 1,Prny
       do i = 1,Prnx
-       if (Prtype(i,j,k)==0) then
+       if (Prtype(i,j,k)<=0) then
         dist = huge(dist)
         nb = 0
 
@@ -2564,64 +2862,185 @@ contains
 
 
 
+  subroutine InitSolidBodies
+print *,obstaclefile
+    if (len_trim(obstaclefile)>0) then
+      call ReadSolidBodiesFromFile(obstaclefile)
+    end if
+
+#ifdef CUSTOMSB
+    !An external subroutine, it should use this module and use AddSolidBody to supply
+    ! pointers to the new solid bodies.
+    call CustomSolidBodies
+#endif
+  end subroutine InitSolidBodies
 
 
 
 
-  pure subroutine IBLinInterpolationCoefs(Coefs,h0,h1,h2)
-    real(KND),intent(out) :: Coefs(:)
-    real(KND),intent(in)  :: h0,h1,h2
+  subroutine ReadSolidBodiesFromFile(filename)
+    use Strings
+    character(*),intent(in) :: filename
+    integer unit,io
+    character(180) :: line
+    type(TSolidBody),pointer :: SB => null()
 
-    if (h0<=h1-h0) then
-      Coefs(1) = -(h0/(h1-h0))
-      Coefs(2) = 0
+    unit=20
+    !provisional, Solaris Studio still doesn't support newunit.
+    open(unit=unit,file=filename,action='read',status='old',iostat=io)
+
+    if (io==0) then
+      do
+        read(unit,'(a)',iostat=io) line
+
+        if (io/=0) exit
+
+        line = adjustl(line)
+
+        if (len_trim(line)>0) then
+print *,line
+          if (upcase(line(1:10))=='POLYHEDRON') then
+print *,"*"
+            call ReadPolyhedron(unit,line(11:),SB)
+          end if
+
+          if (associated(SB)) then
+print *,"-"
+            call AddSolidBody(SB)
+            SB => null()
+          end if
+
+        end if
+
+      end do
+
+      close(unit)
+
     else
-      Coefs(1) = - (h2-2*h0) / (h2-h1)
-      Coefs(2) = - (2*h0-h1) / (h2-h1)
-    endif
-  end subroutine IBLinInterpolationCoefs
+
+      write(*,*) "Could not open file",filename
+      stop
+
+    end if
+  end subroutine ReadSolidBodiesFromFile
+
+
+  subroutine ReadPolyhedron(unit,restline,SB)
+    integer,intent(in)       :: unit
+    character(*),intent(in)  :: restline
+    type(TSolidBody),pointer :: SB
+    integer nPlanes,i,io
+
+    read(restline,*,iostat=io) nPlanes
+
+    if (io/=0) then
+      write(*,*) "Expected number of planes in polyhedron, received '",trim(restline),"' instead."
+      stop
+    end if
+
+    allocate(SB)
+    allocate(SB%Polyhedron)
+    allocate(SB%Polyhedron%Planes(nPlanes))
+
+    SB%Polyhedron%nplanes = nPlanes
+
+    SB%typeofbody = Polyhedron
+
+    do i=1,nPlanes
+      call ReadPlane(unit,SB%Polyhedron%Planes(i))
+    end do
+
+  end subroutine ReadPolyhedron
+
+
+  subroutine ReadPlane(unit,Pl)
+    use Strings
+    integer,intent(in) :: unit
+    type(TPlane),intent(inout) :: Pl
+    character(180) :: line
+    integer io
+
+    read(unit,'(a)',iostat=io) line
+    if (io/=0) then
+      write(*,*) "Error reading the line with the plane definition."
+      stop
+    end if
+
+    if (count_multispaces(line) == 4) then
+      read(line,*,iostat=io) Pl%a,Pl%b,Pl%c,Pl%d,Pl%gl
+    else if (count_multispaces(line) == 6) then
+      read(line,*,iostat=io) Pl%a,Pl%b,Pl%c,Pl%d,Pl%gl,Pl%rough, Pl%z0
+    else
+      io = 999
+    end if
+    if (io/=0) then
+      write(*,*) "Error parsing the line with the plane definition."
+      stop
+    end if
+  end subroutine ReadPlane
 
 
 
-  pure subroutine IBBiLinInterpolationCoefs(Coefs,x0,y0,x1,y1)
+  subroutine AddSolidBody(SB)
+    type(TSolidBody),pointer :: SB
+    type(TSolidBody),pointer :: p
+
+    if (.not. associated(FirstSB)) then
+      FirstSB => SB
+      SB%numofbody = 1
+    else
+      p => FirstSB
+      do
+        if (associated(p%next)) then
+
+          p => p%next
+
+        else
+
+          p%next => SB
+          SB%numofbody = p%numofbody + 1
+          exit
+
+        end if
+
+      end do
+    end if
+  end subroutine AddSolidBody
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  pure subroutine IBLeastSquare2InterpolationCoefs(Coefs,xr,x)
     real(KND),intent(out) :: Coefs(:)
-    real(KND),intent(in)  :: x0,y0,x1,y1
+    real(KND),intent(in)  :: xr,x(0:)
+    real(KND) :: A1, A2, A4
+    integer   :: n
 
-    real(KND) :: a,b,c
+    n = size(Coefs)
+    if ( n<3 .or. size(x)<=n ) then
+      Coefs = 0
+    else
+      A1 = sum( x(1:) - xr )**2
+      A2 = sum( (x(1:)**2 - xr**2) * (x(1:) - xr) )
+      A4 = sum( x(1:)**2 - xr**2 )**2
 
-    a = (x1-x0) / x1
-    b = (y1-y0) / y1
-    c = a * b
+      Coefs = ( ( A2 * (x(1:)**2 - xr**2) - A4 * (x(1:) - xr) ) * (x(0)    - xr)&
+            +   ( A2 * (x(1:) - xr) - A1 * (x(1:)**2 - xr**2) ) * (x(0)**2 - xr**2) )&
+            / (A2**2 - A1*A4)
+    end if
 
-    Coefs(1) = - ((1-a)*b) / c
-    Coefs(2) = - (a*(1-b)) / c
-    Coefs(3) = - ((1-a)*(1-b)) / c
-
-  end subroutine IBBiLinInterpolationCoefs
-
-
-  pure subroutine IBTriLinInterpolationCoefs(Coefs,x0,y0,z0,x1,y1,z1)
-    real(KND),intent(out) :: Coefs(:)
-    real(KND),intent(in)  :: x0,y0,z0,x1,y1,z1
-
-    real(KND) :: a,b,c,d
-
-    a = x0/x1
-    b = y0/y1
-    c = z0/z1
-    d = (1-a) * (1-b) * (1-c)
-
-    Coefs(1) = - (a*(1-b)*(1-c)) / d
-    Coefs(2) = - ((1-a)*b*(1-c)) / d
-    Coefs(4) = - (a*b*(1-c)) / d
-    Coefs(3) = - ((1-a)*(1-b)*c) / d
-    Coefs(5) = - (a*(1-b)*c) / d
-    Coefs(6) = - ((1-a)*b*c) / d
-    Coefs(7) = - (a*b*c) / d
-
-  end subroutine IBTriLinInterpolationCoefs
-
-
-
+   end subroutine IBLeastSquare2InterpolationCoefs
 
 endmodule GEOMETRIC

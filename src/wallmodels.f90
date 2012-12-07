@@ -334,7 +334,7 @@ implicit none
     if (Btype(We)==NOSLIP) then
       do k = 1,Prnz
        do j = 1,Prny
-         if (Prtype(1,j,k)==0) then
+         if (Prtype(1,j,k)<=0) then
            WMP%xi = 1
            WMP%yj = j
            WMP%zk = k
@@ -353,7 +353,7 @@ implicit none
     if (Btype(Ea)==NOSLIP) then
       do k = 1,Prnz
        do j = 1,Prny
-         if (Prtype(Prnx,j,k)==0) then
+         if (Prtype(Prnx,j,k)<=0) then
            WMP%xi = Prnx
            WMP%yj = j
            WMP%zk = k
@@ -372,7 +372,7 @@ implicit none
     if (Btype(So)==NOSLIP.or.(Btype(So)==DIRICHLET.and.sideU(2,So)==0)) then
       do k = 1,Prnz
        do i = 1,Prnx
-         if (Prtype(i,1,k)==0) then
+         if (Prtype(i,1,k)<=0) then
            WMP%xi = i
            WMP%yj = 1
            WMP%zk = k
@@ -397,7 +397,7 @@ implicit none
     if (Btype(No)==NOSLIP.or.(Btype(No)==DIRICHLET.and.sideU(2,No)==0)) then
       do k = 1,Prnz
        do i = 1,Prnx
-         if (Prtype(i,Prny,k)==0) then
+         if (Prtype(i,Prny,k)<=0) then
            WMP%xi = i
            WMP%yj = Prny
            WMP%zk = k
@@ -422,7 +422,7 @@ implicit none
     if (Btype(Bo)==NOSLIP.or.(Btype(Bo)==DIRICHLET.and.sideU(3,Bo)==0)) then
       do j = 1,Prny
        do i = 1,Prnx
-         if (Prtype(i,j,1)==0) then
+         if (Prtype(i,j,1)<=0) then
 
            WMP%xi = i
            WMP%yj = j
@@ -461,7 +461,7 @@ implicit none
 
       do j = 1,Prny
        do i = 1,Prnx
-         if (Prtype(i,j,Prnz)==0) then
+         if (Prtype(i,j,Prnz)<=0) then
            WMP%xi = i
            WMP%yj = j
            WMP%zk = Prnz
@@ -520,30 +520,40 @@ implicit none
     real(KND),intent(in) :: vel,dist
     real(KND),parameter :: eps = 1e-4_KND
     real(KND),parameter :: yplcrit = 11.225_KND
-    real(KND) :: ustar2
+    real(KND) :: ustar2,ustar_lam
     integer i
 
-    i = 0
+    ustar_lam = sqrt(vel/(dist*Re))
 
-    do
-      i = i+1
-      ustar2 = ustar
+    if ((dist*ustar_lam*Re)<yplcrit) then
 
-      if ((dist*ustar2*Re)<yplcrit) then
-        ustar = sqrt(vel/(dist*Re))
-      else
-        ustar = vel/(log(abs(ustar2*dist*Re))/0.41_KND+5.2_KND)
-      end if
+      ustar = ustar_lam
 
-      if  (abs(ustar-ustar2)/abs(ustar)<eps) exit
+    else   !turbulent region
+      i = 0
 
-      if (i>=50) then
-                  ustar = 0
-                  exit
-      end if
-    end do
+      do
+        i = i+1
+        ustar2 = ustar
 
-  end subroutine WMFlatustar
+        if ((dist*ustar2*Re)<yplcrit) then
+          ustar = sqrt(vel/(dist*Re))
+        else
+          ustar = vel/(log(abs(ustar2*dist*Re))/0.41_KND+5.2_KND)
+        end if
+
+        if  (abs(ustar-ustar2)/abs(ustar)<eps) exit
+
+        if (i>=50) then
+                    ustar = 0
+                    exit
+        end if
+
+      end do
+
+    end if
+
+  end subroutine WMFlatUstar
 
 
   pure subroutine WMFlatVisc(visc,ustar,distvect,uvect,walluvect)
@@ -596,8 +606,8 @@ implicit none
   pure subroutine WMRoughUstar(ustar,vel,dist,z0)
     real(KND),intent(inout) :: ustar
     real(KND),intent(in) :: vel,dist,z0
-    real(KND),parameter:: eps = 1e-4_KND
-    real(KND),parameter:: yplcrit = 11.225_KND
+    real(KND),parameter  :: eps = 1e-4_KND
+    real(KND),parameter  :: yplcrit = 11.225_KND
 
     if (dist<=z0) then
      if (Re>0) then
@@ -606,14 +616,14 @@ implicit none
       ustar = 0
      end if
     else
-      ustar = vel*0.41_KND/log(dist/z0)
+      ustar = vel * 0.41_KND / log(dist/z0)
     end if
 
   end subroutine WMRoughUstar
 
 
   pure subroutine WMRoughVisc(visc,ustar,z0,distvect,uvect,walluvect)
-    real(KND),intent(out) :: visc
+    real(KND),intent(out)   :: visc
     real(KND),intent(inout) :: ustar
     real(KND),intent(in)    :: z0
     real(KND),intent(in)    :: distvect(3),uvect(3),walluvect(3)
@@ -644,6 +654,143 @@ implicit none
     end if
 
   end subroutine WMRoughVisc
+
+
+
+
+
+  pure subroutine WMFlatPrGradUstar(ustar,vel,prgrad,dist)
+    real(KND),intent(out) :: ustar
+    real(KND),intent(in) :: vel,prgrad,dist
+    real(KND),parameter :: eps = 1e-4_KND
+    real(KND),parameter :: yplcrit = 11.225_KND
+    real(KND),parameter :: ustar_div = 1000
+    real(KND) :: ustar1,ustar2,ustar_lam,f1,f2
+    integer i,nprob
+
+    !u/u_* = z * u_* / nu  +  dp/dx * z**2 / (2 * u_*)
+    ustar_lam = sqrt(abs((1._KND/(dist*Re)) * (vel - dist**2 * prgrad/2) ))
+
+    if ((dist*ustar_lam*Re)<yplcrit) then
+
+      ustar = ustar_lam
+
+    else   !turbulent region
+
+
+      i = 0
+
+      ustar1 = ustar_lam*0.9
+      ustar2 = ustar_lam*1.1
+
+      f2 = f(ustar2)
+
+      nprob = 0
+
+      !secant method iteration
+      do
+        i = i+1
+
+        f1 = f(ustar1)
+
+        ustar = ustar1 - f1 * (ustar1 - ustar2)/(f1-f2)
+
+        if (ustar<0) then
+          ustar = ustar_lam
+          ustar1 = ustar_lam*1.1
+          f1 = f(ustar1)
+          nprob=nprob+1
+          if (nprob>1) then
+            ustar = ustar_lam
+            exit
+          end if
+        else
+          nprob = 0
+        end if
+
+      if  (abs(ustar-ustar1)/abs(ustar)<eps) exit
+
+         ustar2 = ustar1
+         f2 = f1
+         ustar1 = ustar
+
+        if (i>=20) then
+                    ustar = ustar_lam
+                    exit
+        end if
+      end do
+
+    end if !laminar/turbulent
+
+    contains
+
+      pure function f(ustar)
+        real(KND) f
+        real(KND),intent(in) :: ustar
+        real(KND) a,b,c
+        !u/u_* = dp/dx * z / (k (u_*)**2)  + (1/k) * ln(z * u_* / nu) + B
+        a = log(ustar*dist*Re)/0.41_KND + 5.2_KND
+        b = - vel
+        c = prgrad * dist / 0.41
+        f = a*ustar**2 + b*ustar + c
+      end function f
+
+  end subroutine WMFlatPrGradUstar
+
+
+
+
+  pure subroutine WMFlatPrGradVisc(visc,ustar,distvect,uvect,walluvect,prgradvect)
+    real(KND),intent(out)   :: visc
+    real(KND),intent(inout) :: ustar
+    real(KND),intent(in)    :: distvect(3),uvect(3),walluvect(3),prgradvect(3)
+    real(KND) vect(3),vel,dist,prgrad
+
+    dist = sqrt(sum(distvect**2))
+
+    vect = uvect - walluvect
+
+    vect = vect - dot_product(vect,distvect) * distvect / dist**2  !tangential part
+
+    vel = sqrt(sum(vect**2))
+
+    prgrad = dot_product( prgradvect , vect ) / vel
+
+    if (vel/=0) then
+
+      call WMFlatPrGradUstar(ustar,vel,prgrad,dist)
+
+    end if
+
+    if (ustar<0) ustar = 0
+
+    if (vel>0) then
+
+     if (dist*ustar*Re>1) then
+       visc = ustar**2 * dist/vel
+     else if (Re>0) then
+       visc = 1._KND/Re
+     else
+       visc = 0
+     end if
+
+    else if (Re>0) then
+
+      visc = 1._KND/Re
+
+    else
+
+      visc = 0
+
+    end if
+
+  end subroutine WMFlatPrGradVisc
+
+
+
+
+
+
 
 
 
@@ -916,12 +1063,60 @@ implicit none
   end subroutine InitTempFL
 
 
+  subroutine WallPrGradient(prgrad,i,j,k,Pr,Prtype)
+    real(KND),intent(out) :: prgrad(3)
+    integer,intent(in)    :: i,j,k
+    real(KND),intent(in)  :: Pr(1:,1:,1:)
+    integer,intent(in)    :: Prtype(0:,0:,0:)
+    integer n
+
+    prgrad = 0
+
+    n=0
+    if (Prtype(i+1,j,k)>0 .and. i<Prnx) then
+      prgrad(1) = prgrad(1) + (Pr(i+1,j,k) - Pr(i,j,k))/(dxU(i))
+      n = n + 1
+    end if
+    if (Prtype(i-1,j,k)>0 .and. i>1) then
+      prgrad(1) = prgrad(1) + (Pr(i,j,k) - Pr(i-1,j,k))/(dxU(i-1))
+      n = n + 1
+    end if
+    if (n>0) prgrad(1) = prgrad(1)/n
+
+    n=0
+    if (Prtype(i,j+1,k)>0 .and. j<Prny) then
+      prgrad(2) = prgrad(2) + (Pr(i,j+1,k) - Pr(i,j,k))/(dyV(j))
+      n = n + 1
+    end if
+    if (Prtype(i,j-1,k)>0 .and. j>1) then
+      prgrad(2) = prgrad(2) + (Pr(i,j,k) - Pr(i,j-1,k))/(dyV(j-1))
+      n = n + 1
+    end if
+    if (n>0) prgrad(2) = prgrad(2)/n
+
+    n=0
+    if (Prtype(i,j,k+1)>0 .and. k<Prnz) then
+      prgrad(3) = prgrad(3) + (Pr(i,j,k+1) - Pr(i,j,k))/(dzW(k))
+      n = n + 1
+    end if
+    if (Prtype(i,j,k-1)>0 .and. k>1) then
+      prgrad(3) = prgrad(3) + (Pr(i,j,k) - Pr(i,j,k-1))/(dzW(k-1))
+      n = n + 1
+    end if
+    if (n>0) prgrad(3) = prgrad(3)/n
+
+    prgrad = prgrad + [prgradientx,prgradienty,0._KND]
+
+  end subroutine WallPrGradient
+
+
+
   subroutine ComputeViscsWM(U,V,W,Pr)
     real(KND),dimension(-2:,-2:,-2:):: U,V,W
     real(KND),dimension(1:,1:,1:):: Pr
     integer i,j,xi,yj,zk
     real(KND) tdif
-    real(KND) dist(3), vel(3), wallvel(3)
+    real(KND) dist(3), vel(3), wallvel(3), prgrad(3)
 
 
     if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
@@ -938,7 +1133,7 @@ implicit none
 
 
 
-    !$omp parallel do private(i,xi,yj,zk,tdif, vel, wallvel, dist)
+    !$omp parallel do private(i,xi,yj,zk,tdif, vel, wallvel, dist, prgrad)
     do i = 1,size(WMPoints)
 
       xi = WMPoints(i)%xi
@@ -982,12 +1177,33 @@ implicit none
        else
 
          if (Re<=0) then
-          stop "The wall model requires positive viscosity or roughness length."
+           stop "The wall model requires positive viscosity or roughness length."
          end if
 
-         call WMFlatVisc(Visc(xi, yj, zk),&
-                         WMPoints(i)%ustar,&
-                         dist, vel, wallvel)
+         if (wallmodeltype == 2) then
+
+           call WallPrGradient(prgrad,xi,yj,zk,Pr,Prtype)
+
+           call WMFlatPrGradVisc(Visc(xi, yj, zk),&
+                           WMPoints(i)%ustar,&
+                           dist, vel, wallvel, prgrad)
+
+           if (zk>34.and.zk<37) then !Visc(xi, yj, zk)>3./Re
+             write(*,*) xi,yj,zk
+             write(*,*) Prtype(xi,yj,zk),WMPoints(i)%ustar
+             write(*,*) dist, sqrt(sum(dist**2))
+             write(*,*) vel, sqrt(sum(vel**2))
+             write(*,*) "x",dot_product(dist,vel)/(sqrt(sum(dist**2))*sqrt(sum(vel**2)))
+             write(*,*) prgrad, sqrt(sum(prgrad**2))
+           end if
+         else
+
+
+           call WMFlatVisc(Visc(xi, yj, zk),&
+                           WMPoints(i)%ustar,&
+                           dist, vel, wallvel)
+
+         end if
        end if
 
     end do

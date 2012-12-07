@@ -122,7 +122,7 @@ $(TARGETDIR_CLMM)/wallmodels.o: $(TARGETDIR_CLMM) wallmodels.f90 $(TARGETDIR_CLM
 $(TARGETDIR_CLMM)/turbinlet.o: $(TARGETDIR_CLMM) turbinlet.f90 $(TARGETDIR_CLMM)/parameters.o
 	hmpp $(COMPILE.f) $(FFLAGS_CLMM $(PARFLAGS)) $(CPPFLAGS_CLMM) -o $@ turbinlet.f90
 
-$(TARGETDIR_CLMM)/geometric.o: $(TARGETDIR_CLMM) geometric.f90 customBC.f90 $(TARGETDIR_CLMM)/parameters.o
+$(TARGETDIR_CLMM)/geometric.o: $(TARGETDIR_CLMM) geometric.f90 $(TARGETDIR_CLMM)/parameters.o
 	hmpp $(COMPILE.f) $(FFLAGS_CLMM) $(PARFLAGS) $(CPPFLAGS_CLMM) -o $@ geometric.f90
 
 $(TARGETDIR_CLMM)/smagorinsky.o: $(TARGETDIR_CLMM) smagorinsky.f90 $(TARGETDIR_CLMM)/parameters.o $(TARGETDIR_CLMM)/boundaries.o $(TARGETDIR_CLMM)/tiling.o
@@ -136,7 +136,8 @@ $(TARGETDIR_CLMM)/tsteps.o: $(TARGETDIR_CLMM) $(TARGETDIR_CLMM)/tsteps-tmp.F90 $
 	$(TARGETDIR_CLMM)/smagorinsky.o $(TARGETDIR_CLMM)/turbinlet.o $(TARGETDIR_CLMM)/wallmodels.o
 	hmpp   $(COMPILE.f) $(FFLAGS_CLMM) $(PARFLAGS) $(CPPFLAGS_CLMM) -o $@ $(TARGETDIR_CLMM)/tsteps-tmp.F90
 
-$(TARGETDIR_CLMM)/main.o: $(TARGETDIR_CLMM) main.f90 $(TARGETDIR_CLMM)/parameters.o
+$(TARGETDIR_CLMM)/main.o: $(TARGETDIR_CLMM) main.f90 $(TARGETDIR_CLMM)/parameters.o $(TARGETDIR_CLMM)/boundaries.o $(TARGETDIR_CLMM)/initial.o $(TARGETDIR_CLMM)/outputs.o\
+	$(TARGETDIR_CLMM)/geometric.o $(TARGETDIR_CLMM)/scalars.o $(TARGETDIR_CLMM)/wallmodels.o $(TARGETDIR_CLMM)/tsteps.o
 	$(COMPILE.f) $(FFLAGS_CLMM) $(PARFLAGS) $(CPPFLAGS_CLMM)  -D__HMPP -o $@ main.f90
 
 

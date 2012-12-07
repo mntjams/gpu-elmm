@@ -19,6 +19,8 @@ module INITIAL
   private
   public  ReadParams, Initconds, ReadBounds
 
+  real(KND) x0,y0,z0
+
 contains
 
 
@@ -27,7 +29,8 @@ contains
    real(KND) mgepsinnerGS
    integer   i,io,io2,itmp
    integer numframeslices
-   namelist /cmd/ tilesize, debugparam, debuglevel, windangle, projectiontype, Prnx, Prny, Prnz
+   namelist /cmd/ tilesize, debugparam, debuglevel, windangle, projectiontype, Prnx, Prny, Prnz,&
+                   obstaclefile
    character(len=1024) :: commandline,msg
    integer :: exenamelength
 
@@ -595,6 +598,12 @@ contains
      close(11)
    endif
 
+   open(11,file="obstacles.conf",status="old",action="read",iostat=io)
+   if (io==0) then
+     read(11,fmt='(/)')
+     read(11,'(a)') obstaclefile
+     close(11)
+   end if
 
    write(*,*) "computescalars",computescalars
    write(*,*) "partdiam",partdiam
@@ -783,7 +792,6 @@ contains
    else
      dt=dxmin
    endif
-   deb=1
 
    if ((timeavg1>=0).and.(timeavg2>=timeavg1)) then
      averaging=1
@@ -879,6 +887,7 @@ contains
   real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
   integer i,j,k
   real(KND) p,x,y,z,x1,x2,y1,y2,z1,z2
+  real(KND),allocatable :: Q(:,:,:)
 
     call init_random_seed
 
@@ -914,7 +923,7 @@ contains
          do k=1,Unz
           do j=1,Uny
            do i=1,Unx
-            !if (Utype(i,j,k)==0) then
+            !if (Utype(i,j,k)<=0) then
                   !call RANDOM_NUMBER(p)
                   x=xU(i)
                   y=yPr(j)
@@ -964,7 +973,7 @@ contains
          do k=1,Unz
           do j=1,Uny
            do i=1,Unx
-            !if (Utype(i,j,k)==0) then
+            !if (Utype(i,j,k)<=0) then
                   !call RANDOM_NUMBER(p)
                   x=xU(i)
                   y=yPr(j)
@@ -1101,7 +1110,7 @@ contains
            !$omp do
            do k=1,Unz
             do j=1,Uny
-              if (Utype(i,j,k)==0) then
+              if (Utype(i,j,k)<=0) then
                     U(i,j,k)=Uin(j,k)
               else
                  U(i,j,k)=0
@@ -1112,7 +1121,7 @@ contains
            !$omp do
            do k=1,Vnz
             do j=1,Vny
-              if (Vtype(i,j,k)==0) then
+              if (Vtype(i,j,k)<=0) then
                     V(i,j,k)=Vin(j,k)
               else
                  V(i,j,k)=0
@@ -1123,7 +1132,7 @@ contains
            !$omp do
            do k=1,Wnz
             do j=1,Wny
-              if (Wtype(i,j,k)==0) then
+              if (Wtype(i,j,k)<=0) then
                     W(i,j,k)=Win(j,k)
               else
                  W(i,j,k)=0
@@ -1141,7 +1150,7 @@ contains
          do k=1,Unz
           do j=1,Uny
            do i=1,Unx
-            if (Utype(i,j,k)==0) then
+            if (Utype(i,j,k)<=0) then
                   call RANDOM_NUMBER(p)
                   U(i,j,k)=Uin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_KND*(p-0.5_KND)!sin(2.*pi*xU(i)+1)*cos(2.*pi*yPr(j)-2)!Uin(j,k)!*(1+0.03_KND*(p-0.5_KND))
              else
@@ -1155,7 +1164,7 @@ contains
          do k=1,Vnz
           do j=1,Vny
            do i=1,Vnx
-            if (Vtype(i,j,k)==0) then
+            if (Vtype(i,j,k)<=0) then
                   call RANDOM_NUMBER(p)
                   V(i,j,k)=Vin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_KND*(p-0.5_KND)!-cos(2.*pi*xPr(i)+1)*sin(2.*pi*yV(j)-2)!Uinlet*(0.3_KND*(p-0.5_KND))
              else
@@ -1169,7 +1178,7 @@ contains
          do k=1,Wnz
           do j=1,Wny
            do i=1,Wnx
-            if (Wtype(i,j,k)==0) then
+            if (Wtype(i,j,k)<=0) then
                   call RANDOM_NUMBER(p)
                   W(i,j,k)=Win(j,k)!Uinlet*(0.00001_KND*(p-0.5_KND))
              else
@@ -1286,13 +1295,17 @@ contains
        !$omp end parallel
 
 
-       call Pr_Correct(U,V,W,Pr,1._KND)
+       call Pr_Correct(U,V,W,Pr,Q,1._KND)
 
 
-       if (sgstype==1) then
-                         call Smag(U,V,W)
-       elseif (sgstype==3) then
-                         call VREMAN(U,V,W)
+       if (sgstype==SmagorinskyModel) then
+                         call SGS_Smag(U,V,W,2._KND)
+       elseif (sgstype==SigmaModel) then
+                         call SGS_Sigma(U,V,W,2._KND)
+       elseif (sgstype==VremanModel) then
+                         call SGS_Vreman(U,V,W,2._KND)
+       elseif (sgstype==StabSmagorinskyModel) then
+                         call SGS_StabSmag(U,V,W,2._KND)
        else
          if (Re>0) then
            Visc=1._KND/Re

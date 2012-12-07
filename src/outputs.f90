@@ -378,7 +378,7 @@ contains
       do k = 1,Prnz
        do j = 1,Prny
         do i = 1,Prnx
-         if (Prtype(i,j,k)==0) S = S+scalar(i,j,k,l)*dxPr(i)*dyPr(j)*dzPr(k)
+         if (Prtype(i,j,k)<=0) S = S+scalar(i,j,k,l)*dxPr(i)*dyPr(j)*dzPr(k)
         enddo
        enddo
       enddo
@@ -1281,6 +1281,19 @@ contains
       enddo
       write (11,*)
 
+      if (store%U_interp==1) then
+        write (11,"(A)") "SCALARS Utype float"
+        write (11,"(A)") "LOOKUP_TABLE default"
+        do k = 1,Unz
+         do j = 1,Uny
+          do i = 1,Unx
+            write (11,*) Utype(i,j,k)
+          enddo
+         enddo
+        enddo
+        write (11,*)
+      end if
+
       close(11)
   endif
 
@@ -1321,6 +1334,19 @@ contains
       enddo
       write (11,*)
 
+      if (store%V_interp==1) then
+        write (11,"(A)") "SCALARS Vtype float"
+        write (11,"(A)") "LOOKUP_TABLE default"
+        do k = 1,Vnz
+         do j = 1,Vny
+          do i = 1,Vnx
+            write (11,*) Vtype(i,j,k)
+          enddo
+         enddo
+        enddo
+        write (11,*)
+      end if
+
       close(11)
   endif !store%V
 
@@ -1360,6 +1386,19 @@ contains
        enddo
       enddo
       write (11,*)
+
+      if (store%W_interp==1) then
+        write (11,"(A)") "SCALARS Wtype float"
+        write (11,"(A)") "LOOKUP_TABLE default"
+        do k = 1,Wnz
+         do j = 1,Wny
+          do i = 1,Wnx
+            write (11,*) Wtype(i,j,k)
+          enddo
+         enddo
+        enddo
+        write (11,*)
+      end if
 
       close(11)
   endif !store%W
@@ -1587,7 +1626,7 @@ contains
        do k = mink,maxk
         do j = minj,maxj
          do i = mini,maxi
-          if (Prtype(i,j,k)==0) then
+          if (Prtype(i,j,k)<=0) then
            write (unit) BigEnd(real(Pr(i,j,k),SNG))
           else
            write (unit) BigEnd(0._SNG)
@@ -1604,7 +1643,7 @@ contains
        do k = mink,maxk
         do j = minj,maxj
          do i = mini,maxi
-          if (Prtype(i,j,k)==0) then
+          if (Prtype(i,j,k)<=0) then
            write (unit) BigEnd(real(Lambda2(i,j,k,U,V,W),SNG))
           else
            write (unit) BigEnd(0._SNG)
@@ -1624,7 +1663,7 @@ contains
         do k = mink,maxk
          do j = minj,maxj
           do i = mini,maxi
-           if (Prtype(i,j,k)==0) then
+           if (Prtype(i,j,k)<=0) then
             write (unit) BigEnd(real(SCALAR(i,j,k,l),SNG))
            else
             write (unit) BigEnd(0._SNG)
@@ -1640,7 +1679,7 @@ contains
         do k = mink,maxk
          do j = minj,maxj
           do i = mini,maxi
-           if (Prtype(i,j,k)==0) then
+           if (Prtype(i,j,k)<=0) then
             write (unit) BigEnd(real(SUM(SCALAR(i,j,k,:)),SNG))
            else
             write (unit) BigEnd(0._SNG)
@@ -1658,7 +1697,7 @@ contains
         do k = mink,maxk
          do j = minj,maxj
           do i = mini,maxi
-           if (Prtype(i,j,k)==0) then
+           if (Prtype(i,j,k)<=0) then
             write (unit) BigEnd(real(Temperature(i,j,k),SNG))
            else
             write (unit) BigEnd(real(temperature_ref,SNG))
@@ -1676,7 +1715,7 @@ contains
         do k = mink,maxk
          do j = minj,maxj
           do i = mini,maxi
-           if (Prtype(i,j,k)==0) then
+           if (Prtype(i,j,k)<=0) then
             write (unit) BigEnd(real(ScalarVerticalFlux(i,j,k,Temperature,W),SNG))
            else
             write (unit) BigEnd(0._SNG)
@@ -1697,7 +1736,7 @@ contains
             do k = mink,maxk
              do j = minj,maxj
               do i = mini,maxi
-               if (Prtype(i,j,k)==0) then
+               if (Prtype(i,j,k)<=0) then
                 write (unit) BigEnd(real(ScalarVerticalFlux(i,j,k,Scalar(:,:,:,l),W),SNG))
                else
                 write (unit) BigEnd(0._SNG)
@@ -1713,7 +1752,7 @@ contains
           do k = mink,maxk
            do j = minj,maxj
             do i = mini,maxi
-             if (Prtype(i,j,k)==0) then
+             if (Prtype(i,j,k)<=0) then
               write (unit) BigEnd(real(ScalarVerticalFlux(i,j,k,SUM(Scalar(:,:,:,:),4),W),SNG))
              else
               write (unit) BigEnd(0._SNG)
@@ -1730,12 +1769,12 @@ contains
        do k = mink,maxk
         do j = minj,maxj
          do i = mini,maxi
-          if (Prtype(i,j,k)==0) then
+!           if (Prtype(i,j,k)<=0) then
            write (unit) BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._KND,SNG)),BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._KND,SNG))&
             ,BigEnd(real((W(i,j,k)+W(i,j,k-1))/2._KND,SNG))
-          else
-           write (unit) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
-          endif
+!           else
+!            write (unit) BigEnd(0._SNG),BigEnd(0._SNG),BigEnd(0._SNG)
+!           endif
          enddo
         enddo
        enddo
@@ -1747,7 +1786,7 @@ contains
        do k = mink,maxk
         do j = minj,maxj
          do i = mini,maxi
-          if (Prtype(i,j,k)==0) then
+          if (Prtype(i,j,k)<=0) then
            write (unit) BigEnd(real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                            -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),SNG)),&
                         BigEnd(real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
@@ -1786,7 +1825,7 @@ contains
      n = 0
      do j = 1,Uny
       do i = 1,Unx
-       if (Utype(i,j,k)==0) then
+       if (Utype(i,j,k)<=0) then
         S = S+U(i,j,k)
         n = n+1
        endif
@@ -1802,7 +1841,7 @@ contains
      n = 0
      do j = 1,Vny
       do i = 1,Vnx
-       if (Vtype(i,j,k)==0) then
+       if (Vtype(i,j,k)<=0) then
         S = S+V(i,j,k)
         n = n+1
        endif
@@ -1820,7 +1859,7 @@ contains
       n = 0
       do j = 1,Prny
        do i = 1,Prnx
-        if (Prtype(i,j,k)==0) then
+        if (Prtype(i,j,k)<=0) then
          S = S+temperature(i,j,k)
          n = n+1
         endif
@@ -1839,7 +1878,7 @@ contains
        n = 0
        do j = 1,Prny
         do i = 1,Prnx
-         if (Prtype(i,j,k)==0) then
+         if (Prtype(i,j,k)<=0) then
           S = S+scalar(i,j,k,l)
           n = n+1
          endif
@@ -1867,7 +1906,7 @@ contains
      n = 0
      do j = 1,Uny
       do i = 1,Unx
-       if ((Utype(i,j,k+1)==0.or.Utype(i,j,k)==0).and.(Wtype(i+1,j,k)==0.or.Wtype(i,j,k)==0)) then
+       if ((Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0).and.(Wtype(i+1,j,k)<=0.or.Wtype(i,j,k)<=0)) then
         S = S+((ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))-((1-ht(k))*profU(k)+ht(k)*profU(k+1)))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))
         n = n+1
        endif
@@ -1883,7 +1922,7 @@ contains
      n = 0
      do j = 1,Vny
       do i = 1,Vnx
-       if ((Vtype(i,j,k+1)==0.or.Vtype(i,j,k)==0).and.(Wtype(i,j+1,k)==0.or.Wtype(i,j,k)==0)) then
+       if ((Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0).and.(Wtype(i,j+1,k)<=0.or.Wtype(i,j,k)<=0)) then
         S = S+(ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)-(ht(k)*profV(k+1)+(1-ht(k))*profV(k)))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))
         n = n+1
        endif
@@ -1899,7 +1938,7 @@ contains
      n = 0
      do j = 1,Uny
       do i = 1,Unx
-       if (Utype(i,j,k+1)==0.or.Utype(i,j,k)==0) then
+       if (Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0) then
         S = S-0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)
         n = n+1
        endif
@@ -1915,7 +1954,7 @@ contains
      n = 0
      do j = 1,Vny
       do i = 1,Vnx
-       if (Vtype(i,j,k+1)==0.or.Vtype(i,j,k)==0) then
+       if (Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0) then
         S = S-0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)
         n = n+1
        endif
@@ -1931,7 +1970,7 @@ contains
      n = 0
      do j = 1,Uny
       do i = 1,Unx
-       if (Utype(i,j,k)==0) then
+       if (Utype(i,j,k)<=0) then
         S = S+(U(i,j,k)-profU(k))**2
         n = n+1
        endif
@@ -1947,7 +1986,7 @@ contains
      n = 0
      do j = 1,Vny
       do i = 1,Vnx
-       if (Vtype(i,j,k)==0) then
+       if (Vtype(i,j,k)<=0) then
         S = S+(V(i,j,k)-profV(k))**2
         n = n+1
        endif
@@ -1963,7 +2002,7 @@ contains
      n = 0
      do j = 1,Wny
       do i = 1,Wnx
-       if (Wtype(i,j,k)==0) then
+       if (Wtype(i,j,k)<=0) then
         S = S+(W(i,j,k))**2
         n = n+1
        endif
@@ -1984,7 +2023,7 @@ contains
       n = 0
       do j = 1,Prny
        do i = 1,Prnx
-        if (Prtype(i,j,k)==0) then
+        if (Prtype(i,j,k)<=0) then
          S = S+(temperature(i,j,k)-profTemp(k))**2
          n = n+1
         endif
@@ -2000,7 +2039,7 @@ contains
       n = 0
       do j = 1,Prny
        do i = 1,Prnx
-        if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
+        if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
           S = S-(0.5_KND*(TDiff(i,j,k+1)+TDiff(i,j,k))*(temperature(i,j,k+1)-temperature(i,j,k)))/dzW(k)
           n = n+1
         endif
@@ -2022,7 +2061,7 @@ contains
        n = 0
        do j = 1,Prny
         do i = 1,Prnx
-         if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
+         if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
           S = S+0.5_KND*(scalar(i,j,k+1,l)+scalar(i,j,k,l))*(W(i,j,k))
           n = n+1
          endif
@@ -2038,7 +2077,7 @@ contains
        n = 0
        do j = 1,Prny
         do i = 1,Prnx
-         if (Prtype(i,j,k)==0) then
+         if (Prtype(i,j,k)<=0) then
           S = S+(scalar(i,j,k,l)-profscal(l,k))**2
           n = n+1
          endif
@@ -2054,7 +2093,7 @@ contains
        n = 0
        do j = 1,Prny
         do i = 1,Prnx
-         if (Prtype(i,j,k+1)==0.or.Prtype(i,j,k)==0) then
+         if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
            S = S-(0.5_KND*(TDiff(i,j,k+1)+TDiff(i,j,k))*(scalar(i,j,k+1,l)-scalar(i,j,k,l)))/dzW(k)
            n = n+1
          endif

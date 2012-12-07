@@ -349,8 +349,8 @@ implicit none
   !$omp sections
   !$omp section
 
-  if (Btype(Bo)==DIRICHLET) then
-    if (component==3.and.regime/=interm) then
+  if (Btype(Bo)==DIRICHLET .and. regime/=interm) then
+    if (component==3) then
       do j=1,ny
        do i=1,nx                       !Dirichlet inlet
         U(i,j,0)=sideU(component,Bo)
@@ -358,7 +358,7 @@ implicit none
         U(i,j,-2)=sideU(component,Bo)+(sideU(component,Bo)-U(i,j,2))
        enddo
       enddo
-    elseif (regime/=interm) then
+    else
       do j=1,ny
        do i=1,nx                       !Dirichlet inlet
         U(i,j,0)=sideU(component,Bo)+(sideU(component,Bo)-U(i,j,1))
@@ -366,16 +366,9 @@ implicit none
         U(i,j,-2)=sideU(component,Bo)+(sideU(component,Bo)-U(i,j,3))
        enddo
       enddo
-    else
-      do j=1,ny
-       do i=1,nx                       !Dirichlet inlet
-        U(i,j,0)=0
-        U(i,j,-1)=0
-        U(i,j,-2)=0
-       enddo
-      enddo
     endif
-  elseif (Btype(Bo)==NOSLIP.or.(component==3.and.Btype(Bo)==FREESLIP)) then
+  elseif (Btype(Bo)==NOSLIP .or. (component==3.and.Btype(Bo)==FREESLIP) .or. &
+             (Btype(Bo)==DIRICHLET.and.regime==interm)) then
     if (component==3) then
       do j=1,ny
        do i=1,nx                       !Solid wall
@@ -412,8 +405,8 @@ implicit none
   endif
 
   !$omp section
-  if (Btype(To)==DIRICHLET) then
-    if (component==3.and.regime/=interm) then
+  if (Btype(To)==DIRICHLET.and.regime/=interm) then
+    if (component==3) then
       do j=1,ny
        do i=1,nx                       !Dirichlet inlet
         U(i,j,nz+1)=sideU(component,To)
@@ -421,7 +414,7 @@ implicit none
         U(i,j,nz+3)=sideU(component,To)+(sideU(component,To)-U(i,j,nz-1))
        enddo
       enddo
-    elseif (regime/=interm) then
+    else
       do j=1,ny
        do i=1,nx                       !Dirichlet inlet
         U(i,j,nz+1)=sideU(component,To)+(sideU(component,To)-U(i,j,nz))
@@ -429,16 +422,9 @@ implicit none
         U(i,j,nz+3)=sideU(component,To)+(sideU(component,To)-U(i,j,nz-2))
        enddo
       enddo
-    else
-      do j=1,ny
-       do i=1,nx                       !Dirichlet inlet
-        U(i,j,nz+1)=0
-        U(i,j,nz+2)=0
-        U(i,j,nz+3)=0
-       enddo
-      enddo
     endif
-  elseif (Btype(To)==NOSLIP.or.(component==3.and.(Btype(To)==FREESLIP.or.Btype(To)==FREESLIPBUFF))) then
+  elseif (Btype(To)==NOSLIP .or. (component==3.and.(Btype(To)==FREESLIP.or.Btype(To)==FREESLIPBUFF)) .or. &
+           (Btype(To)==DIRICHLET.and.regime==interm) ) then
     if (component==3) then
       do j=1,ny
        do i=1,nx                       !Solid wall
@@ -477,8 +463,8 @@ implicit none
 
   !$omp sections
   !$omp section
-  if (Btype(So)==DIRICHLET) then
-    if (component==2.and.regime/=interm) then
+  if (Btype(So)==DIRICHLET.and.regime/=interm) then
+    if (component==2) then
       do k=-2,nz+3
        do i=1,nx                       !Dirichlet inlet
         U(i,0,k)=sideU(component,So)
@@ -486,7 +472,7 @@ implicit none
         U(i,-2,k)=sideU(component,So)+(sideU(component,So)-U(i,2,k))
        enddo
       enddo
-    else if (regime/=interm) then
+    else
       do k=-2,nz+3
        do i=1,nx                       !Dirichlet inlet
         U(i,0,k)=sideU(component,So)+(sideU(component,So)-U(i,1,k))
@@ -494,16 +480,9 @@ implicit none
         U(i,-2,k)=sideU(component,So)+(sideU(component,So)-U(i,3,k))
        enddo
       enddo
-    else
-      do k=-2,nz+3
-       do i=1,nx                       !Dirichlet inlet
-        U(i,0,k)=0
-        U(i,-1,k)=0
-        U(i,-2,k)=0
-       enddo
-      enddo
     endif
-  elseif (Btype(So)==NOSLIP.or.(component==2.and.Btype(So)==FREESLIP)) then
+  elseif (Btype(So)==NOSLIP .or. (component==2.and.Btype(So)==FREESLIP) .or. &
+             (Btype(So)==DIRICHLET.and.regime==interm)) then
     if (component==2) then
       do k=-2,nz+3
        do i=1,nx                       !Solid wall
@@ -541,8 +520,8 @@ implicit none
 
 
   !$omp section
-  if (Btype(No)==DIRICHLET) then
-    if (component==2.and.regime/=interm) then
+  if (Btype(No)==DIRICHLET.and.regime/=interm) then
+    if (component==2) then
       do k=-2,nz+3
        do i=1,nx                       !Dirichlet inlet
         U(i,ny+1,k)=sideU(component,No)
@@ -550,7 +529,7 @@ implicit none
         U(i,ny+3,k)=sideU(component,No)+(sideU(component,No)-U(i,ny-1,k))
        enddo
       enddo
-    elseif (regime/=interm) then
+    else
       do k=-2,nz+3
        do i=1,nx                       !Dirichlet inlet
         U(i,ny+1,k)=sideU(component,No)+(sideU(component,No)-U(i,ny,k))
@@ -558,16 +537,9 @@ implicit none
         U(i,ny+3,k)=sideU(component,No)+(sideU(component,No)-U(i,ny-2,k))
        enddo
       enddo
-    else
-      do k=-2,nz+3
-       do i=1,nx                       !Dirichlet inlet
-        U(i,ny+1,k)=0
-        U(i,ny+2,k)=0
-        U(i,ny+3,k)=0
-       enddo
-      enddo
     endif
-  elseif (Btype(No)==NOSLIP.or.(component==2.and.Btype(So)==FREESLIP)) then
+  elseif (Btype(No)==NOSLIP .or. (component==2.and.Btype(So)==FREESLIP) .or. &
+           (Btype(No)==DIRICHLET.and.regime==interm)) then
     if (component==2) then
       do k=-2,nz+3
        do i=1,nx                       !Solid wall
@@ -585,7 +557,7 @@ implicit none
        enddo
       enddo
     endif
-  elseif (Btype(No)==NEUMANN.or.(component/=2.and.Btype(No)==FREESLIP)) then
+  elseif (Btype(No)==NEUMANN .or. (component/=2.and.Btype(No)==FREESLIP)) then
     do k=-2,nz+3
      do i=1,nx                       !Neumann inlet
       U(i,ny+1,k)=U(i,ny,k)
@@ -606,25 +578,26 @@ implicit none
 
   !$omp sections
   !$omp section
-  if (Btype(We)==DIRICHLET) then
-    if (component==1.and.regime/=interm) then
+  if (Btype(We)==DIRICHLET.and.regime/=interm) then
+    if (component==1) then
        do k=-2,nz+3
         do j=-2,ny+3                       !Dirichlet inlet
          U(0,j,k)=Uin(j,k)
-         U(-1,j,k)=Uin(j,k)
-         U(-2,j,k)=Uin(j,k)
+         U(-1,j,k)=Uin(j,k)+(Uin(j,k)-U(1,j,k))
+         U(-2,j,k)=Uin(j,k)+(Uin(j,k)-U(2,j,k))
         enddo
        enddo
     else
        do k=-2,nz+3
         do j=-2,ny+3                       !Dirichlet inlet
-         U(0,j,k)=0
-         U(-1,j,k)=0
-         U(-2,j,k)=0
+         U(0,j,k)=-U(1,j,k)
+         U(-1,j,k)=-U(2,j,k)
+         U(-2,j,k)=-U(3,j,k)
         enddo
        enddo
     endif
-  elseif (Btype(We)==NOSLIP.or.(component==1.and.Btype(We)==FREESLIP)) then
+  elseif (Btype(We)==NOSLIP .or. (component==1.and.Btype(We)==FREESLIP) .or. &
+           (Btype(We)==DIRICHLET.and.regime==interm)) then
     if (component==1) then
        do k=-2,nz+3
         do j=-2,ny+3                       !Solid wall
@@ -670,45 +643,66 @@ implicit none
     enddo
   elseif (Btype(We)==TURBULENTINLET.or.Btype(We)==INLETFROMFILE) then
     if (regime/=interm) then
-      do k=-2,nz+3
-       do j=-2,ny+3
-        U(0,j,k)=Uin(j,k)
-        U(-1,j,k)=Uin(j,k)
-        U(-2,j,k)=Uin(j,k)
-       enddo
-      enddo
+      if (component==1) then
+        do k=-2,nz+3
+         do j=-2,ny+3
+          U(0,j,k)=Uin(j,k)
+          U(-1,j,k)=Uin(j,k)+(Uin(j,k)-U(1,j,k))
+          U(-2,j,k)=Uin(j,k)+(Uin(j,k)-U(2,j,k))
+         enddo
+        enddo
+      else
+        do k=-2,nz+3
+         do j=-2,ny+3
+          U(0,j,k)=Uin(j,k)+(Uin(j,k)-U(1,j,k))
+          U(-1,j,k)=Uin(j,k)+(Uin(j,k)-U(2,j,k))
+          U(-2,j,k)=Uin(j,k)+(Uin(j,k)-U(3,j,k))
+         enddo
+        enddo
+      endif
     else
-      do k=-2,nz+3
-       do j=-2,ny+3
-        U(0,j,k)=0
-        U(-1,j,k)=0
-        U(-2,j,k)=0
-       enddo
-      enddo
+      if (component==1) then
+         do k=-2,nz+3
+          do j=-2,ny+3
+           U(0,j,k)=0
+           U(-1,j,k)=-U(1,j,k)
+           U(-2,j,k)=-U(2,j,k)
+          enddo
+         enddo
+      else
+         do k=-2,nz+3
+          do j=-2,ny+3
+           U(0,j,k)=-U(1,j,k)
+           U(-1,j,k)=-U(2,j,k)
+           U(-2,j,k)=-U(3,j,k)
+          enddo
+         enddo
+      endif
     endif
   endif
 
 
   !$omp section
-  if (Btype(Ea)==DIRICHLET) then
-    if (component==1.and.regime/=interm) then
+  if (Btype(Ea)==DIRICHLET.and.regime/=interm) then
+    if (component==1) then
       do k=-2,nz+3
        do j=-2,ny+3                       !Dirichlet inlet
         U(nx+1,j,k)=Uin(j,k)
-        U(nx+2,j,k)=Uin(j,k)
-        U(nx+3,j,k)=Uin(j,k)
+        U(nx+2,j,k)=Uin(j,k)+(Uin(j,k)-U(nx,j,k))
+        U(nx+3,j,k)=Uin(j,k)+(Uin(j,k)-U(nx-1,j,k))
        enddo
       enddo
     else
       do k=-2,nz+3
        do j=-2,ny+3                       !Dirichlet inlet
-        U(nx+1,j,k)=0
-        U(nx+2,j,k)=0
-        U(nx+3,j,k)=0
+        U(nx+1,j,k)=-U(nx,j,k)
+        U(nx+2,j,k)=-U(nx-1,j,k)
+        U(nx+3,j,k)=-U(nx-2,j,k)
        enddo
       enddo
     endif
-  elseif (Btype(Ea)==NOSLIP.or.(component==1.and.Btype(Ea)==FREESLIP)) then
+  elseif (Btype(Ea)==NOSLIP .or. (component==1.and.Btype(Ea)==FREESLIP) .or. &
+            (Btype(Ea)==DIRICHLET.and.regime==interm)) then
     if (component==1) then
       do k=-2,nz+3
        do j=-2,ny+3                       !Solid wall
@@ -744,21 +738,41 @@ implicit none
     enddo
   elseif (Btype(Ea)==TURBULENTINLET) then
     if (regime/=interm) then
-      do k=-2,nz+3
-       do j=-2,ny+3                       !Dirichlet inlet
-        U(nx+1,j,k)=Uin(j,k)
-        U(nx+2,j,k)=Uin(j,k)
-        U(nx+3,j,k)=Uin(j,k)
-       enddo
-      enddo
+      if (component==1) then
+        do k=-2,nz+3
+         do j=-2,ny+3
+          U(nx+1,j,k)=Uin(j,k)
+          U(nx+2,j,k)=Uin(j,k)+(Uin(j,k)-U(nx,j,k))
+          U(nx+3,j,k)=Uin(j,k)+(Uin(j,k)-U(nx-1,j,k))
+         enddo
+        enddo
+      else
+        do k=-2,nz+3
+         do j=-2,ny+3
+          U(nx+1,j,k)=Uin(j,k)+(Uin(j,k)-U(nx,j,k))
+          U(nx+2,j,k)=Uin(j,k)+(Uin(j,k)-U(nx-1,j,k))
+          U(nx+3,j,k)=Uin(j,k)+(Uin(j,k)-U(nx-2,j,k))
+         enddo
+        enddo
+      endif
     else
-     do k=-2,nz+3
-       do j=-2,ny+3                       !Dirichlet inlet
-        U(nx+1,j,k)=0
-        U(nx+2,j,k)=0
-        U(nx+3,j,k)=0
-       enddo
-      enddo
+      if (component==1) then
+         do k=-2,nz+3
+          do j=-2,ny+3
+           U(nx+1,j,k)=0
+           U(nx+2,j,k)=-U(nx,j,k)
+           U(nx+3,j,k)=-U(nx-1,j,k)
+          enddo
+         enddo
+      else
+         do k=-2,nz+3
+          do j=-2,ny+3
+           U(nx+1,j,k)=-U(nx,j,k)
+           U(nx+2,j,k)=-U(nx-1,j,k)
+           U(nx+3,j,k)=-U(nx-2,j,k)
+          enddo
+         enddo
+      endif
     endif
   endif
   !$omp end sections

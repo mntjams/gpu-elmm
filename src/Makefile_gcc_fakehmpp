@@ -94,9 +94,9 @@ $(TARGETDIR_CLMM)/outputs.o: $(TARGETDIR_CLMM) outputs.f90 $(TARGETDIR_CLMM)/par
 	$(TARGETDIR_CLMM)/scalars.o $(TARGETDIR_CLMM)/wallmodels.o $(TARGETDIR_CLMM)/geometric.o $(TARGETDIR_CLMM)/turbinlet.o
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ outputs.f90
 
-$(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.f90 $(TARGETDIR_CLMM)/parameters.o $(TARGETDIR_CLMM)/boundaries.o \
+$(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.F90 $(TARGETDIR_CLMM)/parameters.o $(TARGETDIR_CLMM)/boundaries.o \
 	$(TARGETDIR_CLMM)/multigrid.o $(TARGETDIR_CLMM)/multigrid2d.o
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -I/usr/local/poisfft_gcc/sp -o $@ poisson.f90
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -I/usr/local/poisfft_gcc/sp -o $@ poisson.F90
 
 $(TARGETDIR_CLMM)/initial.o: $(TARGETDIR_CLMM) initial.f90 $(TARGETDIR_CLMM)/parameters.o $(TARGETDIR_CLMM)/limiters.o \
 	$(TARGETDIR_CLMM)/multigrid.o $(TARGETDIR_CLMM)/multigrid2d.o $(TARGETDIR_CLMM)/poisson.o \

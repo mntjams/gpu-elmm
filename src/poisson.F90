@@ -20,10 +20,10 @@ implicit none
 contains
 
 
-  subroutine PR_CORRECT(U,V,W,Pr,coef,Q)                       !Pressure correction
+  subroutine PR_CORRECT(U,V,W,Pr,Q,coef)                       !Pressure correction
     real(KND),dimension(-2:,-2:,-2:),intent(inout)    :: U,V,W !Phi is computed in Poisson eq. with div of U in RHS
     real(KND),dimension(1:,1:,1:),intent(inout)       :: Pr    !Depend ing on active projection method Phi becomes new pressure
-    real(KND),dimension(0:,0:,0:),optional,intent(in) :: Q     !or is added to last pressure
+    real(KND),dimension(:,:,:),allocatable,intent(in) :: Q     !or is added to last pressure
     real(KND),intent(in) :: coef
                                                            !U,V,W velocity field for correction
     real(KND),save,allocatable :: Phi(:,:,:), RHS(:,:,:)   !Pr pressure
@@ -80,7 +80,7 @@ contains
       call PrePoisson(U,V,W,RHS,dt2,uncompatibility,divergence)
     end if
 #else
-    call PrePoisson(U,V,W,RHS,dt2,uncompatibility,divergence)
+    call PrePoisson(U,V,W,Q,RHS,dt2,uncompatibility,divergence)
 #endif
 
     if (debugparam>1.and.called>1) call system_clock(count=time2)
@@ -156,11 +156,12 @@ contains
 
 
 
-  subroutine PrePoisson(U,V,W,RHS,dt2,uncompatibility,divergence)
+  subroutine PrePoisson(U,V,W,Q,RHS,dt2,uncompatibility,divergence)
     real(KND),intent(inout) :: U(-2:,-2:,-2:)
     real(KND),intent(inout) :: V(-2:,-2:,-2:)
     real(KND),intent(inout) :: W(-2:,-2:,-2:)
     real(KND),intent(out)   :: RHS(0:,0:,0:)
+    real(KND),allocatable,intent(in) :: Q(:,:,:)
     real(KND),intent(out)   :: uncompatibility,divergence
     real(KND),intent(in)    :: dt2
     real(KND) :: S,S2
@@ -195,7 +196,7 @@ contains
       uncompatibility = S
 
       !$omp parallel workshare
-      U(Unx+1,:,:)=U(Unx+1,:,:)+S
+      U(Unx+1,:,:) = U(Unx+1,:,:)+S
       !$omp end parallel workshare
 
     end if
@@ -203,17 +204,36 @@ contains
     S=0
     S2=0
 
-    !$omp parallel do private(i,j,k) reduction(+:s2)
-    do k=1,Prnz            !divergence of U -> RHS
-     do j=1,Prny
-      do i=1,Prnx
-           RHS(i,j,k)=(U(i,j,k)-U(i-1,j,k))/(dxmin)+(V(i,j,k)-V(i,j-1,k))/(dymin)+(W(i,j,k)-W(i,j,k-1))/(dzmin)
-           S2=S2+abs(RHS(i,j,k))
-           RHS(i,j,k)=RHS(i,j,k)/(dt2)
+    if (allocated(Q)) then
+      !$omp parallel do private(i,j,k) reduction(+:s2)
+      do k=1,Prnz            !divergence of U -> RHS
+       do j=1,Prny
+        do i=1,Prnx
+             RHS(i,j,k) = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
+                         +(V(i,j,k)-V(i,j-1,k))/(dymin)&
+                         +(W(i,j,k)-W(i,j,k-1))/(dzmin)&
+                         -Q(i,j,k)
+             S2=S2+abs(RHS(i,j,k))
+             RHS(i,j,k) = RHS(i,j,k)/(dt2)
+        end do
+       end do
       end do
-     end do
-    end do
-    !$omp end parallel do
+      !$omp end parallel do
+    else
+      !$omp parallel do private(i,j,k) reduction(+:s2)
+      do k=1,Prnz            !divergence of U -> RHS
+       do j=1,Prny
+        do i=1,Prnx
+             RHS(i,j,k) = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
+                         +(V(i,j,k)-V(i,j-1,k))/(dymin)&
+                         +(W(i,j,k)-W(i,j,k-1))/(dzmin)
+             S2=S2+abs(RHS(i,j,k))
+             RHS(i,j,k) = RHS(i,j,k)/(dt2)
+        end do
+       end do
+      end do
+      !$omp end parallel do
+    end if
 
     divergence = S2/(Prnx*Prny*Prnz)
 
