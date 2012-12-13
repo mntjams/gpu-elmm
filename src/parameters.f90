@@ -9,7 +9,12 @@ module KINDS
   integer,parameter :: real64 = selected_real_kind(p=15,r=200)
 
   integer,parameter :: DBL = real64, SNG = real32
-  integer,parameter :: KND = SNG                                       !KND is default real kind for the whole program
+
+#ifdef DPREC
+  integer,parameter :: KND = DBL                                       !KND is default real kind for the whole program, choosing double
+#else
+  integer,parameter :: KND = SNG                                       !KND is default real kind for the whole program, choosing single
+#endif
 
   integer,parameter :: TIM = KND                                       !Kind for time variables, can be double for very small timesteps.
                                                                        !It may affect performance

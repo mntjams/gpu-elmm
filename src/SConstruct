@@ -1,0 +1,130 @@
+import os
+comp = ARGUMENTS.get('comp','')
+prec = ARGUMENTS.get('prec','')
+omp = ARGUMENTS.get('omp','')
+fast = ARGUMENTS.get('fast','')
+lto = ARGUMENTS.get('lto','')
+dtrace = ARGUMENTS.get('dtrace','')
+dir = ARGUMENTS.get('dir','')
+customSB = ARGUMENTS.get('customSB','')
+SB = ARGUMENTS.get('SB','')
+extra = ARGUMENTS.get('extra','')
+
+extra_flag = ' ' + str(extra)
+
+target_dir = str(dir)
+if (len(target_dir)>0) and (target_dir[-1]!='/'):
+  target_dir += '/'
+
+if str(prec)=='dp':
+  prec_dir = 'dp/'
+  prec_flag = ' -DDPREC'
+else:
+  prec_dir = 'sp/'
+  prec_flag = ''
+  
+
+if str(comp)=='sun':
+  env = Environment(tools=['link','sunf90','sunf95'])
+  
+  if str(omp)!='no':
+    omp_flag = ' -openmp'
+  else:
+    omp_flag = ''
+  
+  if str(fast)=='yes':
+    fast_flag = ' -fast'
+  else:
+    fast_flag = ' -C'
+  
+  if str(lto)=='yes':
+    lto_flag = ' -xipo'
+  else:
+    lto_flag = ''
+    
+  if str(dtrace)=='yes':
+    env.Append(F90FLAGS=' -xinstrument=datarace')
+    env.Append(LINKFLAGS=' -xinstrument=datarace')
+  
+  env.Append(F90FLAGS='-fpp -xpp=cpp -DNO_INTERNAL_NML -g -dalign')
+
+  env.Append(LIBPATH = ['/usr/local/poisfft_sun/'+prec_dir])
+
+  env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_sun/'+prec_dir])
+  
+  env.Append(FORTRANMODDIRPREFIX = '-moddir=')
+                            
+  env.Append(INCPREFIX = '-M')
+                            
+else:
+  env = Environment()
+ 
+  if str(omp)!='no':
+    omp_flag = ' -fopenmp'
+  else:
+    omp_flag = ''
+
+  if str(fast)=='yes':
+    fast_flag = ' -Ofast -Warray-temporaries'
+  else:
+    fast_flag = ' -fcheck=all -Wall'
+  
+  if str(lto)=='yes':
+    lto_flag = ' -flto'
+  else:
+    lto_flag = ''
+  
+  env.Append(F90FLAGS='-cpp -fbacktrace -g -pedantic -ffpe-trap=zero,overflow,invalid -fstack-arrays')
+
+  env.Append(LIBPATH = ['/usr/local/poisfft_gcc/'+prec_dir])
+
+  env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_gcc/'+prec_dir])
+  
+  env.Append(FORTRANMODDIRPREFIX = '-J')
+  
+  
+  
+env.Append(ENV = {'PATH' : os.environ['PATH']})
+  
+env.Append(F90FLAGS= fast_flag + omp_flag + lto_flag + extra_flag + prec_flag)
+  
+env.Append(LINKFLAGS= fast_flag + omp_flag + lto_flag + extra_flag)
+    
+env.Append(FORTRANMODDIR = '${TARGET.dir}')
+
+env.Append(LIBS = ['poisfft','lapack','fftw3','fftw3f','fftw3_omp','fftw3f_omp'])
+
+if customSB=='yes':
+  env.Append(F90FLAGS='-DCUSTOMSB')
+  if str(SB)=='':
+    SBfile = ['../custom/emptySB.o']
+  else:
+    SBfile = [str(SB)]
+
+
+objs = env.Object(target=target_dir+'parameters', source='parameters.f90')
+objs += env.Object(target=target_dir+'strings', source='strings.f90')
+objs += env.Object(target=target_dir+'tiling', source='tiling.f90')
+objs += env.Object(target=target_dir+'limiters', source='limiters.f90')
+objs += env.Object(target=target_dir+'multigrid', source='multigrid.f90')
+objs += env.Object(target=target_dir+'multigrid2d', source='multigrid2d.f90')
+objs += env.Object(target=target_dir+'wallmodels', source='wallmodels.f90')
+objs += env.Object(target=target_dir+'geometric', source='geometric.f90')
+objs += env.Object(target=target_dir+'turbinlet', source='turbinlet.f90')
+objs += env.Object(target=target_dir+'boundaries', source='boundaries.f90')
+objs += env.Object(target=target_dir+'scalars', source='scalars.f90')
+objs += env.Object(target=target_dir+'smagorinsky', source='smagorinsky.f90')
+objs += env.Object(target=target_dir+'outputs', source='outputs.f90')
+objs += env.Object(target=target_dir+'poisson', source='poisson.F90')
+objs += env.Object(target=target_dir+'initial', source='initial.f90')
+objs += env.Object(target=target_dir+'cds', source='cds.f90')
+objs += env.Object(target=target_dir+'laxfried', source='laxfried.f90')
+objs += env.Object(target=target_dir+'laxwend', source='laxwend.f90')
+objs += env.Object(target=target_dir+'tsteps', source='tsteps.f90')
+objs += env.Object(target=target_dir+'main', source='main.f90')
+
+objs = filter(lambda o: str(o)[-4:] != '.mod', objs)
+
+t = env.Program(target=target_dir+'CLMM', source= objs + SBfile)
+
+Default(t)

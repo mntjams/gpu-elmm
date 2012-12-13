@@ -1,0 +1,3 @@
+#!/bin/bash
+scons -j 8 comp=sun lto=yes fast=yes openmp=yes prec=sp dir=../bin/sun/release customSB=yes $1 $2 $3
+
