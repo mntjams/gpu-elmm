@@ -41,7 +41,7 @@ OBJS_CLMM =  \
 	$(TARGETDIR_CLMM)/boundaries.o \
 	$(TARGETDIR_CLMM)/hmpp-scalars.o \
 	$(TARGETDIR_CLMM)/scalars.o \
-	$(TARGETDIR_CLMM)/smagorinsky.o \
+	$(TARGETDIR_CLMM)/subgrido \
 	$(TARGETDIR_CLMM)/outputs.o \
 	$(TARGETDIR_CLMM)/poisson.o \
 	$(TARGETDIR_CLMM)/initial.o \
@@ -100,7 +100,7 @@ $(TARGETDIR_CLMM)/poisson.o: $(TARGETDIR_CLMM) poisson.F90 $(TARGETDIR_CLMM)/par
 
 $(TARGETDIR_CLMM)/initial.o: $(TARGETDIR_CLMM) initial.f90 $(TARGETDIR_CLMM)/parameters.o $(TARGETDIR_CLMM)/limiters.o \
 	$(TARGETDIR_CLMM)/multigrid.o $(TARGETDIR_CLMM)/multigrid2d.o $(TARGETDIR_CLMM)/poisson.o \
-	$(TARGETDIR_CLMM)/boundaries.o $(TARGETDIR_CLMM)/outputs.o $(TARGETDIR_CLMM)/scalars.o $(TARGETDIR_CLMM)/smagorinsky.o \
+	$(TARGETDIR_CLMM)/boundaries.o $(TARGETDIR_CLMM)/outputs.o $(TARGETDIR_CLMM)/scalars.o $(TARGETDIR_CLMM)/subgrido \
 	$(TARGETDIR_CLMM)/turbinlet.o $(TARGETDIR_CLMM)/geometric.o $(TARGETDIR_CLMM)/wallmodels.o
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ initial.f90
 
@@ -122,15 +122,15 @@ $(TARGETDIR_CLMM)/turbinlet.o: $(TARGETDIR_CLMM) turbinlet.f90 $(TARGETDIR_CLMM)
 $(TARGETDIR_CLMM)/geometric.o: $(TARGETDIR_CLMM) geometric.f90 customBC.f90 $(TARGETDIR_CLMM)/parameters.o
 	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ geometric.f90
 
-$(TARGETDIR_CLMM)/smagorinsky.o: $(TARGETDIR_CLMM) smagorinsky.f90 $(TARGETDIR_CLMM)/parameters.o $(TARGETDIR_CLMM)/boundaries.o $(TARGETDIR_CLMM)/tiling.o
-	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ smagorinsky.f90
+$(TARGETDIR_CLMM)/subgrido: $(TARGETDIR_CLMM) subgridf90 $(TARGETDIR_CLMM)/parameters.o $(TARGETDIR_CLMM)/boundaries.o $(TARGETDIR_CLMM)/tiling.o
+	$(COMPILE.f) $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ subgridf90
 
 $(TARGETDIR_CLMM)/tsteps-tmp.F90: tsteps.f90 tsteps_GPU.f90 boundaries_GPU.f90 hmpp-include.f90 smagorinsky_GPU.f90
 	$(COMPILE.f) tsteps.f90 -E -D__HMPP > $(TARGETDIR_CLMM)/tsteps-tmp.F90
 
 $(TARGETDIR_CLMM)/tsteps.o: $(TARGETDIR_CLMM) $(TARGETDIR_CLMM)/tsteps-tmp.F90 $(TARGETDIR_CLMM)/parameters.o $(TARGETDIR_CLMM)/cds.o $(TARGETDIR_CLMM)/laxfried.o $(TARGETDIR_CLMM)/laxwend.o \
 	$(TARGETDIR_CLMM)/boundaries.o $(TARGETDIR_CLMM)/poisson.o $(TARGETDIR_CLMM)/outputs.o $(TARGETDIR_CLMM)/scalars.o \
-	$(TARGETDIR_CLMM)/smagorinsky.o $(TARGETDIR_CLMM)/turbinlet.o $(TARGETDIR_CLMM)/wallmodels.o
+	$(TARGETDIR_CLMM)/subgrido $(TARGETDIR_CLMM)/turbinlet.o $(TARGETDIR_CLMM)/wallmodels.o
 	$(COMPILE.f) -D__HMPP $(FFLAGS_CLMM) $(CPPFLAGS_CLMM) -o $@ $(TARGETDIR_CLMM)/tsteps-tmp.F90
 
 $(TARGETDIR_CLMM)/main.o: $(TARGETDIR_CLMM) main.f90 $(TARGETDIR_CLMM)/parameters.o

@@ -138,9 +138,6 @@ program CLMM
        allocate(TDiff(0,0,0))
      endif
 
-     if (fullstress==1) then
-       allocate(tstress(3,3,-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-     endif
    end subroutine AllocateGlobals
 
 

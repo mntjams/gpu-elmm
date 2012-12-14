@@ -60,7 +60,7 @@ module OUTPUTS
   use PARAMETERS
   use BOUNDARIES
   use SCALARS
-  use WALLMODELS, only: GroundDeposition, GroundUstar
+  use WALLMODELS, only: GroundDeposition, GroundUstar, wallmodeltype
   use GEOMETRIC
   use TURBINLET, only: ustarinlet
   use BigEndian

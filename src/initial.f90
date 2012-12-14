@@ -8,7 +8,8 @@ module INITIAL
   use BOUNDARIES
   use OUTPUTS, only: store, display, probes, NumProbes, SetFrameDomain
   use SCALARS
-  use SMAGORINSKY
+  use Filters, only: filtertype, filter_ratios
+  use Subgrid
   use TURBINLET, only: GetTurbInlet, GetInletFromFile, TLag, Lturby, Lturbz, ustarinlet, transformtensor
   use GEOMETRIC
   use WALLMODELS
@@ -49,10 +50,6 @@ contains
    read(11,*) limitertype
    read(11,fmt='(/)')
    read(11,*) limparam
-   read(11,fmt='(/)')
-   read(11,*) wallmodeltype
-   read(11,fmt='(/)')
-   read(11,*) sgstype
    read(11,fmt='(/)')
    read(11,*) masssourc
    read(11,fmt='(/)')
@@ -96,6 +93,22 @@ contains
    read(11,fmt='(/)')
    read(11,*) debugparam
    write(*,*) "debug parameter=",debugparam
+   close(11)
+
+
+   open(11,file="les.conf",status="old",action="read")
+   read(11,fmt='(/)')
+   read(11,*) sgstype
+   read(11,fmt='(/)')
+   read(11,*) filtertype
+
+   if (filtertype > size(filter_ratios)) then
+     write(*,*) "Chosen filter type does not exist. Maximum index is:",size(filter_ratios)
+     stop
+   end if
+
+   read(11,fmt='(/)')
+   read(11,*) wallmodeltype
    close(11)
 
 
@@ -614,8 +627,6 @@ contains
    windangle=0._KND
 
    projectiontype=1
-
-   fullstress=0
 
 #ifndef NO_INTERNAL_NML
    !Parsing of command line uses namelist input on an internal file (Fortran 2003).
@@ -1298,13 +1309,13 @@ contains
        call Pr_Correct(U,V,W,Pr,Q,1._KND)
 
 
-       if (sgstype==SmagorinskyModel) then
+       if (sgstype==SubgridModel) then
                          call SGS_Smag(U,V,W,2._KND)
        elseif (sgstype==SigmaModel) then
                          call SGS_Sigma(U,V,W,2._KND)
        elseif (sgstype==VremanModel) then
                          call SGS_Vreman(U,V,W,2._KND)
-       elseif (sgstype==StabSmagorinskyModel) then
+       elseif (sgstype==StabSubgridModel) then
                          call SGS_StabSmag(U,V,W,2._KND)
        else
          if (Re>0) then

@@ -2863,7 +2863,7 @@ contains
 
 
   subroutine InitSolidBodies
-print *,obstaclefile
+
     if (len_trim(obstaclefile)>0) then
       call ReadSolidBodiesFromFile(obstaclefile)
     end if
@@ -2898,14 +2898,14 @@ print *,obstaclefile
         line = adjustl(line)
 
         if (len_trim(line)>0) then
-print *,line
+
           if (upcase(line(1:10))=='POLYHEDRON') then
-print *,"*"
+
             call ReadPolyhedron(unit,line(11:),SB)
           end if
 
           if (associated(SB)) then
-print *,"-"
+
             call AddSolidBody(SB)
             SB => null()
           end if

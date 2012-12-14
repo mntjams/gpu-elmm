@@ -82,7 +82,7 @@ module PARAMETERS
   real(TIM) :: timefram1,timefram2,timeavg1,timeavg2
 
   integer :: tempmet,poissmet,convmet,masssourc,frames,steady
-  integer :: tasktype,averaging,impldiff,wallmodeltype,sgstype,fullstress
+  integer :: tasktype,averaging,impldiff
   integer :: buoyancy,computescalars,partdistrib,computedeposition,computegravsettling
   integer :: maxCNiter,maxPOISSONiter,maxiter,endstep
   integer :: projectiontype,correctcompatibility = 0
@@ -99,7 +99,7 @@ module PARAMETERS
   real(KND),allocatable,dimension(:,:,:) :: temperature,temperatureavg
 
 
-  real(KND),allocatable :: Visc(:,:,:),TDiff(:,:,:),tstress(:,:,:,:,:)  !(turbulent) viscosity, (turbulent) thermal diffusivity
+  real(KND),allocatable :: Visc(:,:,:),TDiff(:,:,:)  !(turbulent) viscosity, (turbulent) thermal diffusivity
 
   integer(sint),allocatable,dimension(:,:,:) :: Utype,Vtype,Wtype,Prtype !number of solid body inside which the point is or 0
   integer,allocatable,dimension(:,:) :: Unull,Vnull,Wnull                !indexes of points to be nulled every timestep
@@ -128,7 +128,7 @@ module PARAMETERS
                         TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
   integer,parameter :: NOINLET=0,CONSTANT=1,SHEAR=2,PARABOLIC=3,CONSTPROF=1,LOGPROF=2,POWERPROF=3  !inlet profile types
   integer,parameter :: GENERALGRID=1,UNIFORMGRID=2
-  integer,parameter :: SmagorinskyModel=1,SigmaModel=2,VremanModel=3,StabSmagorinskyModel=4
+  integer,parameter :: SubgridModel=1,SigmaModel=2,VremanModel=3,StabSubgridModel=4
   integer,parameter :: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4
 
   integer :: debuglevel = 0 !amount of information to write out

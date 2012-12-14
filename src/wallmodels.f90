@@ -24,7 +24,7 @@ implicit none
 
  private
  public WMPoint, AddWMPoint, FirstWMPoint, ComputeViscsWM, MoveWMPointsToArray, GetOutsideBoundariesWM,&
-        InitTempFl, GroundDeposition, GroundUstar, WMPoints, ListLength
+        InitTempFl, GroundDeposition, GroundUstar, WMPoints, ListLength, wallmodeltype
 #ifdef __HMPP
  public hmppWMpoint,WMPtoHMPP
 #endif
@@ -64,6 +64,8 @@ implicit none
  interface assignment(=)
    module procedure WMPtoWMP
  end interface
+
+ integer :: wallmodeltype
 
  contains
 
