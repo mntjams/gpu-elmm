@@ -361,7 +361,11 @@ contains
 
   subroutine POISS_POISFFT(Phi,RHS)
     use poisfft
-    type(PoisFFT_Solver3D),save :: Solver
+#ifdef DPREC
+    type(PoisFFT_Solver3D_DP),save :: Solver
+#else
+    type(PoisFFT_Solver3D_SP),save :: Solver
+#endif
     real(KND),dimension(0:,0:,0:),intent(inout) :: Phi
     real(KND),dimension(0:,0:,0:),intent(in) :: RHS
     integer i
@@ -379,14 +383,14 @@ contains
     end do
 
     if (.not.called) then
-      Solver = PoisFFT_Solver3D_New(Prnx,Prny,Prnz,dxmin,dymin,dzmin,bounds)
+      call New(Solver,Prnx,Prny,Prnz,dxmin,dymin,dzmin,bounds)
       called = .true.
       call system_clock(count_rate=trate)
     end if
 
     call system_clock(count=t1)
 
-    call PoisFFT_Solver3D_Execute(Solver,Phi,RHS)
+    call Execute(Solver,Phi,RHS)
 
     call system_clock(count=t2)
     write(*,*) "solver cpu time", real(t2-t1)/real(trate)

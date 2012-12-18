@@ -8,4 +8,5 @@
 *.hmg
 .make.*
 custom*.f90
-
+bin/*
+*.dblite

@@ -48,9 +48,9 @@ if str(comp)=='sun':
   
   env.Append(F90FLAGS='-fpp -xpp=cpp -DNO_INTERNAL_NML -g -dalign')
 
-  env.Append(LIBPATH = ['/usr/local/poisfft_sun/'+prec_dir])
+  env.Append(LIBPATH = ['/usr/local/poisfft_sun/'])
 
-  env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_sun/'+prec_dir])
+  env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_sun/'])
   
   env.Append(FORTRANMODDIRPREFIX = '-moddir=')
                             
@@ -76,9 +76,9 @@ else:
   
   env.Append(F90FLAGS='-cpp -fbacktrace -g -pedantic -ffpe-trap=zero,overflow,invalid -fstack-arrays')
 
-  env.Append(LIBPATH = ['/usr/local/poisfft_gcc/'+prec_dir])
+  env.Append(LIBPATH = ['/usr/local/poisfft_gcc/'])
 
-  env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_gcc/'+prec_dir])
+  env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_gcc/'])
   
   env.Append(FORTRANMODDIRPREFIX = '-J')
   
@@ -100,6 +100,8 @@ if customSB=='yes':
     SBfile = ['../custom/emptySB.o']
   else:
     SBfile = [str(SB)]
+else:
+  SBfile=[]
 
 
 objs = env.Object(target=target_dir+'parameters', source='parameters.f90')
