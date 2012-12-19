@@ -85,6 +85,12 @@ else:
   
   
 env.Append(ENV = {'PATH' : os.environ['PATH']})
+
+try:
+  fc = os.environ['FC']
+  env.Replace(F90 = fc)
+except:
+  pass
   
 env.Append(F90FLAGS= fast_flag + omp_flag + lto_flag + extra_flag + prec_flag)
   
