@@ -6,7 +6,7 @@ module Subgrid
   implicit none
 
   private
-  public :: SGS_Smag, Smag2, SGS_StabSmag, SGS_Vreman, SGS_Sigma, sgstype
+  public :: SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma, sgstype
 
   real(KND),parameter :: CSmag = 0.1_KND
 
