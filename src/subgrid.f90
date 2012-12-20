@@ -32,25 +32,6 @@ module Subgrid
     endsubroutine SGS_Smag
 
 
-    subroutine Smag2(U,V,W,filter_ratio)  !Standard Smagorinsky model with explicit filtering
-      real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-      real(KND),intent(in) :: filter_ratio
-      integer i,j,k
-
-      do k = 1,Prnz
-       do j = 1,Prny
-        do i = 1,Prnx
-         if (Re>0) then
-          Visc(i,j,k) = 1._KND/Re+NuSmag2(i,j,k,U,V,W,filter_ratio)
-         else
-          Visc(i,j,k) = NuSmag2(i,j,k,U,V,W,filter_ratio)
-         end if
-        end do
-       end do
-      end do
-    endsubroutine Smag2
-
-
 
 
     real(KND) function NuSmag(i,j,k,U,V,W,filter_ratio)    !subgrid viscosity for Smagorinsky with implicit filtering
@@ -60,25 +41,12 @@ module Subgrid
       real(KND) S(1:3,1:3)
       real(KND) width,Sbar
 
-      width = (dxPr(i)*dyPr(j)*dzPr(k))**(1._KND/3._KND)
+      width = filter_ratio * (dxPr(i)*dyPr(j)*dzPr(k))**(1._KND/3._KND)
       call StrainIJ(i,j,k,U,V,W,S)
       Sbar = Strainu(S)
       NuSmag = Sbar*(width*CSmag)**2
     endfunction NuSmag
 
-
-    real(KND) function NuSmag2(i,j,k,U,V,W,filter_ratio)    !subgrid viscosity for Smagorinsky with implicit filtering
-      integer,intent(in) :: i,j,k
-      real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-      real(KND),intent(in) :: filter_ratio
-      real(KND) S(1:3,1:3)
-      real(KND) width,Sbar
-
-      width = filter_ratio * (dxPr(i)*dyPr(j)*dzPr(k))**(1._KND/3._KND)
-      call StrainIJ(i,j,k,U,V,W,S)
-      Sbar = Strainu(S)
-      NuSmag2 = Sbar*(width*CSmag)**2
-    endfunction NuSmag2
 
 
 
