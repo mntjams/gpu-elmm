@@ -119,6 +119,8 @@ else:
 
 objs = env.Object(target=target_dir+'parameters', source='parameters.f90')
 objs += env.Object(target=target_dir+'strings', source='strings.f90')
+objs += env.Object(target=target_dir+'endianness', source='endianness.f90')
+objs += env.Object(target=target_dir+'freeunit', source='freeunit.f90')
 objs += env.Object(target=target_dir+'tiling', source='tiling.f90')
 objs += env.Object(target=target_dir+'limiters', source='limiters.f90')
 objs += env.Object(target=target_dir+'multigrid', source='multigrid.f90')

@@ -1,61 +1,3 @@
-module BigEndian
-!   use iso_fortran_env
-  implicit none
-
-  private
-  public :: GetEndianess, BigEnd
-
-  integer,parameter :: int8=selected_int_kind(1),int32=selected_int_kind(9),int64=selected_int_kind(10)
-  integer,parameter :: real32=selected_real_kind(p=6,r=37),real64=selected_real_kind(p=15,r=200)
-  logical,save :: littleendian
-
-  interface BigEnd
-    module procedure BigEnd32
-    module procedure BigEnd64
-  end interface
-
-  contains
-
-    subroutine GetEndianess
-      integer(int8),dimension(4):: bytes !may not work on some processors
-
-      bytes=transfer(1_int32,bytes,4)
-      if (bytes(4)==1) then
-        littleendian=.false.
-      else
-        littleendian=.true.
-      endif
-    end subroutine GetEndianess
-
-    elemental function BigEnd32(x) result(res)
-      real(real32) :: res
-      real(real32),intent(in)::x
-      integer(int8),dimension(4):: bytes !may not work on some processors
-
-      if (.not.littleendian) then
-        res = x
-      else
-        bytes = transfer(x,bytes,4)
-        res = transfer(bytes(4:1:-1),res)
-      endif
-    end function BigEnd32
-
-    elemental function BigEnd64(x) result(res)
-      real(real64) :: res
-      real(real64),intent(in)::x
-      integer(int8),dimension(8):: bytes !may not work on some processors
-
-      if (.not.littleendian) then
-        res = x
-      else
-        bytes = transfer(x,bytes,8)
-        res = transfer(bytes(8:1:-1),res)
-      endif
-    end function BigEnd64
-
-end module BigEndian
-
-
 module OUTPUTS
   use PARAMETERS
   use BOUNDARIES
@@ -63,7 +5,8 @@ module OUTPUTS
   use WALLMODELS, only: GroundDeposition, GroundUstar, wallmodeltype
   use GEOMETRIC
   use TURBINLET, only: ustarinlet
-  use BigEndian
+  use Endianness
+  use FreeUnit
 
   implicit none
 
@@ -346,7 +289,7 @@ contains
 
   endif
 
-  call GetEndianess
+  call GetEndianness
 
  end subroutine AllocateOutputs
 
@@ -585,178 +528,180 @@ contains
  character(70) :: str
  character(2) :: prob
  real(KND) :: S,S2,nom,denom
- integer :: i,j,k
+ integer :: i,j,k,unit
 
   do k = 1,NumProbes
 
     write(prob,"(i2.2)") k
 
-    open(11,file="Prtimep"//prob//".txt")
-    do j = 0,endstep
-     write (11,*) times(j),Prtime(k,j)
-    enddo
-    close(11)
+    unit = newunit()
 
-    open(11,file="Utimep"//prob//".txt")
+    open(unit,file="Prtimep"//prob//".txt")
     do j = 0,endstep
-     write (11,*) times(j),Utime(k,j)
+     write (unit,*) times(j),Prtime(k,j)
     enddo
-    close(11)
+    close(unit)
 
-    open(11,file="Vtimep"//prob//".txt")
+    open(unit,file="Utimep"//prob//".txt")
     do j = 0,endstep
-     write (11,*) times(j),Vtime(k,j)
+     write (unit,*) times(j),Utime(k,j)
     enddo
-    close(11)
+    close(unit)
 
-    open(11,file="Wtimep"//prob//".txt")
+    open(unit,file="Vtimep"//prob//".txt")
     do j = 0,endstep
-     write (11,*) times(j),Wtime(k,j)
+     write (unit,*) times(j),Vtime(k,j)
     enddo
-    close(11)
+    close(unit)
+
+    open(unit,file="Wtimep"//prob//".txt")
+    do j = 0,endstep
+     write (unit,*) times(j),Wtime(k,j)
+    enddo
+    close(unit)
 
     if (buoyancy==1) then
-      open(11,file="temptimep"//prob//".txt")
+      open(unit,file="temptimep"//prob//".txt")
       do j = 0,endstep
-       write (11,*) times(j),temptime(k,j)
+       write (unit,*) times(j),temptime(k,j)
       enddo
-      close(11)
+      close(unit)
     endif
 
     if (computescalars>0) then
-      open(11,file="scaltimep"//prob//".txt")
+      open(unit,file="scaltimep"//prob//".txt")
       do j = 1,endstep
-       write (11,*) times(j),scalptime(:,k,j)
+       write (unit,*) times(j),scalptime(:,k,j)
       enddo
-      close(11)
+      close(unit)
     endif
 
   enddo
 
   if (store%deltime>0) then
-    open(11,file="deltime.txt")
+    open(unit,file="deltime.txt")
     do j = 1,endstep
-     write (11,*) times(j),deltime(j)
+     write (unit,*) times(j),deltime(j)
     enddo
-    close(11)
+    close(unit)
   endif
 
   if (store%tke>0) then
-    open(11,file="tke.txt")
+    open(unit,file="tke.txt")
     do j = 0,endstep
-     write (11,*) times(j),tke(j)
+     write (unit,*) times(j),tke(j)
     enddo
-    close(11)
+    close(unit)
   endif
 
   if (store%tke>0.and.store%dissip>0) then
-   open(11,file="dissip.txt")
+   open(unit,file="dissip.txt")
     do j = 1,endstep
-     write (11,*) times(j),dissip(j)
+     write (unit,*) times(j),dissip(j)
     enddo
-    close(11)
+    close(unit)
   endif
 
   if (wallmodeltype>0.and.display%ustar>0) then
-    open(11,file="Retau.txt")
+    open(unit,file="Retau.txt")
     do j = 0,endstep
-     write (11,*) times(j),ustar(:,j)
+     write (unit,*) times(j),ustar(:,j)
     enddo
-    close(11)
+    close(unit)
   endif
 
   if (wallmodeltype>0.and.buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.store%tstar>0) then
-    open(11,file="tflux.txt")
+    open(unit,file="tflux.txt")
     do j = 0,endstep
-     write (11,*) times(j),tstar(:,j)
+     write (unit,*) times(j),tstar(:,j)
     enddo
-    close(11)
+    close(unit)
   endif
 
 
   if (computescalars>0.and.store%scalsumtime>0) then
-    open(11,file="scalsumtime.txt")
+    open(unit,file="scalsumtime.txt")
     do j = 1,endstep
-     write (11,*) times(j),scalsumtime(:,j)
+     write (unit,*) times(j),scalsumtime(:,j)
     enddo
-    close(11)
+    close(unit)
   endif
 
   if (computescalars>0.and.store%scaltotsumtime>0) then
-    open(11,file="scaltotsumtime.txt")
+    open(unit,file="scaltotsumtime.txt")
     do j = 1,endstep
-     write (11,*) times(j),sum(scalsumtime(:,j))
+     write (unit,*) times(j),sum(scalsumtime(:,j))
     enddo
-    close(11)
+    close(unit)
   endif
 
 
   if (store%BLprofiles>0.and.averaging==1) then
 
-     open(11,file="profu.txt")
+     open(unit,file="profu.txt")
      do k = 1,Unz
-      write (11,*) zPr(k),profuavg(k)
+      write (unit,*) zPr(k),profuavg(k)
      enddo
-     close(11)
+     close(unit)
 
-     open(11,file="profv.txt")
+     open(unit,file="profv.txt")
      do k = 1,Vnz
-      write (11,*) zPr(k),profvavg(k)
+      write (unit,*) zPr(k),profvavg(k)
      enddo
-     close(11)
+     close(unit)
 
-     open(11,file="profuu.txt")
+     open(unit,file="profuu.txt")
      do k = 1,Unz
-      write (11,*) zPr(k),profuuavg(k)
+      write (unit,*) zPr(k),profuuavg(k)
      enddo
-     close(11)
+     close(unit)
 
-     open(11,file="profvv.txt")
+     open(unit,file="profvv.txt")
      do k = 1,Vnz
-      write (11,*) zPr(k),profvvavg(k)
+      write (unit,*) zPr(k),profvvavg(k)
      enddo
-     close(11)
+     close(unit)
 
-     open(11,file="profww.txt")
+     open(unit,file="profww.txt")
      do k = 1,Wnz
-      write (11,*) zW(k),profwwavg(k)
+      write (unit,*) zW(k),profwwavg(k)
      enddo
-     close(11)
+     close(unit)
 
-     open(11,file="profuw.txt")
+     open(unit,file="profuw.txt")
      do k = 0,Prnz
-      write (11,*) zW(k),profuwavg(k),profuwsgsavg(k)
+      write (unit,*) zW(k),profuwavg(k),profuwsgsavg(k)
      enddo
-     close(11)
+     close(unit)
 
-     open(11,file="profvw.txt")
+     open(unit,file="profvw.txt")
      do k = 0,Prnz
-      write (11,*) zW(k),profvwavg(k),profvwsgsavg(k)
+      write (unit,*) zW(k),profvwavg(k),profvwsgsavg(k)
      enddo
-     close(11)
+     close(unit)
 
      if (buoyancy>0) then
 
-        open(11,file="proftemp.txt")
+        open(unit,file="proftemp.txt")
         do k = 1,Prnz
-         write (11,*) zPr(k),proftempavg(k)
+         write (unit,*) zPr(k),proftempavg(k)
         enddo
-        close(11)
+        close(unit)
 
-        open(11,file="proftempfl.txt")
+        open(unit,file="proftempfl.txt")
         do k = 0,Prnz
-         write (11,*) zW(k),proftempflavg(k),proftempflsgsavg(k)
+         write (unit,*) zW(k),proftempflavg(k),proftempflsgsavg(k)
         enddo
-        close(11)
+        close(unit)
 
-        open(11,file="proftt.txt")
+        open(unit,file="proftt.txt")
         do k = 1,Prnz
-         write (11,*) zPr(k),profttavg(k)
+         write (unit,*) zPr(k),profttavg(k)
         enddo
-        close(11)
+        close(unit)
 
         if (allocated(Uavg).and.allocated(Vavg).and.allocated(temperatureavg)) then
-          open(11,file="profRig.txt")
+          open(unit,file="profRig.txt")
           do k = 1,Prnz
            S = 0
            do j = 1,Prny
@@ -765,11 +710,11 @@ contains
             enddo
            enddo
            S = S/(Prnx*Prny)
-           write (11,*) zPr(k),S
+           write (unit,*) zPr(k),S
           enddo
-          close(11)
+          close(unit)
 
-          open(11,file="profRf.txt")
+          open(unit,file="profRf.txt")
           do k = 1,Prnz
            S = 0
            S2 = 0
@@ -791,9 +736,9 @@ contains
              S = 100000._KND*sign(1.0_KND,nom)*sign(1.0_KND,denom)
            endif
 
-           write (11,*) zPr(k),S
+           write (unit,*) zPr(k),S
           enddo
-          close(11)
+          close(unit)
         endif !allocated avgs
 
      endif !buoyancy>0
@@ -801,23 +746,23 @@ contains
 
      if (computescalars>0) then
 
-        open(11,file="profscal.txt")
+        open(unit,file="profscal.txt")
         do k = 1,Prnz
-         write (11,*) zPr(k),(profscalavg(i,k), i = 1,computescalars)
+         write (unit,*) zPr(k),(profscalavg(i,k), i = 1,computescalars)
         enddo
-        close(11)
+        close(unit)
 
-        open(11,file="profscalfl.txt")
+        open(unit,file="profscalfl.txt")
         do k = 0,Prnz
-         write (11,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i = 1,computescalars)
+         write (unit,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i = 1,computescalars)
         enddo
-        close(11)
+        close(unit)
 
-        open(11,file="profss.txt")
+        open(unit,file="profss.txt")
         do k = 1,Prnz
-         write (11,*) zPr(k),(profssavg(i,k), i = 1,computescalars)
+         write (unit,*) zPr(k),(profssavg(i,k), i = 1,computescalars)
         enddo
-        close(11)
+        close(unit)
 
      endif !computescalars>0
 
@@ -835,128 +780,131 @@ contains
  real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
  real(KND),dimension(1:,1:,1:),intent(in) :: Pr
  character(70) :: str
- integer i,j,k
+ integer i,j,k,unit
 
    if (store%out>0) then
-      open(11,file="out.vtk")
-      write (11,"(A)") "# vtk DataFile Version 2.0"
-      write (11,"(A)") "CLMM output file"
-      write (11,"(A)") "ASCII"
-      write (11,"(A)") "DATASET RECTILINEAR_GRID"
+
+      unit = newunit();
+
+      open(unit,file="out.vtk")
+      write (unit,"(A)") "# vtk DataFile Version 2.0"
+      write (unit,"(A)") "CLMM output file"
+      write (unit,"(A)") "ASCII"
+      write (unit,"(A)") "DATASET RECTILINEAR_GRID"
       str="DIMENSIONS"
       write (str(12:),*) Prnx,Prny,Prnz
-      write (11,"(A)") str
+      write (unit,"(A)") str
       str="X_COORDINATES"
       write (str(15:),'(i5,2x,a)') Prnx,"float"
-      write (11,"(A)") str
-      write (11,*) xPr(1:Prnx)
+      write (unit,"(A)") str
+      write (unit,*) xPr(1:Prnx)
       str="Y_COORDINATES"
       write (str(15:),'(i5,2x,a)') Prny,"float"
-      write (11,"(A)") str
-      write (11,*) yPr(1:Prny)
+      write (unit,"(A)") str
+      write (unit,*) yPr(1:Prny)
       str="Z_COORDINATES"
       write (str(15:),'(i5,2x,a)') Prnz,"float"
-      write (11,"(A)") str
-      write (11,*) zPr(1:Prnz)
+      write (unit,"(A)") str
+      write (unit,*) zPr(1:Prnz)
       str="POINT_DATA"
       write (str(12:),*) Prnx*Prny*Prnz
-      write (11,"(A)") str
+      write (unit,"(A)") str
 
       if (store%out_Pr>0) then
-        write (11,"(A)") "SCALARS p float"
-        write (11,"(A)") "LOOKUP_TABLE default"
+        write (unit,"(A)") "SCALARS p float"
+        write (unit,"(A)") "LOOKUP_TABLE default"
         do k = 1,Prnz
          do j = 1,Prny
           do i = 1,Prnx
-            write (11,*) Pr(i,j,k)
+            write (unit,*) Pr(i,j,k)
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       endif
 
       if (buoyancy>0.and.store%out_T>0) then
-        write (11,*) "SCALARS temperature float"
-        write (11,*) "LOOKUP_TABLE default"
+        write (unit,*) "SCALARS temperature float"
+        write (unit,*) "LOOKUP_TABLE default"
         do k = 1,Prnz
           do j = 1,Prny
           do i = 1,Prnx
-            write (11,*) Temperature(i,j,k)
+            write (unit,*) Temperature(i,j,k)
           enddo
           enddo
         enddo
-        write (11,*)
+        write (unit,*)
       endif
 
       if (store%out_Prtype>0) then
-        write (11,*) "SCALARS ptype float"
-        write (11,*) "LOOKUP_TABLE default"
+        write (unit,*) "SCALARS ptype float"
+        write (unit,*) "LOOKUP_TABLE default"
         do k = 1,Prnz
          do j = 1,Prny
           do i = 1,Prnx
-            Write (11,*) Prtype(i,j,k)
+            Write (unit,*) Prtype(i,j,k)
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       endif
 
       if (store%out_div>0) then
-        write (11,*) "SCALARS div float"
-        write (11,*) "LOOKUP_TABLE default"
+        write (unit,*) "SCALARS div float"
+        write (unit,*) "LOOKUP_TABLE default"
         do k = 1,Prnz
          do j = 1,Prny
           do i = 1,Prnx
-            Write (11,*) (U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k))
+            Write (unit,*) (U(i,j,k)-U(i-1,j,k))/(dxPr(i))+(V(i,j,k)-V(i,j-1,k))/(dyPr(j))+(W(i,j,k)-W(i,j,k-1))/(dzPr(k))
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       endif
 
       if (store%out_lambda2>0) then
-        write (11,*) "SCALARS lambda2 float"
-        write (11,*) "LOOKUP_TABLE default"
+        write (unit,*) "SCALARS lambda2 float"
+        write (unit,*) "LOOKUP_TABLE default"
         do k = 1,Prnz
          do j = 1,Prny
           do i = 1,Prnx
-            write (11,*) Lambda2(i,j,k,U,V,W)
+            write (unit,*) Lambda2(i,j,k,U,V,W)
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       endif
 
       if (store%out_visc>0) then
-        write (11,*) "SCALARS visc float"
-        write (11,*) "LOOKUP_TABLE default"
+        write (unit,*) "SCALARS visc float"
+        write (unit,*) "LOOKUP_TABLE default"
         do k = 1,Prnz
          do j = 1,Prny
           do i = 1,Prnx
-            Write (11,*) Visc(i,j,k)
+            Write (unit,*) Visc(i,j,k)
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       endif
 
       if (store%out_U>0) then
-        write (11,"(A)") "VECTORS u float"
+        write (unit,"(A)") "VECTORS u float"
         do k = 1,Prnz
          do j = 1,Prny
           do i = 1,Prnx
-            write (11,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
+            write (unit,*) (U(i,j,k)+U(i-1,j,k))/2._KND,(V(i,j,k)+V(i,j-1,k))/2._KND,(W(i,j,k)+W(i,j,k-1))/2._KND
           enddo
          enddo
         enddo
       endif
 
       if (store%out_vort>0) then
-        write (11,"(A)") "VECTORS vort float"
+        write (unit,"(A)") "VECTORS vort float"
         do k = 1,Prnz
          do j = 1,Prny
           do i = 1,Prnx
-            write (11,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+            write (unit,*) (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                             -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
                         (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
                             -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),&
@@ -965,9 +913,9 @@ contains
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       endif
-      close(11)
+      close(unit)
    endif  !store%out
  end subroutine OutputOut
 
@@ -982,48 +930,51 @@ contains
  character(70) :: str
  real(KND),dimension(:,:,:),allocatable :: depos
  character(8) ::  scalname="scalar00"
- integer :: i,j,k,l
+ integer :: i,j,k,l,unit
 
   if (computescalars>0) then
     if (store%scalars>0) then
-        open(11,file="scalars.vtk")
-        write (11,"(A)") "# vtk DataFile Version 2.0"
-        write (11,"(A)") "CLMM output file"
-        write (11,"(A)") "ASCII"
-        write (11,"(A)") "DATASET RECTILINEAR_GRID"
+
+        unit = newunit()
+
+        open(unit,file="scalars.vtk")
+        write (unit,"(A)") "# vtk DataFile Version 2.0"
+        write (unit,"(A)") "CLMM output file"
+        write (unit,"(A)") "ASCII"
+        write (unit,"(A)") "DATASET RECTILINEAR_GRID"
         str="DIMENSIONS"
         write (str(12:),*) Prnx,Prny,Prnz
-        write (11,"(A)") str
+        write (unit,"(A)") str
         str="X_COORDINATES"
         write (str(15:),'(i5,2x,a)') Prnx,"float"
-        write (11,"(A)") str
-        write (11,*) xPr(1:Prnx)
+        write (unit,"(A)") str
+        write (unit,*) xPr(1:Prnx)
         str="Y_COORDINATES"
         write (str(15:),'(i5,2x,a)') Prny,"float"
-        write (11,"(A)") str
-        write (11,*) yPr(1:Prny)
+        write (unit,"(A)") str
+        write (unit,*) yPr(1:Prny)
         str="Z_COORDINATES"
         write (str(15:),'(i5,2x,a)') Prnz,"float"
-        write (11,"(A)") str
-        write (11,*) zPr(1:Prnz)
+        write (unit,"(A)") str
+        write (unit,*) zPr(1:Prnz)
         str="POINT_DATA"
         write (str(12:),*) Prnx*Prny*Prnz
-        write (11,"(A)") str
+        write (unit,"(A)") str
 
         do l = 1,computescalars
           write(scalname(7:8),"(I2.2)") l
-          write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
-          write (11,"(A)") "LOOKUP_TABLE default"
+          write (unit,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
+          write (unit,"(A)") "LOOKUP_TABLE default"
           do k = 1,Prnz
            do j = 1,Prny
             do i = 1,Prnx
-              write (11,*) SCALAR(i,j,k,l)
+              write (unit,*) SCALAR(i,j,k,l)
             enddo
            enddo
           enddo
-          write (11,*)
+          write (unit,*)
         enddo
-        close(11)
+        close(unit)
     endif !store%scalars
 
     if (computedeposition>0.and.store%deposition>0) then
@@ -1031,45 +982,47 @@ contains
         allocate(depos(1:Prnx,1:Prny,computescalars))
         depos = GroundDeposition()
 
-        open(11,file="deposition.vtk")
-        write (11,"(A)") "# vtk DataFile Version 2.0"
-        write (11,"(A)") "CLMM output file"
-        write (11,"(A)") "ASCII"
-        write (11,"(A)") "DATASET RECTILINEAR_GRID"
+        unit = newunit()
+
+        open(unit,file="deposition.vtk")
+        write (unit,"(A)") "# vtk DataFile Version 2.0"
+        write (unit,"(A)") "CLMM output file"
+        write (unit,"(A)") "ASCII"
+        write (unit,"(A)") "DATASET RECTILINEAR_GRID"
         str="DIMENSIONS"
         write (str(12:),*) Prnx,Prny,1
-        write (11,"(A)") str
+        write (unit,"(A)") str
         str="X_COORDINATES"
         write (str(15:),'(i5,2x,a)') Prnx,"float"
-        write (11,"(A)") str
-        write (11,*) xPr(1:Prnx)
+        write (unit,"(A)") str
+        write (unit,*) xPr(1:Prnx)
         str="Y_COORDINATES"
         write (str(15:),'(i5,2x,a)') Prny,"float"
-        write (11,"(A)") str
-        write (11,*) yPr(1:Prny)
+        write (unit,"(A)") str
+        write (unit,*) yPr(1:Prny)
         str="Z_COORDINATES"
         write (str(15:),'(i5,2x,a)') 1,"float"
-        write (11,"(A)") str
-        write (11,*) zW(0)
+        write (unit,"(A)") str
+        write (unit,*) zW(0)
         str="POINT_DATA"
         write (str(12:),*) Prnx*Prny
-        write (11,"(A)") str
+        write (unit,"(A)") str
 
         do l = 1,computescalars
           write(scalname(7:8),"(I2.2)") l
-          write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
-          write (11,"(A)") "LOOKUP_TABLE default"
+          write (unit,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
+          write (unit,"(A)") "LOOKUP_TABLE default"
 
           do j = 1,Prny
             do i = 1,Prnx
-              write (11,*) depos(i,j,l)
+              write (unit,*) depos(i,j,l)
             enddo
           enddo
 
-          write (11,*)
+          write (unit,*)
         enddo
 
-        close(11)
+        close(unit)
 
         deallocate(depos)
 
@@ -1093,89 +1046,92 @@ contains
  character(2) :: sc
  real(KND),dimension(:,:,:),allocatable :: Upat,Vpat,Wpat
  character(8) ::  scalname="scalar00"
- integer i,j,k,l,m
+ integer i,j,k,l,m,unit
 
   if (averaging==1.and.store%avg>0) then
-      open(11,file="avg.vtk")
-      write (11,"(A)") "# vtk DataFile Version 2.0"
-      write (11,"(A)") "CLMM output file"
-      write (11,"(A)") "ASCII"
-      write (11,"(A)") "DATASET RECTILINEAR_GRID"
+
+      unit = newunit()
+
+      open(unit,file="avg.vtk")
+      write (unit,"(A)") "# vtk DataFile Version 2.0"
+      write (unit,"(A)") "CLMM output file"
+      write (unit,"(A)") "ASCII"
+      write (unit,"(A)") "DATASET RECTILINEAR_GRID"
       str="DIMENSIONS"
       write (str(12:),*) Prnx,Prny,Prnz
-      write (11,"(A)") str
+      write (unit,"(A)") str
       str="X_COORDINATES"
       write (str(15:),'(i5,2x,a)') Prnx,"float"
-      write (11,"(A)") str
-      write (11,*) xPr(1:Prnx)
+      write (unit,"(A)") str
+      write (unit,*) xPr(1:Prnx)
       str="Y_COORDINATES"
       write (str(15:),'(i5,2x,a)') Prny,"float"
-      write (11,"(A)") str
-      write (11,*) yPr(1:Prny)
+      write (unit,"(A)") str
+      write (unit,*) yPr(1:Prny)
       str="Z_COORDINATES"
       write (str(15:),'(i5,2x,a)') Prnz,"float"
-      write (11,"(A)") str
-      write (11,*) zPr(1:Prnz)
+      write (unit,"(A)") str
+      write (unit,*) zPr(1:Prnz)
       str="POINT_DATA"
       write (str(12:),*) Prnx*Prny*Prnz
-      write (11,"(A)") str
+      write (unit,"(A)") str
 
       if (store%avg_Pr>0) then
-        write (11,"(A)") "SCALARS p float"
-        write (11,"(A)") "LOOKUP_TABLE default"
+        write (unit,"(A)") "SCALARS p float"
+        write (unit,"(A)") "LOOKUP_TABLE default"
         do k = 1,Prnz
          do j = 1,Prny
           do i = 1,Prnx
-            write (11,*) Pravg(i,j,k)
+            write (unit,*) Pravg(i,j,k)
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       endif
 
       if (store%avg_Prtype>0) then
-        write (11,*) "SCALARS ptype float"
-        write (11,*) "LOOKUP_TABLE default"
+        write (unit,*) "SCALARS ptype float"
+        write (unit,*) "LOOKUP_TABLE default"
         do k = 1,Prnz
          do j = 1,Prny
           do i = 1,Prnx
-            write (11,*) Prtype(i,j,k)
+            write (unit,*) Prtype(i,j,k)
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       endif
 
       if (buoyancy>0.and.store%avg_T>0) then
-        write (11,*) "SCALARS temperature float"
-        write (11,*) "LOOKUP_TABLE default"
+        write (unit,*) "SCALARS temperature float"
+        write (unit,*) "LOOKUP_TABLE default"
         do k = 1,Prnz
          do j = 1,Prny
           do i = 1,Prnx
-            write (11,*) Temperatureavg(i,j,k)
+            write (unit,*) Temperatureavg(i,j,k)
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       endif
 
       if (store%avg_U>0) then
-        write (11,"(A)") "VECTORS u float"
+        write (unit,"(A)") "VECTORS u float"
         do k = 1,Prnz
          do j = 1,Prny
           do i = 1,Prnx
-            write (11,*) (Uavg(i,j,k)+Uavg(i-1,j,k))/2._KND,(Vavg(i,j,k)+Vavg(i,j-1,k))/2._KND,(Wavg(i,j,k)+Wavg(i,j,k-1))/2._KND
+            write (unit,*) (Uavg(i,j,k)+Uavg(i-1,j,k))/2._KND,(Vavg(i,j,k)+Vavg(i,j-1,k))/2._KND,(Wavg(i,j,k)+Wavg(i,j,k-1))/2._KND
           enddo
          enddo
         enddo
       endif
 
       if (store%avg_vort>0) then
-        write (11,"(A)") "VECTORS vort float"
+        write (unit,"(A)") "VECTORS vort float"
         do k = 1,Prnz
          do j = 1,Prny
           do i = 1,Prnx
-            write (11,*) (Wavg(i,j+1,k)-Wavg(i,j-1,k)+Wavg(i,j+1,k-1)-Wavg(i,j-1,k-1))/(4*dxmin)&
+            write (unit,*) (Wavg(i,j+1,k)-Wavg(i,j-1,k)+Wavg(i,j+1,k-1)-Wavg(i,j-1,k-1))/(4*dxmin)&
                             -(Vavg(i,j,k+1)-Vavg(i,j,k-1)+Vavg(i,j-1,k+1)-Vavg(i,j-1,k-1))/(4*dymin),&
                         (Uavg(i,j,k+1)-Uavg(i,j,k-1)+Uavg(i-1,j,k+1)-Uavg(i-1,j,k-1))/(4*dxmin)&
                             -(Wavg(i+1,j,k)-Wavg(i-1,j,k)+Wavg(i+1,j,k-1)-Wavg(i-1,j,k-1))/(4*dymin),&
@@ -1184,52 +1140,52 @@ contains
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       endif
 
-      close(11)
+      close(unit)
   endif !averaging
 
   if (averaging==1.and.store%scalarsavg>0) then
       if (computescalars>0) then
-          open(11,file="scalarsavg.vtk")
-          write (11,"(A)") "# vtk DataFile Version 2.0"
-          write (11,"(A)") "CLMM output file"
-          write (11,"(A)") "ASCII"
-          write (11,"(A)") "DATASET RECTILINEAR_GRID"
+          open(unit,file="scalarsavg.vtk")
+          write (unit,"(A)") "# vtk DataFile Version 2.0"
+          write (unit,"(A)") "CLMM output file"
+          write (unit,"(A)") "ASCII"
+          write (unit,"(A)") "DATASET RECTILINEAR_GRID"
           str="DIMENSIONS"
           write (str(12:),*) Prnx,Prny,Prnz
-          write (11,"(A)") str
+          write (unit,"(A)") str
           str="X_COORDINATES"
           write (str(15:),'(i5,2x,a)') Prnx,"float"
-          write (11,"(A)") str
-          write (11,*) xPr(1:Prnx)
+          write (unit,"(A)") str
+          write (unit,*) xPr(1:Prnx)
           str="Y_COORDINATES"
           write (str(15:),'(i5,2x,a)') Prny,"float"
-          write (11,"(A)") str
-          write (11,*) yPr(1:Prny)
+          write (unit,"(A)") str
+          write (unit,*) yPr(1:Prny)
           str="Z_COORDINATES"
           write (str(15:),'(i5,2x,a)') Prnz,"float"
-          write (11,"(A)") str
-          write (11,*) zPr(1:Prnz)
+          write (unit,"(A)") str
+          write (unit,*) zPr(1:Prnz)
           str="POINT_DATA"
           write (str(12:),*) Prnx*Prny*Prnz
-          write (11,"(A)") str
+          write (unit,"(A)") str
 
           do l = 1,computescalars
             write(scalname(7:8),"(I2.2)") l
-            write (11,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
-            write (11,"(A)") "LOOKUP_TABLE default"
+            write (unit,"(A,1X,A,1X,A)") "SCALARS", scalname , "float"
+            write (unit,"(A)") "LOOKUP_TABLE default"
             do k = 1,Prnz
              do j = 1,Prny
               do i = 1,Prnx
-                write (11,*) SCALARavg(i,j,k,l)
+                write (unit,*) SCALARavg(i,j,k,l)
               enddo
              enddo
             enddo
-            write (11,*)
+            write (unit,*)
           enddo
-          close(11)
+          close(unit)
       endif  !computescalars
 
   endif !averaging
@@ -1241,218 +1197,239 @@ contains
  subroutine OutputUVW(U,V,W)
  real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
  character(70) :: str
- integer i,j,k,l
+ integer i,j,k,l,unit
 
 
   if (store%U>0) then
-      open(11,file="U.vtk")
-      write (11,"(A)") "# vtk DataFile Version 2.0"
-      write (11,"(A)") "CLMM output file"
-      write (11,"(A)") "ASCII"
-      write (11,"(A)") "DATASET RECTILINEAR_GRID"
+
+      unit = newunit()
+
+      open(unit,file="U.vtk")
+      write (unit,"(A)") "# vtk DataFile Version 2.0"
+      write (unit,"(A)") "CLMM output file"
+      write (unit,"(A)") "ASCII"
+      write (unit,"(A)") "DATASET RECTILINEAR_GRID"
       str="DIMENSIONS"
       write (str(12:),*) Unx,Uny,Unz
-      write (11,"(A)") str
+      write (unit,"(A)") str
       str="X_COORDINATES"
       write (str(15:),'(i5,2x,a)') Unx,"float"
-      write (11,"(A)") str
-      write (11,*) xU(1:Unx)
+      write (unit,"(A)") str
+      write (unit,*) xU(1:Unx)
       str="Y_COORDINATES"
       write (str(15:),'(i5,2x,a)') Uny,"float"
-      write (11,"(A)") str
-      write (11,*) yPr(1:Uny)
+      write (unit,"(A)") str
+      write (unit,*) yPr(1:Uny)
       str="Z_COORDINATES"
       write (str(15:),'(i5,2x,a)') Unz,"float"
-      write (11,"(A)") str
-      write (11,*) zPr(1:Unz)
+      write (unit,"(A)") str
+      write (unit,*) zPr(1:Unz)
       str="POINT_DATA"
       write (str(12:),*) Unx*Uny*Unz
-      write (11,"(A)") str
+      write (unit,"(A)") str
 
 
-      write (11,"(A)") "SCALARS U float"
-      write (11,"(A)") "LOOKUP_TABLE default"
+      write (unit,"(A)") "SCALARS U float"
+      write (unit,"(A)") "LOOKUP_TABLE default"
       do k = 1,Unz
        do j = 1,Uny
         do i = 1,Unx
-          write (11,*) U(i,j,k)
+          write (unit,*) U(i,j,k)
         enddo
        enddo
       enddo
-      write (11,*)
+      write (unit,*)
 
       if (store%U_interp==1) then
-        write (11,"(A)") "SCALARS Utype float"
-        write (11,"(A)") "LOOKUP_TABLE default"
+        write (unit,"(A)") "SCALARS Utype float"
+        write (unit,"(A)") "LOOKUP_TABLE default"
         do k = 1,Unz
          do j = 1,Uny
           do i = 1,Unx
-            write (11,*) Utype(i,j,k)
+            write (unit,*) Utype(i,j,k)
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       end if
 
-      close(11)
+      close(unit)
   endif
 
   if (store%V>0) then
-      open(11,file="V.vtk")
-      write (11,"(A)") "# vtk DataFile Version 2.0"
-      write (11,"(A)") "CLMM output file"
-      write (11,"(A)") "ASCII"
-      write (11,"(A)") "DATASET RECTILINEAR_GRID"
+
+      unit = newunit()
+
+      open(unit,file="V.vtk")
+      write (unit,"(A)") "# vtk DataFile Version 2.0"
+      write (unit,"(A)") "CLMM output file"
+      write (unit,"(A)") "ASCII"
+      write (unit,"(A)") "DATASET RECTILINEAR_GRID"
       str="DIMENSIONS"
       write (str(12:),*) Vnx,Vny,Vnz
-      write (11,"(A)") str
+      write (unit,"(A)") str
       str="X_COORDINATES"
       write (str(15:),'(i5,2x,a)') Vnx,"float"
-      write (11,"(A)") str
-      write (11,*) xPr(1:Vnx)
+      write (unit,"(A)") str
+      write (unit,*) xPr(1:Vnx)
       str="Y_COORDINATES"
       write (str(15:),'(i5,2x,a)') Vny,"float"
-      write (11,"(A)") str
-      write (11,*) yV(1:Vny)
+      write (unit,"(A)") str
+      write (unit,*) yV(1:Vny)
       str="Z_COORDINATES"
       write (str(15:),'(i5,2x,a)') Vnz,"float"
-      write (11,"(A)") str
-      write (11,*) zPr(1:Vnz)
+      write (unit,"(A)") str
+      write (unit,*) zPr(1:Vnz)
       str="POINT_DATA"
       write (str(12:),*) Vnx*Vny*Vnz
-      write (11,"(A)") str
+      write (unit,"(A)") str
 
 
-      write (11,"(A)") "SCALARS V float"
-      write (11,"(A)") "LOOKUP_TABLE default"
+      write (unit,"(A)") "SCALARS V float"
+      write (unit,"(A)") "LOOKUP_TABLE default"
       do k = 1,Vnz
        do j = 1,Vny
         do i = 1,Vnx
-          write (11,*) V(i,j,k)
+          write (unit,*) V(i,j,k)
         enddo
        enddo
       enddo
-      write (11,*)
+      write (unit,*)
 
       if (store%V_interp==1) then
-        write (11,"(A)") "SCALARS Vtype float"
-        write (11,"(A)") "LOOKUP_TABLE default"
+        write (unit,"(A)") "SCALARS Vtype float"
+        write (unit,"(A)") "LOOKUP_TABLE default"
         do k = 1,Vnz
          do j = 1,Vny
           do i = 1,Vnx
-            write (11,*) Vtype(i,j,k)
+            write (unit,*) Vtype(i,j,k)
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       end if
 
-      close(11)
+      close(unit)
   endif !store%V
 
   if (store%W>0) then
-      open(11,file="W.vtk")
-      write (11,"(A)") "# vtk DataFile Version 2.0"
-      write (11,"(A)") "CLMM output file"
-      write (11,"(A)") "ASCII"
-      write (11,"(A)") "DATASET RECTILINEAR_GRID"
+
+      unit = newunit()
+
+      open(unit,file="W.vtk")
+      write (unit,"(A)") "# vtk DataFile Version 2.0"
+      write (unit,"(A)") "CLMM output file"
+      write (unit,"(A)") "ASCII"
+      write (unit,"(A)") "DATASET RECTILINEAR_GRID"
       str="DIMENSIONS"
       write (str(12:),*) Wnx,Wny,Wnz
-      write (11,"(A)") str
+      write (unit,"(A)") str
       str="X_COORDINATES"
       write (str(15:),'(i5,2x,a)') Wnx,"float"
-      write (11,"(A)") str
-      write (11,*) xPr(1:Wnx)
+      write (unit,"(A)") str
+      write (unit,*) xPr(1:Wnx)
       str="Y_COORDINATES"
       write (str(15:),'(i5,2x,a)') Wny,"float"
-      write (11,"(A)") str
-      write (11,*) yPr(1:Wny)
+      write (unit,"(A)") str
+      write (unit,*) yPr(1:Wny)
       str="Z_COORDINATES"
       write (str(15:),'(i5,2x,a)') Wnz,"float"
-      write (11,"(A)") str
-      write (11,*) zW(1:Wnz)
+      write (unit,"(A)") str
+      write (unit,*) zW(1:Wnz)
       str="POINT_DATA"
       write (str(12:),*) Wnx*Wny*Wnz
-      write (11,"(A)") str
+      write (unit,"(A)") str
 
 
-      write (11,"(A)") "SCALARS W float"
-      write (11,"(A)") "LOOKUP_TABLE default"
+      write (unit,"(A)") "SCALARS W float"
+      write (unit,"(A)") "LOOKUP_TABLE default"
       do k = 1,Wnz
        do j = 1,Wny
         do i = 1,Wnx
-          write (11,*) W(i,j,k)
+          write (unit,*) W(i,j,k)
         enddo
        enddo
       enddo
-      write (11,*)
+      write (unit,*)
 
       if (store%W_interp==1) then
-        write (11,"(A)") "SCALARS Wtype float"
-        write (11,"(A)") "LOOKUP_TABLE default"
+        write (unit,"(A)") "SCALARS Wtype float"
+        write (unit,"(A)") "LOOKUP_TABLE default"
         do k = 1,Wnz
          do j = 1,Wny
           do i = 1,Wnx
-            write (11,*) Wtype(i,j,k)
+            write (unit,*) Wtype(i,j,k)
           enddo
          enddo
         enddo
-        write (11,*)
+        write (unit,*)
       end if
 
-      close(11)
+      close(unit)
   endif !store%W
 
   if (store%U_interp/=0) then
-    open(11,file="Uinterp.txt")
+
+    unit = newunit()
+
+    open(unit,file="Uinterp.txt")
     do i = 1,size(UIBPoints)
-      write(11,*) "xi,yj,zk",UIBPoints(i)%xi,UIBPoints(i)%yj,UIBPoints(i)%zk
-      write(11,*) "interp",UIBPoints(i)%interp
-      write(11,*) "xi",UIBPoints(i)%IntPoints%xi
-      write(11,*) "yj",UIBPoints(i)%IntPoints%yj
-      write(11,*) "zk",UIBPoints(i)%IntPoints%zk
-      write(11,*) "coefs",UIBPoints(i)%IntPoints%coef
+      write(unit,*) "xi,yj,zk",UIBPoints(i)%xi,UIBPoints(i)%yj,UIBPoints(i)%zk
+      write(unit,*) "interp",UIBPoints(i)%interp
+      write(unit,*) "xi",UIBPoints(i)%IntPoints%xi
+      write(unit,*) "yj",UIBPoints(i)%IntPoints%yj
+      write(unit,*) "zk",UIBPoints(i)%IntPoints%zk
+      write(unit,*) "coefs",UIBPoints(i)%IntPoints%coef
     enddo
-    close(11)
+    close(unit)
   endif
 
   if (store%V_interp/=0) then
-    open(11,file="Vinterp.txt")
+
+    unit = newunit()
+
+    open(unit,file="Vinterp.txt")
     do i = 1,size(VIBPoints)
-      write(11,*) "xi,yj,zk",VIBPoints(i)%xi,VIBPoints(i)%yj,VIBPoints(i)%zk
-      write(11,*) "interp",VIBPoints(i)%interp
-      write(11,*) "xi",VIBPoints(i)%IntPoints%xi
-      write(11,*) "yj",VIBPoints(i)%IntPoints%yj
-      write(11,*) "zk",VIBPoints(i)%IntPoints%zk
-      write(11,*) "coefs",VIBPoints(i)%IntPoints%coef
+      write(unit,*) "xi,yj,zk",VIBPoints(i)%xi,VIBPoints(i)%yj,VIBPoints(i)%zk
+      write(unit,*) "interp",VIBPoints(i)%interp
+      write(unit,*) "xi",VIBPoints(i)%IntPoints%xi
+      write(unit,*) "yj",VIBPoints(i)%IntPoints%yj
+      write(unit,*) "zk",VIBPoints(i)%IntPoints%zk
+      write(unit,*) "coefs",VIBPoints(i)%IntPoints%coef
     enddo
-    close(11)
+    close(unit)
   endif
 
   if (store%W_interp/=0) then
-    open(11,file="Winterp.txt")
+
+    unit = newunit()
+
+    open(unit,file="Winterp.txt")
     do i = 1,size(WIBPoints)
-      write(11,*) "xi,yj,zk",WIBPoints(i)%xi,WIBPoints(i)%yj,WIBPoints(i)%zk
-      write(11,*) "interp",WIBPoints(i)%interp
-      write(11,*) "xi",WIBPoints(i)%IntPoints%xi
-      write(11,*) "yj",WIBPoints(i)%IntPoints%yj
-      write(11,*) "zk",WIBPoints(i)%IntPoints%zk
-      write(11,*) "coefs",WIBPoints(i)%IntPoints%coef
+      write(unit,*) "xi,yj,zk",WIBPoints(i)%xi,WIBPoints(i)%yj,WIBPoints(i)%zk
+      write(unit,*) "interp",WIBPoints(i)%interp
+      write(unit,*) "xi",WIBPoints(i)%IntPoints%xi
+      write(unit,*) "yj",WIBPoints(i)%IntPoints%yj
+      write(unit,*) "zk",WIBPoints(i)%IntPoints%zk
+      write(unit,*) "coefs",WIBPoints(i)%IntPoints%coef
     enddo
-    close(11)
+    close(unit)
   endif
 
   if (store%U_interp/=0.and.store%V_interp/=0.and.store%W_interp/=0) then
-    open(11,file="Scinterp.txt")
+
+    unit = newunit()
+
+    open(unit,file="Scinterp.txt")
     do i = 1,size(ScalFlIBPoints)
-      write(11,*) "xi,yj,zk",ScalFlIBPoints(i)%xi,ScalFlIBPoints(i)%yj,ScalFlIBPoints(i)%zk
-      write(11,*) "interp",ScalFlIBPoints(i)%interp
-      write(11,*) "xi",ScalFlIBPoints(i)%IntPoints%xi
-      write(11,*) "yj",ScalFlIBPoints(i)%IntPoints%yj
-      write(11,*) "zk",ScalFlIBPoints(i)%IntPoints%zk
-      write(11,*) "coefs",ScalFlIBPoints(i)%IntPoints%coef
+      write(unit,*) "xi,yj,zk",ScalFlIBPoints(i)%xi,ScalFlIBPoints(i)%yj,ScalFlIBPoints(i)%zk
+      write(unit,*) "interp",ScalFlIBPoints(i)%interp
+      write(unit,*) "xi",ScalFlIBPoints(i)%IntPoints%xi
+      write(unit,*) "yj",ScalFlIBPoints(i)%IntPoints%yj
+      write(unit,*) "zk",ScalFlIBPoints(i)%IntPoints%zk
+      write(unit,*) "coefs",ScalFlIBPoints(i)%IntPoints%coef
     enddo
-    close(11)
+    close(unit)
   endif
 
  end subroutine OutputUVW
@@ -1584,7 +1561,9 @@ contains
       write(fnumber,"(I4.4)") n
       write(*,*) "Saving frame:",fnumber,"   time:",time
 
-      unit = 100+m
+      !$omp critical
+      unit = newunit()
+      !$omp end critical
 
       mini = store%frame_domains(m)%mini
       minj = store%frame_domains(m)%minj
@@ -2165,122 +2144,123 @@ contains
 
  subroutine OUTPUTU2(U,V,W)
  real(KND),dimension(-2:,-2:,-2:) :: U,V,W
- integer i,j,k
+ integer i,j,k,unit
  character(70) :: str
 
-  open(11,file="U2.vtk")
-  write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "CLMM output file"
-  write (11,"(A)") "ASCII"
-  write (11,"(A)") "DATASET RECTILINEAR_GRID"
+  unit = newunit()
+
+  open(unit,file="U2.vtk")
+  write (unit,"(A)") "# vtk DataFile Version 2.0"
+  write (unit,"(A)") "CLMM output file"
+  write (unit,"(A)") "ASCII"
+  write (unit,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
   write (str(12:),*) Unx,Uny,Unz
-  write (11,"(A)") str
+  write (unit,"(A)") str
   str="X_COORDINATES"
   write (str(15:),'(i5,2x,a)') Unx,"float"
-  write (11,"(A)") str
-  write (11,*) xU(1:Unx)
+  write (unit,"(A)") str
+  write (unit,*) xU(1:Unx)
   str="Y_COORDINATES"
   write (str(15:),'(i5,2x,a)') Uny,"float"
-  write (11,"(A)") str
-  write (11,*) yPr(1:Uny)
+  write (unit,"(A)") str
+  write (unit,*) yPr(1:Uny)
   str="Z_COORDINATES"
   write (str(15:),'(i5,2x,a)') Unz,"float"
-  write (11,"(A)") str
-  write (11,*) zPr(1:Unz)
+  write (unit,"(A)") str
+  write (unit,*) zPr(1:Unz)
   str="POINT_DATA"
   write (str(12:),*) Unx*Uny*Unz
-  write (11,"(A)") str
+  write (unit,"(A)") str
 
 
-  write (11,"(A)") "SCALARS U float"
-  write (11,"(A)") "LOOKUP_TABLE default"
+  write (unit,"(A)") "SCALARS U float"
+  write (unit,"(A)") "LOOKUP_TABLE default"
   do k = 1,Unz
    do j = 1,Uny
     do i = 1,Unx
-      write (11,*) U(i,j,k)
+      write (unit,*) U(i,j,k)
     enddo
    enddo
   enddo
-  write (11,*)
-  close(11)
+  write (unit,*)
+  close(unit)
 
 
-  open(11,file="V2.vtk")
-  write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "CLMM output file"
-  write (11,"(A)") "ASCII"
-  write (11,"(A)") "DATASET RECTILINEAR_GRID"
+  open(unit,file="V2.vtk")
+  write (unit,"(A)") "# vtk DataFile Version 2.0"
+  write (unit,"(A)") "CLMM output file"
+  write (unit,"(A)") "ASCII"
+  write (unit,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
   write (str(12:),*) Vnx,Vny,Vnz
-  write (11,"(A)") str
+  write (unit,"(A)") str
   str="X_COORDINATES"
   write (str(15:),'(i5,2x,a)') Vnx,"float"
-  write (11,"(A)") str
-  write (11,*) xPr(1:Vnx)
+  write (unit,"(A)") str
+  write (unit,*) xPr(1:Vnx)
   str="Y_COORDINATES"
   write (str(15:),'(i5,2x,a)') Vny,"float"
-  write (11,"(A)") str
-  write (11,*) yV(1:Vny)
+  write (unit,"(A)") str
+  write (unit,*) yV(1:Vny)
   str="Z_COORDINATES"
   write (str(15:),'(i5,2x,a)') Vnz,"float"
-  write (11,"(A)") str
-  write (11,*) zPr(1:Vnz)
+  write (unit,"(A)") str
+  write (unit,*) zPr(1:Vnz)
   str="POINT_DATA"
   write (str(12:),*) Vnx*Vny*Vnz
-  write (11,"(A)") str
+  write (unit,"(A)") str
 
 
-  write (11,"(A)") "SCALARS V float"
-  write (11,"(A)") "LOOKUP_TABLE default"
+  write (unit,"(A)") "SCALARS V float"
+  write (unit,"(A)") "LOOKUP_TABLE default"
   do k = 1,Vnz
    do j = 1,Vny
     do i = 1,Vnx
-      write (11,*) V(i,j,k)
+      write (unit,*) V(i,j,k)
     enddo
    enddo
   enddo
-  write (11,*)
-  close(11)
+  write (unit,*)
+  close(unit)
 
 
-
-  open(11,file="W2.vtk")
-  write (11,"(A)") "# vtk DataFile Version 2.0"
-  write (11,"(A)") "CLMM output file"
-  write (11,"(A)") "ASCII"
-  write (11,"(A)") "DATASET RECTILINEAR_GRID"
+  open(unit,file="W2.vtk")
+  write (unit,"(A)") "# vtk DataFile Version 2.0"
+  write (unit,"(A)") "CLMM output file"
+  write (unit,"(A)") "ASCII"
+  write (unit,"(A)") "DATASET RECTILINEAR_GRID"
   str="DIMENSIONS"
   write (str(12:),*) Wnx,Wny,Wnz
-  write (11,"(A)") str
+  write (unit,"(A)") str
   str="X_COORDINATES"
   write (str(15:),'(i5,2x,a)') Wnx,"float"
-  write (11,"(A)") str
-  write (11,*) xPr(1:Wnx)
+  write (unit,"(A)") str
+  write (unit,*) xPr(1:Wnx)
   str="Y_COORDINATES"
   write (str(15:),'(i5,2x,a)') Wny,"float"
-  write (11,"(A)") str
-  write (11,*) yPr(1:Wny)
+  write (unit,"(A)") str
+  write (unit,*) yPr(1:Wny)
   str="Z_COORDINATES"
   write (str(15:),'(i5,2x,a)') Wnz,"float"
-  write (11,"(A)") str
-  write (11,*) zW(1:Wnz)
+  write (unit,"(A)") str
+  write (unit,*) zW(1:Wnz)
   str="POINT_DATA"
   write (str(12:),*) Wnx*Wny*Wnz
-  write (11,"(A)") str
+  write (unit,"(A)") str
 
 
-  write (11,"(A)") "SCALARS W float"
-  write (11,"(A)") "LOOKUP_TABLE default"
+  write (unit,"(A)") "SCALARS W float"
+  write (unit,"(A)") "LOOKUP_TABLE default"
   do k = 1,Wnz
    do j = 1,Wny
     do i = 1,Wnx
-      write (11,*) W(i,j,k)
+      write (unit,*) W(i,j,k)
     enddo
    enddo
   enddo
-  write (11,*)
-  close(11)
+  write (unit,*)
+  close(unit)
   end subroutine OUTPUTU2
 
 
@@ -2317,7 +2297,7 @@ contains
     real(KND) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer n,i,j,k,l,m
     character(12) :: fname
-    integer mini,maxi,minj,maxj,mink,maxk
+    integer mini,maxi,minj,maxj,mink,maxk,unit
 
     call Gridcoords(mini,minj,mink,store%frame_domains(1)%position,(yV(Prny+1)+yV(0))/2._KND,(zW(Prnz+1)+zW(0))/2._KND)
     maxi = mini
@@ -2332,16 +2312,18 @@ contains
     fname(9:12)=".unf"
     write(*,*) "Saving frame:",fname(1:6),"   time:",time
 
-    open(11,file = fname,form='unformatted',access='sequential',status='replace',action='write')
+    unit = newunit()
+
+    open(unit,file = fname,form='unformatted',access='sequential',status='replace',action='write')
 
 
-    write(11) U(mini,1:Uny,1:Unz)
-    write(11) V(mini,1:Vny,1:Vnz)
-    write(11) W(mini,1:Wny,1:Wnz)
+    write(unit) U(mini,1:Uny,1:Unz)
+    write(unit) V(mini,1:Vny,1:Vnz)
+    write(unit) W(mini,1:Wny,1:Wnz)
     if (buoyancy>0) then
-         write(11) Temperature(mini,1:Prny,1:Prnz)
+         write(unit) Temperature(mini,1:Prny,1:Prnz)
     endif
-    close(11)
+    close(unit)
 
   end subroutine OUTINLETFRAME
 
@@ -2370,6 +2352,8 @@ module vtkarray
  !Mostly only for debugging.
 
 !   use iso_fortran_env, only: real32, real64
+  use FreeUnit
+
   implicit none
 
   integer,parameter :: real32=selected_real_kind(p=6,r=37)
@@ -2387,47 +2371,50 @@ module vtkarray
       real(real32),dimension(1:,1:,1:) :: A
       integer                          :: nx,ny,nz
       integer                          :: i,j,k
+      integer                          :: unit
       character(len=40)                :: str
 
       nx=Ubound(A,1)
       ny=Ubound(A,2)
       nz=Ubound(A,3)
 
-      open(11,file=fname)
-      write (11,"(A)") "# vtk DataFile Version 2.0"
-      write (11,"(A)") "CLMM output file"
-      write (11,"(A)") "ASCII"
-      write (11,"(A)") "DATASET RECTILINEAR_GRID"
+      unit = newunit()
+
+      open(unit,file=fname)
+      write (unit,"(A)") "# vtk DataFile Version 2.0"
+      write (unit,"(A)") "CLMM output file"
+      write (unit,"(A)") "ASCII"
+      write (unit,"(A)") "DATASET RECTILINEAR_GRID"
       str="DIMENSIONS"
       write (str(12:),'(i0,1x,i0,1x,i0)') nx,ny,nz
-      write (11,"(A)") trim(str)
+      write (unit,"(A)") trim(str)
       str="X_COORDINATES"
       write (str(15:),'(i5,2x,a)') nx,"float"
-      write (11,"(A)") str
-      write (11,*) (i, i=1,nx)
+      write (unit,"(A)") str
+      write (unit,*) (i, i=1,nx)
       str="Y_COORDINATES"
       write (str(15:),'(i5,2x,a)') ny,"float"
-      write (11,"(A)") trim(str)
-      write (11,*) (i, i=1,ny)
+      write (unit,"(A)") trim(str)
+      write (unit,*) (i, i=1,ny)
       str="Z_COORDINATES"
       write (str(15:),'(i5,2x,a)') nz,"float"
-      write (11,"(A)") trim(str)
-      write (11,*) (i, i=1,nz)
+      write (unit,"(A)") trim(str)
+      write (unit,*) (i, i=1,nz)
       str="POINT_DATA"
       write (str(12:),*) nx*ny*nz
-      write (11,"(A)") trim(str)
+      write (unit,"(A)") trim(str)
 
 
-      write (11,"(A)") "SCALARS array float"
-      write (11,"(A)") "LOOKUP_TABLE default"
+      write (unit,"(A)") "SCALARS array float"
+      write (unit,"(A)") "LOOKUP_TABLE default"
       do k=1,nz
        do j=1,ny
         do i=1,nx
-          write (11,*) A(i,j,k)
+          write (unit,*) A(i,j,k)
         enddo
         enddo
       enddo
-      write (11,*)
+      write (unit,*)
 
     end subroutine SVtkArraySimple
 
@@ -2436,47 +2423,50 @@ module vtkarray
       real(real64),dimension(1:,1:,1:) :: A
       integer                          :: nx,ny,nz
       integer                          :: i,j,k
+      integer                          :: unit
       character(len=40)                :: str
 
       nx=Ubound(A,1)
       ny=Ubound(A,2)
       nz=Ubound(A,3)
 
-      open(11,file=fname)
-      write (11,"(A)") "# vtk DataFile Version 2.0"
-      write (11,"(A)") "CLMM output file"
-      write (11,"(A)") "ASCII"
-      write (11,"(A)") "DATASET RECTILINEAR_GRID"
+      unit = newunit()
+
+      open(unit,file=fname)
+      write (unit,"(A)") "# vtk DataFile Version 2.0"
+      write (unit,"(A)") "CLMM output file"
+      write (unit,"(A)") "ASCII"
+      write (unit,"(A)") "DATASET RECTILINEAR_GRID"
       str="DIMENSIONS"
       write (str(12:),'(i0,1x,i0,1x,i0)') nx,ny,nz
-      write (11,"(A)") trim(str)
+      write (unit,"(A)") trim(str)
       str="X_COORDINATES"
       write (str(15:),'(i5,2x,a)') nx,"float"
-      write (11,"(A)") str
-      write (11,*) (i, i=1,nx)
+      write (unit,"(A)") str
+      write (unit,*) (i, i=1,nx)
       str="Y_COORDINATES"
       write (str(15:),'(i5,2x,a)') ny,"float"
-      write (11,"(A)") trim(str)
-      write (11,*) (i, i=1,ny)
+      write (unit,"(A)") trim(str)
+      write (unit,*) (i, i=1,ny)
       str="Z_COORDINATES"
       write (str(15:),'(i5,2x,a)') nz,"float"
-      write (11,"(A)") trim(str)
-      write (11,*) (i, i=1,nz)
+      write (unit,"(A)") trim(str)
+      write (unit,*) (i, i=1,nz)
       str="POINT_DATA"
       write (str(12:),*) nx*ny*nz
-      write (11,"(A)") trim(str)
+      write (unit,"(A)") trim(str)
 
 
-      write (11,"(A)") "SCALARS array float"
-      write (11,"(A)") "LOOKUP_TABLE default"
+      write (unit,"(A)") "SCALARS array float"
+      write (unit,"(A)") "LOOKUP_TABLE default"
       do k=1,nz
        do j=1,ny
         do i=1,nx
-          write (11,*) A(i,j,k)
+          write (unit,*) A(i,j,k)
         enddo
         enddo
       enddo
-      write (11,*)
+      write (unit,*)
 
     end subroutine DVtkArraySimple
 end module vtkarray
