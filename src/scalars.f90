@@ -1845,7 +1845,7 @@ contains
 
 
   subroutine InitTemperature(TempIn,Temperature)
-    real(KND),intent(out) :: TempIn(-1:,-1:)
+    real(KND),intent(in) :: TempIn(-1:,-1:)
     real(KND),intent(out) :: Temperature(-1:,-1:,-1:)
     real(KND) :: p_x,p_y,p_z,p
     integer   :: i,j,k
