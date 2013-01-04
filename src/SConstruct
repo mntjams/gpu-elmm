@@ -5,6 +5,7 @@ omp = ARGUMENTS.get('omp','')
 fast = ARGUMENTS.get('fast','')
 lto = ARGUMENTS.get('lto','')
 dtrace = ARGUMENTS.get('dtrace','')
+diag = ARGUMENTS.get('diag','')
 dir = ARGUMENTS.get('dir','')
 customSB = ARGUMENTS.get('customSB','')
 SB = ARGUMENTS.get('SB','')
@@ -26,36 +27,65 @@ else:
 
 if str(comp)=='sun':
   env = Environment(tools=['link','sunf90','sunf95'])
-  
+
   if str(omp)!='no':
     omp_flag = ' -openmp'
   else:
     omp_flag = ''
-  
+
   if str(fast)=='yes':
     fast_flag = ' -fast'
   else:
     fast_flag = ' -C'
-  
+
   if str(lto)=='yes':
     lto_flag = ' -xipo'
   else:
     lto_flag = ''
-    
+
   if str(dtrace)=='yes':
     env.Append(F90FLAGS=' -xinstrument=datarace')
     env.Append(LINKFLAGS=' -xinstrument=datarace')
-  
+
   env.Append(F90FLAGS='-fpp -xpp=cpp -DNO_INTERNAL_NML -g -dalign')
 
   env.Append(LIBPATH = ['/usr/local/poisfft_sun/'])
 
   env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_sun/'])
-  
+
   env.Append(FORTRANMODDIRPREFIX = '-moddir=')
-                            
+
   env.Append(INCPREFIX = '-M')
-                            
+
+
+elif str(comp)=='intel':
+  env = Environment(tools=['default','ifort'])
+
+  if str(omp)!='no':
+    omp_flag = ' -openmp'
+  else:
+    omp_flag = ''
+
+  if str(fast)=='yes':
+    fast_flag = ' -fast'
+  else:
+    fast_flag = ' -check all'
+
+  if str(lto)=='yes':
+    lto_flag = ' -ipo'
+  else:
+    lto_flag = ''
+
+  env.Append(F90FLAGS='-cpp -g')
+
+  env.Append(LIBPATH = ['/usr/local/poisfft_intel/'])
+
+  env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_intel/'])
+
+  if str(diag)=='yes':
+   env.Append(F90FLAGS=' -diag-enable sc3')
+   env.Append(LINKFLAGS=' -diag-enable sc3')
+   
 else:
   env = Environment()
  
