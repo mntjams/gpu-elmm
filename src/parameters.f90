@@ -50,7 +50,7 @@ module PARAMETERS
 
   real(TIM) :: dt,starttime,endtime        !active time step
 
-  real(KND) :: dxmin,dymin,dzmin,lx,ly,lz,CFL,Uref  !minimum grid spacing, dimensions of the domain
+  real(KND) :: dxmin,dymin,dzmin,CFL,Uref  !minimum grid spacing, dimensions of the domain
 
 
   real(KND) :: Re = 70000, Prandtl = 0.7!1/molecular viscosity, viscosity/thermal diffusivity

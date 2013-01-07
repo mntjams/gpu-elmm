@@ -1049,47 +1049,60 @@ implicit none
 
 
   subroutine CONSTINLET
-  !Dirichlet inlet condition
-  !Uin must be allocated beforehand
-  integer j,k
-  do k=LBOUND(Uin,2),UBOUND(Uin,2)
-   do j=LBOUND(Uin,1),UBOUND(Uin,1)
-     Uin(j,k)=Uinlet
-   enddo
-  enddo
-  do k=LBOUND(Vin,2),UBOUND(Vin,2)
-   do j=LBOUND(Vin,1),UBOUND(Vin,1)
-     Vin(j,k)=0
-   enddo
-  enddo
-  do k=LBOUND(Win,2),UBOUND(Win,2)
-   do j=LBOUND(Win,1),UBOUND(Win,1)
-     Win(j,k)=0
-   enddo
-  enddo
+    !Dirichlet inlet condition
+    !Uin must be allocated beforehand
+    integer j,k
+
+    do k=LBOUND(Uin,2),UBOUND(Uin,2)
+     do j=LBOUND(Uin,1),UBOUND(Uin,1)
+       Uin(j,k)=Uinlet
+     enddo
+    enddo
+
+    do k=LBOUND(Vin,2),UBOUND(Vin,2)
+     do j=LBOUND(Vin,1),UBOUND(Vin,1)
+       Vin(j,k)=0
+     enddo
+    enddo
+
+    do k=LBOUND(Win,2),UBOUND(Win,2)
+     do j=LBOUND(Win,1),UBOUND(Win,1)
+       Win(j,k)=0
+     enddo
+    enddo
+
   endsubroutine CONSTINLET
 
   subroutine SHEARINLET(G)
-  real(KND) G
-  integer j,k
-  do k=LBOUND(Uin,2),UBOUND(Uin,2)
-   do j=LBOUND(Uin,1),UBOUND(Uin,1)
-     Uin(j,k)=G*(zPr(k)-((zW(Wnz+1)+zW(0))/2._KND))
-   enddo
-  enddo
-  Vin=0
-  Win=0
+    real(KND) G
+    integer j,k
+
+    do k=LBOUND(Uin,2),UBOUND(Uin,2)
+     do j=LBOUND(Uin,1),UBOUND(Uin,1)
+       Uin(j,k)=G*(zPr(k)-((zW(Wnz+1)+zW(0))/2._KND))
+     enddo
+    enddo
+
+    Vin=0
+    Win=0
+
   endsubroutine SHEARINLET
 
   subroutine PARINLET
-  integer j,k
-  do k=LBOUND(Uin,2),UBOUND(Uin,2)
-   do j=LBOUND(Uin,1),UBOUND(Uin,1)
-     Uin(j,k)=1.5*Uinlet*(1-((lz/2._KND-(zPr(k)-zW(0)))/(lz/2._KND))**2)
-   enddo
-  enddo
-  Vin=0
-  Win=0
+    integer j,k
+    real(KND) lz
+
+    lz = zW(Prnz) - zW(0)
+
+    do k=LBOUND(Uin,2),UBOUND(Uin,2)
+     do j=LBOUND(Uin,1),UBOUND(Uin,1)
+       Uin(j,k)=1.5*Uinlet*(1-((lz/2._KND-(zPr(k)-zW(0)))/(lz/2._KND))**2)
+     enddo
+    enddo
+
+    Vin=0
+    Win=0
+
   endsubroutine PARINLET
 
 

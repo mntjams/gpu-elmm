@@ -21,7 +21,8 @@ module INITIAL
   private
   public  ReadParams, Initconds, ReadBounds
 
-  real(KND) x0,y0,z0
+  real(KND) x0,y0,z0 !domain boundaries, will become xU(0), yV(0), zW(0)
+  real(KND) lx,ly,lz !domain extents
 
 contains
 
@@ -124,6 +125,7 @@ contains
    read(unit,fmt='(/)')
    read(unit,*) zgridfromfile
    read(unit,fmt='(/)')
+
    read(unit,*) x0
    write(*,*) "x0=",x0
    read(unit,fmt='(/)')
@@ -133,23 +135,59 @@ contains
    read(unit,*) z0
    write(*,*) "z0=",z0
    read(unit,fmt='(/)')
+
    read(unit,*) lx
-   write(*,*) "lx=",lx
+   if (lx>0) then
+     write(*,*) "lx=",lx
+   else
+     write (*,*) "Domain length in x direction must be positive."
+     stop
+   end if
    read(unit,fmt='(/)')
+
    read(unit,*) ly
-   write(*,*) "ly=",ly
+   if (ly>0) then
+     write(*,*) "ly=",ly
+   else
+     write (*,*) "Domain length in y direction must be positive."
+     stop
+   end if
    read(unit,fmt='(/)')
+
    read(unit,*) lz
-   write(*,*) "lz=",lz
+   if (lz>0) then
+     write(*,*) "lz=",lz
+   else
+     write (*,*) "Domain length in z direction must be positive."
+     stop
+   end if
    read(unit,fmt='(/)')
+
    read(unit,*) Prnx
-   write(*,*) "nx=",Prnx
+   if (Prnx>0) then
+     write(*,*) "nx=",Prnx
+   else
+     write (*,*) "Number of cells in x direction must be positive."
+     stop
+   end if
    read(unit,fmt='(/)')
+
    read(unit,*) Prny
-   write(*,*) "ny=",Prny
+   if (Prny>0) then
+     write(*,*) "ny=",Prny
+   else
+     write (*,*) "Number of cells in y direction must be positive."
+     stop
+   end if
    read(unit,fmt='(/)')
+
    read(unit,*) Prnz
-   write(*,*) "ny=",Prnz
+   if (Prnz>0) then
+     write(*,*) "nz=",Prnz
+   else
+     write (*,*) "Number of cells in z direction must be positive."
+     stop
+   end if
    close(unit)
 
    open(unit,file="boundconds.conf",status="old",action="read")
@@ -644,6 +682,7 @@ contains
    end if
 
    if (io==0) then
+     msg = ''
      read(commandline,nml=cmd,iostat=io,iomsg=msg)
      if (io/=0) then
        write(*,*) io,"Error parsing command line."

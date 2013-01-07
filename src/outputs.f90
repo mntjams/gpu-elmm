@@ -2109,26 +2109,32 @@ contains
 
 
   function TotKE(U,V,W) result(res)
-  real(KND) :: res
-  real(KND),dimension(-2:,-2:,-2:) :: U,V,W
-  real(KND) Um,Vm,Wm
-  integer i,j,k
-   res = 0
-   Um = 0
-   Vm = 0
-   Wm = 0
-   !$omp parallel do private(i,j,k) reduction(+:res)
-   do k = 1,Prnz
-    do j = 1,Prny
-     do i = 1,Prnx
-      res = res + (((U(i-1,j,k)+U(i,j,k))/2._KND-Um)**2+&
-                      ((V(i,j-1,k)+V(i,j,k))/2._KND-Vm)**2+&
-                      ((W(i,j,k-1)+W(i,j,k))/2._KND-Wm)**2)
+    real(KND) :: res
+    real(KND),dimension(-2:,-2:,-2:) :: U,V,W
+    real(KND) Um,Vm,Wm
+    integer i,j,k
+    real(KND) lx,ly,lz
+
+    lx = xU(Prnx) - xU(0)
+    ly = yV(Prny) - yV(0)
+    lz = zW(Prnz) - zW(0)
+
+    res = 0
+    Um = 0
+    Vm = 0
+    Wm = 0
+    !$omp parallel do private(i,j,k) reduction(+:res)
+    do k = 1,Prnz
+     do j = 1,Prny
+      do i = 1,Prnx
+       res = res + (((U(i-1,j,k)+U(i,j,k))/2._KND-Um)**2+&
+                       ((V(i,j-1,k)+V(i,j,k))/2._KND-Vm)**2+&
+                       ((W(i,j,k-1)+W(i,j,k))/2._KND-Wm)**2)
+      enddo
      enddo
     enddo
-   enddo
-   !$omp end parallel do
-   res = res*lx*lz*lz/2
+    !$omp end parallel do
+    res = res*lx*ly*lz/2
   end function TotKE
 
   pure real(KND) function VorticityMag(i,j,k,U,V,W) result(res)

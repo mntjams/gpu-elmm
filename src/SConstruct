@@ -67,7 +67,7 @@ elif str(comp)=='intel':
     omp_flag = ''
 
   if str(fast)=='yes':
-    fast_flag = ' -fast'
+    fast_flag = ' -O1'
   else:
     fast_flag = ' -check all'
 
@@ -83,8 +83,8 @@ elif str(comp)=='intel':
   env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_intel/'])
 
   if str(diag)=='yes':
-   env.Append(F90FLAGS=' -diag-enable sc3')
-   env.Append(LINKFLAGS=' -diag-enable sc3')
+   env.Append(F90FLAGS=' -diag-enable sc1 -diag-enable sc-precise')
+   env.Append(LINKFLAGS=' -diag-enable sc1 -diag-enable sc-precise')
    
 else:
   env = Environment()

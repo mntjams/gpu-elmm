@@ -69,16 +69,16 @@ contains
    ny=bny*2**level
    nz=bnz*2**level
 
+#ifdef __HMPP
    if (GPU>0.and.level>=minGPUlevel-1) then!.and.level>3
-
 
       !$hmpp <GSKernels> advancedload, args[Pr::level]
       !$hmpp <GSKernels> Pr callsite,args[*].noupdate=true
       call Pr_GPU(nxa,nya,nza,PhiMG(0)%Arr,PhiMG(1)%Arr,PhiMG(2)%Arr,PhiMG(3)%Arr,PhiMG(4)%Arr,&
                              PhiMG(5)%Arr,PhiMG(6)%Arr,PhiMG(7)%Arr,PhiMG(8)%Arr,&
                              Btype,level)
-
    else
+#endif
 
     if (called==0) then
       do kk=-1,1
@@ -118,7 +118,9 @@ contains
      !$omp end parallel
 
      call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
+#ifdef __HMPP
    endif
+#endif
  endsubroutine Prolongate
 
 
@@ -133,7 +135,9 @@ contains
    ny=bny*2**level
    nz=bnz*2**level
 
+#ifdef __HMPP
    if (GPU>0.and.level>=minGPUlevel-1) then
+
       !$hmpp <GSKernels> advancedload, args[Re::level]
       !$hmpp <GSKernels> Re callsite,args[*].noupdate=true
           call Re_GPU(nxa,nya,nza,RHSMG(0)%Arr,RHSMG(1)%Arr,RHSMG(2)%Arr,RHSMG(3)%Arr,RHSMG(4)%Arr,&
@@ -142,6 +146,7 @@ contains
                              ResMG(5)%Arr,ResMG(6)%Arr,ResMG(7)%Arr,ResMG(8)%Arr,&
                              Btype,level)
    else
+#endif
 
 
       call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
@@ -262,7 +267,9 @@ contains
         if (Btype(Ea)==PERIODIC) ACoarse(0,:,:)=ACoarse(nx,:,:)
         if (Btype(No)==PERIODIC) ACoarse(:,0,:)=ACoarse(:,ny,:)
         if (Btype(To)==PERIODIC) ACoarse(:,:,0)=ACoarse(:,:,nz)
+#ifdef __HMPP
    endif
+#endif
 endsubroutine Restrict
 
 
@@ -953,6 +960,7 @@ integer,intent(in)::level,niter
 integer i,j,k,l
 real(KND) p,Ap
 
+#ifdef __HMPP
   if (GPU>0.and.level>=minGPUlevel) then!.and.level>3
 !    write (*,*) "Gauss-Seidel GPU call level", level
    !$hmpp  <GSKernels> advancedload, args[GS::nit,GS::level]
@@ -963,8 +971,8 @@ real(KND) p,Ap
                              RHSMG(5)%Arr,RHSMG(6)%Arr,RHSMG(7)%Arr,RHSMG(8)%Arr,&
                      Aw,Ae,As,An,Ab,At,&
                      Btype,level)
-
   else
+#endif
 
    do l=1,niter
     !$OMP PARALLEL PRIVATE(i,j,k,p,Ap)
@@ -1083,7 +1091,9 @@ real(KND) p,Ap
     !$OMP END PARALLEL
 
    enddo
+#ifdef __HMPP
   endif
+#endif
 endsubroutine MG_GS
 
 subroutine MG_res(level,R)
@@ -1092,6 +1102,7 @@ real(KND),intent(out)::R
 integer i,j,k
 real(KND),save:: p,Ap
 
+#ifdef __HMPP
   if (GPU>0.and.level>=minGPUlevel) then!.and.level>3
     !$hmpp <GSKernels> advancedload, args[Res::level]
    !$hmpp  <GSKernels> Res callsite,args[*].noupdate=true
@@ -1104,6 +1115,7 @@ real(KND),save:: p,Ap
                      Aw,Ae,As,An,Ab,At,&
                      Btype,R,level)
   else
+#endif
      !$omp parallel do private(p,Ap)
      do k=0,CoefMG(level)%nz
         do j=0,CoefMG(level)%ny
@@ -1160,7 +1172,9 @@ real(KND),save:: p,Ap
     enddo
     !$omp end parallel do
     R=MAXVAL(ResMG(level)%Arr(0:CoefMG(level)%nx,0:CoefMG(level)%ny,0:CoefMG(level)%nz))
+#ifdef __HMPP
    endif
+#endif
 endsubroutine MG_res
 
 
@@ -1168,6 +1182,7 @@ subroutine MG_clear(level)
 integer,intent(in):: level
 integer l
 
+#ifdef __HMPP
  if (GPU>0.and.level>=minGPUlevel) then!.and.level>2
   !$hmpp <GSKernels> advancedload, args[Cl::level]
   !$hmpp <GSKernels> Cl callsite,args[*].noupdate=true
@@ -1178,12 +1193,15 @@ integer l
                              ResMG(0)%Arr,ResMG(1)%Arr,ResMG(2)%Arr,ResMG(3)%Arr,ResMG(4)%Arr,&
                              ResMG(5)%Arr,ResMG(6)%Arr,ResMG(7)%Arr,level,minmglevel)
  else
+#endif
   do l=level,minmglevel,-1
    PhiMG(l)%Arr=0
    RHSMG(l)%Arr=0
    ResMG(l)%Arr=0
   enddo
+#ifdef __HMPP
  endif
+#endif
 endsubroutine
 
 
@@ -1509,7 +1527,7 @@ endsubroutine POISSMG
 
 
 
-
+#ifdef __HMPP
 
 
 !GPU Codelets.
@@ -1528,10 +1546,7 @@ endsubroutine POISSMG
   subroutine Pr_GPU(nx,ny,nz,Phi0,Phi1,Phi2,Phi3,Phi4,Phi5,Phi6,Phi7,Phi8,&
                                   Btype,level)
   implicit none
-#ifdef __HMPP
-  integer,parameter:: KND=4,PERIODIC=3
-  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
-#endif
+#include "hmpp-include.f90"
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0
@@ -1573,10 +1588,7 @@ endsubroutine POISSMG
   subroutine Prolongate_GPU(nx,ny,nz,AFine,ACoarse,Btype)
 
   implicit none
-#ifdef __HMPP
-  integer,parameter:: KND=4,PERIODIC=3
-  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
-#endif
+#include "hmpp-include.f90"
 
   integer,intent(in):: nx,ny,nz,Btype(6)
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in):: ACoarse
@@ -1713,10 +1725,7 @@ endsubroutine POISSMG
                              Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,Res8,&
                                   Btype,level)
   implicit none
-#ifdef __HMPP
-  integer,parameter:: KND=4,PERIODIC=3
-  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
-#endif
+#include "hmpp-include.f90"
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Res0,RHS0
@@ -1759,10 +1768,7 @@ endsubroutine POISSMG
 
   subroutine Restrict_GPU(nx,ny,nz,ACoarse,AFine,Btype)
   implicit none
-#ifdef __HMPP
-  integer,parameter:: KND=4,PERIODIC=3
-  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
-#endif
+#include "hmpp-include.f90"
 
   integer,intent(in):: nx,ny,nz,Btype(6)
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out):: ACoarse
@@ -2000,10 +2006,7 @@ endsubroutine POISSMG
                      Aw,Ae,As,An,Ab,At,&
                      Btype,level)
   implicit none
-#ifdef __HMPP
-  integer,parameter:: KND=4
-  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
-#endif
+#include "hmpp-include.f90"
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   integer,intent(in) :: nit
@@ -2080,10 +2083,7 @@ endsubroutine POISSMG
                      Aw,Ae,As,An,Ab,At,&
                      Btype)
   implicit none
-#ifdef __HMPP
-  integer,parameter:: KND=4,PERIODIC=3
-  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
-#endif
+#include "hmpp-include.f90"
 
   integer,intent(in)   :: nx,ny,nz,nit,Btype(6)
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::Phi
@@ -2217,10 +2217,7 @@ endsubroutine POISSMG
                      Aw,Ae,As,An,Ab,At,&
                      Btype,R,level)
   implicit none
-#ifdef __HMPP
-  integer,parameter:: KND=4
-  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
-#endif
+#include "hmpp-include.f90"
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,Res0,RHS0
@@ -2301,10 +2298,7 @@ endsubroutine POISSMG
                              Btype,R)
 
   implicit none
-#ifdef __HMPP
-  integer,parameter:: KND=4,PERIODIC=3
-  integer, parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
-#endif
+#include "hmpp-include.f90"
 
   integer,intent(in)   :: nx,ny,nz,Btype(6)
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::Phi
@@ -2394,9 +2388,7 @@ endsubroutine POISSMG
                              RHS0,RHS1,RHS2,RHS3,RHS4,RHS5,RHS6,RHS7,&
                              Res0,Res1,Res2,Res3,Res4,Res5,Res6,Res7,level,minmglevel)
   implicit none
-#ifdef __HMPP
-  integer,parameter:: KND=4
-#endif
+#include "hmpp-include.f90"
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,Res0,RHS0
@@ -2445,9 +2437,7 @@ endsubroutine POISSMG
 
   subroutine Clear_GPU(nx,ny,nz,Phi,RHS,Res)
   implicit none
-#ifdef __HMPP
-  integer,parameter:: KND=4
-#endif
+#include "hmpp-include.f90"
 
   integer,intent(in) :: nx,ny,nz
   real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Phi
@@ -2490,5 +2480,6 @@ endsubroutine POISSMG
 
   endsubroutine Clear_GPU
 
+#endif
 
 endmodule MULTIGRID

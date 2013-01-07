@@ -1965,10 +1965,15 @@ contains
     real(KND),intent(in) :: x,y,z
     real(KND),intent(in),optional :: eps
     real(KND) x2,y2,z2
+    real(KND) lx,ly,lz
 
     x2 = x
     y2 = y
     z2 = z
+
+    lx = xU(Prnx) - xU(0)
+    ly = yV(Prny) - yV(0)
+    lz = zW(Prnz) - zW(0)
 
     if (Btype(Ea)==PERIODIC.and.x2>xU(Prnx+1)) x2 = x2-lx
     if (Btype(No)==PERIODIC.and.y2>yV(Prny+1)) y2 = y2-ly
