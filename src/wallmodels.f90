@@ -198,19 +198,23 @@ implicit none
 
     allocate(WMPoints(WMPoint_ListLength(FirstWMPoint)))
 
-    CurrentWMPoint => FirstWMPoint
-    i = 0
-    do
-     if (associated(CurrentWMPoint)) then
-       i = i + 1
-       WMPoints(i) = CurrentWMPoint
-     else
-       exit
-     end if
-     CurrentWMPoint => CurrentWMPoint%next
-    end do
+    if (size(WMPoints)>0) then
 
-    call RemoveDuplicateWMPoints(WMPoints)
+      CurrentWMPoint => FirstWMPoint
+      i = 0
+      do
+       if (associated(CurrentWMPoint)) then
+         i = i + 1
+         WMPoints(i) = CurrentWMPoint
+       else
+         exit
+       end if
+       CurrentWMPoint => CurrentWMPoint%next
+      end do
+
+      call RemoveDuplicateWMPoints(WMPoints)
+
+    end if
 
     call WMPoint_DeallocateList(FirstWMPoint)
 
