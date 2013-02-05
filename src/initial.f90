@@ -6,7 +6,7 @@ module INITIAL
   use MULTIGRID2d, only: SetMGParams2d
   use POISSON
   use BOUNDARIES
-  use OUTPUTS, only: store, display, probes, NumProbes, SetFrameDomain
+  use OUTPUTS, only: store, display, probes, NumProbes, SetFrameDomain, StaggeredFrameDomains
   use SCALARS
   use Filters, only: filtertype, filter_ratios
   use Subgrid
@@ -28,6 +28,7 @@ contains
 
 
  subroutine ReadParams
+   use StaggeredFrames, only: rrange, TFrameTimes, TSaveFlags, Init
    integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter,minGPUlevel
    real(KND) mgepsinnerGS
    integer   i,io,io2,itmp
@@ -38,7 +39,13 @@ contains
    integer :: exenamelength
    integer :: unit
 
-   unit = newunit()
+   type(rrange) :: range
+   type(TFrameTimes) :: frame_times
+   type(TSaveFlags) :: frame_save_flags
+   character(10) :: domain_label
+   integer :: num_staggered_domains
+
+   call newunit(unit)
 
    open(unit,file="main.conf",status="old",action="read")
    read(unit,fmt='(/)')
@@ -557,6 +564,49 @@ contains
 
    close(unit)
 
+
+   open(unit,file="stagframes.conf",status="old",action="read",iostat=io)
+   if (io==0) then
+     read(unit,fmt='(/)')
+     read(unit,*) num_staggered_domains
+
+     allocate(StaggeredFrameDomains(num_staggered_domains))
+
+     do i=1,num_staggered_domains
+       read(unit,fmt='(//)')
+       read(unit,*) domain_label
+       read(unit,fmt='(/)')
+       read(unit,*) range%min%x,range%max%x
+       read(unit,fmt='(/)')
+       read(unit,*) range%min%y,range%max%y
+       read(unit,fmt='(/)')
+       read(unit,*) range%min%z,range%max%z
+       read(unit,fmt='(/)')
+       read(unit,*) frame_times%nframes
+       read(unit,fmt='(/)')
+       read(unit,*) frame_times%start, frame_times%end
+       read(unit,fmt='(/)')
+       read(unit,*) frame_save_flags%U, frame_save_flags%V, frame_save_flags%W
+       read(unit,fmt='(/)')
+       read(unit,*) frame_save_flags%Pr
+       read(unit,fmt='(/)')
+       read(unit,*) frame_save_flags%Temperature
+       if (buoyancy == 0) frame_save_flags%Temperature = .false.
+       read(unit,fmt='(/)')
+       read(unit,*) frame_save_flags%Scalar
+       if (computescalars == 0) frame_save_flags%Scalar = .false.
+
+       call Init(StaggeredFrameDomains(i), trim(domain_label), &
+                 range, &
+                 frame_times, &
+                 frame_save_flags )
+     end do
+     close(unit)
+   end if
+
+
+
+
    open(unit,file="output.conf",status="old",action="read",iostat=io)
    if (io==0) then
      read(unit,fmt='(/)')
@@ -872,7 +922,7 @@ contains
  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
  integer i,j,k,unit
 
-   unit = newunit()
+   call newunit(unit)
 
    open(unit,file="in.vtk",position="rewind",status="old",action="read")
    do i=1,14
@@ -1438,7 +1488,7 @@ contains
 
     if (xgridfromfile) then
 
-      unit = newunit()
+      call newunit(unit)
 
       open(unit,file="xgrid.txt")
       j=-1
@@ -1468,7 +1518,7 @@ contains
 
     if (ygridfromfile) then
 
-      unit = newunit()
+      call newunit(unit)
 
       open(unit,file="ygrid.txt")
       j=-1
@@ -1498,7 +1548,7 @@ contains
 
     if (zgridfromfile) then
 
-      unit = newunit()
+      call newunit(unit)
 
       open(unit,file="zgrid.txt")
       j=-1
@@ -1539,7 +1589,7 @@ contains
 
     if (xgridfromfile) then
 
-      unit = newunit()
+      call newunit(unit)
 
       open(unit,file="xgrid.txt")
       do j=0,nx
@@ -1581,7 +1631,7 @@ contains
 
     if (ygridfromfile) then
 
-      unit = newunit()
+      call newunit(unit)
 
       open(unit,file="ygrid.txt")
       do j=0,ny
@@ -1622,7 +1672,7 @@ contains
 
     if (zgridfromfile) then
 
-      unit = newunit()
+      call newunit(unit)
 
       open(unit,file="zgrid.txt")
       do j=0,nz

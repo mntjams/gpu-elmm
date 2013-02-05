@@ -1,9 +1,10 @@
 module TSTEPS
 
+  use PARAMETERS
+  use ArrayUtilities
   use CDS!, only: CDU, CDV, CDW, CDS4U, CDS4V, CDS4W, CDS4_2U, CDS4_2V, CDS4_2W
   use LAXFRIED
   use LAXWEND
-  use PARAMETERS
   use BOUNDARIES, only: BoundU,Bound_Q
   use POISSON !it exports Pr_Correct and GetPrFromGPU
   use OUTPUTS, only: store,display,proftempfl
@@ -36,8 +37,8 @@ contains
 
 
  subroutine TMarchRK3(U,V,W,Pr,Temperature,Scalar,delta)
-  real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),intent(inout) :: Temperature(-1:,-1:,-1:),Scalar(-1:,-1:,-1:,-1:)
+  real(KND),allocatable,intent(inout):: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)  !allocatable to anable move_alloc
+  real(KND),allocatable,intent(inout) :: Temperature(:,:,:),Scalar(:,:,:,:)
   real(KND),intent(out):: delta
 
   real(KND),dimension(:,:,:),allocatable,save   :: Q
@@ -49,10 +50,11 @@ contains
   real(KND),dimension(1:3),parameter:: beta  = (/ 8._KND/15._KND, 5._KND/12._KND, 3._KND/4._KND /)
   real(KND),dimension(1:3),parameter:: rho   = (/       0._KND, -17._KND/60._KND,-5._KND/12._KND/)
 
-  integer i,l
+  integer l
   integer,save:: called = 0
   integer(DBL), save :: trate
   integer(DBL), save :: time1, time2
+
 
   if (called==0) then
    called = 1
@@ -225,29 +227,24 @@ write(*,*) "stage:",l
     call UpdateU_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,U,V,W,U2,V2,W2)
 #else
     if (l==1) delta = 0
-    !$omp parallel
+#ifdef DEBUG
     if (debuglevel>0.or.steady==1) then
-      !$omp workshare
-      delta = delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-!       delta = delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
-      delta = delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
-      !$omp end workshare
+      if (Unx*Uny*Unz>0) then &
+        delta = delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
+      if (Vnx*Vny*Vnz>0) then &
+        delta = delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
+      if (Wnx*Wny*Wnz>0) then &
+        delta = delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
     end if
-
-    !$omp workshare
-    U = U2
-    V = V2
-    W = W2
-    !$omp end workshare
-    !$omp end parallel
+#endif
+    call exchange_alloc(U,U2)
+    call exchange_alloc(V,V2)
+    call exchange_alloc(W,W2)
 #endif
 
 
 
     !Upload the new values from Pr_Correct to GPU
-
-!     !$hmpp <tsteps> advancedload, args[PressureGrad::Pr]
-!     !$hmpp <tsteps> advancedload, args[AttenuateOut2::U,AttenuateOut2::V,AttenuateOut2::W]
 
 
     call ScalarRK3(U,V,W,Temperature,Scalar,l,proftempfl)
@@ -334,9 +331,9 @@ end subroutine TMarchRK3
    real(KND),intent(in):: coef
 
    real(KND),dimension(:,:,:),allocatable,save:: U3,V3,W3
-   real(KND) Ap,Apre,Aprn,Aprt,S
+   real(KND) S
 
-   integer i,j,k,it
+   integer i,j,k
    integer,save:: called=0
 
    if (called==0) then
@@ -444,15 +441,11 @@ end subroutine TMarchRK3
          call BoundU(3,W2,2)
 
 
-         call Filter(U3,U2)
+         call Filter(U2)
 
-         call Filter(V3,V2)
+         call Filter(V2)
 
-         call Filter(W3,W2)
-
-         U2(1:Unx,1:Uny,1:Unz) = U3(1:Unx,1:Uny,1:Unz)
-         V2(1:Vnx,1:Vny,1:Vnz) = V3(1:Vnx,1:Vny,1:Vnz)
-         W2(1:Wnx,1:Wny,1:Wnz) = W3(1:Wnx,1:Wny,1:Wnz)
+         call Filter(W2)
 
          call BoundU(1,U2,2)
          call BoundU(2,V2,2)
@@ -495,7 +488,7 @@ end subroutine TMarchRK3
        !$omp parallel private(i,j,k,bi,bj,bk,Suavg,Svavg,Swavg)
 
        !The explicit part, which doesn't have to be changed inside the loop
-       !$omp do
+       !$omp do schedule(runtime)
        do bk = 1,Unz,tilenz(narr)
         do bj = 1,Uny,tileny(narr)
          do bi = 1,Unx,tilenx(narr)
@@ -516,7 +509,7 @@ end subroutine TMarchRK3
         end do
        end do
        !$omp end do nowait
-       !$omp do
+       !$omp do schedule(runtime)
        do bk = 1,Vnz,tilenz(narr)
         do bj = 1,Vny,tileny(narr)
          do bi = 1,Vnx,tilenx(narr)
@@ -537,7 +530,7 @@ end subroutine TMarchRK3
         end do
        end do
        !$omp end do nowait
-       !$omp do
+       !$omp do schedule(runtime)
        do bk = 1,Wnz,tilenz(narr)
         do bj = 1,Wny,tileny(narr)
          do bi = 1,Wnx,tilenx(narr)
@@ -560,7 +553,7 @@ end subroutine TMarchRK3
        !$omp end do nowait
 
        !Auxiliary coefficients to better efficiency in loops
-       !$omp do
+       !$omp do schedule(runtime)
        do bk = 1,Unz,tilenz(narr)
         do bj = 1,Uny,tileny(narr)
          do bi = 1,Unx,tilenx(narr)
@@ -585,7 +578,7 @@ end subroutine TMarchRK3
        ApU = 1._KND/(1._KND+Ap*ApU)
        !$omp end workshare nowait
 
-       !$omp do
+       !$omp do schedule(runtime)
        do bk = 1,Vnz,tilenz(narr)
         do bj = 1,Vny,tileny(narr)
          do bi = 1,Vnx,tilenx(narr)
@@ -610,7 +603,7 @@ end subroutine TMarchRK3
        ApV = 1._KND/(1._KND+Ap*ApV)
        !$omp end workshare nowait
 
-       !$omp do
+       !$omp do schedule(runtime)
        do bk = 1,Wnz,tilenz(narr)
         do bj = 1,Wny,tileny(narr)
          do bi = 1,Wnx,tilenx(narr)
@@ -662,7 +655,7 @@ end subroutine TMarchRK3
         Sv = 0
         Sw = 0
         !$OMP PARALLEL PRIVATE(i,j,k,bi,bj,bk,p) REDUCTION(max:Su,Sv,Sw)
-        !$OMP DO
+        !$OMP DO schedule(runtime)
         do bk = 1,Unz,tilenz(narr2)
          do bj = 1,Uny,tileny(narr2)
           do bi = 1,Unx,tilenx(narr2)
@@ -686,7 +679,7 @@ end subroutine TMarchRK3
          end do
         end do
         !$OMP ENDDO NOWAIT
-        !$OMP DO
+        !$OMP DO schedule(runtime)
         do bk = 1,Vnz,tilenz(narr2)
          do bj = 1,Vny,tileny(narr2)
           do bi = 1,Vnx,tilenx(narr2)
@@ -710,7 +703,7 @@ end subroutine TMarchRK3
          end do
         end do
         !$OMP ENDDO NOWAIT
-        !$OMP DO
+        !$OMP DO schedule(runtime)
         do bk = 1,Wnz,tilenz(narr2)
          do bj = 1,Wny,tileny(narr2)
           do bi = 1,Wnx,tilenx(narr2)
@@ -735,7 +728,7 @@ end subroutine TMarchRK3
         end do
         !$OMP ENDDO
 
-        !$OMP DO
+        !$OMP DO schedule(runtime)
         do bk = 1,Unz,tilenz(narr2)
          do bj = 1,Uny,tileny(narr2)
           do bi = 1,Unx,tilenx(narr2)
@@ -761,7 +754,7 @@ end subroutine TMarchRK3
          end do
         end do
         !$OMP ENDDO NOWAIT
-        !$OMP DO
+        !$OMP DO schedule(runtime)
         do bk = 1,Vnz,tilenz(narr2)
          do bj = 1,Vny,tileny(narr2)
           do bi = 1,Vnx,tilenx(narr2)
@@ -785,7 +778,7 @@ end subroutine TMarchRK3
          end do
         end do
         !$OMP ENDDO NOWAIT
-        !$OMP DO
+        !$OMP DO schedule(runtime)
         do bk = 1,Wnz,tilenz(narr2)
          do bj = 1,Wny,tileny(narr2)
           do bi = 1,Wnx,tilenx(narr2)
@@ -816,13 +809,10 @@ end subroutine TMarchRK3
         if (S<=epsCN) exit
        end do
 
-       !$omp parallel
-       !$omp workshare
-       U2 = U3
-       V2 = V3
-       W2 = W3
-       !$omp end workshare
-       !$omp end parallel
+       call assign(U2,U3)  !alllocatables for exchange_alloc make compilers crash here :(
+       call assign(V2,V3)
+       call assign(W2,W3)
+
 
   end subroutine UNIFREDBLACK
 
@@ -834,7 +824,6 @@ end subroutine TMarchRK3
    real(KND),intent(in):: coef
    real(KND) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
    integer i,j,k,l
-   integer ind(3)
    real(KND),allocatable,save:: Apu(:,:,:),ApV(:,:,:),ApW(:,:,:)
    integer,save :: called = 0
 
@@ -1322,7 +1311,6 @@ end subroutine TMarchRK3
     if (getTDiff) call GetTDiffFromGPU
 
   end subroutine GetDataFromGPU
-#endif
 
 
   subroutine GetUFromGPU(U)
@@ -1348,6 +1336,7 @@ end subroutine TMarchRK3
   subroutine GetTDiffFromGPU
       !$hmpp <tsteps> delegatedstore, args[Bound_Visc_TDiff::TDiff]
   end subroutine GetTDiffFromGPU
+#endif
 
 
 end module TSTEPS

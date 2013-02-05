@@ -108,10 +108,11 @@ program CLMM
      allocate(V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
      allocate(W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
      allocate(Pr(1:Unx+1,1:Vny+1,1:Wnz+1))
-     U=huge(1._KND)
-     V=huge(1._KND)
-     W=huge(1._KND)
-     Pr=0000
+
+     U = 0
+     V = 0
+     W = 0
+     Pr = 0000
 
 
      if (buoyancy==1) then
@@ -123,7 +124,7 @@ program CLMM
 
      if (computescalars>0) then
        allocate(Scalar(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
-       Scalar=huge(1.0_KND)
+       Scalar = 0
      else
        allocate(Scalar(0,0,0,0))
      endif
@@ -133,7 +134,7 @@ program CLMM
 
      if (buoyancy>0.or.computescalars>0) then
        allocate(TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-       TDiff=huge(1.0_KND)
+       TDiff = 0
      else
        allocate(TDiff(0,0,0))
      endif

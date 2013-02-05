@@ -1,5 +1,6 @@
 module SCALARS
  use PARAMETERS
+ use ArrayUtilities
  use WALLMODELS
  use GEOMETRIC, only: TIBPoint, ScalFlIBPoints,TIBPoint_ScalFlSource
  use LIMITERS, only: Limiter, limparam
@@ -159,17 +160,14 @@ contains
       call BoundTemperature(temperature)
 
       if (RKstage>1) then
-        !$omp parallel
-        !$omp workshare
-        temperature2 = temperature_adv*rho(RKstage)
-        !$omp end workshare
-        !$omp end parallel
+
+        call assign(temperature2, temperature_adv)
+        call multiply(temperature2, rho(RKstage))
+
       else
-        !$omp parallel
-        !$omp workshare
-        temperature2=0
-        !$omp end workshare
-        !$omp end parallel
+
+        call set(temperature2,0._KND)
+
       endif
 
 ! #ifdef __HMPP
@@ -181,13 +179,9 @@ contains
       call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,SubsidenceProfile,fluxProfile)
 ! #endif
 
-      !$omp parallel
-      !$omp workshare
-      temperature2 = temperature2+temperature_adv*beta(RKstage)
+      call add_multiplied(temperature2, temperature_adv, beta(RKstage))
 
-      temperature = temperature+temperature2
-      !$omp end workshare
-      !$omp end parallel
+      call add(temperature, temperature2)
 
       call BoundTemperature(temperature)
 
@@ -199,11 +193,8 @@ contains
       call DiffScalar(temperature2,temperature,1,2._KND*alpha(RKstage))
 ! #endif
 
-      !$omp parallel
-      !$omp workshare
-      temperature = temperature2
-      !$omp end workshare
-      !$omp end parallel
+      call assign(temperature,temperature2)
+      
 #endif
     endif
 
@@ -288,11 +279,17 @@ contains
   integer i,j,k,l
   real(KND) A,Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
   real(KND) vel,SL,SR,FLUX
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
+  real(KND),allocatable,save :: SLOPE(:,:,:)
   real(KND),parameter ::eps = 1e-8
   real(KND) :: FluxLimiter,r
+  integer, save :: called = 0
 
   FluxLimiter(r)=max(0._KND,min(2._KND*r,min(limparam,(1+2._KND*r)/3._KND)))
+
+  if (called==0) then
+    allocate(SLOPE(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+    called = 1
+  end if
 
   A = coef*dt
   Ax = coef*dt/dxmin
@@ -300,12 +297,10 @@ contains
   Az = coef*dt/dzmin
 
 
-  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX)
+  call set(SCAL2,0._KND)
+  call set(SLOPE,0._KND)
 
-  !$omp workshare
-  SCAL2 = 0
-  SLOPE = 0
-  !$omp end workshare
+  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,fluxProfile)
   !$omp do
   do k = 1,Prnz
    do j = 1,Prny
@@ -338,11 +333,12 @@ contains
    enddo
   enddo
   !$omp end do nowait
+  !$omp end parallel
 
 
-  !$omp workshare
-  SLOPE = 0
-  !$omp end workshare
+  call set(SLOPE,0._KND)
+
+  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,fluxProfile)
   !$omp do
   do k = 1,Prnz
    do j = 0,Prny
@@ -377,11 +373,12 @@ contains
    enddo
   enddo
   !$omp end do nowait
+  !$omp end parallel
 
 
-  !$omp workshare
-  SLOPE = 0
-  !$omp end workshare
+  call set(SLOPE ,0._KND)
+
+  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,fluxProfile)
   !$omp do
   do k = 0,Prnz
    do j = 1,Prny
@@ -398,11 +395,11 @@ contains
    enddo
   enddo
   !$omp end do nowait
+  !$omp end parallel
 
-  !$omp workshare
-  fluxprofile = 0
-  !$omp end workshare
+  call set(fluxprofile,0._KND)
 
+  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,fluxProfile)
   do l=0,1  !odd-even separation to avoid a race condition
     !$omp do reduction(+:fluxprofile)
     do k = 0+l,Prnz,2
@@ -446,12 +443,17 @@ contains
   integer i,j,k,l
   real(KND) A                       !Auxiliary variables to store muliplication constants for efficiency
   real(KND) vel,SL,SR,FLUX
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
+  real(KND),allocatable,save :: SLOPE(:,:,:)
   real(KND),parameter::eps = 1e-8
   real(KND) :: FluxLimiter,r
+  integer,save :: called = 0
 
   FluxLimiter(r)=max(0._KND,min(2._KND*r,min(limparam,(1+2._KND*r)/3._KND)))
 
+  if (called==0) then
+    allocate(SLOPE(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+    called = 1
+  end if
 
   A = coef*dt
 
@@ -598,15 +600,23 @@ contains
   real(KND),intent(inout) ::Scal2(-1:,-1:,-1:),Scal(-1:,-1:,-1:)
   real(KND),intent(in) :: coef
   integer,intent(in) :: sctype
-  real(KND) Scal3(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
+  real(KND),allocatable,save :: Scal3(:,:,:)
+  real(KND),allocatable,save :: Ap(:,:,:)
   integer nx,ny,nz,i,j,k,bi,bj,bk,l,xi,yj,zk
   real(KND) p,S
-  real(KND) A,Ax,Ay,Az,Ap(-1:Prnx+1,-1:Prny+1,-1:Prnz+1)
+  real(KND) A,Ax,Ay,Az
   integer,parameter :: narr = 3, narr2 = 5
+  integer,save :: called = 0
 
-   nx = Prnx
-   ny = Prny
-   nz = Prnz
+  if (called==0) then
+    allocate(Scal3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+    allocate(Ap(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+    called = 1
+  end if
+
+  nx = Prnx
+  ny = Prny
+  nz = Prnz
 
 
   if (Re>0) then
@@ -671,15 +681,15 @@ contains
      enddo
      !$omp end do
    endif
+   !$omp end parallel
 
    Ax = 1._KND/(4._KND*dxmin**2)
    Ay = 1._KND/(4._KND*dymin**2)
    Az = 1._KND/(4._KND*dzmin**2)
 
-   !$omp workshare
-   SCAL2(1:Prnx,1:Prny,1:Prnz) = SCAL(1:Prnx,1:Prny,1:Prnz) + A * SCAL3(1:Prnx,1:Prny,1:Prnz)
-   !$omp end workshare
-   !$omp end parallel
+   !SCAL2 = SCAL + SCAL3 * A
+   call assign(SCAL2,SCAL)
+   call add_multiplied(SCAL2,SCAL3,A)
 
    if (sctype==1) then
      call BoundTemperature(SCAL2)
@@ -867,7 +877,7 @@ contains
   else
 
 
-   SCAL2 = SCAL
+   call assign(SCAL2,SCAL)
 
    if (sctype==1) then
      call BoundTemperature(SCAL2)
