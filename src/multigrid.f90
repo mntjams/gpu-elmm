@@ -128,8 +128,10 @@ contains
  integer,intent(in):: level
  real(KND),dimension(-1:,-1:,-1:),intent(out):: ACoarse
  real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
- real(KND) q
- integer:: i,j,k,nx,ny,nz
+ real(KND) p,S,w
+ integer:: i,j,k,ii,jj,kk,nx,ny,nz
+ real(KND) :: weight(-1:1,-1:1,-1:1)
+
 
    nx=bnx*2**level !level means on which grid we restrict
    ny=bny*2**level
@@ -147,123 +149,40 @@ contains
                              Btype,level)
    else
 #endif
-
+      weight = 1
+      weight(-1,:,:) = weight(-1,:,:) / 2._KND
+      weight( 1,:,:) = weight( 1,:,:) / 2._KND
+      weight(:,-1,:) = weight(:,-1,:) / 2._KND
+      weight(:, 1,:) = weight(:, 1,:) / 2._KND
+      weight(:,:,-1) = weight(:,:,-1) / 2._KND
+      weight(:,:, 1) = weight(:,:, 1) / 2._KND
 
       call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
 
+      !$omp parallel do private(i,j,k,ii,jj,kk,w,S,p)
       do k=0,nz
        do j=0,ny
         do i=0,nx
-            ACoarse(i,j,k)=AFine(2*i,2*j,2*k); q=1.0
 
-            if (i<nx) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i+1,2*j,2*k); q=q+0.5
-            endif
+            p = 0
+            S = 0
 
-            if (i>0) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i-1,2*j,2*k); q=q+0.5
-            endif
+            do kk = max(2*k-1, 0), min(2*k+1, 2*nz)
+             do jj = max(2*j-1, 0), min(2*j+1, 2*ny)
+              do ii = max(2*i-1, 0), min(2*i+1, 2*nx)
+               w = weight(ii-2*i, jj-2*j, kk-2*k)
+               S = S + w * AFine(ii,jj,kk)
+               p = p + w
+              enddo
+             enddo
+            enddo
 
-            if (j<ny) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j+1,2*k); q=q+0.5
-            endif
+            ACoarse(i,j,k)=S/p
 
-            if (j>0) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j-1,2*k); q=q+0.5
-            endif
-
-            if (k<nz) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k+1); q=q+0.5
-            endif
-
-            if (k>0) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.5*AFine(2*i,2*j,2*k-1); q=q+0.5
-            endif
-
-            if ((i<nx).and.(j<ny)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j+1,2*k); q=q+0.25
-            endif
-
-            if ((i<nx).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k+1); q=q+0.25
-            endif
-
-            if ((j<ny).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k+1); q=q+0.25
-            endif
-
-            if ((i>0).and.(j>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j-1,2*k); q=q+0.25
-            endif
-
-            if ((i>0).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k-1); q=q+0.25
-            endif
-
-            if ((j>0).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k-1); q=q+0.25
-            endif
-
-            if ((i>0).and.(j<ny)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j+1,2*k); q=q+0.25
-            endif
-
-            if ((i>0).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i-1,2*j,2*k+1); q=q+0.25
-            endif
-
-            if ((i<nx).and.(j>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j-1,2*k); q=q+0.25
-            endif
-
-            if ((j>0).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j-1,2*k+1); q=q+0.25
-            endif
-
-            if ((i<nx).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i+1,2*j,2*k-1); q=q+0.25
-            endif
-
-            if ((j<ny).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.25*AFine(2*i,2*j+1,2*k-1); q=q+0.25
-            endif
-
-            if ((i<nx).and.(j<ny).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k+1); q=q+0.125
-            endif
-
-            if ((i>0).and.(j<ny).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k+1); q=q+0.125
-            endif
-
-            if ((i<nx).and.(j>0).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k+1); q=q+0.125
-            endif
-
-            if ((i<nx).and.(j<ny).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j+1,2*k-1); q=q+0.125
-            endif
-
-            if ((i>0).and.(j>0).and.(k<nz)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k+1); q=q+0.125
-            endif
-
-            if ((i>0).and.(j<ny).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j+1,2*k-1); q=q+0.125
-            endif
-
-            if ((i<nx).and.(j>0).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i+1,2*j-1,2*k-1); q=q+0.125
-            endif
-
-            if ((i>0).and.(j>0).and.(k>0)) then
-              ACoarse(i,j,k)=ACoarse(i,j,k)+0.125*AFine(2*i-1,2*j-1,2*k-1); q=q+0.125
-            endif
-
-            ACoarse(i,j,k)=ACoarse(i,j,k)/q
         enddo
-        enddo
+       enddo
       enddo
+      !$omp end parallel do
         if (Btype(Ea)==PERIODIC) ACoarse(0,:,:)=ACoarse(nx,:,:)
         if (Btype(No)==PERIODIC) ACoarse(:,0,:)=ACoarse(:,ny,:)
         if (Btype(To)==PERIODIC) ACoarse(:,:,0)=ACoarse(:,:,nz)

@@ -83,52 +83,40 @@ contains
  integer,intent(in):: level
  real(KND),dimension(-1:,-1:),intent(out):: ACoarse
  real(KND),dimension(-1:,-1:),intent(inout):: AFine
- real(KND) q
- integer:: i,k,nx,nz
+ real(KND) p,S,w
+ integer:: i,k,ii,kk,nx,nz
+ real(KND) :: weight(-1:1,-1:1)
 
    nx=bnx*2**level !level means on which grid we restrict
    nz=bnz*2**level
    call Bound_Phi_MG(Afine,2*nx,2*nz)
 
+   weight = 1
+   weight(-1,:) = weight(-1,:) / 2._KND
+   weight( 1,:) = weight( 1,:) / 2._KND
+   weight(:,-1) = weight(:,-1) / 2._KND
+   weight(:, 1) = weight(:, 1) / 2._KND
+
+   !$omp parallel do private(i,k,ii,kk,w,S,p)
    do k=0,nz
      do i=0,nx
-        ACoarse(i,k)=AFine(2*i,2*k); q=1.0
 
-        if (i<nx) then
-         ACoarse(i,k)=ACoarse(i,k)+0.5*AFine(2*i+1,2*k); q=q+0.5
-        endif
+         p = 0
+         S = 0
 
-        if (i>0) then
-         ACoarse(i,k)=ACoarse(i,k)+0.5*AFine(2*i-1,2*k); q=q+0.5
-        endif
+         do kk = max(2*k-1, 0), min(2*k+1, 2*nz)
+           do ii = max(2*i-1, 0), min(2*i+1, 2*nx)
+            w = weight(ii-2*i, kk-2*k)
+            S = S + w * AFine(ii,kk)
+            p = p + w
+           enddo
+         enddo
 
-        if (k<nz) then
-         ACoarse(i,k)=ACoarse(i,k)+0.5*AFine(2*i,2*k+1); q=q+0.5
-        endif
+         ACoarse(i,k)=S/p
 
-        if (k>0) then
-         ACoarse(i,k)=ACoarse(i,k)+0.5*AFine(2*i,2*k-1); q=q+0.5
-        endif
-
-        if ((i<nx).and.(k<nz)) then
-         ACoarse(i,k)=ACoarse(i,k)+0.25*AFine(2*i+1,2*k+1); q=q+0.25
-        endif
-
-        if ((i>0).and.(k>0)) then
-         ACoarse(i,k)=ACoarse(i,k)+0.25*AFine(2*i-1,2*k-1); q=q+0.25
-        endif
-
-        if ((i>0).and.(k<nz)) then
-         ACoarse(i,k)=ACoarse(i,k)+0.25*AFine(2*i-1,2*k+1); q=q+0.25
-        endif
-
-        if ((i<nx).and.(k>0)) then
-         ACoarse(i,k)=ACoarse(i,k)+0.25*AFine(2*i+1,2*k-1); q=q+0.25
-        endif
-
-        ACoarse(i,k)=ACoarse(i,k)/q
      enddo
    enddo
+   !$omp end parallel do
     if (Btype(Ea)==PERIODIC) ACoarse(0,:)=ACoarse(nx,:)
     if (Btype(To)==PERIODIC) ACoarse(:,0)=ACoarse(:,nz)
 endsubroutine Restrict
