@@ -221,7 +221,8 @@ module Geometric
  !     procedure Viscosity        => TIBPoint_Viscosity
   end type TIBPoint
 
-  type(TList)  :: IBPointsList, ScalFlIBPointsList, SolidBodiesList
+  type(TList)  :: UIBPointsList, VIBPointsList, WIBPointsList, ScalFlIBPointsList
+  type(TList)  :: SolidBodiesList
 
   type(TIBPoint),dimension(:),allocatable,save :: UIBPoints, VIBPoints, WIBPoints
   type(TIBPoint),dimension(:),allocatable,save :: ScalFlIBPoints
@@ -1472,17 +1473,12 @@ contains
 
 
   subroutine MoveIBPointsToArray
-    integer :: i,iU,iV,iW
+    integer :: iS,iU,iV,iW
 
-    NUIBPoints = 0
-    NVIBPoints = 0
-    NWIBPoints = 0
-    NScalFlIBPoints = 0
-
-
-    call IBPointsList%ForEach(CountIBPoint)
-
-    call ScalFlIBPointsList%ForEach(CountIBPoint)
+    NUIBPoints = UIBPointsList%Len()
+    NVIBPoints = VIBPointsList%Len()
+    NWIBPoints = WIBPointsList%Len()
+    NScalFlIBPoints = ScalFlIBPointsList%Len()
 
     allocate(UIBPoints(NUIBPoints))
     allocate(VIBPoints(NVIBPoints))
@@ -1492,29 +1488,13 @@ contains
     iU = 0
     iV = 0
     iW = 0
-    call IBPointsList%ForEach(CopyIBPoint)
-
-    i = 0
+    iS = 0
+    call UIBPointsList%ForEach(CopyIBPoint)
+    call VIBPointsList%ForEach(CopyIBPoint)
+    call WIBPointsList%ForEach(CopyIBPoint)
     call ScalFlIBPointsList%ForEach(CopyIBPoint)
 
     contains
-
-      subroutine CountIBPoint(CurrentIBPoint)
-        class(TListable) :: CurrentIBPoint
-
-        select type (CurrentIBPoint)
-          type is (TVelIBPoint)
-            if (CurrentIBPoint%component==1) then
-              NUIBPoints = NUIBPoints + 1
-            elseif (CurrentIBPoint%component==2) then
-              NVIBPoints = NVIBPoints + 1
-            else
-              NWIBPoints = NWIBPoints + 1
-            endif
-          type is (TScalFlIBPoint)
-            NScalFlIBPoints = NScalFlIBPoints + 1
-        end select
-      end subroutine        
 
       subroutine CopyIBPoint(CurrentIBPoint)
         class(TListable) :: CurrentIBPoint
@@ -1532,8 +1512,8 @@ contains
               WIBPoints(iW) = CurrentIBPoint
             endif
           type is (TScalFlIBPoint)
-            i = i + 1
-            ScalFlIBPoints(i) = CurrentIBPoint
+            iS = iS + 1
+            ScalFlIBPoints(iS) = CurrentIBPoint
         end select
       end subroutine
 
@@ -2560,7 +2540,7 @@ contains
         if (Utype(i+1,j,k)<=0.or.Utype(i-1,j,k)<=0.or.Utype(i,j+1,k)<=0&
           .or.Utype(i,j-1,k)<=0.or.Utype(i,j,k+1)<=0.or.Utype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xU(-2:),yPr(-2:),zPr(-2:),Utype,1)
-            call  IBPointsList%Add(IBP)
+            call  UIBPointsList%Add(IBP)
         endif
        endif
       enddo
@@ -2574,7 +2554,7 @@ contains
         if (Vtype(i+1,j,k)<=0.or.Vtype(i-1,j,k)<=0.or.Vtype(i,j+1,k)<=0&
           .or.Vtype(i,j-1,k)<=0.or.Vtype(i,j,k+1)<=0.or.Vtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yV(-2:),zPr(-2:),Vtype,2)
-            call  IBPointsList%Add(IBP)
+            call  VIBPointsList%Add(IBP)
         endif
        endif
       enddo
@@ -2588,7 +2568,7 @@ contains
         if (Wtype(i+1,j,k)<=0.or.Wtype(i-1,j,k)<=0.or.Wtype(i,j+1,k)<=0&
           .or.Wtype(i,j-1,k)<=0.or.Wtype(i,j,k+1)<=0.or.Wtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yPr(-2:),zW(-2:),Wtype,3)
-            call  IBPointsList%Add(IBP)
+            call  WIBPointsList%Add(IBP)
         endif
        endif
       enddo
@@ -2611,7 +2591,9 @@ contains
 
     call MoveIBPointsToArray
 
-    call IBPointsList%Deallocate
+    call UIBPointsList%Deallocate
+    call VIBPointsList%Deallocate
+    call WIBPointsList%Deallocate
     call ScalFlIBPointsList%Deallocate
 
   end subroutine InitImBoundaries
