@@ -1,6 +1,7 @@
-module GEOMETRIC
+module Geometric
 
-  use PARAMETERS
+  use Parameters
+  use Lists
 
   implicit none
 
@@ -11,10 +12,42 @@ module GEOMETRIC
          InitSolidBodies,GetSolidBodiesBC, &
          obstaclefile
 #ifdef CUSTOMSB
-  public TLine, TPlane, TPolyhedron, TBall, TCylJacket, TCylinder, TTerrainPoint, TTerrain, TSolidBody, &
-         NoneBody, Polyhedron, Ball, Cylinder, Terrain, &
-         AddSolidBody
+  public TLine, TPlane, TPolyhedron, TBall, TCylJacket, TCylinder, TTerrainPoint, TTerrain, &
+  TSolidBody, AddBody, SolidBodiesList
 #endif
+
+  type,abstract :: TGeometricShape
+  contains
+    procedure(TGeometricShape_Inside), deferred :: Inside
+    procedure(TGeometricShape_Nearest), deferred :: Nearest
+    procedure(TGeometricShape_Nearest), deferred :: NearestOut
+  end type
+
+  abstract interface
+    pure logical function TGeometricShape_Inside(self,x,y,z,eps)
+      import
+      class(TGeometricShape),intent(in) :: self
+      real(KND),intent(in) :: x,y,z
+      real(KND),optional,intent(in) ::eps
+    end function
+    subroutine TGeometricShape_Nearest(self,xnear,ynear,znear,x,y,z)
+      import
+      class(TGeometricShape),intent(in) :: self
+      real(KND),intent(out) :: xnear,ynear,znear
+      real(KND),intent(in) :: x,y,z
+    end subroutine
+  end interface
+
+  type, extends(TListable) :: TBody
+     integer numofbody
+     class(TGeometricShape),allocatable :: GeometricShape
+  end type
+
+  type, extends(TBody) :: TSolidBody
+    logical   :: rough = .false.                             !T rough surface, F flat surface
+    real(KND) :: z0 = 0                                      !roughness parameter
+    real(KND) :: temperatureflux = 0
+  end type TSolidbody
 
   type TLine                            !These object could be implemented using Fortran's 2003 inheritance.
     real(KND) xc,yc,zc                  !This approach using pointers is more portable and less safe.
@@ -35,24 +68,24 @@ module GEOMETRIC
   end type TPlane
 
 
-  type TPolyhedron
+  type,extends(TGeometricShape) :: TPolyhedron
     integer :: nplanes = 0
     type(TPlane),dimension(:),allocatable :: Planes !intersection of half-spaces
- !  contains
- !    procedure Inside => TPolyhedron_Inside
- !    procedure Nearest => TPolyhedron_Nearest
- !    procedure NearestOut => TPolyhedron_NearestOut
+  contains
+    procedure :: Inside => TPolyhedron_Inside
+    procedure :: Nearest => TPolyhedron_Nearest
+    procedure :: NearestOut => TPolyhedron_NearestOut
   end type TPolyhedron
 
 
-  type TBall
+  type,extends(TGeometricShape) :: TBall
     real(KND) xc,yc,zc,r
     logical :: rough = .false. !T rough surface, F flat surface
     real(KND) z0            !roughness parameter
- !  contains
- !    procedure Inside => TBall_Inside
- !    procedure Nearest => TBall_Nearest
- !    procedure NearestOut => TBall_NearestOut
+  contains
+    procedure :: Inside => TBall_Inside
+    procedure :: Nearest => TBall_Nearest
+    procedure :: NearestOut => TBall_NearestOut
   end type TBall
 
 
@@ -68,13 +101,13 @@ module GEOMETRIC
   end type TCylJacket
 
 
-  type TCylinder
+  type,extends(TGeometricShape) :: TCylinder
     type(TCylJacket) Jacket
-    type(TPlane),pointer :: Plane1 => null() ,Plane2 => null()
- !  contains
- !    procedure Inside => TCylinder_Inside
- !    procedure Nearest => TCylinder_Nearest
- !    procedure NearestOut => TCylinder_NearestOut
+    type(TPlane),allocatable :: Plane1 ,Plane2
+  contains
+    procedure :: Inside => TCylinder_Inside
+    procedure :: Nearest => TCylinder_Nearest
+    procedure :: NearestOut => TCylinder_NearestOut
   end type TCylinder
 
 
@@ -85,37 +118,14 @@ module GEOMETRIC
   end type TTerrainPoint
 
 
-   type TTerrain
+   type,extends(TGeometricShape) :: TTerrain
      type(TTerrainPoint),dimension(:,:),allocatable :: UPoints,VPoints,PrPoints !allocate with a buffer of width 1 (i.e. 0:Xnx)
- !  contains
- !    procedure Inside => TTerrain_Inside
- !    procedure Nearest => TTerrain_Nearest
- !    procedure NearestOut => TTerrain_NearestOut
+   contains
+     procedure :: Inside => TTerrain_Inside
+     procedure :: Nearest => TTerrain_Nearest
+     procedure :: NearestOut => TTerrain_NearestOut
    end type TTerrain
 
-
-  type TSolidBody
-    integer numofbody
-    integer :: typeofbody = 0                              !0.. none, 1..polyhedron, 2.. ball, 3.. cylinder, 4.. terrain
-    type(TPolyhedron),pointer :: Polyhedron => null()    !asociated will be only part writen in typeofbody
-    type(TBall),pointer :: Ball => null()
-    type(TCylinder),pointer :: Cylinder => null()
-    type(TTerrain),pointer :: Terrain => null()
-    logical   :: rough = .false.                             !T rough surface, F flat surface
-    real(KND) :: z0 = 0                                      !roughness parameter
-    real(KND) :: temperatureflux = 0
-    type(TSolidBody),pointer :: next =>null()
- !  contains
- !    procedure Inside => TSolidbody_Inside
- !    procedure Nearest => TSolidbody_Nearest
- !    procedure NearestOut => TSolidbody_NearestOut
-  end type TSolidbody
-
-
-  type(TSolidBody),pointer :: FirstSB => null()         !First member of the linked list of solid objects
-
-
-  integer, parameter :: NoneBody = 0, Polyhedron = 1, Ball = 2, Cylinder = 3, Terrain = 4
 
   interface Inside
     module procedure TPlane_Inside
@@ -155,7 +165,7 @@ module GEOMETRIC
     real(KND) :: coef              !interpolation coefficients for the interpolation points
   endtype TInterpolationPoint
 
-  type TVelIBPoint    !NOTE: this implementation is not very efficient, because it computes the int. coefficients again and again. It should be changed similarly to the scalar variant below.
+  type,extends(TListable) :: TVelIBPoint
     integer   :: component      !1..U, 2..V, 3..W
     integer   :: xi             !coordinates of the grid point
     integer   :: yj
@@ -169,16 +179,13 @@ module GEOMETRIC
     integer   :: interp         !kind of interpolation 0.. none (boundarypoint), 1..linear, 2..bilinear, 3..trilinear
     integer   :: interpdir      !direction of interpolation in the linear case, for bilinear it is normal direction to the interpolation plane
     type(TInterpolationPoint),dimension(:),allocatable :: IntPoints !array of interpolation points
-    type(TVelIBPoint),pointer :: next => null()  !pointer to the next item in the list, not used when in the array in any way
  !  contains
  !    procedure Create         => TVelIBPoint_Create
- !    procedure AddToList      => TVelIBPoint_AddToList
- !    procedure DeallocateList => TVelIBPoint_DeallocateList
   end type TVelIBPoint
 
 
 
-  type TScalFlIBPoint
+  type,extends(TListable) :: TScalFlIBPoint
     integer                :: xi                       !coordinates of the grid point
     integer                :: yj
     integer                :: zk
@@ -186,11 +193,8 @@ module GEOMETRIC
     type(TInterpolationPoint),dimension(:),allocatable :: IntPoints !array of interpolation points
     integer                :: interp                   !kind of interpolation 1.. none (1 point outside), 2..linear, 4..bilinear  other values not allowed
     real(KND)              :: temperatureflux = 0      !desired temperature flux
-    type(TScalFlIBPoint),pointer :: next => null()     !pointer to the next item in the list, not used when in the array in any way
  !  contains
  !    procedure Create         => TScalFlIBPoint_Create
- !    procedure AddToList      => TScalFlIBPoint_AddToList
- !    procedure DeallocateList => TScalFlIBPoint_DeallocateList
   end type TScalFlIBPoint
 
 
@@ -198,16 +202,6 @@ module GEOMETRIC
     module procedure TVelIBPoint_Create
     module procedure TScalFlIBPoint_Create
   end interface Create
-
-  interface AddToList
-    module procedure TVelIBPoint_AddToList
-    module procedure TScalFlIBPoint_AddToList
-  end interface AddToList
-
-  interface DeallocateList
-    module procedure TVelIBPoint_DeallocateList
-    module procedure TScalFlIBPoint_DeallocateList
-  end interface DeallocateList
 
 
 
@@ -227,8 +221,7 @@ module GEOMETRIC
  !     procedure Viscosity        => TIBPoint_Viscosity
   end type TIBPoint
 
-  type(TVelIBPoint),pointer,save    :: FirstIBPoint => null(), LastIBPoint => null()
-  type(TScalFlIBPoint),pointer,save :: FirstScalFlIBPoint => null(), LastScalFlIBPoint => null()
+  type(TList)  :: IBPointsList, ScalFlIBPointsList, SolidBodiesList
 
   type(TIBPoint),dimension(:),allocatable,save :: UIBPoints, VIBPoints, WIBPoints
   type(TIBPoint),dimension(:),allocatable,save :: ScalFlIBPoints
@@ -1478,82 +1471,7 @@ contains
 
 
 
-  subroutine TVelIBPoint_DeallocateList(first)
-    type(TVelIBPoint),pointer :: first,node,tmp
-
-    node => first
-
-    if (associated(node)) then
-      tmp => node
-      node => node%next
-
-      deallocate(node)
-    endif
-
-    node => null()
-
-  end subroutine TVelIBPoint_DeallocateList
-
-
-
-  subroutine TScalFlIBPoint_DeallocateList(first)
-    type(TScalFlIBPoint),pointer ::first,node,tmp
-
-    node => first
-
-    if (associated(node)) then
-      tmp => node
-      node => node%next
-
-      deallocate(node)
-    endif
-
-    node => null()
-
-  end subroutine TScalFlIBPoint_DeallocateList
-
-
-
-
-  subroutine TVelIBPoint_AddToList(IBP)
-    type(TVelIBPoint),intent(in) :: IBP
-
-    if (.not.associated(LastIBPoint)) then
-     allocate(FirstIBPoint)
-     FirstIBPoint = IBP
-     LastIBPoint => FirstIBPoint
-    else
-     allocate(LastIBPoint%next)
-     LastIBPoint%next = IBP
-     LastIBPoint => LastIBPoint%next
-    endif
-  end subroutine TVelIBPoint_AddToList
-
-
-
-  subroutine TScalFlIBPoint_AddToList(SIBP)
-    type(TScalFlIBPoint),intent(in) :: SIBP
-
-    if (.not.associated(LastScalFlIBPoint)) then
-     allocate(FirstScalFlIBPoint)
-     FirstScalFlIBPoint = SIBP
-     LastScalFlIBPoint => FirstScalFlIBPoint
-    else
-     allocate(LastScalFlIBPoint%next)
-     LastScalFlIBPoint%next = SIBP
-     LastScalFlIBPoint => LastScalFlIBPoint%next
-    endif
-  end subroutine TScalFlIBPoint_AddToList
-
-
-
-
-
-
-
   subroutine MoveIBPointsToArray
-    type(TVelIBPoint),pointer :: CurrentIBPoint
-    type(TScalFlIBPoint),pointer :: CurrentScalFlIBPoint
     integer :: i,iU,iV,iW
 
     NUIBPoints = 0
@@ -1561,70 +1479,63 @@ contains
     NWIBPoints = 0
     NScalFlIBPoints = 0
 
-    CurrentIBPoint => FirstIBPoint
-    do
-     if (associated(CurrentIBPoint)) then
-       if (CurrentIBPoint%component==1) then
-         NUIBPoints = NUIBPoints + 1
-       elseif (CurrentIBPoint%component==2) then
-         NVIBPoints = NVIBPoints + 1
-       else
-         NWIBPoints = NWIBPoints + 1
-       endif
-     else
-       exit
-     endif
-     CurrentIBPoint => CurrentIBPoint%next
-    enddo
 
-    CurrentScalFlIBPoint => FirstScalFlIBPoint
-    do
-     if (associated(CurrentScalFlIBPoint)) then
-       NScalFlIBPoints = NScalFlIBPoints + 1
-     else
-       exit
-     endif
-     CurrentScalFlIBPoint => CurrentScalFlIBPoint%next
-    enddo
+    call IBPointsList%ForEach(CountIBPoint)
+
+    call ScalFlIBPointsList%ForEach(CountIBPoint)
 
     allocate(UIBPoints(NUIBPoints))
     allocate(VIBPoints(NVIBPoints))
     allocate(WIBPoints(NWIBPoints))
     allocate(ScalFlIBPoints(NScalFlIBPoints))
 
-    CurrentIBPoint => FirstIBPoint
     iU = 0
     iV = 0
     iW = 0
-    do
-     if (associated(CurrentIBPoint)) then
-       if (CurrentIBPoint%component==1) then
-         iU = iU + 1
-         UIBPoints(iU) = CurrentIBPoint
-       elseif (CurrentIBPoint%component==2) then
-         iV = iV + 1
-         VIBPoints(iV) = CurrentIBPoint
-       else
-         iW = iW + 1
-         WIBPoints(iW) = CurrentIBPoint
-       endif
-     else
-       exit
-     endif
-     CurrentIBPoint => CurrentIBPoint%next
-    enddo
+    call IBPointsList%ForEach(CopyIBPoint)
 
-    CurrentScalFlIBPoint => FirstScalFlIBPoint
     i = 0
-    do
-     if (associated(CurrentScalFlIBPoint)) then
-       i = i + 1
-       ScalFlIBPoints(i) = CurrentScalFlIBPoint
-     else
-       exit
-     endif
-     CurrentScalFlIBPoint => CurrentScalFlIBPoint%next
-    enddo
+    call ScalFlIBPointsList%ForEach(CopyIBPoint)
+
+    contains
+
+      subroutine CountIBPoint(CurrentIBPoint)
+        class(TListable) :: CurrentIBPoint
+
+        select type (CurrentIBPoint)
+          type is (TVelIBPoint)
+            if (CurrentIBPoint%component==1) then
+              NUIBPoints = NUIBPoints + 1
+            elseif (CurrentIBPoint%component==2) then
+              NVIBPoints = NVIBPoints + 1
+            else
+              NWIBPoints = NWIBPoints + 1
+            endif
+          type is (TScalFlIBPoint)
+            NScalFlIBPoints = NScalFlIBPoints + 1
+        end select
+      end subroutine        
+
+      subroutine CopyIBPoint(CurrentIBPoint)
+        class(TListable) :: CurrentIBPoint
+
+        select type (CurrentIBPoint)
+          type is (TVelIBPoint)
+            if (CurrentIBPoint%component==1) then
+              iU = iU + 1
+              UIBPoints(iU) = CurrentIBPoint
+            elseif (CurrentIBPoint%component==2) then
+              iV = iV + 1
+              VIBPoints(iV) = CurrentIBPoint
+            else
+              iW = iW + 1
+              WIBPoints(iW) = CurrentIBPoint
+            endif
+          type is (TScalFlIBPoint)
+            i = i + 1
+            ScalFlIBPoints(i) = CurrentIBPoint
+        end select
+      end subroutine
 
   end subroutine MoveIBPointsToArray
 
@@ -1653,20 +1564,30 @@ contains
 
 
   subroutine SetCurrentSB(SB,n)
-    type(TSolidBody),pointer :: SB
-    integer(SINT),intent(in) :: n
+    type(TSolidBody),pointer,intent(out) :: SB
+    integer,intent(in) :: n
+    class(TListable),pointer :: ptr
     integer i
 
-    SB => FirstSB
+    call SolidBodiesList%IterRestart
 
-    do i = 2,n
-      if (associated(SB%next)) then
-        SB => SB%next
-      else
-        SB => null()
-        exit
-      endif
+    do i = 1,n
+      call SolidBodiesList%IterNext(ptr)
     enddo
+
+    if (associated(ptr)) then
+      select type (ptr)
+        type is (TSolidBody)
+          SB => ptr
+        class default
+          write (*,*) "Error, wrong dynamic type of item in SolidBodiesList."
+          stop
+      end select
+    else
+      write (*,*) "Error, no SolidBody with number",n,"in the list."
+      stop
+    end if
+
   end subroutine SetCurrentSB
 
 
@@ -1742,20 +1663,20 @@ contains
 
 
 
-  pure logical function TPolyhedron_Inside(PH,x,y,z,eps)
-    type(TPolyhedron),intent(in) :: PH
+  pure logical function TPolyhedron_Inside(self,x,y,z,eps)
+    class(TPolyhedron),intent(in) :: self
     real(KND),intent(in) :: x,y,z
     real(KND),optional,intent(in) ::eps
     logical ins
     integer i
 
-    if (PH%nplanes>0) then
+    if (self%nplanes>0) then
       ins = .true.
-      do i = 1,PH%nplanes
+      do i = 1,self%nplanes
        if (present(eps)) then
-        ins = Inside(PH%Planes(i),x,y,z,eps)
+        ins = Inside(self%Planes(i),x,y,z,eps)
        else
-        ins = Inside(PH%Planes(i),x,y,z)
+        ins = Inside(self%Planes(i),x,y,z)
        endif
        if (.not. ins) exit
       enddo
@@ -1768,8 +1689,8 @@ contains
 
 
 
-  pure logical function TBall_Inside(B,x,y,z,eps)
-    type(TBall),intent(in) :: B
+  pure logical function TBall_Inside(self,x,y,z,eps)
+    class(TBall),intent(in) :: self
     real(KND),intent(in) :: x,y,z
     real(KND),intent(in),optional ::eps
     real(KND) :: eps2
@@ -1781,7 +1702,7 @@ contains
      eps2 = MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND)
     endif
 
-    if ((B%xc-x)**2+(B%yc-y)**2+(B%zc-z)**2<=(B%r+eps2)**2) then
+    if ((self%xc-x)**2+(self%yc-y)**2+(self%zc-z)**2<=(self%r+eps2)**2) then
      ins = .true.
     else
      ins = .false.
@@ -1832,21 +1753,21 @@ contains
 
 
 
-  pure logical function TCylinder_Inside(C,x,y,z,eps)
-   type(TCylinder),intent(in) :: C
+  pure logical function TCylinder_Inside(self,x,y,z,eps)
+   class(TCylinder),intent(in) :: self
    real(KND),intent(in) :: x,y,z
    real(KND),intent(in),optional ::eps
    logical ins
 
     ins = .true.
 
-    if (.not.Inside(C%Jacket,x,y,z,eps)) ins = .false.
+    if (.not.Inside(self%Jacket,x,y,z,eps)) ins = .false.
 
-    if (ins.and.associated(C%Plane1)) then
-           if (.not.Inside(C%Plane1,x,y,z,eps)) ins = .false.
+    if (ins.and.allocated(self%Plane1)) then
+           if (.not.Inside(self%Plane1,x,y,z,eps)) ins = .false.
     endif
-    if (ins.and.associated(C%Plane2)) then
-          if (.not.Inside(C%Plane2,x,y,z,eps)) ins = .false.
+    if (ins.and.allocated(self%Plane2)) then
+          if (.not.Inside(self%Plane2,x,y,z,eps)) ins = .false.
     endif
 
     TCylinder_Inside = ins
@@ -1854,7 +1775,7 @@ contains
 
 
 
-   subroutine TTerrain_GridCoords(x2,y2,xi,yj,comp)
+  pure subroutine TTerrain_GridCoords(x2,y2,xi,yj,comp)
     real(KND),intent(in) :: x2,y2
     integer,intent(out) :: xi,yj,comp
     real(KND) x,y,distPr,distU,distV
@@ -1930,8 +1851,8 @@ contains
 
 
 
-   logical function TTerrain_Inside(T,x,y,z,eps)
-    type(TTerrain),intent(in) :: T
+  pure logical function TTerrain_Inside(self,x,y,z,eps)
+    class(TTerrain),intent(in) :: self
     real(KND),intent(in) :: x,y,z
     real(KND),intent(in),optional ::eps
     real(KND) eps2
@@ -1948,11 +1869,11 @@ contains
     call TTerrain_GridCoords(x,y,xi,yj,comp)
 
     if (comp==1) then
-     if (z<=T%UPoints(xi,yj)%elev+eps2) ins = .true.
+     if (z<=self%UPoints(xi,yj)%elev+eps2) ins = .true.
     elseif (comp==2) then
-     if (z<=T%VPoints(xi,yj)%elev+eps2) ins = .true.
+     if (z<=self%VPoints(xi,yj)%elev+eps2) ins = .true.
     elseif (comp==3) then
-     if (z<=T%PrPoints(xi,yj)%elev+eps2) ins = .true.
+     if (z<=self%PrPoints(xi,yj)%elev+eps2) ins = .true.
     endif
 
     TTerrain_Inside = ins
@@ -1983,44 +1904,11 @@ contains
     if (Btype(So)==PERIODIC.and.y2<yV(0)) y2 = y2+ly
     if (Btype(Bo)==PERIODIC.and.z2<zW(0)) z2 = z2+lz
 
-    select case (SB%typeofbody)
-
-     case (Polyhedron)
-
-       if (present(eps)) then
-         TSolidBody_Inside = Inside(SB%Polyhedron,x2,y2,z2,eps)
-       else
-         TSolidBody_Inside = Inside(SB%Polyhedron,x2,y2,z2)
-       endif
-
-     case (Ball)
-
-       if (present(eps)) then
-         TSolidBody_Inside = Inside(SB%Ball,x2,y2,z2,eps)
-       else
-         TSolidBody_Inside = Inside(SB%Ball,x2,y2,z2)
-       endif
-
-     case (Cylinder)
-
-       if (present(eps)) then
-         TSolidBody_Inside = Inside(SB%Cylinder,x2,y2,z2,eps)
-       else
-         TSolidBody_Inside = Inside(SB%Cylinder,x2,y2,z2)
-       endif
-
-     case (Terrain)
-
-       if (present(eps)) then
-         TSolidBody_Inside = Inside(SB%Terrain,x2,y2,z2,eps)
-       else
-         TSolidBody_Inside = Inside(SB%Terrain,x2,y2,z2)
-       endif
-
-     case default
-       TSolidBody_Inside = .false.
-
-    end select
+    if (present(eps)) then
+      TSolidBody_Inside = SB%GeometricShape%Inside(x2,y2,z2,eps)
+    else
+      TSolidBody_Inside = SB%GeometricShape%Inside(x2,y2,z2)
+    endif
 
   end function TSolidBody_Inside
 
@@ -2063,20 +1951,20 @@ contains
 
 
 
-  subroutine TCylinder_Nearest(C,xnear,ynear,znear,x,y,z) !only for planes perpendicular to the axis
-   type(TCylinder),intent(in) :: C
+  subroutine TCylinder_Nearest(self,xnear,ynear,znear,x,y,z) !only for planes perpendicular to the axis
+   class(TCylinder),intent(in) :: self
    real(KND),intent(out) :: xnear,ynear,znear
    real(KND),intent(in) :: x,y,z
    real(KND) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
 
    !!!Only for Planes perpendicular to jacket!!!!
 
-   if (associated(C%Plane1)) then
-       if (associated(C%Plane2)) then
-          call Nearest(C%Jacket,xJ,yJ,zJ,x,y,z)
-          call Nearest(C%Plane1,xP1,yP1,zP1,x,y,z)
-          call Nearest(C%Plane2,xP2,yP2,zP2,x,y,z)
-          if (Inside(C%Jacket,x,y,z)) then
+   if (allocated(self%Plane1)) then
+       if (allocated(self%Plane2)) then
+          call Nearest(self%Jacket,xJ,yJ,zJ,x,y,z)
+          call Nearest(self%Plane1,xP1,yP1,zP1,x,y,z)
+          call Nearest(self%Plane2,xP2,yP2,zP2,x,y,z)
+          if (Inside(self%Jacket,x,y,z)) then
              if (PointDist(x,y,z,xP1,yP1,zP1)<=PointDist(x,y,z,xP2,yP2,zP2)) then
                 xnear = xP1
                 ynear = yP1
@@ -2086,60 +1974,60 @@ contains
                 ynear = yP2
                 znear = zP2
              endif
-          elseif (Inside(C%Plane1,x,y,z).and.Inside(C%Plane2,x,y,z)) then
+          elseif (Inside(self%Plane1,x,y,z).and.Inside(self%Plane2,x,y,z)) then
                 xnear = xJ
                 ynear = yJ
                 znear = zJ
           elseif (PointDist(x,y,z,xP1,yP1,zP1)<=PointDist(x,y,z,xP2,yP2,zP2)) then
-           call Nearest(C%Jacket,xnear,ynear,znear,xP1,yP1,zP1)
+           call Nearest(self%Jacket,xnear,ynear,znear,xP1,yP1,zP1)
           else
-           call Nearest(C%Jacket,xnear,ynear,znear,xP2,yP2,zP2)
+           call Nearest(self%Jacket,xnear,ynear,znear,xP2,yP2,zP2)
           endif
        else
-          call Nearest(C%Jacket,xJ,yJ,zJ,x,y,z)
-          call Nearest(C%Plane1,xP1,yP1,zP1,x,y,z)
-          if (Inside(C%Jacket,x,y,z)) then
+          call Nearest(self%Jacket,xJ,yJ,zJ,x,y,z)
+          call Nearest(self%Plane1,xP1,yP1,zP1,x,y,z)
+          if (Inside(self%Jacket,x,y,z)) then
                 xnear = xP1
                 ynear = yP1
                 znear = zP1
-          elseif (Inside(C%Plane1,x,y,z)) then
+          elseif (Inside(self%Plane1,x,y,z)) then
                 xnear = xJ
                 ynear = yJ
                 znear = zJ
           else
-           call Nearest(C%Jacket,xnear,ynear,znear,xP1,yP1,zP1)
+           call Nearest(self%Jacket,xnear,ynear,znear,xP1,yP1,zP1)
          endif
        endif
 
     else
 
-      call Nearest(C%Jacket,xnear,ynear,znear,x,y,z)
+      call Nearest(self%Jacket,xnear,ynear,znear,x,y,z)
 
     endif
   end subroutine TCylinder_Nearest
 
-  subroutine TBall_Nearest(Bl,xnear,ynear,znear,x,y,z)
-    type(TBall),intent(in) :: Bl
+  subroutine TBall_Nearest(self,xnear,ynear,znear,x,y,z)
+    class(TBall),intent(in) :: self
     real(KND),intent(out) :: xnear,ynear,znear
     real(KND),intent(in) :: x,y,z
     real(KND) t,a,b,c
 
-    a = x-Bl%xc
-    b = y-Bl%yc
-    c = z-Bl%zc
-    t = Bl%r/SQRT(a**2+b**2+c**2)
-    xnear = a*t+Bl%xc
-    ynear = b*t+Bl%yc
-    znear = c*t+Bl%zc
+    a = x-self%xc
+    b = y-self%yc
+    c = z-self%zc
+    t = self%r/SQRT(a**2+b**2+c**2)
+    xnear = a*t+self%xc
+    ynear = b*t+self%yc
+    znear = c*t+self%zc
   end subroutine TBall_Nearest
 
 
-  subroutine TPolyhedron_Nearest(PH,xnear,ynear,znear,x,y,z)
-    type(TPolyhedron),intent(in) :: PH
+  subroutine TPolyhedron_Nearest(self,xnear,ynear,znear,x,y,z)
+    class(TPolyhedron),intent(in) :: self
     real(KND),intent(out) :: xnear,ynear,znear
     real(KND),intent(in) :: x,y,z
 
-    real(KND) :: dists(PH%nplanes),xP(PH%nplanes),yP(PH%nplanes),zP(PH%nplanes)
+    real(KND) :: dists(self%nplanes),xP(self%nplanes),yP(self%nplanes),zP(self%nplanes)
     real(KND) :: minv
     real(KND) :: ailine,biline,ciline
     real(KND) :: x0iline,y0iline,z0iline,xln,yln,zln,p
@@ -2162,15 +2050,15 @@ contains
    !Nejbl. bod na prusecnici. Pokud +-eps. uvnitr, (najit vekt. v rovine  kolme na prusecnic)-:hotovo
    !Jinak iterativne najit bod na prusecnici uvnitr
 
-    do i = 1,PH%nplanes
-     call Nearest(PH%Planes(i),xP(i),yP(i),zP(i),x,y,z)
+    do i = 1,self%nplanes
+     call Nearest(self%Planes(i),xP(i),yP(i),zP(i),x,y,z)
      dists(i) = SQRT((x-xP(i))**2+(y-yP(i))**2+(z-zp(i))**2)
-     if (Inside(PH%Planes(i),x,y,z)) dists(i) = -ABS(dists(i))
+     if (Inside(self%Planes(i),x,y,z)) dists(i) = -ABS(dists(i))
     enddo
     !find nearest plane with
     inearest = 0
     minv = huge(minv)
-    do i = 1,PH%nplanes
+    do i = 1,self%nplanes
      if (dists(i)>=0.and.dists(i)<minv) then
        inearest = i
        minv = dists(i)
@@ -2182,7 +2070,7 @@ contains
       return
     endif
 
-    if (Inside(PH,xP(inearest),yP(inearest),zP(inearest),MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND))) then
+    if (Inside(self,xP(inearest),yP(inearest),zP(inearest),MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND))) then
      xnear = xP(inearest)
      ynear = yP(inearest)
      znear = zP(inearest)
@@ -2193,7 +2081,7 @@ contains
 
     inearest2 = 0
     minv = huge(minv)
-    do i = 1,PH%nplanes
+    do i = 1,self%nplanes
      if (i/=inearest.and.dists(i)<minv) then
        inearest2 = i
        minv = dists(i)
@@ -2202,26 +2090,26 @@ contains
 
     inearest3 = 0
     minv = huge(minv)
-    do i = 1,PH%nplanes
+    do i = 1,self%nplanes
      if (i/=inearest.and.i/=inearest2.and.dists(i)<minv) then
        inearest3 = i
        minv = dists(i)
      endif
     enddo
 
-    ailine = PH%Planes(inearest)%b*PH%Planes(inearest2)%c-PH%Planes(inearest)%c*PH%Planes(inearest2)%b
-    biline = PH%Planes(inearest)%c*PH%Planes(inearest2)%a-PH%Planes(inearest)%a*PH%Planes(inearest2)%c
-    ciline = PH%Planes(inearest)%a*PH%Planes(inearest2)%b-PH%Planes(inearest)%b*PH%Planes(inearest2)%a
+    ailine = self%Planes(inearest)%b*self%Planes(inearest2)%c-self%Planes(inearest)%c*self%Planes(inearest2)%b
+    biline = self%Planes(inearest)%c*self%Planes(inearest2)%a-self%Planes(inearest)%a*self%Planes(inearest2)%c
+    ciline = self%Planes(inearest)%a*self%Planes(inearest2)%b-self%Planes(inearest)%b*self%Planes(inearest2)%a
 
     if (abs(ailine)<=epsilon(ailine).and.abs(biline)<=epsilon(biline).and.abs(ciline)<=epsilon(ciline)) then
      write(*,*) "cross product 0"
      write(*,*) "numbers of planes",inearest,inearest2
      write(*,*) "x,y,z",x,y,z
-     write(*,*) "pl1",PH%Planes(inearest)%a,PH%Planes(inearest)%b,PH%Planes(inearest)%c,PH%Planes(inearest)%d
-     write(*,*) "pl2",PH%Planes(inearest2)%a,PH%Planes(inearest2)%b,PH%Planes(inearest2)%c,PH%Planes(inearest2)%d
+     write(*,*) "pl1",self%Planes(inearest)%a,self%Planes(inearest)%b,self%Planes(inearest)%c,self%Planes(inearest)%d
+     write(*,*) "pl2",self%Planes(inearest2)%a,self%Planes(inearest2)%b,self%Planes(inearest2)%c,self%Planes(inearest2)%d
 
-     call Nearest(PH%Planes(inearest),xln,yln,zln,x,y,z)
-     call Nearest(PH%Planes(inearest2),xnear,ynear,znear,x,y,z)
+     call Nearest(self%Planes(inearest),xln,yln,zln,x,y,z)
+     call Nearest(self%Planes(inearest2),xnear,ynear,znear,x,y,z)
 
      if ((xln-x)**2+(yln-y)**2+(zln-z)**2<(xln-x)**2+(yln-y)**2+(zln-z)**2) then
        xnear = xln
@@ -2240,12 +2128,12 @@ contains
 
     if (abs(ciline)>=0.1_KND) then
 
-       ag = reshape(source = (/ PH%Planes(inearest)%a,PH%Planes(inearest2)%a,0._KND,&
-                           PH%Planes(inearest)%b,PH%Planes(inearest2)%b,0._KND,&
-                           PH%Planes(inearest)%c,PH%Planes(inearest2)%c,1._KND /),&
+       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,0._KND,&
+                           self%Planes(inearest)%b,self%Planes(inearest2)%b,0._KND,&
+                           self%Planes(inearest)%c,self%Planes(inearest2)%c,1._KND /),&
                  shape = (/ 3,3 /))
 
-       bg = (/ -PH%Planes(inearest)%d,-PH%Planes(inearest2)%d,(zW(Wnz+1)+zW(0))/2._KND /)
+       bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(zW(Wnz+1)+zW(0))/2._KND /)
 
        if (KND==DBL) then
         call DGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
@@ -2259,12 +2147,12 @@ contains
 
     elseif (abs(biline)>=0.1_KND) then
 
-       ag = reshape(source = (/ PH%Planes(inearest)%a,PH%Planes(inearest2)%a,0._KND,&
-                           PH%Planes(inearest)%b,PH%Planes(inearest2)%b,1._KND,&
-                           PH%Planes(inearest)%c,PH%Planes(inearest2)%c,0._KND /),&
+       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,0._KND,&
+                           self%Planes(inearest)%b,self%Planes(inearest2)%b,1._KND,&
+                           self%Planes(inearest)%c,self%Planes(inearest2)%c,0._KND /),&
                  shape = (/ 3,3 /))
 
-       bg = (/ -PH%Planes(inearest)%d,-PH%Planes(inearest2)%d,(yV(Vny+1)+yV(0))/2._KND /)
+       bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(yV(Vny+1)+yV(0))/2._KND /)
 
        if (KND==DBL) then
         call DGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
@@ -2278,12 +2166,12 @@ contains
 
     else
 
-       ag = reshape(source = (/ PH%Planes(inearest)%a,PH%Planes(inearest2)%a,1._KND,&
-                           PH%Planes(inearest)%b,PH%Planes(inearest2)%b,0._KND,&
-                           PH%Planes(inearest)%c,PH%Planes(inearest2)%c,0._KND /),&
+       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,1._KND,&
+                           self%Planes(inearest)%b,self%Planes(inearest2)%b,0._KND,&
+                           self%Planes(inearest)%c,self%Planes(inearest2)%c,0._KND /),&
                   shape = (/ 3,3 /))
 
-       bg = (/ -PH%Planes(inearest)%d,-PH%Planes(inearest2)%d,(xU(Unx+1)+xU(0))/2._KND /)
+       bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(xU(Unx+1)+xU(0))/2._KND /)
 
        if (KND==DBL) then
         call DGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
@@ -2299,7 +2187,7 @@ contains
 
     call Nearest(TLine(x0iline,y0iline,z0iline,ailine,biline,ciline),xln,yln,zln,x,y,z)
 
-    if (Inside(PH,xln,yln,zln,min(dxmin/1000._KND,dymin/10000._KND,dzmin/10000._KND))) then
+    if (Inside(self,xln,yln,zln,min(dxmin/1000._KND,dymin/10000._KND,dzmin/10000._KND))) then
      xnear = xln
      ynear = yln
      znear = zln
@@ -2308,11 +2196,11 @@ contains
 
 
 
-    ag = reshape(source = (/ PH%Planes(inearest)%a,PH%Planes(inearest2)%a,PH%Planes(inearest3)%a,&
-                        PH%Planes(inearest)%b,PH%Planes(inearest2)%b,PH%Planes(inearest3)%b,&
-                        PH%Planes(inearest)%c,PH%Planes(inearest2)%c,PH%Planes(inearest3)%c /),&
+    ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,self%Planes(inearest3)%a,&
+                        self%Planes(inearest)%b,self%Planes(inearest2)%b,self%Planes(inearest3)%b,&
+                        self%Planes(inearest)%c,self%Planes(inearest2)%c,self%Planes(inearest3)%c /),&
                shape = (/ 3,3 /))
-    bg = (/ -PH%Planes(inearest)%d,-PH%Planes(inearest2)%d,-PH%Planes(inearest3)%d /)
+    bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,-self%Planes(inearest3)%d /)
 
     if (KND==DBL) then
      call DGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
@@ -2329,8 +2217,8 @@ contains
 
 
 
-  subroutine TTerrain_Nearest(T,xnear,ynear,znear,x,y,z)
-    type(TTerrain),intent(in) :: T
+  subroutine TTerrain_Nearest(self,xnear,ynear,znear,x,y,z)
+    class(TTerrain),intent(in) :: self
     real(KND),intent(out) :: xnear,ynear,znear
     real(KND),intent(in) :: x,y,z
     type(TPlane) :: Pl
@@ -2344,9 +2232,9 @@ contains
 
     if (comp==1) then  !Construct a tangent plane using first derivatives
 
-     zloc = T%UPoints(xi,yj)%elev
-     a = (T%PrPoints(xi+1,yj)%elev - T%PrPoints(xi,yj)%elev) / dxU(xi)
-     b = (T%UPoints(xi,yj+1)%elev - T%UPoints(xi,yj-1)%elev) / (yPr(yj+1)-yPr(yj-1))
+     zloc = self%UPoints(xi,yj)%elev
+     a = (self%PrPoints(xi+1,yj)%elev - self%PrPoints(xi,yj)%elev) / dxU(xi)
+     b = (self%UPoints(xi,yj+1)%elev - self%UPoints(xi,yj-1)%elev) / (yPr(yj+1)-yPr(yj-1))
 
      Pl%a = a
      Pl%b = b
@@ -2357,9 +2245,9 @@ contains
 
     elseif (comp==2) then
 
-     zloc = T%VPoints(xi,yj)%elev
-     a = (T%VPoints(xi+1,yj)%elev - T%VPoints(xi-1,yj)%elev) / (xPr(xi+1)-xPr(xi-1))
-     b = (T%PrPoints(xi,yj+1)%elev - T%PrPoints(xi,yj)%elev) / dyV(yj)
+     zloc = self%VPoints(xi,yj)%elev
+     a = (self%VPoints(xi+1,yj)%elev - self%VPoints(xi-1,yj)%elev) / (xPr(xi+1)-xPr(xi-1))
+     b = (self%PrPoints(xi,yj+1)%elev - self%PrPoints(xi,yj)%elev) / dyV(yj)
 
      Pl%a = a
      Pl%b = b
@@ -2370,9 +2258,9 @@ contains
 
     elseif (comp==3) then
 
-     zloc = T%PrPoints(xi,yj)%elev
-     a = (T%UPoints(xi,yj)%elev - T%UPoints(xi-1,yj)%elev) / dxPr(xi)
-     b = (T%VPoints(xi,yj)%elev - T%VPoints(xi,yj-1)%elev) / dyPr(yj)
+     zloc = self%PrPoints(xi,yj)%elev
+     a = (self%UPoints(xi,yj)%elev - self%UPoints(xi-1,yj)%elev) / dxPr(xi)
+     b = (self%VPoints(xi,yj)%elev - self%VPoints(xi,yj-1)%elev) / dyPr(yj)
 
      Pl%a = a
      Pl%b = b
@@ -2390,20 +2278,8 @@ contains
     real(KND),intent(out) :: xnear,ynear,znear
     real(KND),intent(in) :: x,y,z
 
-    select case (SB%typeofbody)
-     case (1)
-      call Nearest(SB%Polyhedron,xnear,ynear,znear,x,y,z)
-     case (2)
-      call Nearest(SB%Ball,xnear,ynear,znear,x,y,z)
-     case (3)
-      call Nearest(SB%Cylinder,xnear,ynear,znear,x,y,z)
-     case (4)
-      call Nearest(SB%Terrain,xnear,ynear,znear,x,y,z)
-     case default
-      xnear = -huge(znear)
-      ynear = -huge(znear)
-      znear = -huge(znear)
-    end select
+    call SB%GeometricShape%Nearest(xnear,ynear,znear,x,y,z)
+
   end subroutine TSolidBody_Nearest
 
 
@@ -2420,22 +2296,22 @@ contains
 
 
 
-  subroutine TPolyhedron_NearestOut(PH,xnear,ynear,znear,x,y,z)
-    type(TPolyhedron),intent(in) :: PH
+  subroutine TPolyhedron_NearestOut(self,xnear,ynear,znear,x,y,z)
+    class(TPolyhedron),intent(in) :: self
     real(KND),intent(out) :: xnear,ynear,znear
     real(KND),intent(in) :: x,y,z
-    real(KND) dists(PH%nplanes),xP(PH%nplanes),yP(PH%nplanes),zP(PH%nplanes),minv
+    real(KND) dists(self%nplanes),xP(self%nplanes),yP(self%nplanes),zP(self%nplanes),minv
     integer inearest,i
 
     dists = huge(minv)
-    do i = 1,PH%nplanes
-     call Nearest(PH%Planes(i),xP(i),yP(i),zP(i),x,y,z)
+    do i = 1,self%nplanes
+     call Nearest(self%Planes(i),xP(i),yP(i),zP(i),x,y,z)
      dists(i) = SQRT((x-xP(i))**2+(y-yP(i))**2+(z-zp(i))**2)
     enddo
 
     inearest = 0
     minv = huge(minv)
-    do i = 1,PH%nplanes
+    do i = 1,self%nplanes
      if (dists(i)>=0.and.dists(i)<minv) then
        inearest = i
        minv = dists(i)
@@ -2449,27 +2325,27 @@ contains
 
 
 
-  subroutine TCylinder_NearestOut(C,xnear,ynear,znear,x,y,z) !only for planes perpendicular to the axis
-    type(TCylinder),intent(in) :: C
+  subroutine TCylinder_NearestOut(self,xnear,ynear,znear,x,y,z) !only for planes perpendicular to the axis
+    class(TCylinder),intent(in) :: self
     real(KND),intent(out) :: xnear,ynear,znear
     real(KND),intent(in) :: x,y,z
     real(KND) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
 
-    if (associated(C%Plane1)) then
-      call Nearest(C%Plane1,xP1,yP1,zP1,x,y,z)
+    if (allocated(self%Plane1)) then
+      call Nearest(self%Plane1,xP1,yP1,zP1,x,y,z)
     else
      xP1 = sqrt(huge(xP1))/10
      yP1 = sqrt(huge(yP1))/10
      zP1 = sqrt(huge(zP1))/10
     endif
-    if (associated(C%Plane2)) then
-      call Nearest(C%Plane2,xP2,yP2,zP2,x,y,z)
+    if (allocated(self%Plane2)) then
+      call Nearest(self%Plane2,xP2,yP2,zP2,x,y,z)
     else
      xP2 = sqrt(huge(xP2))/10
      yP2 = sqrt(huge(yP2))/10
      zP2 = sqrt(huge(zP2))/10
     endif
-    call Nearest(C%Jacket,xJ,yJ,zJ,x,y,z)
+    call Nearest(self%Jacket,xJ,yJ,zJ,x,y,z)
 
     if (PointDist(x,y,z,xP1,yP1,zP1)<=PointDist(x,y,z,xP2,yP2,zP2).and.&
          PointDist(x,y,z,xP1,yP1,zP1)<=PointDist(x,y,z,xJ,yJ,zJ)) then
@@ -2491,22 +2367,22 @@ contains
 
 
 
-  subroutine TBall_NearestOut(Bl,xnear,ynear,znear,x,y,z)
-    type(TBall),intent(in) :: Bl
+  subroutine TBall_NearestOut(self,xnear,ynear,znear,x,y,z)
+    class(TBall),intent(in) :: self
     real(KND),intent(out) :: xnear,ynear,znear
     real(KND),intent(in) :: x,y,z
 
-    call Nearest(Bl,xnear,ynear,znear,x,y,z)
+    call Nearest(self,xnear,ynear,znear,x,y,z)
   end subroutine TBall_NearestOut
 
 
 
-  subroutine TTerrain_NearestOut(T,xnear,ynear,znear,x,y,z)
-    type(TTerrain),intent(in) :: T
+  subroutine TTerrain_NearestOut(self,xnear,ynear,znear,x,y,z)
+    class(TTerrain),intent(in) :: self
     real(KND),intent(out) :: xnear,ynear,znear
     real(KND),intent(in) :: x,y,z
 
-    call Nearest(T,xnear,ynear,znear,x,y,z)
+    call Nearest(self,xnear,ynear,znear,x,y,z)
   end subroutine TTerrain_NearestOut
 
 
@@ -2517,20 +2393,8 @@ contains
     real(KND),intent(out) :: xnear,ynear,znear
     real(KND),intent(in) :: x,y,z
 
-    xnear = -1e+9;ynear = -1e+9;znear = -1e+9
+    call SB%GeometricShape%NearestOut(xnear,ynear,znear,x,y,z)
 
-    select case (SB%typeofbody)
-     case (1)
-      call NearestOut(SB%Polyhedron,xnear,ynear,znear,x,y,z)
-     case (2)
-      call NearestOut(SB%Ball,xnear,ynear,znear,x,y,z)
-     case (3)
-      call NearestOut(SB%Cylinder,xnear,ynear,znear,x,y,z)
-     case (4)
-      call NearestOut(SB%Terrain,xnear,ynear,znear,x,y,z)
-     case default
-      xnear = -huge(znear);ynear = -huge(znear);znear = -huge(znear)
-    end select
   end subroutine TSolidBody_NearestOut
 
 
@@ -2569,44 +2433,6 @@ contains
 
 
 
-  recursive subroutine TSolidBody_DeallocateList(SB)
-    type(TSolidbody),pointer :: SB
-
-    if (associated(SB%next)) call TSolidBody_DeallocateList(SB%next)
-
-    if (associated(SB%Terrain)) then
-           if (allocated(SB%Terrain%UPoints)) deallocate(SB%Terrain%UPoints)
-           if (allocated(SB%Terrain%VPoints)) deallocate(SB%Terrain%VPoints)
-           if (allocated(SB%Terrain%PrPoints)) deallocate(SB%Terrain%PrPoints)
-           deallocate(SB%Ball)
-    endif
-
-    if (associated(SB%Ball)) deallocate(SB%Ball)
-
-    if (associated(SB%Cylinder)) then
-           if (associated(SB%Cylinder%Plane1)) deallocate(SB%Cylinder%Plane1)
-           if (associated(SB%Cylinder%Plane2)) deallocate(SB%Cylinder%Plane2)
-           deallocate(SB%Cylinder)
-    endif
-
-    if (associated(SB%Polyhedron)) then
-           if (allocated(SB%Polyhedron%Planes)) deallocate(SB%Polyhedron%Planes)
-           deallocate(SB%Polyhedron)
-    endif
-
-    deallocate(SB)
-
-  end subroutine TSolidBody_DeallocateList
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2631,86 +2457,90 @@ contains
 
 
   subroutine FindInsideCells
-    integer i,j,k
-    type(TSolidBody),pointer :: CurrentSB => null()
-
-    !find if the gridpoints lie ins a solid body and write it's number
+    !find if the gridpoints lie inside a solid body and write it's number
     !do not nullify the .type arrays, they could have been made nonzero by other unit
-    CurrentSB => FirstSB
 
-    do
-     if (associated(CurrentSB)) then
-      !$omp parallel do private(i,j,k)
-      do k = 0,Prnz+1
-       do j = 0,Prny+1
-        do i = 0,Prnx+1
-           if (Inside(CurrentSB,xPr(i),yPr(j),zPr(k))) Prtype(i,j,k) = CurrentSB%numofbody
-        enddo
-       enddo
-      enddo
-      !$omp end parallel do
-     else
-       exit
-     endif
-     CurrentSB => CurrentSB%next
-    enddo
+    call SolidBodiesList%ForEach(SetPrtype)
+    call SolidBodiesList%ForEach(SetUtype)
+    call SolidBodiesList%ForEach(SetVtype)
+    call SolidBodiesList%ForEach(SetWtype)
 
-    CurrentSB => FirstSB
-    do
-     if (associated(CurrentSB)) then
-      !$omp parallel do private(i,j,k)
-      do k = 0,Unz+1
-       do j = 0,Uny+1
-         do i = 0,Unx+1
-            if (Inside(CurrentSB,xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._KND/3)/1000))&
-                     Utype(i,j,k) = CurrentSB%numofbody
-         enddo
-        enddo
-       enddo
-      !$omp end parallel do
-     else
-       exit
-     endif
-     CurrentSB => CurrentSB%next
-    enddo
+    contains
 
-    CurrentSB => FirstSB
-    do
-     if (associated(CurrentSB)) then
-      !$omp parallel do private(i,j,k)
-      do k = 0,Vnz+1
-       do j = 0,Vny+1
-        do i = 0,Vnx+1
-           if (Inside(CurrentSB,xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._KND/3)/1000))&
-                     Vtype(i,j,k) = CurrentSB%numofbody
-        enddo
-       enddo
-      enddo
-      !$omp end parallel do
-     else
-       exit
-     endif
-     CurrentSB => CurrentSB%next
-    enddo
+      subroutine SetPrtype(CurrentSB)
+        class(TListable) :: CurrentSB
+        integer i,j,k
 
-    CurrentSB => FirstSB
-    do
-     if (associated(CurrentSB)) then
-      !$omp parallel do private(i,j,k)
-      do k = 0,Wnz+1
-       do j = 0,Wny+1
-        do i = 0,Wnx+1
-           if (Inside(CurrentSB,xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._KND/3)/1000))&
-                     Wtype(i,j,k) = CurrentSB%numofbody
-        enddo
-       enddo
-      enddo
-      !$omp end parallel do
-     else
-       exit
-     endif
-     CurrentSB => CurrentSB%next
-    enddo
+        select type (CurrentSB)
+          type is (TSolidBody)
+            !$omp parallel do private(i,j,k)
+            do k = 0,Prnz+1
+             do j = 0,Prny+1
+              do i = 0,Prnx+1
+                 if (Inside(CurrentSB,xPr(i),yPr(j),zPr(k))) Prtype(i,j,k) = CurrentSB%numofbody
+              enddo
+             enddo
+            enddo
+            !$omp end parallel do
+        end select
+      end subroutine
+
+      subroutine SetUtype(CurrentSB)
+        class(TListable) :: CurrentSB
+        integer i,j,k
+
+        select type (CurrentSB)
+          type is (TSolidBody)
+            !$omp parallel do private(i,j,k)
+            do k = 0,Unz+1
+             do j = 0,Uny+1
+               do i = 0,Unx+1
+                  if (Inside(CurrentSB,xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._KND/3)/1000))&
+                           Utype(i,j,k) = CurrentSB%numofbody
+               enddo
+              enddo
+             enddo
+            !$omp end parallel do
+        end select
+      end subroutine
+
+      subroutine SetVtype(CurrentSB)
+        class(TListable) :: CurrentSB
+        integer i,j,k
+
+        select type (CurrentSB)
+          type is (TSolidBody)
+            !$omp parallel do private(i,j,k)
+            do k = 0,Vnz+1
+             do j = 0,Vny+1
+              do i = 0,Vnx+1
+                 if (Inside(CurrentSB,xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._KND/3)/1000))&
+                           Vtype(i,j,k) = CurrentSB%numofbody
+              enddo
+             enddo
+            enddo
+            !$omp end parallel do
+        end select
+      end subroutine
+
+      subroutine SetWtype(CurrentSB)
+        class(TListable) :: CurrentSB
+        integer i,j,k
+
+         select type (CurrentSB)
+          type is (TSolidBody)
+            !$omp parallel do private(i,j,k)
+            do k = 0,Wnz+1
+             do j = 0,Wny+1
+              do i = 0,Wnx+1
+                 if (Inside(CurrentSB,xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._KND/3)/1000))&
+                           Wtype(i,j,k) = CurrentSB%numofbody
+              enddo
+             enddo
+            enddo
+            !$omp end parallel do
+        end select
+      end subroutine
 
   end subroutine FindInsideCells
 
@@ -2730,7 +2560,7 @@ contains
         if (Utype(i+1,j,k)<=0.or.Utype(i-1,j,k)<=0.or.Utype(i,j+1,k)<=0&
           .or.Utype(i,j-1,k)<=0.or.Utype(i,j,k+1)<=0.or.Utype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xU(-2:),yPr(-2:),zPr(-2:),Utype,1)
-            call  AddToList(IBP)
+            call  IBPointsList%Add(IBP)
         endif
        endif
       enddo
@@ -2744,7 +2574,7 @@ contains
         if (Vtype(i+1,j,k)<=0.or.Vtype(i-1,j,k)<=0.or.Vtype(i,j+1,k)<=0&
           .or.Vtype(i,j-1,k)<=0.or.Vtype(i,j,k+1)<=0.or.Vtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yV(-2:),zPr(-2:),Vtype,2)
-            call  AddToList(IBP)
+            call  IBPointsList%Add(IBP)
         endif
        endif
       enddo
@@ -2758,7 +2588,7 @@ contains
         if (Wtype(i+1,j,k)<=0.or.Wtype(i-1,j,k)<=0.or.Wtype(i,j+1,k)<=0&
           .or.Wtype(i,j-1,k)<=0.or.Wtype(i,j,k+1)<=0.or.Wtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yPr(-2:),zW(-2:),Wtype,3)
-            call  AddToList(IBP)
+            call  IBPointsList%Add(IBP)
         endif
        endif
       enddo
@@ -2772,7 +2602,7 @@ contains
         if (Prtype(i+1,j,k)<=0.or.Prtype(i-1,j,k)<=0.or.Prtype(i,j+1,k)<=0&
           .or.Prtype(i,j-1,k)<=0.or.Prtype(i,j,k+1)<=0.or.Prtype(i,j,k-1)<=0)  then
             call  Create(SIBP,i,j,k)
-            call  AddToList(SIBP)
+            call  ScalFlIBPointsList%Add(SIBP)
         endif
        endif
       enddo
@@ -2781,8 +2611,8 @@ contains
 
     call MoveIBPointsToArray
 
-    call DeallocateList(FirstIBPoint)
-    call DeallocateList(FirstScalFlIBPoint)
+    call IBPointsList%Deallocate
+    call ScalFlIBPointsList%Deallocate
 
   end subroutine InitImBoundaries
 
@@ -2796,7 +2626,7 @@ contains
     integer                  :: neighbours(3,6)
     real(KND)     :: dist,nearx,neary,nearz
     integer       :: i,j,k,m,n,o,p
-    integer(SINT) :: nb
+    integer       :: nb
 
     allocate(WMP%depscalar(computescalars))
 
@@ -2838,19 +2668,22 @@ contains
           WMP%disty = neary-yPr(j)
           WMP%distz = nearz-zPr(k)
           WMP%ustar = 1
-          if (CurrentSB%typeofbody==4) then
-           if (CurrentSB%Terrain%PrPoints(i,j)%rough) then
-             WMP%z0 = CurrentSB%Terrain%PrPoints(i,j)%z0
-           else
-             WMP%z0 = 0
-           endif
-          else
-           if (CurrentSB%rough) then
-             WMP%z0 = CurrentSB%z0
-           else
-             WMP%z0 = 0
-           endif
-          endif
+
+          select type (geomshape => CurrentSB%GeometricShape)
+            type is (TTerrain)
+              if (geomshape%PrPoints(i,j)%rough) then
+                WMP%z0 = geomshape%PrPoints(i,j)%z0
+              else
+                WMP%z0 = 0
+              endif
+            class default
+              if (CurrentSB%rough) then
+                WMP%z0 = CurrentSB%z0
+              else
+                WMP%z0 = 0
+              endif
+          end select
+
           call AddWMPoint(WMP)
         endif
        endif
@@ -2874,7 +2707,7 @@ contains
     end if
 
 #ifdef CUSTOMSB
-    !An external subroutine, it should use this module and use AddSolidBody to supply
+    !An external subroutine, it should use this module and use AddBody to supply
     ! pointers to the new solid bodies.
     call CustomSolidBodies
 #endif
@@ -2911,8 +2744,9 @@ contains
 
           if (associated(SB)) then
 
-            call AddSolidBody(SB)
-            SB => null()
+            call AddBody(SolidBodiesList,SB)
+            deallocate(SB)
+
           end if
 
         end if
@@ -2944,16 +2778,18 @@ contains
     end if
 
     allocate(SB)
-    allocate(SB%Polyhedron)
-    allocate(SB%Polyhedron%Planes(nPlanes))
+    allocate(TPolyhedron :: SB%GeometricShape)
 
-    SB%Polyhedron%nplanes = nPlanes
+    select type (geomshape => SB%GeometricShape)
+      type is (TPolyhedron)
+        allocate(geomshape%Planes(nPlanes))
 
-    SB%typeofbody = Polyhedron
+        geomshape%nplanes = nPlanes
 
-    do i=1,nPlanes
-      call ReadPlane(unit,SB%Polyhedron%Planes(i))
-    end do
+        do i=1,nPlanes
+          call ReadPlane(unit,geomshape%Planes(i))
+        end do
+    end select
 
   end subroutine ReadPolyhedron
 
@@ -2986,31 +2822,15 @@ contains
 
 
 
-  subroutine AddSolidBody(SB)
-    type(TSolidBody),pointer :: SB
-    type(TSolidBody),pointer :: p
+  subroutine AddBody(List,SB)
+    type(TList),intent(inout) :: List
+    class(TBody) :: SB
 
-    if (.not. associated(FirstSB)) then
-      FirstSB => SB
-      SB%numofbody = 1
-    else
-      p => FirstSB
-      do
-        if (associated(p%next)) then
+    SB%numofbody = List%Len() + 1
 
-          p => p%next
+    call List%Add(SB)
 
-        else
-
-          p%next => SB
-          SB%numofbody = p%numofbody + 1
-          exit
-
-        end if
-
-      end do
-    end if
-  end subroutine AddSolidBody
+  end subroutine AddBody
 
 
 
@@ -3048,4 +2868,4 @@ contains
 
    end subroutine IBLeastSquare2InterpolationCoefs
 
-endmodule GEOMETRIC
+endmodule Geometric
