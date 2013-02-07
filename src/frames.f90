@@ -359,7 +359,7 @@ module StaggeredFrames
 
 
     subroutine TStaggeredFrameDomain_Wait(D)
-      type(TStaggeredFrameDomain),intent(inout) :: D
+      type(TStaggeredFrameDomain),asynchronous,intent(inout) :: D
       integer err
 
       call pthread_join_opaque(D%threadptr,err)
@@ -372,44 +372,68 @@ module StaggeredFrames
     end subroutine TStaggeredFrameDomain_Wait
 
 
+    
+    subroutine SaveBuffer(Dptr) bind(C)
+      type(c_ptr),value :: Dptr
+      type(TStaggeredFrameDomain),pointer :: D
+      character(40) :: file_name
+      !line feed
+      character,parameter :: lf = achar(10)
+
+      call c_f_pointer(Dptr, D)
+
+      write(file_name,'(a,i0,a)') trim(D%base_name)//"-",D%frame_number,trim(D%suffix)
+
+      write(*,*) "Writing frame: ",file_name, " size: ",D%buffer_size
+
+      open(unit=D%unit, file=file_name, access='stream', form='unformatted', action='write', status='replace')
+
+      write(D%unit) D%times(D%frame_number)          !current time
+
+      write(D%unit) D%buffer
+
+      close(D%unit)
+
+    end subroutine SaveBuffer
+
+
 
     subroutine TStaggeredFrameDomain_Save(D, time, U, V, W, Pr, Temperature, Scalar)
-      type(TStaggeredFrameDomain),target,intent(inout) :: D
+      type(TStaggeredFrameDomain),target,asynchronous,intent(inout) :: D
       real(KND),intent(in) :: time
       real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
       real(KND),intent(in) :: Pr(1:,1:,1:), Temperature(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,-1:)
       integer err
-      real(KND),pointer :: start,end
-      integer,pointer :: nframes
 
-      !instead of associate until better supported
-      start => D%frame_times%start
-      end   => D%frame_times%end
-      nframes => D%frame_times%nframes
+      associate(start   => D%frame_times%start,&
+                end     => D%frame_times%end,&
+                nframes => D%frame_times%nframes)
 
-      if ( (time >= start) .and. (time <= end + (end-start)/(nframes-1)) &
-        .and. (time >= start + (D%frame_number+1)*(end-start) / (nframes-1)) ) then
+        if ( (time >= start) .and. (time <= end + (end-start)/(nframes-1)) &
+          .and. (time >= start + (D%frame_number+1)*(end-start) / (nframes-1)) ) then
 
-        D%frame_number = D%frame_number + 1
+          D%frame_number = D%frame_number + 1
 
-        if (.not.allocated(D%times)) allocate(D%times(D%frame_number:D%frame_number+1000))
+          if (.not.allocated(D%times)) allocate(D%times(D%frame_number:D%frame_number+1000))
 
-        call Add(D%times,D%frame_number,time)
+          call Add(D%times,D%frame_number,time)
 
-        if (D%in_progress) call Wait(D)
+          if (D%in_progress) call Wait(D)
 
-        call Fill(D, U, V, W, Pr, Temperature, Scalar)
+          call Fill(D, U, V, W, Pr, Temperature, Scalar)
 
-        call pthread_create_opaque(D%threadptr, c_funloc(SaveBuffer), c_loc(D), err)
+          call pthread_create_opaque(D%threadptr, c_funloc(SaveBuffer), c_loc(D), err)
 
-        if (err==0) then
-          D%in_progress = .true.
-        else
-          write (*,*) "Error in creating frame thread. Will run again synchronously. Code:",err
-          call SaveBuffer(c_loc(D))
+          if (err==0) then
+            D%in_progress = .true.
+          else
+            write (*,*) "Error in creating frame thread. Will run again synchronously. Code:",err
+            call SaveBuffer(c_loc(D))
+          end if
+
         end if
 
-      end if
+      end associate
     end subroutine TStaggeredFrameDomain_Save
 
 
@@ -458,31 +482,6 @@ module StaggeredFrames
       close(D%unit)
 
     end subroutine TStaggeredFrameDomain_SaveHeader
-
-
-
-    subroutine SaveBuffer(Dptr) bind(C)
-      type(c_ptr),value :: Dptr
-      type(TStaggeredFrameDomain),pointer :: D
-      character(40) :: file_name
-      !line feed
-      character,parameter :: lf = achar(10)
-
-      call c_f_pointer(Dptr, D)
-
-      write(file_name,'(a,i0,a)') trim(D%base_name)//"-",D%frame_number,trim(D%suffix)
-
-      write(*,*) "Writing frame: ",file_name, " size: ",D%buffer_size
-
-      open(unit=D%unit, file=file_name, access='stream', form='unformatted', action='write', status='replace')
-
-      write(D%unit) D%times(D%frame_number)          !current time
-
-      write(D%unit) D%buffer
-
-      close(D%unit)
-
-    end subroutine SaveBuffer
 
 
 
