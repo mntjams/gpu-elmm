@@ -95,9 +95,9 @@ else:
     omp_flag = ''
 
   if str(fast)=='yes':
-    fast_flag = ' -Ofast -Warray-temporaries'
+    fast_flag = ' -Ofast'# -Warray-temporaries'
   else:
-    fast_flag = ' -fcheck=all -Wall'
+   fast_flag = ' -fcheck=all -Wall  -pedantic'
   
   if str(lto)=='yes':
     lto_flag = ' -flto'
@@ -106,7 +106,7 @@ else:
 
   env.Replace(F90='gfortran')
   
-  env.Append(F90FLAGS='-cpp -fbacktrace -g -pedantic -ffpe-trap=zero,overflow,invalid -fstack-arrays')
+  env.Append(F90FLAGS='-cpp -fbacktrace -g -ffpe-trap=zero,overflow,invalid -fstack-arrays')
 
   env.Append(LIBPATH = ['/usr/local/poisfft_gcc/'])
 
@@ -150,6 +150,7 @@ else:
 
 
 objs =  env.Object(target=target_dir+'parameters',     source='parameters.f90')
+objs += env.Object(target=target_dir+'lapack',         source='lapack.f')
 objs += env.Object(target=target_dir+'strings',        source='strings.f90')
 objs += env.Object(target=target_dir+'lists',          source='lists.f90')
 objs += env.Object(target=target_dir+'endianness',     source='endianness.f90')

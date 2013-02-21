@@ -509,6 +509,7 @@ contains
 
 
   subroutine TPolyhedron_Nearest(self,xnear,ynear,znear,x,y,z)
+    use Lapack
     class(TPolyhedron),intent(in) :: self
     real(KND),intent(out) :: xnear,ynear,znear
     real(KND),intent(in) :: x,y,z
@@ -521,14 +522,12 @@ contains
     integer   :: i
 
     integer,dimension(3)    :: ipivot,work2             !arguments of the LAPACK
-    real(KND),dimension(3)  :: xg,bg,R,C,ferr,berr      !  routine xGESVX
+    real(KND),dimension(3)  :: xg,bg,R,C,ferr,berr      !  routine GESVX
     real(KND),dimension(12) :: work
     real(KND),dimension(3,3) :: ag,af                    !
     integer   :: info                                   !
     real(KND) :: rcond                                  !
     character :: equed                                  !
-
-    external :: DGESVX, SGESVX
 
    !Vzdalenosti od rovin, pokud je nejbl. bod roviny uvnitr jine, nebo puv. bod na vnitrni strane -> vzd. *-1
    !Pokud je nejbl. body +- eps. (norm. vektor!,dxmin/100) uvnitr a vne polyh -> hotovo
@@ -620,18 +619,15 @@ contains
 
     if (abs(ciline)>=0.1_KND) then
 
-       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,0._KND,&
-                           self%Planes(inearest)%b,self%Planes(inearest2)%b,0._KND,&
-                           self%Planes(inearest)%c,self%Planes(inearest2)%c,1._KND /),&
+       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,0._KND, &
+                           self%Planes(inearest)%b,self%Planes(inearest2)%b,0._KND, &
+                           self%Planes(inearest)%c,self%Planes(inearest2)%c,1._KND /), &
                  shape = (/ 3,3 /))
 
        bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(zW(Wnz+1)+zW(0))/2._KND /)
 
-       if (KND==DBL) then
-        call DGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
-       else
-        call SGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
-       endif
+       call gesvx("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3, &
+                  rcond,ferr,berr,work,work2,info)
 
        x0iline = xg(1)
        y0iline = xg(2)
@@ -639,18 +635,15 @@ contains
 
     elseif (abs(biline)>=0.1_KND) then
 
-       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,0._KND,&
-                           self%Planes(inearest)%b,self%Planes(inearest2)%b,1._KND,&
-                           self%Planes(inearest)%c,self%Planes(inearest2)%c,0._KND /),&
+       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,0._KND, &
+                           self%Planes(inearest)%b,self%Planes(inearest2)%b,1._KND, &
+                           self%Planes(inearest)%c,self%Planes(inearest2)%c,0._KND /), &
                  shape = (/ 3,3 /))
 
        bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(yV(Vny+1)+yV(0))/2._KND /)
 
-       if (KND==DBL) then
-        call DGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
-       else
-        call SGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
-       endif
+       call gesvx("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3, &
+                  rcond,ferr,berr,work,work2,info)
 
        x0iline = xg(1)
        y0iline = xg(2)
@@ -658,18 +651,15 @@ contains
 
     else
 
-       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,1._KND,&
-                           self%Planes(inearest)%b,self%Planes(inearest2)%b,0._KND,&
-                           self%Planes(inearest)%c,self%Planes(inearest2)%c,0._KND /),&
+       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,1._KND, &
+                           self%Planes(inearest)%b,self%Planes(inearest2)%b,0._KND, &
+                           self%Planes(inearest)%c,self%Planes(inearest2)%c,0._KND /), &
                   shape = (/ 3,3 /))
 
        bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(xU(Unx+1)+xU(0))/2._KND /)
 
-       if (KND==DBL) then
-        call DGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
-       else
-        call SGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
-       endif
+       call gesvx("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3, &
+                  rcond,ferr,berr,work,work2,info)
 
        x0iline = xg(1)
        y0iline = xg(2)
@@ -688,17 +678,14 @@ contains
 
 
 
-    ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,self%Planes(inearest3)%a,&
-                        self%Planes(inearest)%b,self%Planes(inearest2)%b,self%Planes(inearest3)%b,&
-                        self%Planes(inearest)%c,self%Planes(inearest2)%c,self%Planes(inearest3)%c /),&
+    ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,self%Planes(inearest3)%a, &
+                        self%Planes(inearest)%b,self%Planes(inearest2)%b,self%Planes(inearest3)%b, &
+                        self%Planes(inearest)%c,self%Planes(inearest2)%c,self%Planes(inearest3)%c /), &
                shape = (/ 3,3 /))
     bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,-self%Planes(inearest3)%d /)
 
-    if (KND==DBL) then
-     call DGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
-    else
-     call SGESVX("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3,rcond,ferr,berr,work,work2,info)
-    endif
+    call gesvx("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3, &
+               rcond,ferr,berr,work,work2,info)
 
     xnear = xg(1)
     ynear = xg(2)

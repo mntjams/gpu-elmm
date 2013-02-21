@@ -11,6 +11,10 @@ module PlantCanopy
 
       subroutine InitPlantBodies
 #ifdef CUSTOMPB
+        interface
+          subroutine CustomPlantBodies
+          end subroutine
+        end interface
       !An external subroutine, it should use this module and use AddBody to supply
       ! pointers to the new solid bodies.
       call CustomPlantBodies

@@ -155,15 +155,20 @@ contains
 
   subroutine InitSolidBodies
 
-    if (len_trim(obstaclefile)>0) then
-      call ReadSolidBodiesFromFile(obstaclefile)
-    end if
-
 #ifdef CUSTOMSB
+    interface
+      subroutine CustomSolidBodies
+      end subroutine
+    end interface
     !An external subroutine, it should use this module and use AddBody to supply
     ! pointers to the new solid bodies.
     call CustomSolidBodies
 #endif
+
+    if (len_trim(obstaclefile)>0) then
+      call ReadSolidBodiesFromFile(obstaclefile)
+    end if
+
   end subroutine InitSolidBodies
 
 
