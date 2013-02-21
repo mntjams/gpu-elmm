@@ -39,7 +39,7 @@
 !       px = loc(x(1))
 !       py = loc(y(1))
 !       call saxpy_(size(x),a,px,1,py,1)
-!     end subroutine saxpy1D
+!     end subroutine
 ! 
 !     subroutine daxpy1D(a, x, y)
 !       real(c_double),target :: a, x(:), y(:)
@@ -48,7 +48,7 @@
 !       px = loc(x(1))
 !       py = loc(y(1))
 !       call daxpy_(size(x),a,px,1,py,1)
-!     end subroutine daxpy1D
+!     end subroutine
 ! 
 !     subroutine saxpy2D(a, x, y)
 !       real(c_float),target :: a, x(:,:), y(:,:)
@@ -57,7 +57,7 @@
 !       px = loc(x(1,1))
 !       py = loc(y(1,1))
 !       call saxpy_(size(x),a,px,1,py,1)
-!     end subroutine saxpy2D
+!     end subroutine
 ! 
 !     subroutine daxpy2D(a, x, y)
 !       real(c_double),target :: a, x(:,:), y(:,:)
@@ -66,7 +66,7 @@
 !       px = loc(x(1,1))
 !       py = loc(y(1,1))
 !       call daxpy_(size(x),a,px,1,py,1)
-!     end subroutine daxpy2D
+!     end subroutine
 ! 
 !     subroutine saxpy3D(a, x, y)
 !       real(c_float),target :: a, x(:,:,:), y(:,:,:)
@@ -75,7 +75,7 @@
 !       px = loc(x(1,1,1))
 !       py = loc(y(1,1,1))
 !       call saxpy_(size(x),a,px,1,py,1)
-!     end subroutine saxpy3D
+!     end subroutine
 ! 
 !     subroutine daxpy3D(a, x, y)
 !       real(c_double),target :: a, x(:,:,:), y(:,:,:)
@@ -84,7 +84,7 @@
 !       px = loc(x(1,1,1))
 !       py = loc(y(1,1,1))
 !       call daxpy_(size(x),a,px,1,py,1)
-!     end subroutine daxpy3D
+!     end subroutine
 ! 
 ! end module MyBLAS
 
@@ -98,7 +98,8 @@ module ArrayUtilities
 
   private
   public exchange_alloc, assign, add, &
-         set, multiply, add_multiplied
+         set, multiply, add_multiplied, &
+         multiply_and_add_scalar, reciprocal
 
   interface exchange_alloc
     module procedure exchange_alloc_1D
@@ -107,33 +108,45 @@ module ArrayUtilities
   end interface
 
   interface assign
-    module procedure assign_array_1D
-    module procedure assign_array_2D
-    module procedure assign_array_3D
+    module procedure assign_1D
+    module procedure assign_2D
+    module procedure assign_3D
   end interface
 
   interface add
-    module procedure add_array_1D
-    module procedure add_array_2D
-    module procedure add_array_3D
+    module procedure add_1D
+    module procedure add_2D
+    module procedure add_3D
   end interface
 
   interface set
-    module procedure set_array_1D
-    module procedure set_array_2D
-    module procedure set_array_3D
+    module procedure set_1D
+    module procedure set_2D
+    module procedure set_3D
   end interface
 
   interface multiply
-    module procedure multiply_array_1D
-    module procedure multiply_array_2D
-    module procedure multiply_array_3D
+    module procedure multiply_1D
+    module procedure multiply_2D
+    module procedure multiply_3D
   end interface
 
   interface add_multiplied
-    module procedure add_multiplied_array_1D
-    module procedure add_multiplied_array_2D
-    module procedure add_multiplied_array_3D
+    module procedure add_multiplied_1D
+    module procedure add_multiplied_2D
+    module procedure add_multiplied_3D
+  end interface
+
+  interface multiply_and_add_scalar
+    module procedure multiply_and_add_scalar_1D
+    module procedure multiply_and_add_scalar_2D
+    module procedure multiply_and_add_scalar_3D
+  end interface
+
+  interface reciprocal
+    module procedure reciprocal_1D
+    module procedure reciprocal_2D
+    module procedure reciprocal_3D
   end interface
 
   contains
@@ -145,7 +158,7 @@ module ArrayUtilities
       call move_alloc(A,tmp)
       call move_alloc(B,A)
       call move_alloc(tmp,B)
-    end subroutine exchange_alloc_1D
+    end subroutine
     
     subroutine exchange_alloc_2D(A,B)
       real(KND),allocatable,intent(inout) :: A(:,:),B(:,:)
@@ -154,7 +167,7 @@ module ArrayUtilities
       call move_alloc(A,tmp)
       call move_alloc(B,A)
       call move_alloc(tmp,B)
-    end subroutine exchange_alloc_2D
+    end subroutine
     
     subroutine exchange_alloc_3D(A,B)
       real(KND),allocatable,intent(inout) :: A(:,:,:),B(:,:,:)
@@ -163,10 +176,10 @@ module ArrayUtilities
       call move_alloc(A,tmp)
       call move_alloc(B,A)
       call move_alloc(tmp,B)
-    end subroutine exchange_alloc_3D
+    end subroutine
 
 
-    subroutine assign_array_1D(to,from)
+    subroutine assign_1D(to,from)
       real(KND),intent(out) :: to(:)
       real(KND),intent(in)  :: from(:)
       integer i
@@ -176,9 +189,9 @@ module ArrayUtilities
         to(i) = from(i)
       end do
       !$omp end parallel do
-    end subroutine assign_array_1D
+    end subroutine
 
-    subroutine assign_array_2D(to,from)
+    subroutine assign_2D(to,from)
       real(KND),intent(out) :: to(:,:)
       real(KND),intent(in)  :: from(:,:)
       integer j
@@ -188,9 +201,9 @@ module ArrayUtilities
         to(:,j) = from(:,j)
       end do
       !$omp end parallel do
-    end subroutine assign_array_2D
+    end subroutine
 
-    subroutine assign_array_3D(to,from)
+    subroutine assign_3D(to,from)
       real(KND),intent(out) :: to(:,:,:)
       real(KND),intent(in)  :: from(:,:,:)
       integer k
@@ -200,10 +213,10 @@ module ArrayUtilities
         to(:,:,k) = from(:,:,k)
       end do
       !$omp end parallel do
-    end subroutine assign_array_3D
+    end subroutine
 
 
-    subroutine add_array_1D(to,from)
+    subroutine add_1D(to,from)
       real(KND),intent(inout) :: to(:)
       real(KND),intent(in)  :: from(:)
       integer i
@@ -213,9 +226,9 @@ module ArrayUtilities
         to(i) = to(i) + from(i)
       end do
       !$omp end parallel do
-    end subroutine add_array_1D
+    end subroutine
 
-    subroutine add_array_2D(to,from)
+    subroutine add_2D(to,from)
       real(KND),intent(inout) :: to(:,:)
       real(KND),intent(in)  :: from(:,:)
       integer j
@@ -225,9 +238,9 @@ module ArrayUtilities
         to(:,j) = to(:,j) + from(:,j)
       end do
       !$omp end parallel do
-    end subroutine add_array_2D
+    end subroutine
 
-    subroutine add_array_3D(to,from)
+    subroutine add_3D(to,from)
       real(KND),intent(inout) :: to(:,:,:)
       real(KND),intent(in)  :: from(:,:,:)
       integer k
@@ -238,10 +251,10 @@ module ArrayUtilities
       end do
       !$omp end parallel do
 !       call axpy(1._KND,from,to)
-    end subroutine add_array_3D
+    end subroutine
 
 
-    subroutine set_array_1D(to,from)
+    subroutine set_1D(to,from)
       real(KND),intent(out) :: to(:)
       real(KND),intent(in)  :: from
       integer i
@@ -251,9 +264,9 @@ module ArrayUtilities
         to(i) = from
       end do
       !$omp end parallel do
-    end subroutine set_array_1D
+    end subroutine
 
-    subroutine set_array_2D(to,from)
+    subroutine set_2D(to,from)
       real(KND),intent(out) :: to(:,:)
       real(KND),intent(in)  :: from
       integer j
@@ -263,9 +276,9 @@ module ArrayUtilities
         to(:,j) = from
       end do
       !$omp end parallel do
-    end subroutine set_array_2D
+    end subroutine
 
-    subroutine set_array_3D(to,from)
+    subroutine set_3D(to,from)
       real(KND),intent(out) :: to(:,:,:)
       real(KND),intent(in)  :: from
       integer k
@@ -275,10 +288,10 @@ module ArrayUtilities
         to(:,:,k) = from
       end do
       !$omp end parallel do
-    end subroutine set_array_3D
+    end subroutine
     
 
-    subroutine multiply_array_1D(to,a)
+    subroutine multiply_1D(to,a)
       real(KND),intent(inout) :: to(:)
       real(KND),intent(in)  :: a
       integer i
@@ -288,9 +301,9 @@ module ArrayUtilities
         to(i) = to(i) * a
       end do
       !$omp end parallel do
-    end subroutine multiply_array_1D
+    end subroutine
 
-    subroutine multiply_array_2D(to,a)
+    subroutine multiply_2D(to,a)
       real(KND),intent(inout) :: to(:,:)
       real(KND),intent(in)  :: a
       integer j
@@ -300,9 +313,9 @@ module ArrayUtilities
         to(:,j) = to(:,j) * a
       end do
       !$omp end parallel do
-    end subroutine multiply_array_2D
+    end subroutine
 
-    subroutine multiply_array_3D(to,a)
+    subroutine multiply_3D(to,a)
       real(KND),intent(inout) :: to(:,:,:)
       real(KND),intent(in)  :: a
       integer k
@@ -313,10 +326,10 @@ module ArrayUtilities
 !         call sscal(size(to,2)*size(to,1),a,to,1)
       end do
       !$omp end parallel do
-    end subroutine multiply_array_3D
+    end subroutine
 
 
-    subroutine add_multiplied_array_1D(to,from,a)
+    subroutine add_multiplied_1D(to,from,a)
       real(KND),intent(inout) :: to(:)
       real(KND),intent(in)  :: from(:)
       real(KND),intent(in)  :: a
@@ -327,9 +340,9 @@ module ArrayUtilities
         to(i) = to(i) + from(i) * a
       end do
       !$omp end parallel do
-    end subroutine add_multiplied_array_1D
+    end subroutine
 
-    subroutine add_multiplied_array_2D(to,from,a)
+    subroutine add_multiplied_2D(to,from,a)
       real(KND),intent(inout) :: to(:,:)
       real(KND),intent(in)  :: from(:,:)
       real(KND),intent(in)  :: a
@@ -340,9 +353,9 @@ module ArrayUtilities
         to(:,j) = to(:,j) + from(:,j) * a
       end do
       !$omp end parallel do
-    end subroutine add_multiplied_array_2D
+    end subroutine
 
-    subroutine add_multiplied_array_3D(to,from,a)
+    subroutine add_multiplied_3D(to,from,a)
       real(KND),intent(inout) :: to(:,:,:)
       real(KND),intent(in)  :: from(:,:,:)
       real(KND),intent(in)  :: a
@@ -354,8 +367,90 @@ module ArrayUtilities
       end do
       !$omp end parallel do
 !        call axpy(a,from,to)
+    end subroutine
 
-    end subroutine add_multiplied_array_3D
+
+    subroutine multiply_and_add_scalar_1D(to,b,a)
+      ! to = b * to + a
+      real(KND),intent(inout) :: to(:)
+      real(KND),intent(in)  :: b
+      real(KND),intent(in)  :: a
+      integer i
+
+      !$omp parallel do
+      do i=1,size(to)
+        to(i) = b * to(i) + a
+      end do
+      !$omp end parallel do
+    end subroutine
+
+    subroutine multiply_and_add_scalar_2D(to,b,a)
+      ! to = b * to + a
+      real(KND),intent(inout) :: to(:,:)
+      real(KND),intent(in)  :: b
+      real(KND),intent(in)  :: a
+      integer j
+
+      !$omp parallel do
+      do j=1,size(to,2)
+        to(:,j) = b * to(:,j) + a
+      end do
+      !$omp end parallel do
+    end subroutine
+
+    subroutine multiply_and_add_scalar_3D(to,b,a)
+      ! to = b * to + a
+      real(KND),intent(inout) :: to(:,:,:)
+      real(KND),intent(in)  :: b
+      real(KND),intent(in)  :: a
+      integer k
+
+      !$omp parallel do
+      do k=1,size(to,3)
+        to(:,:,k) = b * to(:,:,k) + a
+      end do
+      !$omp end parallel do
+    end subroutine
+
+
+    subroutine reciprocal_1D(to,a)
+      ! to = a / to
+      real(KND),intent(inout) :: to(:)
+      real(KND),intent(in)  :: a
+      integer i
+
+      !$omp parallel do
+      do i=1,size(to)
+        to(i) = a / to(i)
+      end do
+      !$omp end parallel do
+    end subroutine
+
+    subroutine reciprocal_2D(to,a)
+      ! to = a / to
+      real(KND),intent(inout) :: to(:,:)
+      real(KND),intent(in)  :: a
+      integer j
+
+      !$omp parallel do
+      do j=1,size(to,2)
+        to(:,j) = a / to(:,j)
+      end do
+      !$omp end parallel do
+    end subroutine
+
+    subroutine reciprocal_3D(to,a)
+      ! to = a / to
+      real(KND),intent(inout) :: to(:,:,:)
+      real(KND),intent(in)  :: a
+      integer k
+
+      !$omp parallel do
+      do k=1,size(to,3)
+        to(:,:,k) = a / to(:,:,k)
+      end do
+      !$omp end parallel do
+    end subroutine
 
 
 end module ArrayUtilities
