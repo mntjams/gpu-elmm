@@ -1,13 +1,10 @@
 program CLMM
 
-  use TSTEPS
+  use TSTEPS, only: TMarchRK3
   use PARAMETERS
-  use BOUNDARIES
+!   use BOUNDARIES
   use INITIAL
   use OUTPUTS, only: AllocateOutputs, OutTStep, Output
-  use GEOMETRIC
-  use SCALARS
-  use WALLMODELS
 
   implicit none
 
@@ -15,6 +12,8 @@ program CLMM
 
 
   real(KND),allocatable:: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)
+  real(KND),allocatable,dimension(:,:,:) :: Temperature
+  real(KND),allocatable,dimension(:,:,:,:) :: Scalar  !last index is a number of scalar (because of paging)
   real(KND) :: delta = 0
 
   pi=2.0_KND*acos(0.0_KND)
@@ -33,14 +32,14 @@ program CLMM
 
 
   write (*,*) "Setting up initial conditions..."
-  call InitConds(U,V,W,Pr)
+  call InitConds(U,V,W,Pr,Temperature,Scalar)
 
   time=starttime
   step=0
 
   call AllocateOutputs
 
-  call OutTStep(U,V,W,Pr,delta)
+  call OutTStep(U,V,W,Pr,Temperature,Scalar,delta)
 
 
 
@@ -66,7 +65,7 @@ program CLMM
       time=time+dt
 
 
-      call OutTStep(U,V,W,Pr,delta)
+      call OutTStep(U,V,W,Pr,Temperature,Scalar,delta)
 
 
       if ((steady==1) .and. (delta<eps)) then
@@ -96,7 +95,7 @@ program CLMM
 
   write (*,*) "Saving results..."
 
-  call OUTPUT(U,V,W,Pr)
+  call OUTPUT(U,V,W,Pr,Temperature,Scalar)
 
 
   contains

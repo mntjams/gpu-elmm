@@ -11,7 +11,8 @@ module INITIAL
   use Filters, only: filtertype, filter_ratios
   use Subgrid
   use TURBINLET, only: GetTurbInlet, GetInletFromFile, TLag, Lturby, Lturbz, ustarinlet, transformtensor
-  use GEOMETRIC
+  use SolidBodies, only: obstaclefile, InitSolidBodies
+  use ImmersedBoundary, only: GetSolidBodiesBC
   use WALLMODELS
   use TILING, only: tilesize,InitTiles
   use FreeUnit, only: newunit
@@ -45,101 +46,77 @@ contains
    character(10) :: domain_label
    integer :: num_staggered_domains
 
+   interface get
+     procedure chget1
+     procedure lget1, lget2, lget3
+     procedure iget1, iget2, iget3
+     procedure rget1, rget2, rget3
+   end interface
+
    call newunit(unit)
 
    open(unit,file="main.conf",status="old",action="read")
-   read(unit,fmt='(/)')
-   read(unit,*) tempmet
-   read(unit,fmt='(/)')
-   read(unit,*) CFL
-   read(unit,fmt='(/)')
-   read(unit,*) Uref
-   read(unit,fmt='(/)')
-   read(unit,*) poissmet
-   read(unit,fmt='(/)')
-   read(unit,*) convmet
-   read(unit,fmt='(/)')
-   read(unit,*) limitertype
-   read(unit,fmt='(/)')
-   read(unit,*) limparam
-   read(unit,fmt='(/)')
-   read(unit,*) masssourc
-   read(unit,fmt='(/)')
-   read(unit,*) steady
-   read(unit,fmt='(/)')
-   read(unit,*) tasktype
+   call get(tempmet)
+   call get(CFL)
+   call get(Uref)
+   call get(poissmet)
+   call get(convmet)
+   call get(limitertype)
+   call get(limparam)
+   call get(masssourc)
+   call get(steady)
+   call get(tasktype)
    write(*,*) "tasktype=",tasktype
-   read(unit,fmt='(/)')
-   read(unit,*) initcondsfromfile
-   read(unit,fmt='(/)')
-   read(unit,*) timeavg1
-   read(unit,fmt='(/)')
-   read(unit,*) timeavg2
-   read(unit,fmt='(/)')
-   read(unit,*) Re
+   call get(initcondsfromfile)
+   call get(timeavg1)
+   call get(timeavg2)
+   call get(Re)
    write(*,*) "Re=",Re
-   read(unit,fmt='(/)')
-   read(unit,*) starttime
+   call get(starttime)
    write(*,*) "starttime=",starttime
-   read(unit,fmt='(/)')
-   read(unit,*) endtime
+   call get(endtime)
    write(*,*) "endtime=",endtime
-   read(unit,fmt='(/)')
-   read(unit,*) maxiter
+   call get(maxiter)
    write(*,*) "maxiter=",maxiter
-   read(unit,fmt='(/)')
-   read(unit,*) eps
+   call get(eps)
    write(*,*) "eps=",eps
-   read(unit,fmt='(/)')
-   read(unit,*) maxCNiter
+   call get(maxCNiter)
    write(*,*) "maxCNiter=",maxCNiter
-   read(unit,fmt='(/)')
-   read(unit,*) epsCN
+   call get(epsCN)
    write(*,*) "epsCN=",epsCN
-   read(unit,fmt='(/)')
-   read(unit,*) maxPOISSONiter
+   call get(maxPOISSONiter)
    write(*,*) "maxPOISSONiter=",maxPOISSONiter
-   read(unit,fmt='(/)')
-   read(unit,*) epsPOISSON
+   call get(epsPOISSON)
    write(*,*) "epsPOISSON=",epsPOISSON
-   read(unit,fmt='(/)')
-   read(unit,*) debugparam
+   call get(debugparam)
    write(*,*) "debug parameter=",debugparam
    close(unit)
 
 
    open(unit,file="les.conf",status="old",action="read")
-   read(unit,fmt='(/)')
-   read(unit,*) sgstype
-   read(unit,fmt='(/)')
-   read(unit,*) filtertype
+   call get(sgstype)
+   call get(filtertype)
 
    if (filtertype > size(filter_ratios)) then
      write(*,*) "Chosen filter type does not exist. Maximum index is:",size(filter_ratios)
      stop
    end if
 
-   read(unit,fmt='(/)')
-   read(unit,*) wallmodeltype
+   call get(wallmodeltype)
    close(unit)
 
 
    open(unit,file="grid.conf",status="old",action="read")
-   read(unit,fmt='(/)')
-   read(unit,*) xgridfromfile
-   read(unit,fmt='(/)')
-   read(unit,*) ygridfromfile
-   read(unit,fmt='(/)')
-   read(unit,*) zgridfromfile
+   call get(xgridfromfile)
+   call get(ygridfromfile)
+   call get(zgridfromfile)
    read(unit,fmt='(/)')
 
    read(unit,*) x0
    write(*,*) "x0=",x0
-   read(unit,fmt='(/)')
-   read(unit,*) y0
+   call get(y0)
    write(*,*) "y0=",y0
-   read(unit,fmt='(/)')
-   read(unit,*) z0
+   call get(z0)
    write(*,*) "z0=",z0
    read(unit,fmt='(/)')
 
@@ -198,70 +175,42 @@ contains
    close(unit)
 
    open(unit,file="boundconds.conf",status="old",action="read")
-   read(unit,fmt='(/)')
-   read(unit,*) Btype(We)
-   read(unit,fmt='(/)')
-   read(unit,*) Btype(Ea)
-   read(unit,fmt='(/)')
-   read(unit,*) Btype(So)
-   read(unit,fmt='(/)')
-   read(unit,*) Btype(No)
-   read(unit,fmt='(/)')
-   read(unit,*) Btype(Bo)
-   read(unit,fmt='(/)')
-   read(unit,*) Btype(To)
-   read(unit,fmt='(/)')
-   read(unit,*) sideU(1,So)
-   read(unit,fmt='(/)')
-   read(unit,*) sideU(2,So)
-   read(unit,fmt='(/)')
-   read(unit,*) sideU(3,So)
-   read(unit,fmt='(/)')
-   read(unit,*) sideU(1,No)
-   read(unit,fmt='(/)')
-   read(unit,*) sideU(2,No)
-   read(unit,fmt='(/)')
-   read(unit,*) sideU(3,No)
-   read(unit,fmt='(/)')
-   read(unit,*) sideU(1,Bo)
-   read(unit,fmt='(/)')
-   read(unit,*) sideU(2,Bo)
-   read(unit,fmt='(/)')
-   read(unit,*) sideU(3,Bo)
-   read(unit,fmt='(/)')
-   read(unit,*) sideU(1,To)
-   read(unit,fmt='(/)')
-   read(unit,*) sideU(2,To)
-   read(unit,fmt='(/)')
-   read(unit,*) sideU(3,To)
-   read(unit,fmt='(/)')
-   read(unit,*) z0W
-   read(unit,fmt='(/)')
-   read(unit,*) z0E
-   read(unit,fmt='(/)')
-   read(unit,*) z0S
-   read(unit,fmt='(/)')
-   read(unit,*) z0N
-   read(unit,fmt='(/)')
-   read(unit,*) z0B
-   read(unit,fmt='(/)')
-   read(unit,*) z0T
+   call get(Btype(We))
+   call get(Btype(Ea))
+   call get(Btype(So))
+   call get(Btype(No))
+   call get(Btype(Bo))
+   call get(Btype(To))
+   call get(sideU(1,So))
+   call get(sideU(2,So))
+   call get(sideU(3,So))
+   call get(sideU(1,No))
+   call get(sideU(2,No))
+   call get(sideU(3,No))
+   call get(sideU(1,Bo))
+   call get(sideU(2,Bo))
+   call get(sideU(3,Bo))
+   call get(sideU(1,To))
+   call get(sideU(2,To))
+   call get(sideU(3,To))
+   call get(z0W)
+   call get(z0E)
+   call get(z0S)
+   call get(z0N)
+   call get(z0B)
+   call get(z0T)
    close(unit)
 
    open(unit,file="large_scale.conf",status="old",action="read",iostat=io)
 
    if (io==0) then
-     read(unit,fmt='(/)')
-     read(unit,*) CoriolisParam
+     call get(CoriolisParam)
      write(*,*) "coriolisparam=",CoriolisParam
-     read(unit,fmt='(/)')
-     read(unit,*) PrGradientX
+     call get(PrGradientX)
      write(*,*) "prgradientx=",PrGradientX
-     read(unit,fmt='(/)')
-     read(unit,*) PrGradientY
+     call get(PrGradientY)
      write(*,*) "prgradienty=",PrGradientY
-     read(unit,fmt='(/)')
-     read(unit,*) SubsidenceGradient
+     call get(SubsidenceGradient)
      write(*,*) "SubsidenceGradient=",SubsidenceGradient
      close(unit)
 
@@ -273,38 +222,22 @@ contains
 
 
    open(unit,file="thermal.conf",status="old",action="read")
-   read(unit,fmt='(/)')
-   read(unit,*) buoyancy
-   read(unit,fmt='(/)')
-   read(unit,*) Prandtl
-   read(unit,fmt='(/)')
-   read(unit,*) grav_acc
-   read(unit,fmt='(/)')
-   read(unit,*) temperature_ref
-   read(unit,fmt='(/)')
-   read(unit,*) TBtype(We)
-   read(unit,fmt='(/)')
-   read(unit,*) TBtype(Ea)
-   read(unit,fmt='(/)')
-   read(unit,*) TBtype(So)
-   read(unit,fmt='(/)')
-   read(unit,*) TBtype(No)
-   read(unit,fmt='(/)')
-   read(unit,*) TBtype(Bo)
-   read(unit,fmt='(/)')
-   read(unit,*) TBtype(To)
-   read(unit,fmt='(/)')
-   read(unit,*) sideTemp(We)
-   read(unit,fmt='(/)')
-   read(unit,*) sideTemp(Ea)
-   read(unit,fmt='(/)')
-   read(unit,*) sideTemp(So)
-   read(unit,fmt='(/)')
-   read(unit,*) sideTemp(No)
-   read(unit,fmt='(/)')
-   read(unit,*) sideTemp(Bo)
-   read(unit,fmt='(/)')
-   read(unit,*) sideTemp(To)
+   call get(buoyancy)
+   call get(Prandtl)
+   call get(grav_acc)
+   call get(temperature_ref)
+   call get(TBtype(We))
+   call get(TBtype(Ea))
+   call get(TBtype(So))
+   call get(TBtype(No))
+   call get(TBtype(Bo))
+   call get(TBtype(To))
+   call get(sideTemp(We))
+   call get(sideTemp(Ea))
+   call get(sideTemp(So))
+   call get(sideTemp(No))
+   call get(sideTemp(Bo))
+   call get(sideTemp(To))
    close(unit)
 
    if (buoyancy==1) then
@@ -312,24 +245,17 @@ contains
      open(unit,file="temp_profile.conf",status="old",action="read",iostat=io)
 
      if (io==0) then
-       read(unit,fmt='(/)')
-       read(unit,*) TemperatureProfile%randomize
-       read(unit,fmt='(/)')
-       read(unit,*) TemperatureProfile%randomizeTop
-       read(unit,fmt='(/)')
-       read(unit,*) TemperatureProfile%randomizeAmplitude
-       read(unit,fmt='(/)')
-       read(unit,*) itmp
+       call get(TemperatureProfile%randomize)
+       call get(TemperatureProfile%randomizeTop)
+       call get(TemperatureProfile%randomizeAmplitude)
+       call get(itmp)
 
        allocate(TemperatureProfile%Sections(max(itmp,0)))
 
        do i = 1, size(TemperatureProfile%Sections)
-         read(unit,fmt='(/)')
-         read(unit,*) TemperatureProfile%Sections(i)%top
-         read(unit,fmt='(/)')
-         read(unit,*) TemperatureProfile%Sections(i)%jump
-         read(unit,fmt='(/)')
-         read(unit,*) TemperatureProfile%Sections(i)%gradient
+         call get(TemperatureProfile%Sections(i)%top)
+         call get(TemperatureProfile%Sections(i)%jump)
+         call get(TemperatureProfile%Sections(i)%gradient)
        enddo
 
        close(unit)
@@ -350,46 +276,27 @@ contains
    endif
 
    open(unit,file="inlet.conf",status="old",action="read")
-   read(unit,fmt='(/)')
-   read(unit,*) inlettype
-   read(unit,fmt='(/)')
-   read(unit,*) profiletype
-   read(unit,fmt='(/)')
-   read(unit,*) SHEARG
+   call get(inlettype)
+   call get(profiletype)
+   call get(SHEARG)
    write(*,*) "G=",SHEARG
-   read(unit,fmt='(/)')
-   read(unit,*) Uinlet
+   call get(Uinlet)
    write(*,*) "Uinlet=",Uinlet
-   read(unit,fmt='(/)')
-   read(unit,*) ustarsurfin  !-<u'w'>
-   read(unit,fmt='(/)')
-   read(unit,*) stressgradin !in relative part per 1m
-   read(unit,fmt='(/)')
-   read(unit,*) z0inlet
-   read(unit,fmt='(/)')
-   read(unit,*) powerexpin
-   read(unit,fmt='(/)')
-   read(unit,*) zrefin
-   read(unit,fmt='(/)')
-   read(unit,*) Urefin
-   read(unit,fmt='(/)')
-   read(unit,*)  relativestress(1,1)
-   read(unit,fmt='(/)')
-   read(unit,*)  relativestress(2,2)
-   read(unit,fmt='(/)')
-   read(unit,*) relativestress(3,3)
-   read(unit,fmt='(/)')
-   read(unit,*) relativestress(1,2)
-   read(unit,fmt='(/)')
-   read(unit,*) relativestress(1,3)
-   read(unit,fmt='(/)')
-   read(unit,*) relativestress(2,3)
-   read(unit,fmt='(/)')
-   read(unit,*) TLag
-   read(unit,fmt='(/)')
-   read(unit,*) Lturby
-   read(unit,fmt='(/)')
-   read(unit,*) Lturbz
+  !call get(ustarsurfin)-<u'w'>
+ !icall get(stressgradin)n relative part per 1m
+   call get(z0inlet)
+   call get(powerexpin)
+   call get(zrefin)
+   call get(Urefin)
+   call get(relativestress(1,1))
+   call get(relativestress(2,2))
+   call get(relativestress(3,3))
+   call get(relativestress(1,2))
+   call get(relativestress(1,3))
+   call get(relativestress(2,3))
+   call get(TLag)
+   call get(Lturby)
+   call get(Lturbz)
    close(unit)
 
    relativestress(2,1)=relativestress(1,2)
@@ -397,43 +304,25 @@ contains
    relativestress(3,2)=relativestress(2,3)
 
    open(unit,file="scalars.conf",status="old",action="read")
-   read(unit,fmt='(/)')
-   read(unit,*) computescalars
-   read(unit,fmt='(/)')
-   read(unit,*) computedeposition
-   read(unit,fmt='(/)')
-   read(unit,*) computegravsettling
-   read(unit,fmt='(/)')
-   read(unit,*) partdistrib
-   read(unit,fmt='(/)')
-   read(unit,*) totalscalsource
-   read(unit,fmt='(/)')
-   read(unit,*) scalsourcetype
+   call get(computescalars)
+   call get(computedeposition)
+   call get(computegravsettling)
+   call get(partdistrib)
+   call get(totalscalsource)
+   call get(scalsourcetype)
 
-   read(unit,fmt='(/)')
-   read(unit,*) ScalBtype(We)
-   read(unit,fmt='(/)')
-   read(unit,*) ScalBtype(Ea)
-   read(unit,fmt='(/)')
-   read(unit,*) ScalBtype(So)
-   read(unit,fmt='(/)')
-   read(unit,*) ScalBtype(No)
-   read(unit,fmt='(/)')
-   read(unit,*) ScalBtype(Bo)
-   read(unit,fmt='(/)')
-   read(unit,*) ScalBtype(To)
-   read(unit,fmt='(/)')
-   read(unit,*) sideScal(We)
-   read(unit,fmt='(/)')
-   read(unit,*) sideScal(Ea)
-   read(unit,fmt='(/)')
-   read(unit,*) sideScal(So)
-   read(unit,fmt='(/)')
-   read(unit,*) sideScal(No)
-   read(unit,fmt='(/)')
-   read(unit,*) sideScal(Bo)
-   read(unit,fmt='(/)')
-   read(unit,*) sideScal(To)
+   call get(ScalBtype(We))
+   call get(ScalBtype(Ea))
+   call get(ScalBtype(So))
+   call get(ScalBtype(No))
+   call get(ScalBtype(Bo))
+   call get(ScalBtype(To))
+   call get(sideScal(We))
+   call get(sideScal(Ea))
+   call get(sideScal(So))
+   call get(sideScal(No))
+   call get(sideScal(Bo))
+   call get(sideScal(To))
 
    if (partdistrib>0) then
 
@@ -442,18 +331,12 @@ contains
       allocate(scalsrci(partdistrib),scalsrcj(partdistrib),scalsrck(partdistrib))
 
       do i=1,partdistrib
-        read(unit,fmt='(/)')
-        read(unit,*) partdiam(i)
-        read(unit,fmt='(/)')
-        read(unit,*) partrho(i)
-        read(unit,fmt='(/)')
-        read(unit,*) percdistrib(i)
-        read(unit,fmt='(/)')
-        read(unit,*) scalsrcx(i)
-        read(unit,fmt='(/)')
-        read(unit,*) scalsrcy(i)
-        read(unit,fmt='(/)')
-        read(unit,*) scalsrcz(i)
+        call get(partdiam(i))
+        call get(partrho(i))
+        call get(percdistrib(i))
+        call get(scalsrcx(i))
+        call get(scalsrcy(i))
+        call get(scalsrcz(i))
       enddo
 
    else
@@ -463,18 +346,12 @@ contains
       allocate(scalsrci(computescalars),scalsrcj(computescalars),scalsrck(computescalars))
 
       do i=1,computescalars
-        read(unit,fmt='(/)')
-        read(unit,*) partdiam(i)
-        read(unit,fmt='(/)')
-        read(unit,*) partrho(i)
-        read(unit,fmt='(/)')
-        read(unit,*) percdistrib(i)
-        read(unit,fmt='(/)')
-        read(unit,*) scalsrcx(i)
-        read(unit,fmt='(/)')
-        read(unit,*) scalsrcy(i)
-        read(unit,fmt='(/)')
-        read(unit,*) scalsrcz(i)
+        call get(partdiam(i))
+        call get(partrho(i))
+        call get(percdistrib(i))
+        call get(scalsrcx(i))
+        call get(scalsrcy(i))
+        call get(scalsrcz(i))
       enddo
 
    endif
@@ -482,26 +359,16 @@ contains
 
    if (poissmet==3.or.poissmet==4.or.poissmet==5) then
      open(unit,file="mgopts.conf",status="old",action="read")
-     read(unit,fmt='(/)')
-     read(unit,*) lmg
-     read(unit,fmt='(/)')
-     read(unit,*) minmglevel
-     read(unit,fmt='(/)')
-     read(unit,*) bnx
-     read(unit,fmt='(/)')
-     read(unit,*) bny
-     read(unit,fmt='(/)')
-     read(unit,*) bnz
-     read(unit,fmt='(/)')
-     read(unit,*) mgncgc
-     read(unit,fmt='(/)')
-     read(unit,*) mgnpre
-     read(unit,fmt='(/)')
-     read(unit,*) mgnpost
-     read(unit,fmt='(/)')
-     read(unit,*) mgmaxinnerGSiter
-     read(unit,fmt='(/)')
-     read(unit,*) mgepsinnerGS
+     call get(lmg)
+     call get(minmglevel)
+     call get(bnx)
+     call get(bny)
+     call get(bnz)
+     call get(mgncgc)
+     call get(mgnpre)
+     call get(mgnpost)
+     call get(mgmaxinnerGSiter)
+     call get(mgepsinnerGS)
      read(unit,fmt='(/)',iostat=io)
      read(unit,*,iostat=io) minGPUlevel
      close(unit)
@@ -521,45 +388,30 @@ contains
    endif
 
    open(unit,file="frames.conf",status="old",action="read")
-   read(unit,fmt='(/)')
-   read(unit,*) frames
-   read(unit,fmt='(/)')
-   read(unit,*) timefram1
-   read(unit,fmt='(/)')
-   read(unit,*) timefram2
+   call get(frames)
+   call get(timefram1)
+   call get(timefram2)
    read(unit,fmt='(/)')
 
    read(unit,*) store%frame_U
-   read(unit,fmt='(/)')
-   read(unit,*) store%frame_vort
-   read(unit,fmt='(/)')
-   read(unit,*) store%frame_Pr
-   read(unit,fmt='(/)')
-   read(unit,*) store%frame_lambda2
-   read(unit,fmt='(/)')
-   read(unit,*) store%frame_scalars
-   read(unit,fmt='(/)')
-   read(unit,*) store%frame_sumscalars
-   read(unit,fmt='(/)')
-   read(unit,*) store%frame_T
-   read(unit,fmt='(/)')
-   read(unit,*) store%frame_tempfl
-   read(unit,fmt='(/)')
-   read(unit,*) store%frame_scalfl
+   call get(store%frame_vort)
+   call get(store%frame_Pr)
+   call get(store%frame_lambda2)
+   call get(store%frame_scalars)
+   call get(store%frame_sumscalars)
+   call get(store%frame_T)
+   call get(store%frame_tempfl)
+   call get(store%frame_scalfl)
 
 
-   read(unit,fmt='(/)')
-   read(unit,*) numframeslices
+   call get(numframeslices)
 
    allocate(store%frame_domains(numframeslices))
 
    do i=1,numframeslices
-     read(unit,fmt='(/)')
-     read(unit,*) store%frame_domains(i)%dimension
-     read(unit,fmt='(/)')
-     read(unit,*) store%frame_domains(i)%direction
-     read(unit,fmt='(/)')
-     read(unit,*) store%frame_domains(i)%position
+     call get(store%frame_domains(i)%dimension)
+     call get(store%frame_domains(i)%direction)
+     call get(store%frame_domains(i)%position)
    enddo
 
    close(unit)
@@ -567,33 +419,23 @@ contains
 
    open(unit,file="stagframes.conf",status="old",action="read",iostat=io)
    if (io==0) then
-     read(unit,fmt='(/)')
-     read(unit,*) num_staggered_domains
+     call get(num_staggered_domains)
 
      allocate(StaggeredFrameDomains(num_staggered_domains))
 
      do i=1,num_staggered_domains
-       read(unit,fmt='(//)')
-       read(unit,*) domain_label
-       read(unit,fmt='(/)')
-       read(unit,*) range%min%x,range%max%x
-       read(unit,fmt='(/)')
-       read(unit,*) range%min%y,range%max%y
-       read(unit,fmt='(/)')
-       read(unit,*) range%min%z,range%max%z
-       read(unit,fmt='(/)')
-       read(unit,*) frame_times%nframes
-       read(unit,fmt='(/)')
-       read(unit,*) frame_times%start, frame_times%end
-       read(unit,fmt='(/)')
-       read(unit,*) frame_save_flags%U, frame_save_flags%V, frame_save_flags%W
-       read(unit,fmt='(/)')
-       read(unit,*) frame_save_flags%Pr
-       read(unit,fmt='(/)')
-       read(unit,*) frame_save_flags%Temperature
+       read(unit,fmt=*)
+       call get(domain_label)
+       call get(range%min%x,range%max%x)
+       call get(range%min%y,range%max%y)
+       call get(range%min%z,range%max%z)
+       call get(frame_times%nframes)
+       call get(frame_times%start, frame_times%end)
+       call get(frame_save_flags%U, frame_save_flags%V, frame_save_flags%W)
+       call get(frame_save_flags%Pr)
+       call get(frame_save_flags%Temperature)
        if (buoyancy == 0) frame_save_flags%Temperature = .false.
-       read(unit,fmt='(/)')
-       read(unit,*) frame_save_flags%Scalar
+       call get(frame_save_flags%Scalar)
        if (computescalars == 0) frame_save_flags%Scalar = .false.
 
        call Init(StaggeredFrameDomains(i), trim(domain_label), &
@@ -609,96 +451,57 @@ contains
 
    open(unit,file="output.conf",status="old",action="read",iostat=io)
    if (io==0) then
-     read(unit,fmt='(/)')
-     read(unit,*) display%delta
-     read(unit,fmt='(/)')
-     read(unit,*) display%ustar
-     read(unit,fmt='(/)')
-     read(unit,*) display%tstar
+     call get(display%delta)
+     call get(display%ustar)
+     call get(display%tstar)
 
-     read(unit,fmt='(/)')
-     read(unit,*) store%U
-     read(unit,fmt='(/)')
-     read(unit,*) store%U_interp
-     read(unit,fmt='(/)')
-     read(unit,*) store%V
-     read(unit,fmt='(/)')
-     read(unit,*) store%V_interp
-     read(unit,fmt='(/)')
-     read(unit,*) store%W
-     read(unit,fmt='(/)')
-     read(unit,*) store%W_interp
+     call get(store%U)
+     call get(store%U_interp)
+     call get(store%V)
+     call get(store%V_interp)
+     call get(store%W)
+     call get(store%W_interp)
 
-     read(unit,fmt='(/)')
-     read(unit,*) store%out
+     call get(store%out)
 
-     read(unit,fmt='(/)')
-     read(unit,*) store%out_U
-     read(unit,fmt='(/)')
-     read(unit,*) store%out_vort
-     read(unit,fmt='(/)')
-     read(unit,*) store%out_Pr
-     read(unit,fmt='(/)')
-     read(unit,*) store%out_Prtype
-     read(unit,fmt='(/)')
-     read(unit,*) store%out_lambda2
-     read(unit,fmt='(/)')
-     read(unit,*) store%out_T
-     read(unit,fmt='(/)')
-     read(unit,*) store%out_div
-     read(unit,fmt='(/)')
-     read(unit,*) store%out_visc
+     call get(store%out_U)
+     call get(store%out_vort)
+     call get(store%out_Pr)
+     call get(store%out_Prtype)
+     call get(store%out_lambda2)
+     call get(store%out_T)
+     call get(store%out_div)
+     call get(store%out_visc)
 
-     read(unit,fmt='(/)')
-     read(unit,*) store%avg
+     call get(store%avg)
 
-     read(unit,fmt='(/)')
-     read(unit,*) store%avg_U
-     read(unit,fmt='(/)')
-     read(unit,*) store%avg_vort
-     read(unit,fmt='(/)')
-     read(unit,*) store%avg_Pr
-     read(unit,fmt='(/)')
-     read(unit,*) store%avg_Prtype
-     read(unit,fmt='(/)')
-     read(unit,*) store%avg_T
+     call get(store%avg_U)
+     call get(store%avg_vort)
+     call get(store%avg_Pr)
+     call get(store%avg_Prtype)
+     call get(store%avg_T)
 
-     read(unit,fmt='(/)')
-     read(unit,*) store%scalars
-     read(unit,fmt='(/)')
-     read(unit,*) store%scalarsavg
+     call get(store%scalars)
+     call get(store%scalarsavg)
 
-     read(unit,fmt='(/)')
-     read(unit,*) store%deposition
+     call get(store%deposition)
 
-     read(unit,fmt='(/)')
-     read(unit,*) store%deltime
-     read(unit,fmt='(/)')
-     read(unit,*) store%tke
-     read(unit,fmt='(/)')
-     read(unit,*) store%dissip
-     read(unit,fmt='(/)')
-     read(unit,*) store%scalsumtime
-     read(unit,fmt='(/)')
-     read(unit,*) store%scaltotsumtime
-     read(unit,fmt='(/)')
-     read(unit,*) store%ustar
-     read(unit,fmt='(/)')
-     read(unit,*) store%tstar
-     read(unit,fmt='(/)')
-     read(unit,*) store%blprofiles
+     call get(store%deltime)
+     call get(store%tke)
+     call get(store%dissip)
+     call get(store%scalsumtime)
+     call get(store%scaltotsumtime)
+     call get(store%ustar)
+     call get(store%tstar)
+     call get(store%blprofiles)
 
-     read(unit,fmt='(/)')
-     read(unit,*) NumProbes
+     call get(NumProbes)
      allocate(probes(Numprobes))
 
      do i=1,NumProbes
-       read(unit,fmt='(/)')
-       read(unit,*) probes(i)%x
-       read(unit,fmt='(/)')
-       read(unit,*) probes(i)%y
-       read(unit,fmt='(/)')
-       read(unit,*) probes(i)%z
+       call get(probes(i)%x)
+       call get(probes(i)%y)
+       call get(probes(i)%z)
      enddo
      close(unit)
    endif
@@ -913,14 +716,68 @@ contains
 
 
    write(*,*) "set"
+
+   contains
+     subroutine chget1(x)
+       character(*),intent(out) :: x
+       read(unit,fmt='(/)')
+       read(unit,*) x
+     end subroutine
+     subroutine lget1(x)
+       logical,intent(out) :: x
+       read(unit,fmt='(/)')
+       read(unit,*) x
+     end subroutine
+     subroutine lget2(x,y)
+       logical,intent(out) :: x,y
+       read(unit,fmt='(/)')
+       read(unit,*) x,y
+     end subroutine
+     subroutine lget3(x,y,z)
+       logical,intent(out) :: x,y,z
+       read(unit,fmt='(/)')
+       read(unit,*) x,y,z
+     end subroutine
+     subroutine iget1(x)
+       integer,intent(out) :: x
+       read(unit,fmt='(/)')
+       read(unit,*) x
+     end subroutine
+     subroutine iget2(x,y)
+       integer,intent(out) :: x,y
+       read(unit,fmt='(/)')
+       read(unit,*) x,y
+     end subroutine
+     subroutine iget3(x,y,z)
+       integer,intent(out) :: x,y,z
+       read(unit,fmt='(/)')
+       read(unit,*) x,y,z
+     end subroutine
+     subroutine rget1(x)
+       real(KND),intent(out) :: x
+       read(unit,fmt='(/)')
+       read(unit,*) x
+     end subroutine
+     subroutine rget2(x,y)
+       real(KND),intent(out) :: x,y
+       read(unit,fmt='(/)')
+       read(unit,*) x,y
+     end subroutine
+     subroutine rget3(x,y,z)
+       real(KND),intent(out) :: x,y,z
+       read(unit,fmt='(/)')
+       read(unit,*) x,y,z
+     end subroutine
  end subroutine ReadParams
 
 
 
 
- subroutine ReadIC(U,V,W,Pr)
- real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
- integer i,j,k,unit
+ subroutine ReadIC(U,V,W,Pr,Temperature)
+   real(KND),intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+   real(KND),intent(inout) :: Pr(1:,1:,1:)
+   real(KND),intent(inout) :: Temperature(-1:,-1:,-1:)
+   integer i,j,k,unit
 
    call newunit(unit)
 
@@ -990,8 +847,10 @@ contains
 
 
 
-  subroutine INITCONDS(U,V,W,Pr)
-  real(KND) U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  subroutine INITCONDS(U,V,W,Pr,Temperature,Scalar)
+  real(KND),intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(KND),intent(inout) :: Temperature(-1:,-1:,:)
+  real(KND),intent(inout) :: Scalar(-1:,-1:,-1:,:)
   integer i,j,k
   real(KND) p,x,y,z,x1,x2,y1,y2,z1,z2
   real(KND),allocatable :: Q(:,:,:)
@@ -1009,7 +868,7 @@ contains
 
     if (initcondsfromfile==1) then
 
-       call ReadIC(U,V,W,Pr)
+       call ReadIC(U,V,W,Pr,Temperature)
 
        if (Re>0) then
          Visc=1._KND/Re
@@ -1412,7 +1271,7 @@ contains
        elseif (sgstype==VremanModel) then
                          call SGS_Vreman(U,V,W,2._KND)
        elseif (sgstype==StabSubgridModel) then
-                         call SGS_StabSmag(U,V,W,2._KND)
+                         call SGS_StabSmag(U,V,W,Temperature,2._KND)
        else
          if (Re>0) then
            Visc=1._KND/Re
@@ -1440,10 +1299,10 @@ contains
          call Bound_PassScalar(Scalar(:,:,:,i))
        enddo
 
-       call InitTempFL
+       call InitTempFL(Temperature)
 
        if (wallmodeltype>0) then
-                      call ComputeViscsWM(U,V,W,Pr)
+                      call ComputeViscsWM(U,V,W,Pr,Temperature)
        endif
 
        call Bound_Visc(Visc)
@@ -1958,8 +1817,8 @@ contains
 
 
   subroutine INIT_RANDOM_SEED()
-  integer:: i, n, clock
-  integer,dimension(:),allocatable:: seed
+    integer :: i, n, clock
+    integer,dimension(:),allocatable :: seed
 
     call RANDOM_SEED(size = n)
     allocate(seed(n))

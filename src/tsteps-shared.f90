@@ -75,19 +75,19 @@
 
 
 
+#ifdef __HMPP
  !$hmpp <tsteps> Convection codelet
  subroutine Convection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
                        dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
                        U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev,dt)
   implicit none
-#ifdef __HMPP
 #include "hmpp-include.f90"
-#endif
 
-  integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,lev
+
+  integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet
   real(KND),intent(in) :: dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref
   real(KND),intent(in) :: dt
-#ifdef __HMPP
+
   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out)   :: U2
   real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: Ustar
@@ -98,15 +98,17 @@
   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(out)   :: W2
   real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: Wstar
   real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: temperature
+  intrinsic abs
 #else
+ subroutine Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev)
   real(KND),dimension(-2:,-2:,-2:),intent(in)    :: U,V,W
   real(KND),dimension(-2:,-2:,-2:),intent(out)   :: U2,V2,W2
   real(KND),dimension(-2:,-2:,-2:),intent(inout) :: Ustar,Vstar,Wstar
   real(KND),dimension(-1:,-1:,-1:),intent(in) :: temperature
 #endif
   real(KND),dimension(1:3),intent(in) :: beta,rho
+  integer,intent(in) :: lev
   integer i,j,k
-  intrinsic abs
 
       if (lev>1) then
         !$omp parallel private(i,j,k)
@@ -335,11 +337,6 @@
       enddo
       !$omp end do
       !$omp end parallel
-
-
-      Where (Utype>0) U2=0
-      Where (Vtype>0) V2=0
-      Where (Wtype>0) W2=0
 
   end subroutine Convection
 

@@ -51,8 +51,9 @@ module Subgrid
 
 
 
-    subroutine SGS_StabSmag(U,V,W,filter_ratio)  !Smagorinsky with a stability correction Brown et al. (1994)
+    subroutine SGS_StabSmag(U,V,W,Temperature,filter_ratio)  !Smagorinsky with a stability correction Brown et al. (1994)
       real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+      real(KND),dimension(-1:,-1:,-1:),intent(in) :: Temperature
       real(KND),intent(in) :: filter_ratio
       real(KND) Ri,l,l0
       real(KND) width,Sbar
@@ -74,14 +75,14 @@ module Subgrid
           l0 = CS*width
           l = WallDamp(l0,z0B,zPr(k))
 
-          Visc(i,j,k) = Sbar*Fm(Ri)*l
+          Visc(i,j,k)  = Sbar*Fm(Ri)*l
           TDiff(i,j,k) = Sbar*Fh(Ri)*l
         end do
        end do
       end do
       if (Re>0) then
-        Visc = Visc+1._KND/Re
-        TDiff = TDiff+1._KND/(Re*Prandtl)
+        Visc  = Visc  + 1._KND/Re
+        TDiff = TDiff + 1._KND/(Re*Prandtl)
       end if
     endsubroutine SGS_StabSmag
 

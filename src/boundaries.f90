@@ -135,7 +135,7 @@ implicit none
 
 
 
-  subroutine BoundU(component,U,reg)
+  recursive subroutine BoundU(component,U,reg)
   integer,intent(in)           :: component
   real(KND),intent(inout)      :: U(-2:,-2:,-2:)
   integer,optional,intent(in) :: reg

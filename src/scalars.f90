@@ -2,7 +2,7 @@ module SCALARS
  use PARAMETERS
  use ArrayUtilities
  use WALLMODELS
- use GEOMETRIC, only: TIBPoint, ScalFlIBPoints,TIBPoint_ScalFlSource
+ use ImmersedBoundary, only: TIBPoint, ScalFlIBPoints,TIBPoint_ScalFlSource
  use LIMITERS, only: Limiter, limparam
  use BOUNDARIES
  use TILING, only: tilenx, tileny, tilenz
@@ -13,14 +13,13 @@ module SCALARS
 
 implicit none
   private
-  public Scalar, ScalarRK3, constPrt, Rig, partdiam, partrho, percdistrib,&
+  public ScalarRK3, constPrt, Rig, partdiam, partrho, percdistrib,&
      Bound_Visc, BoundTemperature, Bound_PassScalar, ComputeTDiff,&
      TTemperatureProfileSection, TTemperatureProfile, TemperatureProfile,&
      InitTemperatureProfile, InitTemperature,&
      SubsidenceProfile, SubsidenceGradient, InitSubsidenceProfile
 
 
-  real(KND),allocatable,dimension(:,:,:,:) :: SCALAR  !last index is a number of scalar (because of paging)
   real(KND),dimension(:),allocatable :: partdiam,partrho,percdistrib !diameter of particles <=0 for gas
 
   real(KND),dimension(:),allocatable :: SubsidenceProfile
@@ -48,6 +47,7 @@ contains
 
 
   subroutine ScalarRK3(U,V,W,Temperature,Scalar,RKstage,fluxprofile)
+    use RK3
     real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(KND),intent(inout) :: Temperature(-1:,-1:,-1:),Scalar(-1:,-1:,-1:,-1:)
     real(KND),intent(out)   :: fluxprofile(:)
@@ -55,10 +55,6 @@ contains
 
     real(KND),dimension(:,:,:,:),allocatable,save ::Scalar_adv,Scalar_2
     real(KND),dimension(:,:,:),allocatable,save   ::Temperature_adv,Temperature2
-
-    real(KND),dimension(1:3),parameter :: alpha = (/ 4._KND/15._KND, 1._KND/15._KND, 1._KND/6._KND /)
-    real(KND),dimension(1:3),parameter :: beta  = (/ 8._KND/15._KND, 5._KND/12._KND, 3._KND/4._KND /)
-    real(KND),dimension(1:3),parameter :: rho   = (/       0._KND, -17._KND/60._KND,-5._KND/12._KND/)
 
     integer :: i
     integer,save :: called = 0
@@ -92,7 +88,7 @@ contains
 
       if (RKstage>1) then
         !$omp parallel workshare
-        Scalar_2 = Scalar_2+Scalar_adv*rho(RKstage)
+        Scalar_2 = Scalar_2+Scalar_adv*RK_rho(RKstage)
         !$omp end parallel workshare
       endif
 
@@ -105,20 +101,23 @@ contains
       enddo
 
       !$omp parallel workshare
-      Scalar_2 = Scalar_2+Scalar_adv*beta(RKstage)
+      Scalar_2 = Scalar_2+Scalar_adv*RK_beta(RKstage)
       !$omp end parallel workshare
 
       if (scalsourcetype==pointsource) then
 
         do i=1,computescalars
-          Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i) = Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
-           percdistrib(i)*(rho(RKstage)+beta(RKstage))*dt*totalscalsource/(dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
+          Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i) = &
+                     Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
+                     percdistrib(i)*(RK_rho(RKstage) + &
+                     RK_beta(RKstage))*dt*totalscalsource / &
+                         (dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
         enddo
 
       elseif (scalsourcetype==volumesource) then
 
         do i=1,computescalars
-          call VolScalSource(Scalar_2,rho(RKstage)+beta(RKstage))
+          call VolScalSource(Scalar_2,RK_rho(RKstage)+RK_beta(RKstage))
         enddo
 
       endif
@@ -130,12 +129,12 @@ contains
       !$omp end parallel
 
       do i=1,computescalars
-         call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,2._KND*alpha(RKstage))
+         call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,2._KND*RK_alpha(RKstage))
       enddo
 
-      if (computedeposition>0) call Deposition(Scalar_2,2._KND*alpha(RKstage))
+      if (computedeposition>0) call Deposition(Scalar_2,2._KND*RK_alpha(RKstage))
 
-      if (computegravsettling>0) call GravSettling(Scalar_2,2._KND*alpha(RKstage))
+      if (computegravsettling>0) call GravSettling(Scalar_2,2._KND*RK_alpha(RKstage))
 
       !$omp parallel
       !$omp workshare
@@ -154,7 +153,7 @@ contains
                             dxmin,dymin,dzmin,maxCNiter,epsCN,Re,limparam,&
                             TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
                             TDiff,Temperature2,Temperature,Temperature_adv,U,V,W,&
-                            SubsidenceProfile,fluxProfile,dt,RKstage,alpha,beta,rho)
+                            SubsidenceProfile,fluxProfile,dt,RKstage,RK_alpha,RK_beta,RK_rho)
 
 #else
       call BoundTemperature(temperature)
@@ -162,7 +161,7 @@ contains
       if (RKstage>1) then
 
         call assign(temperature2, temperature_adv)
-        call multiply(temperature2, rho(RKstage))
+        call multiply(temperature2, RK_rho(RKstage))
 
       else
 
@@ -179,7 +178,7 @@ contains
       call AdvScalar(temperature_adv,temperature,U,V,W,1,1._KND,SubsidenceProfile,fluxProfile)
 ! #endif
 
-      call add_multiplied(temperature2, temperature_adv, beta(RKstage))
+      call add_multiplied(temperature2, temperature_adv, RK_beta(RKstage))
 
       call add(temperature, temperature2)
 
@@ -188,9 +187,9 @@ contains
 ! #ifdef __HMPP
 !       call HMPP_DiffTemperature(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
 !                              TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,TDiff,&
-!                              temperature2,temperature,2._KND*alpha(RKstage),dt)
+!                              temperature2,temperature,2._KND*RK_alpha(RKstage),dt)
 ! #else
-      call DiffScalar(temperature2,temperature,1,2._KND*alpha(RKstage))
+      call DiffScalar(temperature2,temperature,1,2._KND*RK_alpha(RKstage))
 ! #endif
 
       call assign(temperature,temperature2)
@@ -1490,24 +1489,24 @@ contains
 
 
 
-  pure real(DBL) function AirDensity(press,temp)
+  pure real(KND) function AirDensity(press,temp)
   real(KND),intent(in) :: press,temp
-  AirDensity = press/(287.05_DBL*temp)
+  AirDensity = press/(287.05_KND*temp)
   endfunction AirDensity
 
 
-  pure real(DBL) function AirDynVisc(temp)
+  pure real(KND) function AirDynVisc(temp)
   real(KND),intent(in) :: temp
-  AirDynVisc = 1.85e-5_DBL
+  AirDynVisc = 1.85e-5_KND
   endfunction AirDynVisc
 
 
 
-  pure real(DBL) function CorrFactor(dp,press,temp)
+  pure real(KND) function CorrFactor(dp,press,temp)
   real(KND),intent(in) :: dp,press,temp
   real(DBL) l
   l = MeanFreePath(press,temp)
-  CorrFactor = 1+(2*l/dp)*(1.257_KND+0.4_KND*exp(-0.55_KND*dp/l))
+  CorrFactor = real(1+(2*l/dp)*(1.257_KND+0.4_KND*exp(-0.55_KND*dp/l)), KND)
   endfunction CorrFactor
 
 
@@ -1528,7 +1527,7 @@ contains
   pure real(KND) function BrownEff(dp,press,temp)
   real(KND),intent(in) :: dp,press,temp
   real(KND) Sc
-  Sc = (AirDynVisc(temp)/AirDensity(press,temp))/BrownDiffusivity(dp,press,temp)
+  Sc = real((AirDynVisc(temp)/AirDensity(press,temp))/BrownDiffusivity(dp,press,temp), KND)
   BrownEff = Sc**(-0.54_KND)
   endfunction BrownEff
 
@@ -1607,7 +1606,7 @@ contains
   real(KND),intent(in) :: dp,press,temp,z,z0,zL,ustar
   real(KND) SurfResist,St,visc
 
-   visc = AirDynVisc(temp)/AirDensity(press,temp)
+   visc = real(AirDynVisc(temp)/AirDensity(press,temp), KND)
    St = SedimVelocity2(dp,press,temp)*ustar**2/(visc)
    SurfResist = 1._KND/(3._KND*ustar*(BrownEff(dp,press,temp)+ImpactEff(dp,press,temp,ustar,visc)))
    DepositionVelocity2 = SedimVelocity2(dp,press,temp)+1._KND/(AerResist(z,z0,zL,ustar,visc)+SurfResist)
@@ -1641,7 +1640,7 @@ contains
    Intexp = Intexp-32.7*log(100*dp)
    Intexp=-exp(Intexp)
 
-   DepositionVelocity = us/(1._KND-exp((us/ustar)*(Intexp+Intz)))
+   DepositionVelocity = real(us/(1._KND-exp((us/ustar)*(Intexp+Intz))), KND)
   endfunction DepositionVelocity
 
 
@@ -1653,7 +1652,7 @@ contains
    press = 101300
    temp = temperature_ref
    if ((.2_KND*WMP%distz)**2>(WMP%distx)**2+(WMP%disty)**2.and.WMP%distz>0) then
-    depvel = DepositionVelocity3(partdiam,rhop,press,temp,WMP%distz,WMP%z0,0._KND,WMP%ustar)
+    depvel = DepositionVelocity(partdiam,rhop,press,temp,WMP%distz,WMP%z0,0._KND,WMP%ustar)
    else
     depvel = 0
    endif
@@ -1710,7 +1709,7 @@ contains
     do k = 1,Prnz
      do j = 1,Prny
       do i = 1,Prnx
-       us = SedimVelocity(partdiam(l),partrho(l),press,temp)
+       us = real(SedimVelocity(partdiam(l),partrho(l),press,temp), KND)
        flux(i,j,k) = us*SCAL(i,j,k+1,l)*coef*dt*dxPr(i)*dyPr(j)
       enddo
      enddo
@@ -1750,7 +1749,7 @@ contains
   subroutine ComputeTDiff(U,V,W)
   real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
   integer:: i,j,k
-  real(KND),parameter :: Prt = constPrt !if variable, then implement as a statement function due to problems with inlining
+  real(KND),parameter :: Prt = constPrt !if variable, then implement as an internal or statement function due to problems with inlining
 
    if (Re>0) then
     !$omp parallel do private(i,j,k)
@@ -1869,7 +1868,7 @@ contains
       do k=0,Prnz+1
 
 !         if (zPr(k) <= TemperatureProfile%randomizeTop) then
-!           call RANdoM_NUMBER(p)
+!           call random_number(p)
 !           p = p - 0.5
 !           p_z=(p_z+p)/2
 !         endif
@@ -1877,7 +1876,7 @@ contains
         do j=0,Prny+1
 
 !           if (zPr(k) <= TemperatureProfile%randomizeTop) then
-!             call RANdoM_NUMBER(p)
+!             call random_number(p)
 !             p = p - 0.5
 !             p_y=(p_y+p)/2
 !           endif
@@ -1885,7 +1884,7 @@ contains
            do i=0,Prnx+1
 
              if (zPr(k) <= TemperatureProfile%randomizeTop) then
-               call RANdoM_NUMBER(p)
+               call random_number(p)
                p = p - 0.5
 !               p_x=(p_x+p)/2
 !               p=p_x+p_y+p_z

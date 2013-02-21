@@ -1056,7 +1056,8 @@ implicit none
 
 
 
-  subroutine InitTempFL
+  subroutine InitTempFL(Temperature)
+    real(KND),intent(in) :: Temperature(-1:,-1:,-1:)
     integer i
 
     if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
@@ -1069,7 +1070,7 @@ implicit none
   end subroutine InitTempFL
 
 
-  subroutine WallPrGradient(prgrad,i,j,k,Pr,Prtype)
+  pure recursive subroutine WallPrGradient(prgrad,i,j,k,Pr,Prtype)
     real(KND),intent(out) :: prgrad(3)
     integer,intent(in)    :: i,j,k
     real(KND),intent(in)  :: Pr(1:,1:,1:)
@@ -1117,9 +1118,10 @@ implicit none
 
 
 
-  subroutine ComputeViscsWM(U,V,W,Pr)
-    real(KND),dimension(-2:,-2:,-2:):: U,V,W
-    real(KND),dimension(1:,1:,1:):: Pr
+  subroutine ComputeViscsWM(U,V,W,Pr,Temperature)
+    real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(KND),dimension(1:,1:,1:),   intent(in) :: Pr
+    real(KND),dimension(-1:,-1:,-1:),intent(in) :: Temperature
     integer i,j,xi,yj,zk
     real(KND) tdif
     real(KND) dist(3), vel(3), wallvel(3), prgrad(3)
@@ -1194,14 +1196,6 @@ implicit none
                            WMPoints(i)%ustar,&
                            dist, vel, wallvel, prgrad)
 
-           if (zk>34.and.zk<37) then !Visc(xi, yj, zk)>3./Re
-             write(*,*) xi,yj,zk
-             write(*,*) Prtype(xi,yj,zk),WMPoints(i)%ustar
-             write(*,*) dist, sqrt(sum(dist**2))
-             write(*,*) vel, sqrt(sum(vel**2))
-             write(*,*) "x",dot_product(dist,vel)/(sqrt(sum(dist**2))*sqrt(sum(vel**2)))
-             write(*,*) prgrad, sqrt(sum(prgrad**2))
-           end if
          else
 
 

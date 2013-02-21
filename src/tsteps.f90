@@ -4,7 +4,7 @@ module TSTEPS
   use ArrayUtilities
   use CDS!, only: CDU, CDV, CDW, CDS4U, CDS4V, CDS4W, CDS4_2U, CDS4_2V, CDS4_2W
   use LAXFRIED
-  use LAXWEND
+  use LAXWend
   use BOUNDARIES, only: BoundU,Bound_Q
   use POISSON !it exports Pr_Correct and GetPrFromGPU
   use OUTPUTS, only: store,display,proftempfl
@@ -37,23 +37,20 @@ contains
 
 
  subroutine TMarchRK3(U,V,W,Pr,Temperature,Scalar,delta)
+  use RK3
   real(KND),allocatable,intent(inout):: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)  !allocatable to anable move_alloc
   real(KND),allocatable,intent(inout) :: Temperature(:,:,:),Scalar(:,:,:,:)
   real(KND),intent(out):: delta
 
   real(KND),dimension(:,:,:),allocatable,save   :: Q
-  real(KND),dimension(:,:,:),allocatable,save   ::U2,Ustar
-  real(KND),dimension(:,:,:),allocatable,save   ::V2,Vstar
-  real(KND),dimension(:,:,:),allocatable,save   ::W2,Wstar
-
-  real(KND),dimension(1:3),parameter:: alpha = (/ 4._KND/15._KND, 1._KND/15._KND, 1._KND/6._KND /)
-  real(KND),dimension(1:3),parameter:: beta  = (/ 8._KND/15._KND, 5._KND/12._KND, 3._KND/4._KND /)
-  real(KND),dimension(1:3),parameter:: rho   = (/       0._KND, -17._KND/60._KND,-5._KND/12._KND/)
+  real(KND),dimension(:,:,:),allocatable,save   :: U2,Ustar
+  real(KND),dimension(:,:,:),allocatable,save   :: V2,Vstar
+  real(KND),dimension(:,:,:),allocatable,save   :: W2,Wstar
 
   integer l
   integer,save:: called = 0
-  integer(DBL), save :: trate
-  integer(DBL), save :: time1, time2
+  integer(int64), save :: trate
+  integer(int64), save :: time1, time2
 
 
   if (called==0) then
@@ -110,7 +107,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
 
     !$hmpp <tsteps> advancedload, args[Vreman::dx,Vreman::dy,Vreman::dz,Vreman::Re]
     !$hmpp <tsteps> advancedload, args[Convection::buoyancy,Convection::convmet,Convection::coriolisparam]
-    !$hmpp <tsteps> advancedload, args[Convection::grav_acc,Convection::temperature_ref,Convection::beta,Convection::rho]
+    !$hmpp <tsteps> advancedload, args[Convection::grav_acc,Convection::temperature_ref,Convection::RK_beta,Convection::RK_rho]
     !$hmpp <tsteps> advancedload, args[PressureGrad::prgradientx,PressureGrad::prgradienty]
 
     !$hmpp <tsteps> advancedload, args[BoundU::Btype]
@@ -162,7 +159,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
 
   write (*,*) "time:",time,"dt: ",dt
 
-  do l=1,3
+  do l=1,RKstages
 
 write(*,*) "stage:",l
 
@@ -171,19 +168,17 @@ write(*,*) "stage:",l
 
 
 
-    call SubgridStresses(U,V,W,Pr)
+    call SubgridStresses(U,V,W,Pr,Temperature)
 
 
     !$hmpp <tsteps> advancedload, args[Convection::lev]
 
 
     !$hmpp <tsteps> Convection callsite, args[*].noupdate = true
-    call Convection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
-                       dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
-                       U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,l,dt)
+    call Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,RK_beta,RK_rho,l)
 
 
-    call OtherTerms(U,V,W,U2,V2,W2,Pr,2._KND*alpha(l))
+    call OtherTerms(U,V,W,U2,V2,W2,Pr,2._KND*RK_alpha(l))
 
 
     !download U2 V2 and W2 to main memory Attenuates below are to slow on GPU, waiting for HMPP update
@@ -218,7 +213,7 @@ write(*,*) "stage:",l
 
 
     if (poissmet>0) then
-       call Pr_Correct(U2,V2,W2,Pr,Q,2._KND*alpha(l))
+       call Pr_Correct(U2,V2,W2,Pr,Q,2._KND*RK_alpha(l))
     end if
 
 
@@ -303,7 +298,7 @@ write(*,*) "stage:",l
 
     if (debugparam>1) then
      call system_clock(count=time2)
-     write (*,*) "ET of part 1", (time2-time1)/real(trate)
+     write (*,*) "ET of part 1", (time2-time1)/real(trate,int64)
      time1 = time2
     end if
 
@@ -327,7 +322,7 @@ end subroutine TMarchRK3
   subroutine OtherTerms(U,V,W,U2,V2,W2,Pr,coef)
    real(KND),intent(inout):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
    real(KND),intent(inout):: Pr(1:,1:,1:)
-   real(KND),intent(inout):: U2(-2:,-2:,-2:),V2(-2:,-2:,-2:),W2(-2:,-2:,-2:)
+   real(KND),allocatable,intent(inout):: U2(:,:,:),V2(:,:,:),W2(:,:,:)
    real(KND),intent(in):: coef
 
    real(KND),dimension(:,:,:),allocatable,save:: U3,V3,W3
@@ -399,6 +394,9 @@ end subroutine TMarchRK3
      else
       call GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
      end if
+     call exchange_alloc(U2,U3)
+     call exchange_alloc(V2,V3)
+     call exchange_alloc(W2,W3)
 #endif
 
    else  Re_gt_0  !Re<=0
@@ -485,7 +483,7 @@ end subroutine TMarchRK3
        recdymin2=1./dymin**2
        recdzmin2=1./dzmin**2
 
-       !$omp parallel private(i,j,k,bi,bj,bk,Suavg,Svavg,Swavg)
+       !$omp parallel private(i,j,k,bi,bj,bk)
 
        !The explicit part, which doesn't have to be changed inside the loop
        !$omp do schedule(runtime)
@@ -573,11 +571,13 @@ end subroutine TMarchRK3
         end do
        end do
        !$omp end do
+       !$omp end parallel
 
-       !$omp workshare
-       ApU = 1._KND/(1._KND+Ap*ApU)
-       !$omp end workshare nowait
+!        ApU = 1._KND/(1._KND+Ap*ApU)
+       call multiply_and_add_scalar(ApU, Ap, 1._KND)
+       call reciprocal(ApU, 1._KND)
 
+       !$omp parallel private(i,j,k,bi,bj,bk)
        !$omp do schedule(runtime)
        do bk = 1,Vnz,tilenz(narr)
         do bj = 1,Vny,tileny(narr)
@@ -598,11 +598,13 @@ end subroutine TMarchRK3
         end do
        end do
        !$omp end do
+       !$omp end parallel
 
-       !$omp workshare
-       ApV = 1._KND/(1._KND+Ap*ApV)
-       !$omp end workshare nowait
+!        ApV = 1._KND/(1._KND+Ap*ApV)
+       call multiply_and_add_scalar(ApV, Ap, 1._KND)
+       call reciprocal(ApV, 1._KND)
 
+       !$omp parallel private(i,j,k,bi,bj,bk,Suavg,Svavg,Swavg)
        !$omp do schedule(runtime)
        do bk = 1,Wnz,tilenz(narr)
         do bj = 1,Wny,tileny(narr)
@@ -623,11 +625,13 @@ end subroutine TMarchRK3
         end do
        end do
        !$omp end do
-
-       !$omp workshare
-       ApW = 1._KND/(1._KND+Ap*ApW)
-       !$omp end workshare nowait
        !$omp end parallel
+
+
+!        ApW = 1._KND/(1._KND+Ap*ApW)
+       call multiply_and_add_scalar(ApW, Ap, 1._KND)
+       call reciprocal(ApW, 1._KND)
+
 
 
 !        !$omp workshare   !problem with gfortran-4.7 - valgrind sees uninitialized values
@@ -654,8 +658,8 @@ end subroutine TMarchRK3
         Su = 0
         Sv = 0
         Sw = 0
-        !$OMP PARALLEL PRIVATE(i,j,k,bi,bj,bk,p) REDUCTION(max:Su,Sv,Sw)
-        !$OMP DO schedule(runtime)
+        !$omp parallel private(i,j,k,bi,bj,bk,p) reduction(max:Su,Sv,Sw)
+        !$omp do schedule(runtime)
         do bk = 1,Unz,tilenz(narr2)
          do bj = 1,Uny,tileny(narr2)
           do bi = 1,Unx,tilenx(narr2)
@@ -678,8 +682,8 @@ end subroutine TMarchRK3
           end do
          end do
         end do
-        !$OMP ENDDO NOWAIT
-        !$OMP DO schedule(runtime)
+        !$omp enddo nowait
+        !$omp do schedule(runtime)
         do bk = 1,Vnz,tilenz(narr2)
          do bj = 1,Vny,tileny(narr2)
           do bi = 1,Vnx,tilenx(narr2)
@@ -702,8 +706,8 @@ end subroutine TMarchRK3
           end do
          end do
         end do
-        !$OMP ENDDO NOWAIT
-        !$OMP DO schedule(runtime)
+        !$omp enddo nowait
+        !$omp do schedule(runtime)
         do bk = 1,Wnz,tilenz(narr2)
          do bj = 1,Wny,tileny(narr2)
           do bi = 1,Wnx,tilenx(narr2)
@@ -726,9 +730,9 @@ end subroutine TMarchRK3
           end do
          end do
         end do
-        !$OMP ENDDO
+        !$omp enddo
 
-        !$OMP DO schedule(runtime)
+        !$omp do schedule(runtime)
         do bk = 1,Unz,tilenz(narr2)
          do bj = 1,Uny,tileny(narr2)
           do bi = 1,Unx,tilenx(narr2)
@@ -753,8 +757,8 @@ end subroutine TMarchRK3
           end do
          end do
         end do
-        !$OMP ENDDO NOWAIT
-        !$OMP DO schedule(runtime)
+        !$omp enddo nowait
+        !$omp do schedule(runtime)
         do bk = 1,Vnz,tilenz(narr2)
          do bj = 1,Vny,tileny(narr2)
           do bi = 1,Vnx,tilenx(narr2)
@@ -777,8 +781,8 @@ end subroutine TMarchRK3
           end do
          end do
         end do
-        !$OMP ENDDO NOWAIT
-        !$OMP DO schedule(runtime)
+        !$omp enddo nowait
+        !$omp do schedule(runtime)
         do bk = 1,Wnz,tilenz(narr2)
          do bj = 1,Wny,tileny(narr2)
           do bi = 1,Wnx,tilenx(narr2)
@@ -801,18 +805,13 @@ end subroutine TMarchRK3
           end do
          end do
         end do
-        !$OMP ENDDO
-        !$OMP END PARALLEL
+        !$omp enddo
+        !$omp end parallel
         S = max(Su/Suavg,Sv/Svavg,Sw/Swavg)
         write (*,*) "CN ",l,S
 
         if (S<=epsCN) exit
        end do
-
-       call assign(U2,U3)  !alllocatables for exchange_alloc make compilers crash here :(
-       call assign(V2,V3)
-       call assign(W2,W3)
-
 
   end subroutine UNIFREDBLACK
 
@@ -945,8 +944,8 @@ end subroutine TMarchRK3
         Su = 0
         Sv = 0
         Sw = 0
-        !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:Su,Sv,Sw)
-        !$OMP DO
+        !$omp parallel private(i,j,k,p) reduction(max:Su,Sv,Sw)
+        !$omp do
         do k=1,Unz
          do j=1,Uny
           do i=1+mod(j+k,2),Unx,2
@@ -965,8 +964,8 @@ end subroutine TMarchRK3
           end do
          end do
         end do
-        !$OMP ENDDO NOWAIT
-        !$OMP DO
+        !$omp enddo nowait
+        !$omp do
         do k=1,Vnz
          do j=1,Vny
           do i=1+mod(j+k,2),Vnx,2
@@ -983,8 +982,8 @@ end subroutine TMarchRK3
           end do
          end do
         end do
-        !$OMP ENDDO NOWAIT
-        !$OMP DO
+        !$omp enddo nowait
+        !$omp do
         do k=1,Wnz
          do j=1,Wny
           do i=1+mod(j+k,2),Wnx,2
@@ -1001,9 +1000,9 @@ end subroutine TMarchRK3
           end do
          end do
         end do
-        !$OMP ENDDO
+        !$omp enddo
 
-        !$OMP DO
+        !$omp do
         do k=1,Unz
          do j=1,Uny
           do i=1+mod(j+k+1,2),Unx,2
@@ -1022,8 +1021,8 @@ end subroutine TMarchRK3
           end do
          end do
         end do
-        !$OMP ENDDO NOWAIT
-        !$OMP DO
+        !$omp enddo nowait
+        !$omp do
         do k=1,Vnz
          do j=1,Vny
           do i=1+mod(j+k+1,2),Vnx,2
@@ -1040,8 +1039,8 @@ end subroutine TMarchRK3
           end do
          end do
         end do
-        !$OMP ENDDO NOWAIT
-        !$OMP DO
+        !$omp enddo nowait
+        !$omp do
         do k=1,Wnz
          do j=1,Wny
           do i=1+mod(j+k+1,2),Wnx,2
@@ -1058,16 +1057,12 @@ end subroutine TMarchRK3
           end do
          end do
         end do
-        !$OMP ENDDO
-        !$OMP END PARALLEL
+        !$omp enddo
+        !$omp end parallel
         S = max(Su/Suavg,Sv/Svavg,Sw/Swavg)
         write (*,*) "CN ",l,S
         if (S<=epsCN) exit
        end do
-
-       U2 = U3
-       V2 = V3
-       W2 = W3
 
    end subroutine GENREDBLACK
 
@@ -1075,11 +1070,13 @@ end subroutine TMarchRK3
 
 
 
-  subroutine SubgridStresses(U,V,W,Pr)
-    use Geometric, only: ScalFlIBPoints, TIBPoint_Viscosity
+  subroutine SubgridStresses(U,V,W,Pr,Temperature)
+    use ImmersedBoundary, only: ScalFlIBPoints, TIBPoint_Viscosity
     use Filters, only: filtertype, filter_ratios
 
-    real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+    real(KND),intent(in):: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(KND),intent(in):: Pr(1:,1:,1:)
+    real(KND),intent(in):: Temperature(-1:,-1:,-1:)
     integer i
 
 #ifdef __HMPP
@@ -1119,7 +1116,7 @@ end subroutine TMarchRK3
      else if (sgstype==VremanModel) then
                        call SGS_Vreman(U,V,W,filter_ratios(filtertype))
      else if (sgstype==StabSubgridModel) then
-                       call SGS_StabSmag(U,V,W,filter_ratios(filtertype))
+                       call SGS_StabSmag(U,V,W,Temperature,filter_ratios(filtertype))
      else
          if (Re>0) then
            Visc=1._KND/Re
@@ -1136,7 +1133,7 @@ end subroutine TMarchRK3
      end if
 
      if (wallmodeltype>0) then
-                     call ComputeViscsWM(U,V,W,Pr)
+                     call ComputeViscsWM(U,V,W,Pr,Temperature)
      end if
 
      do i=1,size(ScalFlIBPoints)
@@ -1178,7 +1175,7 @@ end subroutine TMarchRK3
 
 
   subroutine IBMomentum(U2,V2,W2,U3,V3,W3)
-    use GEOMETRIC, only: UIBPoints, VIBPoints, WIBPoints, TIBPoint_MomentumSource
+    use ImmersedBoundary, only: UIBPoints, VIBPoints, WIBPoints, TIBPoint_MomentumSource
 
     real(KND),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
     integer   :: i,xi,yj,zk
@@ -1241,7 +1238,7 @@ end subroutine TMarchRK3
 
 
   subroutine IBMassSources(Q,U,V,W)
-    use GEOMETRIC, only: UIBPoints, VIBPoints, WIBPoints
+    use ImmersedBoundary, only: UIBPoints, VIBPoints, WIBPoints
 
     real(KND),dimension(-2:,-2:,-2:),intent(in):: U,V,W
     real(KND),intent(out):: Q(0:,0:,0:)

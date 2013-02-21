@@ -3,7 +3,7 @@ module Outputs
   use Boundaries
   use Scalars
   use Wallmodels, only: GroundDeposition, GroundUstar, wallmodeltype
-  use Geometric
+  use ImmersedBoundary
   use Turbinlet, only: ustarinlet
   use Endianness
   use FreeUnit
@@ -27,7 +27,10 @@ module Outputs
   real(KND),dimension(:,:),allocatable ::profscal,profscalfl,profscalavg,profscalavg2,profscalflavg,&  !which scalar, height
                                          profscalflsgs,profscalflsgsavg,profss,profssavg
 
-  real(KND),allocatable :: Uavg(:,:,:),Vavg(:,:,:),Wavg(:,:,:),Pravg(:,:,:),ScalarAvg(:,:,:,:)
+  real(KND),allocatable :: Uavg(:,:,:),Vavg(:,:,:),Wavg(:,:,:)
+  real(KND),allocatable :: Pravg(:,:,:)
+  real(KND),allocatable :: Temperatureavg(:,:,:)
+  real(KND),allocatable :: Scalaravg(:,:,:,:)
 
   real(TIM),allocatable,dimension(:) :: times                                !times of the timesteps
 
@@ -311,9 +314,11 @@ contains
 
 
 
-  subroutine OutTStep(U,V,W,Pr,delta)
-    real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-    real(KND),dimension(1:,1:,1:),intent(in) :: Pr
+  subroutine OutTStep(U,V,W,Pr,Temperature,Scalar,delta)
+    real(KND),dimension(-2:,-2:,-2:),intent(in)   :: U,V,W
+    real(KND),dimension(1:,1:,1:),intent(in)      :: Pr
+    real(KND),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
+    real(KND),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
     real(KND),intent(in) :: delta
 
     integer :: l,i,j,k
@@ -532,7 +537,7 @@ contains
        if ((time>=timefram1).and.(time<=timefram2+(timefram2-timefram1)/(frames-1))&
          .and.(time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
         fnum = fnum+1
-        call Frame(U,V,W,Pr,fnum)
+        call Frame(U,V,W,Pr,Temperature,Scalar,fnum)
        endif
     endif
 
@@ -802,9 +807,10 @@ contains
 
 
 
-  subroutine OutputOut(U,V,W,Pr)
+  subroutine OutputOut(U,V,W,Pr,Temperature)
     real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
     real(KND),dimension(1:,1:,1:),intent(in) :: Pr
+    real(KND),intent(in) :: Temperature(-1:,-1:,:)
     character(70) :: str
     integer i,j,k,unit
     real(KND),allocatable :: tmp(:,:,:,:)
@@ -871,12 +877,12 @@ contains
          write (unit) "LOOKUP_TABLE default",lf
 
          if (gridtype==uniformgrid) then
-           write (unit) BigEnd(real((U(1:Unx,1:Uny,1:Unz) - &
-                                       U(0:Unx-1,1:Uny,1:Unz))/dxmin + &
-                                    (V(1:Vnx,1:Vny,1:Vnz) - &
+           write (unit) BigEnd(real((U(1:Prnx,1:Prny,1:Prnz) - &
+                                       U(0:Prnx-1,1:Prny,1:Prnz))/dxmin + &
+                                    (V(1:Prnx,1:Prny,1:Prnz) - &
                                        V(1:Vnx,0:Vny-1,1:Vnz))/dymin + &
-                                    (W(1:Wnx,1:Wny,1:Wnz) - &
-                                       W(1:Wnx,1:Wny,0:Wnz-1))/dzmin &
+                                    (W(1:Prnx,1:Prny,1:Prnz) - &
+                                       W(1:Prnx,1:Prny,0:Prnz-1))/dzmin &
                                , real32))
          else
            do k = 1,Prnz
@@ -973,7 +979,8 @@ contains
 
 
 
-  subroutine OutputScalars
+  subroutine OutputScalars(Scalar)
+    real(KND),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
     character(70) :: str
     real(KND),dimension(:,:,:),allocatable :: depos
     character(8) ::  scalname="scalar00"
@@ -1015,7 +1022,7 @@ contains
             write (unit) "SCALARS ", scalname , " float",lf
             write (unit) "LOOKUP_TABLE default",lf
 
-            write (unit) BigEnd(real(SCALAR(1:Prnx,1:Prny,1:Prnz,l), real32))
+            write (unit) BigEnd(real(Scalar(1:Prnx,1:Prny,1:Prnz,l), real32))
 
             write (unit) lf
           enddo
@@ -1464,20 +1471,22 @@ contains
 
 
 
-  subroutine Output(U,V,W,Pr)
+  subroutine Output(U,V,W,Pr,Temperature,Scalar)
     real(KND),dimension(-2:,-2:,-2:),intent(inout) :: U,V,W
-    real(KND),dimension(1:,1:,1:),intent(inout) :: Pr
+    real(KND),intent(inout) :: Pr(1:,1:,1:)
+    real(KND),intent(in) :: Temperature(-1:,-1:,:)
+    real(KND),intent(in) :: Scalar(-1:,-1:,-1:,:)
     integer i
 
     call BoundU(1,U)
     call BoundU(2,V)
     call BoundU(3,W)
 
-    call OutputOut(U,V,W,Pr)
+    call OutputOut(U,V,W,Pr,Temperature)
 
-    call OutputScalars
+    call OutputScalars(Scalar)
 
-    if (time>=timeavg1) call OutputAvg(Uavg,Vavg,Wavg,Pravg,Temperatureavg,ScalarAvg)
+    if (time>=timeavg1) call OutputAvg(Uavg,Vavg,Wavg,Pravg,Temperatureavg,Scalaravg)
 
     call OutputUVW(U,V,W)
 
@@ -1569,9 +1578,12 @@ contains
 
 
 
-  subroutine Frame(U,V,W,Pr,n)
-    real(KND) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-    integer n,i,j,k,l,m
+  subroutine Frame(U,V,W,Pr,Temperature,Scalar,n)
+    real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+    real(KND),intent(in) :: Temperature(-1:,-1:,:)
+    real(KND),intent(in) :: Scalar(-1:,-1:,-1:,:)
+    integer,intent(in)   :: n
+    integer i,j,k,l,m
     character(20) :: fname,fnumber
     character(20) :: fsuffix
     character(70) :: str
@@ -2313,9 +2325,10 @@ contains
   end subroutine OutputU2
 
 
-  subroutine OUTINLET(U,V,W)
+  subroutine OUTINLET(U,V,W,Temperature)
     !for output of 2d data for use as an inilet condition later
     real(KND),dimension(-2:,-2:,-2:) :: U,V,W
+    real(KND),dimension(-1:,-1:,-1:) :: Temperature
     integer,save ::fnum
     integer,save :: called = 0
 
@@ -2332,7 +2345,7 @@ contains
      endif
      fnum = fnum+1
      write(101) time-timefram1
-     call OUTINLETFrame(U,V,W,fnum)
+     call OUTINLETFrame(U,V,W,Temperature,fnum)
     elseif (time>timefram2+(timefram2-timefram1)/(frames-1).and.called==1) then
       close(101)
       called = 2
@@ -2341,8 +2354,9 @@ contains
   end subroutine OUTINLET
 
 
-  subroutine OUTINLETFrame(U,V,W,n)
-    real(KND) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  subroutine OUTINLETFrame(U,V,W,Temperature,n)
+    real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(KND),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
     integer n
     character(12) :: fname
     integer mini,maxi,minj,maxj,mink,maxk,unit

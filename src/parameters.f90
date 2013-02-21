@@ -96,9 +96,6 @@ module PARAMETERS
 
   real(KND) :: xheading !true geographic heading of the x axis
 
-  real(KND),allocatable,dimension(:,:,:) :: temperature,temperatureavg
-
-
   real(KND),allocatable :: Visc(:,:,:),TDiff(:,:,:)  !(turbulent) viscosity, (turbulent) thermal diffusivity
 
   integer(sint),allocatable,dimension(:,:,:) :: Utype,Vtype,Wtype,Prtype !number of solid body inside which the point is or 0
@@ -130,7 +127,6 @@ module PARAMETERS
   integer,parameter :: GENERALGRID=1,UNIFORMGRID=2
   integer,parameter :: SubgridModel=1,SigmaModel=2,VremanModel=3,StabSubgridModel=4
   integer,parameter :: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4
-
   integer :: debuglevel = 0 !amount of information to write out
 
 ! #ifdef __HMPP
@@ -155,3 +151,13 @@ module PARAMETERS
 ! #endif
 
 endmodule PARAMETERS
+
+module RK3
+  use Kinds
+
+  real(KND),parameter :: RK_alpha(3) = [ 4._KND/15._KND, 1._KND/15._KND,  1._KND/6._KND  ]
+  real(KND),parameter :: RK_beta(3)  = [ 8._KND/15._KND, 5._KND/12._KND,  3._KND/4._KND  ]
+  real(KND),parameter :: RK_rho(3)   = [ 0._KND,       -17._KND/60._KND, -5._KND/12._KND ]
+  integer,parameter   :: RKstages = 3
+
+end module RK3

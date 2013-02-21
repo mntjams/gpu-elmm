@@ -1,6 +1,7 @@
 subroutine  CustomSolidBodies
-   use PARAMETERS
-   use GEOMETRIC
+   use Parameters
+   use GeometricShapes
+   use SolidBodies
 
    implicit none
 
