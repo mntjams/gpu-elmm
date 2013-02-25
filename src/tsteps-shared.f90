@@ -290,6 +290,8 @@
 
       endif
 
+      call FilterUstar    
+
 
       if (abs(coriolisparam)>1E-10_KND) call CoriolisForce(Unx,Uny,Unz,Vnx,Vny,Vnz,&
                                                     coriolisparam,&
@@ -338,6 +340,30 @@
       !$omp end do
       !$omp end parallel
 
+      contains
+
+        subroutine FilterUstar
+
+          use Filters, only: filtertype, Filter
+
+          if (filtertype/=0) then
+            call BoundU(1,Ustar,2)
+            call BoundU(2,Vstar,2)
+            call BoundU(3,Wstar,2)
+
+
+            call Filter(Ustar)
+
+            call Filter(Vstar)
+
+            call Filter(Wstar)
+
+            call BoundU(1,Ustar,2)
+            call BoundU(2,Vstar,2)
+            call BoundU(3,Wstar,2)
+          end if
+
+        end subroutine
   end subroutine Convection
 
 

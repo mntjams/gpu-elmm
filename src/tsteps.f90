@@ -340,8 +340,6 @@ end subroutine TMarchRK3
 
    write(*,*) "Otherterms:"
 
-   call FilterU2
-
    !$hmpp <tsteps> advancedload, args[PressureGrad::coef]
 
    !Pressure gradient terms
@@ -427,30 +425,6 @@ end subroutine TMarchRK3
    end if
 
 
-   contains
-
-     subroutine FilterU2
-
-       use Filters, only: filtertype, Filter
-
-       if (filtertype/=0) then
-         call BoundU(1,U2,2)
-         call BoundU(2,V2,2)
-         call BoundU(3,W2,2)
-
-
-         call Filter(U2)
-
-         call Filter(V2)
-
-         call Filter(W2)
-
-         call BoundU(1,U2,2)
-         call BoundU(2,V2,2)
-         call BoundU(3,W2,2)
-       end if
-
-     end subroutine
   end subroutine OtherTerms
 
 
