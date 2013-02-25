@@ -1492,9 +1492,11 @@ contains
 
     if (time>=timeavg1) call OutputProfiles
 
-    do i=1,size(StaggeredFrameDomains)
-      call Finalize(StaggeredFrameDomains(i))
-    end do
+    if (allocated(StaggeredFrameDomains)) then
+      do i=1,size(StaggeredFrameDomains)
+        call Finalize(StaggeredFrameDomains(i))
+      end do
+    end if
 
     write (*,*) "saved"
   end subroutine Output

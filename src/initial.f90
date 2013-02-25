@@ -444,6 +444,8 @@ contains
                  frame_save_flags )
      end do
      close(unit)
+   else
+     allocate(StaggeredFrameDomains(0))
    end if
 
 
