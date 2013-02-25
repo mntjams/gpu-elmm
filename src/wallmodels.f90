@@ -668,11 +668,12 @@ implicit none
   pure subroutine WMFlatPrGradUstar(ustar,vel,prgrad,dist)
     real(KND),intent(out) :: ustar
     real(KND),intent(in) :: vel,prgrad,dist
-    real(KND),parameter :: eps = 1e-4_KND
+    real(KND),parameter :: eps = 1e-3_KND
     real(KND),parameter :: yplcrit = 11.225_KND
     real(KND),parameter :: ustar_div = 1000
-    real(KND) :: ustar1,ustar2,ustar_lam,f1,f2
-    integer i,nprob
+    real(KND) :: ustar1,ustar2,ustar_lam
+    integer i
+    integer,parameter :: maxiter = 30
 
     !u/u_* = z * u_* / nu  +  dp/dx * z**2 / (2 * u_*)
     ustar_lam = sqrt(abs((1._KND/(dist*Re)) * (vel - dist**2 * prgrad/2) ))
@@ -686,43 +687,33 @@ implicit none
 
       i = 0
 
-      ustar1 = ustar_lam*0.9
-      ustar2 = ustar_lam*1.1
+      ustar1 = ustar_lam
 
-      f2 = f(ustar2)
-
-      nprob = 0
-
-      !secant method iteration
       do
         i = i+1
 
-        f1 = f(ustar1)
-
-        ustar = ustar1 - f1 * (ustar1 - ustar2)/(f1-f2)
-
-        if (ustar<0) then
-          ustar = ustar_lam
-          ustar1 = ustar_lam*1.1
-          f1 = f(ustar1)
-          nprob=nprob+1
-          if (nprob>1) then
+        ustar2 = newguess(ustar1)
+        if (ustar2 < 0) then
+          if (ustar1>max(100*vel,10*Uinlet).or.i>=30) then
             ustar = ustar_lam
             exit
           end if
+          ustar1 = ustar1 * 10
+        else if (ustar2<tiny(1._KND)) then
+          ustar = ustar_lam
+          exit
+        else if (abs(ustar1-ustar2)/abs(ustar1)<eps) then
+          ustar = ustar2
+          exit
+        else if (i<20) then
+          ustar1 = ustar2
         else
-          nprob = 0
-        end if
-
-      if  (abs(ustar-ustar1)/abs(ustar)<eps) exit
-
-         ustar2 = ustar1
-         f2 = f1
-         ustar1 = ustar
-
-        if (i>=20) then
-                    ustar = ustar_lam
-                    exit
+          if (abs(ustar1-ustar2)/abs(ustar1)<0.1) then
+            ustar = ustar2
+          else
+            ustar = ustar_lam
+          end if
+          exit
         end if
       end do
 
@@ -730,16 +721,26 @@ implicit none
 
     contains
 
-      pure function f(ustar)
-        real(KND) f
-        real(KND),intent(in) :: ustar
-        real(KND) a,b,c
-        !u/u_* = dp/dx * z / (k (u_*)**2)  + (1/k) * ln(z * u_* / nu) + B
-        a = log(ustar*dist*Re)/0.41_KND + 5.2_KND
-        b = - vel
-        c = prgrad * dist / 0.41
-        f = a*ustar**2 + b*ustar + c
-      end function f
+      pure function newguess(ustar)
+         !linearize the function by letting the ustar in log constant
+         !  and solve the quadratic equation for the larger root
+         real(KND) newguess
+         real(KND),intent(in) :: ustar
+         real(KND) a,b,c,D
+         !u/u_* = dp/dx * z / (k (u_*)**2)  + (1/k) * ln(z * u_* / nu) + B
+
+         a = log(ustar*dist*Re)/0.41_KND + 5.2_KND
+         b = - vel
+         c = prgrad * dist / 0.41
+         !function to find root of is f(ustar) = a*ustar**2 + b*ustar + c
+         D = b**2 - 4*a*c
+
+         if (D<0) then !solution does not exist
+           newguess = -1
+         else
+           newguess = (-b+sqrt(D))/(2*a)
+         end if
+      end function
 
   end subroutine WMFlatPrGradUstar
 
