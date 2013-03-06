@@ -9,20 +9,20 @@
 #include "hmpp-include.f90"
 #endif
   integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
-  real(KND),intent(in)    :: prgradientx,prgradienty,dt,coef
+  real(knd),intent(in)    :: prgradientx,prgradienty,dt,coef
   integer,intent(in)      :: Btype(6)
 #ifdef __HMPP
-  real(KND),intent(in)    :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
-  real(KND),intent(in)    :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
-  real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
-  real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
-  real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(knd),intent(in)    :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
+  real(knd),intent(in)    :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
+  real(knd),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+  real(knd),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+  real(knd),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
 #else
-  real(KND),intent(in),dimension(-2:) :: dxU,dyV,dzW
-  real(KND),intent(inout) :: Pr(1:,1:,1:)
-  real(KND),intent(inout),dimension(-2:,-2:,-2:) :: U,V,W
+  real(knd),intent(in),dimension(-2:) :: dxU,dyV,dzW
+  real(knd),intent(inout) :: Pr(1:,1:,1:)
+  real(knd),intent(inout),dimension(-2:,-2:,-2:) :: U,V,W
 #endif
-  real(KND) :: A
+  real(knd) :: A
   integer i,j,k
 
    A=-coef*dt
@@ -85,30 +85,30 @@
 
 
   integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet
-  real(KND),intent(in) :: dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref
-  real(KND),intent(in) :: dt
+  real(knd),intent(in) :: dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref
+  real(knd),intent(in) :: dt
 
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out)   :: U2
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: Ustar
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)    :: V
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(out)   :: V2
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: Vstar
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)    :: W
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(out)   :: W2
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: Wstar
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: temperature
+  real(knd),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
+  real(knd),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(out)   :: U2
+  real(knd),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: Ustar
+  real(knd),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)    :: V
+  real(knd),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(out)   :: V2
+  real(knd),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: Vstar
+  real(knd),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)    :: W
+  real(knd),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(out)   :: W2
+  real(knd),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: Wstar
+  real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: temperature
   intrinsic abs
 #else
  subroutine Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev)
   use VolumeSources, only: ResistanceForce
   use VTKArray
-  real(KND),dimension(-2:,-2:,-2:),intent(in)    :: U,V,W
-  real(KND),dimension(-2:,-2:,-2:),intent(out)   :: U2,V2,W2
-  real(KND),dimension(-2:,-2:,-2:),intent(inout) :: Ustar,Vstar,Wstar
-  real(KND),dimension(-1:,-1:,-1:),intent(in) :: temperature
+  real(knd),dimension(-2:,-2:,-2:),intent(in)    :: U,V,W
+  real(knd),dimension(-2:,-2:,-2:),intent(out)   :: U2,V2,W2
+  real(knd),dimension(-2:,-2:,-2:),intent(inout) :: Ustar,Vstar,Wstar
+  real(knd),dimension(-1:,-1:,-1:),intent(in) :: temperature
 #endif
-  real(KND),dimension(1:3),intent(in) :: beta,rho
+  real(knd),dimension(1:3),intent(in) :: beta,rho
   integer,intent(in) :: lev
   integer i,j,k
 
@@ -290,7 +290,7 @@
 
       call FilterUstar    
 
-      if (abs(coriolisparam)>tiny(1._KND)) call CoriolisForce(Unx,Uny,Unz,Vnx,Vny,Vnz,&
+      if (abs(coriolisparam)>tiny(1._knd)) call CoriolisForce(Unx,Uny,Unz,Vnx,Vny,Vnz,&
                                                     coriolisparam,&
                                                     Ustar,Vstar,U,V,dt)
 
@@ -385,21 +385,21 @@
   intrinsic min,max,abs
 #endif
   integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,steady
-  real(KND),intent(in) :: dxmin
-  real(KND),intent(in) :: CFL,Uref
+  real(knd),intent(in) :: dxmin
+  real(knd),intent(in) :: CFL,Uref
   real(TIM),intent(in) :: time,endtime
 #ifdef __HMPP
-  real(KND),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)  :: U
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)  :: V
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)  :: W
+  real(knd),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
+  real(knd),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)  :: U
+  real(knd),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)  :: V
+  real(knd),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)  :: W
 #else
-  real(KND),dimension(-2:),intent(in)  :: dxU,dyV,dzW
-  real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+  real(knd),dimension(-2:),intent(in)  :: dxU,dyV,dzW
+  real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
 #endif
   real(TIM),intent(out) :: dt
   integer i,j,k
-  real(KND) m,p
+  real(knd) m,p
 
     m = 0
    !$omp parallel do private(i,j,k,p) reduction(max:m)
@@ -441,14 +441,14 @@
 #endif
   integer,intent(in) :: Prnx,Prny,Prnz,Wnx,Wny,Wnz
 #ifdef __HMPP
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W2
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: theta
+  real(knd),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W2
+  real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: theta
 #else
-  real(KND),dimension(-2:,-2:,-2:),intent(inout) :: W2
-  real(KND),dimension(-1:,-1:,-1:),intent(in) :: theta
+  real(knd),dimension(-2:,-2:,-2:),intent(inout) :: W2
+  real(knd),dimension(-1:,-1:,-1:),intent(in) :: theta
 #endif
-  real(KND),intent(in) :: grav_acc,temperature_ref,dt
-  real(KND) A
+  real(knd),intent(in) :: grav_acc,temperature_ref,dt
+  real(knd) A
   integer i,j,k
 
     A = grav_acc*dt/temperature_ref
@@ -459,7 +459,7 @@
     do k=1,Wnz
      do j=1,Wny
       do i=1,Wnx
-            W2(i,j,k) = W2(i,j,k)+A*((theta(i,j,k+1)+theta(i,j,k))/2._KND-temperature_ref)
+            W2(i,j,k) = W2(i,j,k)+A*((theta(i,j,k+1)+theta(i,j,k))/2._knd-temperature_ref)
       enddo
      enddo
     enddo
@@ -479,16 +479,16 @@
 #endif
   integer,intent(in) :: Unx,Uny,Unz,Vnx,Vny,Vnz
 #ifdef __HMPP
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)    :: V
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: U2
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: V2
+  real(knd),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)    :: U
+  real(knd),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)    :: V
+  real(knd),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: U2
+  real(knd),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: V2
 #else
-  real(KND),dimension(-2:,-2:,-2:),intent(in)    :: U,V
-  real(KND),dimension(-2:,-2:,-2:),intent(inout) :: U2,V2
+  real(knd),dimension(-2:,-2:,-2:),intent(in)    :: U,V
+  real(knd),dimension(-2:,-2:,-2:),intent(inout) :: U2,V2
 #endif
-  real(KND),intent(in):: coriolisparam,dt
-  real(KND) A
+  real(knd),intent(in):: coriolisparam,dt
+  real(knd) A
   integer i,j,k
 
    A=-dt
@@ -501,7 +501,7 @@
     do k=1,Unz
      do j=1,Uny
       do i=1,Unx
-           U2(i,j,k) = U2(i,j,k)-A*coriolisparam*(V(i,j-1,k)+V(i+1,j-1,k)+V(i,j,k)+V(i+1,j,k))/4._KND
+           U2(i,j,k) = U2(i,j,k)-A*coriolisparam*(V(i,j-1,k)+V(i+1,j-1,k)+V(i,j,k)+V(i+1,j,k))/4._knd
       enddo
      enddo
     enddo
@@ -514,7 +514,7 @@
     do k=1,Vnz
      do j=1,Vny
       do i=1,Vnx
-           V2(i,j,k) = V2(i,j,k)+A*coriolisparam*(U(i-1,j,k)+U(i-1,j+1,k)+U(i,j,k)+U(i,j+1,k))/4._KND
+           V2(i,j,k) = V2(i,j,k)+A*coriolisparam*(U(i-1,j,k)+U(i-1,j+1,k)+U(i,j,k)+U(i,j+1,k))/4._knd
       enddo
      enddo
     enddo
@@ -542,13 +542,13 @@
 #include "hmpp-include.f90"
 
   integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
-  real(KND),intent(in):: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),intent(in):: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3),V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),intent(out):: U3(-2:Unx+3,-2:Uny+3,-2:Unz+3),V3(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W3(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),intent(in):: Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-  real(KND),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
-  real(KND),intent(in) :: dxPr(-2:Prnx+3),dyPr(-2:Prny+3),dzPr(-2:Prnz+3),dt,coef
-  real(KND) :: Ap,Ax,Ay,Az,dxmin,dymin,dzmin
+  real(knd),intent(in):: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(knd),intent(in):: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3),V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(knd),intent(out):: U3(-2:Unx+3,-2:Uny+3,-2:Unz+3),V3(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W3(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(knd),intent(in):: Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(knd),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
+  real(knd),intent(in) :: dxPr(-2:Prnx+3),dyPr(-2:Prny+3),dzPr(-2:Prnz+3),dt,coef
+  real(knd) :: Ap,Ax,Ay,Az,dxmin,dymin,dzmin
   integer i,j,k
 
 
@@ -558,9 +558,9 @@
 
      Ap = coef*dt
 
-     Ax = 1._KND/(dxmin**2)
-     Ay = 1._KND/(dymin**2)
-     Az = 1._KND/(dzmin**2)
+     Ax = 1._knd/(dxmin**2)
+     Ay = 1._knd/(dymin**2)
+     Az = 1._knd/(dzmin**2)
 
 
      !$hmppcg grid blocksize myblocksize
@@ -573,10 +573,10 @@
              (Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
              Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*Ax
          U3(i,j,k) = U3(i,j,k) +&
-             Ay*0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
+             Ay*0.25_knd*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
              (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))
          U3(i,j,k) = U3(i,j,k) +&
-             Az*0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
+             Az*0.25_knd*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
              (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))
          U3(i,j,k) = U3(i,j,k) * Ap
        enddo
@@ -603,10 +603,10 @@
              (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
              Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*Ay
          V3(i,j,k) = V3(i,j,k) +&
-             Ax*0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
+             Ax*0.25_knd*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
              (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))
          V3(i,j,k) = V3(i,j,k) +&
-             Az*0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
+             Az*0.25_knd*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
              (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))
          V3(i,j,k) = V3(i,j,k) * Ap
        enddo
@@ -630,10 +630,10 @@
       do j=1,Wny
        do i=1,Wnx
          W3(i,j,k) =&
-             Ax*0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
+             Ax*0.25_knd*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
              (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))
          W3(i,j,k) = W3(i,j,k) +&
-             Ay*0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
+             Ay*0.25_knd*((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
              (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))
          W3(i,j,k) = W3(i,j,k) +&
              (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
@@ -671,23 +671,23 @@
   integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
 
 
-  real(KND),intent(in),dimension(-2:,-2:,-2:) :: U,V,W
-  real(KND),intent(in),dimension(-2:,-2:,-2:) :: U2,V2,W2
-  real(KND),intent(out),dimension(-2:,-2:,-2:):: U3,V3,W3
-  real(KND),intent(in),dimension(-1:,-1:,-1:) :: Visc
-  real(KND),intent(in),dimension(-2:) :: dxU,dyV,dzW
-  real(KND),intent(in),dimension(-2:) :: dxPr,dyPr,dzPr
-  real(KND),intent(in) :: dt,coef
+  real(knd),intent(in),dimension(-2:,-2:,-2:) :: U,V,W
+  real(knd),intent(in),dimension(-2:,-2:,-2:) :: U2,V2,W2
+  real(knd),intent(out),dimension(-2:,-2:,-2:):: U3,V3,W3
+  real(knd),intent(in),dimension(-1:,-1:,-1:) :: Visc
+  real(knd),intent(in),dimension(-2:) :: dxU,dyV,dzW
+  real(knd),intent(in),dimension(-2:) :: dxPr,dyPr,dzPr
+  real(knd),intent(in) :: dt,coef
 
-  real(KND) :: Ap,Ax,Ay,Az
+  real(knd) :: Ap,Ax,Ay,Az
   integer i,j,k
 
 
      Ap = coef*dt
 
-     Ax = 1._KND/(dxmin**2)
-     Ay = 1._KND/(dymin**2)
-     Az = 1._KND/(dzmin**2)
+     Ax = 1._knd/(dxmin**2)
+     Ay = 1._knd/(dymin**2)
+     Az = 1._knd/(dzmin**2)
 
      if (gridtype==uniformgrid) then
        !$omp parallel private(i,j,k)
@@ -700,10 +700,10 @@
                (Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
                Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*Ax
            U3(i,j,k) = U3(i,j,k) +&
-               Ay*0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
+               Ay*0.25_knd*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
                (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))
            U3(i,j,k) = U3(i,j,k) +&
-               Az*0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
+               Az*0.25_knd*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
                (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))
            U3(i,j,k) = U3(i,j,k) * Ap
          enddo
@@ -729,10 +729,10 @@
                (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
                Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*Ay
            V3(i,j,k) = V3(i,j,k) +&
-               Ax*0.25_KND*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
+               Ax*0.25_knd*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
                (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))
            V3(i,j,k) = V3(i,j,k) +&
-               Az*0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
+               Az*0.25_knd*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
                (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))
            V3(i,j,k) = V3(i,j,k) * Ap
          enddo
@@ -755,10 +755,10 @@
         do j=1,Wny
          do i=1,Wnx
            W3(i,j,k) =+&
-               Ax*0.25_KND*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
+               Ax*0.25_knd*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
                (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))
            W3(i,j,k) = W3(i,j,k) +&
-               Ay*0.25_KND*((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
+               Ay*0.25_knd*((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
                (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))
            W3(i,j,k) = W3(i,j,k) +&
                (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
@@ -789,7 +789,7 @@
           U3(i,j,k) = U(i,j,k)+U2(i,j,k)+Ap*(&
           ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
           Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
-           0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
+           0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
            (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
            ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
            (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))))
@@ -804,7 +804,7 @@
           V3(i,j,k) = V(i,j,k)+V2(i,j,k)+Ap*(&
           ((Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
            Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
-           0.25_KND*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
+           0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
           (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
            ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
            (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k))))
@@ -817,7 +817,7 @@
         do j=1,Wny
          do i=1,Wnx
           W3(i,j,k) = W(i,j,k)+W2(i,j,k)+Ap*(&
-          0.25_KND*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
+          0.25_knd*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
           (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
            ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
            (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j))+&
@@ -865,21 +865,21 @@
   integer,intent(in)      :: Btype(6)
 #ifdef __HMPP
 #include "hmpp-include.f90"
-  real(KND),intent(in)    :: zPr(-2:Prnz+3)
-  real(KND),intent(in)    :: zW(-3:Prnz+3)
-  real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
-  real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
-  real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
+  real(knd),intent(in)    :: zPr(-2:Prnz+3)
+  real(knd),intent(in)    :: zW(-3:Prnz+3)
+  real(knd),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+  real(knd),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+  real(knd),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
 #else
-  real(KND),intent(in)    :: zPr(-2:)
-  real(KND),intent(in)    :: zW(-3:)
-  real(KND),intent(inout),dimension(-2:,-2:,-2:) :: U,V,W
-  real(KND),dimension(-1:,-1:,-1:),intent(inout) :: temperature
+  real(knd),intent(in)    :: zPr(-2:)
+  real(knd),intent(in)    :: zW(-3:)
+  real(knd),intent(inout),dimension(-2:,-2:,-2:) :: U,V,W
+  real(knd),dimension(-1:,-1:,-1:),intent(inout) :: temperature
 #endif
   integer i,j,k,bufn,mini,maxi,maxUi
-  real(KND) ze,zs,zb,p
-  real(KND),dimension(:),allocatable :: DF,avg
+  real(knd) ze,zs,zb,p
+  real(knd),dimension(:),allocatable :: DF,avg
   intrinsic max,min
 
     if (Btype(We)==DIRICHLET.or.Btype(We)==TURBULENTINLET.or.Btype(We)==INLETFROMFILE) then
@@ -1110,20 +1110,20 @@
   integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
 #ifdef __HMPP
 #include "hmpp-include.f90"
-  real(KND),intent(in)    :: xPr(-2:Prnx+3)
-  real(KND),intent(in)    :: xU(-3:Prnx+3)
-  real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
-  real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
-  real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
+  real(knd),intent(in)    :: xPr(-2:Prnx+3)
+  real(knd),intent(in)    :: xU(-3:Prnx+3)
+  real(knd),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+  real(knd),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+  real(knd),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
 #else
-  real(KND),intent(in)    :: xPr(-2:)
-  real(KND),intent(in)    :: xU(-3:)
-  real(KND),intent(inout),dimension(-2:,-2:,-2:) :: U,V,W
-  real(KND),dimension(-1:,-1:,-1:),intent(inout) :: temperature
+  real(knd),intent(in)    :: xPr(-2:)
+  real(knd),intent(in)    :: xU(-3:)
+  real(knd),intent(inout),dimension(-2:,-2:,-2:) :: U,V,W
+  real(knd),dimension(-1:,-1:,-1:),intent(inout) :: temperature
 #endif
   integer i,j,k,bufn
-  real(KND) p,xe,xs,xb,DF
+  real(knd) p,xe,xs,xb,DF
   intrinsic max
 
     bufn = min(max(10,Prnx/8),Prnx/2)
@@ -1221,8 +1221,8 @@
 #ifdef __HMPP
 #include "hmpp-include.f90"
 #endif
-  real(KND) DampF
-  real(KND),intent(in)::x
+  real(knd) DampF
+  real(knd),intent(in)::x
   intrinsic exp
 
   if (x<=0) then
@@ -1230,7 +1230,7 @@
   elseif (x>=1) then
     DampF = 0
   else
-   DampF=(1-0.04_KND*x**2)*(1-(1-exp(10._KND*x**2))/(1-exp(10._KND)))
+   DampF=(1-0.04_knd*x**2)*(1-(1-exp(10._knd*x**2))/(1-exp(10._knd)))
   endif
   endfunction Dampf
 
@@ -1247,12 +1247,12 @@
   integer,dimension(3,nUnull),intent(in)      :: Unull
   integer,dimension(3,nVnull),intent(in)      :: Vnull
   integer,dimension(3,nWnull),intent(in)      :: Wnull
-  real(KND),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: U
-  real(KND),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: V
-  real(KND),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W
+  real(knd),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: U
+  real(knd),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: V
+  real(knd),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W
 #else
   integer,dimension(:,:),intent(in)      :: Unull,Vnull,Wnull
-  real(KND),dimension(-2:,-2:,-2:),intent(inout) :: U,V,W
+  real(knd),dimension(-2:,-2:,-2:),intent(inout) :: U,V,W
 #endif
   integer i
 
