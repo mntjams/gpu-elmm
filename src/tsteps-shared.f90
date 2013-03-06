@@ -240,8 +240,8 @@
           call CDW(Wstar,U,V,W)
         else if (convmet==4) then
           call CD4divU(Ustar,U,V,W)
-          call CDS4divV(Vstar,U,V,W)
-          call CDS4divW(Wstar,U,V,W)
+          call CD4divV(Vstar,U,V,W)
+          call CD4divW(Wstar,U,V,W)
         end if
 #endif
 
