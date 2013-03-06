@@ -1247,6 +1247,32 @@ contains
   end subroutine MoveIBPointsToArray
 
 
+  subroutine AuxNeighbours(Xtype,nx,ny,nz,s) !helper procedure to FindNeighbouringCells
+    integer,intent(in)    :: nx,ny,nz,s
+    integer,intent(inout) :: Xtype(s:,s:,s:)
+    integer i,j,k
+    !$omp parallel do private(i,j,k)
+    do k = 1,nz
+      do j = 1,ny
+        do i = 1,nx
+          if (Xtype(i,j,k)==0.and.any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)>0)) &
+              Xtype(i,j,k) = -1
+        end do
+      end do
+    end do
+    !$omp end parallel do
+  end subroutine
+
+  subroutine FindNeighbouringCells
+    !sets type of the cells closest to the solid body to -1
+    call AuxNeighbours(Prtype,Prnx,Prny,Prnz,0)
+    call AuxNeighbours(Utype,Unx,Uny,Unz,-2)
+    call AuxNeighbours(Vtype,Vnx,Vny,Vnz,-2)
+    call AuxNeighbours(Wtype,Wnx,Wny,Wnz,-2)
+  end subroutine FindNeighbouringCells
+
+  
+
 
 
   subroutine InitImBoundaries
@@ -1324,6 +1350,8 @@ contains
   subroutine GetSolidBodiesBC
 
     call FindInsideCells
+
+    call FindNeighbouringCells
 
     call InitImBoundaries
 
