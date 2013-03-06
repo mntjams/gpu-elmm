@@ -137,9 +137,9 @@ contains
   subroutine AllocateOutputs
     integer :: k
 
-    if (computescalars>0) then
+    if (num_of_scalars>0) then
      if (averaging==1.and.store%scalarsavg>0) then
-      allocate(Scalaravg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
+      allocate(Scalaravg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
       Scalaravg = 0
      endif
     else
@@ -212,14 +212,14 @@ contains
      tstar = huge(1.0)
    endif
 
-   if (computescalars>0) then
+   if (num_of_scalars>0) then
      if (store%scalsumtime>0) then
-       allocate(scalsumtime(1:computescalars,0:nt))
+       allocate(scalsumtime(1:num_of_scalars,0:nt))
        scalsumtime = huge(1.0_knd)
      endif
 
      if (NumProbes>0) then
-       allocate(scalptime(1:computescalars,1:NumProbes,0:nt))
+       allocate(scalptime(1:num_of_scalars,1:NumProbes,0:nt))
        scalptime = huge(1.0_knd)
     endif
    endif
@@ -248,10 +248,10 @@ contains
      allocate(proftemp(1:Prnz),proftempfl(0:Prnz),proftempavg(1:Prnz),proftempavg2(1:Prnz),proftempflavg(0:Prnz))
      allocate(proftempflsgs(0:Prnz),proftempflsgsavg(0:Prnz),proftt(1:Prnz),profttavg(1:Prnz))
 
-     allocate(profscal(computescalars,1:Prnz),profscalfl(computescalars,0:Prnz),profscalavg(computescalars,1:Prnz))
-     allocate(profscalavg2(computescalars,1:Prnz),profscalflavg(computescalars,0:Prnz))
-     allocate(profscalflsgs(computescalars,0:Prnz),profscalflsgsavg(computescalars,0:Prnz))
-     allocate(profss(computescalars,1:Prnz),profssavg(computescalars,1:Prnz))
+     allocate(profscal(num_of_scalars,1:Prnz),profscalfl(num_of_scalars,0:Prnz),profscalavg(num_of_scalars,1:Prnz))
+     allocate(profscalavg2(num_of_scalars,1:Prnz),profscalflavg(num_of_scalars,0:Prnz))
+     allocate(profscalflsgs(num_of_scalars,0:Prnz),profscalflsgsavg(num_of_scalars,0:Prnz))
+     allocate(profss(num_of_scalars,1:Prnz),profssavg(num_of_scalars,1:Prnz))
 
      profU = 0
      profV = 0
@@ -280,7 +280,7 @@ contains
      proftt = 0
      profttavg = 0
 
-     if (computescalars>0) then
+     if (num_of_scalars>0) then
        profscal = 0
        profscalavg = 0
        profscalavg2 = 0
@@ -327,7 +327,7 @@ contains
 
     times(step)=time
 
-    do l = 1,computescalars
+    do l = 1,num_of_scalars
        S = 0
        do k = 1,Prnz
         do j = 1,Prny
@@ -392,7 +392,7 @@ contains
                            temperature(probes(k)%i+1,probes(k)%j+1,probes(k)%k+1))
       endif
 
-      do l = 1,computescalars
+      do l = 1,num_of_scalars
         scalptime(l,k,step)=Trilinint((probes(k)%x-xPr(probes(k)%i))/(xPr(probes(k)%i+1)-xPr(probes(k)%i)),&
                            (probes(k)%y-yPr(probes(k)%j))/(yPr(probes(k)%j+1)-yPr(probes(k)%j)),&
                            (probes(k)%z-zPr(probes(k)%k))/(zPr(probes(k)%k+1)-zPr(probes(k)%k)),&
@@ -452,7 +452,7 @@ contains
         temperatureavg = temperatureavg+temperature*dt/(timeavg2-timeavg1)
       endif
 
-      if (computescalars>0.and.store%scalarsavg>0) then
+      if (num_of_scalars>0.and.store%scalarsavg>0) then
         SCALARavg = SCALARavg+SCALAR*dt/(timeavg2-timeavg1)
       endif
 
@@ -495,11 +495,11 @@ contains
     if (store%BLprofiles>0) then
       if ((averaging==1).and.((time>=timeavg1).and.(time<=timeavg2))) then
 
-       if (enable_buoyancy>0.and.computescalars>0) then
+       if (enable_buoyancy>0.and.num_of_scalars>0) then
          call BLProfiles(U,V,W,temperature,scalar)
        elseif (enable_buoyancy>0) then
          call BLProfiles(U,V,W,temperature = temperature)
-       elseif (computescalars>0) then
+       elseif (num_of_scalars>0) then
          call BLProfiles(U,V,W,scalar = scalar)
        else
          call BLProfiles(U,V,W)
@@ -522,7 +522,7 @@ contains
          profttavg = profttavg+proftt*dt/(timeavg2-timeavg1)
        endif
 
-       if (computescalars>0) then
+       if (num_of_scalars>0) then
          profscalavg = profscalavg+profscal*dt/(timeavg2-timeavg1)
          profscalflavg = profscalflavg+profscalfl*dt/(timeavg2-timeavg1)
          profscalflsgsavg = profscalflsgsavg+profscalflsgs*dt/(timeavg2-timeavg1)
@@ -599,7 +599,7 @@ contains
         close(unit)
       endif
 
-      if (computescalars>0) then
+      if (num_of_scalars>0) then
         open(unit,file="scaltimep"//prob//".txt")
         do j = 1,endstep
          write (unit,*) times(j),scalptime(:,k,j)
@@ -650,7 +650,7 @@ contains
     endif
 
 
-    if (computescalars>0.and.store%scalsumtime>0) then
+    if (num_of_scalars>0.and.store%scalsumtime>0) then
       open(unit,file="scalsumtime.txt")
       do j = 1,endstep
        write (unit,*) times(j),scalsumtime(:,j)
@@ -658,7 +658,7 @@ contains
       close(unit)
     endif
 
-    if (computescalars>0.and.store%scaltotsumtime>0) then
+    if (num_of_scalars>0.and.store%scaltotsumtime>0) then
       open(unit,file="scaltotsumtime.txt")
       do j = 1,endstep
        write (unit,*) times(j),sum(scalsumtime(:,j))
@@ -775,27 +775,27 @@ contains
        endif !enable_buoyancy>0
 
 
-       if (computescalars>0) then
+       if (num_of_scalars>0) then
 
           open(unit,file="profscal.txt")
           do k = 1,Prnz
-           write (unit,*) zPr(k),(profscalavg(i,k), i = 1,computescalars)
+           write (unit,*) zPr(k),(profscalavg(i,k), i = 1,num_of_scalars)
           enddo
           close(unit)
 
           open(unit,file="profscalfl.txt")
           do k = 0,Prnz
-           write (unit,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i = 1,computescalars)
+           write (unit,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i = 1,num_of_scalars)
           enddo
           close(unit)
 
           open(unit,file="profss.txt")
           do k = 1,Prnz
-           write (unit,*) zPr(k),(profssavg(i,k), i = 1,computescalars)
+           write (unit,*) zPr(k),(profssavg(i,k), i = 1,num_of_scalars)
           enddo
           close(unit)
 
-       endif !computescalars>0
+       endif !num_of_scalars>0
 
     endif !store%BLprofiles
 
@@ -986,7 +986,7 @@ contains
     character(8) ::  scalname="scalar00"
     integer :: l,unit
 
-    if (computescalars>0) then
+    if (num_of_scalars>0) then
       if (store%scalars>0) then
 
           call newunit(unit)
@@ -1017,7 +1017,7 @@ contains
           write (str(12:),*) Prnx*Prny*Prnz
           write (unit) str,lf
 
-          do l = 1,computescalars
+          do l = 1,num_of_scalars
             write(scalname(7:8),"(I2.2)") l
             write (unit) "SCALARS ", scalname , " float",lf
             write (unit) "LOOKUP_TABLE default",lf
@@ -1031,7 +1031,7 @@ contains
 
       if (computedeposition>0.and.store%deposition>0) then
 
-          allocate(depos(1:Prnx,1:Prny,computescalars))
+          allocate(depos(1:Prnx,1:Prny,num_of_scalars))
           depos = GroundDeposition()
 
           call newunit(unit)
@@ -1061,7 +1061,7 @@ contains
           write (str(12:),*) Prnx*Prny
           write (unit) str,lf
 
-          do l = 1,computescalars
+          do l = 1,num_of_scalars
             write(scalname(7:8),"(I2.2)") l
             write (unit) "SCALARS ", scalname , " float",lf
             write (unit) "LOOKUP_TABLE default",lf
@@ -1076,7 +1076,7 @@ contains
           deallocate(depos)
 
       endif  !store%deposition
-    endif  !compute_scalars
+    endif  !num_of_scalars
   end subroutine OutputScalars
 
 
@@ -1199,7 +1199,7 @@ contains
     endif !averaging
 
     if (averaging==1.and.store%scalarsavg>0) then
-        if (computescalars>0) then
+        if (num_of_scalars>0) then
             open(unit,file="scalarsavg.vtk",&
               access='stream',status='replace',form="unformatted",action="write")
 
@@ -1226,7 +1226,7 @@ contains
             write (str(12:),*) Prnx*Prny*Prnz
             write (unit) str,lf
 
-            do l = 1,computescalars
+            do l = 1,num_of_scalars
               write(scalname(7:8),"(I2.2)") l
               write (unit) "SCALARS ", scalname , " float",lf
               write (unit) "LOOKUP_TABLE default",lf
@@ -1236,7 +1236,7 @@ contains
               write (unit) lf
             enddo
             close(unit)
-        endif  !computescalars
+        endif  !num_of_scalars
 
     endif !averaging
   endsubroutine OutputAvg
@@ -1598,7 +1598,7 @@ contains
 
 
     !$omp parallel do default(private) shared(n,store,time,fsuffix,xPr,yPr,zPr,Prtype,Pr,U,V,W,&
-    !$omp                      scalar,temperature,enable_buoyancy,computescalars,dxmin,dymin,dzmin,temperature_ref)
+    !$omp                      scalar,temperature,enable_buoyancy,num_of_scalars,dxmin,dymin,dzmin,temperature_ref)
     do m = 1,size(store%frame_domains)
 
       fname="frame-"//achar(iachar('a')+m-1)//"-"
@@ -1680,7 +1680,7 @@ contains
 
       if (store%frame_scalars>0) then
         scalname(1:6)="scalar"
-        do l = 1,computescalars
+        do l = 1,num_of_scalars
          write(scalname(7:8),"(I2.2)") l
          write (unit) "SCALARS ", scalname , " float",lf
          write (unit) "LOOKUP_TABLE default",lf
@@ -1701,7 +1701,7 @@ contains
 
          write (unit) lf
         enddo
-      elseif (store%frame_sumscalars>0.and.computescalars>0) then
+      elseif (store%frame_sumscalars>0.and.num_of_scalars>0) then
         write (unit) "SCALARS ", "scalar" , " float",lf
         write (unit) "LOOKUP_TABLE default",lf
         do k = mink,maxk
@@ -1767,7 +1767,7 @@ contains
       if (store%frame_scalfl>0) then
         if (store%frame_scalars>0) then
           scalname(1:6)="scalfl"
-          do l = 1,computescalars
+          do l = 1,num_of_scalars
             write(scalname(7:8),"(I2.2)") l
             write (unit) "SCALARS ", scalname , " float", lf
             write (unit) "LOOKUP_TABLE default", lf
@@ -1787,7 +1787,7 @@ contains
 
             write (unit) lf
           enddo
-        elseif (store%frame_sumscalars>0.and.computescalars>0) then
+        elseif (store%frame_sumscalars>0.and.num_of_scalars>0) then
           write (unit) "SCALARS scalfl float", lf
           write (unit) "LOOKUP_TABLE default", lf
           do k = mink,maxk
@@ -1921,7 +1921,7 @@ contains
     endif
 
     if (present(scalar)) then
-      do l = 1,computescalars
+      do l = 1,num_of_scalars
         !$omp parallel do private(i,j,k,n,S)
         do k = 1,Prnz
           S = 0
@@ -2103,7 +2103,7 @@ contains
 
 
     if (present(scalar)) then
-      do l = 1,computescalars
+      do l = 1,num_of_scalars
         !$omp parallel private(i,j,k,n,S)
         !$omp do
         do k = 0,Prnz

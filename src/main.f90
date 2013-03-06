@@ -121,8 +121,8 @@ program CLMM
        allocate(temperature(0,0,0))
      endif
 
-     if (computescalars>0) then
-       allocate(Scalar(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,computescalars))
+     if (num_of_scalars>0) then
+       allocate(Scalar(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
        Scalar = 0
      else
        allocate(Scalar(0,0,0,0))
@@ -131,7 +131,7 @@ program CLMM
 
      allocate(Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
 
-     if (enable_buoyancy>0.or.computescalars>0) then
+     if (enable_buoyancy>0.or.num_of_scalars>0) then
        allocate(TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
        TDiff = 0
      else

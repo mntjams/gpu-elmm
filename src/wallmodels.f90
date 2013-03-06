@@ -1244,7 +1244,7 @@ implicit none
 
 
   pure function GroundDeposition() result(depos)
-    real(knd), dimension(:) :: depos(1:Prnx,1:Prny,computescalars)
+    real(knd), dimension(:) :: depos(1:Prnx,1:Prny,num_of_scalars)
 
     integer :: i, j
 
@@ -1254,7 +1254,7 @@ implicit none
 
       if (allocated(WMPoints(j)%depscalar)) then
 
-        do i = 1, computescalars
+        do i = 1, num_of_scalars
           depos(WMPoints(j)%xi,WMPoints(j)%yj,i) = depos(WMPoints(j)%xi,WMPoints(j)%yj,i) + WMPoints(j)%depscalar(i)
         end do
 

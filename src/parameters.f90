@@ -83,7 +83,13 @@ module PARAMETERS
 
   integer :: tempmet,poissmet,convmet,masssourc,frames,steady
   integer :: tasktype,averaging,impldiff
-  integer :: enable_buoyancy,computescalars,partdistrib,computedeposition,computegravsettling
+
+  integer :: enable_buoyancy = 0 !1 if enabled, zero otherwise
+  integer :: enable_moisture = 0
+  integer :: enable_liquid   = 0 !enable condensation of water vapor
+  integer :: num_of_scalars  = 0
+
+  integer :: partdistrib,computedeposition,computegravsettling
   integer :: maxCNiter,maxPOISSONiter,maxiter,endstep
   integer :: projectiontype,correctcompatibility = 0
 

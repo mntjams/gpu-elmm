@@ -17,7 +17,7 @@ contains
     integer       :: i,j,k,m,n,o,p
     integer       :: nb
 
-    allocate(WMP%depscalar(computescalars))
+    allocate(WMP%depscalar(num_of_scalars))
 
     !six triplets [1,0,0], [-1,0,0], [0,1,0],...
     neighbours = 0

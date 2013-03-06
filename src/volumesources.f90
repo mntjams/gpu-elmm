@@ -179,7 +179,7 @@ module VolumeSources
 
           select type (PB)
             class is (TVolumeSourceBody)
-              allocate(Selem%scalar_flux(computescalars))  !to avoid allocation inside the loop
+              allocate(Selem%scalar_flux(num_of_scalars))  !to avoid allocation inside the loop
               do k = 0,Prnz+1
                do j = 0,Prny+1
                 do i = 0,Prnx+1

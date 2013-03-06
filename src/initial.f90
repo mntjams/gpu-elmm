@@ -306,7 +306,7 @@ contains
    relativestress(3,2)=relativestress(2,3)
 
    open(unit,file="scalars.conf",status="old",action="read")
-   call get(computescalars)
+   call get(num_of_scalars)
    call get(computedeposition)
    call get(computegravsettling)
    call get(partdistrib)
@@ -343,11 +343,11 @@ contains
 
    else
 
-      allocate(partdiam(computescalars),partrho(computescalars),percdistrib(computescalars))
-      allocate(scalsrcx(computescalars),scalsrcy(computescalars),scalsrcz(computescalars))
-      allocate(scalsrci(computescalars),scalsrcj(computescalars),scalsrck(computescalars))
+      allocate(partdiam(num_of_scalars),partrho(num_of_scalars),percdistrib(num_of_scalars))
+      allocate(scalsrcx(num_of_scalars),scalsrcy(num_of_scalars),scalsrcz(num_of_scalars))
+      allocate(scalsrci(num_of_scalars),scalsrcj(num_of_scalars),scalsrck(num_of_scalars))
 
-      do i=1,computescalars
+      do i=1,num_of_scalars
         call get(partdiam(i))
         call get(partrho(i))
         call get(percdistrib(i))
@@ -438,7 +438,7 @@ contains
        call get(frame_save_flags%Temperature)
        if (enable_buoyancy == 0) frame_save_flags%Temperature = .false.
        call get(frame_save_flags%Scalar)
-       if (computescalars == 0) frame_save_flags%Scalar = .false.
+       if (num_of_scalars == 0) frame_save_flags%Scalar = .false.
 
        call Init(StaggeredFrameDomains(i), trim(domain_label), &
                  range, &
@@ -517,7 +517,7 @@ contains
      close(unit)
    end if
 
-   write(*,*) "computescalars",computescalars
+   write(*,*) "num_of_scalars",num_of_scalars
    write(*,*) "partdiam",partdiam
 
 
@@ -879,7 +879,7 @@ contains
        else
          Visc=0
        endif
-       if (enable_buoyancy==1.or.computescalars>0) TDiff=1._knd/(Re*Prandtl)
+       if (enable_buoyancy==1.or.num_of_scalars>0) TDiff=1._knd/(Re*Prandtl)
 
        call BoundU(1,U)
        call BoundU(2,V)
@@ -1163,7 +1163,7 @@ contains
 
 
 
-       if (computescalars>0) then
+       if (num_of_scalars>0) then
          !$omp parallel
          !$omp workshare
          SCALAR(1:Prnx,1:Prny,1:Prnz,:)=0
@@ -1243,7 +1243,7 @@ contains
          !$omp end parallel
        endif
 
-       if (Re>0.and.(enable_buoyancy==1.or.computescalars>0)) then
+       if (Re>0.and.(enable_buoyancy==1.or.num_of_scalars>0)) then
          !$omp parallel
          !$omp workshare
          TDiff=1._knd/(Re*Prandtl)
@@ -1299,7 +1299,7 @@ contains
          call BoundTemperature(temperature)
        endif
 
-       do i=1,computescalars
+       do i=1,num_of_scalars
          call Bound_PassScalar(Scalar(:,:,:,i))
        enddo
 
@@ -1690,7 +1690,7 @@ contains
     call InitSubsidenceProfile
 
 
-   if (computescalars>0.and.scalsourcetype==pointsource) then
+   if (num_of_scalars>0.and.scalsourcetype==pointsource) then
         call Gridcoords(scalsrci(:),scalsrcj(:),scalsrck(:),scalsrcx(:),scalsrcy(:),scalsrcz(:))
    endif
 
@@ -1703,7 +1703,7 @@ contains
    call GetSolidBodiesBC
 
    !add also the wall model points from domain boundaries to the list
-   call GetOutsideBoundariesWM(computescalars)
+   call GetOutsideBoundariesWM(num_of_scalars)
 
    !create arrays of w.m. points from the list
    call MoveWMPointsToArray

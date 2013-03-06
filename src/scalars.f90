@@ -77,10 +77,10 @@ contains
     endif
 
 
-!     if (computescalars>0.and..not.released) call Release(Scalar,released)
+!     if (num_of_scalars>0.and..not.released) call Release(Scalar,released)
 
 
-    if (computescalars>0) then
+    if (num_of_scalars>0) then
 
       !$omp parallel workshare
       Scalar_2=0
@@ -92,7 +92,7 @@ contains
         !$omp end parallel workshare
       endif
 
-      do i=1,computescalars
+      do i=1,num_of_scalars
 
         call Bound_PassScalar(Scalar(:,:,:,i))
 
@@ -106,7 +106,7 @@ contains
 
       if (scalsourcetype==pointsource) then
 
-        do i=1,computescalars
+        do i=1,num_of_scalars
           Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i) = &
                      Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
                      percdistrib(i)*(RK_rho(RKstage) + &
@@ -116,7 +116,7 @@ contains
 
       elseif (scalsourcetype==volumesource) then
 
-        do i=1,computescalars
+        do i=1,num_of_scalars
           call VolScalSource(Scalar_2,RK_rho(RKstage)+RK_beta(RKstage))
         enddo
 
@@ -128,7 +128,7 @@ contains
       !$omp end workshare
       !$omp end parallel
 
-      do i=1,computescalars
+      do i=1,num_of_scalars
          call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i),2,2._knd*RK_alpha(RKstage))
       enddo
 
@@ -1678,7 +1678,7 @@ contains
       SCAL(WMP%xi,WMP%yj,WMP%zk,1) = SCAL(WMP%xi,WMP%yj,WMP%zk,1)-deptmp/(dxPr(WMP%xi)*dyPr(WMP%yj)*dzPr(WMP%zk))
      enddo
     else
-     do i = 1,computescalars
+     do i = 1,num_of_scalars
       deptmp = abs(DepositionFlux(WMP,SCAL(WMP%xi,WMP%yj,WMP%zk,i),partdiam(i),partrho(i)))&
           *coef*dt*dxPr(WMP%xi)*dyPr(WMP%yj)
       WMP%depscalar(i) = WMP%depscalar(i)+deptmp/(dxPr(WMP%xi)*dyPr(WMP%yj)*dzPr(WMP%zk))
@@ -1705,7 +1705,7 @@ contains
   press = 101300
   temp = temperature_ref
   if (partdistrib==0) then
-   do l = 1,computescalars
+   do l = 1,num_of_scalars
     do k = 1,Prnz
      do j = 1,Prny
       do i = 1,Prnx
@@ -1953,7 +1953,7 @@ contains
     dxp=(xf-xs)/nprobx
     dyp=(yf-ys)/nproby
     dzp=(zf-zs)/nprobz
-    if (computescalars>=4) then
+    if (num_of_scalars>=4) then
      if (time>(endtime-starttime)/3._knd) then
       Scalar = 0
       p = 0
