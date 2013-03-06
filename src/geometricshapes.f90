@@ -865,24 +865,26 @@ module TBody_class
 
   private
 
-  public TBody
+  public TBody,Inside
 
 
   type, extends(TListable) :: TBody
      integer numofbody
      class(TGeometricShape),allocatable :: GeometricShape
   contains
-     procedure :: Inside
+     procedure :: Inside => CInside  !Hack around yet inidentified problem in GCC.
      procedure :: Nearest
      procedure :: NearestOut
      procedure :: NearestOnLineOut
   end type
-
+  interface Inside
+    module procedure CInside
+  end interface
 
 contains
 
 
-  pure logical function Inside(self,x,y,z,eps)
+  pure logical function CInside(self,x,y,z,eps)
     class(TBody),intent(in) :: self
     real(KND),intent(in) :: x,y,z
     real(KND),intent(in),optional :: eps
@@ -890,7 +892,7 @@ contains
     real(KND) lx,ly,lz
 
     if (.not.allocated(self%GeometricShape)) then
-      Inside = .false.
+      CInside = .false.
     else
       x2 = x
       y2 = y
@@ -909,13 +911,13 @@ contains
       if (Btype(Bo)==PERIODIC.and.z2<zW(0)) z2 = z2+lz
 
       if (present(eps)) then
-        Inside = self%GeometricShape%Inside(x2,y2,z2,eps)
+        CInside = self%GeometricShape%Inside(x2,y2,z2,eps)
       else
-        Inside = self%GeometricShape%Inside(x2,y2,z2)
+        CInside = self%GeometricShape%Inside(x2,y2,z2)
       endif
     end if
 
-  end function Inside
+  end function CInside
 
   
 
