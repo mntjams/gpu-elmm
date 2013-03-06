@@ -9,6 +9,8 @@ diag = ARGUMENTS.get('diag','')
 dir = ARGUMENTS.get('dir','')
 customSB = ARGUMENTS.get('customSB','')
 SB = ARGUMENTS.get('SB','')
+customPB = ARGUMENTS.get('customPB','')
+PB = ARGUMENTS.get('PB','')
 extra = ARGUMENTS.get('extra','')
 
 extra_flag = ' ' + str(extra)
@@ -140,13 +142,23 @@ env.Append(FORTRANMODDIR = '${TARGET.dir}')
 env.Append(LIBS = ['poisfft','lapack','fftw3','fftw3f','fftw3_omp','fftw3f_omp','pthread'])
 
 if customSB=='yes':
-  env.Append(F90FLAGS='-DCUSTOMSB')
-  if str(SB)=='':
-    SBfile = ['../custom/emptySB.o']
-  else:
-    SBfile = [str(SB)]
+ env.Append(F90FLAGS='-DCUSTOMSB')
+ if str(SB)=='':
+   SBfile = ['../custom/emptySB.o']
+ else:
+   SBfile = [str(SB)]
 else:
-  SBfile=[]
+ SBfile=[]
+   
+   
+if customPB=='yes':
+  env.Append(F90FLAGS='-DCUSTOMPB')
+  if str(PB)=='':
+    PBfile = ['../custom/emptyPB.o']
+  else:
+    PBfile = [str(PB)]
+else:
+  PBfile=[]
 
 
 objs =  env.Object(target=target_dir+'parameters',     source='parameters.f90')
@@ -184,6 +196,6 @@ objs += env.Object(target=target_dir+'main',           source='main.f90')
 
 objs = filter(lambda o: str(o)[-4:] != '.mod', objs)
 
-t = env.Program(target=target_dir+'CLMM', source= objs + SBfile)
+t = env.Program(target=target_dir+'CLMM', source= objs + SBfile + PBfile)
 
 Default(t)
