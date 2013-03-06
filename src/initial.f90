@@ -13,6 +13,8 @@ module INITIAL
   use TURBINLET, only: GetTurbInlet, GetInletFromFile, TLag, Lturby, Lturbz, ustarinlet, transformtensor
   use SolidBodies, only: obstaclefile, InitSolidBodies
   use ImmersedBoundary, only: GetSolidBodiesBC
+  use VolumeSources, only: InitVolumeSources
+  use PlantCanopy, only: InitPlantBodies
   use WALLMODELS
   use TILING, only: tilesize,InitTiles
   use FreeUnit, only: newunit
@@ -1631,24 +1633,24 @@ contains
     allocate(Wtype(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
     allocate(Prtype(0:Prnx+1,0:Prny+1,0:Prnz+1))
 
-    Utype=0
-    Vtype=0
-    Wtype=0
-    Prtype=0
+    Utype = 0
+    Vtype = 0
+    Wtype = 0
+    Prtype = 0
 
 
     allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
-    Uin=huge(1._KND)
-    Vin=huge(1._KND)
-    Win=huge(1._KND)
+    Uin = huge(1._KND)
+    Vin = huge(1._KND)
+    Win = huge(1._KND)
 
     if (buoyancy>0) allocate(Tempin(-1:Prny+2,-1:Prnz+2))
 
     select case (inlettype)
       case (NOINLET)
-        Uin=0
-        Vin=0
-        Win=0
+        Uin = 0
+        Vin = 0
+        Win = 0
       case (SHEAR)
         call SHEARINLET(SHEARG)
       case (PARABOLIC)
@@ -1668,14 +1670,14 @@ contains
          allocate(BsideTFLArr(-1:Prnx+2,-1:Prny+2))
 
          if (TBtype(Bo)==CONSTFLUX) then
-           BsideTFLArr=sideTemp(Bo)
+           BsideTFLArr = sideTemp(Bo)
          else
-           BsideTFLArr=0
+           BsideTFLArr = 0
          endif
 
          if (TBtype(Bo)==DIRICHLET) then
            allocate(BsideTArr(-1:Prnx+2,-1:Prny+2))
-           BsideTArr=sideTemp(Bo)
+           BsideTArr = sideTemp(Bo)
          endif
 
         endif
@@ -1694,15 +1696,25 @@ contains
 
    call InitTiles(Prnx,Prny,Prnz)
 
+   !prepare the geometry of the solid bodies
    call InitSolidBodies
 
+   !create actual immersed boundary and wall model points, i.m. points end up in an array
    call GetSolidBodiesBC
 
+   !add also the wall model points from domain boundaries to the list
    call GetOutsideBoundariesWM(computescalars)
 
+   !create arrays of w.m. points from the list
    call MoveWMPointsToArray
 
    call SetNullifiedPoints
+
+   !prepare the geometry of the plant bodies
+   call InitPlantBodies
+
+   !create actual arrays of the source points
+   call InitVolumeSources
 
    call SetFrameDomain(store%frame_domains)
 
@@ -1716,12 +1728,12 @@ contains
     integer i,j,k,n
 
     !$omp parallel do reduction(+:nUnull)
-    do k=1,Unz
-     do j=1,Uny
-      do i=1,Unx
+    do k = 1,Unz
+     do j = 1,Uny
+      do i = 1,Unx
        if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
            .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
-           .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  nUnull=nUnull+1
+           .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  nUnull = nUnull+1
       enddo
      enddo
     enddo
@@ -1729,32 +1741,32 @@ contains
 
     allocate(Unull(3,nUnull))
 
-    n=0
+    n = 0
 
-    do k=1,Unz
-     do j=1,Uny
-      do i=1,Unx
+    do k = 1,Unz
+     do j = 1,Uny
+      do i = 1,Unx
        if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
            .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
            .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  then
             !$omp atomic
-            n=n+1
-            Unull(:,n)=(/ i,j,k /)
+            n = n+1
+            Unull(:,n) = (/ i,j,k /)
 
        endif
       enddo
      enddo
     enddo
 
-    nVnull=0
+    nVnull = 0
 
     !$omp parallel do reduction(+:nVnull)
-    do k=1,Vnz
-     do j=1,Vny
-      do i=1,Vnx
+    do k = 1,Vnz
+     do j = 1,Vny
+      do i = 1,Vnx
        if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
            .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
-           .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  nVnull=nVnull+1
+           .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  nVnull = nVnull+1
       enddo
      enddo
     enddo
@@ -1762,32 +1774,32 @@ contains
 
     allocate(Vnull(3,nVnull))
 
-    n=0
+    n = 0
 
-    do k=1,Vnz
-     do j=1,Vny
-      do i=1,Vnx
+    do k = 1,Vnz
+     do j = 1,Vny
+      do i = 1,Vnx
        if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
            .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
            .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  then
 
-            n=n+1
-            Vnull(:,n)=(/ i,j,k /)
+            n = n+1
+            Vnull(:,n) = (/ i,j,k /)
 
        endif
       enddo
      enddo
     enddo
 
-    nWnull=0
+    nWnull = 0
 
     !$omp parallel do reduction(+:nWnull)
-    do k=1,Wnz
-     do j=1,Wny
-      do i=1,Wnx
+    do k = 1,Wnz
+     do j = 1,Wny
+      do i = 1,Wnx
        if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
            .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
-           .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  nWnull=nWnull+1
+           .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  nWnull = nWnull+1
       enddo
      enddo
     enddo
@@ -1795,18 +1807,18 @@ contains
 
     allocate(Wnull(3,nWnull))
 
-    n=0
+    n = 0
 
 
-    do k=1,Wnz
-     do j=1,Wny
-      do i=1,Wnx
+    do k = 1,Wnz
+     do j = 1,Wny
+      do i = 1,Wnx
        if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
            .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
            .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  then
 
-            n=n+1
-            Wnull(:,n)=(/ i,j,k /)
+            n = n+1
+            Wnull(:,n) = (/ i,j,k /)
 
        endif
       enddo
@@ -1827,7 +1839,7 @@ contains
 
     call SYSTEM_CLOCK(COUNT=clock)
 
-    seed=0!clock+37*(/(i-1,i=1,n)/)
+    seed = 0!clock+37*(/(i-1,i=1,n)/)
     call RANDOM_SEED(PUT=seed)
 
     deallocate(seed)
