@@ -2475,6 +2475,7 @@ module vtkarray
       write (unit,'(99999999(g0,/))') A(1:nx,1:ny,1:nz)
 
       write (unit,*)
+      close(unit)
 
     end subroutine SVtkArraySimple
 
@@ -2523,6 +2524,7 @@ module vtkarray
       write (unit,'(99999999(g0,/))') A(1:nx,1:ny,1:nz)
 
       write (unit,*)
+      close(unit)
 
     end subroutine DVtkArraySimple
 end module vtkarray
