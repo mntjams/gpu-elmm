@@ -11,12 +11,12 @@ module KINDS
   integer,parameter :: DBL = real64, SNG = real32
 
 #ifdef DPREC
-  integer,parameter :: KND = DBL                                       !KND is default real kind for the whole program, choosing double
+  integer,parameter :: knd = DBL                                       !knd is default real kind for the whole program, choosing double
 #else
-  integer,parameter :: KND = SNG                                       !KND is default real kind for the whole program, choosing single
+  integer,parameter :: knd = SNG                                       !knd is default real kind for the whole program, choosing single
 #endif
 
-  integer,parameter :: TIM = KND                                       !Kind for time variables, can be double for very small timesteps.
+  integer,parameter :: TIM = knd                                       !Kind for time variables, can be double for very small timesteps.
                                                                        !It may affect performance
 
   integer,parameter :: SINT = kind(1)                                  !To save memory a smaller type can be used for some integer
@@ -33,9 +33,9 @@ module PARAMETERS
 
   save
 
-  real(KND)           :: pi !computed at the first line of main
-  real(KND),parameter :: Karman=0.41_KND
-  real(KND),parameter :: BoltzC=1.3806503e-23_KND
+  real(knd)           :: pi !computed at the first line of main
+  real(knd),parameter :: Karman=0.41_knd
+  real(knd),parameter :: BoltzC=1.3806503e-23_knd
 
   integer :: Unx,Uny,Unz     !dimensions of grid for velocity component U
 
@@ -50,53 +50,53 @@ module PARAMETERS
 
   real(TIM) :: dt,starttime,endtime        !active time step
 
-  real(KND) :: dxmin,dymin,dzmin,CFL,Uref  !minimum grid spacing, dimensions of the domain
+  real(knd) :: dxmin,dymin,dzmin,CFL,Uref  !minimum grid spacing, dimensions of the domain
 
 
-  real(KND) :: Re = 70000, Prandtl = 0.7!1/molecular viscosity, viscosity/thermal diffusivity
+  real(knd) :: Re = 70000, Prandtl = 0.7!1/molecular viscosity, viscosity/thermal diffusivity
 
 
-  real(KND) :: prgradientx = 0, prgradienty = 0, temperature_ref = 295, grav_acc = 0, coriolisparam = 0
+  real(knd) :: prgradientx = 0, prgradienty = 0, temperature_ref = 295, grav_acc = 0, coriolisparam = 0
 
-  real(KND) :: SHEARG,Uinlet,ustarsurfin
+  real(knd) :: SHEARG,Uinlet,ustarsurfin
 
-  real(KND) :: z0inlet,z0W,z0E,z0S,z0N,z0B,z0T
+  real(knd) :: z0inlet,z0W,z0E,z0S,z0N,z0B,z0T
 
-  real(KND) :: stressgradin,urefin,zrefin,powerexpin
+  real(knd) :: stressgradin,urefin,zrefin,powerexpin
 
-  real(KND) :: windangle
+  real(knd) :: windangle
 
-  real(KND),dimension(:),allocatable :: scalsrcx,scalsrcy,scalsrcz
+  real(knd),dimension(:),allocatable :: scalsrcx,scalsrcy,scalsrcz
 
-  real(KND) :: totalscalsource
+  real(knd) :: totalscalsource
 
   integer,dimension(:),allocatable :: scalsrci,scalsrcj,scalsrck
 
   integer :: scalsourcetype
 
-  real(KND),dimension(1:3,1:3) :: relativestress
+  real(knd),dimension(1:3,1:3) :: relativestress
 
 
-  real(KND) :: epsCN,epsPoisson,eps,debugparam
+  real(knd) :: epsCN,epsPoisson,eps,debugparam
   real(TIM) :: time
   real(TIM) :: timefram1,timefram2,timeavg1,timeavg2
 
   integer :: tempmet,poissmet,convmet,masssourc,frames,steady
   integer :: tasktype,averaging,impldiff
-  integer :: buoyancy,computescalars,partdistrib,computedeposition,computegravsettling
+  integer :: enable_buoyancy,computescalars,partdistrib,computedeposition,computegravsettling
   integer :: maxCNiter,maxPOISSONiter,maxiter,endstep
   integer :: projectiontype,correctcompatibility = 0
 
   integer :: inlettype,gridtype,profiletype
 
 
-  real(KND),allocatable :: Uin(:,:),Vin(:,:),Win(:,:),Uoutb(:,:),Tempin(:,:) !1:Unz
-  real(KND),allocatable :: xU(:),xPr(:),yV(:),yPr(:),zW(:),zPr(:)          !coordinates of grid points
-  real(KND),allocatable :: dxU(:),dxPr(:),dyV(:),dyPr(:),dzW(:),dzPr(:)    !dxPr(i)=xU(i)-xU(i-1), dxU(i)=xPr(i+1)-xPr(i)
+  real(knd),allocatable :: Uin(:,:),Vin(:,:),Win(:,:),Uoutb(:,:),Tempin(:,:) !1:Unz
+  real(knd),allocatable :: xU(:),xPr(:),yV(:),yPr(:),zW(:),zPr(:)          !coordinates of grid points
+  real(knd),allocatable :: dxU(:),dxPr(:),dyV(:),dyPr(:),dzW(:),dzPr(:)    !dxPr(i)=xU(i)-xU(i-1), dxU(i)=xPr(i+1)-xPr(i)
 
-  real(KND) :: xheading !true geographic heading of the x axis
+  real(knd) :: xheading !true geographic heading of the x axis
 
-  real(KND),allocatable :: Visc(:,:,:),TDiff(:,:,:)  !(turbulent) viscosity, (turbulent) thermal diffusivity
+  real(knd),allocatable :: Visc(:,:,:),TDiff(:,:,:)  !(turbulent) viscosity, (turbulent) thermal diffusivity
 
   integer(sint),allocatable,dimension(:,:,:) :: Utype,Vtype,Wtype,Prtype !number of solid body inside which the point is or 0
   integer,allocatable,dimension(:,:) :: Unull,Vnull,Wnull                !indexes of points to be nulled every timestep
@@ -115,11 +115,11 @@ module PARAMETERS
   integer,dimension(6) :: ScalBtype !boundary condition types for scalars
 
 
-  real(KND),dimension(3,6)   :: sideU    !velocities on boundaries in case of Dirichlet BC
-  real(KND),dimension(6)     :: sideTemp !temperatures or temperature fluxes on boundaries
-  real(KND),allocatable      :: BsideTArr(:,:),BsideTFLArr(:,:)
+  real(knd),dimension(3,6)   :: sideU    !velocities on boundaries in case of Dirichlet BC
+  real(knd),dimension(6)     :: sideTemp !temperatures or temperature fluxes on boundaries
+  real(knd),allocatable      :: BsideTArr(:,:),BsideTFLArr(:,:)
 
-  real(KND),dimension(6) :: sideScal  !scalars or scalar fluxes on boundaries
+  real(knd),dimension(6) :: sideScal  !scalars or scalar fluxes on boundaries
 
   integer,parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
                         TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
@@ -138,14 +138,14 @@ module PARAMETERS
   integer   :: yj
   integer   :: zk
 
-  real(KND) :: distx
-  real(KND) :: disty
-  real(KND) :: distz
+  real(knd) :: distx
+  real(knd) :: disty
+  real(knd) :: distz
 
-  real(KND) :: z0=0
-  real(KND) :: ustar=1
-  real(KND) :: temp=0
-  real(KND) :: tempfl=0
+  real(knd) :: z0=0
+  real(knd) :: ustar=1
+  real(knd) :: temp=0
+  real(knd) :: tempfl=0
 
  endtype hmppWMpoint
 ! #endif
@@ -155,9 +155,9 @@ endmodule PARAMETERS
 module RK3
   use Kinds
 
-  real(KND),parameter :: RK_alpha(3) = [ 4._KND/15._KND, 1._KND/15._KND,  1._KND/6._KND  ]
-  real(KND),parameter :: RK_beta(3)  = [ 8._KND/15._KND, 5._KND/12._KND,  3._KND/4._KND  ]
-  real(KND),parameter :: RK_rho(3)   = [ 0._KND,       -17._KND/60._KND, -5._KND/12._KND ]
+  real(knd),parameter :: RK_alpha(3) = [ 4._knd/15._knd, 1._knd/15._knd,  1._knd/6._knd  ]
+  real(knd),parameter :: RK_beta(3)  = [ 8._knd/15._knd, 5._knd/12._knd,  3._knd/4._knd  ]
+  real(knd),parameter :: RK_rho(3)   = [ 0._knd,       -17._knd/60._knd, -5._knd/12._knd ]
   integer,parameter   :: RKstages = 3
 
 end module RK3

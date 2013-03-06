@@ -2,24 +2,24 @@
   pure function FluxLimiter(r,limparam) result(res)
     implicit none
 #include "hmpp-include.f90"
-    real(KND) res
-    real(KND),intent(in) :: r,limparam
+    real(knd) res
+    real(knd),intent(in) :: r,limparam
     intrinsic max,min
-    res = max(0._KND,min(2._KND*r,min(limparam,(1+2._KND*r)/3._KND)))
+    res = max(0._knd,min(2._knd*r,min(limparam,(1+2._knd*r)/3._knd)))
   end function FluxLimiter
 
   pure function hsign(r) result(res)  !sign is not supported by HMPP yet
     implicit none
 #include "hmpp-include.f90"
-    real(KND) res
-    real(KND),intent(in) :: r
+    real(knd) res
+    real(knd),intent(in) :: r
 
     if (r>0) then
-      res = 1._KND
+      res = 1._knd
     else if (r<0) then
-      res = -1._KND
+      res = -1._knd
     else
-      res = 0._KND
+      res = 0._knd
     end if
   end function hsign
 
@@ -33,17 +33,17 @@
 #include "hmpp-include.f90"
 
   integer,intent(in)    :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
-  real(KND),intent(in)  :: Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-  real(KND),intent(out) :: Temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-  real(KND),intent(in)  :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(KND),intent(in)  :: dxmin,dymin,dzmin,coef,dt,limparam
-  real(KND),intent(in)  :: SubsidenceProfile(0:Prnz)
-  real(KND),intent(out) :: fluxProfile(0:Prnz)
+  real(knd),intent(in)  :: Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(knd),intent(out) :: Temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(knd),intent(in)  :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+  real(knd),intent(in)  :: dxmin,dymin,dzmin,coef,dt,limparam
+  real(knd),intent(in)  :: SubsidenceProfile(0:Prnz)
+  real(knd),intent(out) :: fluxProfile(0:Prnz)
   integer i,j,k,l
-  real(KND) A,Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
-  real(KND) vel,SL,SR,SP,FLUX
-  real(KND),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
-  real(KND),parameter ::eps = 1e-8
+  real(knd) A,Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
+  real(knd) vel,SL,SR,SP,FLUX
+  real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: SLOPE
+  real(knd),parameter ::eps = 1e-8
   intrinsic sign
 
 
@@ -88,9 +88,9 @@
      do i = 0+l,Prnx,2
       do j = 1,Prny
        if (U(i,j,k)>0) then
-        FLUX = U(i,j,k)*(Temperature(i,j,k)+(Temperature(i,j,k)-Temperature(i-1,j,k))*SLOPE(i,j,k)/2._KND)
+        FLUX = U(i,j,k)*(Temperature(i,j,k)+(Temperature(i,j,k)-Temperature(i-1,j,k))*SLOPE(i,j,k)/2._knd)
        else
-        FLUX = U(i,j,k)*(Temperature(i+1,j,k)+(Temperature(i+1,j,k)-Temperature(i+2,j,k))*SLOPE(i,j,k)/2._KND)
+        FLUX = U(i,j,k)*(Temperature(i+1,j,k)+(Temperature(i+1,j,k)-Temperature(i+2,j,k))*SLOPE(i,j,k)/2._knd)
        endif
        Temperature2(i,j,k) = Temperature2(i,j,k)-Ax*FLUX
        Temperature2(i+1,j,k) = Temperature2(i+1,j,k)+Ax*FLUX
@@ -126,9 +126,9 @@
      do i = 1,Prnx
       do j = 0+l,Prny,2
        if (V(i,j,k)>0) then
-        FLUX = V(i,j,k)*(Temperature(i,j,k)+(Temperature(i,j,k)-Temperature(i,j-1,k))*SLOPE(i,j,k)/2._KND)
+        FLUX = V(i,j,k)*(Temperature(i,j,k)+(Temperature(i,j,k)-Temperature(i,j-1,k))*SLOPE(i,j,k)/2._knd)
        else
-        FLUX = V(i,j,k)*(Temperature(i,j+1,k)+(Temperature(i,j+1,k)-Temperature(i,j+2,k))*SLOPE(i,j,k)/2._KND)
+        FLUX = V(i,j,k)*(Temperature(i,j+1,k)+(Temperature(i,j+1,k)-Temperature(i,j+2,k))*SLOPE(i,j,k)/2._knd)
        endif
 
        Temperature2(i,j,k) = Temperature2(i,j,k)-Ay*FLUX
@@ -168,9 +168,9 @@
        vel = W(i,j,k) - SubsidenceProfile(k)
 
        if (vel>0) then
-        FLUX = vel*(Temperature(i,j,k)+(Temperature(i,j,k)-Temperature(i,j,k-1))*SLOPE(i,j,k)/2._KND)
+        FLUX = vel*(Temperature(i,j,k)+(Temperature(i,j,k)-Temperature(i,j,k-1))*SLOPE(i,j,k)/2._knd)
        else
-        FLUX = vel*(Temperature(i,j,k+1)+(Temperature(i,j,k+1)-Temperature(i,j,k+2))*SLOPE(i,j,k)/2._KND)
+        FLUX = vel*(Temperature(i,j,k+1)+(Temperature(i,j,k+1)-Temperature(i,j,k+2))*SLOPE(i,j,k)/2._knd)
        endif
 
        if (abs(vel)>=1e-6) then
@@ -206,25 +206,25 @@
 #include "hmpp-include.f90"
 
   integer,intent(in)    :: Prnx,Prny,Prnz,maxCNiter,TBtype(6)
-  real(KND),intent(out),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: Temperature2
-  real(KND),intent(in),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)  :: Temperature
+  real(knd),intent(out),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: Temperature2
+  real(knd),intent(in),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)  :: Temperature
 
-  real(KND),intent(in)  :: dxmin,dymin,dzmin,epsCN,Re,coef,dt
-  real(KND),intent(in)  :: sideTemp(6),Tempin(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-  real(KND),intent(in),dimension(-1:Prnx+2,-1:Prny+2) :: BsideTArr,BsideTFLArr
+  real(knd),intent(in)  :: dxmin,dymin,dzmin,epsCN,Re,coef,dt
+  real(knd),intent(in)  :: sideTemp(6),Tempin(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(knd),intent(in),dimension(-1:Prnx+2,-1:Prny+2) :: BsideTArr,BsideTFLArr
   integer,intent(out)   :: l
-  real(KND),intent(out) :: res
-  real(KND) Temperature3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(knd),intent(out) :: res
+  real(knd) Temperature3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
   integer i,j,k,xi,yj,zk
-  real(KND) p
-  real(KND) A,Ax,Ay,Az,Ap(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(knd) p
+  real(knd) A,Ax,Ay,Az,Ap(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
 
   intrinsic max, abs, mod
 
 
-  Ax = 1._KND/(dxmin**2)
-  Ay = 1._KND/(dymin**2)
-  Az = 1._KND/(dzmin**2)
+  Ax = 1._knd/(dxmin**2)
+  Ay = 1._knd/(dymin**2)
+  Az = 1._knd/(dzmin**2)
 
   if (Re>0) then
 
@@ -262,16 +262,16 @@
 
 
 
-   Ax = 1._KND/(4._KND*dxmin**2)
-   Ay = 1._KND/(4._KND*dymin**2)
-   Az = 1._KND/(4._KND*dzmin**2)
+   Ax = 1._knd/(4._knd*dxmin**2)
+   Ay = 1._knd/(4._knd*dymin**2)
+   Az = 1._knd/(4._knd*dzmin**2)
 
   !$hmppcg grid blocksize myblocksize
    !$hmppcg gridify(k,i)
    do k = 1,Prnz
     do i = 1,Prnx
      do j = 1,Prny
-      Ap(i,j,k) = 1._KND/(1._KND/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))+&
+      Ap(i,j,k) = 1._knd/(1._knd/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))+&
                            (TDiff(i,j,k)+TDiff(i-1,j,k)))*Ax+&
                            ((TDiff(i,j+1,k)+TDiff(i,j,k))+&
                            (TDiff(i,j,k)+TDiff(i,j-1,k)))*Ay+&
@@ -282,7 +282,7 @@
    enddo
 
    l=0
-   res = epsCN + 1._KND
+   res = epsCN + 1._knd
    do while (l<maxCNiter)!.and.res>epsCN
     l=l+1
 !     res = 0
@@ -296,7 +296,7 @@
     do k = 1,Prnz
      do i = 1,Prnx
       do j = 1+mod(i+k,2),Prny,2
-        p = (Temperature(i,j,k)/A)+(Temperature3(i,j,k)/4._KND+&
+        p = (Temperature(i,j,k)/A)+(Temperature3(i,j,k)/4._knd+&
          ((TDiff(i+1,j,k)+TDiff(i,j,k))*(Temperature2(i+1,j,k))-&
           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-Temperature2(i-1,j,k)))*Ax+&
          ((TDiff(i,j+1,k)+TDiff(i,j,k))*(Temperature2(i,j+1,k))-&
@@ -317,7 +317,7 @@
     do k = 1,Prnz
      do i = 1,Prnx
       do j = 1+mod(i+k+1,2),Prny,2
-        p = (Temperature(i,j,k)/A)+(Temperature3(i,j,k)/4._KND+&
+        p = (Temperature(i,j,k)/A)+(Temperature3(i,j,k)/4._knd+&
          ((TDiff(i+1,j,k)+TDiff(i,j,k))*(Temperature2(i+1,j,k))-&
           (TDiff(i,j,k)+TDiff(i-1,j,k))*(-Temperature2(i-1,j,k)))*Ax+&
          ((TDiff(i,j+1,k)+TDiff(i,j,k))*(Temperature2(i,j+1,k))-&
@@ -365,18 +365,18 @@
 #include "hmpp-include.f90"
 
     integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,maxCNiter,TBtype(6),RKstage
-    real(KND),intent(inout) :: Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-    real(KND),intent(inout) :: Temperature_adv(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-    real(KND),intent(in)    :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-    real(KND),intent(in)    :: dxmin,dymin,dzmin,epsCN,Re,limparam,dt
-    real(KND),intent(in)    :: sideTemp(6),Tempin(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-    real(KND),intent(in),dimension(-1:Prnx+2,-1:Prny+2) :: BsideTArr,BsideTFLArr
-    real(KND),intent(in)    :: SubsidenceProfile(0:Prnz)
-    real(KND),intent(out)   :: fluxProfile(0:Prnz)
-    real(KND),intent(in)    :: alpha(3),beta(3),rho(3)
+    real(knd),intent(inout) :: Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+    real(knd),intent(inout) :: Temperature_adv(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+    real(knd),intent(in)    :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+    real(knd),intent(in)    :: dxmin,dymin,dzmin,epsCN,Re,limparam,dt
+    real(knd),intent(in)    :: sideTemp(6),Tempin(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+    real(knd),intent(in),dimension(-1:Prnx+2,-1:Prny+2) :: BsideTArr,BsideTFLArr
+    real(knd),intent(in)    :: SubsidenceProfile(0:Prnz)
+    real(knd),intent(out)   :: fluxProfile(0:Prnz)
+    real(knd),intent(in)    :: alpha(3),beta(3),rho(3)
     integer,intent(out)     :: CNiters
-    real(KND),intent(out)   :: CNres
-    real(KND),intent(out)   :: Temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+    real(knd),intent(out)   :: CNres
+    real(knd),intent(out)   :: Temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
 
     integer i,j,k
 
@@ -412,7 +412,7 @@
       call KappaTemperature_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                             dxmin,dymin,dzmin,limparam,&
                             temperature_adv,temperature,U,V,W,&
-                            1._KND,dt,SubsidenceProfile,fluxProfile)
+                            1._knd,dt,SubsidenceProfile,fluxProfile)
 
 
 
@@ -441,7 +441,7 @@
 
       call DiffTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
                              TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,TDiff,&
-                             temperature2,temperature,2._KND*alpha(RKstage),dt,CNiters,CNres)
+                             temperature2,temperature,2._knd*alpha(RKstage),dt,CNiters,CNres)
 
 
       !$hmppcg grid blocksize myblocksize
@@ -465,7 +465,7 @@
     implicit none
 #include "hmpp-include.f90"
     integer, intent(in) :: Prnx,Prny,Prnz,Btype(6)
-    real(KND),intent(inout) :: Nu(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+    real(knd),intent(inout) :: Nu(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
     integer i,j,k,nx,ny,nz
 
     nx = Prnx
@@ -524,18 +524,18 @@
 
 
   !$hmpp <tsteps> Bound_Visc_TDiff codelet
-  subroutine Bound_Visc_TDiff(Prnx,Prny,Prnz,buoyancy,Btype,Re,Prandtl,Visc,TDiff)
+  subroutine Bound_Visc_TDiff(Prnx,Prny,Prnz,enable_buoyancy,Btype,Re,Prandtl,Visc,TDiff)
     implicit none
 #include "hmpp-include.f90"
-    integer,intent(in)      :: Prnx,Prny,Prnz,buoyancy,Btype(6)
-    real(KND),intent(in)    :: Re,Prandtl
-    real(KND),intent(inout) :: Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+    integer,intent(in)      :: Prnx,Prny,Prnz,enable_buoyancy,Btype(6)
+    real(knd),intent(in)    :: Re,Prandtl
+    real(knd),intent(inout) :: Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
     integer                 :: i,j,k
-    real(KND),parameter     :: Prt = 0.6
+    real(knd),parameter     :: Prt = 0.6
 
     call Bound_Visc_GPU(Prnx,Prny,Prnz,Btype,Visc)
 
-    if (buoyancy==1) then
+    if (enable_buoyancy==1) then
       if (Re>0) then
 
        !$hmppcg grid blocksize myblocksize
@@ -544,7 +544,7 @@
        do k=1,Prnz
          do j=1,Prny
            do i=1,Prnx
-             TDiff(i,j,k) = (Visc(i,j,k)-1._KND/Re)/Prt + (1._KND/(Re*Prandtl))
+             TDiff(i,j,k) = (Visc(i,j,k)-1._knd/Re)/Prt + (1._knd/(Re*Prandtl))
            end do
          end do
        end do
@@ -582,31 +582,31 @@
 ! #include "hmpp-include.f90"
 !
 !   integer,intent(in)    :: nscalars,Prnx,Prny,Prnz,maxCNiter,ScalBtype(6)
-!   real(KND),intent(out),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,nscalars) :: Scal2
-!   real(KND),intent(in),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,nscalars)  :: Scal
+!   real(knd),intent(out),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,nscalars) :: Scal2
+!   real(knd),intent(in),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,nscalars)  :: Scal
 !
-!   real(KND),intent(in)  :: dxmin,dymin,dzmin,epsCN,Re,coef,dt
-!   real(KND),intent(in)  :: sideScal(6),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+!   real(knd),intent(in)  :: dxmin,dymin,dzmin,epsCN,Re,coef,dt
+!   real(knd),intent(in)  :: sideScal(6),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
 !   integer,intent(out)   :: l
-!   real(KND),intent(out) :: res
-!   real(KND) Scal3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,nscalars)
+!   real(knd),intent(out) :: res
+!   real(knd) Scal3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,nscalars)
 !   integer nx,ny,nz,i,j,k,m,xi,yj,zk
-!   real(KND) p
-!   real(KND) A,Ax,Ay,Az,Ap(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+!   real(knd) p
+!   real(knd) A,Ax,Ay,Az,Ap(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
 !
 !   intrinsic max, abs, mod
 !
 !
-!   Ax = 1._KND/(4._KND*dxmin**2)
-!   Ay = 1._KND/(4._KND*dymin**2)
-!   Az = 1._KND/(4._KND*dzmin**2)
+!   Ax = 1._knd/(4._knd*dxmin**2)
+!   Ay = 1._knd/(4._knd*dymin**2)
+!   Az = 1._knd/(4._knd*dzmin**2)
 !
 !   !$hmppcg grid blocksize myblocksize
 !   !$hmppcg gridify(k,i)
 !   do k = 1,Prnz
 !    do i = 1,Prnx
 !     do j = 1,Prny
-!       Ap(i,j,k) = 1._KND/(1._KND/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))+&
+!       Ap(i,j,k) = 1._knd/(1._knd/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))+&
 !                            (TDiff(i,j,k)+TDiff(i-1,j,k)))*Ax+&
 !                            ((TDiff(i,j+1,k)+TDiff(i,j,k))+&
 !                            (TDiff(i,j,k)+TDiff(i,j-1,k)))*Ay+&
@@ -664,7 +664,7 @@
 !       do k = 1,Prnz
 !        do i = 1,Prnx
 !         do j = 1+mod(i+k,2),Prny,2
-!           p = (SCAL(i,j,k,l)/A)+(SCAL3(i,j,k,l)/4._KND+&
+!           p = (SCAL(i,j,k,l)/A)+(SCAL3(i,j,k,l)/4._knd+&
 !            ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k,l))-&
 !             (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k,l)))*Ax+&
 !            ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k,l))-&
@@ -684,7 +684,7 @@
 !       do k = 1,Prnz
 !        do i = 1,Prnx
 !         do j = 1+mod(i+k+1,2),Prny,2
-!           p = (SCAL(i,j,k,l)/A)+(SCAL3(i,j,k,l)/4._KND+&
+!           p = (SCAL(i,j,k,l)/A)+(SCAL3(i,j,k,l)/4._knd+&
 !            ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k,l))-&
 !             (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k,l)))*Ax+&
 !            ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k,l))-&

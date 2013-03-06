@@ -14,9 +14,9 @@
   integer,intent(in)      :: component  ! 1,2,3 for U,V,W
   integer,intent(in)      :: nx,ny,nz,Prny,Prnz
   integer,intent(in)      :: Btype(6)
-  real(KND),intent(in)    :: sideU(3,6)
-  real(KND),intent(in)    :: Uin(-2:ny+3,-2:nz+3)
-  real(KND),intent(inout) :: U(-2:nx+3,-2:ny+3,-2:nz+3)
+  real(knd),intent(in)    :: sideU(3,6)
+  real(knd),intent(in)    :: Uin(-2:ny+3,-2:nz+3)
+  real(knd),intent(inout) :: U(-2:nx+3,-2:ny+3,-2:nz+3)
   integer i,j,k
 
   !!! corners and edges for periodic conditions
@@ -656,7 +656,7 @@
 #endif
   integer,intent(in)      :: Unx,Vny,Wnz,Prnx,Prny,Prnz
   integer,intent(in)      :: Btype(6)
-  real(KND),intent(inout) :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
+  real(knd),intent(inout) :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
 
   integer :: i,j,k,nx,ny,nz
 

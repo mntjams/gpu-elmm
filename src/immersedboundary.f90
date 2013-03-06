@@ -13,7 +13,7 @@ contains
     type(WMPOINT)            :: WMP
     type(TSolidBody),pointer :: CurrentSB => null()
     integer                  :: neighbours(3,6)
-    real(KND)     :: dist,nearx,neary,nearz
+    real(knd)     :: dist,nearx,neary,nearz
     integer       :: i,j,k,m,n,o,p
     integer       :: nb
 
@@ -110,7 +110,7 @@ module ImmersedBoundary
     integer   :: xi                !coordinates of the interpolation points
     integer   :: yj
     integer   :: zk
-    real(KND) :: coef              !interpolation coefficients for the interpolation points
+    real(knd) :: coef              !interpolation coefficients for the interpolation points
   endtype TInterpolationPoint
 
   type,extends(TListable) :: TVelIBPoint
@@ -118,9 +118,9 @@ module ImmersedBoundary
     integer   :: xi             !coordinates of the grid point
     integer   :: yj
     integer   :: zk
-    real(KND) :: distx          !vector to the nearest boundary point
-    real(KND) :: disty
-    real(KND) :: distz
+    real(knd) :: distx          !vector to the nearest boundary point
+    real(knd) :: disty
+    real(knd) :: distz
     integer   :: dirx           !integer form of the above vector (~sign(distx))
     integer   :: diry
     integer   :: dirz
@@ -137,10 +137,10 @@ module ImmersedBoundary
     integer                :: xi                       !coordinates of the grid point
     integer                :: yj
     integer                :: zk
-    real(KND)              :: dist                     !distance to the boundary
+    real(knd)              :: dist                     !distance to the boundary
     type(TInterpolationPoint),dimension(:),allocatable :: IntPoints !array of interpolation points
     integer                :: interp                   !kind of interpolation 1.. none (1 point outside), 2..linear, 4..bilinear  other values not allowed
-    real(KND)              :: temperatureflux = 0      !desired temperature flux
+    real(knd)              :: temperatureflux = 0      !desired temperature flux
  !  contains
  !    procedure Create         => TScalFlIBPoint_Create
   end type TScalFlIBPoint
@@ -157,8 +157,8 @@ module ImmersedBoundary
     integer   :: xi
     integer   :: yj
     integer   :: zk
-    real(KND) :: dist
-    real(KND) :: temperatureflux = 0
+    real(knd) :: dist
+    real(knd) :: temperatureflux = 0
     integer   :: interp
     type(TInterpolationPoint),dimension(:),allocatable :: IntPoints !array of interpolation points
  !   contains
@@ -219,10 +219,10 @@ contains
 
 
   pure recursive function TIBPoint_Interpolate(IBP,U,lb) result(Uint)
-    real(KND) :: Uint
+    real(knd) :: Uint
     type(TIBPoint),intent(in) :: IBP
     integer,intent(in) :: lb
-    real(KND),dimension(lb:,lb:,lb:),intent(in) :: U
+    real(knd),dimension(lb:,lb:,lb:),intent(in) :: U
     integer i
 
     Uint = 0
@@ -236,16 +236,16 @@ contains
 
 
   pure recursive function TIBPoint_InterpolateTDiff(IBP,U) result(Uint)
-    real(KND) :: Uint
+    real(knd) :: Uint
     type(TIBPoint),intent(in) :: IBP
-    real(KND),dimension(-1:,-1:,-1:),intent(in) :: U
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: U
     integer i,n
 
     n = 0
     Uint = 0
 
     do i=1,IBP%interp
-      if (abs(IBP%IntPoints(i)%coef-0._KND)>epsilon(1._KND)) then
+      if (abs(IBP%IntPoints(i)%coef-0._knd)>epsilon(1._knd)) then
         Uint = Uint + U(IBP%IntPoints(i)%xi,&
                         IBP%IntPoints(i)%yj,&
                         IBP%IntPoints(i)%zk)
@@ -259,13 +259,13 @@ contains
 
 
   pure recursive function TIBPoint_ScalFlSource(IBP,Scalar,sctype)  result(src)  !Virtual scalar source for the Immersed Boundary Method with prescribed scalar flux on the boundary
-    real(KND) :: src
+    real(knd) :: src
 
     type(TIBPoint),intent(in) :: IBP
-    real(KND),intent(in)      :: Scalar(-1:,-1:,-1:)
+    real(knd),intent(in)      :: Scalar(-1:,-1:,-1:)
     integer,intent(in)        :: sctype
 
-    real(KND) intscal,intTDiff
+    real(knd) intscal,intTDiff
 
     intscal = TIBPoint_Interpolate(IBP,Scalar,-1)
 
@@ -282,10 +282,10 @@ contains
 
 
   pure recursive function TIBPoint_Viscosity(IBP,Viscosity)  result(src)  !Virtual scalar source for the Immersed Boundary Method with prescribed scalar flux on the boundary
-    real(KND) :: src
+    real(knd) :: src
 
     type(TIBPoint),intent(in) :: IBP
-    real(KND),intent(in)      :: Viscosity(-1:,-1:,-1:)
+    real(knd),intent(in)      :: Viscosity(-1:,-1:,-1:)
 
     src = TIBPoint_Interpolate(IBP,Viscosity,-1)
 
@@ -294,10 +294,10 @@ contains
 
 
   pure recursive function TIBPoint_MomentumSource(IBP,U) result(src)
-    real(KND) :: src
+    real(knd) :: src
 
     type(TIBpoint),intent(in) :: IBP
-    real(KND),intent(in)                      :: U(-2:,-2:,-2:)
+    real(knd),intent(in)                      :: U(-2:,-2:,-2:)
 
     src = (TIBPoint_Interpolate(IBP,U,-2) - U(IBP%xi,IBP%yj,IBP%zk)) / dt
 
@@ -310,13 +310,13 @@ contains
   subroutine TVelIBPoint_Create(IBP,xi,yj,zk,xU,yU,zU,Utype,component)
     type(TVelIBPoint),intent(out)               :: IBP
     integer,intent(in)                          :: xi,yj,zk
-    real(KND),dimension(-2:),intent(in)         :: xU,yU,zU
+    real(knd),dimension(-2:),intent(in)         :: xU,yU,zU
     integer,dimension(-2:,-2:,-2:),intent(in)   :: Utype
     integer,intent(in)                          :: component
 
     type(TSolidBody),pointer :: SB
     integer dirx,diry,dirz,n1,n2,nx,ny,nz
-    real(KND) x,y,z,xnear,ynear,znear,t
+    real(knd) x,y,z,xnear,ynear,znear,t
     logical free100,free010,free001
 
     x = xU(xi)                                !real coordinates of the IB forcing point
@@ -331,9 +331,9 @@ contains
     IBP%distx = xnear-x                       !real distance to the boundary in the x,y,z direction
     IBP%disty = ynear-y
     IBP%distz = znear-z
-    IBP%dirx = nint(sign(1.0_KND,IBP%distx))  !integer value denoting direction to the boundary
-    IBP%diry = nint(sign(1.0_KND,IBP%disty))
-    IBP%dirz = nint(sign(1.0_KND,IBP%distz))
+    IBP%dirx = nint(sign(1.0_knd,IBP%distx))  !integer value denoting direction to the boundary
+    IBP%diry = nint(sign(1.0_knd,IBP%disty))
+    IBP%dirz = nint(sign(1.0_knd,IBP%distz))
 
     dirx = abs(IBP%dirx)                      !local temporary variable with abs(dir)
     diry = abs(IBP%diry)
@@ -350,19 +350,19 @@ contains
     endif
 
 
-    if (abs(IBP%distx)<(xU(xi+1)-xU(xi-1))/1000._KND) then      !if too close to the boundary, set the distance to 0
+    if (abs(IBP%distx)<(xU(xi+1)-xU(xi-1))/1000._knd) then      !if too close to the boundary, set the distance to 0
       IBP%distx = 0
       dirx = 0
       IBP%dirx = 0
     endif
 
-    if (abs(IBP%disty)<(yU(yj+1)-yU(yj-1))/1000._KND) then
+    if (abs(IBP%disty)<(yU(yj+1)-yU(yj-1))/1000._knd) then
       IBP%disty = 0
       diry = 0
       IBP%diry = 0
     endif
 
-    if (abs(IBP%distz)<(zU(zk+1)-zU(zk-1))/1000._KND) then
+    if (abs(IBP%distz)<(zU(zk+1)-zU(zk-1))/1000._knd) then
       IBP%distz = 0
       dirz = 0
       IBP%dirz = 0
@@ -599,9 +599,9 @@ contains
 
   subroutine TVelIBPoint_InterpolationCoefs(IBP,xU,yU,zU)
     type(TVelIBpoint),intent(inout)     :: IBP
-    real(KND),dimension(-2:),intent(in) :: xU,yU,zU
-    real(KND) xr, yr, zr, x(0:3), y(0:3), z(0:3)
-    real(KND) b1, b2, b3, c
+    real(knd),dimension(-2:),intent(in) :: xU,yU,zU
+    real(knd) xr, yr, zr, x(0:3), y(0:3), z(0:3)
+    real(knd) b1, b2, b3, c
     integer xi,yj,zk,dirx,diry,dirz
 
     xi = IBP%xi
@@ -830,9 +830,9 @@ contains
 
 
   pure subroutine IBLeastSquare2InterpolationCoefs(Coefs,xr,x)
-    real(KND),intent(out) :: Coefs(:)
-    real(KND),intent(in)  :: xr,x(0:)
-    real(KND) :: A1, A2, A4
+    real(knd),intent(out) :: Coefs(:)
+    real(knd),intent(in)  :: xr,x(0:)
+    real(knd) :: A1, A2, A4
     integer   :: n
 
     n = size(Coefs)
@@ -859,7 +859,7 @@ contains
     integer,intent(in) :: xi,yj,zk               !grid coordinates of the forcing point
     type(TSolidBody),pointer :: SB
     integer dirx,diry,dirz,dirx2,diry2,dirz2,nfreedirs,ndirs,i
-    real(KND) x,y,z,xnear,ynear,znear,distx,disty,distz,t,tx,ty,tz
+    real(knd) x,y,z,xnear,ynear,znear,distx,disty,distz,t,tx,ty,tz
     logical freep00,free0p0,free00p,freem00,free0m0,free00m
 
     x = xPr(xi)                                   !physical coordinates of the forcing point
@@ -875,22 +875,22 @@ contains
     distx = xnear-x                               !distance to the nearest point on the boundary
     disty = ynear-y
     distz = znear-z
-    dirx = nint(sign(1.0_KND,distx))              !direction to the boundary point
-    diry = nint(sign(1.0_KND,disty))
-    dirz = nint(sign(1.0_KND,distz))
+    dirx = nint(sign(1.0_knd,distx))              !direction to the boundary point
+    diry = nint(sign(1.0_knd,disty))
+    dirz = nint(sign(1.0_knd,distz))
 
 
-    if (abs(distx)<(xPr(xi+1)-xPr(xi-1))/100._KND) then  !If very close to the boundary, set the boundary here
+    if (abs(distx)<(xPr(xi+1)-xPr(xi-1))/100._knd) then  !If very close to the boundary, set the boundary here
       distx = 0
       dirx = 0
     endif
 
-    if (abs(disty)<(yPr(yj+1)-yPr(yj-1))/100._KND) then
+    if (abs(disty)<(yPr(yj+1)-yPr(yj-1))/100._knd) then
       disty = 0
       diry = 0
     endif
 
-    if (abs(distz)<(zW(zk+1)-zW(zk-1))/100._KND) then
+    if (abs(distz)<(zW(zk+1)-zW(zk-1))/100._knd) then
       distz = 0
       dirz = 0
     endif
@@ -967,32 +967,32 @@ contains
         i = 1
         IBP%dist = 0
         if (freep00) then
-          IBP%IntPoints(i) = TInterpolationPoint(xi + 1, yj, zk, 1._KND / nfreedirs)
+          IBP%IntPoints(i) = TInterpolationPoint(xi + 1, yj, zk, 1._knd / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + xPr(xi+1)-xPr(xi)
         endif
         if (freem00) then
-          IBP%IntPoints(i) = TInterpolationPoint(xi - 1, yj, zk, 1._KND / nfreedirs)
+          IBP%IntPoints(i) = TInterpolationPoint(xi - 1, yj, zk, 1._knd / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + xPr(xi)-xPr(xi-1)
         endif
         if (free0p0) then
-          IBP%IntPoints(i) = TInterpolationPoint(xi, yj + 1, zk, 1._KND / nfreedirs)
+          IBP%IntPoints(i) = TInterpolationPoint(xi, yj + 1, zk, 1._knd / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + yPr(yj+1)-yPr(yj)
         endif
         if (free0m0) then
-          IBP%IntPoints(i) = TInterpolationPoint(xi, yj - 1, zk, 1._KND / nfreedirs)
+          IBP%IntPoints(i) = TInterpolationPoint(xi, yj - 1, zk, 1._knd / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + yPr(yj)-yPr(yj-1)
         endif
         if (free00p) then
-          IBP%IntPoints(i) = TInterpolationPoint(xi, yj, zk + 1, 1._KND / nfreedirs)
+          IBP%IntPoints(i) = TInterpolationPoint(xi, yj, zk + 1, 1._knd / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + zPr(zk+1)-zPr(zk)
         endif
         if (free00m) then
-          IBP%IntPoints(i) = TInterpolationPoint(xi, yj, zk - 1, 1._KND / nfreedirs)
+          IBP%IntPoints(i) = TInterpolationPoint(xi, yj, zk - 1, 1._knd / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + zPr(zk)-zPr(zk-1)
         endif
@@ -1005,7 +1005,7 @@ contains
         IBP%IntPoints(1)%xi = IBP%xi+dirx2
         IBP%IntPoints(1)%yj = IBP%yj+diry2
         IBP%IntPoints(1)%zk = IBP%zk+dirz2
-        IBP%IntPoints%coef = 1._KND
+        IBP%IntPoints%coef = 1._knd
         IBP%interp = 1
         IBP%dist = sqrt((x-xPr(IBP%xi+dirx2))**2+(y-yPr(IBP%yj+diry2))**2+(z-zPr(IBP%zk+dirz2))**2)
 
@@ -1018,7 +1018,7 @@ contains
       IBP%IntPoints(1)%xi = IBP%xi+dirx
       IBP%IntPoints(1)%yj = IBP%yj+diry
       IBP%IntPoints(1)%zk = IBP%zk+dirz
-      IBP%IntPoints%coef = 1._KND
+      IBP%IntPoints%coef = 1._knd
       IBP%interp = 1
       IBP%dist = sqrt((x-xPr(IBP%xi+dirx))**2+(y-yPr(IBP%yj+diry))**2+(z-zPr(IBP%zk+dirz))**2)
 

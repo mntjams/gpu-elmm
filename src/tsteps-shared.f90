@@ -77,14 +77,14 @@
 
 #ifdef __HMPP
  !$hmpp <tsteps> Convection codelet
- subroutine Convection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet,&
+ subroutine Convection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,enable_buoyancy,convmet,&
                        dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
                        U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev,dt)
   implicit none
 #include "hmpp-include.f90"
 
 
-  integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy,convmet
+  integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,enable_buoyancy,convmet
   real(knd),intent(in) :: dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref
   real(knd),intent(in) :: dt
 
@@ -294,7 +294,7 @@
                                                     coriolisparam,&
                                                     Ustar,Vstar,U,V,dt)
 
-      if (buoyancy==1) call BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,&
+      if (enable_buoyancy==1) call BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,&
                                 grav_acc,temperature_ref,Wstar,temperature,dt)
 
       call ResistanceForce(Ustar,Vstar,Wstar,U,V,W)
@@ -857,11 +857,11 @@
   !Slower using HMPP than CPU, but if we avoid memory transfer, it is still profitable.
 
   !$hmpp <tsteps> AttenuateTop codelet
-  subroutine AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,zPr,zW,U,V,W,temperature,buoyancy)
+  subroutine AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,zPr,zW,U,V,W,temperature,enable_buoyancy)
 
   implicit none
 
-  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
+  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,enable_buoyancy
   integer,intent(in)      :: Btype(6)
 #ifdef __HMPP
 #include "hmpp-include.f90"
@@ -1046,7 +1046,7 @@
 
 
 
-    if (buoyancy==1) then
+    if (enable_buoyancy==1) then
 
       !$omp do
       do k=Prnz-bufn,Prnz
@@ -1103,11 +1103,11 @@
 
   !$hmpp <tsteps> AttenuateOut codelet
   !$hmpp <tsteps> AttenuateOut2 codelet
-  subroutine AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,xPr,xU,U,V,W,temperature,buoyancy)
+  subroutine AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,xPr,xU,U,V,W,temperature,enable_buoyancy)
 
   implicit none
 
-  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,buoyancy
+  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,enable_buoyancy
 #ifdef __HMPP
 #include "hmpp-include.f90"
   real(knd),intent(in)    :: xPr(-2:Prnx+3)
@@ -1189,7 +1189,7 @@
     enddo
     !$omp end do
 
-    if (buoyancy==1) then
+    if (enable_buoyancy==1) then
       !$omp do
       !$hmppcg grid blocksize myblocksize
       !$hmppcg gridify (k,j) private(p,xb,DF)

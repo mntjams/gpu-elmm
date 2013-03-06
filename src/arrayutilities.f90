@@ -152,8 +152,8 @@ module ArrayUtilities
   contains
 
     subroutine exchange_alloc_1D(A,B)
-      real(KND),allocatable,intent(inout) :: A(:),B(:)
-      real(KND),allocatable :: tmp(:)
+      real(knd),allocatable,intent(inout) :: A(:),B(:)
+      real(knd),allocatable :: tmp(:)
 
       call move_alloc(A,tmp)
       call move_alloc(B,A)
@@ -161,8 +161,8 @@ module ArrayUtilities
     end subroutine
     
     subroutine exchange_alloc_2D(A,B)
-      real(KND),allocatable,intent(inout) :: A(:,:),B(:,:)
-      real(KND),allocatable :: tmp(:,:)
+      real(knd),allocatable,intent(inout) :: A(:,:),B(:,:)
+      real(knd),allocatable :: tmp(:,:)
 
       call move_alloc(A,tmp)
       call move_alloc(B,A)
@@ -170,8 +170,8 @@ module ArrayUtilities
     end subroutine
     
     subroutine exchange_alloc_3D(A,B)
-      real(KND),allocatable,intent(inout) :: A(:,:,:),B(:,:,:)
-      real(KND),allocatable :: tmp(:,:,:)
+      real(knd),allocatable,intent(inout) :: A(:,:,:),B(:,:,:)
+      real(knd),allocatable :: tmp(:,:,:)
 
       call move_alloc(A,tmp)
       call move_alloc(B,A)
@@ -180,8 +180,8 @@ module ArrayUtilities
 
 
     subroutine assign_1D(to,from)
-      real(KND),intent(out) :: to(:)
-      real(KND),intent(in)  :: from(:)
+      real(knd),intent(out) :: to(:)
+      real(knd),intent(in)  :: from(:)
       integer i
 
       !$omp parallel do
@@ -192,8 +192,8 @@ module ArrayUtilities
     end subroutine
 
     subroutine assign_2D(to,from)
-      real(KND),intent(out) :: to(:,:)
-      real(KND),intent(in)  :: from(:,:)
+      real(knd),intent(out) :: to(:,:)
+      real(knd),intent(in)  :: from(:,:)
       integer j
 
       !$omp parallel do
@@ -204,8 +204,8 @@ module ArrayUtilities
     end subroutine
 
     subroutine assign_3D(to,from)
-      real(KND),intent(out) :: to(:,:,:)
-      real(KND),intent(in)  :: from(:,:,:)
+      real(knd),intent(out) :: to(:,:,:)
+      real(knd),intent(in)  :: from(:,:,:)
       integer k
 
       !$omp parallel do
@@ -217,8 +217,8 @@ module ArrayUtilities
 
 
     subroutine add_1D(to,from)
-      real(KND),intent(inout) :: to(:)
-      real(KND),intent(in)  :: from(:)
+      real(knd),intent(inout) :: to(:)
+      real(knd),intent(in)  :: from(:)
       integer i
 
       !$omp parallel do
@@ -229,8 +229,8 @@ module ArrayUtilities
     end subroutine
 
     subroutine add_2D(to,from)
-      real(KND),intent(inout) :: to(:,:)
-      real(KND),intent(in)  :: from(:,:)
+      real(knd),intent(inout) :: to(:,:)
+      real(knd),intent(in)  :: from(:,:)
       integer j
 
       !$omp parallel do
@@ -241,8 +241,8 @@ module ArrayUtilities
     end subroutine
 
     subroutine add_3D(to,from)
-      real(KND),intent(inout) :: to(:,:,:)
-      real(KND),intent(in)  :: from(:,:,:)
+      real(knd),intent(inout) :: to(:,:,:)
+      real(knd),intent(in)  :: from(:,:,:)
       integer k
 
       !$omp parallel do
@@ -250,13 +250,13 @@ module ArrayUtilities
         to(:,:,k) = to(:,:,k) + from(:,:,k)
       end do
       !$omp end parallel do
-!       call axpy(1._KND,from,to)
+!       call axpy(1._knd,from,to)
     end subroutine
 
 
     subroutine set_1D(to,from)
-      real(KND),intent(out) :: to(:)
-      real(KND),intent(in)  :: from
+      real(knd),intent(out) :: to(:)
+      real(knd),intent(in)  :: from
       integer i
 
       !$omp parallel do
@@ -267,8 +267,8 @@ module ArrayUtilities
     end subroutine
 
     subroutine set_2D(to,from)
-      real(KND),intent(out) :: to(:,:)
-      real(KND),intent(in)  :: from
+      real(knd),intent(out) :: to(:,:)
+      real(knd),intent(in)  :: from
       integer j
 
       !$omp parallel do
@@ -279,8 +279,8 @@ module ArrayUtilities
     end subroutine
 
     subroutine set_3D(to,from)
-      real(KND),intent(out) :: to(:,:,:)
-      real(KND),intent(in)  :: from
+      real(knd),intent(out) :: to(:,:,:)
+      real(knd),intent(in)  :: from
       integer k
 
       !$omp parallel do
@@ -292,8 +292,8 @@ module ArrayUtilities
     
 
     subroutine multiply_1D(to,a)
-      real(KND),intent(inout) :: to(:)
-      real(KND),intent(in)  :: a
+      real(knd),intent(inout) :: to(:)
+      real(knd),intent(in)  :: a
       integer i
 
       !$omp parallel do
@@ -304,8 +304,8 @@ module ArrayUtilities
     end subroutine
 
     subroutine multiply_2D(to,a)
-      real(KND),intent(inout) :: to(:,:)
-      real(KND),intent(in)  :: a
+      real(knd),intent(inout) :: to(:,:)
+      real(knd),intent(in)  :: a
       integer j
 
       !$omp parallel do
@@ -316,8 +316,8 @@ module ArrayUtilities
     end subroutine
 
     subroutine multiply_3D(to,a)
-      real(KND),intent(inout) :: to(:,:,:)
-      real(KND),intent(in)  :: a
+      real(knd),intent(inout) :: to(:,:,:)
+      real(knd),intent(in)  :: a
       integer k
 
       !$omp parallel do
@@ -330,9 +330,9 @@ module ArrayUtilities
 
 
     subroutine add_multiplied_1D(to,from,a)
-      real(KND),intent(inout) :: to(:)
-      real(KND),intent(in)  :: from(:)
-      real(KND),intent(in)  :: a
+      real(knd),intent(inout) :: to(:)
+      real(knd),intent(in)  :: from(:)
+      real(knd),intent(in)  :: a
       integer i
 
       !$omp parallel do
@@ -343,9 +343,9 @@ module ArrayUtilities
     end subroutine
 
     subroutine add_multiplied_2D(to,from,a)
-      real(KND),intent(inout) :: to(:,:)
-      real(KND),intent(in)  :: from(:,:)
-      real(KND),intent(in)  :: a
+      real(knd),intent(inout) :: to(:,:)
+      real(knd),intent(in)  :: from(:,:)
+      real(knd),intent(in)  :: a
       integer j
 
       !$omp parallel do
@@ -356,9 +356,9 @@ module ArrayUtilities
     end subroutine
 
     subroutine add_multiplied_3D(to,from,a)
-      real(KND),intent(inout) :: to(:,:,:)
-      real(KND),intent(in)  :: from(:,:,:)
-      real(KND),intent(in)  :: a
+      real(knd),intent(inout) :: to(:,:,:)
+      real(knd),intent(in)  :: from(:,:,:)
+      real(knd),intent(in)  :: a
       integer k
 
       !$omp parallel do
@@ -372,9 +372,9 @@ module ArrayUtilities
 
     subroutine multiply_and_add_scalar_1D(to,b,a)
       ! to = b * to + a
-      real(KND),intent(inout) :: to(:)
-      real(KND),intent(in)  :: b
-      real(KND),intent(in)  :: a
+      real(knd),intent(inout) :: to(:)
+      real(knd),intent(in)  :: b
+      real(knd),intent(in)  :: a
       integer i
 
       !$omp parallel do
@@ -386,9 +386,9 @@ module ArrayUtilities
 
     subroutine multiply_and_add_scalar_2D(to,b,a)
       ! to = b * to + a
-      real(KND),intent(inout) :: to(:,:)
-      real(KND),intent(in)  :: b
-      real(KND),intent(in)  :: a
+      real(knd),intent(inout) :: to(:,:)
+      real(knd),intent(in)  :: b
+      real(knd),intent(in)  :: a
       integer j
 
       !$omp parallel do
@@ -400,9 +400,9 @@ module ArrayUtilities
 
     subroutine multiply_and_add_scalar_3D(to,b,a)
       ! to = b * to + a
-      real(KND),intent(inout) :: to(:,:,:)
-      real(KND),intent(in)  :: b
-      real(KND),intent(in)  :: a
+      real(knd),intent(inout) :: to(:,:,:)
+      real(knd),intent(in)  :: b
+      real(knd),intent(in)  :: a
       integer k
 
       !$omp parallel do
@@ -415,8 +415,8 @@ module ArrayUtilities
 
     subroutine reciprocal_1D(to,a)
       ! to = a / to
-      real(KND),intent(inout) :: to(:)
-      real(KND),intent(in)  :: a
+      real(knd),intent(inout) :: to(:)
+      real(knd),intent(in)  :: a
       integer i
 
       !$omp parallel do
@@ -428,8 +428,8 @@ module ArrayUtilities
 
     subroutine reciprocal_2D(to,a)
       ! to = a / to
-      real(KND),intent(inout) :: to(:,:)
-      real(KND),intent(in)  :: a
+      real(knd),intent(inout) :: to(:,:)
+      real(knd),intent(in)  :: a
       integer j
 
       !$omp parallel do
@@ -441,8 +441,8 @@ module ArrayUtilities
 
     subroutine reciprocal_3D(to,a)
       ! to = a / to
-      real(KND),intent(inout) :: to(:,:,:)
-      real(KND),intent(in)  :: a
+      real(knd),intent(inout) :: to(:,:,:)
+      real(knd),intent(in)  :: a
       integer k
 
       !$omp parallel do

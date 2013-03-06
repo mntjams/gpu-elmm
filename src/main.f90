@@ -11,12 +11,12 @@ program CLMM
 
 
 
-  real(KND),allocatable:: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)
-  real(KND),allocatable,dimension(:,:,:) :: Temperature
-  real(KND),allocatable,dimension(:,:,:,:) :: Scalar  !last index is a number of scalar (because of paging)
-  real(KND) :: delta = 0
+  real(knd),allocatable:: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)
+  real(knd),allocatable,dimension(:,:,:) :: Temperature
+  real(knd),allocatable,dimension(:,:,:,:) :: Scalar  !last index is a number of scalar (because of paging)
+  real(knd) :: delta = 0
 
-  pi=2.0_KND*acos(0.0_KND)
+  pi=2.0_knd*acos(0.0_knd)
 
 
   write (*,*) "Reading parameters..."
@@ -78,7 +78,7 @@ program CLMM
         exit
       endif
 
-      if (dt<abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/20._KND)) then
+      if (dt<abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/20._knd)) then
         write (*,*) "Solution diverged."
         exit
       endif
@@ -88,7 +88,7 @@ program CLMM
   endif
 
 #ifdef __HMPP
-  call GetDataFromGPU(.true.,.true.,.true.,.true.,buoyancy==1,&
+  call GetDataFromGPU(.true.,.true.,.true.,.true.,enable_buoyancy==1,&
                       U,     V,     W,     Pr,    Temperature)
 #endif
 
@@ -114,7 +114,7 @@ program CLMM
      Pr = 0000
 
 
-     if (buoyancy==1) then
+     if (enable_buoyancy==1) then
        allocate(temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
        temperature=0
      else
@@ -131,7 +131,7 @@ program CLMM
 
      allocate(Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
 
-     if (buoyancy>0.or.computescalars>0) then
+     if (enable_buoyancy>0.or.computescalars>0) then
        allocate(TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
        TDiff = 0
      else

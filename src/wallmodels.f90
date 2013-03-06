@@ -35,19 +35,19 @@ implicit none
    integer   :: yj
    integer   :: zk
 
-   real(KND) :: distx
-   real(KND) :: disty
-   real(KND) :: distz
+   real(knd) :: distx
+   real(knd) :: disty
+   real(knd) :: distz
 
-   real(KND) :: z0 = 0
-   real(KND) :: ustar = 1
-   real(KND) :: temp = 0
-   real(KND) :: tempfl = 0
-   real(KND) :: wallu = 0
-   real(KND) :: wallv = 0
-   real(KND) :: wallw = 0
+   real(knd) :: z0 = 0
+   real(knd) :: ustar = 1
+   real(knd) :: temp = 0
+   real(knd) :: tempfl = 0
+   real(knd) :: wallu = 0
+   real(knd) :: wallv = 0
+   real(knd) :: wallw = 0
 
-   real(KND),allocatable:: depscalar(:)
+   real(knd),allocatable:: depscalar(:)
 
    type(WMpoint),pointer:: next=>null()
 
@@ -522,11 +522,11 @@ implicit none
 
 
   pure subroutine WMFlatUstar(ustar,vel,dist)
-    real(KND),intent(inout) :: ustar
-    real(KND),intent(in) :: vel,dist
-    real(KND),parameter :: eps = 1e-4_KND
-    real(KND),parameter :: yplcrit = 11.225_KND
-    real(KND) :: ustar2,ustar_lam
+    real(knd),intent(inout) :: ustar
+    real(knd),intent(in) :: vel,dist
+    real(knd),parameter :: eps = 1e-4_knd
+    real(knd),parameter :: yplcrit = 11.225_knd
+    real(knd) :: ustar2,ustar_lam
     integer i
 
     ustar_lam = sqrt(vel/(dist*Re))
@@ -545,7 +545,7 @@ implicit none
         if ((dist*ustar2*Re)<yplcrit) then
           ustar = sqrt(vel/(dist*Re))
         else
-          ustar = vel/(log(abs(ustar2*dist*Re))/0.41_KND+5.2_KND)
+          ustar = vel/(log(abs(ustar2*dist*Re))/0.41_knd+5.2_knd)
         end if
 
         if  (abs(ustar-ustar2)/abs(ustar)<eps) exit
@@ -563,10 +563,10 @@ implicit none
 
 
   pure subroutine WMFlatVisc(visc,ustar,distvect,uvect,walluvect)
-    real(KND),intent(out)   :: visc
-    real(KND),intent(inout) :: ustar
-    real(KND),intent(in)    :: distvect(3),uvect(3),walluvect(3)
-    real(KND) vect(3),vel,dist
+    real(knd),intent(out)   :: visc
+    real(knd),intent(inout) :: ustar
+    real(knd),intent(in)    :: distvect(3),uvect(3),walluvect(3)
+    real(knd) vect(3),vel,dist
 
     dist = sqrt(sum(distvect**2))
 
@@ -589,14 +589,14 @@ implicit none
      if (dist*ustar*Re>1) then
        visc = ustar**2 * dist/vel
      else if (Re>0) then
-       visc = 1._KND/Re
+       visc = 1._knd/Re
      else
        visc = 0
      end if
 
     else if (Re>0) then
 
-      visc = 1._KND/Re
+      visc = 1._knd/Re
 
     else
 
@@ -610,10 +610,10 @@ implicit none
 
 
   pure subroutine WMRoughUstar(ustar,vel,dist,z0)
-    real(KND),intent(inout) :: ustar
-    real(KND),intent(in) :: vel,dist,z0
-    real(KND),parameter  :: eps = 1e-4_KND
-    real(KND),parameter  :: yplcrit = 11.225_KND
+    real(knd),intent(inout) :: ustar
+    real(knd),intent(in) :: vel,dist,z0
+    real(knd),parameter  :: eps = 1e-4_knd
+    real(knd),parameter  :: yplcrit = 11.225_knd
 
     if (dist<=z0) then
      if (Re>0) then
@@ -622,18 +622,18 @@ implicit none
       ustar = 0
      end if
     else
-      ustar = vel * 0.41_KND / log(dist/z0)
+      ustar = vel * 0.41_knd / log(dist/z0)
     end if
 
   end subroutine WMRoughUstar
 
 
   pure subroutine WMRoughVisc(visc,ustar,z0,distvect,uvect,walluvect)
-    real(KND),intent(out)   :: visc
-    real(KND),intent(inout) :: ustar
-    real(KND),intent(in)    :: z0
-    real(KND),intent(in)    :: distvect(3),uvect(3),walluvect(3)
-    real(KND) vect(3),vel,dist
+    real(knd),intent(out)   :: visc
+    real(knd),intent(inout) :: ustar
+    real(knd),intent(in)    :: z0
+    real(knd),intent(in)    :: distvect(3),uvect(3),walluvect(3)
+    real(knd) vect(3),vel,dist
 
     dist = sqrt(sum(distvect**2))
 
@@ -651,10 +651,10 @@ implicit none
 
     if (ustar<0) ustar = 0
 
-    if (vel>0 .and. ustar**2 * dist/vel>1._KND/Re) then
+    if (vel>0 .and. ustar**2 * dist/vel>1._knd/Re) then
       visc = ustar**2 * dist/vel
     else if (Re>0) then
-      visc = 1._KND/Re
+      visc = 1._knd/Re
     else
       visc = 0
     end if
@@ -666,17 +666,17 @@ implicit none
 
 
   pure subroutine WMFlatPrGradUstar(ustar,vel,prgrad,dist)
-    real(KND),intent(out) :: ustar
-    real(KND),intent(in) :: vel,prgrad,dist
-    real(KND),parameter :: eps = 1e-3_KND
-    real(KND),parameter :: yplcrit = 11.225_KND
-    real(KND),parameter :: ustar_div = 1000
-    real(KND) :: ustar1,ustar2,ustar_lam
+    real(knd),intent(out) :: ustar
+    real(knd),intent(in) :: vel,prgrad,dist
+    real(knd),parameter :: eps = 1e-3_knd
+    real(knd),parameter :: yplcrit = 11.225_knd
+    real(knd),parameter :: ustar_div = 1000
+    real(knd) :: ustar1,ustar2,ustar_lam
     integer i
     integer,parameter :: maxiter = 30
 
     !u/u_* = z * u_* / nu  +  dp/dx * z**2 / (2 * u_*)
-    ustar_lam = sqrt(abs((1._KND/(dist*Re)) * (vel - dist**2 * prgrad/2) ))
+    ustar_lam = sqrt(abs((1._knd/(dist*Re)) * (vel - dist**2 * prgrad/2) ))
 
     if ((dist*ustar_lam*Re)<yplcrit) then
 
@@ -699,7 +699,7 @@ implicit none
             exit
           end if
           ustar1 = ustar1 * 10
-        else if (ustar2<tiny(1._KND)) then
+        else if (ustar2<tiny(1._knd)) then
           ustar = ustar_lam
           exit
         else if (abs(ustar1-ustar2)/abs(ustar1)<eps) then
@@ -724,12 +724,12 @@ implicit none
       pure function newguess(ustar)
          !linearize the function by letting the ustar in log constant
          !  and solve the quadratic equation for the larger root
-         real(KND) newguess
-         real(KND),intent(in) :: ustar
-         real(KND) a,b,c,D
+         real(knd) newguess
+         real(knd),intent(in) :: ustar
+         real(knd) a,b,c,D
          !u/u_* = dp/dx * z / (k (u_*)**2)  + (1/k) * ln(z * u_* / nu) + B
 
-         a = log(ustar*dist*Re)/0.41_KND + 5.2_KND
+         a = log(ustar*dist*Re)/0.41_knd + 5.2_knd
          b = - vel
          c = prgrad * dist / 0.41
          !function to find root of is f(ustar) = a*ustar**2 + b*ustar + c
@@ -748,10 +748,10 @@ implicit none
 
 
   pure subroutine WMFlatPrGradVisc(visc,ustar,distvect,uvect,walluvect,prgradvect)
-    real(KND),intent(out)   :: visc
-    real(KND),intent(inout) :: ustar
-    real(KND),intent(in)    :: distvect(3),uvect(3),walluvect(3),prgradvect(3)
-    real(KND) vect(3),vel,dist,prgrad
+    real(knd),intent(out)   :: visc
+    real(knd),intent(inout) :: ustar
+    real(knd),intent(in)    :: distvect(3),uvect(3),walluvect(3),prgradvect(3)
+    real(knd) vect(3),vel,dist,prgrad
 
     dist = sqrt(sum(distvect**2))
 
@@ -776,14 +776,14 @@ implicit none
      if (dist*ustar*Re>1) then
        visc = ustar**2 * dist/vel
      else if (Re>0) then
-       visc = 1._KND/Re
+       visc = 1._knd/Re
      else
        visc = 0
      end if
 
     else if (Re>0) then
 
-      visc = 1._KND/Re
+      visc = 1._knd/Re
 
     else
 
@@ -811,36 +811,36 @@ implicit none
 
 
 
-  pure real(KND) function PsiM_MO(zeta)
-    real(KND),intent(in):: zeta
-    real(KND) x
+  pure real(knd) function PsiM_MO(zeta)
+    real(knd),intent(in):: zeta
+    real(knd) x
 
     if (zeta<0) then
-     x = (1-15._KND*zeta)**(1/4._KND)
-     PsiM_MO = log(((1+x**2)/2._KND)*((1+x)/2._KND)**2)-2._KND*atan(x)+pi/2
+     x = (1-15._knd*zeta)**(1/4._knd)
+     PsiM_MO = log(((1+x**2)/2._knd)*((1+x)/2._knd)**2)-2._knd*atan(x)+pi/2
     else
-     PsiM_MO = -4.8_KND*zeta !GABLS recommend ation
+     PsiM_MO = -4.8_knd*zeta !GABLS recommend ation
     end if
   end function PsiM_MO
 
 
-  pure real(KND) function PsiH_MO(zeta)
-    real(KND),intent(in):: zeta
-    real(KND) x
+  pure real(knd) function PsiH_MO(zeta)
+    real(knd),intent(in):: zeta
+    real(knd) x
 
     if (zeta<0) then
-     x = (1-15._KND*zeta)**(1/4._KND)
-     PsiH_MO = 2._KND*log((1+x**2)/2._KND)
+     x = (1-15._knd*zeta)**(1/4._knd)
+     PsiH_MO = 2._knd*log((1+x**2)/2._knd)
     else
-     PsiH_MO = -7.8_KND*zeta !GABLS recommend ation
+     PsiH_MO = -7.8_knd*zeta !GABLS recommend ation
     end if
   end function PsiH_MO
 
 
-  pure real(KND) function Obukhov_zL(ustar,tempfl,tempref,g,z)
-    real(KND),intent(in):: ustar,tempfl,tempref,g,z
+  pure real(knd) function Obukhov_zL(ustar,tempfl,tempref,g,z)
+    real(knd),intent(in):: ustar,tempfl,tempref,g,z
 
-    Obukhov_zL = z*(0.4_KND*(g/tempref)*tempfl)/(-ustar**3)
+    Obukhov_zL = z*(0.4_knd*(g/tempref)*tempfl)/(-ustar**3)
   end function Obukhov_zL
 
 
@@ -848,12 +848,12 @@ implicit none
   pure subroutine WM_MO_FLUX_ustar(vel,dist,ustar,z0,tempflux,Re,temperature_ref,grav_acc)
     implicit none
 
-    real(KND),intent(inout) :: ustar
-    real(KND),parameter  :: eps = 1e-3
-    real(KND),parameter  :: yplcrit = 11.225_KND
-    real(KND),intent(in) :: vel,dist,z0,tempflux
-    real(KND),intent(in) :: Re,temperature_ref,grav_acc
-    real(KND) ustar2,zL,zL2,Psi
+    real(knd),intent(inout) :: ustar
+    real(knd),parameter  :: eps = 1e-3
+    real(knd),parameter  :: yplcrit = 11.225_knd
+    real(knd),intent(in) :: vel,dist,z0,tempflux
+    real(knd),intent(in) :: Re,temperature_ref,grav_acc
+    real(knd) ustar2,zL,zL2,Psi
     integer i
 
     if (dist<=z0) then
@@ -863,7 +863,7 @@ implicit none
       if ((dist*ustar*Re)<yplcrit) then
         ustar = sqrt(vel/(dist*Re))
       else
-        ustar = vel/(log(abs(ustar*dist*Re))/0.4_KND+5.2_KND)
+        ustar = vel/(log(abs(ustar*dist*Re))/0.4_knd+5.2_knd)
       end if
      else
        ustar = 0
@@ -879,7 +879,7 @@ implicit none
       i = i+1
       ustar2 = ustar
 
-      ustar = ustar+(max(vel*0.4_KND/(log(max((dist/z0)-Psi,1E-5))),0._KND)-ustar)/2
+      ustar = ustar+(max(vel*0.4_knd/(log(max((dist/z0)-Psi,1E-5))),0._knd)-ustar)/2
 
       if (ustar<1E-4) then
        zL = -10000
@@ -890,7 +890,7 @@ implicit none
 
       Psi = PsiM_MO(zL)
 
-      if  (abs(ustar-ustar2)/max(abs(ustar),1.e-3_KND)<eps) exit
+      if  (abs(ustar-ustar2)/max(abs(ustar),1.e-3_knd)<eps) exit
 
       if (i>=50) then
                   ustar = 0
@@ -906,11 +906,11 @@ implicit none
 
 
   pure subroutine WM_MO_DIRICHLET_ustar_tfl(ustar,tempflux,vel,dist,z0,tempdif)
-    real(KND),intent(inout) :: ustar,tempflux
-    real(KND),intent(in) :: vel,dist,z0,tempdif
-    real(KND),parameter :: eps = 1e-3
-    real(KND),parameter :: yplcrit = 11.225
-    real(KND) :: zL,zL0,Rib
+    real(knd),intent(inout) :: ustar,tempflux
+    real(knd),intent(in) :: vel,dist,z0,tempdif
+    real(knd),parameter :: eps = 1e-3
+    real(knd),parameter :: yplcrit = 11.225
+    real(knd) :: zL,zL0,Rib
     integer i
 
     call WMRoughUstar(ustar,vel,dist,z0)
@@ -921,7 +921,7 @@ implicit none
        if ((dist*ustar*Re)<yplcrit) then
          ustar = sqrt(vel/(dist*Re))
        else
-         ustar = vel/(log(abs(ustar*dist*Re))/0.4_KND+5.2_KND)
+         ustar = vel/(log(abs(ustar*dist*Re))/0.4_knd+5.2_knd)
        end if
       else
        ustar = 0
@@ -929,10 +929,10 @@ implicit none
 
     else
 
-      Rib = -grav_acc*dist*tempdif/(temperature_ref*max(vel**2,1E-6_KND))
+      Rib = -grav_acc*dist*tempdif/(temperature_ref*max(vel**2,1E-6_knd))
       zL = 0
       i = 0
-      if (Rib>0.34_KND) then
+      if (Rib>0.34_knd) then
                           ustar = 0
                           tempflux = 0
       else
@@ -940,7 +940,7 @@ implicit none
           i = i+1
           zL0 = zL
           zL = Rib*(log(dist/z0)-PsiM_MO(zl))**2/(log(dist/z0)-PsiH_MO(zl))
-          if  (abs(zL-zL0)/max(abs(zL),1.e-3_KND)<eps) exit
+          if  (abs(zL-zL0)/max(abs(zL),1.e-3_knd)<eps) exit
           if (i>=50.or.zL>100) exit
         end do
 
@@ -948,8 +948,8 @@ implicit none
           ustar = 0
           tempflux = 0
         else
-          ustar = vel*0.4_KND/(log(dist/z0)-PsiM_MO(zL))
-          tempflux = 0.4_KND*ustar*tempdif/(log(dist/z0)-PsiH_MO(zL))
+          ustar = vel*0.4_knd/(log(dist/z0)-PsiM_MO(zL))
+          tempflux = 0.4_knd*ustar*tempdif/(log(dist/z0)-PsiH_MO(zL))
         end if
       end if
     end if
@@ -962,11 +962,11 @@ implicit none
 
 
   pure subroutine WM_MO_FLUX(visc,ustar,tempfl,z0,distvect,uvect)
-    real(KND),intent(out) :: visc
-    real(KND),intent(inout) :: ustar
-    real(KND),intent(in)    :: z0,tempfl
-    real(KND),intent(in)    :: distvect(3),uvect(3)
-    real(KND) vect(3),vel,dist
+    real(knd),intent(out) :: visc
+    real(knd),intent(inout) :: ustar
+    real(knd),intent(in)    :: z0,tempfl
+    real(knd),intent(in)    :: distvect(3),uvect(3)
+    real(knd) vect(3),vel,dist
 
     dist = sqrt(sum(distvect**2))
 
@@ -979,10 +979,10 @@ implicit none
       if (ustar<0) ustar = 0
     end if
 
-    if (vel>0.and.ustar*ustar*dist/vel>1._KND/Re) then
+    if (vel>0.and.ustar*ustar*dist/vel>1._knd/Re) then
       visc = ustar*ustar*dist/vel
     else if (Re>0) then
-      visc = 1._KND/Re
+      visc = 1._knd/Re
     else
       visc = 0
     end if
@@ -992,12 +992,12 @@ implicit none
 
 
   pure subroutine WM_MO_DIRICHLET(visc,ustar,tempfl,z0,tempdif,distvect,uvect)
-    real(KND),intent(out)   :: visc
-    real(KND),intent(inout) :: ustar,tempfl
-    real(KND),intent(in)    :: z0
-    real(KND),intent(in)    :: tempdif ! temperature difference surface - nearest point
-    real(KND),intent(in)    :: distvect(3),uvect(3)
-    real(KND) vect(3),vel,dist
+    real(knd),intent(out)   :: visc
+    real(knd),intent(inout) :: ustar,tempfl
+    real(knd),intent(in)    :: z0
+    real(knd),intent(in)    :: tempdif ! temperature difference surface - nearest point
+    real(knd),intent(in)    :: distvect(3),uvect(3)
+    real(knd) vect(3),vel,dist
 
     dist = sqrt(sum(distvect**2))
 
@@ -1010,9 +1010,9 @@ implicit none
     if (ustar<0) ustar = 0
 
     if ((vel>0.or.tempfl/=0)) then
-      visc = max(ustar*ustar*dist/vel,1._KND/Re)
+      visc = max(ustar*ustar*dist/vel,1._knd/Re)
     else if (Re>0) then
-      visc = 1._KND/Re
+      visc = 1._knd/Re
     else
       visc = 0
     end if
@@ -1022,7 +1022,7 @@ implicit none
 
 
   pure subroutine BOUND_tempfl(Nu)
-    real(KND),intent(inout):: Nu(-1:,-1:)
+    real(knd),intent(inout):: Nu(-1:,-1:)
     integer i,j,nx,ny
 
     nx = Prnx
@@ -1058,10 +1058,10 @@ implicit none
 
 
   subroutine InitTempFL(Temperature)
-    real(KND),intent(in) :: Temperature(-1:,-1:,-1:)
+    real(knd),intent(in) :: Temperature(-1:,-1:,-1:)
     integer i
 
-    if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
+    if (enable_buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
       do i = 1,size(WMPoints)
         if (WMPoints(i)%zk==1) WMPoints(i)%tempfl = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&
                        (temperature(WMPoints(i)%xi,WMPoints(i)%yj,1) - temperature(WMPoints(i)%xi,WMPoints(i)%yj,0))
@@ -1072,9 +1072,9 @@ implicit none
 
 
   pure recursive subroutine WallPrGradient(prgrad,i,j,k,Pr,Prtype)
-    real(KND),intent(out) :: prgrad(3)
+    real(knd),intent(out) :: prgrad(3)
     integer,intent(in)    :: i,j,k
-    real(KND),intent(in)  :: Pr(1:,1:,1:)
+    real(knd),intent(in)  :: Pr(1:,1:,1:)
     integer,intent(in)    :: Prtype(0:,0:,0:)
     integer n
 
@@ -1113,22 +1113,22 @@ implicit none
     end if
     if (n>0) prgrad(3) = prgrad(3)/n
 
-    prgrad = prgrad + [prgradientx,prgradienty,0._KND]
+    prgrad = prgrad + [prgradientx,prgradienty,0._knd]
 
   end subroutine WallPrGradient
 
 
 
   subroutine ComputeViscsWM(U,V,W,Pr,Temperature)
-    real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-    real(KND),dimension(1:,1:,1:),   intent(in) :: Pr
-    real(KND),dimension(-1:,-1:,-1:),intent(in) :: Temperature
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),dimension(1:,1:,1:),   intent(in) :: Pr
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
     integer i,j,xi,yj,zk
-    real(KND) tdif
-    real(KND) dist(3), vel(3), wallvel(3), prgrad(3)
+    real(knd) tdif
+    real(knd) dist(3), vel(3), wallvel(3), prgrad(3)
 
 
-    if (buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
+    if (enable_buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
       !$omp parallel private(i,j)
       !$omp do
       do j = 1,Prny
@@ -1151,21 +1151,21 @@ implicit none
 
       dist(:) = [WMPoints(i)%distx, WMPoints(i)%disty, WMPoints(i)%distz]
 
-      vel(1) = (U(xi,yj,zk)+U(xi-1,yj,zk))/2._KND
-      vel(2) = (V(xi,yj,zk)+V(xi,yj-1,zk))/2._KND
-      vel(3) = (W(xi,yj,zk)+W(xi,yj,zk-1))/2._KND
+      vel(1) = (U(xi,yj,zk)+U(xi-1,yj,zk))/2._knd
+      vel(2) = (V(xi,yj,zk)+V(xi,yj-1,zk))/2._knd
+      vel(3) = (W(xi,yj,zk)+W(xi,yj,zk-1))/2._knd
 
       wallvel(:) = [WMPoints(i)%wallu, WMPoints(i)%wallv, WMPoints(i)%wallw]
 
 
       if (WMPoints(i)%z0>0) then
 
-         if (buoyancy==1 .and. TBtype(Bo)==CONSTFLUX) then
+         if (enable_buoyancy==1 .and. TBtype(Bo)==CONSTFLUX) then
 
            call WM_MO_FLUX(Visc(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%tempfl,&
                            WMPoints(i)%z0, dist, vel)
 
-         else if (buoyancy==1 .and. TBtype(Bo)==DIRICHLET) then
+         else if (enable_buoyancy==1 .and. TBtype(Bo)==DIRICHLET) then
 
            if (WMPoints(i)%zk==1) WMPoints(i)%temp = BsideTArr(WMPoints(i)%xi,WMPoints(i)%yj)
 
@@ -1210,7 +1210,7 @@ implicit none
     end do
     !$omp end parallel do
 
-    if (buoyancy==1.and. TBtype(Bo)==DIRICHLET) call Bound_tempfl(BsideTFLArr)
+    if (enable_buoyancy==1.and. TBtype(Bo)==DIRICHLET) call Bound_tempfl(BsideTFLArr)
 
 
   end subroutine ComputeViscsWM
@@ -1220,7 +1220,7 @@ implicit none
 
 
 
-  pure real(KND) function GroundUstar()
+  pure real(knd) function GroundUstar()
     if (any(WMPoints%zk == 1)) then
       GroundUstar = sum(WMPoints%ustar, mask = (WMPoints%zk == 1)) / count(WMPoints%zk == 1)
     else
@@ -1231,7 +1231,7 @@ implicit none
 
 
 
-  pure real(KND) function TotalUstar()
+  pure real(knd) function TotalUstar()
     if (size(WMPoints) > 0) then
       TotalUstar = sum(WMPoints%ustar) / size(WMPoints%zk)
     else
@@ -1244,7 +1244,7 @@ implicit none
 
 
   pure function GroundDeposition() result(depos)
-    real(KND), dimension(:) :: depos(1:Prnx,1:Prny,computescalars)
+    real(knd), dimension(:) :: depos(1:Prnx,1:Prny,computescalars)
 
     integer :: i, j
 
@@ -1265,8 +1265,8 @@ implicit none
 
 
 
-  pure real(KND) function SurfTemperature(x,y,t)
-   real(KND),intent(in):: x,y
+  pure real(knd) function SurfTemperature(x,y,t)
+   real(knd),intent(in):: x,y
    real(TIM),intent(in):: t
 
    SurfTemperature = sideTemp(Bo)  ! Needs bet to allow time evolution somehow

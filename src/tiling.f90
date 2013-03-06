@@ -1,6 +1,6 @@
 module Tiling
 !computation of tile sizes
-  use Kinds, only: int8,KND
+  use Kinds, only: int8,knd
  !$ use OMP_LIB
 
   implicit none
@@ -30,7 +30,7 @@ module Tiling
       !$omp do
       do narrays=1,size(tilenx)
 
-        bn = tilesize/(storage_size(1._KND)/storage_size('a'))
+        bn = tilesize/(storage_size(1._knd)/storage_size('a'))
                                           !requires F2008, c_sizeof not supported by Solaris Studio 12.3
 
         bn = bn/narrays !four arrays U,V,W,Visc

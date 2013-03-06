@@ -17,22 +17,22 @@ module VolumeSources
 
   type,extends(TGridVolume) :: TResistanceVolume
     ! f_drag_i = - Cd * a * V * u_i , V = sqrt(sum(u_i**2))
-    real(KND) :: resistance  !Cd * a
+    real(knd) :: resistance  !Cd * a
   end type TResistanceVolume
 
   type,extends(TGridVolume) :: TTemperatureFlVolume
     ! <T'w'> = temperature_flux, Qh = rho*Cp*temperature_flux
-    real(KND) :: temperature_flux
+    real(knd) :: temperature_flux
   end type TTemperatureFlVolume
 
   type,extends(TGridVolume) :: TMoistureFlVolume
     ! <q'w'> = moisture_flux, Qe = rho*Lv*moisture_flux
-    real(KND) :: moisture_flux
+    real(knd) :: moisture_flux
   end type TMoistureFlVolume
 
   type,extends(TGridVolume) :: TScalarFlVolume
     ! <c'w'> = scalar_flux
-    real(KND),allocatable :: scalar_flux(:)
+    real(knd),allocatable :: scalar_flux(:)
   end type TScalarFlVolume
 
   type, extends(TBody) :: TVolumeSourceBody
@@ -45,15 +45,15 @@ module VolumeSources
   abstract interface
     function resistance_interface(self,x,y,z) result(res)
       import
-      real(KND) :: res
+      real(knd) :: res
       class(TVolumeSourceBody),intent(in) :: self
-      real(KND),intent(in) :: x,y,z
+      real(knd),intent(in) :: x,y,z
     end function
     function scalar_flux_interface(self,x,y,z) result(res)
       import
-      real(KND),allocatable :: res(:) !allocatable causes ICE in gfortran 4.7.1, ok in repository since March 2013
+      real(knd),allocatable :: res(:) !allocatable causes ICE in gfortran 4.7.1, ok in repository since March 2013
       class(TVolumeSourceBody),intent(in) :: self
-      real(KND),intent(in) :: x,y,z
+      real(knd),intent(in) :: x,y,z
     end function
   end interface
 
@@ -285,8 +285,8 @@ module VolumeSources
     
 
     subroutine ResistanceForce(U2,V2,W2,U,V,W)
-      real(KND),dimension(-2:,-2:,-2:),intent(inout) :: U2,V2,W2
-      real(KND),dimension(-2:,-2:,-2:),intent(in)    :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),intent(inout) :: U2,V2,W2
+      real(knd),dimension(-2:,-2:,-2:),intent(in)    :: U,V,W
 
       call apply(U2,U,UResistanceVolumes,totU_u)
       call apply(V2,V,VResistanceVolumes,totU_v)
@@ -294,33 +294,33 @@ module VolumeSources
 
       contains
 
-         pure real(KND) function totU_u(i,j,k)
+         pure real(knd) function totU_u(i,j,k)
            integer,intent(in) :: i,j,k
 
            totU_u = hypot( hypot( U(i,j,k), &
-                                  (V(i,j,k)+V(i,j-1,k)+V(i-1,j,k)+V(i-1,j-1,k))/4._KND ) , &
-                                  (W(i,j,k)+W(i,j,k-1)+W(i-1,j,k)+W(i-1,j,k-1))/4._KND )
+                                  (V(i,j,k)+V(i,j-1,k)+V(i-1,j,k)+V(i-1,j-1,k))/4._knd ) , &
+                                  (W(i,j,k)+W(i,j,k-1)+W(i-1,j,k)+W(i-1,j,k-1))/4._knd )
          end function
 
-         pure real(KND) function totU_v(i,j,k)
+         pure real(knd) function totU_v(i,j,k)
            integer,intent(in) :: i,j,k
 
-           totU_v = hypot( hypot( (U(i,j,k)+U(i-1,j,k)+U(i,j-1,k)+U(i-1,j-1,k))/4._KND, &
+           totU_v = hypot( hypot( (U(i,j,k)+U(i-1,j,k)+U(i,j-1,k)+U(i-1,j-1,k))/4._knd, &
                                   V(i,j,k) ) , &
-                                  (W(i,j,k)+W(i,j,k-1)+W(i,j-1,k)+W(i,j-1,k-1))/4._KND )
+                                  (W(i,j,k)+W(i,j,k-1)+W(i,j-1,k)+W(i,j-1,k-1))/4._knd )
          end function
 
-         pure real(KND) function totU_w(i,j,k)
+         pure real(knd) function totU_w(i,j,k)
            integer,intent(in) :: i,j,k
 
-           totU_w = hypot( hypot( (U(i,j,k)+U(i-1,j,k)+U(i,j,k-1)+U(i-1,j,k-1))/4._KND, &
-                                  (V(i,j,k)+V(i,j-1,k)+V(i,j,k-1)+V(i,j-1,k-1))/4._KND ) , &
+           totU_w = hypot( hypot( (U(i,j,k)+U(i-1,j,k)+U(i,j,k-1)+U(i-1,j,k-1))/4._knd, &
+                                  (V(i,j,k)+V(i,j-1,k)+V(i,j,k-1)+V(i,j-1,k-1))/4._knd ) , &
                                   W(i,j,k) )
          end function
 
          subroutine apply(X2,X,src,fun)
-           real(KND),dimension(-2:,-2:,-2:),intent(inout)  :: X2
-           real(KND),dimension(-2:,-2:,-2:),intent(in)     :: X
+           real(knd),dimension(-2:,-2:,-2:),intent(inout)  :: X2
+           real(knd),dimension(-2:,-2:,-2:),intent(in)     :: X
            type(TResistanceVolume),allocatable,intent(in)  :: src(:)
            procedure(totU_u) :: fun
            integer i

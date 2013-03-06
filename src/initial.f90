@@ -24,8 +24,8 @@ module INITIAL
   private
   public  ReadParams, Initconds, ReadBounds
 
-  real(KND) x0,y0,z0 !domain boundaries, will become xU(0), yV(0), zW(0)
-  real(KND) lx,ly,lz !domain extents
+  real(knd) x0,y0,z0 !domain boundaries, will become xU(0), yV(0), zW(0)
+  real(knd) lx,ly,lz !domain extents
 
 contains
 
@@ -33,7 +33,7 @@ contains
  subroutine ReadParams
    use StaggeredFrames, only: rrange, TFrameTimes, TSaveFlags, Init
    integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter,minGPUlevel
-   real(KND) mgepsinnerGS
+   real(knd) mgepsinnerGS
    integer   i,io,io2,itmp
    integer numframeslices
    namelist /cmd/ tilesize, debugparam, debuglevel, windangle, projectiontype, Prnx, Prny, Prnz,&
@@ -224,7 +224,7 @@ contains
 
 
    open(unit,file="thermal.conf",status="old",action="read")
-   call get(buoyancy)
+   call get(enable_buoyancy)
    call get(Prandtl)
    call get(grav_acc)
    call get(temperature_ref)
@@ -242,7 +242,7 @@ contains
    call get(sideTemp(To))
    close(unit)
 
-   if (buoyancy==1) then
+   if (enable_buoyancy==1) then
 
      open(unit,file="temp_profile.conf",status="old",action="read",iostat=io)
 
@@ -436,7 +436,7 @@ contains
        call get(frame_save_flags%U, frame_save_flags%V, frame_save_flags%W)
        call get(frame_save_flags%Pr)
        call get(frame_save_flags%Temperature)
-       if (buoyancy == 0) frame_save_flags%Temperature = .false.
+       if (enable_buoyancy == 0) frame_save_flags%Temperature = .false.
        call get(frame_save_flags%Scalar)
        if (computescalars == 0) frame_save_flags%Scalar = .false.
 
@@ -523,7 +523,7 @@ contains
 
 
 
-   windangle=0._KND
+   windangle=0._knd
 
    projectiontype=1
 
@@ -758,17 +758,17 @@ contains
        read(unit,*) x,y,z
      end subroutine
      subroutine rget1(x)
-       real(KND),intent(out) :: x
+       real(knd),intent(out) :: x
        read(unit,fmt='(/)')
        read(unit,*) x
      end subroutine
      subroutine rget2(x,y)
-       real(KND),intent(out) :: x,y
+       real(knd),intent(out) :: x,y
        read(unit,fmt='(/)')
        read(unit,*) x,y
      end subroutine
      subroutine rget3(x,y,z)
-       real(KND),intent(out) :: x,y,z
+       real(knd),intent(out) :: x,y,z
        read(unit,fmt='(/)')
        read(unit,*) x,y,z
      end subroutine
@@ -778,9 +778,9 @@ contains
 
 
  subroutine ReadIC(U,V,W,Pr,Temperature)
-   real(KND),intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-   real(KND),intent(inout) :: Pr(1:,1:,1:)
-   real(KND),intent(inout) :: Temperature(-1:,-1:,-1:)
+   real(knd),intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+   real(knd),intent(inout) :: Pr(1:,1:,1:)
+   real(knd),intent(inout) :: Temperature(-1:,-1:,-1:)
    integer i,j,k,unit
 
    call newunit(unit)
@@ -796,7 +796,7 @@ contains
      enddo
     enddo
    enddo
-   if (buoyancy==1) then
+   if (enable_buoyancy==1) then
     do i=1,3
      read(unit,*)
     enddo
@@ -852,20 +852,20 @@ contains
 
 
   subroutine INITCONDS(U,V,W,Pr,Temperature,Scalar)
-  real(KND),intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(KND),intent(inout) :: Temperature(-1:,-1:,:)
-  real(KND),intent(inout) :: Scalar(-1:,-1:,-1:,:)
+  real(knd),intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(knd),intent(inout) :: Temperature(-1:,-1:,:)
+  real(knd),intent(inout) :: Scalar(-1:,-1:,-1:,:)
   integer i,j,k
-  real(KND) p,x,y,z,x1,x2,y1,y2,z1,z2
-  real(KND),allocatable :: Q(:,:,:)
+  real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
+  real(knd),allocatable :: Q(:,:,:)
 
     call init_random_seed
 
     Pr(1:Prnx,1:Prny,1:Prnz)=0
 
-    U=huge(1._KND)
-    V=huge(1._KND)
-    W=huge(1._KND)
+    U=huge(1._knd)
+    V=huge(1._knd)
+    W=huge(1._knd)
 
     V(1:Vnx,1:Vny,1:Vnz)=0
     W(1:Wnx,1:Wny,1:Wnz)=0
@@ -875,11 +875,11 @@ contains
        call ReadIC(U,V,W,Pr,Temperature)
 
        if (Re>0) then
-         Visc=1._KND/Re
+         Visc=1._knd/Re
        else
          Visc=0
        endif
-       if (buoyancy==1.or.computescalars>0) TDiff=1._KND/(Re*Prandtl)
+       if (enable_buoyancy==1.or.computescalars>0) TDiff=1._knd/(Re*Prandtl)
 
        call BoundU(1,U)
        call BoundU(2,V)
@@ -899,7 +899,7 @@ contains
                   y=yPr(j)
                   z=zPr(k)
                   U(i,j,k)=-2*pi*y!*(1+0.1*(p-0.5))!-Uinlet*cos(z)*sin(x)*cos(y)!
-              !0.5_KND*(p-0.5_KND)z
+              !0.5_knd*(p-0.5_knd)z
              !else
              !  V(i,j,k)=0
             !endif
@@ -933,7 +933,7 @@ contains
                   x=xPr(i)
                   y=yPr(j)
                   z=zPr(k)
-                  Pr(i,j,k)=0!(Uinlet/16._KND)*((2+cos(2*z))*(cos(2*(x))+cos(2*(y)))-2)
+                  Pr(i,j,k)=0!(Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(x))+cos(2*(y)))-2)
            enddo
           enddo
          enddo
@@ -949,7 +949,7 @@ contains
                   y=yPr(j)
                   z=zPr(k)
                   U(i,j,k)=Uinlet*sin(x)*cos(z)*cos(-y)!*(1+0.1*(p-0.5))!-Uinlet*cos(z)*sin(x)*cos(y)!
-              !0.5_KND*(p-0.5_KND)z
+              !0.5_knd*(p-0.5_knd)z
              !else
              !  V(i,j,k)=0
             !endif
@@ -983,7 +983,7 @@ contains
                   x=xPr(i)
                   y=yPr(j)
                   z=zPr(k)
-                  Pr(i,j,k)=(Uinlet/16._KND)*((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)!(Uinlet/16._KND)*((2+cos(2*z))*(cos(2*(x))+cos(2*(y)))-2)
+                  Pr(i,j,k)=(Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)!(Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(x))+cos(2*(y)))-2)
            enddo
           enddo
          enddo
@@ -1007,9 +1007,9 @@ contains
                    p=0
                      !(20/(pi*pi))*(cos((pi/10)*x1)-cos((pi/10)*x2))*((pi/2)*(z2-z1)-0.8*(cos((pi/2)*z2)-cos((pi/2)*z1)))
                     !sin(pi*xU(i)/10)*(1+0.8*sin(pi*zPr(k)/2))
-                   x2=cosh(y2+0.4_KND*p-yPr(Uny/2))
-                   x1=cosh(y1+0.4_KND*p-yPr(Uny/2))
-                   if (abs(x2-x1)>0.000001_KND) then
+                   x2=cosh(y2+0.4_knd*p-yPr(Uny/2))
+                   x1=cosh(y1+0.4_knd*p-yPr(Uny/2))
+                   if (abs(x2-x1)>0.000001_knd) then
                     U(i,j,k)=(log(x2)-log(x1))/(y2-y1)
                    else
                     U(i,j,k)=0
@@ -1028,7 +1028,7 @@ contains
                    p=sin(2*pi*xPr(i)/10)*(1+0.3*sin(3*pi*zPr(k)/10))*exp(-(yV(j)-yPr(Uny/2))*(yV(j)-yPr(Uny/2)))
                   !endif
 
-                   V(i,j,k)=0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_KND*(p-0.5_KND)
+                   V(i,j,k)=0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_knd*(p-0.5_knd)
            enddo
           enddo
          enddo
@@ -1042,7 +1042,7 @@ contains
                    p=cos(2*pi*xPr(i)/10)*(1+0.3*cos(3*pi*zW(k)/10))*exp(-(yPr(j)-yPr(Uny/2))*(yPr(j)-yPr(Uny/2)))
                   !endif
 
-                   W(i,j,k)=0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_KND*(p-0.5_KND)
+                   W(i,j,k)=0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_knd*(p-0.5_knd)
            enddo
           enddo
          enddo
@@ -1051,7 +1051,7 @@ contains
       !     do j=1,Uny
       !      do i=1,Unx
       !             call RANDOM_NUMBER(p)
-      !       U(i,j,k)=-prgradienty/(coriolisparam)*(1+0.1_KND*(p-0.5_KND))
+      !       U(i,j,k)=-prgradienty/(coriolisparam)*(1+0.1_knd*(p-0.5_knd))
       !      enddo
       !     enddo
       !    enddo
@@ -1059,7 +1059,7 @@ contains
       !     do j=1,Vny
       !      do i=1,Vnx
       !               call RANDOM_NUMBER(p)
-      !      V(i,j,k)=prgradientx/(coriolisparam)*(1+0.1_KND*(p-0.5_KND))
+      !      V(i,j,k)=prgradientx/(coriolisparam)*(1+0.1_knd*(p-0.5_knd))
       !      enddo
       !     enddo
       !    enddo
@@ -1122,7 +1122,7 @@ contains
            do i=1,Unx
             if (Utype(i,j,k)<=0) then
                   call RANDOM_NUMBER(p)
-                  U(i,j,k)=Uin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_KND*(p-0.5_KND)!sin(2.*pi*xU(i)+1)*cos(2.*pi*yPr(j)-2)!Uin(j,k)!*(1+0.03_KND*(p-0.5_KND))
+                  U(i,j,k)=Uin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_knd*(p-0.5_knd)!sin(2.*pi*xU(i)+1)*cos(2.*pi*yPr(j)-2)!Uin(j,k)!*(1+0.03_knd*(p-0.5_knd))
              else
                U(i,j,k)=0
             endif
@@ -1136,7 +1136,7 @@ contains
            do i=1,Vnx
             if (Vtype(i,j,k)<=0) then
                   call RANDOM_NUMBER(p)
-                  V(i,j,k)=Vin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_KND*(p-0.5_KND)!-cos(2.*pi*xPr(i)+1)*sin(2.*pi*yV(j)-2)!Uinlet*(0.3_KND*(p-0.5_KND))
+                  V(i,j,k)=Vin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_knd*(p-0.5_knd)!-cos(2.*pi*xPr(i)+1)*sin(2.*pi*yV(j)-2)!Uinlet*(0.3_knd*(p-0.5_knd))
              else
                V(i,j,k)=0
             endif
@@ -1150,7 +1150,7 @@ contains
            do i=1,Wnx
             if (Wtype(i,j,k)<=0) then
                   call RANDOM_NUMBER(p)
-                  W(i,j,k)=Win(j,k)!Uinlet*(0.00001_KND*(p-0.5_KND))
+                  W(i,j,k)=Win(j,k)!Uinlet*(0.00001_knd*(p-0.5_knd))
              else
                W(i,j,k)=0
             endif
@@ -1171,7 +1171,7 @@ contains
          !$omp end parallel
        end if
 
-       if (buoyancy==1.and.tasktype==2) then
+       if (enable_buoyancy==1.and.tasktype==2) then
 
          do k=0,Prnz+1
           do j=0,Prny+1
@@ -1179,8 +1179,8 @@ contains
             x=xPr(i)
             y=yPr(j)
             z=zPr(k)
-            if ((x)**2+(y-0.5)**2<0.2_KND**2) then
-             temperature(i,j,k)=cos(sqrt(x**2+(y-0.5)**2)*pi/2/0.2_KND)**2
+            if ((x)**2+(y-0.5)**2<0.2_knd**2) then
+             temperature(i,j,k)=cos(sqrt(x**2+(y-0.5)**2)*pi/2/0.2_knd)**2
             else
              temperature(i,j,k)=0
             endif
@@ -1188,7 +1188,7 @@ contains
           enddo
          enddo
 
-       elseif (buoyancy==1.and.tasktype==3) then
+       elseif (enable_buoyancy==1.and.tasktype==3) then
 
          do k=0,Prnz+1
           do j=0,Prny+1
@@ -1196,12 +1196,12 @@ contains
             x=xPr(i)
             y=yPr(j)
             z=zPr(k)
-            temperature(i,j,k)=temperature_ref+(temperature_ref/100._KND)*((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
+            temperature(i,j,k)=temperature_ref+(temperature_ref/100._knd)*((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
            enddo
           enddo
          enddo
 
-       elseif (buoyancy==1) then
+       elseif (enable_buoyancy==1) then
 
          call InitTemperatureProfile(TempIn)
 
@@ -1219,7 +1219,7 @@ contains
            do i=1,Unx+1
             Pr(i,j,k)=Pr(i,j,k-1) + &
                    grav_acc*dzW(k-1) * &
-                  ( (temperature(i,j,k-1)+temperature(i,j,k))/2._KND - temperature_ref )&
+                  ( (temperature(i,j,k-1)+temperature(i,j,k))/2._knd - temperature_ref )&
                   / temperature_ref
            enddo
           enddo
@@ -1232,7 +1232,7 @@ contains
        if (Re>0) then
          !$omp parallel
          !$omp workshare
-         Visc=1._KND/Re
+         Visc=1._knd/Re
          !$omp end workshare
          !$omp end parallel
        else
@@ -1243,10 +1243,10 @@ contains
          !$omp end parallel
        endif
 
-       if (Re>0.and.(buoyancy==1.or.computescalars>0)) then
+       if (Re>0.and.(enable_buoyancy==1.or.computescalars>0)) then
          !$omp parallel
          !$omp workshare
-         TDiff=1._KND/(Re*Prandtl)
+         TDiff=1._knd/(Re*Prandtl)
          !$omp end workshare
          !$omp end parallel
        endif  !Re>0
@@ -1265,20 +1265,20 @@ contains
        !$omp end parallel
 
 
-       call Pr_Correct(U,V,W,Pr,Q,1._KND)
+       call Pr_Correct(U,V,W,Pr,Q,1._knd)
 
 
        if (sgstype==SubgridModel) then
-                         call SGS_Smag(U,V,W,2._KND)
+                         call SGS_Smag(U,V,W,2._knd)
        elseif (sgstype==SigmaModel) then
-                         call SGS_Sigma(U,V,W,2._KND)
+                         call SGS_Sigma(U,V,W,2._knd)
        elseif (sgstype==VremanModel) then
-                         call SGS_Vreman(U,V,W,2._KND)
+                         call SGS_Vreman(U,V,W,2._knd)
        elseif (sgstype==StabSubgridModel) then
-                         call SGS_StabSmag(U,V,W,Temperature,2._KND)
+                         call SGS_StabSmag(U,V,W,Temperature,2._knd)
        else
          if (Re>0) then
-           Visc=1._KND/Re
+           Visc=1._knd/Re
          else
            Visc=0
          endif
@@ -1286,11 +1286,11 @@ contains
 
        call Bound_Visc(Visc)
 
-       if (buoyancy>0) then
+       if (enable_buoyancy>0) then
          !$omp parallel
          !$omp workshare
          forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-           TDiff(i,j,k)=1.35*(Visc(i,j,k)-1._KND/Re)+(1._KND/(Re*constPrt))
+           TDiff(i,j,k)=1.35*(Visc(i,j,k)-1._knd/Re)+(1._knd/(Re*constPrt))
          endforall
          !$omp end workshare
          !$omp end parallel
@@ -1340,9 +1340,9 @@ contains
 
 
   subroutine READBOUNDS
-  real(KND),allocatable:: xU2(:),yV2(:),zW2(:)
+  real(knd),allocatable:: xU2(:),yV2(:),zW2(:)
   integer i,j,k,nx,ny,nz,nxup,nxdown,nyup,nydown,nzup,nzdown,io
-  real(KND) P
+  real(knd) P
   integer unit
 
     nx=Prnx-1
@@ -1597,17 +1597,17 @@ contains
     zW=zW2(nzdown-3:nzup+3)
 
     forall (i=-2:nx+4)
-      xPr(i)=(xU(i-1)+xU(i))/2._KND
+      xPr(i)=(xU(i-1)+xU(i))/2._knd
       dxPr(i)=xU(i)-xU(i-1)
     endforall
 
     forall (j=-2:ny+4)
-      yPr(j)=(yV(j-1)+yV(j))/2._KND
+      yPr(j)=(yV(j-1)+yV(j))/2._knd
       dyPr(j)=yV(j)-yV(j-1)
     endforall
 
     forall (k=-2:nz+4)
-      zPr(k)=(zW(k-1)+zW(k))/2._KND
+      zPr(k)=(zW(k-1)+zW(k))/2._knd
       dzPr(k)=zW(k)-zW(k-1)
     endforall
 
@@ -1640,11 +1640,11 @@ contains
 
 
     allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
-    Uin = huge(1._KND)
-    Vin = huge(1._KND)
-    Win = huge(1._KND)
+    Uin = huge(1._knd)
+    Vin = huge(1._knd)
+    Win = huge(1._knd)
 
-    if (buoyancy>0) allocate(Tempin(-1:Prny+2,-1:Prnz+2))
+    if (enable_buoyancy>0) allocate(Tempin(-1:Prny+2,-1:Prnz+2))
 
     select case (inlettype)
       case (NOINLET)
@@ -1664,7 +1664,7 @@ contains
     endselect
 
 
-    if (buoyancy==1) then
+    if (enable_buoyancy==1) then
        if (TBtype(Bo)==CONSTFLUX.or.TBtype(Bo)==DIRICHLET) then
 
          allocate(BsideTFLArr(-1:Prnx+2,-1:Prny+2))

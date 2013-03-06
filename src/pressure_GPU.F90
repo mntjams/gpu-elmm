@@ -12,16 +12,16 @@
 
     integer,intent(in)      :: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,correctcompatibility
     integer,intent(in)      :: Btype(6)
-    real(KND),intent(in)    :: sideU(3,6)
-    real(KND),intent(in)    :: dxmin,dymin,dzmin
-    real(KND),dimension(-2:Prny+3,-2:Prnz+3),intent(in)       :: Uin,Vin,Win
-    real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
-    real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
-    real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-    real(KND),intent(out)   :: RHS(0:Prnx+1,0:Prny+1,0:Prnz+1)
-    real(KND),intent(out)   :: uncompatibility,divergence
-    real(KND),intent(in)    :: dt2
-    real(KND) :: S,S2
+    real(knd),intent(in)    :: sideU(3,6)
+    real(knd),intent(in)    :: dxmin,dymin,dzmin
+    real(knd),dimension(-2:Prny+3,-2:Prnz+3),intent(in)       :: Uin,Vin,Win
+    real(knd),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+    real(knd),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+    real(knd),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+    real(knd),intent(out)   :: RHS(0:Prnx+1,0:Prny+1,0:Prnz+1)
+    real(knd),intent(out)   :: uncompatibility,divergence
+    real(knd),intent(in)    :: dt2
+    real(knd) :: S,S2
     integer   :: i,j,k
 
 
@@ -99,16 +99,16 @@
 
     integer,intent(in)      :: Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz
     integer,intent(in)      :: Btype(6)
-    real(KND),intent(in)    :: sideU(3,6)
-    real(KND),intent(in)    :: dxmin,dymin,dzmin
-    real(KND),dimension(-2:Prny+3,-2:Prnz+3),intent(in) :: Uin,Vin,Win
-    real(KND),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
-    real(KND),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
-    real(KND),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-    real(KND),intent(inout) :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
-    real(KND),intent(inout) :: Phi(0:Prnx+1,0:Prny+1,0:Prnz+1)
-    real(KND),intent(in)    :: dt2,dt3
-    real(KND) :: Phiref,Au,Av,Aw,dxmin2,dymin2,dzmin2
+    real(knd),intent(in)    :: sideU(3,6)
+    real(knd),intent(in)    :: dxmin,dymin,dzmin
+    real(knd),dimension(-2:Prny+3,-2:Prnz+3),intent(in) :: Uin,Vin,Win
+    real(knd),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+    real(knd),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+    real(knd),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+    real(knd),intent(inout) :: Pr(1:Unx+1,1:Vny+1,1:Wnz+1)
+    real(knd),intent(inout) :: Phi(0:Prnx+1,0:Prny+1,0:Prnz+1)
+    real(knd),intent(in)    :: dt2,dt3
+    real(knd) :: Phiref,Au,Av,Aw,dxmin2,dymin2,dzmin2
     integer   :: i,j,k
 
 

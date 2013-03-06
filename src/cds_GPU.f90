@@ -7,20 +7,20 @@
 #include "hmpp-include.f90"
 
     integer,intent(in)    :: Unx, Uny, Unz, Vnx, Vny, Vnz, Wnx, Wny, Wnz
-    real(KND),intent(in)  :: dx, dy, dz, dt
-    real(KND),intent(out) :: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3)
-    real(KND),intent(in)  :: U( -2:Unx+3,-2:Uny+3,-2:Unz+3)
-    real(KND),intent(out) :: V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
-    real(KND),intent(in)  :: V( -2:Vnx+3,-2:Vny+3,-2:Vnz+3)
-    real(KND),intent(out) :: W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-    real(KND),intent(in)  :: W( -2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+    real(knd),intent(in)  :: dx, dy, dz, dt
+    real(knd),intent(out) :: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3)
+    real(knd),intent(in)  :: U( -2:Unx+3,-2:Uny+3,-2:Unz+3)
+    real(knd),intent(out) :: V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+    real(knd),intent(in)  :: V( -2:Vnx+3,-2:Vny+3,-2:Vnz+3)
+    real(knd),intent(out) :: W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+    real(knd),intent(in)  :: W( -2:Wnx+3,-2:Wny+3,-2:Wnz+3)
     integer i,j,k
-    real(KND) Ax,Ay,Az
+    real(knd) Ax,Ay,Az
 
 
-        Ax=0.25_KND*dt/dx
-        Ay=0.25_KND*dt/dy
-        Az=0.25_KND*dt/dz
+        Ax=0.25_knd*dt/dx
+        Ay=0.25_knd*dt/dy
+        Az=0.25_knd*dt/dz
        !$hmppcg grid blocksize myblocksize2
        !$hmppcg permute (k,i,j)
        !$hmppcg gridify(k,i)

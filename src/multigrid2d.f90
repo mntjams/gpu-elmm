@@ -9,11 +9,11 @@ implicit none
   public POISSMG2d,SetMGParams2d
 
   type TMGArr
-    real(KND),allocatable,dimension(:,:):: Arr
+    real(knd),allocatable,dimension(:,:):: Arr
   endtype
 
   type TCoefs
-   real(KND) dx,dy,dz,Aw,Ae,As,An,Ab,At
+   real(knd) dx,dy,dz,Aw,Ae,As,An,Ab,At
    integer nx,nz
   endtype
 
@@ -28,7 +28,7 @@ implicit none
   integer mgnpre
   integer mgnpost
   integer mgmaxinnerGSiter
-  real(KND) mgepsinnerGS
+  real(knd) mgepsinnerGS
 
 
 contains
@@ -37,7 +37,7 @@ contains
                            lmgncgc, lmgnpre, lmgnpost, lmgmaxinnerGSiter, lmgepsinnerGS)
 
     integer,intent(in)::   llmg, lminmglevel, lbnx, lbnz, lmgncgc, lmgnpre, lmgnpost, lmgmaxinnerGSiter
-    real(KND),intent(in):: lmgepsinnerGS
+    real(knd),intent(in):: lmgepsinnerGS
 
     lmg=llmg
     minmglevel=lminmglevel
@@ -53,8 +53,8 @@ contains
 
   pure subroutine Prolongate(AFine,ACoarse,level)
     integer,intent(in):: level
-    real(KND),dimension(-1:,-1:),intent(in):: ACoarse
-    real(KND),dimension(-1:,-1:),intent(inout):: AFine
+    real(knd),dimension(-1:,-1:),intent(in):: ACoarse
+    real(knd),dimension(-1:,-1:),intent(inout):: AFine
     integer:: i,k,nx,nz
 
     nx=bnx*2**level !level means from which grid we interpolate
@@ -81,21 +81,21 @@ contains
 
   subroutine Restrict(ACoarse,AFine,level)
     integer,intent(in):: level
-    real(KND),dimension(-1:,-1:),intent(out):: ACoarse
-    real(KND),dimension(-1:,-1:),intent(inout):: AFine
-    real(KND) p,S,w
+    real(knd),dimension(-1:,-1:),intent(out):: ACoarse
+    real(knd),dimension(-1:,-1:),intent(inout):: AFine
+    real(knd) p,S,w
     integer:: i,k,ii,kk,nx,nz
-    real(KND) :: weight(-1:1,-1:1)
+    real(knd) :: weight(-1:1,-1:1)
 
     nx=bnx*2**level !level means on which grid we restrict
     nz=bnz*2**level
     call Bound_Phi_MG(Afine,2*nx,2*nz)
 
     weight = 1
-    weight(-1,:) = weight(-1,:) / 2._KND
-    weight( 1,:) = weight( 1,:) / 2._KND
-    weight(:,-1) = weight(:,-1) / 2._KND
-    weight(:, 1) = weight(:, 1) / 2._KND
+    weight(-1,:) = weight(-1,:) / 2._knd
+    weight( 1,:) = weight( 1,:) / 2._knd
+    weight(:,-1) = weight(:,-1) / 2._knd
+    weight(:, 1) = weight(:, 1) / 2._knd
 
     !$omp parallel do private(i,k,ii,kk,w,S,p)
     do k=0,nz
@@ -128,7 +128,7 @@ contains
 
 
   pure subroutine BOUND_Phi_MG(Phi,nx,nz)
-    real(KND),intent(inout):: Phi(-1:,-1:)
+    real(knd),intent(inout):: Phi(-1:,-1:)
     integer,intent(in):: nx,nz
     integer i,k
 
@@ -190,9 +190,9 @@ contains
     integer,intent(in)::level
     integer i,k,l,info
     integer,allocatable,dimension(:),save:: ige,ipivot,work2
-    real(KND),allocatable,dimension(:),save:: xge,bge,work,R,C,ferr,berr
-    real(KND),allocatable,dimension(:,:),save:: age,af
-    real(KND) Ap,rcond
+    real(knd),allocatable,dimension(:),save:: xge,bge,work,R,C,ferr,berr
+    real(knd),allocatable,dimension(:,:),save:: age,af
+    real(knd) Ap,rcond
     integer,save:: nx,nz,nulx,nulz,nxyz,called=0
     character(1),save:: equed
 
@@ -340,9 +340,9 @@ contains
     integer,intent(in)::level
     integer i,k,l,info
     integer,allocatable,dimension(:),save:: ige,ipivot,work2
-    real(KND),allocatable,dimension(:),save:: xge,bge,work,R,C,ferr,berr
-    real(KND),allocatable,dimension(:,:),save:: age,af
-    real(KND) Ap,rcond
+    real(knd),allocatable,dimension(:),save:: xge,bge,work,R,C,ferr,berr
+    real(knd),allocatable,dimension(:,:),save:: age,af
+    real(knd) Ap,rcond
     integer,save:: nx,nz,nulx,nulz,nxyz,called=0
 
     if (called==0) then
@@ -489,9 +489,9 @@ contains
     integer,intent(in)::level
     integer i,k,l,info,ldwork
     integer,allocatable,dimension(:):: ipivot
-    real(KND),allocatable,dimension(:),save:: xge,bge,work
-    real(KND),allocatable,dimension(:,:),save:: age
-    real(KND) Ap
+    real(knd),allocatable,dimension(:),save:: xge,bge,work
+    real(knd),allocatable,dimension(:,:),save:: age
+    real(knd) Ap
     integer,save:: nx,nz,nulx,nulz,nxyz,called=0
 
     if (called==0) then
@@ -613,7 +613,7 @@ contains
 
        xge=0
        do k=1,nxyz !rows of X{j}
-        do i=1,nxyz !columns of A(i,j) if (age(i,j)>100*tiny(1._KND))
+        do i=1,nxyz !columns of A(i,j) if (age(i,j)>100*tiny(1._knd))
          xge(i)=xge(i)+age(i,k)*bge(k)
         enddo
        enddo
@@ -646,9 +646,9 @@ contains
 
   subroutine MG_GS(level,niter)
     integer,intent(in)::level,niter
-    ! real(KND),intent(OUT):: R
+    ! real(knd),intent(OUT):: R
     integer i,k,l
-    real(KND) p,Ap
+    real(knd) p,Ap
 
      do l=1,niter
   !     S=0
@@ -740,9 +740,9 @@ contains
 
   subroutine MG_res(level,R)
     integer,intent(in)::level
-    real(KND),intent(out)::R
+    real(knd),intent(out)::R
     integer i,k
-    real(KND),save:: p,Ap
+    real(knd),save:: p,Ap
 
        call BOUND_Phi_MG(PhiMG(level)%Arr,CoefMG(level)%nx,CoefMG(level)%nz)
        do k=0,CoefMG(level)%nz
@@ -801,9 +801,9 @@ contains
 
   recursive subroutine MG_CGC(level,eps,ncgc,npre,npost,R)
     integer,intent(in):: level,ncgc,npre,npost
-    real(KND),intent(in):: eps
-    real(KND),intent(out):: R
-    real(KND) R1
+    real(knd),intent(in):: eps
+    real(knd),intent(out):: R
+    real(knd) R1
     integer k
   !   write (*,*) "cgc",level
     if (level == minmglevel) then !1
@@ -818,7 +818,7 @@ contains
           call MG_res(level,R)
   !         write (*,*) "GSres",sqrt(R)
           if (R < mgepsinnerGS**2) exit
-          if (R1<R*1.05_KND) exit
+          if (R1<R*1.05_knd) exit
           R1=R
         enddo
        endif
@@ -844,11 +844,11 @@ contains
 
 
   subroutine POISSMG2d(Phi,RHS)        !Solves Poisson equation using Successive over-relaxation
-    real(KND),dimension(0:,0:,0:),intent(inout):: Phi
-    real(KND),dimension(1:,1:,1:),intent(in)::RHS
+    real(knd),dimension(0:,0:,0:),intent(inout):: Phi
+    real(knd),dimension(1:,1:,1:),intent(in)::RHS
     integer i,k,l,nx,nz,sx,sz
-    real(KND) mgeps,R,Phiref
-    real(KND),save:: called=0
+    real(knd) mgeps,R,Phiref
+    real(knd),save:: called=0
 
     mgeps=epsPoisson
     Phi=0
@@ -876,10 +876,10 @@ contains
       allocate(PhiMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%nz+1))
       allocate(RHSMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%nz+1))
       allocate(ResMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%nz+1))
-      CoefMG(l)%Ae=1._KND/(CoefMG(l)%dx*CoefMG(l)%dx)
-      CoefMG(l)%Aw=1._KND/(CoefMG(l)%dx*CoefMG(l)%dx)
-      CoefMG(l)%At=1._KND/(CoefMG(l)%dz*CoefMG(l)%dz)
-      CoefMG(l)%Ab=1._KND/(CoefMG(l)%dz*CoefMG(l)%dz)
+      CoefMG(l)%Ae=1._knd/(CoefMG(l)%dx*CoefMG(l)%dx)
+      CoefMG(l)%Aw=1._knd/(CoefMG(l)%dx*CoefMG(l)%dx)
+      CoefMG(l)%At=1._knd/(CoefMG(l)%dz*CoefMG(l)%dz)
+      CoefMG(l)%Ab=1._knd/(CoefMG(l)%dz*CoefMG(l)%dz)
      enddo
      called=1
     endif

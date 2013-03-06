@@ -16,8 +16,8 @@ module SolidBodies
 
   type, extends(TBody) :: TSolidBody
     logical   :: rough = .false.                             !T rough surface, F flat surface
-    real(KND) :: z0 = 0                                      !roughness parameter
-    real(KND) :: temperatureflux = 0
+    real(knd) :: z0 = 0                                      !roughness parameter
+    real(knd) :: temperatureflux = 0
   end type TSolidbody
 
   type(TList) :: SolidBodiesList
@@ -101,7 +101,7 @@ contains
             do k = 0,Unz+1
              do j = 0,Uny+1
                do i = 0,Unx+1
-                  if (CurrentSB%Inside(xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._KND/3)/1000))&
+                  if (CurrentSB%Inside(xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
                            Utype(i,j,k) = CurrentSB%numofbody
                enddo
               enddo
@@ -120,7 +120,7 @@ contains
             do k = 0,Vnz+1
              do j = 0,Vny+1
               do i = 0,Vnx+1
-                 if (CurrentSB%Inside(xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._KND/3)/1000))&
+                 if (CurrentSB%Inside(xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
                            Vtype(i,j,k) = CurrentSB%numofbody
               enddo
              enddo
@@ -139,7 +139,7 @@ contains
             do k = 0,Wnz+1
              do j = 0,Wny+1
               do i = 0,Wnx+1
-                 if (CurrentSB%Inside(xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._KND/3)/1000))&
+                 if (CurrentSB%Inside(xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
                            Wtype(i,j,k) = CurrentSB%numofbody
               enddo
              enddo

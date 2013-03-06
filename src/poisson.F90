@@ -21,16 +21,16 @@ contains
 
 
   subroutine PR_CORRECT(U,V,W,Pr,Q,coef)                       !Pressure correction
-    real(KND),dimension(-2:,-2:,-2:),intent(inout)    :: U,V,W !Phi is computed in Poisson eq. with div of U in RHS
-    real(KND),dimension(1:,1:,1:),intent(inout)       :: Pr    !Depend ing on active projection method Phi becomes new pressure
-    real(KND),dimension(:,:,:),allocatable,intent(in) :: Q     !or is added to last pressure
-    real(KND),intent(in) :: coef
+    real(knd),dimension(-2:,-2:,-2:),intent(inout)    :: U,V,W !Phi is computed in Poisson eq. with div of U in RHS
+    real(knd),dimension(1:,1:,1:),intent(inout)       :: Pr    !Depend ing on active projection method Phi becomes new pressure
+    real(knd),dimension(:,:,:),allocatable,intent(in) :: Q     !or is added to last pressure
+    real(knd),intent(in) :: coef
                                                            !U,V,W velocity field for correction
-    real(KND),save,allocatable :: Phi(:,:,:), RHS(:,:,:)   !Pr pressure
+    real(knd),save,allocatable :: Phi(:,:,:), RHS(:,:,:)   !Pr pressure
                                                            !coef cofficient from Runge Kutta, Q mass sources from immersed boundary
     real(TIM) dt2,dt3                                      !RHS right hand side of eq. with divergence of U
                                                            !Phi computed pseudopressure, saved as first guess for next time
-    real(KND) :: divergence,uncompatibility
+    real(knd) :: divergence,uncompatibility
     character(70) :: str
     integer,save :: called = 0
     integer(DBL), save :: trate
@@ -147,7 +147,7 @@ contains
 
 #ifdef __HMPP
   subroutine GetPrFromGPU(Pr)
-    real(KND),dimension(1:,1:,1:),intent(in) :: Pr
+    real(knd),dimension(1:,1:,1:),intent(in) :: Pr
     !$hmpp <tsteps> delegatedstore, args[PostPoisson::Pr]
   end subroutine GetPrFromGPU
 #endif
@@ -157,14 +157,14 @@ contains
 
 
   subroutine PrePoisson(U,V,W,Q,RHS,dt2,uncompatibility,divergence)
-    real(KND),intent(inout) :: U(-2:,-2:,-2:)
-    real(KND),intent(inout) :: V(-2:,-2:,-2:)
-    real(KND),intent(inout) :: W(-2:,-2:,-2:)
-    real(KND),intent(out)   :: RHS(0:,0:,0:)
-    real(KND),allocatable,intent(in) :: Q(:,:,:)
-    real(KND),intent(out)   :: uncompatibility,divergence
-    real(KND),intent(in)    :: dt2
-    real(KND) :: S,S2
+    real(knd),intent(inout) :: U(-2:,-2:,-2:)
+    real(knd),intent(inout) :: V(-2:,-2:,-2:)
+    real(knd),intent(inout) :: W(-2:,-2:,-2:)
+    real(knd),intent(out)   :: RHS(0:,0:,0:)
+    real(knd),allocatable,intent(in) :: Q(:,:,:)
+    real(knd),intent(out)   :: uncompatibility,divergence
+    real(knd),intent(in)    :: dt2
+    real(knd) :: S,S2
     integer   :: i,j,k
 
     !$omp parallel
@@ -243,13 +243,13 @@ contains
 
 
   subroutine PostPoisson(U,V,W,Pr,Phi,dt2,dt3)
-    real(KND),intent(inout) :: U(-2:,-2:,-2:)
-    real(KND),intent(inout) :: V(-2:,-2:,-2:)
-    real(KND),intent(inout) :: W(-2:,-2:,-2:)
-    real(KND),intent(inout) :: Pr(1:,1:,1:)
-    real(KND),intent(inout) :: Phi(0:,0:,0:)
-    real(KND),intent(in)    :: dt2,dt3
-    real(KND) :: Phiref,Au,Av,Aw,dxmin2,dymin2,dzmin2
+    real(knd),intent(inout) :: U(-2:,-2:,-2:)
+    real(knd),intent(inout) :: V(-2:,-2:,-2:)
+    real(knd),intent(inout) :: W(-2:,-2:,-2:)
+    real(knd),intent(inout) :: Pr(1:,1:,1:)
+    real(knd),intent(inout) :: Phi(0:,0:,0:)
+    real(knd),intent(in)    :: dt2,dt3
+    real(knd) :: Phiref,Au,Av,Aw,dxmin2,dymin2,dzmin2
     integer   :: i,j,k
 
 
@@ -366,8 +366,8 @@ contains
 #else
     type(PoisFFT_Solver3D_SP),save :: Solver
 #endif
-    real(KND),dimension(0:,0:,0:),intent(inout) :: Phi
-    real(KND),dimension(0:,0:,0:),intent(in) :: RHS
+    real(knd),dimension(0:,0:,0:),intent(inout) :: Phi
+    real(knd),dimension(0:,0:,0:),intent(in) :: RHS
     integer i
     logical, save :: called = .false.
     integer bounds(6)
@@ -403,12 +403,12 @@ contains
 
   subroutine POISSSOR(Phi,RHS)        !Solves Poisson equation using Successive over-relaxation
 
-  real(KND),dimension(0:,0:,0:),intent(inout) :: Phi
-  real(KND),dimension(0:,0:,0:),intent(in) :: RHS
+  real(knd),dimension(0:,0:,0:),intent(inout) :: Phi
+  real(knd),dimension(0:,0:,0:),intent(in) :: RHS
   integer,save :: called=0
   integer nx,ny,nz,i,j,k,l,blockit
-  real(KND) S,P,Ap
-  real(KND),dimension(:),allocatable,save :: Aw,Ae,As,An,Ab,At
+  real(knd) S,P,Ap
+  real(knd),dimension(:),allocatable,save :: Aw,Ae,As,An,Ab,At
 
 
    write (*,*) "Computing Poisson equation"
@@ -421,22 +421,22 @@ contains
        allocate(As(1:ny),An(1:ny))
        allocate(Ab(1:nz),At(1:nz))
        forall(i=1:nx)
-        Ae(i)=1._KND/(dxU(i)*dxPr(i))
-        Aw(i)=1._KND/(dxU(i-1)*dxPr(i))
+        Ae(i)=1._knd/(dxU(i)*dxPr(i))
+        Aw(i)=1._knd/(dxU(i-1)*dxPr(i))
        end forall
        forall(j=1:ny)
-        An(j)=1._KND/(dyV(j)*dyPr(j))
-        As(j)=1._KND/(dyV(j-1)*dyPr(j))
+        An(j)=1._knd/(dyV(j)*dyPr(j))
+        As(j)=1._knd/(dyV(j-1)*dyPr(j))
        end forall
        forall(k=1:nz)
-        At(k)=1._KND/(dzW(k)*dzPr(k))
-        Ab(k)=1._KND/(dzW(k-1)*dzPr(k))
+        At(k)=1._knd/(dzW(k)*dzPr(k))
+        Ab(k)=1._knd/(dzW(k-1)*dzPr(k))
        end forall
        called=1
    end if
 
     l=0
-    S=huge(1.0_KND)
+    S=huge(1.0_knd)
         do while (l<=maxPoissoniter.and.S>epsPoisson)
           l=l+1
           S=0

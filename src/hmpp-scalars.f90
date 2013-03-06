@@ -15,13 +15,13 @@ module HMPP_SCALARS
 !                             Temperature2,Temperature,U,V,W,coef,dt,SubsidenceProfile,fluxProfile)
 !
 !       integer,intent(in)         :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
-!       real(KND),intent(out)      :: Temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-!       real(KND),intent(in)       :: Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-!       real(KND),intent(in)       :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-!       real(KND),intent(in)       :: dxmin,dymin,dzmin,coef,dt,limparam
-!       real(KND),intent(in)       :: SubsidenceProfile(0:)
-!       real(KND),intent(out)      :: fluxProfile(0:)
-!       real(KND),allocatable,save :: SubsidenceProfileLoc(:),fluxProfileLoc(:)
+!       real(knd),intent(out)      :: Temperature2(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+!       real(knd),intent(in)       :: Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+!       real(knd),intent(in)       :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
+!       real(knd),intent(in)       :: dxmin,dymin,dzmin,coef,dt,limparam
+!       real(knd),intent(in)       :: SubsidenceProfile(0:)
+!       real(knd),intent(out)      :: fluxProfile(0:)
+!       real(knd),allocatable,save :: SubsidenceProfileLoc(:),fluxProfileLoc(:)
 !       integer,save :: called = 0
 !
 !       if (called==0) then
@@ -64,14 +64,14 @@ module HMPP_SCALARS
 !                               coef,dt)
 !
 !       integer,intent(in)    :: Prnx,Prny,Prnz,maxCNiter,TBtype(6)
-!       real(KND),intent(out),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: Temperature2
-!       real(KND),intent(in),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)  :: Temperature
-!       real(KND),intent(in)  :: dxmin,dymin,dzmin,epsCN,Re,coef,dt
-!       real(KND),intent(in)  :: sideTemp(6),Tempin(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-!       real(KND),intent(in),dimension(-1:,-1:) :: BsideTArr,BsideTFLArr
-!       real(KND),dimension(:,:),allocatable,save :: BsideTArrLoc,BsideTFLArrLoc
+!       real(knd),intent(out),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: Temperature2
+!       real(knd),intent(in),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)  :: Temperature
+!       real(knd),intent(in)  :: dxmin,dymin,dzmin,epsCN,Re,coef,dt
+!       real(knd),intent(in)  :: sideTemp(6),Tempin(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+!       real(knd),intent(in),dimension(-1:,-1:) :: BsideTArr,BsideTFLArr
+!       real(knd),dimension(:,:),allocatable,save :: BsideTArrLoc,BsideTFLArrLoc
 !       integer   :: l
-!       real(KND) :: res
+!       real(knd) :: res
 !       integer,save :: called = 0
 !
 !
@@ -116,22 +116,22 @@ module HMPP_SCALARS
                             SubsidenceProfile,fluxProfile,dt,RKstage,alpha,beta,rho)
 
       integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,maxCNiter,TBtype(6),RKstage
-      real(KND),intent(inout) :: Temperature2(-1:,-1:,-1:)  !Only to avoid allocation of an automatic array, memory transfers to codelet should be avoided. Assuming we do not have to save main memory.
-      real(KND),intent(inout) :: Temperature(-1:,-1:,-1:)
-      real(KND),intent(inout) :: Temperature_adv(-1:,-1:,-1:)
-      real(KND),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-      real(KND),intent(in)    :: dxmin,dymin,dzmin,epsCN,Re,limparam,dt
-      real(KND),intent(in)    :: sideTemp(6),Tempin(-1:,-1:),TDiff(-1:,-1:,-1:)
-      real(KND),intent(in)    :: BsideTArr(-1:,-1:),BsideTFLArr(-1:,-1:)
-      real(KND),intent(in)    :: SubsidenceProfile(0:)
-      real(KND),intent(out)   :: fluxProfile(0:)
-      real(KND),intent(in)    :: alpha(3),beta(3),rho(3)
+      real(knd),intent(inout) :: Temperature2(-1:,-1:,-1:)  !Only to avoid allocation of an automatic array, memory transfers to codelet should be avoided. Assuming we do not have to save main memory.
+      real(knd),intent(inout) :: Temperature(-1:,-1:,-1:)
+      real(knd),intent(inout) :: Temperature_adv(-1:,-1:,-1:)
+      real(knd),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+      real(knd),intent(in)    :: dxmin,dymin,dzmin,epsCN,Re,limparam,dt
+      real(knd),intent(in)    :: sideTemp(6),Tempin(-1:,-1:),TDiff(-1:,-1:,-1:)
+      real(knd),intent(in)    :: BsideTArr(-1:,-1:),BsideTFLArr(-1:,-1:)
+      real(knd),intent(in)    :: SubsidenceProfile(0:)
+      real(knd),intent(out)   :: fluxProfile(0:)
+      real(knd),intent(in)    :: alpha(3),beta(3),rho(3)
 
       integer   :: CNiters
-      real(KND) :: CNres
+      real(knd) :: CNres
 
-      real(KND),allocatable,save :: SubsidenceProfileLoc(:),fluxProfileLoc(:)
-      real(KND),allocatable,save :: BsideTArrLoc(:,:),BsideTFLArrLoc(:,:)
+      real(knd),allocatable,save :: SubsidenceProfileLoc(:),fluxProfileLoc(:)
+      real(knd),allocatable,save :: BsideTArrLoc(:,:),BsideTFLArrLoc(:,:)
       integer,save               :: called = 0
 
       if (called==0) then
@@ -199,7 +199,7 @@ module HMPP_SCALARS
 
 
   subroutine GetTemperatureFromGPU(Temperature)
-    real(KND),intent(inout) :: Temperature(-1:,-1:,-1:)
+    real(knd),intent(inout) :: Temperature(-1:,-1:,-1:)
     !$hmpp <tsteps> delegatedstore, args[RKstage_Temperature::Temperature]
   end subroutine GetTemperatureFromGPU
 

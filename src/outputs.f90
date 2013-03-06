@@ -17,46 +17,46 @@ module Outputs
          Tprobe, TOutputSwitches, TDisplaySwitches, SetFrameDomain, proftempfl,&
          StaggeredFrameDomains
 
-  real(KND),dimension(:),allocatable :: profuavg,profuavg2,profvavg,profvavg2,profuuavg,profvvavg,profwwavg,&
+  real(knd),dimension(:),allocatable :: profuavg,profuavg2,profvavg,profvavg2,profuuavg,profvvavg,profwwavg,&
                                          profU,profV,profuu,profvv,profww,proftauavg,proftau,proftausgs,proftausgsavg,&
                                          proftemp,proftempfl,proftempavg,proftempavg2,proftempflavg,&
                                          proftempflsgs,proftempflsgsavg,proftt,profttavg,&
                                          profuw,profuwavg,profuwsgs,profuwsgsavg,&
                                          profvw,profvwavg,profvwsgs,profvwsgsavg
 
-  real(KND),dimension(:,:),allocatable ::profscal,profscalfl,profscalavg,profscalavg2,profscalflavg,&  !which scalar, height
+  real(knd),dimension(:,:),allocatable ::profscal,profscalfl,profscalavg,profscalavg2,profscalflavg,&  !which scalar, height
                                          profscalflsgs,profscalflsgsavg,profss,profssavg
 
-  real(KND),allocatable :: Uavg(:,:,:),Vavg(:,:,:),Wavg(:,:,:)
-  real(KND),allocatable :: Pravg(:,:,:)
-  real(KND),allocatable :: Temperatureavg(:,:,:)
-  real(KND),allocatable :: Scalaravg(:,:,:,:)
+  real(knd),allocatable :: Uavg(:,:,:),Vavg(:,:,:),Wavg(:,:,:)
+  real(knd),allocatable :: Pravg(:,:,:)
+  real(knd),allocatable :: Temperatureavg(:,:,:)
+  real(knd),allocatable :: Scalaravg(:,:,:,:)
 
   real(TIM),allocatable,dimension(:) :: times                                !times of the timesteps
 
-  real(KND),allocatable,dimension(:) :: CDtime,CLtime,deltime,tke,dissip
+  real(knd),allocatable,dimension(:) :: CDtime,CLtime,deltime,tke,dissip
 
-  real(KND),allocatable,dimension(:,:) :: ustar,tstar                        !first index differentiates flux from friction number
+  real(knd),allocatable,dimension(:,:) :: ustar,tstar                        !first index differentiates flux from friction number
                                                                              !second index is time
 
-  real(KND),allocatable,dimension(:,:) :: Utime,Vtime,Wtime,Prtime,temptime  !position, time
+  real(knd),allocatable,dimension(:,:) :: Utime,Vtime,Wtime,Prtime,temptime  !position, time
 
-  real(KND),allocatable,dimension(:,:,:) :: scalptime                        !which scalar, position, time
-  real(KND),allocatable,dimension(:,:) :: scalsumtime                        !which scalar, time
+  real(knd),allocatable,dimension(:,:,:) :: scalptime                        !which scalar, position, time
+  real(knd),allocatable,dimension(:,:) :: scalsumtime                        !which scalar, time
 
   integer :: NumProbes                        !number of probes in space to collect timed data
 
   type TProbe
     integer :: Ui,Uj,Uk,Vi,Vj,Vk,Wi,Wj,Wk    !grid coordinates of probes in the U,V,W grids
     integer :: i,j,k                         !grid coordinates of probes in the scalar grid
-    real(KND) :: x,y,z                       !physical coordinates of probes
+    real(knd) :: x,y,z                       !physical coordinates of probes
   end type TProbe
 
   type(TProbe),allocatable,dimension(:),save :: probes
 
   type TFrameDomain
     integer   :: dimension,direction
-    real(KND) :: position
+    real(knd) :: position
     integer   :: mini, maxi, minj, maxj, mink, maxk
   endtype TFrameDomain
 
@@ -164,7 +164,7 @@ contains
       Pravg = 0
     endif
 
-    if (buoyancy==1.and.store%avg_T>0) then
+    if (enable_buoyancy==1.and.store%avg_T>0) then
      allocate(temperatureavg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
      temperatureavg = 0
     endif
@@ -174,31 +174,31 @@ contains
 
    if (NumProbes>0) then
      allocate(Utime(NumProbes,0:nt),Vtime(NumProbes,0:nt),Wtime(NumProbes,0:nt),Prtime(NumProbes,0:nt))
-     times = huge(1.0_KND)
-     Utime = huge(1.0_KND)
-     Vtime = huge(1.0_KND)
-     Wtime = huge(1.0_KND)
-     Prtime = huge(1.0_KND)
+     times = huge(1.0_knd)
+     Utime = huge(1.0_knd)
+     Vtime = huge(1.0_knd)
+     Wtime = huge(1.0_knd)
+     Prtime = huge(1.0_knd)
    endif
 
-   if (NumProbes>0.and.buoyancy==1) then
+   if (NumProbes>0.and.enable_buoyancy==1) then
     allocate(temptime(NumProbes,0:nt))
-    temptime = huge(1.0_KND)
+    temptime = huge(1.0_knd)
    endif
 
    if (store%deltime>0) then
      allocate(deltime(0:nt))
-     deltime = huge(1.0_KND)
+     deltime = huge(1.0_knd)
    endif
 
    if (store%tke>0) then
      allocate(tke(0:nt))
-     tke = huge(1.0_KND)
+     tke = huge(1.0_knd)
    endif
 
    if (store%deltime>0) then
      allocate(dissip(0:nt))
-     dissip = huge(1.0_KND)
+     dissip = huge(1.0_knd)
      dissip(0)=0
    endif
 
@@ -207,7 +207,7 @@ contains
      ustar = huge(1.0)
    endif
 
-   if (wallmodeltype>0.and.buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.(display%tstar>0.or.store%tstar>0)) then
+   if (wallmodeltype>0.and.enable_buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.(display%tstar>0.or.store%tstar>0)) then
      allocate(tstar(2,0:nt))
      tstar = huge(1.0)
    endif
@@ -215,12 +215,12 @@ contains
    if (computescalars>0) then
      if (store%scalsumtime>0) then
        allocate(scalsumtime(1:computescalars,0:nt))
-       scalsumtime = huge(1.0_KND)
+       scalsumtime = huge(1.0_knd)
      endif
 
      if (NumProbes>0) then
        allocate(scalptime(1:computescalars,1:NumProbes,0:nt))
-       scalptime = huge(1.0_KND)
+       scalptime = huge(1.0_knd)
     endif
    endif
 
@@ -315,14 +315,14 @@ contains
 
 
   subroutine OutTStep(U,V,W,Pr,Temperature,Scalar,delta)
-    real(KND),dimension(-2:,-2:,-2:),intent(in)   :: U,V,W
-    real(KND),dimension(1:,1:,1:),intent(in)      :: Pr
-    real(KND),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
-    real(KND),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
-    real(KND),intent(in) :: delta
+    real(knd),dimension(-2:,-2:,-2:),intent(in)   :: U,V,W
+    real(knd),dimension(1:,1:,1:),intent(in)      :: Pr
+    real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
+    real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
+    real(knd),intent(in) :: delta
 
     integer :: l,i,j,k
-    real(KND) :: S,S2
+    real(knd) :: S,S2
     integer, save :: fnum = 0
 
     times(step)=time
@@ -378,7 +378,7 @@ contains
                             Pr(probes(k)%i,min(probes(k)%j+1,Vny+1),min(probes(k)%k+1,Wnz+1)),&
                             Pr(min(probes(k)%i+1,Unx+1),min(probes(k)%j+1,Vny+1),min(probes(k)%k+1,Wnz+1)))
 
-      if (buoyancy>0) then
+      if (enable_buoyancy>0) then
         temptime(k,step)=Trilinint((probes(k)%x-xPr(probes(k)%i))/(xPr(probes(k)%i+1)-xPr(probes(k)%i)),&
                            (probes(k)%y-yPr(probes(k)%j))/(yPr(probes(k)%j+1)-yPr(probes(k)%j)),&
                            (probes(k)%z-zPr(probes(k)%k))/(zPr(probes(k)%k+1)-zPr(probes(k)%k)),&
@@ -448,7 +448,7 @@ contains
         Pravg = Pravg+Pr(1:Prnx,1:Prny,1:Prnz)*dt/(timeavg2-timeavg1)
       endif
 
-      if (buoyancy==1.and.store%avg_T>0) then
+      if (enable_buoyancy==1.and.store%avg_T>0) then
         temperatureavg = temperatureavg+temperature*dt/(timeavg2-timeavg1)
       endif
 
@@ -478,7 +478,7 @@ contains
    endif
 
 
-    if (wallmodeltype>0.and.buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.(display%tstar>0.or.store%tstar>0)) then
+    if (wallmodeltype>0.and.enable_buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.(display%tstar>0.or.store%tstar>0)) then
      S2 = SUM(BsideTFLArr(1:Prnx,1:Prny))/(Prnx*Prny)
      S=-S*S2
 
@@ -495,9 +495,9 @@ contains
     if (store%BLprofiles>0) then
       if ((averaging==1).and.((time>=timeavg1).and.(time<=timeavg2))) then
 
-       if (buoyancy>0.and.computescalars>0) then
+       if (enable_buoyancy>0.and.computescalars>0) then
          call BLProfiles(U,V,W,temperature,scalar)
-       elseif (buoyancy>0) then
+       elseif (enable_buoyancy>0) then
          call BLProfiles(U,V,W,temperature = temperature)
        elseif (computescalars>0) then
          call BLProfiles(U,V,W,scalar = scalar)
@@ -515,7 +515,7 @@ contains
        profvvavg = profvvavg+profvv*dt/(timeavg2-timeavg1)
        profwwavg = profwwavg+profww*dt/(timeavg2-timeavg1)
 
-       if (buoyancy>0) then
+       if (enable_buoyancy>0) then
          proftempavg = proftempavg+proftemp*dt/(timeavg2-timeavg1)
          proftempflavg = proftempflavg+proftempfl*dt/(timeavg2-timeavg1)
          proftempflsgsavg = proftempflsgsavg+proftempflsgs*dt/(timeavg2-timeavg1)
@@ -558,7 +558,7 @@ contains
 
   subroutine OutputProfiles
     character(2) :: prob
-    real(KND) :: S,S2,nom,denom
+    real(knd) :: S,S2,nom,denom
     integer :: i,j,k,unit
 
     do k = 1,NumProbes
@@ -591,7 +591,7 @@ contains
       enddo
       close(unit)
 
-      if (buoyancy==1) then
+      if (enable_buoyancy==1) then
         open(unit,file="temptimep"//prob//".txt")
         do j = 0,endstep
          write (unit,*) times(j),temptime(k,j)
@@ -641,7 +641,7 @@ contains
       close(unit)
     endif
 
-    if (wallmodeltype>0.and.buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.store%tstar>0) then
+    if (wallmodeltype>0.and.enable_buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.store%tstar>0) then
       open(unit,file="tflux.txt")
       do j = 0,endstep
        write (unit,*) times(j),tstar(:,j)
@@ -711,7 +711,7 @@ contains
        enddo
        close(unit)
 
-       if (buoyancy>0) then
+       if (enable_buoyancy>0) then
 
           open(unit,file="proftemp.txt")
           do k = 1,Prnz
@@ -751,8 +751,8 @@ contains
              S2 = 0
              do j = 1,Prny
               do i = 1,Prnx
-               S = S+(Uavg(i,j,k+1)+Uavg(i-1,j,k+1)-Uavg(i,j,k-1)-Uavg(i-1,j,k-1))/(2._KND*(zPr(k+1)-zPr(k-1)))
-               S2 = S2+(Vavg(i,j,k+1)+Vavg(i,j-1,k+1)-Vavg(i,j,k-1)-Vavg(i,j-1,k-1))/(2._KND*(zPr(k+1)-zPr(k-1)))
+               S = S+(Uavg(i,j,k+1)+Uavg(i-1,j,k+1)-Uavg(i,j,k-1)-Uavg(i-1,j,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
+               S2 = S2+(Vavg(i,j,k+1)+Vavg(i,j-1,k+1)-Vavg(i,j,k-1)-Vavg(i,j-1,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
               enddo
              enddo
 
@@ -761,10 +761,10 @@ contains
              nom=(grav_acc/temperature_ref)*(proftempflavg(k)+proftempflsgsavg(k))
              denom=((profuwavg(k)+profuwsgsavg(k))*S+(profvwavg(k)+profvwsgsavg(k))*S2)
 
-             if (abs(denom)>1E-5_KND*abs(nom)) then
+             if (abs(denom)>1E-5_knd*abs(nom)) then
                S = nom/denom
              else
-               S = 100000._KND*sign(1.0_KND,nom)*sign(1.0_KND,denom)
+               S = 100000._knd*sign(1.0_knd,nom)*sign(1.0_knd,denom)
              endif
 
              write (unit,*) zPr(k),S
@@ -772,7 +772,7 @@ contains
             close(unit)
           endif !allocated avgs
 
-       endif !buoyancy>0
+       endif !enable_buoyancy>0
 
 
        if (computescalars>0) then
@@ -808,12 +808,12 @@ contains
 
 
   subroutine OutputOut(U,V,W,Pr,Temperature)
-    real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-    real(KND),dimension(1:,1:,1:),intent(in) :: Pr
-    real(KND),intent(in) :: Temperature(-1:,-1:,:)
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),dimension(1:,1:,1:),intent(in) :: Pr
+    real(knd),intent(in) :: Temperature(-1:,-1:,:)
     character(70) :: str
     integer i,j,k,unit
-    real(KND),allocatable :: tmp(:,:,:,:)
+    real(knd),allocatable :: tmp(:,:,:,:)
 
     if (store%out>0) then
 
@@ -854,7 +854,7 @@ contains
          write (unit) lf
        endif
 
-       if (buoyancy>0.and.store%out_T>0) then
+       if (enable_buoyancy>0.and.store%out_T>0) then
          write (unit) "SCALARS temperature float",lf
          write (unit) "LOOKUP_TABLE default",lf
 
@@ -936,9 +936,9 @@ contains
          do k = 1,Prnz
           do j = 1,Prny
            do i = 1,Prnx
-             tmp(1:3,i,j,k) = [ BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._KND, real32)), &
-                                BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._KND, real32)), &
-                                BigEnd(real((W(i,j,k)+W(i,j,k-1))/2._KND, real32)) ]
+             tmp(1:3,i,j,k) = [ BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._knd, real32)), &
+                                BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._knd, real32)), &
+                                BigEnd(real((W(i,j,k)+W(i,j,k-1))/2._knd, real32)) ]
            enddo
           enddo
          enddo
@@ -980,9 +980,9 @@ contains
 
 
   subroutine OutputScalars(Scalar)
-    real(KND),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
+    real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
     character(70) :: str
-    real(KND),dimension(:,:,:),allocatable :: depos
+    real(knd),dimension(:,:,:),allocatable :: depos
     character(8) ::  scalname="scalar00"
     integer :: l,unit
 
@@ -1089,14 +1089,14 @@ contains
 
 
   subroutine OutputAvg(U,V,W,Pr,Temperature,Scalar)
-    real(KND),dimension(-2:,-2:,-2:),intent(in)   :: U,V,W
-    real(KND),dimension(1:,1:,1:),intent(in)      :: Pr
-    real(KND),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
-    real(KND),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
+    real(knd),dimension(-2:,-2:,-2:),intent(in)   :: U,V,W
+    real(knd),dimension(1:,1:,1:),intent(in)      :: Pr
+    real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
+    real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
     character(70) :: str
     character(8) ::  scalname="scalar00"
     integer i,j,k,l,unit
-    real(KND),allocatable :: tmp(:,:,:,:)
+    real(knd),allocatable :: tmp(:,:,:,:)
 
     if (averaging==1.and.store%avg>0) then
         allocate(tmp(1:3,1:Prnx,1:Prny,1:Prnz))
@@ -1147,7 +1147,7 @@ contains
           write (unit) lf
         endif
 
-        if (buoyancy>0.and.store%avg_T>0) then
+        if (enable_buoyancy>0.and.store%avg_T>0) then
           write (unit) "SCALARS temperature float",lf
           write (unit) "LOOKUP_TABLE default",lf
 
@@ -1162,9 +1162,9 @@ contains
           do k = 1,Prnz
            do j = 1,Prny
             do i = 1,Prnx
-              tmp(:,i,j,k) = [ BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._KND, real32)), &
-                               BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._KND, real32)), &
-                               BigEnd(real((W(i,j,k)+W(i,j,k-1))/2._KND, real32)) ]
+              tmp(:,i,j,k) = [ BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._knd, real32)), &
+                               BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._knd, real32)), &
+                               BigEnd(real((W(i,j,k)+W(i,j,k-1))/2._knd, real32)) ]
             enddo
            enddo
           enddo
@@ -1245,7 +1245,7 @@ contains
 
 
   subroutine OutputUVW(U,V,W)
-    real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
     character(70) :: str
     integer i,unit
 
@@ -1472,10 +1472,10 @@ contains
 
 
   subroutine Output(U,V,W,Pr,Temperature,Scalar)
-    real(KND),dimension(-2:,-2:,-2:),intent(inout) :: U,V,W
-    real(KND),intent(inout) :: Pr(1:,1:,1:)
-    real(KND),intent(in) :: Temperature(-1:,-1:,:)
-    real(KND),intent(in) :: Scalar(-1:,-1:,-1:,:)
+    real(knd),dimension(-2:,-2:,-2:),intent(inout) :: U,V,W
+    real(knd),intent(inout) :: Pr(1:,1:,1:)
+    real(knd),intent(in) :: Temperature(-1:,-1:,:)
+    real(knd),intent(in) :: Scalar(-1:,-1:,-1:,:)
     integer i
 
     call BoundU(1,U)
@@ -1502,18 +1502,18 @@ contains
   end subroutine Output
 
 
-  pure real(KND) function ScalarVerticalFlux(i,j,k,Scal,W)
+  pure real(knd) function ScalarVerticalFlux(i,j,k,Scal,W)
     integer, intent(in)   :: i,j,k
-    real(KND), intent(in) :: Scal(-1:,-1:,-1:), W(-2:,-2:,-2:)
+    real(knd), intent(in) :: Scal(-1:,-1:,-1:), W(-2:,-2:,-2:)
 
     ScalarVerticalFlux = Scal(i,j,k) * (W(i,j,k)+W(i,j,k-1))/2 + &
                        TDiff(i,j,k) * (Scal(i,j,k+1)-Scal(i,j,k-1)) / (zW(k+1)-zW(k-1))
   end function ScalarVerticalFlux
 
   pure function Vorticity(i,j,k,U,V,W)
-    real(KND), dimension(3) :: Vorticity
+    real(knd), dimension(3) :: Vorticity
     integer, intent(in)     :: i,j,k
-    real(KND),dimension(-2:,-2:,-2:), intent(in) :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:), intent(in) :: U,V,W
 
     Vorticity = (/         (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                               -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
@@ -1542,7 +1542,7 @@ contains
           if (domain%direction==1) then
 
             call Gridcoords(domain%mini, domain%minj, domain%mink, domain%position, &
-                            (yV(Prny+1)+yV(0))/2._KND, (zW(Prnz+1)+zW(0))/2._KND )
+                            (yV(Prny+1)+yV(0))/2._knd, (zW(Prnz+1)+zW(0))/2._knd )
 
             domain%maxi = domain%mini
             domain%minj = 1
@@ -1552,8 +1552,8 @@ contains
 
           elseif (domain%direction==2) then
 
-            call Gridcoords(domain%mini, domain%minj, domain%mink, (xU(Prnx+1)+xU(0))/2._KND, &
-                            domain%position, (zW(Prnz+1)+zW(0))/2._KND )
+            call Gridcoords(domain%mini, domain%minj, domain%mink, (xU(Prnx+1)+xU(0))/2._knd, &
+                            domain%position, (zW(Prnz+1)+zW(0))/2._knd )
 
             domain%maxj = domain%minj
             domain%mini = 1
@@ -1563,8 +1563,8 @@ contains
 
           else
 
-            call Gridcoords(domain%mini, domain%minj, domain%mink, (xU(Prnx+1)+xU(0))/2._KND, &
-                            (yV(Prny+1)+yV(0))/2._KND, domain%position )
+            call Gridcoords(domain%mini, domain%minj, domain%mink, (xU(Prnx+1)+xU(0))/2._knd, &
+                            (yV(Prny+1)+yV(0))/2._knd, domain%position )
 
             domain%maxk = domain%mink
             domain%mini = 1
@@ -1581,9 +1581,9 @@ contains
 
 
   subroutine Frame(U,V,W,Pr,Temperature,Scalar,n)
-    real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-    real(KND),intent(in) :: Temperature(-1:,-1:,:)
-    real(KND),intent(in) :: Scalar(-1:,-1:,-1:,:)
+    real(knd),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+    real(knd),intent(in) :: Temperature(-1:,-1:,:)
+    real(knd),intent(in) :: Scalar(-1:,-1:,-1:,:)
     integer,intent(in)   :: n
     integer i,j,k,l,m
     character(20) :: fname,fnumber
@@ -1592,13 +1592,13 @@ contains
     character(8) ::  scalname="scalar00"
     integer mini,maxi,minj,maxj,mink,maxk
     integer unit
-    real(KND),allocatable :: buffer(:,:,:),vbuffer(:,:,:,:)
+    real(knd),allocatable :: buffer(:,:,:),vbuffer(:,:,:,:)
 
     fsuffix=".vtk"
 
 
     !$omp parallel do default(private) shared(n,store,time,fsuffix,xPr,yPr,zPr,Prtype,Pr,U,V,W,&
-    !$omp                      scalar,temperature,buoyancy,computescalars,dxmin,dymin,dzmin,temperature_ref)
+    !$omp                      scalar,temperature,enable_buoyancy,computescalars,dxmin,dymin,dzmin,temperature_ref)
     do m = 1,size(store%frame_domains)
 
       fname="frame-"//achar(iachar('a')+m-1)//"-"
@@ -1722,7 +1722,7 @@ contains
       endif
 
       if (store%frame_T>0) then
-       if (buoyancy>0) then
+       if (enable_buoyancy>0) then
           write (unit) "SCALARS temperature float",lf
           write (unit) "LOOKUP_TABLE default",lf
           do k = mink,maxk
@@ -1743,7 +1743,7 @@ contains
         endif
       endif
 
-      if (buoyancy==1.and.store%frame_tempfl>0) then
+      if (enable_buoyancy==1.and.store%frame_tempfl>0) then
         write (unit) "SCALARS tempfl float", lf
         write (unit) "LOOKUP_TABLE default", lf
 
@@ -1860,11 +1860,11 @@ contains
 
 
   subroutine BLProfiles(U,V,W,temperature,scalar)
-    real(KND),dimension(-2:,-2:,-2:) :: U,V,W
-    real(KND),dimension(-1:,-1:,-1:),optional:: temperature
-    real(KND),dimension(-1:,-1:,-1:,1:),optional:: scalar
-    real(KND) :: S
-    real(KND),allocatable,save ::fp(:),ht(:),gp(:)
+    real(knd),dimension(-2:,-2:,-2:) :: U,V,W
+    real(knd),dimension(-1:,-1:,-1:),optional:: temperature
+    real(knd),dimension(-1:,-1:,-1:,1:),optional:: scalar
+    real(knd) :: S
+    real(knd),allocatable,save ::fp(:),ht(:),gp(:)
     integer   :: i,j,k,l,n
     integer,save :: called = 0
 
@@ -1989,7 +1989,7 @@ contains
       do j = 1,Uny
        do i = 1,Unx
          if (Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0) then
-           S = S-0.25_KND*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)
+           S = S-0.25_knd*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)
            n = n+1
          endif
        enddo
@@ -2005,7 +2005,7 @@ contains
       do j = 1,Vny
        do i = 1,Vnx
          if (Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0) then
-           S = S-0.25_KND*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)
+           S = S-0.25_knd*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)
            n = n+1
          endif
        enddo
@@ -2090,7 +2090,7 @@ contains
         do j = 1,Prny
          do i = 1,Prnx
            if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-             S = S-(0.5_KND*(TDiff(i,j,k+1)+TDiff(i,j,k))*(temperature(i,j,k+1)-temperature(i,j,k)))/dzW(k)
+             S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(temperature(i,j,k+1)-temperature(i,j,k)))/dzW(k)
              n = n+1
            endif
          enddo
@@ -2112,7 +2112,7 @@ contains
           do j = 1,Prny
            do i = 1,Prnx
              if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-              S = S+0.5_KND*(scalar(i,j,k+1,l)+scalar(i,j,k,l))*(W(i,j,k))
+              S = S+0.5_knd*(scalar(i,j,k+1,l)+scalar(i,j,k,l))*(W(i,j,k))
               n = n+1
              endif
            enddo
@@ -2144,7 +2144,7 @@ contains
           do j = 1,Prny
            do i = 1,Prnx
              if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-               S = S-(0.5_KND*(TDiff(i,j,k+1)+TDiff(i,j,k))*(scalar(i,j,k+1,l)-scalar(i,j,k,l)))/dzW(k)
+               S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(scalar(i,j,k+1,l)-scalar(i,j,k,l)))/dzW(k)
                n = n+1
              endif
            enddo
@@ -2161,11 +2161,11 @@ contains
 
 
   function TotKE(U,V,W) result(res)
-    real(KND) :: res
-    real(KND),dimension(-2:,-2:,-2:) :: U,V,W
-    real(KND) Um,Vm,Wm
+    real(knd) :: res
+    real(knd),dimension(-2:,-2:,-2:) :: U,V,W
+    real(knd) Um,Vm,Wm
     integer i,j,k
-    real(KND) lx,ly,lz
+    real(knd) lx,ly,lz
 
     lx = xU(Prnx) - xU(0)
     ly = yV(Prny) - yV(0)
@@ -2179,9 +2179,9 @@ contains
     do k = 1,Prnz
      do j = 1,Prny
       do i = 1,Prnx
-       res = res + (((U(i-1,j,k)+U(i,j,k))/2._KND-Um)**2+&
-                       ((V(i,j-1,k)+V(i,j,k))/2._KND-Vm)**2+&
-                       ((W(i,j,k-1)+W(i,j,k))/2._KND-Wm)**2)
+       res = res + (((U(i-1,j,k)+U(i,j,k))/2._knd-Um)**2+&
+                       ((V(i,j-1,k)+V(i,j,k))/2._knd-Vm)**2+&
+                       ((W(i,j,k-1)+W(i,j,k))/2._knd-Wm)**2)
       enddo
      enddo
     enddo
@@ -2189,18 +2189,18 @@ contains
     res = res*lx*ly*lz/2
   end function TotKE
 
-  pure real(KND) function VorticityMag(i,j,k,U,V,W) result(res)
+  pure real(knd) function VorticityMag(i,j,k,U,V,W) result(res)
     integer,intent(in) :: i,j,k
-    real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
 
     res = sum(Vorticity(i,j,k,U,V,W)**2)
     res = Sqrt(res)
   end function VorticityMag
 
 
-  pure real(KND) function Lambda2(i,j,k,U,V,W) result(res)
+  pure real(knd) function Lambda2(i,j,k,U,V,W) result(res)
     integer,intent(in) :: i,j,k
-    real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
 
     res = ((U(i,j,k)-U(i-1,j,k))/dxmin)**2
     res = res + ((V(i,j,k)-V(i,j-1,k))/dymin)**2
@@ -2218,7 +2218,7 @@ contains
 
 
   subroutine OutputU2(U,V,W)
-    real(KND),dimension(-2:,-2:,-2:) :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:) :: U,V,W
     integer unit
     character(70) :: str
 
@@ -2329,8 +2329,8 @@ contains
 
   subroutine OUTINLET(U,V,W,Temperature)
     !for output of 2d data for use as an inilet condition later
-    real(KND),dimension(-2:,-2:,-2:) :: U,V,W
-    real(KND),dimension(-1:,-1:,-1:) :: Temperature
+    real(knd),dimension(-2:,-2:,-2:) :: U,V,W
+    real(knd),dimension(-1:,-1:,-1:) :: Temperature
     integer,save ::fnum
     integer,save :: called = 0
 
@@ -2357,13 +2357,13 @@ contains
 
 
   subroutine OUTINLETFrame(U,V,W,Temperature,n)
-    real(KND),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(KND),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
+    real(knd),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
     integer n
     character(12) :: fname
     integer mini,maxi,minj,maxj,mink,maxk,unit
 
-    call Gridcoords(mini,minj,mink,store%frame_domains(1)%position,(yV(Prny+1)+yV(0))/2._KND,(zW(Prnz+1)+zW(0))/2._KND)
+    call Gridcoords(mini,minj,mink,store%frame_domains(1)%position,(yV(Prny+1)+yV(0))/2._knd,(zW(Prnz+1)+zW(0))/2._knd)
     maxi = mini
     minj = 1
     maxj = Prny
@@ -2384,7 +2384,7 @@ contains
     write(unit) U(mini,1:Uny,1:Unz)
     write(unit) V(mini,1:Vny,1:Vnz)
     write(unit) W(mini,1:Wny,1:Wnz)
-    if (buoyancy>0) then
+    if (enable_buoyancy>0) then
          write(unit) Temperature(mini,1:Prny,1:Prnz)
     endif
     close(unit)
@@ -2393,8 +2393,8 @@ contains
 
 
 
-  pure real(KND) function TriLinInt(a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111)
-  real(KND),intent(in) :: a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111
+  pure real(knd) function TriLinInt(a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111)
+  real(knd),intent(in) :: a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111
 
     TriLinInt=   (1-a)*(1-b)*(1-c)*vel000+&
                  a*(1-b)*(1-c)*vel100+&

@@ -1,6 +1,6 @@
 module Limiters
 
- use Parameters, only : KND
+ use Parameters, only : knd
  
  implicit none
 
@@ -9,17 +9,17 @@ module Limiters
   
   integer,parameter:: minmodlim=1,extminmodlim=2,gammalim=3,vanalbadalim=4,vanleerlim=5,superbeelim=6
   integer,save   :: limitertype
-  real(KND),save :: limparam
+  real(knd),save :: limparam
 
  contains
 
-  elemental real(KND) function FluxLimiter(r)
-    real(KND),intent(in):: r
-    real(KND) K
+  elemental real(knd) function FluxLimiter(r)
+    real(knd),intent(in):: r
+    real(knd) K
 
-    K=(1+2._KND*r)/3._KND  !assuming kappa=1/3 scheme (Koren, 1993; Hundsdorfer, 1994)
+    K=(1+2._knd*r)/3._knd  !assuming kappa=1/3 scheme (Koren, 1993; Hundsdorfer, 1994)
     if (limparam>0) then
-     FluxLimiter=max(0._KND,min(2._KND*r,min(limparam,K)))
+     FluxLimiter=max(0._knd,min(2._knd*r,min(limparam,K)))
     elseif (limparam<0) then
      FluxLimiter=K
     else
@@ -28,17 +28,17 @@ module Limiters
   endfunction FluxLimiter
 
 
-  elemental real(KND) function Limiter(a,b,c)
-    real(KND),intent(in):: a,b
-    real(KND),intent(in),optional:: c
-    real(KND) R
-    real(KND),parameter:: epsil=0.00001_KND
+  elemental real(knd) function Limiter(a,b,c)
+    real(knd),intent(in):: a,b
+    real(knd),intent(in),optional:: c
+    real(knd) R
+    real(knd),parameter:: epsil=0.00001_knd
 
     if (limitertype==minmodlim) then
      Limiter=MinMod(a,b)
     elseif (limitertype==extminmodlim) then
      if (.not.present(c)) then
-       Limiter=MinMod(limparam*a,limparam*b,(a+b)/2._KND)
+       Limiter=MinMod(limparam*a,limparam*b,(a+b)/2._knd)
      else
        Limiter=MinMod(limparam*a,limparam*b,c)
      endif
@@ -73,42 +73,42 @@ module Limiters
     elseif (limitertype==0) then
      Limiter=0
     else
-     Limiter=(a+b)/2._KND
+     Limiter=(a+b)/2._knd
     endif
   endfunction Limiter
 
-  elemental real(KND) function Heaviside(x)
-    real(KND),intent(in):: x
-    Heaviside=(1._KND+SIGN(1._KND,x))/2._KND
+  elemental real(knd) function Heaviside(x)
+    real(knd),intent(in):: x
+    Heaviside=(1._knd+SIGN(1._knd,x))/2._knd
   endfunction Heaviside
 
-  elemental real(KND) function GAMMAL(R)
-    real(KND),intent(in):: R
+  elemental real(knd) function GAMMAL(R)
+    real(knd),intent(in):: R
     GAMMAL=((1-limparam)/limparam)*R*(Heaviside(R) - Heaviside(r-(limparam/(1-limparam)))) + Heaviside(r-(limparam/(1-limparam)))
   endfunction GAMMAL
 
-  elemental real(KND) function VanAlbada(R)
-    real(KND),intent(in):: R
+  elemental real(knd) function VanAlbada(R)
+    real(knd),intent(in):: R
     VanAlbada=(R+R*R)/(1+R*R)
   endfunction VanAlbada
 
-  elemental real(KND) function VanLeer(R)
-    real(KND),intent(in):: R
+  elemental real(knd) function VanLeer(R)
+    real(knd),intent(in):: R
     VanLeer=(R+abs(R))/(1+abs(R))
   endfunction VanLeer
 
-  elemental real(KND) function SuperBee(R)
-    real(KND),intent(in):: R
-    SuperBee=MAX(0._KND,MAX(MIN(2*R,1._KND),MIN(R,2._KND)))
+  elemental real(knd) function SuperBee(R)
+    real(knd),intent(in):: R
+    SuperBee=MAX(0._knd,MAX(MIN(2*R,1._knd),MIN(R,2._knd)))
   endfunction SuperBee
 
-  elemental real(KND) function MinMod(a,b,c)
-    real(KND),intent(in):: a,b
-    real(KND),intent(in),optional:: c
+  elemental real(knd) function MinMod(a,b,c)
+    real(knd),intent(in):: a,b
+    real(knd),intent(in),optional:: c
 
     if (.not. present(c)) then
 
-     MinMod=(SIGN(1._KND,a)+SIGN(1._KND,b))*MIN(ABS(a),ABS(b))/2._KND
+     MinMod=(SIGN(1._knd,a)+SIGN(1._knd,b))*MIN(ABS(a),ABS(b))/2._knd
 
     else
 

@@ -9,11 +9,11 @@ module MULTIGRID
  public POISSMG, SetMGParams
 
   type TMGArr
-    real(KND),allocatable,dimension(:,:,:):: Arr
+    real(knd),allocatable,dimension(:,:,:):: Arr
   endtype
 
   type TCoefs
-   real(KND) dx,dy,dz,Aw,Ae,As,An,Ab,At
+   real(knd) dx,dy,dz,Aw,Ae,As,An,Ab,At
    integer nx,ny,nz
   endtype
 
@@ -29,10 +29,10 @@ module MULTIGRID
   integer mgnpre
   integer mgnpost
   integer mgmaxinnerGSiter
-  real(KND) mgepsinnerGS
+  real(knd) mgepsinnerGS
 
   integer,dimension(0:8) :: nxa,nya,nza
-  real(KND),dimension(0:8) :: Aw,Ae,As,An,Ab,At
+  real(knd),dimension(0:8) :: Aw,Ae,As,An,Ab,At
 
 contains
 
@@ -41,7 +41,7 @@ contains
                            lmgncgc, lmgnpre, lmgnpost, lmgmaxinnerGSiter, lmgepsinnerGS)
 
    integer,intent(in)::   llmg, lminmglevel, lmingpulevel, lbnx, lbny, lbnz, lmgncgc, lmgnpre, lmgnpost, lmgmaxinnerGSiter
-   real(KND),intent(in):: lmgepsinnerGS
+   real(knd),intent(in):: lmgepsinnerGS
 
    lmg=llmg
    minmglevel=lminmglevel
@@ -58,10 +58,10 @@ contains
 
   subroutine Prolongate(AFine,ACoarse,level)
     integer,intent(in):: level
-    real(KND),dimension(-1:,-1:,-1:),intent(in):: ACoarse
-    real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
+    real(knd),dimension(-1:,-1:,-1:),intent(in):: ACoarse
+    real(knd),dimension(-1:,-1:,-1:),intent(inout):: AFine
     integer:: i,j,k,ii,jj,kk,nx,ny,nz
-    real(KND),dimension(-1:1,-1:1,-1:1),save:: Cf
+    real(knd),dimension(-1:1,-1:1,-1:1),save:: Cf
     integer,save:: called=0
 
 
@@ -85,13 +85,13 @@ contains
          do jj=-1,1
           do ii=-1,1
            if (ii==0.and.jj==0.and.kk==0) then
-               Cf(ii,jj,kk)=1._KND
+               Cf(ii,jj,kk)=1._knd
            else if (abs(ii)+abs(jj)+abs(kk)==1) then
-               Cf(ii,jj,kk)=1/2._KND
+               Cf(ii,jj,kk)=1/2._knd
            else if (abs(ii)+abs(jj)+abs(kk)==2) then
-               Cf(ii,jj,kk)=1/4._KND
+               Cf(ii,jj,kk)=1/4._knd
            else
-               Cf(ii,jj,kk)=1/8._KND
+               Cf(ii,jj,kk)=1/8._knd
            end if
           enddo
          enddo
@@ -126,11 +126,11 @@ contains
 
   subroutine Restrict(ACoarse,AFine,level)
     integer,intent(in):: level
-    real(KND),dimension(-1:,-1:,-1:),intent(out):: ACoarse
-    real(KND),dimension(-1:,-1:,-1:),intent(inout):: AFine
-    real(KND) p,S,w
+    real(knd),dimension(-1:,-1:,-1:),intent(out):: ACoarse
+    real(knd),dimension(-1:,-1:,-1:),intent(inout):: AFine
+    real(knd) p,S,w
     integer:: i,j,k,ii,jj,kk,nx,ny,nz
-    real(KND) :: weight(-1:1,-1:1,-1:1)
+    real(knd) :: weight(-1:1,-1:1,-1:1)
 
 
     nx=bnx*2**level !level means on which grid we restrict
@@ -150,12 +150,12 @@ contains
     else
 #endif
        weight = 1
-       weight(-1,:,:) = weight(-1,:,:) / 2._KND
-       weight( 1,:,:) = weight( 1,:,:) / 2._KND
-       weight(:,-1,:) = weight(:,-1,:) / 2._KND
-       weight(:, 1,:) = weight(:, 1,:) / 2._KND
-       weight(:,:,-1) = weight(:,:,-1) / 2._KND
-       weight(:,:, 1) = weight(:,:, 1) / 2._KND
+       weight(-1,:,:) = weight(-1,:,:) / 2._knd
+       weight( 1,:,:) = weight( 1,:,:) / 2._knd
+       weight(:,-1,:) = weight(:,-1,:) / 2._knd
+       weight(:, 1,:) = weight(:, 1,:) / 2._knd
+       weight(:,:,-1) = weight(:,:,-1) / 2._knd
+       weight(:,:, 1) = weight(:,:, 1) / 2._knd
 
        call Bound_Phi_MG(Afine,2*nx,2*ny,2*nz)
 
@@ -198,7 +198,7 @@ contains
 
 
   pure subroutine BOUND_Phi_MG(Phi,nx,ny,nz)
-    real(KND),intent(inout):: Phi(-1:,-1:,-1:)
+    real(knd),intent(inout):: Phi(-1:,-1:,-1:)
     integer,intent(in):: nx,ny,nz
     integer i,j,k
 
@@ -304,9 +304,9 @@ contains
     integer,intent(in)::level
     integer i,j,k,l,info
     integer,allocatable,dimension(:),save:: ige,ipivot,work2
-    real(KND),allocatable,dimension(:),save:: xge,bge,work,R,C,ferr,berr
-    real(KND),allocatable,dimension(:,:),save:: age,af
-    real(KND) Ap,rcond
+    real(knd),allocatable,dimension(:),save:: xge,bge,work,R,C,ferr,berr
+    real(knd),allocatable,dimension(:,:),save:: age,af
+    real(knd) Ap,rcond
     integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
     character(1),save:: equed
 
@@ -483,9 +483,9 @@ contains
     integer,intent(in)::level
     integer i,j,k,l,info
     integer,allocatable,dimension(:),save:: ige,ipivot,work2
-    real(KND),allocatable,dimension(:),save:: xge,bge,work,R,C,ferr,berr
-    real(KND),allocatable,dimension(:,:),save:: age,af
-    real(KND) Ap,rcond
+    real(knd),allocatable,dimension(:),save:: xge,bge,work,R,C,ferr,berr
+    real(knd),allocatable,dimension(:,:),save:: age,af
+    real(knd) Ap,rcond
     integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
     character(1),save:: equed
 
@@ -662,9 +662,9 @@ contains
     integer,intent(in)::level
     integer i,j,k,l,info,ldwork
     integer,allocatable,dimension(:):: ipivot
-    real(KND),allocatable,dimension(:),save:: xge,bge,work
-    real(KND),allocatable,dimension(:,:),save:: age
-    real(KND) Ap
+    real(knd),allocatable,dimension(:),save:: xge,bge,work
+    real(knd),allocatable,dimension(:,:),save:: age
+    real(knd) Ap
     integer,save:: nx,ny,nz,nulx,nuly,nulz,nxyz,called=0
 
     if (called==0) then
@@ -810,7 +810,7 @@ contains
 
        xge=0
        do j=1,nxyz !rows of X{j}
-        do i=1,nxyz !columns of A(i,j) if (age(i,j)>100*tiny(1._KND))
+        do i=1,nxyz !columns of A(i,j) if (age(i,j)>100*tiny(1._knd))
          xge(i)=xge(i)+age(i,j)*bge(j)
         enddo
        enddo
@@ -848,7 +848,7 @@ contains
   subroutine MG_GS(level,niter)
     integer,intent(in)::level,niter
     integer i,j,k,l
-    real(KND) p,Ap
+    real(knd) p,Ap
 
 #ifdef __HMPP
     if (GPU>0.and.level>=minGPUlevel) then!.and.level>3
@@ -988,9 +988,9 @@ contains
 
   subroutine MG_res(level,R)
     integer,intent(in)::level
-    real(KND),intent(out)::R
+    real(knd),intent(out)::R
     integer i,j,k
-    real(KND),save:: p,Ap
+    real(knd),save:: p,Ap
 
 #ifdef __HMPP
     if (GPU>0.and.level>=minGPUlevel) then!.and.level>3
@@ -1098,9 +1098,9 @@ contains
 
   recursive subroutine MG_CGC(level,eps,ncgc,npre,npost,R)
     integer,intent(in):: level,ncgc,npre,npost
-    real(KND),intent(in):: eps
-    real(KND),intent(out):: R
-    real(KND) R1
+    real(knd),intent(in):: eps
+    real(knd),intent(out):: R
+    real(knd) R1
     integer k
 
     if (level==minGPUlevel-1) then
@@ -1146,7 +1146,7 @@ contains
 
    !        write (*,*) "GSres",R
           if (R < mgepsinnerGS) exit
-          if (R1<R*1.05_KND) exit
+          if (R1<R*1.05_knd) exit
           R1=R
         enddo
        endif
@@ -1197,11 +1197,11 @@ contains
 
 
     subroutine POISSMG(Phi,RHS)        !Solves Poisson equation using Successive over-relaxation
-    real(KND),dimension(0:,0:,0:),intent(inout):: Phi
-    real(KND),dimension(1:,1:,1:),intent(in)::RHS
+    real(knd),dimension(0:,0:,0:),intent(inout):: Phi
+    real(knd),dimension(1:,1:,1:),intent(in)::RHS
     integer i,j,k,l,nx,ny,nz,sx,sy,sz
-    real(KND) mgeps,R,Phiref
-    real(KND),save:: called=0
+    real(knd) mgeps,R,Phiref
+    real(knd),save:: called=0
 
     mgeps=epsPoisson
     Phi=0
@@ -1243,12 +1243,12 @@ contains
        allocate(PhiMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%ny+1,-1:CoefMG(l)%nz+1))
        allocate(RHSMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%ny+1,-1:CoefMG(l)%nz+1))
        allocate(ResMG(l)%Arr(-1:CoefMG(l)%nx+1,-1:CoefMG(l)%ny+1,-1:CoefMG(l)%nz+1))
-       CoefMG(l)%Ae=1._KND/(CoefMG(l)%dx*CoefMG(l)%dx)
-       CoefMG(l)%Aw=1._KND/(CoefMG(l)%dx*CoefMG(l)%dx)
-       CoefMG(l)%An=1._KND/(CoefMG(l)%dy*CoefMG(l)%dy)
-       CoefMG(l)%As=1._KND/(CoefMG(l)%dy*CoefMG(l)%dy)
-       CoefMG(l)%At=1._KND/(CoefMG(l)%dz*CoefMG(l)%dz)
-       CoefMG(l)%Ab=1._KND/(CoefMG(l)%dz*CoefMG(l)%dz)
+       CoefMG(l)%Ae=1._knd/(CoefMG(l)%dx*CoefMG(l)%dx)
+       CoefMG(l)%Aw=1._knd/(CoefMG(l)%dx*CoefMG(l)%dx)
+       CoefMG(l)%An=1._knd/(CoefMG(l)%dy*CoefMG(l)%dy)
+       CoefMG(l)%As=1._knd/(CoefMG(l)%dy*CoefMG(l)%dy)
+       CoefMG(l)%At=1._knd/(CoefMG(l)%dz*CoefMG(l)%dz)
+       CoefMG(l)%Ab=1._knd/(CoefMG(l)%dz*CoefMG(l)%dz)
       endif
      enddo
      called=1
@@ -1439,15 +1439,15 @@ contains
 #include "hmpp-include.f90"
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
-  real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0
-  real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1
-  real(KND),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Phi2
-  real(KND),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Phi3
-  real(KND),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Phi4
-  real(KND),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Phi5
-  real(KND),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6
-  real(KND),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7
-  real(KND),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Phi8
+  real(knd),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0
+  real(knd),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1
+  real(knd),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Phi2
+  real(knd),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Phi3
+  real(knd),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Phi4
+  real(knd),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Phi5
+  real(knd),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6
+  real(knd),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7
+  real(knd),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Phi8
   integer,intent(in) :: Btype(6),level
   integer :: nxl, nyl, nzl
 
@@ -1481,9 +1481,9 @@ contains
 #include "hmpp-include.f90"
 
   integer,intent(in):: nx,ny,nz,Btype(6)
-  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in):: ACoarse
-  real(KND),dimension(-1:2*nx+1,-1:2*ny+1,-1:2*nz+1),intent(inout):: AFine
-  real(KND),dimension(-1:1,-1:1,-1:1):: Cf
+  real(knd),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in):: ACoarse
+  real(knd),dimension(-1:2*nx+1,-1:2*ny+1,-1:2*nz+1),intent(inout):: AFine
+  real(knd),dimension(-1:1,-1:1,-1:1):: Cf
   integer:: i,j,k,ii,jj,kk
   intrinsic abs
 
@@ -1491,13 +1491,13 @@ contains
      do jj=-1,1
       do ii=-1,1
        if (ii==0.and.jj==0.and.kk==0) then
-           Cf(ii,jj,kk)=1._KND
+           Cf(ii,jj,kk)=1._knd
        else if (abs(ii)+abs(jj)+abs(kk)==1) then
-           Cf(ii,jj,kk)=1/2._KND
+           Cf(ii,jj,kk)=1/2._knd
        else if (abs(ii)+abs(jj)+abs(kk)==2) then
-           Cf(ii,jj,kk)=1/4._KND
+           Cf(ii,jj,kk)=1/4._knd
        else
-           Cf(ii,jj,kk)=1/8._KND
+           Cf(ii,jj,kk)=1/8._knd
        end if
       enddo
      enddo
@@ -1618,15 +1618,15 @@ contains
 #include "hmpp-include.f90"
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
-  real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Res0,RHS0
-  real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Res1,RHS1
-  real(KND),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Res2,RHS2
-  real(KND),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Res3,RHS3
-  real(KND),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Res4,RHS4
-  real(KND),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Res5,RHS5
-  real(KND),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Res6,RHS6
-  real(KND),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Res7,RHS7
-  real(KND),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Res8,RHS8
+  real(knd),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Res0,RHS0
+  real(knd),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Res1,RHS1
+  real(knd),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Res2,RHS2
+  real(knd),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Res3,RHS3
+  real(knd),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Res4,RHS4
+  real(knd),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Res5,RHS5
+  real(knd),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Res6,RHS6
+  real(knd),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Res7,RHS7
+  real(knd),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Res8,RHS8
   integer,intent(in) :: Btype(6),level
   integer :: nxl, nyl, nzl
 
@@ -1661,9 +1661,9 @@ contains
 #include "hmpp-include.f90"
 
   integer,intent(in):: nx,ny,nz,Btype(6)
-  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out):: ACoarse
-  real(KND),dimension(-1:2*nx+1,-1:2*ny+1,-1:2*nz+1),intent(inout):: AFine
-  real(KND) q
+  real(knd),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out):: ACoarse
+  real(knd),dimension(-1:2*nx+1,-1:2*ny+1,-1:2*nz+1),intent(inout):: AFine
+  real(knd) q
   integer:: i,j,k
 
 
@@ -1900,17 +1900,17 @@ contains
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
   integer,intent(in) :: nit
-  real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,RHS0
-  real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1,RHS1
-  real(KND),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Phi2,RHS2
-  real(KND),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Phi3,RHS3
-  real(KND),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Phi4,RHS4
-  real(KND),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Phi5,RHS5
-  real(KND),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6,RHS6
-  real(KND),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7,RHS7
-  real(KND),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Phi8,RHS8
+  real(knd),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,RHS0
+  real(knd),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1,RHS1
+  real(knd),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Phi2,RHS2
+  real(knd),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Phi3,RHS3
+  real(knd),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Phi4,RHS4
+  real(knd),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Phi5,RHS5
+  real(knd),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6,RHS6
+  real(knd),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7,RHS7
+  real(knd),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Phi8,RHS8
   integer,intent(in) :: level
-  real(KND),dimension(0:8),intent(in) :: Aw,Ae,As,An,Ab,At
+  real(knd),dimension(0:8),intent(in) :: Aw,Ae,As,An,Ab,At
   integer,intent(in)   :: Btype(6)
   integer :: nxl, nyl, nzl
 
@@ -1976,11 +1976,11 @@ contains
 #include "hmpp-include.f90"
 
   integer,intent(in)   :: nx,ny,nz,nit,Btype(6)
-  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::Phi
-  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::RHS
-  real(KND),intent(in) :: Aw,Ae,As,An,Ab,At
+  real(knd),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::Phi
+  real(knd),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(inout)::RHS
+  real(knd),intent(in) :: Aw,Ae,As,An,Ab,At
   integer i,j,k,l
-  real(KND) :: p,Ap
+  real(knd) :: p,Ap
   intrinsic mod
 
     do l=1,nit
@@ -2110,19 +2110,19 @@ contains
 #include "hmpp-include.f90"
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
-  real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,Res0,RHS0
-  real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1,Res1,RHS1
-  real(KND),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Phi2,Res2,RHS2
-  real(KND),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Phi3,Res3,RHS3
-  real(KND),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Phi4,Res4,RHS4
-  real(KND),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Phi5,Res5,RHS5
-  real(KND),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6,Res6,RHS6
-  real(KND),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7,Res7,RHS7
-  real(KND),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Phi8,Res8,RHS8
+  real(knd),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,Res0,RHS0
+  real(knd),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1,Res1,RHS1
+  real(knd),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Phi2,Res2,RHS2
+  real(knd),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Phi3,Res3,RHS3
+  real(knd),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Phi4,Res4,RHS4
+  real(knd),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Phi5,Res5,RHS5
+  real(knd),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6,Res6,RHS6
+  real(knd),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7,Res7,RHS7
+  real(knd),dimension(-1:nx(8)+1,-1:ny(8)+1,-1:nz(8)+1),intent(inout)::Phi8,Res8,RHS8
   integer,intent(in) :: level
-  real(KND),dimension(0:8),intent(in) :: Aw,Ae,As,An,Ab,At
+  real(knd),dimension(0:8),intent(in) :: Aw,Ae,As,An,Ab,At
   integer,intent(in)   :: Btype(6)
-  real(KND),intent(out) :: R
+  real(knd),intent(out) :: R
   integer :: nxl, nyl, nzl
 
    nxl=nx(level)
@@ -2191,13 +2191,13 @@ contains
 #include "hmpp-include.f90"
 
   integer,intent(in)   :: nx,ny,nz,Btype(6)
-  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::Phi
-  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
-  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
-  real(KND),intent(in) :: Aw,Ae,As,An,Ab,At
-  real(KND),intent(out) :: R
+  real(knd),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::Phi
+  real(knd),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
+  real(knd),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(in)::RHS
+  real(knd),intent(in) :: Aw,Ae,As,An,Ab,At
+  real(knd),intent(out) :: R
   integer i,j,k,l
-  real(KND) :: p,Ap
+  real(knd) :: p,Ap
   intrinsic max, abs
 
     !$hmppcg grid blocksize 512x1
@@ -2281,14 +2281,14 @@ contains
 #include "hmpp-include.f90"
 
   integer,intent(in),dimension(0:8) :: nx,ny,nz
-  real(KND),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,Res0,RHS0
-  real(KND),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1,Res1,RHS1
-  real(KND),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Phi2,Res2,RHS2
-  real(KND),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Phi3,Res3,RHS3
-  real(KND),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Phi4,Res4,RHS4
-  real(KND),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Phi5,Res5,RHS5
-  real(KND),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6,Res6,RHS6
-  real(KND),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7,Res7,RHS7
+  real(knd),dimension(-1:nx(0)+1,-1:ny(0)+1,-1:nz(0)+1),intent(inout)::Phi0,Res0,RHS0
+  real(knd),dimension(-1:nx(1)+1,-1:ny(1)+1,-1:nz(1)+1),intent(inout)::Phi1,Res1,RHS1
+  real(knd),dimension(-1:nx(2)+1,-1:ny(2)+1,-1:nz(2)+1),intent(inout)::Phi2,Res2,RHS2
+  real(knd),dimension(-1:nx(3)+1,-1:ny(3)+1,-1:nz(3)+1),intent(inout)::Phi3,Res3,RHS3
+  real(knd),dimension(-1:nx(4)+1,-1:ny(4)+1,-1:nz(4)+1),intent(inout)::Phi4,Res4,RHS4
+  real(knd),dimension(-1:nx(5)+1,-1:ny(5)+1,-1:nz(5)+1),intent(inout)::Phi5,Res5,RHS5
+  real(knd),dimension(-1:nx(6)+1,-1:ny(6)+1,-1:nz(6)+1),intent(inout)::Phi6,Res6,RHS6
+  real(knd),dimension(-1:nx(7)+1,-1:ny(7)+1,-1:nz(7)+1),intent(inout)::Phi7,Res7,RHS7
   integer,intent(in) :: level,minmglevel
   integer :: l
   integer :: nxl, nyl, nzl
@@ -2330,9 +2330,9 @@ contains
 #include "hmpp-include.f90"
 
   integer,intent(in) :: nx,ny,nz
-  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Phi
-  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
-  real(KND),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::RHS
+  real(knd),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Phi
+  real(knd),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::Res
+  real(knd),dimension(-1:nx+1,-1:ny+1,-1:nz+1),intent(out)::RHS
   integer :: i,j,k
 
      !$hmppcg permute (k,i,j)

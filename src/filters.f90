@@ -10,7 +10,7 @@ module Filters
 
   integer filtertype
 
-  real(KND), parameter :: filter_ratios(0:1) = [ 1.0_KND, 2._KND]
+  real(knd), parameter :: filter_ratios(0:1) = [ 1.0_knd, 2._knd]
 
  
   contains
@@ -19,16 +19,16 @@ module Filters
     subroutine Filter3ord(U,Utype,dir)
       !3D filter with 3 vanishing moments width 2 delta x
       !Vasilyev, Lund, Moin, 1998, http://dx.doi.org/10.1006/jcph.1998.6060
-      real(KND),dimension(-2:,-2:,-2:),intent(inout)  :: U
+      real(knd),dimension(-2:,-2:,-2:),intent(inout)  :: U
       integer,dimension(-2:,-2:,-2:),intent(inout)  :: Utype
       integer,intent(in) :: dir
-      real(KND),parameter :: w(-3:3) = (/ -1._KND/32, 0._KND, 9._KND/32, 1._KND/2, 9._KND/32, 0._KND, -1._KND/32 /)
-      real(KND) S,q
+      real(knd),parameter :: w(-3:3) = (/ -1._knd/32, 0._knd, 9._knd/32, 1._knd/2, 9._knd/32, 0._knd, -1._knd/32 /)
+      real(knd) S,q
       integer i,j,k,ii,jj,kk
       integer mini,minj,mink
       integer maxi,maxj,maxk
 
-      real(KND) :: tmp(-2:ubound(U,dir))
+      real(knd) :: tmp(-2:ubound(U,dir))
       
       mini = lbound(U,1)+3
       maxi = ubound(U,1)-3
@@ -109,7 +109,7 @@ module Filters
 
 
     subroutine Filter(U,Utype)    !Calls a selected filter  U2 <- filt(U1)
-      real(KND),dimension(:,:,:),intent(inout) :: U
+      real(knd),dimension(:,:,:),intent(inout) :: U
       integer,dimension(-2:,-2:,-2:),intent(inout)  :: Utype
 
       if (filtertype==1) then

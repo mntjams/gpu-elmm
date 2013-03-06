@@ -3,8 +3,8 @@
 #include "hmpp-include.f90"
 
   integer, intent(in) :: Prnx,Prny,Prnz,ScalBtype(6)
-  real(KND),intent(in) :: dxmin,dymin,dzmin,Re,sideScal(6),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-  real(KND),intent(inout) :: SCAL(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(knd),intent(in) :: dxmin,dymin,dzmin,Re,sideScal(6),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(knd),intent(inout) :: SCAL(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
   integer i,j,k,nx,ny,nz
 
    nx = Prnx
@@ -189,7 +189,7 @@
    else if (ScalBtype(Bo)==CONSTFLUX.or.ScalBtype(Bo)==DIRICHLET) then
     do j=-1,ny+2
      do i=-1,nx+2
-      SCAL(i,j,0) = SCAL(i,j,1)+sideScal(Bo)*dzmin/((TDiff(i,j,1)+TDiff(i,j,0))/(2._KND))
+      SCAL(i,j,0) = SCAL(i,j,1)+sideScal(Bo)*dzmin/((TDiff(i,j,1)+TDiff(i,j,0))/(2._knd))
       SCAL(i,j,-1) = SCAL(i,j,0)-(SCAL(i,j,1)-SCAL(i,j,0))
      enddo
     enddo
@@ -226,7 +226,7 @@
    else if (ScalBtype(To)==CONSTFLUX) then
     do j=-1,ny+2
      do i=-1,nx+2
-      SCAL(i,j,nz+1) = SCAL(i,j,nz)-sideScal(To)*dzmin/((TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2._KND))
+      SCAL(i,j,nz+1) = SCAL(i,j,nz)-sideScal(To)*dzmin/((TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2._knd))
       SCAL(i,j,nz+2) = SCAL(i,j,nz+1)-(SCAL(i,j,nz)-SCAL(i,j,nz+1))
      enddo
     enddo
@@ -252,9 +252,9 @@
 #include "hmpp-include.f90"
 
   integer, intent(in) :: Prnx,Prny,Prnz,TBtype(6)
-  real(KND),intent(in) :: Re,dxmin,dymin,dzmin,sideTemp(6),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),TempIn(-1:Prny+2,-1:Prnz+2)
-  real(KND),intent(in),dimension(-1:Prnx+2,-1:Prny+2) :: BsideTArr,BsideTFLArr
-  real(KND),intent(inout) :: Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(knd),intent(in) :: Re,dxmin,dymin,dzmin,sideTemp(6),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),TempIn(-1:Prny+2,-1:Prnz+2)
+  real(knd),intent(in),dimension(-1:Prnx+2,-1:Prny+2) :: BsideTArr,BsideTFLArr
+  real(knd),intent(inout) :: Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
   integer i,j,k,nx,ny,nz
 
   intrinsic abs
@@ -434,10 +434,10 @@
    else if (TBtype(Bo)==CONSTFLUX.or.TBtype(Bo)==DIRICHLET) then
     do j=-1,ny+2
      do i=-1,nx+2
-      if (abs(BsideTFLArr(i,j))<=0.and.TDiff(i,j,1)<1.5_KND/(Re).and.TBtype(Bo)==DIRICHLET) then
+      if (abs(BsideTFLArr(i,j))<=0.and.TDiff(i,j,1)<1.5_knd/(Re).and.TBtype(Bo)==DIRICHLET) then
        Temperature(i,j,0) = BsideTArr(i,j)
       else
-       Temperature(i,j,0) = Temperature(i,j,1)+BsideTFLArr(i,j)*dzmin/((TDiff(i,j,1)+TDiff(i,j,0))/(2._KND))
+       Temperature(i,j,0) = Temperature(i,j,1)+BsideTFLArr(i,j)*dzmin/((TDiff(i,j,1)+TDiff(i,j,0))/(2._knd))
       endif
       Temperature(i,j,-1) = Temperature(i,j,0)-(Temperature(i,j,1)-Temperature(i,j,0))
      enddo
@@ -475,7 +475,7 @@
    else if (TBtype(To)==CONSTFLUX) then
     do j=-1,ny+2
      do i=-1,nx+2
-      Temperature(i,j,nz+1) = Temperature(i,j,nz)-sideTemp(To)*dzmin/((TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2._KND))
+      Temperature(i,j,nz+1) = Temperature(i,j,nz)-sideTemp(To)*dzmin/((TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2._knd))
       Temperature(i,j,nz+2) = Temperature(i,j,nz+1)-(Temperature(i,j,nz)-Temperature(i,j,nz+1))
      enddo
     enddo

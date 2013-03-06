@@ -16,7 +16,7 @@ implicit none
 
   elemental subroutine GridCoords(xi,yj,zk,x,y,z)
   integer,intent(out):: xi,yj,zk
-  real(KND),intent(in):: x,y,z
+  real(knd),intent(in):: x,y,z
   integer i
 
   xi=Prnx
@@ -45,7 +45,7 @@ implicit none
 
   elemental subroutine GridCoordsU(xi,yj,zk,x,y,z)
   integer,intent(out) :: xi,yj,zk
-  real(KND),intent(in) :: x,y,z
+  real(knd),intent(in) :: x,y,z
   integer i
 
   xi=Unx+1
@@ -75,7 +75,7 @@ implicit none
 
   elemental subroutine GridCoordsV(xi,yj,zk,x,y,z)
   integer,intent(out) :: xi,yj,zk
-  real(KND),intent(in) :: x,y,z
+  real(knd),intent(in) :: x,y,z
   integer i
 
   xi=Unx
@@ -105,7 +105,7 @@ implicit none
 
   elemental subroutine GridCoordsW(xi,yj,zk,x,y,z)
   integer,intent(out) :: xi,yj,zk
-  real(KND),intent(in) :: x,y,z
+  real(knd),intent(in) :: x,y,z
   integer i
 
   xi=Unx
@@ -137,7 +137,7 @@ implicit none
 
   recursive subroutine BoundU(component,U,reg)
   integer,intent(in)           :: component
-  real(KND),intent(inout)      :: U(-2:,-2:,-2:)
+  real(knd),intent(inout)      :: U(-2:,-2:,-2:)
   integer,optional,intent(in) :: reg
   integer regime,i,j,k,nx,ny,nz
   integer,parameter :: interm = 2
@@ -783,7 +783,7 @@ implicit none
 
 
   pure subroutine BOUND_Phi(Phi)
-  real(KND),intent(inout):: Phi(0:,0:,0:)
+  real(knd),intent(inout):: Phi(0:,0:,0:)
   integer i,j,k,nx,ny,nz
    nx=Prnx
    ny=Prny
@@ -876,7 +876,7 @@ implicit none
   end subroutine BOUND_Phi
 
   pure subroutine BOUND_Pr(Pr)
-  real(KND),intent(inout):: Pr(1:,1:,1:)
+  real(knd),intent(inout):: Pr(1:,1:,1:)
   integer i,j,k,nx,ny,nz
 
   nx=Prnx
@@ -930,7 +930,7 @@ implicit none
 
 
   pure subroutine BOUND_Q(Phi)
-  real(KND),intent(inout):: Phi(0:,0:,0:)
+  real(knd),intent(inout):: Phi(0:,0:,0:)
   integer i,j,k,nx,ny,nz
    nx=Prnx
    ny=Prny
@@ -1074,12 +1074,12 @@ implicit none
   endsubroutine CONSTINLET
 
   subroutine SHEARINLET(G)
-    real(KND) G
+    real(knd) G
     integer j,k
 
     do k=LBOUND(Uin,2),UBOUND(Uin,2)
      do j=LBOUND(Uin,1),UBOUND(Uin,1)
-       Uin(j,k)=G*(zPr(k)-((zW(Wnz+1)+zW(0))/2._KND))
+       Uin(j,k)=G*(zPr(k)-((zW(Wnz+1)+zW(0))/2._knd))
      enddo
     enddo
 
@@ -1090,13 +1090,13 @@ implicit none
 
   subroutine PARINLET
     integer j,k
-    real(KND) lz
+    real(knd) lz
 
     lz = zW(Prnz) - zW(0)
 
     do k=LBOUND(Uin,2),UBOUND(Uin,2)
      do j=LBOUND(Uin,1),UBOUND(Uin,1)
-       Uin(j,k)=1.5*Uinlet*(1-((lz/2._KND-(zPr(k)-zW(0)))/(lz/2._KND))**2)
+       Uin(j,k)=1.5*Uinlet*(1-((lz/2._knd-(zPr(k)-zW(0)))/(lz/2._knd))**2)
      enddo
     enddo
 

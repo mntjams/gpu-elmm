@@ -17,10 +17,10 @@ module CDS
 
 
     subroutine CDUdiv(U2,U,V,W)
-    real(KND) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer nx,ny,nz,i,j,k
-    real(KND) Ax,Ay,Az,Utmp
-    real(KND),allocatable,dimension(:),save:: fe,fp,gn,ht
+    real(knd) Ax,Ay,Az,Utmp
+    real(knd),allocatable,dimension(:),save:: fe,fp,gn,ht
     integer,save:: called=0
 
      nx=Unx
@@ -80,10 +80,10 @@ module CDS
 
 
     subroutine CDVdiv(V2,U,V,W)
-    real(KND) :: V2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd) :: V2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer nx,ny,nz,i,j,k
-    real(KND) Ax,Ay,Az,Vtmp
-    real(KND),allocatable,dimension(:),save:: gn,gp,fe,ht
+    real(knd) Ax,Ay,Az,Vtmp
+    real(knd),allocatable,dimension(:),save:: gn,gp,fe,ht
     integer,save:: called=0
 
 
@@ -143,10 +143,10 @@ module CDS
 
 
     subroutine CDWdiv(W2,U,V,W)
-    real(KND) :: W2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd) :: W2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer nx,ny,nz,i,j,k
-    real(KND) Ax,Ay,Az,Wtmp
-    real(KND),allocatable,dimension(:),save:: ht,hp,fe,gn
+    real(knd) Ax,Ay,Az,Wtmp
+    real(knd),allocatable,dimension(:),save:: ht,hp,fe,gn
     integer,save:: called=0
 
      nx=Wnx
@@ -211,9 +211,9 @@ module CDS
 
 
     subroutine CDUadv(U2,U,V,W)
-    real(KND) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer i,j,k
-    real(KND) Ax,Ay,Az,Vadv,Wadv
+    real(knd) Ax,Ay,Az,Vadv,Wadv
 
 
      if (gridtype==UNIFORMGRID) then
@@ -244,9 +244,9 @@ module CDS
 
 
     subroutine CDVadv(V2,U,V,W)
-    real(KND) :: V2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd) :: V2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer i,j,k
-    real(KND) Ax,Ay,Az,Uadv,Wadv
+    real(knd) Ax,Ay,Az,Uadv,Wadv
 
 
      if (gridtype==UNIFORMGRID) then
@@ -277,9 +277,9 @@ module CDS
 
 
     subroutine CDWadv(W2,U,V,W)
-    real(KND) :: W2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd) :: W2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer i,j,k
-    real(KND) Ax,Ay,Az,Uadv,Vadv
+    real(knd) Ax,Ay,Az,Uadv,Vadv
 
 
      if (gridtype==UNIFORMGRID) then
@@ -320,7 +320,7 @@ module CDS
 
 
     subroutine CDU(U2,U,V,W)
-    real(KND) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
 
      U2 = 0
      call CDUdiv(U2,U,V,W)
@@ -334,7 +334,7 @@ module CDS
 
 
     subroutine CDV(V2,U,V,W)
-    real(KND) :: V2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd) :: V2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
 
      V2 = 0
      call CDVdiv(V2,U,V,W)
@@ -348,7 +348,7 @@ module CDS
 
 
     subroutine CDW(W2,U,V,W)
-    real(KND) :: W2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd) :: W2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
 
      W2 = 0
      call CDWdiv(W2,U,V,W)
@@ -373,13 +373,13 @@ module CDS
 
 
     subroutine CDS4U(U2,U,V,W)
-      real(KND),dimension(-2:,-2:,-2:),intent(out) :: U2
-      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),intent(out) :: U2
+      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
       integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
       integer,parameter :: divcoef = 256
       integer,parameter :: mask2(2) = (/ 8, 8 /)
       integer   :: i,j,k,l
-      real(KND) :: flux
+      real(knd) :: flux
 
       !$omp parallel private(i,j,k,l,flux)
       !$omp workshare
@@ -463,13 +463,13 @@ module CDS
 
 
     subroutine CDS4V(V2,U,V,W)
-      real(KND),dimension(-2:,-2:,-2:),intent(out) :: V2
-      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),intent(out) :: V2
+      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
       integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
       integer,parameter :: divcoef = 256
       integer,parameter :: mask2(2) = (/ 8, 8 /)
       integer   :: i,j,k,l
-      real(KND) :: flux
+      real(knd) :: flux
 
       !$omp parallel private(i,j,k,l,flux)
       !$omp workshare
@@ -554,13 +554,13 @@ module CDS
 
 
     subroutine CDS4W(W2,U,V,W)
-      real(KND),dimension(-2:,-2:,-2:),intent(out) :: W2
-      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),intent(out) :: W2
+      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
       integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
       integer,parameter :: divcoef = 256
       integer,parameter :: mask2(2) = (/  8, 8 /)
       integer   :: i,j,k,l
-      real(KND) :: flux
+      real(knd) :: flux
 
       !$omp parallel private(i,j,k,l,flux)
       !$omp workshare
@@ -659,13 +659,13 @@ module CDS
 
 
     subroutine CDS4_2U(U2,U,V,W)
-      real(KND),dimension(-2:,-2:,-2:),intent(out) :: U2
-      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),intent(out) :: U2
+      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
       integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
       integer,parameter :: divcoef = 256
       integer,parameter :: mask2(2) = (/ 8, 8 /)
       integer   :: i,j,k,l
-      real(KND) :: flux
+      real(knd) :: flux
 
       !$omp parallel private(i,j,k,l,flux)
       !$omp workshare
@@ -749,13 +749,13 @@ module CDS
 
 
     subroutine CDS4_2V(V2,U,V,W)
-      real(KND),dimension(-2:,-2:,-2:),intent(out) :: V2
-      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),intent(out) :: V2
+      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
       integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
       integer,parameter :: divcoef = 256
       integer,parameter :: mask2(2) = (/ 8, 8 /)
       integer   :: i,j,k,l
-      real(KND) :: flux
+      real(knd) :: flux
 
       !$omp parallel private(i,j,k,l,flux)
       !$omp workshare
@@ -840,13 +840,13 @@ module CDS
 
 
     subroutine CDS4_2W(W2,U,V,W)
-      real(KND),dimension(-2:,-2:,-2:),intent(out) :: W2
-      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),intent(out) :: W2
+      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
       integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
       integer,parameter :: divcoef = 256
       integer,parameter :: mask2(2) = (/  8, 8 /)
       integer   :: i,j,k,l
-      real(KND) :: flux
+      real(knd) :: flux
 
       !$omp parallel private(i,j,k,l,flux)
       !$omp workshare
@@ -942,17 +942,17 @@ module CDS
 
     subroutine CD4divU(U2,U,V,W)
       !Morinishi et al., JCP 143, http://dx.doi.org/10.1006/jcph.1998.5962
-      real(KND),dimension(-2:,-2:,-2:),intent(out) :: U2
-      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),intent(out) :: U2
+      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
       integer,parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
       integer,parameter :: coef2ord = divcoef / 4
       integer,parameter :: narr = 4
       !UV1 and UV3 are sized to fit to the L1 cache, so no stack overflow should be possible
-      real(KND) :: UV1(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
-      real(KND) :: UV3(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
+      real(knd) :: UV1(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
+      real(knd) :: UV3(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
       integer   :: bi,bj,bk,i,j,k,li,lj,lk
-      real(KND) :: Uint,Vint,Wint,dU
+      real(knd) :: Uint,Vint,Wint,dU
 
       call set(U2,0._knd)
 
@@ -1103,17 +1103,17 @@ module CDS
 
     subroutine CD4divV(V2,U,V,W)
       !Morinishi et al., JCP 143, http://dx.doi.org/10.1006/jcph.1998.5962
-      real(KND),dimension(-2:,-2:,-2:),intent(out) :: V2
-      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),intent(out) :: V2
+      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
       integer,parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
       integer,parameter :: coef2ord = divcoef / 4
       integer,parameter :: narr = 4
       !UV1 and UV3 are sized to fit to the L1 cache, so no stack overflow should be possible
-      real(KND) :: UV1(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
-      real(KND) :: UV3(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
+      real(knd) :: UV1(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
+      real(knd) :: UV3(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
       integer   :: bi,bj,bk,i,j,k,li,lj,lk
-      real(KND) :: Uint,Vint,Wint,dV
+      real(knd) :: Uint,Vint,Wint,dV
 
       call set(V2,0._knd)
 
@@ -1269,17 +1269,17 @@ module CDS
 
     subroutine CD4divW(W2,U,V,W)
       !Morinishi et al., JCP 143, http://dx.doi.org/10.1006/jcph.1998.5962
-      real(KND),dimension(-2:,-2:,-2:),intent(out) :: W2
-      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),intent(out) :: W2
+      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
       integer,parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
       integer,parameter :: coef2ord = divcoef / 4
       integer,parameter :: narr = 4
       !UV1 and UV3 are sized to fit to the L1 cache, so no stack overflow should be possible
-      real(KND) :: UV1(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
-      real(KND) :: UV3(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
+      real(knd) :: UV1(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
+      real(knd) :: UV3(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
       integer   :: bi,bj,bk,i,j,k,li,lj,lk
-      real(KND) :: Uint,Vint,Wint,dW
+      real(knd) :: Uint,Vint,Wint,dW
 
       call set(W2,0._knd)
 
@@ -1446,16 +1446,16 @@ module CDS
 
 
 !     subroutine JST4U(U2,U,V,W)
-!       real(KND),dimension(-2:,-2:,-2:),intent(out) :: U2
-!       real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+!       real(knd),dimension(-2:,-2:,-2:),intent(out) :: U2
+!       real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
 !       integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
 !       integer,parameter :: divcoef = 16
 !       integer,parameter :: mask2(4) = (/ 0, 8, 8, 0 /)
 !       integer,parameter :: diffmask(4) = (/ -1, +3, -3, +1 /)
-!       real(KND),parameter :: k4 = 0.01_KND
+!       real(knd),parameter :: k4 = 0.01_knd
 !       integer   :: i,j,k,l,mask(4)
-!       real(KND) :: flux,nubar,eps4,Uadv,Vadv,Wadv,d
-!       real(KND) :: nu(-2:ubound(U,1),-2:ubound(U,2),-2:ubound(U,3))
+!       real(knd) :: flux,nubar,eps4,Uadv,Vadv,Wadv,d
+!       real(knd) :: nu(-2:ubound(U,1),-2:ubound(U,2),-2:ubound(U,3))
 !
 !       !$omp parallel private(i,j,k,l,flux,nubar,eps4,Uadv,Vadv,Wadv,mask)
 !       !$omp workshare
@@ -1467,7 +1467,7 @@ module CDS
 !         do j=1,Uny
 !           do i=-1,Unx+2
 !             d = sum(U(i-1:i+1,j,k)*[1,2,1])  !divisor
-!             if (abs(d) > 100*tiny(1._KND)) then
+!             if (abs(d) > 100*tiny(1._knd)) then
 !               nu(i,j,k) = abs( sum(U(i-1:i+1,j,k)*[1,-2,1]) / d )
 !             else
 !               nu(i,j,k) = 0
@@ -1484,7 +1484,7 @@ module CDS
 !             if (Utype(i-1,j,k)<=0 .or. Utype(i,j,k)<=0) then
 !
 !               nubar = maxval(nu(i-2:i+1,j,k))
-!               eps4 = 0.1!max(0._KND, k4 * max(nubar,0.1_KND))
+!               eps4 = 0.1!max(0._knd, k4 * max(nubar,0.1_knd))
 !
 !               if (Utype(i-1,j,k)<=0 .and. Utype(i,j,k)<=0) then
 !                 mask = mask4
@@ -1511,7 +1511,7 @@ module CDS
 !         do j=-1,Uny+2
 !           do i=1,Unx
 !             d = sum(U(i,j-1:j+1,k)*[1,2,1])  !divisor
-!             if (abs(d) > 100*tiny(1._KND)) then
+!             if (abs(d) > 100*tiny(1._knd)) then
 !               nu(i,j,k) = abs( sum(U(i,j-1:j+1,k)*[1,-2,1]) / d )
 !             else
 !               nu(i,j,k) = 0
@@ -1528,7 +1528,7 @@ module CDS
 !             if (Utype(i,j-1,k)<=0 .or. Utype(i,j,k)<=0) then
 !
 !               nubar = maxval(nu(i,j-2:j+1,k))
-!               eps4 = 0.1!max(0._KND, k4 * max(nubar,.1_KND))
+!               eps4 = 0.1!max(0._knd, k4 * max(nubar,.1_knd))
 !
 !               if (Utype(i,j-1,k)<=0 .and. Utype(i,j,k)<=0) then
 !                 mask = mask4
@@ -1555,7 +1555,7 @@ module CDS
 !         do j=1,Uny
 !           do i=1,Unx
 !             d = sum(U(i,j,k-1:k+1)*[1,2,1])  !divisor
-!             if (abs(d) > 100*tiny(1._KND)) then
+!             if (abs(d) > 100*tiny(1._knd)) then
 !               nu(i,j,k) = abs( sum(U(i,j,k-1:k+1)*[1,-2,1]) / d )
 !             else
 !               nu(i,j,k) = 0
@@ -1573,7 +1573,7 @@ module CDS
 !               if (Utype(i,j,k-1)<=0 .or. Utype(i,j,k)<=0) then
 !
 !                 nubar = maxval(nu(i,j,k-2:k+1))
-!                 eps4 = 0.1!max(0._KND, k4 * max(nubar,.1_KND))
+!                 eps4 = 0.1!max(0._knd, k4 * max(nubar,.1_knd))
 !
 !                 if (Utype(i,j,k-1)<=0 .and. Utype(i,j,k)<=0) then
 !                   mask = mask4
@@ -1605,16 +1605,16 @@ module CDS
 !
 !
 !     subroutine JST4V(V2,U,V,W)
-!       real(KND),dimension(-2:,-2:,-2:),intent(out) :: V2
-!       real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+!       real(knd),dimension(-2:,-2:,-2:),intent(out) :: V2
+!       real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
 !       integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
 !       integer,parameter :: divcoef = 16
 !       integer,parameter :: mask2(4) = (/ 0, 8, 8, 0 /)
 !       integer,parameter :: diffmask(4) = (/ -1, +3, -3, +1 /)
-!       real(KND),parameter :: k4 = 0.01_KND
+!       real(knd),parameter :: k4 = 0.01_knd
 !       integer   :: i,j,k,l,mask(4)
-!       real(KND) :: flux,nubar,eps4,Uadv,Vadv,Wadv,d
-!       real(KND) :: nu(-2:ubound(V,1),-2:ubound(V,2),-2:ubound(V,3))
+!       real(knd) :: flux,nubar,eps4,Uadv,Vadv,Wadv,d
+!       real(knd) :: nu(-2:ubound(V,1),-2:ubound(V,2),-2:ubound(V,3))
 !
 !       !$omp parallel private(i,j,k,l,flux,nubar,eps4,Uadv,Vadv,Wadv,mask)
 !       !$omp workshare
@@ -1627,7 +1627,7 @@ module CDS
 !         do j=1,Vny
 !           do i=-1,Vnx+2
 !             d = sum(V(i-1:i+1,j,k)*[1,2,1])  !divisor
-!             if (abs(d) > 100*tiny(1._KND)) then
+!             if (abs(d) > 100*tiny(1._knd)) then
 !               nu(i,j,k) = abs( sum(V(i-1:i+1,j,k)*[1,-2,1]) / d )
 !             else
 !               nu(i,j,k) = 0
@@ -1644,7 +1644,7 @@ module CDS
 !             if (Vtype(i-1,j,k)<=0 .or. Vtype(i,j,k)<=0) then
 !
 !               nubar = maxval(nu(i-2:i+1,j,k))
-!               eps4 = 0.1!max(0._KND, k4 * max(nubar,.1_KND))
+!               eps4 = 0.1!max(0._knd, k4 * max(nubar,.1_knd))
 !
 !               if (Vtype(i-1,j,k)<=0 .and. Vtype(i,j,k)<=0) then
 !                 mask = mask4
@@ -1671,7 +1671,7 @@ module CDS
 !         do j=-1,Vny+2
 !           do i=1,Vnx
 !             d = sum(V(i,j-1:j+1,k)*[1,2,1])  !divisor
-!             if (abs(d) > 100*tiny(1._KND)) then
+!             if (abs(d) > 100*tiny(1._knd)) then
 !               nu(i,j,k) = abs( sum(V(i,j-1:j+1,k)*[1,-2,1]) / d )
 !             else
 !               nu(i,j,k) = 0
@@ -1688,7 +1688,7 @@ module CDS
 !             if (Vtype(i,j-1,k)<=0 .or. Vtype(i,j,k)<=0) then
 !
 !               nubar = maxval(nu(i,j-2:j+1,k))
-!               eps4 = 0.1!max(0._KND, k4 * max(nubar,.1_KND))
+!               eps4 = 0.1!max(0._knd, k4 * max(nubar,.1_knd))
 !
 !               if (Vtype(i,j-1,k)<=0 .and. Vtype(i,j,k)<=0) then
 !                 mask = mask4
@@ -1715,7 +1715,7 @@ module CDS
 !         do j=1,Vny
 !           do i=1,Vnx
 !             d = sum(V(i,j,k-1:k+1)*[1,2,1])  !divisor
-!             if (abs(d) > 100*tiny(1._KND)) then
+!             if (abs(d) > 100*tiny(1._knd)) then
 !               nu(i,j,k) = abs( sum(V(i,j,k-1:k+1)*[1,-2,1]) / d )
 !             else
 !               nu(i,j,k) = 0
@@ -1733,7 +1733,7 @@ module CDS
 !               if (Vtype(i,j,k-1)<=0 .or. Vtype(i,j,k)<=0) then
 !
 !                 nubar = maxval(nu(i,j,k-2:k+1))
-!                 eps4 = 0.1!max(0._KND, k4 * max(nubar,.1_KND))
+!                 eps4 = 0.1!max(0._knd, k4 * max(nubar,.1_knd))
 !
 !                 if (Vtype(i,j,k-1)<=0 .and. Vtype(i,j,k)<=0) then
 !                   mask = mask4
@@ -1765,16 +1765,16 @@ module CDS
 !
 !
 !     subroutine JST4W(W2,U,V,W)
-!       real(KND),dimension(-2:,-2:,-2:),intent(out) :: W2
-!       real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+!       real(knd),dimension(-2:,-2:,-2:),intent(out) :: W2
+!       real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
 !       integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
 !       integer,parameter :: divcoef = 16
 !       integer,parameter :: mask2(4) = (/ 0, 8, 8, 0 /)
 !       integer,parameter :: diffmask(4) = (/ -1, +3, -3, +1 /)
-!       real(KND),parameter :: k4 = 0.01_KND
+!       real(knd),parameter :: k4 = 0.01_knd
 !       integer   :: i,j,k,l,mask(4)
-!       real(KND) :: flux,nubar,eps4,Uadv,Vadv,Wadv,d
-!       real(KND) :: nu(-2:ubound(U,1),-2:ubound(U,2),-2:ubound(U,3))
+!       real(knd) :: flux,nubar,eps4,Uadv,Vadv,Wadv,d
+!       real(knd) :: nu(-2:ubound(U,1),-2:ubound(U,2),-2:ubound(U,3))
 !
 !       !$omp parallel private(i,j,k,l,flux,nubar,eps4,Uadv,Vadv,Wadv,mask)
 !       !$omp workshare
@@ -1786,7 +1786,7 @@ module CDS
 !         do j=1,Wny
 !           do i=-1,Wnx+2
 !             d = sum(W(i-1:i+1,j,k)*[1,2,1])  !divisor
-!             if (abs(d) > 100*tiny(1._KND)) then
+!             if (abs(d) > 100*tiny(1._knd)) then
 !               nu(i,j,k) = abs( sum(W(i-1:i+1,j,k)*[1,-2,1]) / d )
 !             else
 !               nu(i,j,k) = 0
@@ -1803,7 +1803,7 @@ module CDS
 !             if (Wtype(i-1,j,k)<=0 .or. Wtype(i,j,k)<=0) then
 !
 !               nubar = maxval(nu(i-2:i+1,j,k))
-!               eps4 = 0.1!max(0._KND, k4 * max(nubar,.1_KND))
+!               eps4 = 0.1!max(0._knd, k4 * max(nubar,.1_knd))
 !
 !               if (Wtype(i-1,j,k)<=0 .and. Wtype(i,j,k)<=0) then
 !                 mask = mask4
@@ -1830,7 +1830,7 @@ module CDS
 !         do j=-1,Wny+2
 !           do i=1,Wnx
 !             d = sum(W(i,j-1:j+1,k)*[1,2,1])  !divisor
-!             if (abs(d) > 100*tiny(1._KND)) then
+!             if (abs(d) > 100*tiny(1._knd)) then
 !               nu(i,j,k) = abs( sum(W(i,j-1:j+1,k)*[1,-2,1]) / d )
 !             else
 !               nu(i,j,k) = 0
@@ -1847,7 +1847,7 @@ module CDS
 !             if (Wtype(i,j-1,k)<=0 .or. Wtype(i,j,k)<=0) then
 !
 !               nubar = maxval(nu(i,j-2:j+1,k))
-!               eps4 = 0.1!max(0._KND, k4 * max(nubar,.1_KND))
+!               eps4 = 0.1!max(0._knd, k4 * max(nubar,.1_knd))
 !
 !               if (Wtype(i,j-1,k)<=0 .and. Wtype(i,j,k)<=0) then
 !                 mask = mask4
@@ -1874,7 +1874,7 @@ module CDS
 !         do j=1,Wny
 !           do i=1,Wnx
 !             d = sum(W(i,j,k-1:k+1)*[1,2,1])  !divisor
-!             if (abs(d) > 100*tiny(1._KND)) then
+!             if (abs(d) > 100*tiny(1._knd)) then
 !               nu(i,j,k) = abs( sum(W(i,j,k-1:k+1)*[1,-2,1]) / d )
 !             else
 !               nu(i,j,k) = 0
@@ -1892,7 +1892,7 @@ module CDS
 !               if (Wtype(i,j,k-1)<=0 .or. Wtype(i,j,k)<=0) then
 !
 !                 nubar = maxval(nu(i,j,k-2:k+1))
-!                 eps4 = 0.1!max(0._KND, k4 * max(nubar,.1_KND))
+!                 eps4 = 0.1!max(0._knd, k4 * max(nubar,.1_knd))
 !
 !                 if (Wtype(i,j,k-1)<=0 .and. Wtype(i,j,k)<=0) then
 !                   mask = mask4

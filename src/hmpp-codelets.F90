@@ -15,7 +15,7 @@ contains
   !$hmpp <tsteps> mapbyname, xPr,zPr,xU,zW
   !$hmpp <tsteps> mapbyname, Pr,Visc,TDiff
 
-  !$hmpp <tsteps> mapbyname, buoyancy
+  !$hmpp <tsteps> mapbyname, enable_buoyancy
 
   !$hmpp <tsteps> mapbyname, temperature_ref,grav_acc
 

@@ -38,7 +38,7 @@ module StaggeredFrames
   end type
 
   type r3
-    real(KND) x,y,z
+    real(knd) x,y,z
   end type
 
   type irange
@@ -60,7 +60,7 @@ module StaggeredFrames
   end type
 
   type TFrameTimes
-    real(KND) :: start, end
+    real(knd) :: start, end
     integer :: nframes
   end type
 
@@ -74,7 +74,7 @@ module StaggeredFrames
 
     integer   :: frame_number = -1 !number of the previous frame
 
-    real(KND), allocatable :: times(:)
+    real(knd), allocatable :: times(:)
 
     type(rrange) :: range
     integer   :: minUi, maxUi, minUj, maxUj, minUk, maxUk
@@ -82,14 +82,14 @@ module StaggeredFrames
     integer   :: minWi, maxWi, minWj, maxWj, minWk, maxWk
     integer   :: minPri, maxPri, minPrj, maxPrj, minPrk, maxPrk
     integer   :: sizeU, sizeV, sizeW, sizePr
-    real(KND),allocatable,dimension(:) :: xPr,yPr,zPr,xU,yV,zW
+    real(knd),allocatable,dimension(:) :: xPr,yPr,zPr,xU,yV,zW
       !temperature and scalars use Prsize and min/maxPr_
     logical :: ranges_set = .false.
 
     type(TSaveFlags) :: save_flags
 
     integer :: buffer_size = 0
-    real(KND),allocatable :: buffer(:)
+    real(knd),allocatable :: buffer(:)
 
     character(20) :: base_name
     character(4)  :: suffix = ".unf"
@@ -149,10 +149,10 @@ module StaggeredFrames
 
 
     subroutine TimeSeries_Add(array,idx,val)
-      real(KND),allocatable,intent(inout) :: array(:)
+      real(knd),allocatable,intent(inout) :: array(:)
       integer,intent(in)   :: idx
-      real(KND),intent(in) :: val
-      real(KND),allocatable :: tmp(:)
+      real(knd),intent(in) :: val
+      real(knd),allocatable :: tmp(:)
 
       !assume allocated, otherwise error by the runtime library
 
@@ -171,8 +171,8 @@ module StaggeredFrames
 
 
     subroutine assign3to1(A1,A3)
-      real(KND),intent(out) :: A1(1:)
-      real(KND),intent(in)  :: A3(1:,1:,1:)
+      real(knd),intent(out) :: A1(1:)
+      real(knd),intent(in)  :: A3(1:,1:,1:)
       integer j,k
       integer s1,s2,s3 !sizes
       integer off2,off3 !offsets
@@ -299,8 +299,8 @@ module StaggeredFrames
     subroutine TStaggeredFrameDomain_Fill(D, U, V, W, Pr, Temperature, Scalar)
       !Fill the output buffer for asynchronous output
       type(TStaggeredFrameDomain),intent(inout) :: D
-      real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-      real(KND),intent(in) :: Pr(1:,1:,1:), Temperature(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,-1:)
+      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+      real(knd),intent(in) :: Pr(1:,1:,1:), Temperature(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,-1:)
       integer :: offset
       integer :: i
 
@@ -400,9 +400,9 @@ module StaggeredFrames
 
     subroutine TStaggeredFrameDomain_Save(D, time, U, V, W, Pr, Temperature, Scalar)
       type(TStaggeredFrameDomain),target,asynchronous,intent(inout) :: D
-      real(KND),intent(in) :: time
-      real(KND),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-      real(KND),intent(in) :: Pr(1:,1:,1:), Temperature(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,-1:)
+      real(knd),intent(in) :: time
+      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+      real(knd),intent(in) :: Pr(1:,1:,1:), Temperature(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,-1:)
       integer err
 
       associate(start   => D%frame_times%start,&
@@ -467,7 +467,7 @@ module StaggeredFrames
       open(unit=D%unit, file=file_name, access='stream', form='unformatted', action='write', status='replace')
 
       write(D%unit) 1_int32 !endianess can be infered from this
-      write(D%unit) int(storage_size(1._KND),int32)  !save number of bits of the used real kind
+      write(D%unit) int(storage_size(1._knd),int32)  !save number of bits of the used real kind
 
       write(D%unit) D%save_flags%U, D%save_flags%V, D%save_flags%W, D%save_flags%Pr
       write(D%unit) D%save_flags%Temperature, D%save_flags%Scalar, D%save_flags%num_scalars

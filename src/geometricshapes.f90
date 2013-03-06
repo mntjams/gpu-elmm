@@ -20,30 +20,30 @@ module GeometricShapes
     pure logical function Inside_interface(self,x,y,z,eps)
       import
       class(TGeometricShape),intent(in) :: self
-      real(KND),intent(in) :: x,y,z
-      real(KND),optional,intent(in) ::eps
+      real(knd),intent(in) :: x,y,z
+      real(knd),optional,intent(in) ::eps
     end function
     subroutine Nearest_interface(self,xnear,ynear,znear,x,y,z)
       import
       class(TGeometricShape),intent(in) :: self
-      real(KND),intent(out) :: xnear,ynear,znear
-      real(KND),intent(in) :: x,y,z
+      real(knd),intent(out) :: xnear,ynear,znear
+      real(knd),intent(in) :: x,y,z
     end subroutine
   end interface
 
     type TLine                            !These object could be implemented using Fortran's 2003 inheritance.
-    real(KND) xc,yc,zc                  !This approach using pointers is more portable and less safe.
-    real(KND) a,b,c
+    real(knd) xc,yc,zc                  !This approach using pointers is more portable and less safe.
+    real(knd) a,b,c
  !  contains
  !    procedure Nearest => TLine_Nearest
   end type TLine
 
 
   type TPlane
-    real(KND) a,b,c,d      !ax+by+cz+d/=0 for inner half-space
+    real(knd) a,b,c,d      !ax+by+cz+d/=0 for inner half-space
     logical gl             !T > in ineq. above F < in ineq. above
     logical :: rough = .false.!T rough surface, F flat surface
-    real(KND) z0           !roughness parameter
+    real(knd) z0           !roughness parameter
 !   contains
 !     procedure Inside => TPlane_Inside
  !    procedure Nearest => TPlane_Nearest
@@ -61,9 +61,9 @@ module GeometricShapes
 
 
   type,extends(TGeometricShape) :: TBall
-    real(KND) xc,yc,zc,r
+    real(knd) xc,yc,zc,r
     logical :: rough = .false. !T rough surface, F flat surface
-    real(KND) z0            !roughness parameter
+    real(knd) z0            !roughness parameter
   contains
     procedure :: Inside => TBall_Inside
     procedure :: Nearest => TBall_Nearest
@@ -72,11 +72,11 @@ module GeometricShapes
 
 
   type TCylJacket
-    real(KND) xc,yc,zc
-    real(KND) a,b,c
-    real(KND) r
+    real(knd) xc,yc,zc
+    real(knd) a,b,c
+    real(knd) r
     logical :: rough = .false. !T rough surface, F flat surface
-    real(KND) z0            !roughness parameter
+    real(knd) z0            !roughness parameter
  !  contains
  !    procedure Inside => TCylJacket_Inside
  !    procedure Nearest => TCylJacket_Nearest
@@ -94,9 +94,9 @@ module GeometricShapes
 
 
   type TTerrainPoint
-    real(KND) :: elev = 0
+    real(knd) :: elev = 0
     logical :: rough = .false.
-    real(KND) z0
+    real(knd) z0
   end type TTerrainPoint
 
 
@@ -124,8 +124,8 @@ module GeometricShapes
 
 contains
 
-  real(KND) function PointDist(x1,y1,z1,x2,y2,z2)
-    real(KND),intent(in) :: x1,y1,z1,x2,y2,z2
+  real(knd) function PointDist(x1,y1,z1,x2,y2,z2)
+    real(knd),intent(in) :: x1,y1,z1,x2,y2,z2
 
     PointDist = SQRT((x1-x2)**2+(y1-y2)**2+(z1-z2)**2)
   end function PointDist
@@ -134,9 +134,9 @@ contains
 
   subroutine TLine_Nearest(L,xnear,ynear,znear,x,y,z)
     type(TLine),intent(in) :: L
-    real(KND),intent(out)  :: xnear,ynear,znear
-    real(KND),intent(in) :: x,y,z
-    real(KND) t
+    real(knd),intent(out)  :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
+    real(knd) t
 
     if (L%a/=0 .or. L%b/=0 .or. L%c/=0) then
       t = ( L%a*(x-L%xc) + L%b*(y-L%yc) + L%c*(z-L%zc) ) / (L%a**2 + L%b**2 + L%c**2)
@@ -153,15 +153,15 @@ contains
   
   pure logical function TPlane_Inside(PL,x,y,z,eps)
     type(TPlane),intent(in) :: PL
-    real(KND),intent(in) :: x,y,z
-    real(KND),optional,intent(in) ::eps
-    real(KND) eps2
+    real(knd),intent(in) :: x,y,z
+    real(knd),optional,intent(in) ::eps
+    real(knd) eps2
     logical ins
 
     if (present(eps)) then
       eps2 = eps
     else
-      eps2 = MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND)
+      eps2 = MIN(dxmin/10000._knd,dymin/10000._knd,dzmin/10000._knd)
     endif
 
     if (PL%GL) then
@@ -184,8 +184,8 @@ contains
 
   pure logical function TPolyhedron_Inside(self,x,y,z,eps)
     class(TPolyhedron),intent(in) :: self
-    real(KND),intent(in) :: x,y,z
-    real(KND),optional,intent(in) ::eps
+    real(knd),intent(in) :: x,y,z
+    real(knd),optional,intent(in) ::eps
     logical ins
     integer i
 
@@ -210,15 +210,15 @@ contains
 
   pure logical function TBall_Inside(self,x,y,z,eps)
     class(TBall),intent(in) :: self
-    real(KND),intent(in) :: x,y,z
-    real(KND),intent(in),optional ::eps
-    real(KND) :: eps2
+    real(knd),intent(in) :: x,y,z
+    real(knd),intent(in),optional ::eps
+    real(knd) :: eps2
     logical ins
 
     if (present(eps)) then
      eps2 = eps
     else
-     eps2 = MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND)
+     eps2 = MIN(dxmin/10000._knd,dymin/10000._knd,dzmin/10000._knd)
     endif
 
     if ((self%xc-x)**2+(self%yc-y)**2+(self%zc-z)**2<=(self%r+eps2)**2) then
@@ -232,9 +232,9 @@ contains
 
 
 
-  pure real(KND) function LineDist(x,y,z,xl,yl,zl,a,b,c)
-    real(KND),intent(in) :: x,y,z,xl,yl,zl,a,b,c
-    real(KND) t
+  pure real(knd) function LineDist(x,y,z,xl,yl,zl,a,b,c)
+    real(knd),intent(in) :: x,y,z,xl,yl,zl,a,b,c
+    real(knd) t
 
     if (((a/=0).or.(b/=0)).or.(c/=0)) then
      t = (a*(x-xl)+b*(y-yl)+c*(z-zl))/(a**2+b**2+c**2)
@@ -249,16 +249,16 @@ contains
 
   pure logical function TCylJacket_Inside(J,x,y,z,eps)
     type(TCylJacket),intent(in) :: J
-    real(KND),intent(in) :: x,y,z
-    real(KND),intent(in),optional ::eps
-    real(KND) eps2
+    real(knd),intent(in) :: x,y,z
+    real(knd),intent(in),optional ::eps
+    real(knd) eps2
     logical ins
 
 
     if (present(eps)) then
      eps2 = eps
     else
-     eps2 = MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND)
+     eps2 = MIN(dxmin/10000._knd,dymin/10000._knd,dzmin/10000._knd)
     endif
 
     if (LineDist(x,y,z,j%xc,j%yc,j%zc,J%a,J%b,J%c)<=j%r+eps2) then
@@ -274,8 +274,8 @@ contains
 
   pure logical function TCylinder_Inside(self,x,y,z,eps)
    class(TCylinder),intent(in) :: self
-   real(KND),intent(in) :: x,y,z
-   real(KND),intent(in),optional ::eps
+   real(knd),intent(in) :: x,y,z
+   real(knd),intent(in),optional ::eps
    logical ins
 
     ins = .true.
@@ -295,9 +295,9 @@ contains
 
 
   pure subroutine TTerrain_GridCoords(x2,y2,xi,yj,comp)
-    real(KND),intent(in) :: x2,y2
+    real(knd),intent(in) :: x2,y2
     integer,intent(out) :: xi,yj,comp
-    real(KND) x,y,distPr,distU,distV
+    real(knd) x,y,distPr,distU,distV
     integer xPri,yPrj,xUi,yVj,i
 
     x = x2
@@ -305,9 +305,9 @@ contains
 
     if (gridtype==uniformgrid) then
 
-        xPri = min(max(nint( (x - xU(0))/dxmin + 0.5_KND ),1),Prnx+1)
+        xPri = min(max(nint( (x - xU(0))/dxmin + 0.5_knd ),1),Prnx+1)
 
-        yPrj = min(max(nint( (y - yV(0))/dymin + 0.5_KND ),1),Prny+1)
+        yPrj = min(max(nint( (y - yV(0))/dymin + 0.5_knd ),1),Prny+1)
 
         xUi = min(max(nint( (x-xU(0))/dxmin ),0), Unx+1)
 
@@ -372,16 +372,16 @@ contains
 
   pure logical function TTerrain_Inside(self,x,y,z,eps)
     class(TTerrain),intent(in) :: self
-    real(KND),intent(in) :: x,y,z
-    real(KND),intent(in),optional ::eps
-    real(KND) eps2
+    real(knd),intent(in) :: x,y,z
+    real(knd),intent(in),optional ::eps
+    real(knd) eps2
     logical ins
     integer xi,yj,comp
 
     if (present(eps)) then
      eps2 = eps
     else
-     eps2 = MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND)
+     eps2 = MIN(dxmin/10000._knd,dymin/10000._knd,dzmin/10000._knd)
     endif
 
     ins = .false.
@@ -401,9 +401,9 @@ contains
 
   subroutine TPlane_Nearest(PL,xnear,ynear,znear,x,y,z)
     type(TPlane),intent(in) :: PL
-    real(KND),intent(out) :: xnear,ynear,znear
-    real(KND),intent(in) ::x,y,z
-    real(KND) t
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) ::x,y,z
+    real(knd) t
 
     if (((PL%a/=0).or.(PL%b/=0)).or.(PL%c/=0)) then
      t = -(PL%a*x+PL%b*y+PL%c*z+PL%d)/(PL%a**2+PL%b**2+PL%c**2)
@@ -419,9 +419,9 @@ contains
 
   subroutine TCylJacket_Nearest(J,xnear,ynear,znear,x,y,z)
     type(TCylJacket),intent(in) :: J
-    real(KND),intent(out) :: xnear,ynear,znear
-    real(KND),intent(in) :: x,y,z
-    real(KND) t,xl,yl,zl,a,b,c
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
+    real(knd) t,xl,yl,zl,a,b,c
 
     call Nearest(TLine(J%xc,J%yc,J%zc,J%a,J%b,J%c),xl,yl,zl,x,y,z)
 
@@ -439,9 +439,9 @@ contains
 
   subroutine TCylinder_Nearest(self,xnear,ynear,znear,x,y,z) !only for planes perpendicular to the axis
    class(TCylinder),intent(in) :: self
-   real(KND),intent(out) :: xnear,ynear,znear
-   real(KND),intent(in) :: x,y,z
-   real(KND) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
+   real(knd),intent(out) :: xnear,ynear,znear
+   real(knd),intent(in) :: x,y,z
+   real(knd) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
 
    !!!Only for Planes perpendicular to jacket!!!!
 
@@ -494,9 +494,9 @@ contains
 
   subroutine TBall_Nearest(self,xnear,ynear,znear,x,y,z)
     class(TBall),intent(in) :: self
-    real(KND),intent(out) :: xnear,ynear,znear
-    real(KND),intent(in) :: x,y,z
-    real(KND) t,a,b,c
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
+    real(knd) t,a,b,c
 
     a = x-self%xc
     b = y-self%yc
@@ -511,22 +511,22 @@ contains
   subroutine TPolyhedron_Nearest(self,xnear,ynear,znear,x,y,z)
     use Lapack
     class(TPolyhedron),intent(in) :: self
-    real(KND),intent(out) :: xnear,ynear,znear
-    real(KND),intent(in) :: x,y,z
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
 
-    real(KND) :: dists(self%nplanes),xP(self%nplanes),yP(self%nplanes),zP(self%nplanes)
-    real(KND) :: minv
-    real(KND) :: ailine,biline,ciline
-    real(KND) :: x0iline,y0iline,z0iline,xln,yln,zln,p
+    real(knd) :: dists(self%nplanes),xP(self%nplanes),yP(self%nplanes),zP(self%nplanes)
+    real(knd) :: minv
+    real(knd) :: ailine,biline,ciline
+    real(knd) :: x0iline,y0iline,z0iline,xln,yln,zln,p
     integer   :: inearest,inearest2,inearest3
     integer   :: i
 
     integer,dimension(3)    :: ipivot,work2             !arguments of the LAPACK
-    real(KND),dimension(3)  :: xg,bg,R,C,ferr,berr      !  routine GESVX
-    real(KND),dimension(12) :: work
-    real(KND),dimension(3,3) :: ag,af                    !
+    real(knd),dimension(3)  :: xg,bg,R,C,ferr,berr      !  routine GESVX
+    real(knd),dimension(12) :: work
+    real(knd),dimension(3,3) :: ag,af                    !
     integer   :: info                                   !
-    real(KND) :: rcond                                  !
+    real(knd) :: rcond                                  !
     character :: equed                                  !
 
    !Vzdalenosti od rovin, pokud je nejbl. bod roviny uvnitr jine, nebo puv. bod na vnitrni strane -> vzd. *-1
@@ -556,7 +556,7 @@ contains
     endif
 
     if (self%Inside(xP(inearest),yP(inearest),zP(inearest), &
-                    MIN(dxmin/10000._KND,dymin/10000._KND,dzmin/10000._KND) &
+                    MIN(dxmin/10000._knd,dymin/10000._knd,dzmin/10000._knd) &
                    )) then
      xnear = xP(inearest)
      ynear = yP(inearest)
@@ -617,14 +617,14 @@ contains
     biline = biline/p
     ciline = ciline/p
 
-    if (abs(ciline)>=0.1_KND) then
+    if (abs(ciline)>=0.1_knd) then
 
-       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,0._KND, &
-                           self%Planes(inearest)%b,self%Planes(inearest2)%b,0._KND, &
-                           self%Planes(inearest)%c,self%Planes(inearest2)%c,1._KND /), &
+       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,0._knd, &
+                           self%Planes(inearest)%b,self%Planes(inearest2)%b,0._knd, &
+                           self%Planes(inearest)%c,self%Planes(inearest2)%c,1._knd /), &
                  shape = (/ 3,3 /))
 
-       bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(zW(Wnz+1)+zW(0))/2._KND /)
+       bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(zW(Wnz+1)+zW(0))/2._knd /)
 
        call gesvx("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3, &
                   rcond,ferr,berr,work,work2,info)
@@ -633,14 +633,14 @@ contains
        y0iline = xg(2)
        z0iline = xg(3)
 
-    elseif (abs(biline)>=0.1_KND) then
+    elseif (abs(biline)>=0.1_knd) then
 
-       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,0._KND, &
-                           self%Planes(inearest)%b,self%Planes(inearest2)%b,1._KND, &
-                           self%Planes(inearest)%c,self%Planes(inearest2)%c,0._KND /), &
+       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,0._knd, &
+                           self%Planes(inearest)%b,self%Planes(inearest2)%b,1._knd, &
+                           self%Planes(inearest)%c,self%Planes(inearest2)%c,0._knd /), &
                  shape = (/ 3,3 /))
 
-       bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(yV(Vny+1)+yV(0))/2._KND /)
+       bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(yV(Vny+1)+yV(0))/2._knd /)
 
        call gesvx("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3, &
                   rcond,ferr,berr,work,work2,info)
@@ -651,12 +651,12 @@ contains
 
     else
 
-       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,1._KND, &
-                           self%Planes(inearest)%b,self%Planes(inearest2)%b,0._KND, &
-                           self%Planes(inearest)%c,self%Planes(inearest2)%c,0._KND /), &
+       ag = reshape(source = (/ self%Planes(inearest)%a,self%Planes(inearest2)%a,1._knd, &
+                           self%Planes(inearest)%b,self%Planes(inearest2)%b,0._knd, &
+                           self%Planes(inearest)%c,self%Planes(inearest2)%c,0._knd /), &
                   shape = (/ 3,3 /))
 
-       bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(xU(Unx+1)+xU(0))/2._KND /)
+       bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(xU(Unx+1)+xU(0))/2._knd /)
 
        call gesvx("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3, &
                   rcond,ferr,berr,work,work2,info)
@@ -669,7 +669,7 @@ contains
 
     call Nearest(TLine(x0iline,y0iline,z0iline,ailine,biline,ciline),xln,yln,zln,x,y,z)
 
-    if (self%Inside(xln,yln,zln,min(dxmin/1000._KND,dymin/10000._KND,dzmin/10000._KND))) then
+    if (self%Inside(xln,yln,zln,min(dxmin/1000._knd,dymin/10000._knd,dzmin/10000._knd))) then
      xnear = xln
      ynear = yln
      znear = zln
@@ -698,11 +698,11 @@ contains
 
   subroutine TTerrain_Nearest(self,xnear,ynear,znear,x,y,z)
     class(TTerrain),intent(in) :: self
-    real(KND),intent(out) :: xnear,ynear,znear
-    real(KND),intent(in) :: x,y,z
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
     type(TPlane) :: Pl
     integer     :: xi,yj,comp
-    real(KND)   :: a,b,zloc
+    real(knd)   :: a,b,zloc
     xnear = x
     ynear = y
     znear = z
@@ -717,7 +717,7 @@ contains
 
      Pl%a = a
      Pl%b = b
-     Pl%c = -1._KND
+     Pl%c = -1._knd
      Pl%d = -a*x-b*y+zloc
 
      call Nearest(Pl,xnear,ynear,znear,x,y,z)
@@ -730,7 +730,7 @@ contains
 
      Pl%a = a
      Pl%b = b
-     Pl%c = -1._KND
+     Pl%c = -1._knd
      Pl%d = -a*x-b*y+zloc
 
      call Nearest(Pl,xnear,ynear,znear,x,y,z)
@@ -743,7 +743,7 @@ contains
 
      Pl%a = a
      Pl%b = b
-     Pl%c = -1._KND
+     Pl%c = -1._knd
      Pl%d = - a*x - b*y + zloc
 
      call Nearest(Pl,xnear,ynear,znear,x,y,z)
@@ -757,9 +757,9 @@ contains
 
   subroutine TPolyhedron_NearestOut(self,xnear,ynear,znear,x,y,z)
     class(TPolyhedron),intent(in) :: self
-    real(KND),intent(out) :: xnear,ynear,znear
-    real(KND),intent(in) :: x,y,z
-    real(KND) dists(self%nplanes),xP(self%nplanes),yP(self%nplanes),zP(self%nplanes),minv
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
+    real(knd) dists(self%nplanes),xP(self%nplanes),yP(self%nplanes),zP(self%nplanes),minv
     integer inearest,i
 
     dists = huge(minv)
@@ -786,9 +786,9 @@ contains
 
   subroutine TCylinder_NearestOut(self,xnear,ynear,znear,x,y,z) !only for planes perpendicular to the axis
     class(TCylinder),intent(in) :: self
-    real(KND),intent(out) :: xnear,ynear,znear
-    real(KND),intent(in) :: x,y,z
-    real(KND) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
+    real(knd) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
 
     if (allocated(self%Plane1)) then
       call Nearest(self%Plane1,xP1,yP1,zP1,x,y,z)
@@ -828,8 +828,8 @@ contains
 
   subroutine TBall_NearestOut(self,xnear,ynear,znear,x,y,z)
     class(TBall),intent(in) :: self
-    real(KND),intent(out) :: xnear,ynear,znear
-    real(KND),intent(in) :: x,y,z
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
 
     call self%Nearest(xnear,ynear,znear,x,y,z)
   end subroutine TBall_NearestOut
@@ -838,8 +838,8 @@ contains
 
   subroutine TTerrain_NearestOut(self,xnear,ynear,znear,x,y,z)
     class(TTerrain),intent(in) :: self
-    real(KND),intent(out) :: xnear,ynear,znear
-    real(KND),intent(in) :: x,y,z
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
 
     call self%Nearest(xnear,ynear,znear,x,y,z)
   end subroutine TTerrain_NearestOut
@@ -856,7 +856,7 @@ end module GeometricShapes
 
 
 module TBody_class
-  use Kinds, only: KND
+  use Kinds, only: knd
   use Lists, only: TListable
   use GeometricShapes, only: TGeometricShape
   use Parameters
@@ -886,10 +886,10 @@ contains
 
   pure logical function CInside(self,x,y,z,eps)
     class(TBody),intent(in) :: self
-    real(KND),intent(in) :: x,y,z
-    real(KND),intent(in),optional :: eps
-    real(KND) x2,y2,z2
-    real(KND) lx,ly,lz
+    real(knd),intent(in) :: x,y,z
+    real(knd),intent(in),optional :: eps
+    real(knd) x2,y2,z2
+    real(knd) lx,ly,lz
 
     if (.not.allocated(self%GeometricShape)) then
       CInside = .false.
@@ -923,8 +923,8 @@ contains
 
   subroutine Nearest(self,xnear,ynear,znear,x,y,z)
     class(TBody),intent(in) :: self
-    real(KND),intent(out) :: xnear,ynear,znear
-    real(KND),intent(in) :: x,y,z
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
 
     call self%GeometricShape%Nearest(xnear,ynear,znear,x,y,z)
 
@@ -934,8 +934,8 @@ contains
 
   subroutine NearestOut(self,xnear,ynear,znear,x,y,z)
     class(TBody),intent(in) :: self
-    real(KND),intent(out) :: xnear,ynear,znear
-    real(KND),intent(in) :: x,y,z
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
 
     call self%GeometricShape%NearestOut(xnear,ynear,znear,x,y,z)
 
@@ -943,22 +943,22 @@ contains
 
 
 
-  real(KND) function NearestOnLineOut(self,x,y,z,x2,y2,z2) !Find t, such that x+(x2-x)*t lies on the boundary of the SB
+  real(knd) function NearestOnLineOut(self,x,y,z,x2,y2,z2) !Find t, such that x+(x2-x)*t lies on the boundary of the SB
     class(TBody),intent(in) :: self
-    real(KND),intent(in) :: x,y,z,x2,y2,z2
+    real(knd),intent(in) :: x,y,z,x2,y2,z2
 
-    real(KND) t,t1,t2
+    real(knd) t,t1,t2
     integer i
 
     t1 = 0
     t2 = 1
     if (self%Inside(x2,y2,z2)) then
      do
-      t2 = t2*2._KND
+      t2 = t2*2._knd
       if (.not. self%Inside(x+(x2-x)*t2,y+(y2-y)*t2,z+(z2-z)*t2)) exit
      enddo
     endif
-    t = (t1+t2)/2._KND
+    t = (t1+t2)/2._knd
 
     do i = 1,20         !The bisection method with maximum 20 iterations (should be well enough)
      if (self%Inside(x+(x2-x)*t,y+(y2-y)*t,z+(z2-z)*t)) then
@@ -966,8 +966,8 @@ contains
      else
       t2 = t
      endif
-     t = (t1+t2)/2._KND
-     if (abs(t1-t2)<MIN(dxmin/1000._KND,dymin/1000._KND,dzmin/1000._KND))   exit
+     t = (t1+t2)/2._knd
+     if (abs(t1-t2)<MIN(dxmin/1000._knd,dymin/1000._knd,dzmin/1000._knd))   exit
     enddo
     NearestOnLineOut = t
   end function NearestOnLineOut

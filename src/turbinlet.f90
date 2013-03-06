@@ -7,17 +7,17 @@ module TURBINLET
   private
   public GetTurbInlet, GetInletFromFile, TLag, Lturby, Lturbz, ustarinlet, transformtensor
 
-  real(KND),save :: TLag
-  real(KND),save :: Lturby
-  real(KND),save :: Lturbz
+  real(knd),save :: TLag
+  real(knd),save :: Lturby
+  real(knd),save :: Lturbz
 
 
-  real(KND),allocatable,dimension(:),save     :: ustarinlet !friction velocity profile at inlet
-  real(KND),allocatable,dimension(:,:),save   :: Uinavg,Vinavg,Winavg !mean values of U,V,W at inflow
-  real(KND),allocatable,dimension(:,:,:),save :: transformtensor
+  real(knd),allocatable,dimension(:),save     :: ustarinlet !friction velocity profile at inlet
+  real(knd),allocatable,dimension(:,:),save   :: Uinavg,Vinavg,Winavg !mean values of U,V,W at inflow
+  real(knd),allocatable,dimension(:,:,:),save :: transformtensor
 
    type TInlet
-    real(KND),allocatable,dimension(:,:) :: U,V,W,temperature
+    real(knd),allocatable,dimension(:,:) :: U,V,W,temperature
    endtype
 
   interface GETTURBINLET
@@ -31,9 +31,9 @@ contains
  logical,save:: called=.false.
  integer i,j,k,ii,jj,kk
  integer,save:: filtnx,filtny,filtnz,bigNx,bigNy,bigNz
- real(KND) Ui,Vi,Wi,bx,by,bz,bxsum,bysum,bzsum
- real(KND),allocatable,dimension(:,:,:),save :: Ru,Rv,Rw !arrays of randoms
- real(KND),allocatable,dimension(:,:,:),save :: bfilt !filter coefficients (ii,jj,kk,kz)
+ real(knd) Ui,Vi,Wi,bx,by,bz,bxsum,bysum,bzsum
+ real(knd),allocatable,dimension(:,:,:),save :: Ru,Rv,Rw !arrays of randoms
+ real(knd),allocatable,dimension(:,:,:),save :: bfilt !filter coefficients (ii,jj,kk,kz)
 
  if (.not. called) then
     write(*,*) "INITTURBULENCEPROFILES"
@@ -296,12 +296,12 @@ contains
  logical,save:: called=.false.
  integer i,j,k
  integer,save:: filtny,filtnz,bigNy,bigNz
- real(KND) Ui,Vi,Wi,bysum,bzsum,p
- real(KND),allocatable,dimension(:):: expsy,expsz
- real(KND),save:: compat
- real(KND),allocatable,dimension(:,:,:),save :: Ru,Rv,Rw !arrays of randoms
- real(KND),allocatable,dimension(:,:,:),save :: Psiu,Psiv,Psiw
- real(KND),allocatable,dimension(:,:,:),save :: bfilt !filter coefficients (ii,jj,kk,kz)
+ real(knd) Ui,Vi,Wi,bysum,bzsum,p
+ real(knd),allocatable,dimension(:):: expsy,expsz
+ real(knd),save:: compat
+ real(knd),allocatable,dimension(:,:,:),save :: Ru,Rv,Rw !arrays of randoms
+ real(knd),allocatable,dimension(:,:,:),save :: Psiu,Psiv,Psiw
+ real(knd),allocatable,dimension(:,:,:),save :: bfilt !filter coefficients (ii,jj,kk,kz)
 
  if (.not. called) then
     write(*,*) "INITTURBULENCEPROFILES"
@@ -311,8 +311,8 @@ contains
  write(*,*) "GETTURBINLET-cont"
 
 
-    filtnz=min(max(NINT(lturbz/dzmin),1),ceiling(1._KND*Prnz/3))
-    filtny=min(max(NINT(lturby/dymin),1),ceiling(1._KND*Prny/3))
+    filtnz=min(max(NINT(lturbz/dzmin),1),ceiling(1._knd*Prnz/3))
+    filtny=min(max(NINT(lturby/dymin),1),ceiling(1._knd*Prny/3))
 
 
     bigNy=2*filtny
@@ -427,9 +427,9 @@ contains
          Psiw(j,k,2)=SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rw(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
     endforall
 
-    Psiu(:,:,1)=Psiu(:,:,1)*exp(-pi*dt/(2._KND*TLag))+Psiu(:,:,2)*sqrt(1-exp(-pi*dt/(TLag)))
-    Psiv(:,:,1)=Psiv(:,:,1)*exp(-pi*dt/(2._KND*TLag))+Psiv(:,:,2)*sqrt(1-exp(-pi*dt/(TLag)))
-    Psiw(:,:,1)=Psiw(:,:,1)*exp(-pi*dt/(2._KND*TLag))+Psiw(:,:,2)*sqrt(1-exp(-pi*dt/(TLag)))
+    Psiu(:,:,1)=Psiu(:,:,1)*exp(-pi*dt/(2._knd*TLag))+Psiu(:,:,2)*sqrt(1-exp(-pi*dt/(TLag)))
+    Psiv(:,:,1)=Psiv(:,:,1)*exp(-pi*dt/(2._knd*TLag))+Psiv(:,:,2)*sqrt(1-exp(-pi*dt/(TLag)))
+    Psiw(:,:,1)=Psiw(:,:,1)*exp(-pi*dt/(2._knd*TLag))+Psiw(:,:,2)*sqrt(1-exp(-pi*dt/(TLag)))
     !$omp end workshare
 
     !$omp do
@@ -550,7 +550,7 @@ contains
 
 
      do k=1,Prnz
-      ustarinlet(k)=ustarsurfin*SQRT(max(1+stressgradin*zPr(k),1E-5_KND))
+      ustarinlet(k)=ustarsurfin*SQRT(max(1+stressgradin*zPr(k),1E-5_knd))
      enddo
 
 !    !Stress tensor divided by ustar**2
@@ -612,16 +612,16 @@ contains
   if (windangle/=0) then
    do k=1,Prnz
     do j=1,Prny
-     Vinavg(j,k)=Uinavg(j,k)*sin(windangle/180._KND*pi)
-     Uinavg(j,k)=Uinavg(j,k)*cos(windangle/180._KND*pi)
+     Vinavg(j,k)=Uinavg(j,k)*sin(windangle/180._knd*pi)
+     Uinavg(j,k)=Uinavg(j,k)*cos(windangle/180._knd*pi)
     enddo
    enddo
   endif
   endsubroutine INITMEANPROFILES
 
   subroutine RANDOMGAUSS(res)  !more effective way: http://www.taygeta.com/random/gaussian.html
-  real(KND), intent(out) :: res
-  real(KND) p,S
+  real(knd), intent(out) :: res
+  real(knd) p,S
   integer,parameter:: n=6
   integer i
 
@@ -631,8 +631,8 @@ contains
    S=S+p
   enddo
   S=S-0.5*n
-  S=S/SQRT(n/12._KND)
-  res=(p-0.5)*sqrt(12._KND)!S
+  S=S/SQRT(n/12._knd)
+  res=(p-0.5)*sqrt(12._knd)!S
 
   end subroutine RANDOMGAUSS
 
@@ -641,7 +641,7 @@ contains
   real(TIM),intent(in):: t
   integer,save:: called=0
   integer Prny2,Prnz2,Vny2,Wnz2
-  real(KND) dx2
+  real(knd) dx2
   character(12):: fname
   integer,save:: inletfnum
 
@@ -650,7 +650,7 @@ contains
   real(TIM) tp
   integer,save:: io
 
-  real(KND) c1,c2
+  real(knd) c1,c2
 
   if (called==0) then
      open(102,file="inletframeinfo.unf",form='unformatted',status='old',action='read',iostat=io)
@@ -665,7 +665,7 @@ contains
      allocate(In1,In2)
      allocate(In1%U(Uny,Unz),In1%V(Vny,Vnz),In1%W(Wny,Wnz))
      allocate(In2%U(Uny,Unz),In2%V(Vny,Vnz),In2%W(Wny,Wnz))
-     if (buoyancy==1) allocate(In1%temperature(Prny,Prnz),In2%temperature(Prny,Prnz))
+     if (enable_buoyancy==1) allocate(In1%temperature(Prny,Prnz),In2%temperature(Prny,Prnz))
 
      if ((Prny/=Prny2).or.(Prnz/=Prnz2).or.(Vny/=Vny2).or.(Wnz/=Wnz2).or.((dx2-dxPr(0))/dx2>0.1)) then
       write(*,*) "Mismatch of computational grid and inlet file."
@@ -746,7 +746,7 @@ contains
   Uin(1:Uny,1:Unz)=c1*In1%U+c2*In2%U
   Vin(1:Vny,1:Vnz)=c1*In1%V+c2*In2%V
   Win(1:Wny,1:Wnz)=c1*In1%W+c2*In2%W
-  if (buoyancy==1) Tempin(1:Prny,1:Prnz)=c1*In1%temperature+c2*In2%temperature
+  if (enable_buoyancy==1) Tempin(1:Prny,1:Prnz)=c1*In1%temperature+c2*In2%temperature
 
   endsubroutine GETINLETFROMFILE
 
@@ -757,7 +757,7 @@ contains
   read(unitnum) In%U
   read(unitnum) In%V
   read(unitnum) In%W
-  if (buoyancy>0) then
+  if (enable_buoyancy>0) then
        read(unitnum) In%temperature
   endif
   endsubroutine READINLETFROMFILE
@@ -765,7 +765,7 @@ contains
 
   pure subroutine BoundUin(component,Uin)
     integer,  intent(in)    :: component
-    real(KND),intent(inout) :: Uin(-2:,-2:)
+    real(knd),intent(inout) :: Uin(-2:,-2:)
     integer :: nx, ny, nz
 
     if (component==1) then
