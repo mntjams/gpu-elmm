@@ -30,73 +30,65 @@ module Tiling
       !$omp do
       do narrays=1,size(tilenx)
 
-        if (omp_threads>1) then
-          bn = tilesize/(storage_size(1._KND)/storage_size('a'))
-                                            !requires F2008, c_sizeof not supported by Solaris Studio 12.3
+        bn = tilesize/(storage_size(1._KND)/storage_size('a'))
+                                          !requires F2008, c_sizeof not supported by Solaris Studio 12.3
 
-          bn = bn/narrays !four arrays U,V,W,Visc
+        bn = bn/narrays !four arrays U,V,W,Visc
 
-          rbn = bn**(1./3.)/(Prnx*Prny*Prnz)**(1./3.) !geometric mean to scale the tiling box
+        rbn = bn**(1./3.)/(Prnx*Prny*Prnz)**(1./3.) !geometric mean to scale the tiling box
+
+        bnx = nint(Prnx*rbn)  !first try for tiling block size
+        bny = nint(Prny*rbn)
+        bnz = nint(Prnz*rbn)
+
+        if (mod(Prnz/bnz,omp_threads)/=0) then
+          bnzo = bnz !original
+
+          bnzu = bnz !upper try
+          i = 0
+          do
+            i = i + 1
+
+            if (mod(Prnz/(bnz+i),omp_threads)==0) then
+              bnzu = bnz + i
+              exit
+            end if
+
+            if (i>=bnz) exit
+          end do
+
+          bnzl = bnz !lower try
+          i = 0
+          do
+            i = i - 1
+
+            if (mod(Prnz/(bnz+i),omp_threads)==0) then
+              bnzl = bnz + i
+              exit
+            end if
+
+            if (i<=-bnz/2) exit
+          end do
+
+          if (bnzu/=bnz .and. bnzl/=bnz) then  !choose the closer one
+            if (abs(bnzu-bnz)<=abs(bnzl-bnz)) then
+              bnz = bnzu
+            else
+              bnz = bnzl
+            end if
+          else if (bnzu/=bnz) then
+            bnz = bnzu
+          else if (bnzl/=bnz) then
+            bnz = bnzl
+          end if
+
+          rbn = sqrt(real(bn)/bnz)/sqrt(real(Prnx*Prny)) !geometric mean to scale the tiling box
 
           bnx = nint(Prnx*rbn)  !first try for tiling block size
           bny = nint(Prny*rbn)
-          bnz = nint(Prnz*rbn)
-
-          if (mod(Prnz/bnz,omp_threads)/=0) then
-            bnzo = bnz !original
-
-            bnzu = bnz !upper try
-            i = 0
-            do
-              i = i + 1
-
-              if (mod(Prnz/(bnz+i),omp_threads)==0) then
-                bnzu = bnz + i
-                exit
-              end if
-
-              if (i>=bnz) exit
-            end do
-
-            bnzl = bnz !lower try
-            i = 0
-            do
-              i = i - 1
-
-              if (mod(Prnz/(bnz+i),omp_threads)==0) then
-                bnzl = bnz + i
-                exit
-              end if
-
-              if (i<=-bnz/2) exit
-            end do
-
-            if (bnzu/=bnz .and. bnzl/=bnz) then  !choose the closer one
-              if (abs(bnzu-bnz)<=abs(bnzl-bnz)) then
-                bnz = bnzu
-              else
-                bnz = bnzl
-              end if
-            else if (bnzu/=bnz) then
-              bnz = bnzu
-            else if (bnzl/=bnz) then
-              bnz = bnzl
-            end if
-
-            rbn = sqrt(real(bn)/bnz)/sqrt(real(Prnx*Prny)) !geometric mean to scale the tiling box
-
-            bnx = nint(Prnx*rbn)  !first try for tiling block size
-            bny = nint(Prny*rbn)
-
-          end if
-
-        else
-
-          bnx = Prnx
-          bny = Prny
-          bnz = Prnz
 
         end if
+
 
         tilenx(narrays) = bnx
         tileny(narrays) = bny
