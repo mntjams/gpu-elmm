@@ -2,6 +2,8 @@ module CDS
     use PARAMETERS
     use BOUNDARIES
     use LIMITERS, only: FluxLimiter
+    use ArrayUtilities
+    use Tiling
 
     implicit none
 
@@ -34,11 +36,11 @@ module CDS
         do k=1,nz
             do j=1,ny
                 do i=1,nx
-                    U2(i,j,k)= - ((Ax*(U(i+1,j,k)+U(i,j,k))*(U(i+1,j,k)+U(i,j,k))&
-                    -Ax*(U(i,j,k)+U(i-1,j,k))*(U(i,j,k)+U(i-1,j,k)))&
-                    +(Ay*(U(i,j+1,k)+U(i,j,k))*(V(i+1,j,k)+V(i,j,k))&
-                    -Ay*(U(i,j,k)+U(i,j-1,k))*(V(i+1,j-1,k)+V(i,j-1,k)))&
-                    +(Az*(U(i,j,k+1)+U(i,j,k))*(W(i+1,j,k)+W(i,j,k))&
+                    U2(i,j,k)= - ((Ax*(U(i+1,j,k)+U(i,j,k))*(U(i+1,j,k)+U(i,j,k)) &
+                    -Ax*(U(i,j,k)+U(i-1,j,k))*(U(i,j,k)+U(i-1,j,k))) &
+                    +(Ay*(U(i,j+1,k)+U(i,j,k))*(V(i+1,j,k)+V(i,j,k)) &
+                    -Ay*(U(i,j,k)+U(i,j-1,k))*(V(i+1,j-1,k)+V(i,j-1,k))) &
+                    +(Az*(U(i,j,k+1)+U(i,j,k))*(W(i+1,j,k)+W(i,j,k)) &
                     -Az*(U(i,j,k)+U(i,j,k-1))*(W(i+1,j,k-1)+W(i,j,k-1))))
                 end do
             end do
@@ -58,11 +60,11 @@ module CDS
         do k=1,nz
          do j=1,ny
           do i=1,nx
-           Utmp=( ((fe(i)*U(i+1,j,k)+(1-fe(i))*U(i,j,k))*(fe(i)*U(i+1,j,k)+(1-fe(i))*U(i,j,k)))&
+           Utmp=( ((fe(i)*U(i+1,j,k)+(1-fe(i))*U(i,j,k))*(fe(i)*U(i+1,j,k)+(1-fe(i))*U(i,j,k))) &
                       -((fe(i-1)*U(i,j,k)+(1-fe(i-1))*U(i-1,j,k))*(fe(i-1)*U(i,j,k)+(1-fe(i-1))*U(i-1,j,k))))/dxU(i)
-           Utmp=Utmp+( (gn(j)*U(i,j+1,k)+(1-gn(j))*U(i,j,k))*(fp(i)*V(i+1,j,k)+(1-fp(i))*V(i,j,k))&
+           Utmp=Utmp+( (gn(j)*U(i,j+1,k)+(1-gn(j))*U(i,j,k))*(fp(i)*V(i+1,j,k)+(1-fp(i))*V(i,j,k)) &
                       -(gn(j-1)*U(i,j,k)+(1-gn(j-1))*U(i,j-1,k))*(fp(i)*V(i+1,j-1,k)+(1-fp(i))*V(i,j-1,k)))/dyPr(j)
-           Utmp=Utmp+( (ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))&
+           Utmp=Utmp+( (ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k)) &
                       -(ht(k-1)*U(i,j,k)+(1-ht(k-1))*U(i,j,k-1))*(fp(i)*W(i+1,j,k-1)+(1-fp(i))*W(i,j,k-1)))/dzPr(k)
            U2(i,j,k)=-dt*Utmp
           end do
@@ -98,11 +100,11 @@ module CDS
         do k=1,nz
             do j=1,ny
                 do i=1,nx
-                    V2(i,j,k)= - ((Ay*(V(i,j+1,k)+V(i,j,k))*(V(i,j+1,k)+V(i,j,k))&
-                    -Ay*(V(i,j,k)+V(i,j-1,k))*(V(i,j,k)+V(i,j-1,k)))&
-                    +(Ax*(V(i+1,j,k)+V(i,j,k))*(U(i,j+1,k)+U(i,j,k))&
-                    -Ax*(V(i,j,k)+V(i-1,j,k))*(U(i-1,j+1,k)+U(i-1,j,k)))&
-                    +(Az*(V(i,j,k+1)+V(i,j,k))*(W(i,j+1,k)+W(i,j,k))&
+                    V2(i,j,k)= - ((Ay*(V(i,j+1,k)+V(i,j,k))*(V(i,j+1,k)+V(i,j,k)) &
+                    -Ay*(V(i,j,k)+V(i,j-1,k))*(V(i,j,k)+V(i,j-1,k))) &
+                    +(Ax*(V(i+1,j,k)+V(i,j,k))*(U(i,j+1,k)+U(i,j,k)) &
+                    -Ax*(V(i,j,k)+V(i-1,j,k))*(U(i-1,j+1,k)+U(i-1,j,k))) &
+                    +(Az*(V(i,j,k+1)+V(i,j,k))*(W(i,j+1,k)+W(i,j,k)) &
                     -Az*(V(i,j,k)+V(i,j,k-1))*(W(i,j+1,k-1)+W(i,j,k-1))))
                 end do
             end do
@@ -122,11 +124,11 @@ module CDS
         do k=1,nz
          do j=1,ny
           do i=1,nx
-           Vtmp=( ((gn(j)*V(i,j+1,k)+(1-gn(j))*V(i,j,k))*(gn(j)*V(i,j+1,k)+(1-gn(j))*V(i,j,k)))&
+           Vtmp=( ((gn(j)*V(i,j+1,k)+(1-gn(j))*V(i,j,k))*(gn(j)*V(i,j+1,k)+(1-gn(j))*V(i,j,k))) &
                       -((gn(j-1)*V(i,j,k)+(1-gn(j-1))*V(i,j-1,k))*(gn(j-1)*V(i,j,k)+(1-gn(j-1))*V(i,j-1,k))))/dyV(j)
-           Vtmp=Vtmp+( (fe(i)*V(i+1,j,k)+(1-fe(i))*V(i,j,k))*(gp(j)*U(i,j+1,k)+(1-gp(j))*U(i,j,k))&
+           Vtmp=Vtmp+( (fe(i)*V(i+1,j,k)+(1-fe(i))*V(i,j,k))*(gp(j)*U(i,j+1,k)+(1-gp(j))*U(i,j,k)) &
                       -(fe(i-1)*V(i,j,k)+(1-fe(i-1))*V(i-1,j,k))*(gp(j)*U(i-1,j+1,k)+(1-gp(j))*U(i-1,j,k)))/dxPr(i)
-           Vtmp=Vtmp+( (ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))&
+           Vtmp=Vtmp+( (ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k)) &
                       -(ht(k-1)*V(i,j,k)+(1-ht(k-1))*V(i,j,k-1))*(gp(j)*W(i,j+1,k-1)+(1-gp(j))*W(i,j,k-1)))/dzPr(k)
            V2(i,j,k)=-dt*Vtmp
           end do
@@ -160,11 +162,11 @@ module CDS
         do k=1,nz
             do j=1,ny
                 do i=1,nx
-                    W2(i,j,k)= - ((Az*(W(i,j,k+1)+W(i,j,k))*(W(i,j,k+1)+W(i,j,k))&
-                    -Az*(W(i,j,k)+W(i,j,k-1))*(W(i,j,k)+W(i,j,k-1)))&
-                    +(Ay*(W(i,j+1,k)+W(i,j,k))*(V(i,j,k+1)+V(i,j,k))&
-                    -Ay*(W(i,j,k)+W(i,j-1,k))*(V(i,j-1,k)+V(i,j-1,k+1)))&
-                    +(Ax*(W(i+1,j,k)+W(i,j,k))*(U(i,j,k+1)+U(i,j,k))&
+                    W2(i,j,k)= - ((Az*(W(i,j,k+1)+W(i,j,k))*(W(i,j,k+1)+W(i,j,k)) &
+                    -Az*(W(i,j,k)+W(i,j,k-1))*(W(i,j,k)+W(i,j,k-1))) &
+                    +(Ay*(W(i,j+1,k)+W(i,j,k))*(V(i,j,k+1)+V(i,j,k)) &
+                    -Ay*(W(i,j,k)+W(i,j-1,k))*(V(i,j-1,k)+V(i,j-1,k+1))) &
+                    +(Ax*(W(i+1,j,k)+W(i,j,k))*(U(i,j,k+1)+U(i,j,k)) &
                     -Ax*(W(i,j,k)+W(i-1,j,k))*(U(i-1,j,k+1)+U(i-1,j,k))))
                 end do
             end do
@@ -184,11 +186,11 @@ module CDS
         do k=1,nz
          do j=1,ny
           do i=1,nx
-           Wtmp=( ((ht(k)*W(i,j,k+1)+(1-ht(k))*W(i,j,k))*(ht(k)*W(i,j,k+1)+(1-ht(k))*W(i,j,k)))&
+           Wtmp=( ((ht(k)*W(i,j,k+1)+(1-ht(k))*W(i,j,k))*(ht(k)*W(i,j,k+1)+(1-ht(k))*W(i,j,k))) &
                       -((ht(k-1)*W(i,j,k)+(1-ht(k-1))*W(i,j,k-1))*(ht(k-1)*W(i,j,k)+(1-ht(k-1))*W(i,j,k-1))))/dzW(k)
-           Wtmp=Wtmp+( (fe(i)*W(i+1,j,k)+(1-fe(i))*W(i,j,k))*(hp(k)*U(i,j,k+1)+(1-hp(k))*U(i,j,k))&
+           Wtmp=Wtmp+( (fe(i)*W(i+1,j,k)+(1-fe(i))*W(i,j,k))*(hp(k)*U(i,j,k+1)+(1-hp(k))*U(i,j,k)) &
                       -(fe(i-1)*W(i,j,k)+(1-fe(i-1))*W(i-1,j,k))*(hp(k)*U(i-1,j,k+1)+(1-hp(k))*U(i-1,j,k)))/dxPr(i)
-           Wtmp=Wtmp+( (gn(j)*W(i,j+1,k)+(1-gn(j))*W(i,j,k))*(hp(k)*V(i,j,k+1)+(1-hp(k))*V(i,j,k))&
+           Wtmp=Wtmp+( (gn(j)*W(i,j+1,k)+(1-gn(j))*W(i,j,k))*(hp(k)*V(i,j,k+1)+(1-hp(k))*V(i,j,k)) &
                       -(gn(j-1)*W(i,j,k)+(1-gn(j-1))*W(i,j-1,k))*(hp(k)*V(i,j-1,k+1)+(1-hp(k))*V(i,j-1,k)))/dzPr(k)
            W2(i,j,k)=-dt*Wtmp
           end do
@@ -225,8 +227,8 @@ module CDS
                 do i=1,Unx
                     Vadv = ( V(i,j,k) + V(i+1,j,k) + V(i,j-1,k) + V(i+1,j-1,k) )
                     Wadv = ( W(i,j,k) + W(i+1,j,k) + W(i,j,k-1) + W(i+1,j,k-1) )
-                    U2(i,j,k)= U2(i,j,k)&
-                               - (Ax*(U(i+1,j,k)-U(i-1,j,k)) * U(i,j,k)&
+                    U2(i,j,k)= U2(i,j,k) &
+                               - (Ax*(U(i+1,j,k)-U(i-1,j,k)) * U(i,j,k) &
                                +  Ay*(U(i,j+1,k)-U(i,j-1,k)) * Vadv&
                                +  Az*(U(i,j,k+1)-U(i,j,k-1)) * Wadv )
                 end do
@@ -258,9 +260,9 @@ module CDS
                 do i=1,Vnx
                     Uadv = ( U(i,j,k) + U(i,j+1,k) + U(i-1,j,k) + U(i-1,j+1,k) )
                     Wadv = ( W(i,j,k) + W(i,j+1,k) + W(i,j,k-1) + W(i,j+1,k-1) )
-                    V2(i,j,k)= V2(i,j,k)&
+                    V2(i,j,k)= V2(i,j,k) &
                                - (Ax*(V(i+1,j,k)-V(i-1,j,k)) * Uadv&
-                               +  Ay*(V(i,j+1,k)-V(i,j-1,k)) * V(i,j,k)&
+                               +  Ay*(V(i,j+1,k)-V(i,j-1,k)) * V(i,j,k) &
                                +  Az*(V(i,j,k+1)-V(i,j,k-1)) * Wadv )
                 end do
             end do
@@ -291,7 +293,7 @@ module CDS
                 do i=1,Wnx
                     Uadv = ( U(i,j,k) + U(i,j,k+1) + U(i-1,j,k) + U(i-1,j,k+1) )
                     Vadv = ( V(i,j,k) + V(i,j,k+1) + V(i,j-1,k) + V(i,j-1,k+1) )
-                    W2(i,j,k)= W2(i,j,k)&
+                    W2(i,j,k)= W2(i,j,k) &
                                - (Ax*(W(i+1,j,k)-W(i-1,j,k)) * Uadv&
                                +  Ay*(W(i,j+1,k)-W(i,j-1,k)) * Vadv&
                                +  Az*(W(i,j,k+1)-W(i,j,k-1)) * W(i,j,k) )
@@ -925,6 +927,499 @@ module CDS
       !$omp end parallel
 
     end subroutine CDS4_2W
+
+
+
+
+
+
+
+
+
+
+
+
+
+    subroutine CD4divU(U2,U,V,W)
+      !Morinishi et al., JCP 143, http://dx.doi.org/10.1006/jcph.1998.5962
+      real(KND),dimension(-2:,-2:,-2:),intent(out) :: U2
+      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      integer,parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
+      integer,parameter :: divcoef = 256
+      integer,parameter :: coef2ord = divcoef / 4
+      integer,parameter :: narr = 4
+      !UV1 and UV3 are sized to fit to the L1 cache, so no stack overflow should be possible
+      real(KND) :: UV1(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
+      real(KND) :: UV3(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
+      integer   :: bi,bj,bk,i,j,k,li,lj,lk
+      real(KND) :: Uint,Vint,Wint,dU
+
+      call set(U2,0._knd)
+
+      !$omp parallel private(bi,bj,bk,i,j,k,li,lj,lk,Uint,Vint,Wint,dU,UV1,UV3)
+      !$omp do
+      do bk = 1,Unz,tilenz(narr)
+       do bj = 1,Uny,tileny(narr)
+        do bi = 1,Unx,tilenx(narr)
+
+          do k = bk,min(bk+tilenz(narr)-1,Unz)
+           do j = bj,min(bj+tileny(narr)-1,Uny)
+            do i = bi-1,min(bi+tilenx(narr)-1,Unx)+2
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 Uj_1 - 1/8 Uj_3
+              Uint = sum( i_mask4 * U(i-2:i+1,j,k) )
+              UV1(li,lj,lk) = Uint * (U(i-1,j,k)+U(i  ,j,k))
+              UV3(li,lj,lk) = Uint * (U(i-2,j,k)+U(i+1,j,k))
+            end do
+           end do
+          end do
+
+          do k = bk,min(bk+tilenz(narr)-1,Unz)
+           do j = bj,min(bj+tileny(narr)-1,Uny)
+            do i = bi,min(bi+tilenx(narr)-1,Unx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 d1 - 1/8 d3
+              if (Utype(i,j,k)==0) then
+                dU =     9 * (UV1(li+1,lj,lk) - UV1(li  ,lj,lk))
+                dU = dU -    (UV3(li+2,lj,lk) - UV3(li-1,lj,lk))/3
+              else if (Utype(i,j,k)<0) then  !near a boundary - 2nd order
+                dU = coef2ord * ((U(i+1,j,k)+U(i  ,j,k)) * (U(i+1,j,k)+U(i  ,j,k)) &
+                                -(U(i  ,j,k)+U(i-1,j,k)) * (U(i  ,j,k)+U(i-1,j,k)))
+              end if
+              U2(i,j,k) = U2(i,j,k) + dU / dxmin
+            end do
+           end do
+          end do
+
+        end do
+       end do
+      end do
+      !$omp end do
+
+      !$omp do
+      do bk = 1,Unz,tilenz(narr)
+       do bj = 1,Uny,tileny(narr)
+        do bi = 1,Unx,tilenx(narr)
+
+          do k = bk,min(bk+tilenz(narr)-1,Unz)
+           do j = bj-2,min(bj+tileny(narr)-1,Uny)+1
+            do i = bi,min(bi+tilenx(narr)-1,Unx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 Uj_1 - 1/8 Uj_3
+              Vint = sum( i_mask4 * V(i-1:i+2,j,k) )
+              UV1(li,lj,lk) = Vint * (U(i,j  ,k)+U(i,j+1,k))
+              UV3(li,lj,lk) = Vint * (U(i,j-1,k)+U(i,j+2,k))
+            end do
+           end do
+          end do
+
+          do k = bk,min(bk+tilenz(narr)-1,Unz)
+           do j = bj,min(bj+tileny(narr)-1,Uny)
+            do i = bi,min(bi+tilenx(narr)-1,Unx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 d1 - 1/8 d3
+              if (Utype(i,j,k)==0) then
+                dU =     9 * (UV1(li,lj  ,lk) - UV1(li,lj-1,lk))
+                dU = dU -    (UV3(li,lj+1,lk) - UV3(li,lj-2,lk))/3
+              else if (Utype(i,j,k)<0) then  !near a boundary - 2nd order
+                dU = coef2ord * ((U(i,j+1,k)+U(i,j  ,k)) * (V(i+1,j  ,k)+V(i,j  ,k)) &
+                                -(U(i,j  ,k)+U(i,j-1,k)) * (V(i+1,j-1,k)+V(i,j-1,k)))
+              end if
+              U2(i,j,k) = U2(i,j,k) + dU / dymin
+            end do
+           end do
+          end do
+
+        end do
+       end do
+      end do
+      !$omp end do
+
+      !$omp do
+      do bk = 1,Unz,tilenz(narr)
+       do bj = 1,Uny,tileny(narr)
+        do bi = 1,Unx,tilenx(narr)
+
+          do k = bk-2,min(bk+tilenz(narr),Unz)+1
+           do j = bj,min(bj+tileny(narr)-1,Uny)
+            do i = bi,min(bi+tilenx(narr)-1,Unx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 Uj_1 - 1/8 Uj_3
+              Wint = sum( i_mask4 * W(i-1:i+2,j,k) )
+              UV1(li,lj,lk) = Wint * (U(i,j,k  )+U(i,j,k+1))
+              UV3(li,lj,lk) = Wint * (U(i,j,k-1)+U(i,j,k+2))
+            end do
+           end do
+          end do
+
+          do k = bk,min(bk+tilenz(narr)-1,Unz)
+           do j = bj,min(bj+tileny(narr)-1,Uny)
+            do i = bi,min(bi+tilenx(narr)-1,Unx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 d1 - 1/8 d3
+              if (Utype(i,j,k)==0) then
+                dU =     9 * (UV1(li,lj,lk  ) - UV1(li,lj,lk-1))
+                dU = dU -    (UV3(li,lj,lk+1) - UV3(li,lj,lk-2))/3
+              else if (Utype(i,j,k)<0) then  !near a boundary - 2nd order
+                dU = coef2ord * ((U(i,j,k+1)+U(i,j,k  )) * (W(i+1,j,k  )+W(i,j,k  )) &
+                                -(U(i,j,k  )+U(i,j,k-1)) * (W(i+1,j,k-1)+W(i,j,k-1)))
+              end if
+              U2(i,j,k) = U2(i,j,k) + dU / dzmin
+            end do
+           end do
+          end do
+
+        end do
+       end do
+      end do
+      !$omp end do
+      !$omp end parallel
+
+      call multiply(U2,-dt/divcoef)
+
+    end subroutine CD4divU
+
+
+
+
+
+
+
+
+
+
+
+    subroutine CD4divV(V2,U,V,W)
+      !Morinishi et al., JCP 143, http://dx.doi.org/10.1006/jcph.1998.5962
+      real(KND),dimension(-2:,-2:,-2:),intent(out) :: V2
+      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      integer,parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
+      integer,parameter :: divcoef = 256
+      integer,parameter :: coef2ord = divcoef / 4
+      integer,parameter :: narr = 4
+      !UV1 and UV3 are sized to fit to the L1 cache, so no stack overflow should be possible
+      real(KND) :: UV1(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
+      real(KND) :: UV3(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
+      integer   :: bi,bj,bk,i,j,k,li,lj,lk
+      real(KND) :: Uint,Vint,Wint,dV
+
+      call set(V2,0._knd)
+
+      !$omp parallel private(bi,bj,bk,i,j,k,li,lj,lk,Uint,Vint,Wint,dV,UV1,UV3)
+      !$omp do
+      do bk = 1,Vnz,tilenz(narr)
+       do bj = 1,Vny,tileny(narr)
+        do bi = 1,Vnx,tilenx(narr)
+
+          do k = bk,min(bk+tilenz(narr)-1,Vnz)
+           do j = bj,min(bj+tileny(narr)-1,Vny)
+            do i = bi-2,min(bi+tilenx(narr)-1,Vnx)+1
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 Uj_1 - 1/8 Uj_3
+              Uint = sum( i_mask4 * U(i,j-1:j+2,k) )
+              UV1(li,lj,lk) = Uint * (V(i  ,j,k)+V(i+1,j,k))
+              UV3(li,lj,lk) = Uint * (V(i-1,j,k)+V(i+2,j,k))
+            end do
+           end do
+          end do
+
+          do k = bk,min(bk+tilenz(narr)-1,Vnz)
+           do j = bj,min(bj+tileny(narr)-1,Vny)
+            do i = bi,min(bi+tilenx(narr)-1,Vnx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 d1 - 1/8 d3
+              if (Vtype(i,j,k)==0) then
+                dV =     9 * (UV1(li  ,lj,lk) - UV1(li-1,lj,lk))
+                dV = dV -    (UV3(li+1,lj,lk) - UV3(li-2,lj,lk))/3
+              else if (Vtype(i,j,k)<0) then  !near a boundary - 2nd order
+                dV = coef2ord * ((V(i+1,j,k)+V(i  ,j,k)) * (U(i  ,j+1,k)+U(i  ,j,k)) &
+                                -(V(i  ,j,k)+V(i-1,j,k))  *(U(i-1,j+1,k)+U(i-1,j,k)))
+              end if
+              V2(i,j,k) = V2(i,j,k) + dV / dxmin
+            end do
+           end do
+          end do
+
+        end do
+       end do
+      end do
+      !$omp end do
+
+      !$omp do
+      do bk = 1,Vnz,tilenz(narr)
+       do bj = 1,Vny,tileny(narr)
+        do bi = 1,Vnx,tilenx(narr)
+
+          do k = bk,min(bk+tilenz(narr)-1,Vnz)
+           do j = bj-1,min(bj+tileny(narr)-1,Vny)+2
+            do i = bi,min(bi+tilenx(narr)-1,Vnx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 Uj_1 - 1/8 Uj_3
+              Vint = sum( i_mask4 * V(i,j-2:j+1,k) )
+              UV1(li,lj,lk) = Vint * (V(i,j-1,k)+V(i,j  ,k))
+              UV3(li,lj,lk) = Vint * (V(i,j-2,k)+V(i,j+1,k))
+            end do
+           end do
+          end do
+
+          do k = bk,min(bk+tilenz(narr)-1,Vnz)
+           do j = bj,min(bj+tileny(narr)-1,Vny)
+            do i = bi,min(bi+tilenx(narr)-1,Vnx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 d1 - 1/8 d3
+              if (Vtype(i,j,k)==0) then
+                dV =     9 * (UV1(li,lj+1,lk) - UV1(li,lj  ,lk))
+                dV = dV -    (UV3(li,lj+2,lk) - UV3(li,lj-1,lk))/3
+              else if (Vtype(i,j,k)<0) then  !near a boundary - 2nd order
+                dV = coef2ord * ((V(i,j+1,k)+V(i,j  ,k)) * (V(i,j+1,k)+V(i,j  ,k)) &
+                                -(V(i,j  ,k)+V(i,j-1,k)) * (V(i,j  ,k)+V(i,j-1,k)))
+              end if
+              V2(i,j,k) = V2(i,j,k) + dV / dymin
+            end do
+           end do
+          end do
+
+        end do
+       end do
+      end do
+      !$omp end do
+
+      !$omp do
+      do bk = 1,Vnz,tilenz(narr)
+       do bj = 1,Vny,tileny(narr)
+        do bi = 1,Vnx,tilenx(narr)
+
+          do k = bk-2,min(bk+tilenz(narr),Vnz)+1
+           do j = bj,min(bj+tileny(narr)-1,Vny)
+            do i = bi,min(bi+tilenx(narr)-1,Vnx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 Uj_1 - 1/8 Uj_3
+              Wint = sum( i_mask4 * W(i,j-1:j+2,k) )
+              UV1(li,lj,lk) = Wint * (V(i,j,k  )+V(i,j,k+1))
+              UV3(li,lj,lk) = Wint * (V(i,j,k-1)+V(i,j,k+2))
+            end do
+           end do
+          end do
+
+          do k = bk,min(bk+tilenz(narr)-1,Vnz)
+           do j = bj,min(bj+tileny(narr)-1,Vny)
+            do i = bi,min(bi+tilenx(narr)-1,Vnx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 d1 - 1/8 d3
+              if (Vtype(i,j,k)==0) then
+                dV =     9 * (UV1(li,lj,lk  ) - UV1(li,lj,lk-1))
+                dV = dV -    (UV3(li,lj,lk+1) - UV3(li,lj,lk-2))/3
+              else if (Vtype(i,j,k)<0) then  !near a boundary - 2nd order
+                dV = coef2ord * ((V(i,j,k+1)+V(i,j,k  )) * (W(i,j+1,k  )+W(i,j,k  )) &
+                                -(V(i,j,k  )+V(i,j,k-1)) * (W(i,j+1,k-1)+W(i,j,k-1)))
+              end if
+              V2(i,j,k) = V2(i,j,k) + dV / dzmin
+            end do
+           end do
+          end do
+
+        end do
+       end do
+      end do
+      !$omp end do
+      !$omp end parallel
+
+      call multiply(V2,-dt/divcoef)
+
+    end subroutine CD4divV
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    subroutine CD4divW(W2,U,V,W)
+      !Morinishi et al., JCP 143, http://dx.doi.org/10.1006/jcph.1998.5962
+      real(KND),dimension(-2:,-2:,-2:),intent(out) :: W2
+      real(KND),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      integer,parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
+      integer,parameter :: divcoef = 256
+      integer,parameter :: coef2ord = divcoef / 4
+      integer,parameter :: narr = 4
+      !UV1 and UV3 are sized to fit to the L1 cache, so no stack overflow should be possible
+      real(KND) :: UV1(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
+      real(KND) :: UV3(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
+      integer   :: bi,bj,bk,i,j,k,li,lj,lk
+      real(KND) :: Uint,Vint,Wint,dW
+
+      call set(W2,0._knd)
+
+      !$omp parallel private(bi,bj,bk,i,j,k,li,lj,lk,Uint,Vint,Wint,dW,UV1,UV3)
+      !$omp do
+      do bk = 1,Wnz,tilenz(narr)
+       do bj = 1,Wny,tileny(narr)
+        do bi = 1,Wnx,tilenx(narr)
+
+          do k = bk,min(bk+tilenz(narr)-1,Wnz)
+           do j = bj,min(bj+tileny(narr)-1,Wny)
+            do i = bi-2,min(bi+tilenx(narr)-1,Wnx)+1
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 Uj_1 - 1/8 Uj_3
+              Uint = sum( i_mask4 * U(i,j,k-1:k+2) )
+              UV1(li,lj,lk) = Uint * (W(i  ,j,k)+W(i+1,j,k))
+              UV3(li,lj,lk) = Uint * (W(i-1,j,k)+W(i+2,j,k))
+            end do
+           end do
+          end do
+
+          do k = bk,min(bk+tilenz(narr)-1,Wnz)
+           do j = bj,min(bj+tileny(narr)-1,Wny)
+            do i = bi,min(bi+tilenx(narr)-1,Wnx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 d1 - 1/8 d3
+              if (Wtype(i,j,k)==0) then
+                dW =     9 * (UV1(li  ,lj,lk) - UV1(li-1,lj,lk))
+                dW = dW -    (UV3(li+1,lj,lk) - UV3(li-2,lj,lk))/3
+              else if (Wtype(i,j,k)<0) then  !near a boundary - 2nd order
+                dW = coef2ord * ((W(i+1,j,k)+W(i  ,j,k)) * (U(i  ,j,k+1)+U(i  ,j,k)) &
+                                -(W(i  ,j,k)+W(i-1,j,k)) * (U(i-1,j,k+1)+U(i-1,j,k)))
+              end if
+              W2(i,j,k) = W2(i,j,k) + dW / dxmin
+            end do
+           end do
+          end do
+
+        end do
+       end do
+      end do
+      !$omp end do
+
+      !$omp do
+      do bk = 1,Wnz,tilenz(narr)
+       do bj = 1,Wny,tileny(narr)
+        do bi = 1,Wnx,tilenx(narr)
+
+          do k = bk,min(bk+tilenz(narr)-1,Wnz)
+           do j = bj-2,min(bj+tileny(narr)-1,Wny)+1
+            do i = bi,min(bi+tilenx(narr)-1,Wnx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 Uj_1 - 1/8 Uj_3
+              Vint = sum( i_mask4 * V(i,j,k-1:k+2) )
+              UV1(li,lj,lk) = Vint * (W(i,j  ,k)+W(i,j+1,k))
+              UV3(li,lj,lk) = Vint * (W(i,j-1,k)+W(i,j+2,k))
+            end do
+           end do
+          end do
+
+          do k = bk,min(bk+tilenz(narr)-1,Wnz)
+           do j = bj,min(bj+tileny(narr)-1,Wny)
+            do i = bi,min(bi+tilenx(narr)-1,Wnx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 d1 - 1/8 d3
+              if (Wtype(i,j,k)==0) then
+                dW =     9 * (UV1(li,lj  ,lk) - UV1(li,lj-1,lk))
+                dW = dW -    (UV3(li,lj+1,lk) - UV3(li,lj-2,lk))/3
+              else if (Wtype(i,j,k)<0) then  !near a boundary - 2nd order
+                dW = coef2ord * ((W(i,j+1,k)+W(i,j  ,k)) * (V(i,j,k+1)+V(i,j  ,k  )) &
+                                -(W(i,j  ,k)+W(i,j-1,k)) * (V(i,j-1,k)+V(i,j-1,k+1)))
+              end if
+              W2(i,j,k) = W2(i,j,k) + dW / dymin
+            end do
+           end do
+          end do
+
+        end do
+       end do
+      end do
+      !$omp end do
+
+      !$omp do
+      do bk = 1,Wnz,tilenz(narr)
+       do bj = 1,Wny,tileny(narr)
+        do bi = 1,Wnx,tilenx(narr)
+
+          do k = bk-1,min(bk+tilenz(narr)-1,Wnz)+2
+           do j = bj,min(bj+tileny(narr)-1,Wny)
+            do i = bi,min(bi+tilenx(narr)-1,Wnx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 Uj_1 - 1/8 Uj_3
+              Wint = sum( i_mask4 * W(i,j,k-2:k+1) )
+              UV1(li,lj,lk) = Wint * (W(i,j,k-1)+W(i,j,k  ))
+              UV3(li,lj,lk) = Wint * (W(i,j,k-2)+W(i,j,k+1))
+            end do
+           end do
+          end do
+
+          do k = bk,min(bk+tilenz(narr)-1,Wnz)
+           do j = bj,min(bj+tileny(narr)-1,Wny)
+            do i = bi,min(bi+tilenx(narr)-1,Wnx)
+              li = i-bi+1
+              lj = j-bj+1
+              lk = k-bk+1
+              !9/8 d1 - 1/8 d3
+              if (Wtype(i,j,k)==0) then
+                dW =     9 * (UV1(li,lj,lk+1) - UV1(li,lj,lk  ))
+                dW = dW -    (UV3(li,lj,lk+2) - UV3(li,lj,lk-1))/3
+              else if (Wtype(i,j,k)<0) then  !near a boundary - 2nd order
+                dW = coef2ord * ((W(i,j,k+1)+W(i,j,k  )) * (W(i,j,k+1)+W(i,j,k  )) &
+                                -(W(i,j,k  )+W(i,j,k-1)) * (W(i,j,k  )+W(i,j,k-1)))
+              end if
+              W2(i,j,k) = W2(i,j,k) + dW / dzmin
+            end do
+           end do
+          end do
+
+        end do
+       end do
+      end do
+      !$omp end do
+      !$omp end parallel
+
+      call multiply(W2,-dt/divcoef)
+
+    end subroutine CD4divW
+
+
+
 
 
 

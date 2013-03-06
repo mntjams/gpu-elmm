@@ -101,6 +101,8 @@
   intrinsic abs
 #else
  subroutine Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev)
+  use VolumeSources, only: ResistanceForce
+  use VTKArray
   real(KND),dimension(-2:,-2:,-2:),intent(in)    :: U,V,W
   real(KND),dimension(-2:,-2:,-2:),intent(out)   :: U2,V2,W2
   real(KND),dimension(-2:,-2:,-2:),intent(inout) :: Ustar,Vstar,Wstar
@@ -237,13 +239,9 @@
           call CDV(Vstar,U,V,W)
           call CDW(Wstar,U,V,W)
         else if (convmet==4) then
-          call CDS4U(Ustar,U,V,W)
-          call CDS4V(Vstar,U,V,W)
-          call CDS4W(Wstar,U,V,W)
-        else if (convmet==5) then
-          call CDS4_2U(Ustar,U,V,W)
-          call CDS4_2V(Vstar,U,V,W)
-          call CDS4_2W(Wstar,U,V,W)
+          call CD4divU(Ustar,U,V,W)
+          call CDS4divV(Vstar,U,V,W)
+          call CDS4divW(Wstar,U,V,W)
         end if
 #endif
 
@@ -292,13 +290,14 @@
 
       call FilterUstar    
 
-
-      if (abs(coriolisparam)>1E-10_KND) call CoriolisForce(Unx,Uny,Unz,Vnx,Vny,Vnz,&
+      if (abs(coriolisparam)>tiny(1._KND)) call CoriolisForce(Unx,Uny,Unz,Vnx,Vny,Vnz,&
                                                     coriolisparam,&
                                                     Ustar,Vstar,U,V,dt)
 
       if (buoyancy==1) call BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,&
                                 grav_acc,temperature_ref,Wstar,temperature,dt)
+
+      call ResistanceForce(Ustar,Vstar,Wstar,U,V,W)
 
 
       !$omp parallel private(i,j,k)
@@ -352,11 +351,11 @@
             call BoundU(3,Wstar,2)
 
 
-            call Filter(Ustar)
+            call Filter(Ustar,Utype)
 
-            call Filter(Vstar)
+            call Filter(Vstar,Vtype)
 
-            call Filter(Wstar)
+            call Filter(Wstar,Wtype)
 
             call BoundU(1,Ustar,2)
             call BoundU(2,Vstar,2)
