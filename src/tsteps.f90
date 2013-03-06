@@ -140,8 +140,6 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
 #endif
   end if
 
-
-
   if ((Btype(We) ==TurbulentInlet).or.(Btype(Ea) ==TurbulentInlet)) then
     call GetTurbInlet
     !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
@@ -157,11 +155,12 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
                U,V,W,dt)
   !$hmpp <tsteps> delegatedstore, args[TimeStepEul::dt]
 
+
   write (*,*) "time:",time,"dt: ",dt
 
   do l=1,RKstages
 
-write(*,*) "stage:",l
+    write(*,*) "stage:",l
 
 
     if (debugparam>1) call system_clock(count=time1)
@@ -262,9 +261,9 @@ write(*,*) "stage:",l
     end if
 
 
-!     !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
-!     call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-!                           nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
+     !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
+     call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                           nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
 
 
 #ifdef __HMPP
