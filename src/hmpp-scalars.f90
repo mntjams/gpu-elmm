@@ -59,15 +59,15 @@ module HMPP_SCALARS
 !
 !
 !     subroutine HMPP_DiffTemperature(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
-!                               TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
+!                               TempBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
 !                               TDiff,Temperature2,Temperature,&
 !                               coef,dt)
 !
-!       integer,intent(in)    :: Prnx,Prny,Prnz,maxCNiter,TBtype(6)
+!       integer,intent(in)    :: Prnx,Prny,Prnz,maxCNiter,TempBtype(6)
 !       real(knd),intent(out),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: Temperature2
 !       real(knd),intent(in),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)  :: Temperature
 !       real(knd),intent(in)  :: dxmin,dymin,dzmin,epsCN,Re,coef,dt
-!       real(knd),intent(in)  :: sideTemp(6),Tempin(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+!       real(knd),intent(in)  :: sideTemp(6),TempIn(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
 !       real(knd),intent(in),dimension(-1:,-1:) :: BsideTArr,BsideTFLArr
 !       real(knd),dimension(:,:),allocatable,save :: BsideTArrLoc,BsideTFLArrLoc
 !       integer   :: l
@@ -78,7 +78,7 @@ module HMPP_SCALARS
 !
 !       if (called==0) then
 !         allocate(BsideTArrLoc(-1:Prnx+2,-1:Prny+2),BsideTFLArrLoc(-1:Prnx+2,-1:Prny+2))
-!         !$hmpp <tsteps> advancedload, args[DiffTemperature::TBtype,DiffTemperature::sideTemp,DiffTemperature::TempIn]
+!         !$hmpp <tsteps> advancedload, args[DiffTemperature::TempBtype,DiffTemperature::sideTemp,DiffTemperature::TempIn]
 !         !$hmpp <tsteps> advancedload, args[DiffTemperature::epsCN,DiffTemperature::maxCNiter]
 !         called = 1
 !       end if
@@ -98,7 +98,7 @@ module HMPP_SCALARS
 !
 !       !$hmpp <tsteps> DiffTemperature callsite, args[*].noupdate=true
 !       call DiffTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
-!                             TBtype,sideTemp,TempIn,BsideTArrLoc,BsideTFLArrLoc,&
+!                             TempBtype,sideTemp,TempIn,BsideTArrLoc,BsideTFLArrLoc,&
 !                             TDiff,Temperature2,Temperature,&
 !                             coef,dt,l,res)
 !
@@ -111,17 +111,17 @@ module HMPP_SCALARS
 
     subroutine HMPP_RKstage_Temperature(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                             dxmin,dymin,dzmin,maxCNiter,epsCN,Re,limparam,&
-                            TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
+                            TempBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
                             TDiff,Temperature2,Temperature,Temperature_adv,U,V,W,&
                             SubsidenceProfile,fluxProfile,dt,RKstage,alpha,beta,rho)
 
-      integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,maxCNiter,TBtype(6),RKstage
+      integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,maxCNiter,TempBtype(6),RKstage
       real(knd),intent(inout) :: Temperature2(-1:,-1:,-1:)  !Only to avoid allocation of an automatic array, memory transfers to codelet should be avoided. Assuming we do not have to save main memory.
       real(knd),intent(inout) :: Temperature(-1:,-1:,-1:)
       real(knd),intent(inout) :: Temperature_adv(-1:,-1:,-1:)
       real(knd),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
       real(knd),intent(in)    :: dxmin,dymin,dzmin,epsCN,Re,limparam,dt
-      real(knd),intent(in)    :: sideTemp(6),Tempin(-1:,-1:),TDiff(-1:,-1:,-1:)
+      real(knd),intent(in)    :: sideTemp(6),TempIn(-1:,-1:),TDiff(-1:,-1:,-1:)
       real(knd),intent(in)    :: BsideTArr(-1:,-1:),BsideTFLArr(-1:,-1:)
       real(knd),intent(in)    :: SubsidenceProfile(0:)
       real(knd),intent(out)   :: fluxProfile(0:)
@@ -141,7 +141,7 @@ module HMPP_SCALARS
         allocate(BsideTArrLoc(-1:Prnx+2,-1:Prny+2),BsideTFLArrLoc(-1:Prnx+2,-1:Prny+2))
        !$hmpp <tsteps> advancedload, args[RKstage_Temperature::limparam]
        !$hmpp <tsteps> advancedload, args[RKstage_Temperature::alpha,RKstage_Temperature::beta,RKstage_Temperature::rho]
-       !$hmpp <tsteps> advancedload, args[RKstage_Temperature::TBtype,RKstage_Temperature::sideTemp,RKstage_Temperature::TempIn]
+       !$hmpp <tsteps> advancedload, args[RKstage_Temperature::TempBtype,RKstage_Temperature::sideTemp,RKstage_Temperature::TempIn]
        !$hmpp <tsteps> advancedload, args[RKstage_Temperature::epsCN,RKstage_Temperature::maxCNiter]
 
        if (size(SubsidenceProfile)==size(SubsidenceProfileLoc)) then
@@ -177,7 +177,7 @@ module HMPP_SCALARS
       !$hmpp <tsteps> RKstage_Temperature callsite, args[*].noupdate=true
       call RKstage_Temperature_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                             dxmin,dymin,dzmin,maxCNiter,epsCN,Re,limparam,&
-                            TBtype,sideTemp,TempIn,BsideTArrLoc,BsideTFLArrLoc,&
+                            TempBtype,sideTemp,TempIn,BsideTArrLoc,BsideTFLArrLoc,&
                             TDiff,Temperature2,Temperature,Temperature_adv,U,V,W,&
                             SubsidenceProfileLoc,fluxProfileLoc,dt,RKstage,alpha,beta,rho,CNiters,CNres)
 

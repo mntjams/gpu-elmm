@@ -114,7 +114,7 @@ contains
 
     if (debugparam>1.and.called>1) then
      call system_clock(count=time3)
-     write (*,*) "ET of part 2", (time3-time2)/real(trate)
+     write (*,*) "ET of part 2", real(time3-time2)/real(trate)
     endif
 
 #ifdef __HMPP
@@ -123,7 +123,7 @@ contains
       !$hmpp <tsteps> advancedload, args[PostPoisson::dt3,PostPoisson::Phi]
       if (debugparam>1.and.called>1) then
        call system_clock(count=timem4)
-       write (*,*) "ET of part 4", ((timem4-timem3)+(timem2-timem1))/real(trate)
+       write (*,*) "ET of part 4", real((timem4-timem3)+(timem2-timem1))/real(trate)
       endif
 
       !$hmpp <tsteps> PostPoisson callsite, args[*].noupdate=true
@@ -139,7 +139,7 @@ contains
 #endif
     if (debugparam>1.and.called>1) then
      call system_clock(count=time4)
-     write (*,*) "ET of part 3", ((time4-time1)-(time3-time2))/real(trate)
+     write (*,*) "ET of part 3", real((time4-time1)-(time3-time2))/real(trate)
     endif
   end subroutine PR_CORRECT
 
@@ -253,19 +253,6 @@ contains
     integer   :: i,j,k
 
 
-
-
-
-
-    Phiref=Phi(Prnx/2,Prny/2,Prnz/2)
-
-    !$omp parallel
-    !$omp workshare
-    Phi = Phi-Phiref
-    !$omp end workshare
-    !$omp end parallel
-
-
     Au = dt2/dxmin
     Av = dt2/dymin
     Aw = dt2/dzmin
@@ -315,6 +302,12 @@ contains
      end do
     end do
     !$omp end do
+
+    !$omp workshare
+    Phiref = sum(Pr(1:Prnx,1:Prny,Prnz))/(Prnx*Prny)
+    Pr = Pr - (Phiref - top_pressure)
+    !$omp end workshare
+    
 
     !$omp sections
     !$omp section

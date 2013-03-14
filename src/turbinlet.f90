@@ -746,7 +746,7 @@ contains
   Uin(1:Uny,1:Unz)=c1*In1%U+c2*In2%U
   Vin(1:Vny,1:Vnz)=c1*In1%V+c2*In2%V
   Win(1:Wny,1:Wnz)=c1*In1%W+c2*In2%W
-  if (enable_buoyancy==1) Tempin(1:Prny,1:Prnz)=c1*In1%temperature+c2*In2%temperature
+  if (enable_buoyancy==1) TempIn(1:Prny,1:Prnz)=c1*In1%temperature+c2*In2%temperature
 
   endsubroutine GETINLETFROMFILE
 

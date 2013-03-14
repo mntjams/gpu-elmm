@@ -58,6 +58,9 @@ module PARAMETERS
 
   real(knd) :: prgradientx = 0, prgradienty = 0, temperature_ref = 295, grav_acc = 0, coriolisparam = 0
 
+  real(knd) :: top_pressure !mean pressure at the top boundary - calculated
+  real(knd) :: bottom_pressure = 0
+
   real(knd) :: SHEARG,Uinlet,ustarsurfin
 
   real(knd) :: z0inlet,z0W,z0E,z0S,z0N,z0B,z0T
@@ -96,7 +99,10 @@ module PARAMETERS
   integer :: inlettype,gridtype,profiletype
 
 
-  real(knd),allocatable :: Uin(:,:),Vin(:,:),Win(:,:),Uoutb(:,:),Tempin(:,:) !1:Unz
+  real(knd),allocatable :: Uin(:,:),Vin(:,:),Win(:,:),Uoutb(:,:)
+
+  real(knd),allocatable :: TempIn(:,:), MoistIn(:,:)
+
   real(knd),allocatable :: xU(:),xPr(:),yV(:),yPr(:),zW(:),zPr(:)          !coordinates of grid points
   real(knd),allocatable :: dxU(:),dxPr(:),dyV(:),dyPr(:),dzW(:),dzPr(:)    !dxPr(i)=xU(i)-xU(i-1), dxU(i)=xPr(i+1)-xPr(i)
 
@@ -116,16 +122,23 @@ module PARAMETERS
 
   integer,parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
 
-  integer,dimension(6) :: Btype     !boundary condition types see below for values
-  integer,dimension(6) :: TBtype    !boundary condition types for temperature
-  integer,dimension(6) :: ScalBtype !boundary condition types for scalars
+  integer,dimension(6) :: Btype      !boundary condition types for velocity, see below for values
+  integer,dimension(6) :: TempBtype  !boundary condition types for temperature
+  integer,dimension(6) :: MoistBtype !boundary condition types for temperature
+  integer,dimension(6) :: ScalBtype  !boundary condition types for scalars
 
 
-  real(knd),dimension(3,6)   :: sideU    !velocities on boundaries in case of Dirichlet BC
-  real(knd),dimension(6)     :: sideTemp !temperatures or temperature fluxes on boundaries
+  real(knd),dimension(3,6)   :: sideU     !velocities on boundaries in case of Dirichlet BC
+  real(knd),dimension(6)     :: sideTemp  !temperatures or temperature fluxes on boundaries
+  real(knd),dimension(6)     :: sideMoist !moistures or moisture fluxes on boundaries
+  real(knd),dimension(6)     :: sideScal  !scalars or scalar fluxes on boundaries
+
   real(knd),allocatable      :: BsideTArr(:,:),BsideTFLArr(:,:)
 
-  real(knd),dimension(6) :: sideScal  !scalars or scalar fluxes on boundaries
+
+  integer,parameter :: scalar_type_temperature = 1, &
+                       scalar_type_moisture = 2, &
+                       scalar_type_passive = 3
 
   integer,parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
                         TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
@@ -164,6 +177,6 @@ module RK3
   real(knd),parameter :: RK_alpha(3) = [ 4._knd/15._knd, 1._knd/15._knd,  1._knd/6._knd  ]
   real(knd),parameter :: RK_beta(3)  = [ 8._knd/15._knd, 5._knd/12._knd,  3._knd/4._knd  ]
   real(knd),parameter :: RK_rho(3)   = [ 0._knd,       -17._knd/60._knd, -5._knd/12._knd ]
-  integer,parameter   :: RKstages = 3
+  integer,parameter   :: RK_stages = 3
 
 end module RK3

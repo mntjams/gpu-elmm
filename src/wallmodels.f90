@@ -446,13 +446,13 @@ implicit none
 
            WMP%z0 = z0B
 
-           if (TBtype(Bo)==CONSTFLUX) then
+           if (TempBtype(Bo)==CONSTFLUX) then
              WMP%tempfl = sideTemp(Bo)
            else
              WMP%temp = 0
            end if
 
-           if (TBtype(Bo)==DIRICHLET) then
+           if (TempBtype(Bo)==DIRICHLET) then
              WMP%temp = sideTemp(Bo)
            end if
 
@@ -761,13 +761,18 @@ implicit none
 
     vel = sqrt(sum(vect**2))
 
-    prgrad = dot_product( prgradvect , vect ) / vel
+    if (vel>=tiny(1._knd)) then
+      !in the same direction as tangential velocity vector
+      prgrad = dot_product( prgradvect , vect ) / vel
 
-    if (vel/=0) then
-
-      call WMFlatPrGradUstar(ustar,vel,prgrad,dist)
+    else
+      !tangential to the wall
+      prgrad = sqrt(sum((prgradvect - dot_product(prgradvect,distvect) * distvect / dist**2)**2))
 
     end if
+
+    call WMFlatPrGradUstar(ustar,vel,prgrad,dist)
+
 
     if (ustar<0) ustar = 0
 
@@ -1061,7 +1066,7 @@ implicit none
     real(knd),intent(in) :: Temperature(-1:,-1:,-1:)
     integer i
 
-    if (enable_buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
+    if (enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET) then
       do i = 1,size(WMPoints)
         if (WMPoints(i)%zk==1) WMPoints(i)%tempfl = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&
                        (temperature(WMPoints(i)%xi,WMPoints(i)%yj,1) - temperature(WMPoints(i)%xi,WMPoints(i)%yj,0))
@@ -1128,7 +1133,7 @@ implicit none
     real(knd) dist(3), vel(3), wallvel(3), prgrad(3)
 
 
-    if (enable_buoyancy==1.and.TBtype(Bo)==DIRICHLET) then
+    if (enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET) then
       !$omp parallel private(i,j)
       !$omp do
       do j = 1,Prny
@@ -1160,12 +1165,12 @@ implicit none
 
       if (WMPoints(i)%z0>0) then
 
-         if (enable_buoyancy==1 .and. TBtype(Bo)==CONSTFLUX) then
+         if (enable_buoyancy==1 .and. TempBtype(Bo)==CONSTFLUX) then
 
            call WM_MO_FLUX(Visc(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%tempfl,&
                            WMPoints(i)%z0, dist, vel)
 
-         else if (enable_buoyancy==1 .and. TBtype(Bo)==DIRICHLET) then
+         else if (enable_buoyancy==1 .and. TempBtype(Bo)==DIRICHLET) then
 
            if (WMPoints(i)%zk==1) WMPoints(i)%temp = BsideTArr(WMPoints(i)%xi,WMPoints(i)%yj)
 
@@ -1210,7 +1215,7 @@ implicit none
     end do
     !$omp end parallel do
 
-    if (enable_buoyancy==1.and. TBtype(Bo)==DIRICHLET) call Bound_tempfl(BsideTFLArr)
+    if (enable_buoyancy==1.and. TempBtype(Bo)==DIRICHLET) call Bound_tempfl(BsideTFLArr)
 
 
   end subroutine ComputeViscsWM

@@ -848,7 +848,7 @@ contains
     real(knd),dimension(1:,1:,1:),intent(in)::RHS
     integer i,k,l,nx,nz,sx,sz
     real(knd) mgeps,R,Phiref
-    real(knd),save:: called=0
+    integer,save:: called=0
 
     mgeps=epsPoisson
     Phi=0

@@ -21,16 +21,19 @@ module Outputs
                                          profU,profV,profuu,profvv,profww,proftauavg,proftau,proftausgs,proftausgsavg,&
                                          proftemp,proftempfl,proftempavg,proftempavg2,proftempflavg,&
                                          proftempflsgs,proftempflsgsavg,proftt,profttavg,&
+                                         profmoist,profmoistfl,profmoistavg,profmoistavg2,profmoistflavg,&
+                                         profmoistflsgs,profmoistflsgsavg,profmm,profmmavg,&
                                          profuw,profuwavg,profuwsgs,profuwsgsavg,&
                                          profvw,profvwavg,profvwsgs,profvwsgsavg
 
   real(knd),dimension(:,:),allocatable ::profscal,profscalfl,profscalavg,profscalavg2,profscalflavg,&  !which scalar, height
                                          profscalflsgs,profscalflsgsavg,profss,profssavg
 
-  real(knd),allocatable :: Uavg(:,:,:),Vavg(:,:,:),Wavg(:,:,:)
-  real(knd),allocatable :: Pravg(:,:,:)
-  real(knd),allocatable :: Temperatureavg(:,:,:)
-  real(knd),allocatable :: Scalaravg(:,:,:,:)
+  real(knd),allocatable :: U_avg(:,:,:),V_avg(:,:,:),W_avg(:,:,:)
+  real(knd),allocatable :: Pr_avg(:,:,:)
+  real(knd),allocatable :: Temperature_avg(:,:,:)
+  real(knd),allocatable :: Moisture_avg(:,:,:)
+  real(knd),allocatable :: Scalar_avg(:,:,:,:)
 
   real(TIM),allocatable,dimension(:) :: times                                !times of the timesteps
 
@@ -39,7 +42,7 @@ module Outputs
   real(knd),allocatable,dimension(:,:) :: ustar,tstar                        !first index differentiates flux from friction number
                                                                              !second index is time
 
-  real(knd),allocatable,dimension(:,:) :: Utime,Vtime,Wtime,Prtime,temptime  !position, time
+  real(knd),allocatable,dimension(:,:) :: Utime,Vtime,Wtime,Prtime,temptime,moisttime  !position, time
 
   real(knd),allocatable,dimension(:,:,:) :: scalptime                        !which scalar, position, time
   real(knd),allocatable,dimension(:,:) :: scalsumtime                        !which scalar, time
@@ -58,7 +61,7 @@ module Outputs
     integer   :: dimension,direction
     real(knd) :: position
     integer   :: mini, maxi, minj, maxj, mink, maxk
-  endtype TFrameDomain
+  end type TFrameDomain
 
 
   type TOutputSwitches
@@ -83,7 +86,8 @@ module Outputs
     integer :: out_Pr = 1
     integer :: out_Prtype = 1
     integer :: out_lambda2 = 1
-    integer :: out_T = 1
+    integer :: out_temperature = 1
+    integer :: out_moisture = 1
     integer :: out_div = 0
     integer :: out_visc = 0
 
@@ -91,7 +95,8 @@ module Outputs
     integer :: avg_vort = 0
     integer :: avg_Pr = 1
     integer :: avg_Prtype = 0
-    integer :: avg_T = 1
+    integer :: avg_temperature = 1
+    integer :: avg_moisture = 1
 
     integer :: frame_U = 1
     integer :: frame_vort = 0
@@ -99,7 +104,8 @@ module Outputs
     integer :: frame_lambda2 = 0
     integer :: frame_scalars = 0
     integer :: frame_sumscalars = 1
-    integer :: frame_T = 1
+    integer :: frame_temperature = 1
+    integer :: frame_moisture = 1
     integer :: frame_tempfl = 0
     integer :: frame_scalfl = 0
     type(TFrameDomain),dimension(:),allocatable :: frame_domains
@@ -121,7 +127,7 @@ module Outputs
     integer :: delta = 1
     integer :: ustar = 0
     integer :: tstar = 0
-  endtype
+  end type
 
   type(TDisplaySwitches),save :: display
 
@@ -138,37 +144,42 @@ contains
     integer :: k
 
     if (num_of_scalars>0) then
-     if (averaging==1.and.store%scalarsavg>0) then
-      allocate(Scalaravg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
-      Scalaravg = 0
-     endif
+     if (averaging==1.and.store%scalarsavg==1) then
+      allocate(Scalar_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+      Scalar_avg = 0
+     end if
     else
      if (averaging==1) then
-      allocate(Scalaravg(0,0,0,0))
-     endif
-    endif
+      allocate(Scalar_avg(0,0,0,0))
+     end if
+    end if
 
 
    if (averaging==1) then
-    if (store%avg_U>0) then
-      allocate(Uavg(-2:Unx+3,-2:Uny+3,-2:Unz+3))
-      allocate(Vavg(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
-      allocate(Wavg(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-      Uavg = 0
-      Vavg = 0
-      Wavg = 0
-    endif
+    if (store%avg_U==1) then
+      allocate(U_avg(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+      allocate(V_avg(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+      allocate(W_avg(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+      U_avg = 0
+      V_avg = 0
+      W_avg = 0
+    end if
 
-    if (store%avg_Pr>0) then
-      allocate(Pravg(1:Prnx,1:Prny,1:Prnz))
-      Pravg = 0
-    endif
+    if (store%avg_Pr==1) then
+      allocate(Pr_avg(1:Prnx,1:Prny,1:Prnz))
+      Pr_avg = 0
+    end if
 
-    if (enable_buoyancy==1.and.store%avg_T>0) then
-     allocate(temperatureavg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-     temperatureavg = 0
-    endif
-   endif
+    if (enable_buoyancy==1.and.store%avg_temperature==1) then
+     allocate(Temperature_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+     Temperature_avg = 0
+    end if
+
+    if (enable_moisture==1.and.store%avg_moisture==1) then
+     allocate(Moisture_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+     Moisture_avg = 0
+    end if
+   end if
 
    allocate(times(0:nt))
 
@@ -179,50 +190,57 @@ contains
      Vtime = huge(1.0_knd)
      Wtime = huge(1.0_knd)
      Prtime = huge(1.0_knd)
-   endif
 
-   if (NumProbes>0.and.enable_buoyancy==1) then
-    allocate(temptime(NumProbes,0:nt))
-    temptime = huge(1.0_knd)
-   endif
+     if (enable_buoyancy==1) then
+       allocate(temptime(NumProbes,0:nt))
+       temptime = huge(1.0_knd)
+     end if
 
-   if (store%deltime>0) then
+      if (enable_moisture==1) then
+       allocate(moisttime(NumProbes,0:nt))
+       moisttime = huge(1.0_knd)
+     end if
+
+   end if
+
+
+   if (store%deltime==1) then
      allocate(deltime(0:nt))
      deltime = huge(1.0_knd)
-   endif
+   end if
 
-   if (store%tke>0) then
+   if (store%tke==1) then
      allocate(tke(0:nt))
      tke = huge(1.0_knd)
-   endif
+   end if
 
-   if (store%deltime>0) then
+   if (store%deltime==1) then
      allocate(dissip(0:nt))
      dissip = huge(1.0_knd)
      dissip(0)=0
-   endif
+   end if
 
-   if (wallmodeltype>0.and.(display%ustar>0.or.store%ustar>0)) then
+   if (wallmodeltype>0.and.(display%ustar==1.or.store%ustar==1)) then
      allocate(ustar(2,0:nt))
      ustar = huge(1.0)
-   endif
+   end if
 
-   if (wallmodeltype>0.and.enable_buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.(display%tstar>0.or.store%tstar>0)) then
+   if (wallmodeltype>0.and.enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
      allocate(tstar(2,0:nt))
      tstar = huge(1.0)
-   endif
+   end if
 
    if (num_of_scalars>0) then
-     if (store%scalsumtime>0) then
+     if (store%scalsumtime==1) then
        allocate(scalsumtime(1:num_of_scalars,0:nt))
        scalsumtime = huge(1.0_knd)
-     endif
+     end if
 
      if (NumProbes>0) then
        allocate(scalptime(1:num_of_scalars,1:NumProbes,0:nt))
        scalptime = huge(1.0_knd)
-    endif
-   endif
+    end if
+   end if
 
    do k = 1,NumProbes
      call GridCoords(probes(k)%i,probes(k)%j,probes(k)%k,probes(k)%x,probes(k)%y,probes(k)%z)
@@ -237,9 +255,9 @@ contains
      call GridCoordsU(probes(k)%Ui,probes(k)%Uj,probes(k)%Uk,probes(k)%x,probes(k)%y,probes(k)%z)
      call GridCoordsV(probes(k)%Vi,probes(k)%Vj,probes(k)%Vk,probes(k)%x,probes(k)%y,probes(k)%z)
      call GridCoordsW(probes(k)%Wi,probes(k)%Wj,probes(k)%Wk,probes(k)%x,probes(k)%y,probes(k)%z)
-   enddo
+   end do
 
-   if (store%BLprofiles>0.and.averaging==1) then
+   if (store%BLprofiles==1.and.averaging==1) then
      allocate(profU(0:Unz+1),profV(0:Vnz+1),profUavg(0:Unz+1),profVavg(0:Vnz+1),profUavg2(0:Unz+1),profVavg2(0:Vnz+1))
      allocate(profuuavg(1:Unz),profvvavg(1:Vnz),profwwavg(0:Wnz),profuu(1:Unz),profvv(1:Vnz),profww(0:Wnz))
      allocate(profuw(0:Prnz),profuwavg(0:Prnz),profuwsgs(0:Prnz),profuwsgsavg(0:Prnz))
@@ -247,6 +265,9 @@ contains
 
      allocate(proftemp(1:Prnz),proftempfl(0:Prnz),proftempavg(1:Prnz),proftempavg2(1:Prnz),proftempflavg(0:Prnz))
      allocate(proftempflsgs(0:Prnz),proftempflsgsavg(0:Prnz),proftt(1:Prnz),profttavg(1:Prnz))
+
+     allocate(profmoist(1:Prnz),profmoistfl(0:Prnz),profmoistavg(1:Prnz),profmoistavg2(1:Prnz),profmoistflavg(0:Prnz))
+     allocate(profmoistflsgs(0:Prnz),profmoistflsgsavg(0:Prnz),profmm(1:Prnz),profmmavg(1:Prnz))
 
      allocate(profscal(num_of_scalars,1:Prnz),profscalfl(num_of_scalars,0:Prnz),profscalavg(num_of_scalars,1:Prnz))
      allocate(profscalavg2(num_of_scalars,1:Prnz),profscalflavg(num_of_scalars,0:Prnz))
@@ -280,6 +301,16 @@ contains
      proftt = 0
      profttavg = 0
 
+     profmoist = 0
+     profmoistavg = 0
+     profmoistavg2 = 0
+     profmoistfl = 0
+     profmoistflavg = 0
+     profmoistflsgs = 0
+     profmoistflsgsavg = 0
+     profmm = 0
+     profmmavg = 0
+
      if (num_of_scalars>0) then
        profscal = 0
        profscalavg = 0
@@ -290,12 +321,14 @@ contains
        profscalflsgsavg = 0
        profss = 0
        profssavg = 0
-     endif
+     end if
    else
+     !to avoid the necessity of an allocatable dummy argument
+     allocate(proftempfl(0))
 
-     allocate(proftempfl(0)) !to avoid the necessity of an allocatable dummy argument
+     allocate(profmoistfl(0))
 
-   endif
+   end if
 
 
    call GetEndianness
@@ -314,30 +347,34 @@ contains
 
 
 
-  subroutine OutTStep(U,V,W,Pr,Temperature,Scalar,delta)
+  subroutine OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
     real(knd),dimension(-2:,-2:,-2:),intent(in)   :: U,V,W
     real(knd),dimension(1:,1:,1:),intent(in)      :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
+    real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Moisture
     real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
     real(knd),intent(in) :: delta
 
     integer :: l,i,j,k
     real(knd) :: S,S2
+    real(knd) :: time_weight
     integer, save :: fnum = 0
 
     times(step)=time
 
-    do l = 1,num_of_scalars
-       S = 0
-       do k = 1,Prnz
-        do j = 1,Prny
-         do i = 1,Prnx
-          if (Prtype(i,j,k)<=0) S = S+scalar(i,j,k,l)*dxPr(i)*dyPr(j)*dzPr(k)
-         enddo
-        enddo
-       enddo
-       scalsumtime(l,step) = S
-    enddo
+    if (store%scalsumtime==1) then
+      do l = 1,num_of_scalars
+         S = 0
+         do k = 1,Prnz
+          do j = 1,Prny
+           do i = 1,Prnx
+            if (Prtype(i,j,k)<=0) S = S + Scalar(i,j,k,l)*dxPr(i)*dyPr(j)*dzPr(k)
+           end do
+          end do
+         end do
+         scalsumtime(l,step) = S
+      end do
+    end if
 
 
 
@@ -378,19 +415,33 @@ contains
                             Pr(probes(k)%i,min(probes(k)%j+1,Vny+1),min(probes(k)%k+1,Wnz+1)),&
                             Pr(min(probes(k)%i+1,Unx+1),min(probes(k)%j+1,Vny+1),min(probes(k)%k+1,Wnz+1)))
 
-      if (enable_buoyancy>0) then
+      if (enable_buoyancy==1) then
         temptime(k,step)=Trilinint((probes(k)%x-xPr(probes(k)%i))/(xPr(probes(k)%i+1)-xPr(probes(k)%i)),&
                            (probes(k)%y-yPr(probes(k)%j))/(yPr(probes(k)%j+1)-yPr(probes(k)%j)),&
                            (probes(k)%z-zPr(probes(k)%k))/(zPr(probes(k)%k+1)-zPr(probes(k)%k)),&
-                           temperature(probes(k)%i,probes(k)%j,probes(k)%k),&
-                           temperature(probes(k)%i+1,probes(k)%j,probes(k)%k),&
-                           temperature(probes(k)%i,probes(k)%j+1,probes(k)%k),&
-                           temperature(probes(k)%i,probes(k)%j,probes(k)%k+1),&
-                           temperature(probes(k)%i+1,probes(k)%j+1,probes(k)%k),&
-                           temperature(probes(k)%i+1,probes(k)%j,probes(k)%k+1),&
-                           temperature(probes(k)%i,probes(k)%j+1,probes(k)%k+1),&
-                           temperature(probes(k)%i+1,probes(k)%j+1,probes(k)%k+1))
-      endif
+                           Temperature(probes(k)%i,probes(k)%j,probes(k)%k),&
+                           Temperature(probes(k)%i+1,probes(k)%j,probes(k)%k),&
+                           Temperature(probes(k)%i,probes(k)%j+1,probes(k)%k),&
+                           Temperature(probes(k)%i,probes(k)%j,probes(k)%k+1),&
+                           Temperature(probes(k)%i+1,probes(k)%j+1,probes(k)%k),&
+                           Temperature(probes(k)%i+1,probes(k)%j,probes(k)%k+1),&
+                           Temperature(probes(k)%i,probes(k)%j+1,probes(k)%k+1),&
+                           Temperature(probes(k)%i+1,probes(k)%j+1,probes(k)%k+1))
+      end if
+
+      if (enable_moisture==1) then
+        moisttime(k,step)=Trilinint((probes(k)%x-xPr(probes(k)%i))/(xPr(probes(k)%i+1)-xPr(probes(k)%i)),&
+                           (probes(k)%y-yPr(probes(k)%j))/(yPr(probes(k)%j+1)-yPr(probes(k)%j)),&
+                           (probes(k)%z-zPr(probes(k)%k))/(zPr(probes(k)%k+1)-zPr(probes(k)%k)),&
+                           Moisture(probes(k)%i,probes(k)%j,probes(k)%k),&
+                           Moisture(probes(k)%i+1,probes(k)%j,probes(k)%k),&
+                           Moisture(probes(k)%i,probes(k)%j+1,probes(k)%k),&
+                           Moisture(probes(k)%i,probes(k)%j,probes(k)%k+1),&
+                           Moisture(probes(k)%i+1,probes(k)%j+1,probes(k)%k),&
+                           Moisture(probes(k)%i+1,probes(k)%j,probes(k)%k+1),&
+                           Moisture(probes(k)%i,probes(k)%j+1,probes(k)%k+1),&
+                           Moisture(probes(k)%i+1,probes(k)%j+1,probes(k)%k+1))
+      end if
 
       do l = 1,num_of_scalars
         scalptime(l,k,step)=Trilinint((probes(k)%x-xPr(probes(k)%i))/(xPr(probes(k)%i+1)-xPr(probes(k)%i)),&
@@ -404,20 +455,20 @@ contains
                            Scalar(probes(k)%i+1,probes(k)%j,probes(k)%k+1,l),&
                            Scalar(probes(k)%i,probes(k)%j+1,probes(k)%k+1,l),&
                            Scalar(probes(k)%i+1,probes(k)%j+1,probes(k)%k+1,l))
-      enddo
-    enddo
+      end do
+    end do
 
-    if (store%tke>0) then
+    if (store%tke==1) then
       tke(step)=totke(U,V,W)
-    endif
+    end if
 
-    if (store%tke>0.and.store%dissip>0.and.step>0) then
+    if (store%tke==1.and.store%dissip==1.and.step>0) then
       dissip(step)=(tke(step-1)-tke(step))/(times(step)-times(step-1))
-    endif
+    end if
 
-    if (store%deltime>0) then
+    if (store%deltime==1) then
       deltime(step)=delta/dt
-    endif
+    end if
 
     endstep = step
 
@@ -426,110 +477,113 @@ contains
 
 
 
-    if (display%delta>0) then
+    if (display%delta==1) then
       write (*,*) "delta: ",delta
-    endif
+    end if
 
 
 
 
 
-
+    time_weight = dt/(timeavg2-timeavg1)
 
     if ((averaging==1).and.((time>=timeavg1).and.(time<=timeavg2))) then
 
-      if (store%avg_U>0) then
-        Uavg = Uavg+U*dt/(timeavg2-timeavg1)
-        Vavg = Vavg+V*dt/(timeavg2-timeavg1)
-        Wavg = Wavg+W*dt/(timeavg2-timeavg1)
-      endif
+      if (store%avg_U==1) then
+        U_avg = U_avg + U * time_weight
+        V_avg = V_avg + V * time_weight
+        W_avg = W_avg + W * time_weight
+      end if
 
-      if (store%avg_Pr>0) then
-        Pravg = Pravg+Pr(1:Prnx,1:Prny,1:Prnz)*dt/(timeavg2-timeavg1)
-      endif
+      if (store%avg_Pr==1) then
+        Pr_avg = Pr_avg + Pr(1:Prnx,1:Prny,1:Prnz) * time_weight
+      end if
 
-      if (enable_buoyancy==1.and.store%avg_T>0) then
-        temperatureavg = temperatureavg+temperature*dt/(timeavg2-timeavg1)
-      endif
+      if (enable_buoyancy==1.and.store%avg_temperature==1) then
+        Temperature_avg = Temperature_avg + temperature * time_weight
+      end if
 
-      if (num_of_scalars>0.and.store%scalarsavg>0) then
-        SCALARavg = SCALARavg+SCALAR*dt/(timeavg2-timeavg1)
-      endif
+      if (enable_moisture==1.and.store%avg_moisture==1) then
+        Moisture_avg = Moisture_avg + moisture * time_weight
+      end if
 
-   endif
+      if (num_of_scalars>0.and.store%scalarsavg==1) then
+        Scalar_avg = Scalar_avg + Scalar * time_weight
+      end if
+
+   end if
 
 
-   if (wallmodeltype>0.and.(display%ustar>0.or.store%ustar>0)) then
+   if (wallmodeltype>0.and.(display%ustar==1.or.store%ustar==1)) then
 
      S = GroundUstar()
 
      S2 = S*Re
 
-     if (display%ustar>0) then
+     if (display%ustar==1) then
        if (allocated(ustarinlet)) then
         write(*,*) "ustar:",S,"Re_tau:",S2,"u*inlet",ustarinlet(1)
        else
         write(*,*) "ustar:",S,"Re_tau:",S2
-       endif
-     endif
-     if (store%ustar>0) then
+       end if
+     end if
+     if (store%ustar==1) then
        ustar(:,step)=(/ S2 , S /)
-     endif
-   endif
+     end if
+   end if
 
 
-    if (wallmodeltype>0.and.enable_buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.(display%tstar>0.or.store%tstar>0)) then
+    if (wallmodeltype>0.and.enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
      S2 = SUM(BsideTFLArr(1:Prnx,1:Prny))/(Prnx*Prny)
      S=-S*S2
 
-     if (display%tstar>0) then
+     if (display%tstar==1) then
        write(*,*) "Tstar",S,"tflux", S2
-     endif
+     end if
 
-     if (store%tstar>0) then
+     if (store%tstar==1) then
        tstar(:,step) = (/ S2,S /)
-     endif
-    endif
+     end if
+    end if
 
 
-    if (store%BLprofiles>0) then
+    if (store%BLprofiles==1) then
       if ((averaging==1).and.((time>=timeavg1).and.(time<=timeavg2))) then
 
-       if (enable_buoyancy>0.and.num_of_scalars>0) then
-         call BLProfiles(U,V,W,temperature,scalar)
-       elseif (enable_buoyancy>0) then
-         call BLProfiles(U,V,W,temperature = temperature)
-       elseif (num_of_scalars>0) then
-         call BLProfiles(U,V,W,scalar = scalar)
-       else
-         call BLProfiles(U,V,W)
-       endif
+       call BLProfiles(U,V,W,Temperature,Moisture,Scalar)
 
-       profuavg = profuavg+profu*dt/(timeavg2-timeavg1)
-       profvavg = profvavg+profv*dt/(timeavg2-timeavg1)
-       profuwavg = profuwavg+profuw*dt/(timeavg2-timeavg1)
-       profuwsgsavg = profuwsgsavg+profuwsgs*dt/(timeavg2-timeavg1)
-       profvwavg = profvwavg+profvw*dt/(timeavg2-timeavg1)
-       profvwsgsavg = profvwsgsavg+profvwsgs*dt/(timeavg2-timeavg1)
-       profuuavg = profuuavg+profuu*dt/(timeavg2-timeavg1)
-       profvvavg = profvvavg+profvv*dt/(timeavg2-timeavg1)
-       profwwavg = profwwavg+profww*dt/(timeavg2-timeavg1)
+       profuavg = profuavg + profu * time_weight
+       profvavg = profvavg + profv * time_weight
+       profuwavg = profuwavg + profuw * time_weight
+       profuwsgsavg = profuwsgsavg + profuwsgs * time_weight
+       profvwavg = profvwavg + profvw * time_weight
+       profvwsgsavg = profvwsgsavg + profvwsgs * time_weight
+       profuuavg = profuuavg + profuu * time_weight
+       profvvavg = profvvavg + profvv * time_weight
+       profwwavg = profwwavg + profww * time_weight
 
-       if (enable_buoyancy>0) then
-         proftempavg = proftempavg+proftemp*dt/(timeavg2-timeavg1)
-         proftempflavg = proftempflavg+proftempfl*dt/(timeavg2-timeavg1)
-         proftempflsgsavg = proftempflsgsavg+proftempflsgs*dt/(timeavg2-timeavg1)
-         profttavg = profttavg+proftt*dt/(timeavg2-timeavg1)
-       endif
+       if (enable_buoyancy==1) then
+         proftempavg = proftempavg + proftemp * time_weight
+         proftempflavg = proftempflavg + proftempfl * time_weight
+         proftempflsgsavg = proftempflsgsavg + proftempflsgs * time_weight
+         profttavg = profttavg + proftt * time_weight
+       end if
+
+       if (enable_buoyancy==1) then
+         profmoistavg = profmoistavg + profmoist * time_weight
+         profmoistflavg = profmoistflavg + profmoistfl * time_weight
+         profmoistflsgsavg = profmoistflsgsavg + profmoistflsgs * time_weight
+         profmmavg = profmmavg + profmm * time_weight
+       end if
 
        if (num_of_scalars>0) then
-         profscalavg = profscalavg+profscal*dt/(timeavg2-timeavg1)
-         profscalflavg = profscalflavg+profscalfl*dt/(timeavg2-timeavg1)
-         profscalflsgsavg = profscalflsgsavg+profscalflsgs*dt/(timeavg2-timeavg1)
-         profssavg = profssavg+profss*dt/(timeavg2-timeavg1)
-       endif
-     endif
-  endif
+         profscalavg = profscalavg + profscal * time_weight
+         profscalflavg = profscalflavg + profscalfl * time_weight
+         profscalflsgsavg = profscalflsgsavg + profscalflsgs * time_weight
+         profssavg = profssavg + profss * time_weight
+       end if
+     end if
+  end if
 
 
 
@@ -537,9 +591,9 @@ contains
        if ((time>=timefram1).and.(time<=timefram2+(timefram2-timefram1)/(frames-1))&
          .and.(time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
         fnum = fnum+1
-        call Frame(U,V,W,Pr,Temperature,Scalar,fnum)
-       endif
-    endif
+        call Frame(U,V,W,Pr,Temperature,Moisture,Scalar,fnum)
+       end if
+    end if
 
     if (allocated(StaggeredFrameDomains)) then
       do i=1,size(StaggeredFrameDomains)
@@ -570,179 +624,187 @@ contains
       open(unit,file="Prtimep"//prob//".txt")
       do j = 0,endstep
        write (unit,*) times(j),Prtime(k,j)
-      enddo
+      end do
       close(unit)
 
       open(unit,file="Utimep"//prob//".txt")
       do j = 0,endstep
        write (unit,*) times(j),Utime(k,j)
-      enddo
+      end do
       close(unit)
 
       open(unit,file="Vtimep"//prob//".txt")
       do j = 0,endstep
        write (unit,*) times(j),Vtime(k,j)
-      enddo
+      end do
       close(unit)
 
       open(unit,file="Wtimep"//prob//".txt")
       do j = 0,endstep
        write (unit,*) times(j),Wtime(k,j)
-      enddo
+      end do
       close(unit)
 
       if (enable_buoyancy==1) then
         open(unit,file="temptimep"//prob//".txt")
         do j = 0,endstep
          write (unit,*) times(j),temptime(k,j)
-        enddo
+        end do
         close(unit)
-      endif
+      end if
+
+      if (enable_moisture==1) then
+        open(unit,file="moisttimep"//prob//".txt")
+        do j = 0,endstep
+         write (unit,*) times(j),moisttime(k,j)
+        end do
+        close(unit)
+      end if
 
       if (num_of_scalars>0) then
         open(unit,file="scaltimep"//prob//".txt")
         do j = 1,endstep
          write (unit,*) times(j),scalptime(:,k,j)
-        enddo
+        end do
         close(unit)
-      endif
+      end if
 
-    enddo
+    end do
 
-    if (store%deltime>0) then
+    if (store%deltime==1) then
       open(unit,file="deltime.txt")
       do j = 1,endstep
        write (unit,*) times(j),deltime(j)
-      enddo
+      end do
       close(unit)
-    endif
+    end if
 
-    if (store%tke>0) then
+    if (store%tke==1) then
       open(unit,file="tke.txt")
       do j = 0,endstep
        write (unit,*) times(j),tke(j)
-      enddo
+      end do
       close(unit)
-    endif
+    end if
 
-    if (store%tke>0.and.store%dissip>0) then
+    if (store%tke==1.and.store%dissip==1) then
      open(unit,file="dissip.txt")
       do j = 1,endstep
        write (unit,*) times(j),dissip(j)
-      enddo
+      end do
       close(unit)
-    endif
+    end if
 
-    if (wallmodeltype>0.and.display%ustar>0) then
+    if (wallmodeltype>0.and.display%ustar==1) then
       open(unit,file="Retau.txt")
       do j = 0,endstep
        write (unit,*) times(j),ustar(:,j)
-      enddo
+      end do
       close(unit)
-    endif
+    end if
 
-    if (wallmodeltype>0.and.enable_buoyancy==1.and.TBtype(Bo)==DIRICHLET.and.store%tstar>0) then
+    if (wallmodeltype>0.and.enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET.and.store%tstar==1) then
       open(unit,file="tflux.txt")
       do j = 0,endstep
        write (unit,*) times(j),tstar(:,j)
-      enddo
+      end do
       close(unit)
-    endif
+    end if
 
 
-    if (num_of_scalars>0.and.store%scalsumtime>0) then
+    if (num_of_scalars>0.and.store%scalsumtime==1) then
       open(unit,file="scalsumtime.txt")
       do j = 1,endstep
        write (unit,*) times(j),scalsumtime(:,j)
-      enddo
+      end do
       close(unit)
-    endif
+    end if
 
-    if (num_of_scalars>0.and.store%scaltotsumtime>0) then
+    if (num_of_scalars>0.and.store%scaltotsumtime==1) then
       open(unit,file="scaltotsumtime.txt")
       do j = 1,endstep
        write (unit,*) times(j),sum(scalsumtime(:,j))
-      enddo
+      end do
       close(unit)
-    endif
+    end if
 
 
-    if (store%BLprofiles>0.and.averaging==1) then
+    if (store%BLprofiles==1.and.averaging==1) then
 
        open(unit,file="profu.txt")
        do k = 1,Unz
         write (unit,*) zPr(k),profuavg(k)
-       enddo
+       end do
        close(unit)
 
        open(unit,file="profv.txt")
        do k = 1,Vnz
         write (unit,*) zPr(k),profvavg(k)
-       enddo
+       end do
        close(unit)
 
        open(unit,file="profuu.txt")
        do k = 1,Unz
         write (unit,*) zPr(k),profuuavg(k)
-       enddo
+       end do
        close(unit)
 
        open(unit,file="profvv.txt")
        do k = 1,Vnz
         write (unit,*) zPr(k),profvvavg(k)
-       enddo
+       end do
        close(unit)
 
        open(unit,file="profww.txt")
        do k = 1,Wnz
         write (unit,*) zW(k),profwwavg(k)
-       enddo
+       end do
        close(unit)
 
        open(unit,file="profuw.txt")
        do k = 0,Prnz
         write (unit,*) zW(k),profuwavg(k),profuwsgsavg(k)
-       enddo
+       end do
        close(unit)
 
        open(unit,file="profvw.txt")
        do k = 0,Prnz
         write (unit,*) zW(k),profvwavg(k),profvwsgsavg(k)
-       enddo
+       end do
        close(unit)
 
-       if (enable_buoyancy>0) then
+       if (enable_buoyancy==1) then
 
           open(unit,file="proftemp.txt")
           do k = 1,Prnz
            write (unit,*) zPr(k),proftempavg(k)
-          enddo
+          end do
           close(unit)
 
           open(unit,file="proftempfl.txt")
           do k = 0,Prnz
            write (unit,*) zW(k),proftempflavg(k),proftempflsgsavg(k)
-          enddo
+          end do
           close(unit)
 
           open(unit,file="proftt.txt")
           do k = 1,Prnz
            write (unit,*) zPr(k),profttavg(k)
-          enddo
+          end do
           close(unit)
 
-          if (allocated(Uavg).and.allocated(Vavg).and.allocated(temperatureavg)) then
+          if (allocated(U_avg).and.allocated(V_avg).and.allocated(Temperature_avg)) then
             open(unit,file="profRig.txt")
             do k = 1,Prnz
              S = 0
              do j = 1,Prny
               do i = 1,Prnx
-               S = S+Rig(i,j,k,Uavg,Vavg,temperatureavg)
-              enddo
-             enddo
-             S = S/(Prnx*Prny)
+               S = S + Rig(i,j,k,U_avg,V_avg,Temperature_avg)
+              end do
+             end do
+             S = S / (Prnx*Prny)
              write (unit,*) zPr(k),S
-            enddo
+            end do
             close(unit)
 
             open(unit,file="profRf.txt")
@@ -751,28 +813,51 @@ contains
              S2 = 0
              do j = 1,Prny
               do i = 1,Prnx
-               S = S+(Uavg(i,j,k+1)+Uavg(i-1,j,k+1)-Uavg(i,j,k-1)-Uavg(i-1,j,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
-               S2 = S2+(Vavg(i,j,k+1)+Vavg(i,j-1,k+1)-Vavg(i,j,k-1)-Vavg(i,j-1,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
-              enddo
-             enddo
+               S = S + (U_avg(i,j,k+1)+U_avg(i-1,j,k+1)-U_avg(i,j,k-1)-U_avg(i-1,j,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
+               S2 = S2+(V_avg(i,j,k+1)+V_avg(i,j-1,k+1)-V_avg(i,j,k-1)-V_avg(i,j-1,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
+              end do
+             end do
 
-             S = S/(Prnx*Prny)
+             S = S / (Prnx*Prny)
              S2 = S2/(Prnx*Prny)
              nom=(grav_acc/temperature_ref)*(proftempflavg(k)+proftempflsgsavg(k))
-             denom=((profuwavg(k)+profuwsgsavg(k))*S+(profvwavg(k)+profvwsgsavg(k))*S2)
+             denom=((profuwavg(k)+profuwsgsavg(k))*S + (profvwavg(k)+profvwsgsavg(k))*S2)
 
              if (abs(denom)>1E-5_knd*abs(nom)) then
                S = nom/denom
              else
                S = 100000._knd*sign(1.0_knd,nom)*sign(1.0_knd,denom)
-             endif
+             end if
 
              write (unit,*) zPr(k),S
-            enddo
+            end do
             close(unit)
-          endif !allocated avgs
+          end if !allocated avgs
 
-       endif !enable_buoyancy>0
+       end if !enable_buoyancy == 1
+
+
+       if (enable_moisture==1) then
+
+          open(unit,file="profmoist.txt")
+          do k = 1,Prnz
+           write (unit,*) zPr(k),profmoistavg(k)
+          end do
+          close(unit)
+
+          open(unit,file="profmoistfl.txt")
+          do k = 0,Prnz
+           write (unit,*) zW(k),profmoistflavg(k),profmoistflsgsavg(k)
+          end do
+          close(unit)
+
+          open(unit,file="profmm.txt")
+          do k = 1,Prnz
+           write (unit,*) zPr(k),profmmavg(k)
+          end do
+          close(unit)
+
+       end if !enable_moisture == 1
 
 
        if (num_of_scalars>0) then
@@ -780,24 +865,24 @@ contains
           open(unit,file="profscal.txt")
           do k = 1,Prnz
            write (unit,*) zPr(k),(profscalavg(i,k), i = 1,num_of_scalars)
-          enddo
+          end do
           close(unit)
 
           open(unit,file="profscalfl.txt")
           do k = 0,Prnz
            write (unit,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i = 1,num_of_scalars)
-          enddo
+          end do
           close(unit)
 
           open(unit,file="profss.txt")
           do k = 1,Prnz
            write (unit,*) zPr(k),(profssavg(i,k), i = 1,num_of_scalars)
-          enddo
+          end do
           close(unit)
 
-       endif !num_of_scalars>0
+       end if !num_of_scalars>0
 
-    endif !store%BLprofiles
+    end if !store%BLprofiles
 
   end subroutine OutputProfiles
 
@@ -807,15 +892,16 @@ contains
 
 
 
-  subroutine OutputOut(U,V,W,Pr,Temperature)
+  subroutine OutputOut(U,V,W,Pr,Temperature,Moisture)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
     real(knd),dimension(1:,1:,1:),intent(in) :: Pr
-    real(knd),intent(in) :: Temperature(-1:,-1:,:)
+    real(knd),intent(in) :: Temperature(-1:,-1:,-1:)
+    real(knd),intent(in) :: Moisture(-1:,-1:,-1:)
     character(70) :: str
     integer i,j,k,unit
-    real(knd),allocatable :: tmp(:,:,:,:)
+    real(real32),allocatable :: tmp(:,:,:,:)
 
-    if (store%out>0) then
+    if (store%out==1) then
 
        call newunit(unit);
 
@@ -845,34 +931,43 @@ contains
        write (str(12:),*) Prnx*Prny*Prnz
        write (unit) str,lf
 
-       if (store%out_Pr>0) then
+       if (store%out_Pr==1) then
          write (unit) "SCALARS p float",lf
          write (unit) "LOOKUP_TABLE default",lf
 
          write (unit) BigEnd(real(Pr(1:Prnx,1:Prny,1:Prnz), real32))
 
          write (unit) lf
-       endif
+       end if
 
-       if (enable_buoyancy>0.and.store%out_T>0) then
+       if (enable_buoyancy>0.and.store%out_temperature==1) then
          write (unit) "SCALARS temperature float",lf
          write (unit) "LOOKUP_TABLE default",lf
 
          write (unit) BigEnd(real(Temperature(1:Prnx,1:Prny,1:Prnz), real32))
 
          write (unit) lf
-       endif
+       end if
 
-       if (store%out_Prtype>0) then
+       if (enable_moisture>0.and.store%out_moisture==1) then
+         write (unit) "SCALARS moisture float",lf
+         write (unit) "LOOKUP_TABLE default",lf
+
+         write (unit) BigEnd(real(Moisture(1:Prnx,1:Prny,1:Prnz), real32))
+
+         write (unit) lf
+       end if
+
+       if (store%out_Prtype==1) then
          write (unit) "SCALARS ptype float",lf
          write (unit) "LOOKUP_TABLE default",lf
 
          write (unit) BigEnd(real(Prtype(1:Prnx,1:Prny,1:Prnz), real32))
 
-         write (unit)
-       endif
+         write (unit) lf
+       end if
 
-       if (store%out_div>0) then
+       if (store%out_div==1) then
          write (unit) "SCALARS div float",lf
          write (unit) "LOOKUP_TABLE default",lf
 
@@ -891,15 +986,15 @@ contains
                write (unit) BigEnd(real((U(i,j,k)-U(i-1,j,k))/(dxPr(i)) + &
                                         (V(i,j,k)-V(i,j-1,k))/(dyPr(j)) + &
                                         (W(i,j,k)-W(i,j,k-1))/(dzPr(k)), real32))
-             enddo
-            enddo
-           enddo
+             end do
+            end do
+           end do
          end if
 
          write (unit) lf
-       endif
+       end if
 
-       if (store%out_lambda2>0) then
+       if (store%out_lambda2==1) then
          allocate(tmp(1:Prnx,1:Prny,1:Prnz,1))
 
          write (unit) "SCALARS lambda2 float",lf
@@ -908,29 +1003,29 @@ contains
          do k = 1,Prnz
           do j = 1,Prny
            do i = 1,Prnx
-             tmp(i,j,k,1) = BigEnd(real(Lambda2(i,j,k,U,V,W)))
-           enddo
-          enddo
-         enddo
+             tmp(i,j,k,1) = BigEnd(real(Lambda2(i,j,k,U,V,W), real32))
+           end do
+          end do
+         end do
 
          write (unit) tmp
 
          write (unit) lf
          deallocate(tmp)
-       endif
+       end if
 
-       if (store%out_visc>0) then
+       if (store%out_visc==1) then
          write (unit) "SCALARS visc float",lf
          write (unit) "LOOKUP_TABLE default",lf
 
          write (unit) BigEnd(real(Visc(1:Prnx,1:Prny,1:Prnz), real32))
 
          write (unit) lf
-       endif
+       end if
 
-       if (store%out_U>0.or.store%out_vort>0) allocate(tmp(1:3,1:Prnx,1:Prny,1:Prnz))
+       if (store%out_U==1.or.store%out_vort==1) allocate(tmp(1:3,1:Prnx,1:Prny,1:Prnz))
 
-       if (store%out_U>0) then
+       if (store%out_U==1) then
          write (unit) "VECTORS u float",lf
 
          do k = 1,Prnz
@@ -939,16 +1034,16 @@ contains
              tmp(1:3,i,j,k) = [ BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._knd, real32)), &
                                 BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._knd, real32)), &
                                 BigEnd(real((W(i,j,k)+W(i,j,k-1))/2._knd, real32)) ]
-           enddo
-          enddo
-         enddo
+           end do
+          end do
+         end do
 
          write (unit) tmp
 
          write (unit) lf
-       endif
+       end if
 
-       if (store%out_vort>0) then
+       if (store%out_vort==1) then
          write (unit) "VECTORS vort float",lf
 
          do k = 1,Prnz
@@ -960,16 +1055,16 @@ contains
                                           -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin), real32)), &
                                 BigEnd(real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin) &
                                           -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin), real32)) ]
-           enddo
-          enddo
-         enddo
+           end do
+          end do
+         end do
 
          write (unit) tmp
 
          write (unit) lf
-       endif
+       end if
        close(unit)
-    endif  !store%out
+    end if  !store%out
   end subroutine OutputOut
 
 
@@ -987,7 +1082,7 @@ contains
     integer :: l,unit
 
     if (num_of_scalars>0) then
-      if (store%scalars>0) then
+      if (store%scalars==1) then
 
           call newunit(unit)
 
@@ -1025,11 +1120,11 @@ contains
             write (unit) BigEnd(real(Scalar(1:Prnx,1:Prny,1:Prnz,l), real32))
 
             write (unit) lf
-          enddo
+          end do
           close(unit)
-      endif !store%scalars
+      end if !store%scalars
 
-      if (computedeposition>0.and.store%deposition>0) then
+      if (computedeposition>0.and.store%deposition==1) then
 
           allocate(depos(1:Prnx,1:Prny,num_of_scalars))
           depos = GroundDeposition()
@@ -1069,14 +1164,14 @@ contains
             write (unit) BigEnd(real(depos(1:Prnx,1:Prny,l), real32))
 
             write (unit) lf
-          enddo
+          end do
 
           close(unit)
 
           deallocate(depos)
 
-      endif  !store%deposition
-    endif  !num_of_scalars
+      end if  !store%deposition
+    end if  !num_of_scalars
   end subroutine OutputScalars
 
 
@@ -1088,17 +1183,18 @@ contains
 
 
 
-  subroutine OutputAvg(U,V,W,Pr,Temperature,Scalar)
+  subroutine OutputAvg(U,V,W,Pr,Temperature,Moisture,Scalar)
     real(knd),dimension(-2:,-2:,-2:),intent(in)   :: U,V,W
     real(knd),dimension(1:,1:,1:),intent(in)      :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
+    real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Moisture
     real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
     character(70) :: str
     character(8) ::  scalname="scalar00"
     integer i,j,k,l,unit
-    real(knd),allocatable :: tmp(:,:,:,:)
+    real(real32),allocatable :: tmp(:,:,:,:)
 
-    if (averaging==1.and.store%avg>0) then
+    if (averaging==1.and.store%avg==1) then
         allocate(tmp(1:3,1:Prnx,1:Prny,1:Prnz))
 
         call newunit(unit)
@@ -1129,34 +1225,43 @@ contains
         write (str(12:),*) Prnx*Prny*Prnz
         write (unit) str,lf
 
-        if (store%avg_Pr>0) then
+        if (store%avg_Pr==1) then
           write (unit) "SCALARS p float",lf
           write (unit) "LOOKUP_TABLE default",lf
 
           write (unit) BigEnd(real(Pr(1:Prnx,1:Prny,1:Prnz), real32))
 
           write (unit) lf
-        endif
+        end if
 
-        if (store%avg_Prtype>0) then
+        if (store%avg_Prtype==1) then
           write (unit) "SCALARS ptype float",lf
           write (unit) "LOOKUP_TABLE default",lf
 
           write (unit) BigEnd(real(Prtype(1:Prnx,1:Prny,1:Prnz), real32))
 
           write (unit) lf
-        endif
+        end if
 
-        if (enable_buoyancy>0.and.store%avg_T>0) then
+        if (enable_buoyancy==1.and.store%avg_temperature==1) then
           write (unit) "SCALARS temperature float",lf
           write (unit) "LOOKUP_TABLE default",lf
 
           write (unit) BigEnd(real(Temperature(1:Prnx,1:Prny,1:Prnz), real32))
 
           write (unit) lf
-        endif
+        end if
 
-        if (store%avg_U>0) then
+        if (enable_moisture==1.and.store%avg_moisture==1) then
+          write (unit) "SCALARS moisture float",lf
+          write (unit) "LOOKUP_TABLE default",lf
+
+          write (unit) BigEnd(real(Moisture(1:Prnx,1:Prny,1:Prnz), real32))
+
+          write (unit) lf
+        end if
+
+        if (store%avg_U==1) then
           write (unit) "VECTORS u float",lf
 
           do k = 1,Prnz
@@ -1165,16 +1270,16 @@ contains
               tmp(:,i,j,k) = [ BigEnd(real((U(i,j,k)+U(i-1,j,k))/2._knd, real32)), &
                                BigEnd(real((V(i,j,k)+V(i,j-1,k))/2._knd, real32)), &
                                BigEnd(real((W(i,j,k)+W(i,j,k-1))/2._knd, real32)) ]
-            enddo
-           enddo
-          enddo
+            end do
+           end do
+          end do
 
           write (unit) tmp
 
           write (unit) lf
-        endif
+        end if
 
-        if (store%avg_vort>0) then
+        if (store%avg_vort==1) then
           write (unit) "VECTORS vort float",lf
 
           do k = 1,Prnz
@@ -1186,19 +1291,19 @@ contains
                                          -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin), real32)), &
                                BigEnd(real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin) &
                                          -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin), real32)) ]
-            enddo
-           enddo
-          enddo
+            end do
+           end do
+          end do
 
           write (unit) tmp
 
           write (unit) lf
-        endif
+        end if
 
         close(unit)
-    endif !averaging
+    end if !averaging
 
-    if (averaging==1.and.store%scalarsavg>0) then
+    if (averaging==1.and.store%scalarsavg==1) then
         if (num_of_scalars>0) then
             open(unit,file="scalarsavg.vtk",&
               access='stream',status='replace',form="unformatted",action="write")
@@ -1234,12 +1339,12 @@ contains
               write (unit) BigEnd(real(Scalar(1:Prnx,1:Prny,1:Prnz,l), real32))
 
               write (unit) lf
-            enddo
+            end do
             close(unit)
-        endif  !num_of_scalars
+        end if  !num_of_scalars
 
-    endif !averaging
-  endsubroutine OutputAvg
+    end if !averaging
+  end subroutine OutputAvg
 
 
 
@@ -1250,7 +1355,7 @@ contains
     integer i,unit
 
 
-    if (store%U>0) then
+    if (store%U==1) then
 
         call newunit(unit)
 
@@ -1298,9 +1403,9 @@ contains
         end if
 
         close(unit)
-    endif
+    end if
 
-    if (store%V>0) then
+    if (store%V==1) then
 
         call newunit(unit)
 
@@ -1348,9 +1453,9 @@ contains
         end if
 
         close(unit)
-    endif !store%V
+    end if !store%V
 
-    if (store%W>0) then
+    if (store%W==1) then
 
         call newunit(unit)
 
@@ -1398,7 +1503,7 @@ contains
         end if
 
         close(unit)
-    endif !store%W
+    end if !store%W
 
     if (store%U_interp/=0) then
 
@@ -1412,9 +1517,9 @@ contains
         write(unit,*) "yj",UIBPoints(i)%IntPoints%yj
         write(unit,*) "zk",UIBPoints(i)%IntPoints%zk
         write(unit,*) "coefs",UIBPoints(i)%IntPoints%coef
-      enddo
+      end do
       close(unit)
-    endif
+    end if
 
     if (store%V_interp/=0) then
 
@@ -1428,9 +1533,9 @@ contains
         write(unit,*) "yj",VIBPoints(i)%IntPoints%yj
         write(unit,*) "zk",VIBPoints(i)%IntPoints%zk
         write(unit,*) "coefs",VIBPoints(i)%IntPoints%coef
-      enddo
+      end do
       close(unit)
-    endif
+    end if
 
     if (store%W_interp/=0) then
 
@@ -1444,9 +1549,9 @@ contains
         write(unit,*) "yj",WIBPoints(i)%IntPoints%yj
         write(unit,*) "zk",WIBPoints(i)%IntPoints%zk
         write(unit,*) "coefs",WIBPoints(i)%IntPoints%coef
-      enddo
+      end do
       close(unit)
-    endif
+    end if
 
     if (store%U_interp/=0.and.store%V_interp/=0.and.store%W_interp/=0) then
 
@@ -1460,9 +1565,9 @@ contains
         write(unit,*) "yj",ScalFlIBPoints(i)%IntPoints%yj
         write(unit,*) "zk",ScalFlIBPoints(i)%IntPoints%zk
         write(unit,*) "coefs",ScalFlIBPoints(i)%IntPoints%coef
-      enddo
+      end do
       close(unit)
-    endif
+    end if
 
   end subroutine OutputUVW
 
@@ -1471,10 +1576,11 @@ contains
 
 
 
-  subroutine Output(U,V,W,Pr,Temperature,Scalar)
+  subroutine Output(U,V,W,Pr,Temperature,Moisture,Scalar)
     real(knd),dimension(-2:,-2:,-2:),intent(inout) :: U,V,W
     real(knd),intent(inout) :: Pr(1:,1:,1:)
-    real(knd),intent(in) :: Temperature(-1:,-1:,:)
+    real(knd),intent(in) :: Temperature(-1:,-1:,-1:)
+    real(knd),intent(in) :: Moisture(-1:,-1:,-1:)
     real(knd),intent(in) :: Scalar(-1:,-1:,-1:,:)
     integer i
 
@@ -1482,11 +1588,11 @@ contains
     call BoundU(2,V)
     call BoundU(3,W)
 
-    call OutputOut(U,V,W,Pr,Temperature)
+    call OutputOut(U,V,W,Pr,Temperature,Moisture)
 
     call OutputScalars(Scalar)
 
-    if (time>=timeavg1) call OutputAvg(Uavg,Vavg,Wavg,Pravg,Temperatureavg,Scalaravg)
+    if (time>=timeavg1) call OutputAvg(U_avg,V_avg,W_avg,Pr_avg,Temperature_avg,Moisture_avg,Scalar_avg)
 
     call OutputUVW(U,V,W)
 
@@ -1572,17 +1678,18 @@ contains
             domain%minj = 1
             domain%maxj = Prny
 
-          endif
+          end if
 
-        endif
+        end if
 
   end subroutine SetFrameDomain
 
 
 
-  subroutine Frame(U,V,W,Pr,Temperature,Scalar,n)
+  subroutine Frame(U,V,W,Pr,Temperature,Moisture,Scalar,n)
     real(knd),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-    real(knd),intent(in) :: Temperature(-1:,-1:,:)
+    real(knd),intent(in) :: Temperature(-1:,-1:,-1:)
+    real(knd),intent(in) :: Moisture(-1:,-1:,-1:)
     real(knd),intent(in) :: Scalar(-1:,-1:,-1:,:)
     integer,intent(in)   :: n
     integer i,j,k,l,m
@@ -1592,13 +1699,14 @@ contains
     character(8) ::  scalname="scalar00"
     integer mini,maxi,minj,maxj,mink,maxk
     integer unit
-    real(knd),allocatable :: buffer(:,:,:),vbuffer(:,:,:,:)
+    real(real32),allocatable :: buffer(:,:,:),vbuffer(:,:,:,:)
 
     fsuffix=".vtk"
 
 
     !$omp parallel do default(private) shared(n,store,time,fsuffix,xPr,yPr,zPr,Prtype,Pr,U,V,W,&
-    !$omp                      scalar,temperature,enable_buoyancy,num_of_scalars,dxmin,dymin,dzmin,temperature_ref)
+    !$omp    scalar,Temperature,Moisture,enable_moisture,enable_buoyancy,num_of_scalars,&
+    !$omp    dxmin,dymin,dzmin,temperature_ref)
     do m = 1,size(store%frame_domains)
 
       fname="frame-"//achar(iachar('a')+m-1)//"-"
@@ -1615,7 +1723,7 @@ contains
 
       allocate(buffer(mini:maxi,minj:maxj,mink:maxk))
 
-      if (store%frame_U>0 .or. store%frame_vort>0) then
+      if (store%frame_U==1 .or. store%frame_vort==1) then
         allocate(vbuffer(3,mini:maxi,minj:maxj,mink:maxk))
       end if
 
@@ -1649,16 +1757,16 @@ contains
       write (str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
       write (unit) str,lf
 
-      if (store%frame_Pr>0) then
+      if (store%frame_Pr==1) then
         write (unit) "SCALARS p float",lf
         write (unit) "LOOKUP_TABLE default",lf
         
         write (unit) BigEnd(real(Pr(mini:maxi,minj:maxj,mink:maxk), real32))
 
         write (unit) lf
-      endif
+      end if
 
-      if (store%frame_lambda2>0) then
+      if (store%frame_lambda2==1) then
         write (unit) "SCALARS lambda2 float",lf
         write (unit) "LOOKUP_TABLE default",lf
         do k = mink,maxk
@@ -1668,17 +1776,17 @@ contains
               buffer(i,j,k) = real(Lambda2(i,j,k,U,V,W), real32)
             else
               buffer(i,j,k) = 0
-            endif
-          enddo
-         enddo
-        enddo
+            end if
+          end do
+         end do
+        end do
 
         write (unit) BigEnd(buffer)
 
         write (unit) lf
-      endif
+      end if
 
-      if (store%frame_scalars>0) then
+      if (store%frame_scalars==1) then
         scalname(1:6)="scalar"
         do l = 1,num_of_scalars
          write(scalname(7:8),"(I2.2)") l
@@ -1692,16 +1800,16 @@ contains
                buffer(i,j,k) = real(SCALAR(i,j,k,l), real32)
              else
                buffer(i,j,k) = 0
-             endif
-           enddo
-          enddo
-         enddo
+             end if
+           end do
+          end do
+         end do
 
          write (unit) BigEnd(buffer)
 
          write (unit) lf
-        enddo
-      elseif (store%frame_sumscalars>0.and.num_of_scalars>0) then
+        end do
+      elseif (store%frame_sumscalars==1.and.num_of_scalars==1) then
         write (unit) "SCALARS ", "scalar" , " float",lf
         write (unit) "LOOKUP_TABLE default",lf
         do k = mink,maxk
@@ -1710,40 +1818,58 @@ contains
             if (Prtype(i,j,k)<=0) then
               buffer(i,j,k) =  real(SUM(SCALAR(i,j,k,:)), real32)
             else
-              buffer(i,j,k) = 0
-            endif
-          enddo
-         enddo
-        enddo
+              buffer(i,j,k) = 0._real32
+            end if
+          end do
+         end do
+        end do
 
         write (unit) BigEnd(buffer)
 
         write (unit) lf
-      endif
+      end if
 
-      if (store%frame_T>0) then
-       if (enable_buoyancy>0) then
-          write (unit) "SCALARS temperature float",lf
-          write (unit) "LOOKUP_TABLE default",lf
-          do k = mink,maxk
-           do j = minj,maxj
-            do i = mini,maxi
-              if (Prtype(i,j,k)<=0) then
-                buffer(i,j,k) = real(Temperature(i,j,k), real32)
-              else
-                buffer(i,j,k) = real(temperature_ref, real32)
-              endif
-            enddo
-           enddo
-          enddo
+      if (enable_buoyancy==1.and.store%frame_temperature==1) then
+        write (unit) "SCALARS temperature float",lf
+        write (unit) "LOOKUP_TABLE default",lf
+        do k = mink,maxk
+         do j = minj,maxj
+          do i = mini,maxi
+            if (Prtype(i,j,k)<=0) then
+              buffer(i,j,k) = real(Temperature(i,j,k), real32)
+            else
+              buffer(i,j,k) = real(temperature_ref, real32)
+            end if
+          end do
+         end do
+        end do
 
-          write (unit) BigEnd(buffer)
+        write (unit) BigEnd(buffer)
 
-          write (unit) lf
-        endif
-      endif
+        write (unit) lf
+      end if
 
-      if (enable_buoyancy==1.and.store%frame_tempfl>0) then
+      if (enable_moisture==1.and.store%frame_moisture==1) then
+        write (unit) "SCALARS moisture float",lf
+        write (unit) "LOOKUP_TABLE default",lf
+        do k = mink,maxk
+         do j = minj,maxj
+          do i = mini,maxi
+            if (Prtype(i,j,k)<=0) then
+              buffer(i,j,k) = real(Moisture(i,j,k), real32)
+            else
+              buffer(i,j,k) = 0._real32
+            end if
+          end do
+         end do
+        end do
+
+        write (unit) BigEnd(buffer)
+
+        write (unit) lf
+      end if
+
+      if (enable_buoyancy==1.and.store%frame_tempfl==1) then
         write (unit) "SCALARS tempfl float", lf
         write (unit) "LOOKUP_TABLE default", lf
 
@@ -1754,18 +1880,18 @@ contains
               buffer(i,j,k) = real(ScalarVerticalFlux(i,j,k,Temperature,W), real32)
             else
               buffer(i,j,k) = 0
-            endif
-          enddo
-         enddo
-        enddo
+            end if
+          end do
+         end do
+        end do
 
         write (unit) BigEnd(buffer)
 
         write (unit) lf
-      endif
+      end if
 
-      if (store%frame_scalfl>0) then
-        if (store%frame_scalars>0) then
+      if (store%frame_scalfl==1) then
+        if (store%frame_scalars==1) then
           scalname(1:6)="scalfl"
           do l = 1,num_of_scalars
             write(scalname(7:8),"(I2.2)") l
@@ -1778,16 +1904,16 @@ contains
                   buffer(i,j,k) = real( ScalarVerticalFlux(i,j,k,Scalar(:,:,:,l),W) , real32)
                 else
                   buffer(i,j,k) = 0
-                endif
-              enddo
-             enddo
-            enddo
+                end if
+              end do
+             end do
+            end do
 
             write (unit) BigEnd(buffer)
 
             write (unit) lf
-          enddo
-        elseif (store%frame_sumscalars>0.and.num_of_scalars>0) then
+          end do
+        elseif (store%frame_sumscalars==1.and.num_of_scalars>0) then
           write (unit) "SCALARS scalfl float", lf
           write (unit) "LOOKUP_TABLE default", lf
           do k = mink,maxk
@@ -1797,18 +1923,18 @@ contains
                 buffer(i,j,k) = real(ScalarVerticalFlux(i,j,k,SUM(Scalar(:,:,:,:),4),W) , real32)
               else
                 buffer(i,j,k) = 0
-              endif
-            enddo
-           enddo
-          enddo
+              end if
+            end do
+           end do
+          end do
 
           write (unit) BigEnd(buffer)
 
           write (unit) lf
-        endif
-      endif
+        end if
+      end if
 
-      if (store%frame_U>0) then
+      if (store%frame_U==1) then
         write (unit) "VECTORS u float",lf
         do k = mink,maxk
          do j = minj,maxj
@@ -1819,17 +1945,17 @@ contains
                                         (W(i,j,k)+W(i,j,k-1))/2 ], real32)
             else
               vbuffer(:,i,j,k) = 0
-            endif
-          enddo
-         enddo
-        enddo
+            end if
+          end do
+         end do
+        end do
 
         write (unit) BigEnd(vbuffer)
 
         write (unit) lf
-      endif
+      end if
 
-      if (store%frame_vort>0) then
+      if (store%frame_vort==1) then
         write (unit) "VECTORS vort float",lf
         do k = mink,maxk
          do j = minj,maxj
@@ -1843,26 +1969,27 @@ contains
                                        - (U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin) ], real32)
             else
               vbuffer(:,i,j,k) = 0
-            endif
-          enddo
-         enddo
-        enddo
+            end if
+          end do
+         end do
+        end do
 
         write (unit) BigEnd(vbuffer)
 
-      endif
+      end if
       close(unit)
 
-    enddo   !frame_domains
+    end do   !frame_domains
     !$omp end parallel do
   end subroutine Frame
 
 
 
-  subroutine BLProfiles(U,V,W,temperature,scalar)
-    real(knd),dimension(-2:,-2:,-2:) :: U,V,W
-    real(knd),dimension(-1:,-1:,-1:),optional:: temperature
-    real(knd),dimension(-1:,-1:,-1:,1:),optional:: scalar
+  subroutine BLProfiles(U,V,W,Temperature,Moisture,Scalar)
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Moisture
+    real(knd),dimension(-1:,-1:,-1:,1:),intent(in) :: Scalar
     real(knd) :: S
     real(knd),allocatable,save ::fp(:),ht(:),gp(:)
     integer   :: i,j,k,l,n
@@ -1876,13 +2003,13 @@ contains
       do j = 1,Uny
        do i = 1,Unx
          if (Utype(i,j,k)<=0) then
-           S = S+U(i,j,k)
-           n = n+1
-         endif
-       enddo
-      enddo
-      profU(k) = S/max(n,1)
-    enddo
+           S = S + U(i,j,k)
+           n = n + 1
+         end if
+       end do
+      end do
+      profU(k) = S / max(n,1)
+    end do
     !$omp end do nowait
 
     !$omp do
@@ -1892,17 +2019,17 @@ contains
       do j = 1,Vny
        do i = 1,Vnx
          if (Vtype(i,j,k)<=0) then
-           S = S+V(i,j,k)
-           n = n+1
-         endif
-       enddo
-      enddo
-      profV(k) = S/max(n,1)
-    enddo
+           S = S + V(i,j,k)
+           n = n + 1
+         end if
+       end do
+      end do
+      profV(k) = S / max(n,1)
+    end do
     !$omp end do nowait
     !$omp end parallel
 
-    if (present(temperature)) then
+    if (size(Temperature)>0) then
       !$omp parallel do private(i,j,k,n,S)
       do k = 1,Prnz
         S = 0
@@ -1910,17 +2037,35 @@ contains
         do j = 1,Prny
          do i = 1,Prnx
            if (Prtype(i,j,k)<=0) then
-             S = S+temperature(i,j,k)
-             n = n+1
-           endif
-         enddo
-        enddo
-        proftemp(k) = S/max(n,1)
-      enddo
+             S = S + Temperature(i,j,k)
+             n = n + 1
+           end if
+         end do
+        end do
+        proftemp(k) = S / max(n,1)
+      end do
       !$omp end parallel do
-    endif
+    end if
 
-    if (present(scalar)) then
+    if (size(Moisture)>0) then
+      !$omp parallel do private(i,j,k,n,S)
+      do k = 1,Prnz
+        S = 0
+        n = 0
+        do j = 1,Prny
+         do i = 1,Prnx
+           if (Prtype(i,j,k)<=0) then
+             S = S + Moisture(i,j,k)
+             n = n + 1
+           end if
+         end do
+        end do
+        profmoist(k) = S / max(n,1)
+      end do
+      !$omp end parallel do
+    end if
+
+    if (size(Scalar)>0) then
       do l = 1,num_of_scalars
         !$omp parallel do private(i,j,k,n,S)
         do k = 1,Prnz
@@ -1929,16 +2074,16 @@ contains
           do j = 1,Prny
            do i = 1,Prnx
              if (Prtype(i,j,k)<=0) then
-               S = S+scalar(i,j,k,l)
-               n = n+1
-             endif
-           enddo
-          enddo
-          profscal(l,k) = S/max(n,1)
-        enddo
+               S = S + Scalar(i,j,k,l)
+               n = n + 1
+             end if
+           end do
+          end do
+          profscal(l,k) = S / max(n,1)
+        end do
         !$omp end parallel do
-      enddo
-    endif
+      end do
+    end if
 
     if (called==0) then
       allocate(fp(0:Prnx+1),ht(0:Prnz+1),gp(0:Prny+1))
@@ -1947,7 +2092,7 @@ contains
       forall (k = 0:Prnz+1)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
       forall (j = 0:Prny+1)      gp(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
       !$omp end parallel workshare
-    endif
+    end if
 
     !$omp parallel private(i,j,k,n,S)
     !$omp do
@@ -1957,13 +2102,14 @@ contains
       do j = 1,Uny
        do i = 1,Unx
          if ((Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0).and.(Wtype(i+1,j,k)<=0.or.Wtype(i,j,k)<=0)) then
-           S = S+((ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))-((1-ht(k))*profU(k)+ht(k)*profU(k+1)))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))
-           n = n+1
-         endif
-       enddo
-      enddo
-      profuw(k) = S/max(n,1)
-    enddo
+           S = S + ((ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))-((1-ht(k))*profU(k)+ht(k)*profU(k+1))) * &
+                   (fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))
+           n = n + 1
+         end if
+       end do
+      end do
+      profuw(k) = S / max(n,1)
+    end do
     !$omp end do nowait
 
     !$omp do
@@ -1973,13 +2119,14 @@ contains
       do j = 1,Vny
        do i = 1,Vnx
          if ((Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0).and.(Wtype(i,j+1,k)<=0.or.Wtype(i,j,k)<=0)) then
-           S = S+(ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)-(ht(k)*profV(k+1)+(1-ht(k))*profV(k)))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))
-           n = n+1
-         endif
-       enddo
-      enddo
-      profvw(k) = S/max(n,1)
-    enddo
+           S = S + (ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)-(ht(k)*profV(k+1)+(1-ht(k))*profV(k))) * &
+                   (gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))
+           n = n + 1
+         end if
+       end do
+      end do
+      profvw(k) = S / max(n,1)
+    end do
     !$omp end do nowait
 
     !$omp do
@@ -1990,12 +2137,12 @@ contains
        do i = 1,Unx
          if (Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0) then
            S = S-0.25_knd*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)
-           n = n+1
-         endif
-       enddo
-      enddo
-      profuwsgs(k) = S/max(n,1)
-    enddo
+           n = n + 1
+         end if
+       end do
+      end do
+      profuwsgs(k) = S / max(n,1)
+    end do
     !$omp end do nowait
 
     !$omp do
@@ -2006,12 +2153,12 @@ contains
        do i = 1,Vnx
          if (Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0) then
            S = S-0.25_knd*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)
-           n = n+1
-         endif
-       enddo
-      enddo
-      profvwsgs(k) = S/max(n,1)
-    enddo
+           n = n + 1
+         end if
+       end do
+      end do
+      profvwsgs(k) = S / max(n,1)
+    end do
     !$omp end do nowait
 
     !$omp do
@@ -2021,13 +2168,13 @@ contains
       do j = 1,Uny
        do i = 1,Unx
          if (Utype(i,j,k)<=0) then
-           S = S+(U(i,j,k)-profU(k))**2
-           n = n+1
-         endif
-       enddo
-      enddo
-      profuu(k) = S/max(n,1)
-    enddo
+           S = S + (U(i,j,k)-profU(k))**2
+           n = n + 1
+         end if
+       end do
+      end do
+      profuu(k) = S / max(n,1)
+    end do
     !$omp end do nowait
 
     !$omp do
@@ -2037,13 +2184,13 @@ contains
       do j = 1,Vny
        do i = 1,Vnx
          if (Vtype(i,j,k)<=0) then
-          S = S+(V(i,j,k)-profV(k))**2
-          n = n+1
-         endif
-       enddo
-      enddo
-      profvv(k) = S/max(n,1)
-    enddo
+          S = S + (V(i,j,k)-profV(k))**2
+          n = n + 1
+         end if
+       end do
+      end do
+      profvv(k) = S / max(n,1)
+    end do
     !$omp end do nowait
 
     !$omp do
@@ -2053,17 +2200,17 @@ contains
       do j = 1,Wny
        do i = 1,Wnx
          if (Wtype(i,j,k)<=0) then
-           S = S+(W(i,j,k))**2
-           n = n+1
-         endif
-       enddo
-      enddo
-      profww(k) = S/max(n,1)
-    enddo
+           S = S + (W(i,j,k))**2
+           n = n + 1
+         end if
+       end do
+      end do
+      profww(k) = S / max(n,1)
+    end do
     !$omp end do
     !$omp end parallel
 
-    if (present(temperature)) then
+    if (size(Temperature)>0) then
       !proftempfl is computed directly during advection step
 
       !$omp parallel private(i,j,k,n,S)
@@ -2074,13 +2221,13 @@ contains
         do j = 1,Prny
          do i = 1,Prnx
            if (Prtype(i,j,k)<=0) then
-             S = S+(temperature(i,j,k)-profTemp(k))**2
-             n = n+1
-           endif
-         enddo
-        enddo
-        proftt(k) = S/max(n,1)
-      enddo
+             S = S + (Temperature(i,j,k)-profTemp(k))**2
+             n = n + 1
+           end if
+         end do
+        end do
+        proftt(k) = S / max(n,1)
+      end do
       !$omp end do nowait
 
       !$omp do
@@ -2090,19 +2237,58 @@ contains
         do j = 1,Prny
          do i = 1,Prnx
            if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-             S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(temperature(i,j,k+1)-temperature(i,j,k)))/dzW(k)
-             n = n+1
-           endif
-         enddo
-        enddo
-        proftempflsgs(k) = S/max(n,1)
-      enddo
+             S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Temperature(i,j,k+1)-Temperature(i,j,k)))/dzW(k)
+             n = n + 1
+           end if
+         end do
+        end do
+        proftempflsgs(k) = S / max(n,1)
+      end do
       !$omp end do
       !$omp end parallel
-    endif ! present(temperature)
+    end if ! size(Temperature)
 
 
-    if (present(scalar)) then
+    if (size(Moisture)>0) then
+      !proftempfl is computed directly during advection step
+
+      !$omp parallel private(i,j,k,n,S)
+      !$omp do
+      do k = 1,Prnz
+        S = 0
+        n = 0
+        do j = 1,Prny
+         do i = 1,Prnx
+           if (Prtype(i,j,k)<=0) then
+             S = S + (Moisture(i,j,k)-profMoist(k))**2
+             n = n + 1
+           end if
+         end do
+        end do
+        profmm(k) = S / max(n,1)
+      end do
+      !$omp end do nowait
+
+      !$omp do
+      do k = 0,Prnz
+        S = 0
+        n = 0
+        do j = 1,Prny
+         do i = 1,Prnx
+           if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
+             S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Moisture(i,j,k+1)-Moisture(i,j,k)))/dzW(k)
+             n = n + 1
+           end if
+         end do
+        end do
+        profmoistflsgs(k) = S / max(n,1)
+      end do
+      !$omp end do
+      !$omp end parallel
+    end if ! size(Moisture)
+
+
+    if (size(Scalar)>0) then
       do l = 1,num_of_scalars
         !$omp parallel private(i,j,k,n,S)
         !$omp do
@@ -2112,13 +2298,13 @@ contains
           do j = 1,Prny
            do i = 1,Prnx
              if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-              S = S+0.5_knd*(scalar(i,j,k+1,l)+scalar(i,j,k,l))*(W(i,j,k))
-              n = n+1
-             endif
-           enddo
-          enddo
-          profscalfl(l,k) = S/max(n,1)
-        enddo
+              S = S + 0.5_knd*(Scalar(i,j,k+1,l)+Scalar(i,j,k,l))*(W(i,j,k))
+              n = n + 1
+             end if
+           end do
+          end do
+          profscalfl(l,k) = S / max(n,1)
+        end do
         !$omp end do nowait
 
         !$omp do
@@ -2128,13 +2314,13 @@ contains
           do j = 1,Prny
            do i = 1,Prnx
              if (Prtype(i,j,k)<=0) then
-              S = S+(scalar(i,j,k,l)-profscal(l,k))**2
-              n = n+1
-             endif
-           enddo
-          enddo
-          profss(l,k) = S/max(n,1)
-        enddo
+              S = S + (Scalar(i,j,k,l)-profscal(l,k))**2
+              n = n + 1
+             end if
+           end do
+          end do
+          profss(l,k) = S / max(n,1)
+        end do
         !$omp end do nowait
 
         !$omp do
@@ -2144,17 +2330,17 @@ contains
           do j = 1,Prny
            do i = 1,Prnx
              if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-               S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(scalar(i,j,k+1,l)-scalar(i,j,k,l)))/dzW(k)
-               n = n+1
-             endif
-           enddo
-          enddo
-          profscalflsgs(l,k) = S/max(n,1)
-        enddo
+               S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Scalar(i,j,k+1,l)-Scalar(i,j,k,l)))/dzW(k)
+               n = n + 1
+             end if
+           end do
+          end do
+          profscalflsgs(l,k) = S / max(n,1)
+        end do
         !$omp end do
         !$omp end parallel
-      enddo
-    endif ! present(scalar)
+      end do
+    end if ! size(Scalar)
 
     called = 1
   end subroutine BLProfiles
@@ -2182,9 +2368,9 @@ contains
        res = res + (((U(i-1,j,k)+U(i,j,k))/2._knd-Um)**2+&
                        ((V(i,j-1,k)+V(i,j,k))/2._knd-Vm)**2+&
                        ((W(i,j,k-1)+W(i,j,k))/2._knd-Wm)**2)
-      enddo
-     enddo
-    enddo
+      end do
+     end do
+    end do
     !$omp end parallel do
     res = res*lx*ly*lz/2
   end function TotKE
@@ -2344,14 +2530,14 @@ contains
       write(101) dxPr(0)
       called = 1
       fnum = 0
-     endif
+     end if
      fnum = fnum+1
      write(101) time-timefram1
      call OUTINLETFrame(U,V,W,Temperature,fnum)
     elseif (time>timefram2+(timefram2-timefram1)/(frames-1).and.called==1) then
       close(101)
       called = 2
-    endif
+    end if
 
   end subroutine OUTINLET
 
@@ -2384,9 +2570,9 @@ contains
     write(unit) U(mini,1:Uny,1:Unz)
     write(unit) V(mini,1:Vny,1:Vnz)
     write(unit) W(mini,1:Wny,1:Wnz)
-    if (enable_buoyancy>0) then
+    if (enable_buoyancy==1) then
          write(unit) Temperature(mini,1:Prny,1:Prnz)
-    endif
+    end if
     close(unit)
 
   end subroutine OUTINLETFrame

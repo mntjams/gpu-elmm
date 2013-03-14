@@ -1,0 +1,359 @@
+module ScalarBoundaries
+  use Parameters
+
+  implicit none
+
+  private
+
+  public BoundTemperature, BoundMoisture, BoundScalar, &
+         BoundViscosity
+  
+contains
+
+
+
+  subroutine CommonBase(arr,btype,side,in,BsideArr,BsideFlArr)
+    real(knd),intent(inout) :: arr(-1:,-1:,-1:)
+    integer  ,intent(in)    :: btype(6)
+    real(knd),intent(in)    :: side(6)
+    real(knd),intent(in),optional :: in(-1:,-1:)
+    real(knd),intent(in),allocatable,optional :: BsideArr(:,:), BsideFlArr(:,:)
+    real(knd) invalue
+    integer i,j,k,nx,ny,nz
+
+    nx = Prnx
+    ny = Prny
+    nz = Prnz
+
+    if (btype(We)==DIRICHLET) then
+      do k = 1,nz
+        do j = 1,ny
+          if (present(in)) then
+            invalue = in(j,k)
+          else
+            invalue = side(We)
+          end if
+          arr(0,j,k)  = in(j,k) - (arr(1,j,k)-side(We))
+          arr(-1,j,k) = in(j,k) - (arr(2,j,k)-side(We))
+        end do
+      end do
+    else if (btype(We)==PERIODIC) then
+      do k = 1,nz
+        do j = 1,ny
+         arr(0,j,k)  = arr(nx,j,k)
+         arr(-1,j,k) = arr(nx-1,j,k)
+        end do
+      end do
+    else if (btype(We)==NEUMANN) then
+      do k = 1,nz
+        do j = 1,ny
+          arr(0,j,k)  = arr(1,j,k) - side(We)*dxU(0)
+          arr(-1,j,k) = arr(1,j,k) - side(We)*(dxU(0)+dxU(-1))
+        end do
+      end do
+    else if (btype(We)==CONSTFLUX) then
+      do k = 1,nz
+        do j = 1,ny
+          arr(0,j,k)  = arr(1,j,k) + &
+                side(We)*dxU(0)/((TDiff(1,j,k)+TDiff(0,j,k))/(2._knd))
+          arr(-1,j,k) = arr(0,j,k) - (arr(1,j,k)-arr(0,j,k))
+        end do
+      end do
+    else
+      do k = 1,nz
+        do j = 1,ny
+          arr(0,j,k)  = arr(1,j,k) - side(We)*dxU(0)
+          arr(-1,j,k) = arr(1,j,k) - side(We)*(dxU(0)+dxU(-1))
+        end do
+      end do
+    end if
+
+    if (btype(Ea)==DIRICHLET) then
+      do k = 1,nz
+        do j = 1,ny
+          arr(nx+1,j,k) = side(Ea) - (arr(nx,j,k)-side(Ea))
+          arr(nx+2,j,k) = side(Ea) - (arr(nx-1,j,k)-side(Ea))
+        end do
+      end do
+    else if (btype(Ea)==PERIODIC) then
+      do k = 1,nz
+        do j = 1,ny
+          arr(nx+1,j,k) = arr(1,j,k)
+          arr(nx+2,j,k) = arr(2,j,k)
+        end do
+      end do
+    else if (btype(Ea)==NEUMANN) then
+      do k = 1,nz
+        do j = 1,ny
+          arr(nx+1,j,k) = arr(nx,j,k) + side(Ea)*dxU(nx+1)
+          arr(nx+2,j,k) = arr(nx,j,k) + side(Ea)*(dxU(nx+1)+dxU(nx+2))
+        end do
+      end do
+    else if (btype(Ea)==CONSTFLUX) then
+      do k = 1,nz
+        do j = 1,ny
+          arr(nx+1,j,k) = arr(nx,j,k) - &
+              side(Ea)*dxU(nx)/((TDiff(nx,j,k)+TDiff(nx+1,j,k))/(2._knd))
+          arr(nx+2,j,k) = arr(nx+1,j,k) - (arr(nx,j,k)-arr(nx+1,j,k))
+        end do
+      end do
+    else
+      do k = 1,nz
+        do j = 1,ny
+          arr(nx+1,j,k) = arr(nx,j,k) + side(Ea)*dxU(nx+1)
+          arr(nx+2,j,k) = arr(nx,j,k) + side(Ea)*(dxU(nx+1)+dxU(nx+2))
+        end do
+      end do
+    end if
+
+
+    if (btype(So)==DIRICHLET) then
+      do k = 1,nz
+        do i=-1,nx+2
+          arr(i,0,k)  = side(So) - (arr(i,1,k)-side(So))
+          arr(i,-1,k) = side(So) - (arr(i,2,k)-side(So))
+        end do
+      end do
+    else if (btype(So)==PERIODIC) then
+      do k = 1,nz
+        do i=-1,nx+2
+          arr(i,0,k)  = arr(i,ny,k)
+          arr(i,-1,k) = arr(i,ny-1,k)
+        end do
+      end do
+    else if (btype(So)==NEUMANN) then
+      do k = 1,nz
+        do i=-1,nx+2
+          arr(i,0,k)  = arr(i,1,k) - side(So)*dyV(0)
+          arr(i,-1,k) = arr(i,1,k) - side(So)*(dyV(0)+dyV(-1))
+        end do
+      end do
+    else if (btype(So)==CONSTFLUX) then
+      do k = 1,nz
+        do i=-1,nx+2
+          arr(i,0,k)  = arr(i,1,k) + &
+                side(So)*dyV(0)/((TDiff(i,1,k)+TDiff(i,0,k))/(2._knd))
+          arr(i,-1,k) = arr(i,0,k) - (arr(i,1,k)-arr(i,0,k))
+        end do
+      end do
+    else
+      do k = 1,nz
+        do i=-1,nx+2
+          arr(i,0,k)  = arr(i,1,k) - side(So)*dyV(0)
+          arr(i,-1,k) = arr(i,1,k) - side(So)*(dyV(0)+dyV(-1))
+        end do
+      end do
+    end if
+
+    if (btype(No)==DIRICHLET) then
+      do k = 1,nz
+        do i=-1,nx+2
+           arr(i,ny+1,k) = side(No) - (arr(i,ny,k)-side(No))
+           arr(i,ny+2,k) = side(No) - (arr(i,ny-1,k)-side(No))
+         end do
+       end do
+    else if (btype(No)==PERIODIC) then
+      do k = 1,nz
+        do i=-1,nx+2
+          arr(i,ny+1,k) = arr(i,1,k)
+          arr(i,ny+2,k) = arr(i,2,k)
+        end do
+      end do
+    else if (btype(No)==NEUMANN) then
+      do k = 1,nz
+        do i=-1,nx+2
+          arr(i,ny+1,k) = arr(i,ny,k) + side(No)*dyV(ny+1)
+          arr(i,ny+2,k) = arr(i,ny,k) + side(No)*(dyV(ny+1)+dyV(ny+2))
+        end do
+      end do
+    else if (btype(No)==CONSTFLUX) then
+      do k = 1,nz
+        do i=-1,nx+2
+          arr(i,ny+1,k) = arr(i,ny+1,k) - &
+              side(No)*dyV(ny)/((TDiff(i,ny,k)+TDiff(i,ny+1,k))/(2._knd))
+          arr(i,ny+2,k) = arr(i,ny+1,k) - (arr(i,ny,k)-arr(i,ny+1,k))
+        end do
+      end do
+    else
+      do k = 1,nz
+        do i=-1,ny+2
+          arr(i,ny+1,k) = arr(i,ny,k) + side(No)*dyV(ny+1)
+          arr(i,ny+2,k) = arr(i,ny,k) + side(No)*(dyV(ny+1)+dyV(ny+2))
+        end do
+      end do
+    end if
+
+
+    if (btype(Bo)==PERIODIC) then
+      do j=-1,ny+2
+        do i=-1,nx+2
+          arr(i,j,0)  = arr(i,j,nz)
+          arr(i,j,-1) = arr(i,j,nz-1)
+        end do
+      end do
+    else if (btype(Bo)==NEUMANN) then
+      do j=-1,ny+2
+        do i=-1,nx+2
+          arr(i,j,0)  = arr(i,j,1) - side(Bo)*dzW(0)
+          arr(i,j,-1) = arr(i,j,1) - side(Bo)*(dzW(0)+dzW(-1))
+        end do
+      end do
+    else if (btype(Bo)==CONSTFLUX.or.btype(Bo)==DIRICHLET) then
+      do j=-1,ny+2
+        do i=-1,nx+2
+          if (present(BsideFlArr).and.present(BsideArr)) then
+            if (abs(BsideFlArr(i,j))<tiny(1._knd) .and. &
+                TDiff(i,j,1)<1.1_knd/(Prandtl*Re) .and. &
+                btype(Bo)==DIRICHLET)                    then
+              arr(i,j,0) = BsideArr(i,j)
+            else
+              arr(i,j,0) = arr(i,j,1) + &
+                  BsideFlArr(i,j)*dzW(0) / ((TDiff(i,j,1)+TDiff(i,j,0))/(2._knd))
+            end if
+          else
+            arr(i,j,0) = arr(i,j,1) + &
+                side(Bo)*dzW(0)/((TDiff(i,j,1)+TDiff(i,j,0))/(2._knd))
+          end if
+          arr(i,j,-1) = arr(i,j,0)-(arr(i,j,1)-arr(i,j,0))
+        end do
+      end do
+    else
+      do j=-1,ny+2
+        do i=-1,nx+2
+          arr(i,j,0)  = arr(i,j,1) - side(Bo)*dzW(0)
+          arr(i,j,-1) = arr(i,j,1) - side(Bo)*(dzW(0)+dzW(-1))
+        end do
+      end do
+    end if
+
+    if (btype(To)==DIRICHLET) then
+      do j=-1,ny+2
+        do i=-1,nx+2
+          arr(i,j,nz+1) = side(To) - (arr(i,j,nz)-side(To))
+          arr(i,j,nz+2) = side(To) - (arr(i,j,nz-1)-side(To))
+        end do
+      end do
+    else if (btype(To)==PERIODIC) then
+      do j=-1,ny+2
+        do i=-1,nx+2
+          arr(i,j,nz+1) = arr(i,j,1)
+          arr(i,j,nz+2) = arr(i,j,2)
+        end do
+      end do
+    else if (btype(To)==NEUMANN) then
+      do j=-1,ny+2
+        do i=-1,nx+2
+          arr(i,j,nz+1) = arr(i,j,nz) + side(To)*dzW(nz+1)
+          arr(i,j,nz+2) = arr(i,j,nz) + side(To)*(dzW(nz+1)+dzW(nz+2))
+        end do
+      end do
+    else if (btype(To)==CONSTFLUX) then
+      do j=-1,ny+2
+        do i=-1,nx+2
+          arr(i,j,nz+1) = arr(i,j,nz) - &
+              side(To)*dzW(nz)/((TDiff(i,j,nz)+TDiff(i,j,nz+1))/(2._knd))
+          arr(i,j,nz+2) = arr(i,j,nz+1) - (arr(i,j,nz)-arr(i,j,nz+1))
+        end do
+      end do
+    else
+      do j=-1,ny+2
+        do i=-1,nx+2
+          arr(i,j,nz+1) = arr(i,j,nz) + side(To)*dzW(nz+1)
+          arr(i,j,nz+2) = arr(i,j,nz) + side(To)*(dzW(nz+1)+dzW(nz+2))
+        end do
+      end do
+     end if
+  end subroutine CommonBase
+
+
+
+
+  subroutine BoundScalar(SCAL)
+    real(knd),intent(inout) :: SCAL(-1:,-1:,-1:)
+
+    call CommonBase(SCAL,ScalBtype,sideScal)
+
+  end subroutine BoundScalar
+
+
+
+
+
+
+  subroutine BoundTemperature(Temperature)
+    real(knd),intent(inout) :: Temperature(-1:,-1:,-1:)
+    
+    call CommonBase(Temperature,TempBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr)
+
+  end subroutine BoundTemperature
+
+
+  subroutine BoundMoisture(Moisture)
+    real(knd),intent(inout) :: Moisture(-1:,-1:,-1:)
+
+    call CommonBase(Moisture,MoistBtype,sideMoist)
+  end subroutine BoundMoisture
+
+
+  pure subroutine BoundViscosity(Nu)
+    real(knd),intent(inout) :: Nu(-1:,-1:,-1:)
+    integer i,j,k,nx,ny,nz
+
+    nx = Prnx
+    ny = Prny
+    nz = Prnz
+
+    if (Btype(To)==PERIODIC) then
+      do j = 1,ny
+       do i = 1,nx
+         Nu(i,j,0) = Nu(i,j,nz)
+         Nu(i,j,nz+1) = Nu(i,j,1)
+       end do
+      end do
+    else
+      do j = 1,ny
+       do i = 1,nx
+         Nu(i,j,0) = Nu(i,j,1)
+         Nu(i,j,nz+1) = Nu(i,j,nz)
+       end do
+      end do
+    end if
+
+    if (Btype(Ea)==PERIODIC) then
+      do k = 0,nz+1
+       do j = 1,ny
+         Nu(0,j,k) = Nu(nx,j,k)
+         Nu(nx+1,j,k) = Nu(1,j,k)
+       end do
+      end do
+    else
+      do k = 0,nz+1
+       do j = 1,ny
+         Nu(0,j,k) = Nu(1,j,k)
+         Nu(nx+1,j,k) = Nu(nx,j,k)
+       end do
+      end do
+    end if
+
+    if (Btype(No)==PERIODIC) then
+      do k = 0,nz+1
+       do i = 0,nx+1
+         Nu(i,0,k) = Nu(i,ny,k)
+         Nu(i,ny+1,k) = Nu(i,1,k)
+       end do
+      end do
+    else
+      do k = 0,nz+1
+       do i = 0,nx+1
+         Nu(i,0,k) = Nu(i,1,k)
+         Nu(i,ny+1,k) = Nu(i,ny,k)
+       end do
+      end do
+    end if
+
+  end subroutine BoundViscosity
+
+
+
+
+end module ScalarBoundaries

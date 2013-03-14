@@ -79,7 +79,7 @@
  !$hmpp <tsteps> Convection codelet
  subroutine Convection(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,enable_buoyancy,convmet,&
                        dxmin,dymin,dzmin,coriolisparam,grav_acc,temperature_ref,&
-                       U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev,dt)
+                       U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,RK_stage,dt)
   implicit none
 #include "hmpp-include.f90"
 
@@ -100,19 +100,20 @@
   real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: temperature
   intrinsic abs
 #else
- subroutine Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,beta,rho,lev)
+ subroutine Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,Temperature,Moisture,beta,rho,RK_stage)
   use VolumeSources, only: ResistanceForce
   use VTKArray
   real(knd),dimension(-2:,-2:,-2:),intent(in)    :: U,V,W
   real(knd),dimension(-2:,-2:,-2:),intent(out)   :: U2,V2,W2
   real(knd),dimension(-2:,-2:,-2:),intent(inout) :: Ustar,Vstar,Wstar
-  real(knd),dimension(-1:,-1:,-1:),intent(in) :: temperature
+  real(knd),dimension(-1:,-1:,-1:),intent(in)    :: Temperature
+  real(knd),dimension(-1:,-1:,-1:),intent(in)    :: Moisture
 #endif
   real(knd),dimension(1:3),intent(in) :: beta,rho
-  integer,intent(in) :: lev
+  integer,intent(in) :: RK_stage
   integer i,j,k
 
-      if (lev>1) then
+      if (RK_stage>1) then
         !$omp parallel private(i,j,k)
         !$omp do
         !$hmppcg grid blocksize myblocksize
@@ -121,7 +122,7 @@
         do k=1,Unz
          do j=1,Uny
           do i=1,Unx
-           U2(i,j,k) = Ustar(i,j,k)*rho(lev)
+           U2(i,j,k) = Ustar(i,j,k)*rho(RK_stage)
           enddo
          enddo
         enddo
@@ -133,7 +134,7 @@
         do k=1,Vnz
          do j=1,Vny
           do i=1,Vnx
-           V2(i,j,k) = Vstar(i,j,k)*rho(lev)
+           V2(i,j,k) = Vstar(i,j,k)*rho(RK_stage)
           enddo
          enddo
         enddo
@@ -145,7 +146,7 @@
         do k=1,Wnz
          do j=1,Wny
           do i=1,Wnx
-           W2(i,j,k) = Wstar(i,j,k)*rho(lev)
+           W2(i,j,k) = Wstar(i,j,k)*rho(RK_stage)
           enddo
          enddo
         enddo
@@ -295,7 +296,7 @@
                                                     Ustar,Vstar,U,V,dt)
 
       if (enable_buoyancy==1) call BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,&
-                                grav_acc,temperature_ref,Wstar,temperature,dt)
+                                grav_acc,temperature_ref,Wstar,Temperature,Moisture,dt)
 
       call ResistanceForce(Ustar,Vstar,Wstar,U,V,W)
 
@@ -308,7 +309,7 @@
       do k=1,Unz
        do j=1,Uny
         do i=1,Unx
-         U2(i,j,k) = U2(i,j,k)+Ustar(i,j,k)*beta(lev)
+         U2(i,j,k) = U2(i,j,k)+Ustar(i,j,k)*beta(RK_stage)
         enddo
        enddo
       enddo
@@ -320,7 +321,7 @@
       do k=1,Vnz
        do j=1,Vny
         do i=1,Vnx
-         V2(i,j,k) = V2(i,j,k)+Vstar(i,j,k)*beta(lev)
+         V2(i,j,k) = V2(i,j,k)+Vstar(i,j,k)*beta(RK_stage)
         enddo
        enddo
       enddo
@@ -332,7 +333,7 @@
       do k=1,Wnz
        do j=1,Wny
         do i=1,Wnx
-         W2(i,j,k) = W2(i,j,k)+Wstar(i,j,k)*beta(lev)
+         W2(i,j,k) = W2(i,j,k)+Wstar(i,j,k)*beta(RK_stage)
         enddo
        enddo
       enddo
@@ -434,36 +435,73 @@
 
 
 
-  subroutine BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,grav_acc,temperature_ref,W2,theta,dt)
-  implicit none
+  subroutine BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,grav_acc,temperature_ref,W2,Temperature,Moisture,dt)
+    implicit none
 #ifdef __HMPP
 #include "hmpp-include.f90"
 #endif
-  integer,intent(in) :: Prnx,Prny,Prnz,Wnx,Wny,Wnz
+    integer,intent(in) :: Prnx,Prny,Prnz,Wnx,Wny,Wnz
 #ifdef __HMPP
-  real(knd),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W2
-  real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: theta
+    real(knd),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W2
+    real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: Temperature
 #else
-  real(knd),dimension(-2:,-2:,-2:),intent(inout) :: W2
-  real(knd),dimension(-1:,-1:,-1:),intent(in) :: theta
+    real(knd),dimension(-2:,-2:,-2:),intent(inout) :: W2
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature,Moisture
 #endif
-  real(knd),intent(in) :: grav_acc,temperature_ref,dt
-  real(knd) A
-  integer i,j,k
+    real(knd),intent(in) :: grav_acc,temperature_ref,dt
+    real(knd) A,A2,temperature_virt
+    integer i,j,k
 
-    A = grav_acc*dt/temperature_ref
-    !$omp parallel do private(i,j,k)
-    !$hmppcg grid blocksize myblocksize
-    !$hmppcg permute (k,i,j)
-    !$hmppcg gridify(k,i)
-    do k=1,Wnz
-     do j=1,Wny
-      do i=1,Wnx
-            W2(i,j,k) = W2(i,j,k)+A*((theta(i,j,k+1)+theta(i,j,k))/2._knd-temperature_ref)
+
+    if (enable_moisture==1) then
+      if (enable_liquid==1) then
+        stop "Liquid water not implemented."
+      else
+        A = grav_acc*dt/temperature_ref
+        A2 = A / 2._KND
+
+        call apply_moist(1)
+        call apply_moist(2)
+      end if
+    else
+      A = grav_acc*dt/temperature_ref
+      A2 = A / 2._KND
+      !$omp parallel do private(i,j,k)
+      !$hmppcg grid blocksize myblocksize
+      !$hmppcg permute (k,i,j)
+      !$hmppcg gridify(k,i)
+      do k=1,Wnz
+       do j=1,Wny
+        do i=1,Wnx
+              W2(i,j,k) = W2(i,j,k) + A2 * (Temperature(i,j,k+1)+Temperature(i,j,k)) - A * temperature_ref
+        enddo
+       enddo
       enddo
-     enddo
-    enddo
-    !$omp end parallel do
+      !$omp end parallel do
+    end if
+
+    contains
+
+      subroutine apply_moist(start)
+        integer,intent(in) :: start
+        !$omp parallel do private(i,j,k,temperature_virt)
+        do k=start,Wnz+1,2
+         do j=1,Wny
+          do i=1,Wnx
+                temperature_virt = theta_v(i,j,k)
+                W2(i,j,k)   = W2(i,j,k)   + A2 * temperature_virt - A * temperature_ref
+                W2(i,j,k-1) = W2(i,j,k-1) + A2 * temperature_virt
+          enddo
+         enddo
+        enddo
+        !$omp end parallel do
+      end subroutine
+
+      real(knd) function theta_v(i,j,k)
+        integer :: i,j,k
+
+        theta_v = Temperature(i,j,k) * (1._knd + 0.61_knd * Moisture(i,j,k))
+      end function
   endsubroutine BuoyancyForce
 
 

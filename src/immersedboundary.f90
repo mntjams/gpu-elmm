@@ -269,7 +269,7 @@ contains
 
     intscal = TIBPoint_Interpolate(IBP,Scalar,-1)
 
-    if (sctype==1) then
+    if (sctype==scalar_type_temperature) then
       intTDiff = TIBPoint_InterpolateTDiff(IBP,TDiff)
 
       if (intTDiff>0)  intscal = intscal + IBP%temperatureflux * IBP%dist / intTDiff

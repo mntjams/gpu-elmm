@@ -55,6 +55,7 @@ module StaggeredFrames
     logical :: W = .false.
     logical :: Pr = .false.
     logical :: Temperature = .false.
+    logical :: Moisture = .false.
     logical :: Scalar = .false.
     integer :: num_scalars = 0
   end type
@@ -278,6 +279,7 @@ module StaggeredFrames
       if (D%save_flags%W) D%buffer_size = D%buffer_size + D%sizeW
       if (D%save_flags%Pr) D%buffer_size = D%buffer_size + D%sizePr
       if (D%save_flags%Temperature) D%buffer_size = D%buffer_size + D%sizePr
+      if (D%save_flags%Moisture) D%buffer_size = D%buffer_size + D%sizePr
       if (D%save_flags%Scalar) D%buffer_size = D%buffer_size + D%sizePr * num_scalars
 
       if (D%save_flags%Scalar) then
@@ -377,8 +379,6 @@ module StaggeredFrames
       type(c_ptr),value :: Dptr
       type(TStaggeredFrameDomain),pointer :: D
       character(40) :: file_name
-      !line feed
-      character,parameter :: lf = achar(10)
 
       call c_f_pointer(Dptr, D)
 
@@ -459,8 +459,6 @@ module StaggeredFrames
     subroutine TStaggeredFrameDomain_SaveHeader(D)
       type(TStaggeredFrameDomain),target,intent(in) :: D
       character(40) :: file_name
-      !line feed
-      character,parameter :: lf = achar(10)
 
       file_name = trim(D%base_name)//"-header"//trim(D%suffix)
 

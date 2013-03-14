@@ -2,8 +2,7 @@ program CLMM
 
   use TSTEPS, only: TMarchRK3
   use PARAMETERS
-!   use BOUNDARIES
-  use INITIAL
+  use Initial
   use OUTPUTS, only: AllocateOutputs, OutTStep, Output
 
   implicit none
@@ -12,19 +11,21 @@ program CLMM
 
 
   real(knd),allocatable:: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)
-  real(knd),allocatable,dimension(:,:,:) :: Temperature
+  real(knd),allocatable,dimension(:,:,:) :: Temperature !If buoyancy enabled then liquid potential temperature, othrewise potential temperature.
+  real(knd),allocatable,dimension(:,:,:) :: Moisture !Total specific humidity q_t.
   real(knd),allocatable,dimension(:,:,:,:) :: Scalar  !last index is a number of scalar (because of paging)
+
   real(knd) :: delta = 0
 
   pi=2.0_knd*acos(0.0_knd)
 
 
   write (*,*) "Reading parameters..."
-  call ReadParams
+  call ReadConfiguration
 
 
   write (*,*) "Setting up boundary conditions..."
-  call ReadBounds
+  call InitBoundaryConditions
 
 
   write (*,*) "Allocating arrays..."
@@ -32,14 +33,14 @@ program CLMM
 
 
   write (*,*) "Setting up initial conditions..."
-  call InitConds(U,V,W,Pr,Temperature,Scalar)
+  call InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
 
   time=starttime
   step=0
 
   call AllocateOutputs
 
-  call OutTStep(U,V,W,Pr,Temperature,Scalar,delta)
+  call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
 
 
 
@@ -47,7 +48,7 @@ program CLMM
 
     write (*,*) "Computing..."
 
-    do step=1,nt
+    do step = 1,nt
 
       write (*,*) "-----------"
       write (*,*) " "
@@ -57,15 +58,15 @@ program CLMM
 
 
 
-      call TMarchRK3(U,V,W,Pr,Temperature,Scalar,delta)
+      call TMarchRK3(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
 
 
 
 
-      time=time+dt
+      time = time + dt
 
 
-      call OutTStep(U,V,W,Pr,Temperature,Scalar,delta)
+      call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
 
 
       if ((steady==1) .and. (delta<eps)) then
@@ -78,7 +79,7 @@ program CLMM
         exit
       endif
 
-      if (dt<abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/20._knd)) then
+      if (dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/20._knd)) then
         write (*,*) "Solution diverged."
         exit
       endif
@@ -95,7 +96,7 @@ program CLMM
 
   write (*,*) "Saving results..."
 
-  call OUTPUT(U,V,W,Pr,Temperature,Scalar)
+  call OUTPUT(U,V,W,Pr,Temperature,Moisture,Scalar)
 
 
   contains
@@ -115,10 +116,17 @@ program CLMM
 
 
      if (enable_buoyancy==1) then
-       allocate(temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-       temperature=0
+       allocate(Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+       Temperature = 0
      else
-       allocate(temperature(0,0,0))
+       allocate(Temperature(0,0,0))
+     endif
+
+     if (enable_moisture==1) then
+       allocate(Moisture(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+       Moisture = 0
+     else
+       allocate(Moisture(0,0,0))
      endif
 
      if (num_of_scalars>0) then
@@ -131,9 +139,13 @@ program CLMM
 
      allocate(Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
 
-     if (enable_buoyancy>0.or.num_of_scalars>0) then
+     if (enable_buoyancy==1 .or. &
+         enable_moisture==1 .or. &
+         num_of_scalars>0)      then
+
        allocate(TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
        TDiff = 0
+
      else
        allocate(TDiff(0,0,0))
      endif

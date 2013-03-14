@@ -199,18 +199,18 @@
 
 !   !$hmpp <tsteps> DiffTemperature codelet
   subroutine DiffTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
-                            TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
+                            TempBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
                             TDiff,Temperature2,Temperature,&
                             coef,dt,l,res)
   implicit none
 #include "hmpp-include.f90"
 
-  integer,intent(in)    :: Prnx,Prny,Prnz,maxCNiter,TBtype(6)
+  integer,intent(in)    :: Prnx,Prny,Prnz,maxCNiter,TempBtype(6)
   real(knd),intent(out),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2) :: Temperature2
   real(knd),intent(in),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)  :: Temperature
 
   real(knd),intent(in)  :: dxmin,dymin,dzmin,epsCN,Re,coef,dt
-  real(knd),intent(in)  :: sideTemp(6),Tempin(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(knd),intent(in)  :: sideTemp(6),TempIn(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
   real(knd),intent(in),dimension(-1:Prnx+2,-1:Prny+2) :: BsideTArr,BsideTFLArr
   integer,intent(out)   :: l
   real(knd),intent(out) :: res
@@ -258,7 +258,7 @@
     enddo
    enddo
 
-   call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,Temperature2)
+   call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TempBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,Temperature2)
 
 
 
@@ -287,7 +287,7 @@
     l=l+1
 !     res = 0
 
-    call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,Temperature2)
+    call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TempBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,Temperature2)
 
 
    !$hmppcg grid blocksize myblocksize
@@ -347,7 +347,7 @@
     enddo
    enddo
 
-   call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,Temperature2)
+   call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TempBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,Temperature2)
 
   endif
   endsubroutine DiffTemperature_GPU
@@ -358,18 +358,18 @@
   !$hmpp <tsteps> RKstage_Temperature codelet
   subroutine RKstage_Temperature_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                             dxmin,dymin,dzmin,maxCNiter,epsCN,Re,limparam,&
-                            TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
+                            TempBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
                             TDiff,Temperature2,Temperature,Temperature_adv,U,V,W,&
                             SubsidenceProfile,fluxProfile,dt,RKstage,alpha,beta,rho,CNiters,CNres)
     implicit none                                                                                   !Hunsdorfer et al. 1995, JCP
 #include "hmpp-include.f90"
 
-    integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,maxCNiter,TBtype(6),RKstage
+    integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,maxCNiter,TempBtype(6),RKstage
     real(knd),intent(inout) :: Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
     real(knd),intent(inout) :: Temperature_adv(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
     real(knd),intent(in)    :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
     real(knd),intent(in)    :: dxmin,dymin,dzmin,epsCN,Re,limparam,dt
-    real(knd),intent(in)    :: sideTemp(6),Tempin(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+    real(knd),intent(in)    :: sideTemp(6),TempIn(-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
     real(knd),intent(in),dimension(-1:Prnx+2,-1:Prny+2) :: BsideTArr,BsideTFLArr
     real(knd),intent(in)    :: SubsidenceProfile(0:Prnz)
     real(knd),intent(out)   :: fluxProfile(0:Prnz)
@@ -380,7 +380,7 @@
 
     integer i,j,k
 
-      call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,temperature)
+      call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TempBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,temperature)
 
       if (RKstage>1) then
 
@@ -437,10 +437,10 @@
       enddo
 
 
-      call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,temperature)
+      call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TempBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,temperature)
 
       call DiffTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,maxCNiter,epsCN,Re,&
-                             TBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,TDiff,&
+                             TempBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,TDiff,&
                              temperature2,temperature,2._knd*alpha(RKstage),dt,CNiters,CNres)
 
 
@@ -461,7 +461,7 @@
 
 
 
-  subroutine BOUND_Visc_GPU(Prnx,Prny,Prnz,Btype,Nu)
+  subroutine BoundViscosity_GPU(Prnx,Prny,Prnz,Btype,Nu)
     implicit none
 #include "hmpp-include.f90"
     integer, intent(in) :: Prnx,Prny,Prnz,Btype(6)
@@ -520,11 +520,11 @@
      enddo
     endif
 
-  endsubroutine BOUND_Visc_GPU
+  endsubroutine BoundViscosity_GPU
 
 
-  !$hmpp <tsteps> Bound_Visc_TDiff codelet
-  subroutine Bound_Visc_TDiff(Prnx,Prny,Prnz,enable_buoyancy,Btype,Re,Prandtl,Visc,TDiff)
+  !$hmpp <tsteps> BoundViscosity_TDiff codelet
+  subroutine BoundViscosity_TDiff(Prnx,Prny,Prnz,enable_buoyancy,Btype,Re,Prandtl,Visc,TDiff)
     implicit none
 #include "hmpp-include.f90"
     integer,intent(in)      :: Prnx,Prny,Prnz,enable_buoyancy,Btype(6)
@@ -533,7 +533,7 @@
     integer                 :: i,j,k
     real(knd),parameter     :: Prt = 0.6
 
-    call Bound_Visc_GPU(Prnx,Prny,Prnz,Btype,Visc)
+    call BoundViscosity_GPU(Prnx,Prny,Prnz,Btype,Visc)
 
     if (enable_buoyancy==1) then
       if (Re>0) then
@@ -561,10 +561,10 @@
        end do
       endif
 
-      call Bound_Visc_GPU(Prnx,Prny,Prnz,Btype,TDiff)
+      call BoundViscosity_GPU(Prnx,Prny,Prnz,Btype,TDiff)
     end if
 
-  end subroutine Bound_Visc_TDiff
+  end subroutine BoundViscosity_TDiff
 
 
 
@@ -647,7 +647,7 @@
 !      enddo
 !
 !
-!      call BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2(:,:,:,l))
+!      call BoundScalar_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2(:,:,:,l))
 !
 !
 !
@@ -656,7 +656,7 @@
 !      do l = 1,maxCNiter
 !       res = 0
 !
-!       call BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2(:,:,:,l))
+!       call BoundScalar_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2(:,:,:,l))
 !
 !
 !      !$hmppcg grid blocksize myblocksize
@@ -717,7 +717,7 @@
 !      enddo
 !
 !
-!       call BOUND_PASSSCALAR_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2(:,:,:,l))
+!       call BoundScalar_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,ScalBtype,sideScal,TDiff,SCAL2(:,:,:,l))
 !
 !     endif
 !

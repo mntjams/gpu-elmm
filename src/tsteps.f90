@@ -6,9 +6,10 @@ module TSTEPS
   use LAXFRIED
   use LAXWend
   use BOUNDARIES, only: BoundU,Bound_Q
+  use ScalarBoundaries, only: BoundTemperature, BoundViscosity
   use POISSON !it exports Pr_Correct and GetPrFromGPU
   use OUTPUTS, only: store,display,proftempfl
-  use SCALARS, only: ScalarRK3, Bound_Visc, ComputeTDiff, BoundTemperature
+  use SCALARS, only: ScalarRK3, ComputeTDiff
   use Subgrid, only: sgstype, SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma
   use TURBINLET, only: GetTurbInlet, GetInletFromFile
   use Wallmodels
@@ -36,18 +37,18 @@ contains
 #endif
 
 
- subroutine TMarchRK3(U,V,W,Pr,Temperature,Scalar,delta)
+ subroutine TMarchRK3(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
   use RK3
-  real(knd),allocatable,intent(inout):: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)  !allocatable to anable move_alloc
-  real(knd),allocatable,intent(inout) :: Temperature(:,:,:),Scalar(:,:,:,:)
-  real(knd),intent(out):: delta
+  real(knd),allocatable,intent(inout) :: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)  !allocatable to anable move_alloc
+  real(knd),allocatable,intent(inout) :: Temperature(:,:,:),Moisture(:,:,:),Scalar(:,:,:,:)
+  real(knd),intent(out) :: delta
 
-  real(knd),dimension(:,:,:),allocatable,save   :: Q
-  real(knd),dimension(:,:,:),allocatable,save   :: U2,Ustar
-  real(knd),dimension(:,:,:),allocatable,save   :: V2,Vstar
-  real(knd),dimension(:,:,:),allocatable,save   :: W2,Wstar
+  real(knd),dimension(:,:,:),allocatable,save :: Q
+  real(knd),dimension(:,:,:),allocatable,save :: U2,Ustar
+  real(knd),dimension(:,:,:),allocatable,save :: V2,Vstar
+  real(knd),dimension(:,:,:),allocatable,save :: W2,Wstar
 
-  integer l
+  integer RK_stage
   integer,save:: called = 0
   integer(int64), save :: trate
   integer(int64), save :: time1, time2
@@ -134,7 +135,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
     end if
 
     !$hmpp <tsteps> advancedload, args[ComputeViscWM::nWMPoints,ComputeViscWM::WMPoints]
-    !$hmpp <tsteps> advancedload, args[Bound_Visc_TDiff::Prandtl]
+    !$hmpp <tsteps> advancedload, args[BoundViscosity_TDiff::Prandtl]
 
     GPU = 1
 #endif
@@ -158,9 +159,9 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
 
   write (*,*) "time:",time,"dt: ",dt
 
-  do l=1,RKstages
+  do RK_stage = 1,RK_stages
 
-    write(*,*) "stage:",l
+    write(*,*) "stage:",RK_stage
 
 
     if (debugparam>1) call system_clock(count=time1)
@@ -170,14 +171,14 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
     call SubgridStresses(U,V,W,Pr,Temperature)
 
 
-    !$hmpp <tsteps> advancedload, args[Convection::lev]
+    !$hmpp <tsteps> advancedload, args[Convection::RK_stage]
 
 
     !$hmpp <tsteps> Convection callsite, args[*].noupdate = true
-    call Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,temperature,RK_beta,RK_rho,l)
+    call Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,Temperature,Moisture,RK_beta,RK_rho,RK_stage)
 
 
-    call OtherTerms(U,V,W,U2,V2,W2,Pr,2._knd*RK_alpha(l))
+    call OtherTerms(U,V,W,U2,V2,W2,Pr,2._knd*RK_alpha(RK_stage))
 
 
     !download U2 V2 and W2 to main memory Attenuates below are to slow on GPU, waiting for HMPP update
@@ -212,7 +213,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
 
 
     if (poissmet>0) then
-       call Pr_Correct(U2,V2,W2,Pr,Q,2._knd*RK_alpha(l))
+       call Pr_Correct(U2,V2,W2,Pr,Q,2._knd*RK_alpha(RK_stage))
     end if
 
 
@@ -220,7 +221,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
     !$hmpp <tsteps> UpdateU callsite, args[*].noupdate=true
     call UpdateU_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,U,V,W,U2,V2,W2)
 #else
-    if (l==1) delta = 0
+    if (RK_stage==1) delta = 0
 #ifdef DEBUG
     if (debuglevel>0.or.steady==1) then
       if (Unx*Uny*Unz>0) then &
@@ -241,7 +242,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
     !Upload the new values from Pr_Correct to GPU
 
 
-    call ScalarRK3(U,V,W,Temperature,Scalar,l,proftempfl)
+    call ScalarRK3(U,V,W,Temperature,Moisture,Scalar,RK_stage,proftempfl)
 
 
 
@@ -253,7 +254,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
 !       if (enable_buoyancy==1) then
 ! #ifdef __HMPP
 ! !              !$hmpp <tsteps> BoundTemperature callsite
-!              call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,temperature)
+!              call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TempBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,temperature)
 ! #else
 !              call BoundTemperature(temperature)
 ! #endif
@@ -1067,15 +1068,15 @@ end subroutine TMarchRK3
        !$hmpp <tsteps> ComputeViscWM callsite, args[*].noupdate = true
        call ComputeViscsWM_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                                 nWMPoints,hmppWMPoints,&
-                                TBtype,Re,temperature_ref,grav_acc,&
+                                TempBtype,Re,temperature_ref,grav_acc,&
                                 U,V,W,Visc)
      end if
 
 
      !boundaries to Visc, compute TDiff and boundaries to TDiff
 
-      !$hmpp <tsteps> Bound_Visc_TDiff callsite, args[*].noupdate = true
-      call Bound_Visc_TDiff(Prnx,Prny,Prnz,enable_buoyancy,Btype,Re,Prandtl,Visc,TDiff)
+      !$hmpp <tsteps> BoundViscosity_TDiff callsite, args[*].noupdate = true
+      call BoundViscosity_TDiff(Prnx,Prny,Prnz,enable_buoyancy,Btype,Re,Prandtl,Visc,TDiff)
 
 
 
@@ -1114,11 +1115,11 @@ end subroutine TMarchRK3
                                                TIBPoint_Viscosity(ScalFlIBPoints(i),Visc)
      end do
 
-     call Bound_Visc(Visc)
+     call BoundViscosity(Visc)
 
      if (sgstype/=StabSubgridModel.and.enable_buoyancy==1)  call ComputeTDiff(U,V,W)
 
-     if (enable_buoyancy==1) call Bound_Visc(TDiff)
+     if (enable_buoyancy==1) call BoundViscosity(TDiff)
 #endif
 
   end subroutine SubgridStresses
@@ -1299,12 +1300,12 @@ end subroutine TMarchRK3
   end subroutine GetWFromGPU
 
   subroutine GetViscFromGPU
-      !$hmpp <tsteps> delegatedstore, args[Bound_Visc_TDiff::Visc]
+      !$hmpp <tsteps> delegatedstore, args[BoundViscosity_TDiff::Visc]
   end subroutine GetViscFromGPU
 
 
   subroutine GetTDiffFromGPU
-      !$hmpp <tsteps> delegatedstore, args[Bound_Visc_TDiff::TDiff]
+      !$hmpp <tsteps> delegatedstore, args[BoundViscosity_TDiff::TDiff]
   end subroutine GetTDiffFromGPU
 #endif
 

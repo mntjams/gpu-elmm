@@ -1,4 +1,4 @@
-module INITIAL
+module Initial
 
   use PARAMETERS
   use LIMITERS, only: limparam, limitertype
@@ -6,6 +6,7 @@ module INITIAL
   use MULTIGRID2d, only: SetMGParams2d
   use POISSON
   use BOUNDARIES
+  use ScalarBoundaries
   use OUTPUTS, only: store, display, probes, NumProbes, SetFrameDomain, StaggeredFrameDomains
   use SCALARS
   use Filters, only: filtertype, filter_ratios
@@ -22,7 +23,7 @@ module INITIAL
   implicit none
 
   private
-  public  ReadParams, Initconds, ReadBounds
+  public  ReadConfiguration, InitialConditions, InitBoundaryConditions
 
   real(knd) x0,y0,z0 !domain boundaries, will become xU(0), yV(0), zW(0)
   real(knd) lx,ly,lz !domain extents
@@ -30,7 +31,7 @@ module INITIAL
 contains
 
 
- subroutine ReadParams
+ subroutine ReadConfiguration
    use StaggeredFrames, only: rrange, TFrameTimes, TSaveFlags, Init
    integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter,minGPUlevel
    real(knd) mgepsinnerGS
@@ -58,7 +59,6 @@ contains
    call newunit(unit)
 
    open(unit,file="main.conf",status="old",action="read")
-   call get(tempmet)
    call get(CFL)
    call get(Uref)
    call get(poissmet)
@@ -223,24 +223,28 @@ contains
    endif
 
 
-   open(unit,file="thermal.conf",status="old",action="read")
-   call get(enable_buoyancy)
-   call get(Prandtl)
-   call get(grav_acc)
-   call get(temperature_ref)
-   call get(TBtype(We))
-   call get(TBtype(Ea))
-   call get(TBtype(So))
-   call get(TBtype(No))
-   call get(TBtype(Bo))
-   call get(TBtype(To))
-   call get(sideTemp(We))
-   call get(sideTemp(Ea))
-   call get(sideTemp(So))
-   call get(sideTemp(No))
-   call get(sideTemp(Bo))
-   call get(sideTemp(To))
-   close(unit)
+   open(unit,file="thermal.conf",status="old",action="read",iostat=io)
+   if (io==0) then
+     call get(enable_buoyancy)
+     call get(Prandtl)
+     call get(grav_acc)
+     call get(temperature_ref)
+     call get(TempBtype(We))
+     call get(TempBtype(Ea))
+     call get(TempBtype(So))
+     call get(TempBtype(No))
+     call get(TempBtype(Bo))
+     call get(TempBtype(To))
+     call get(sideTemp(We))
+     call get(sideTemp(Ea))
+     call get(sideTemp(So))
+     call get(sideTemp(No))
+     call get(sideTemp(Bo))
+     call get(sideTemp(To))
+     close(unit)
+   else
+     enable_buoyancy = 0
+   end if
 
    if (enable_buoyancy==1) then
 
@@ -273,7 +277,64 @@ contains
 
    else
 
-     TBtype = 0
+     TempBtype = 0
+
+   endif
+
+
+
+   open(unit,file="moisture.conf",status="old",action="read",iostat=io)
+   if (io==0) then
+     call get(enable_moisture)
+     call get(MoistBtype(We))
+     call get(MoistBtype(Ea))
+     call get(MoistBtype(So))
+     call get(MoistBtype(No))
+     call get(MoistBtype(Bo))
+     call get(MoistBtype(To))
+     call get(sideMoist(We))
+     call get(sideMoist(Ea))
+     call get(sideMoist(So))
+     call get(sideMoist(No))
+     call get(sideMoist(Bo))
+     call get(sideMoist(To))
+     close(unit)
+   else
+     enable_moisture = 0
+   end if
+
+   if (enable_moisture==1) then
+
+     open(unit,file="moist_profile.conf",status="old",action="read",iostat=io)
+
+     if (io==0) then
+       call get(MoistureProfile%randomize)
+       call get(MoistureProfile%randomizeTop)
+       call get(MoistureProfile%randomizeAmplitude)
+       call get(itmp)
+
+       allocate(MoistureProfile%Sections(max(itmp,0)))
+
+       do i = 1, size(MoistureProfile%Sections)
+         call get(MoistureProfile%Sections(i)%top)
+         call get(MoistureProfile%Sections(i)%jump)
+         call get(MoistureProfile%Sections(i)%gradient)
+       enddo
+
+       close(unit)
+
+     else
+
+       write(*,*) "Warning! Could not open file moist_profile.conf. Using defaults."
+       MoistureProfile%randomize = 0
+
+       allocate(MoistureProfile%Sections(0))
+
+     endif
+
+   else
+
+     MoistBtype = 0
 
    endif
 
@@ -301,63 +362,68 @@ contains
    call get(Lturbz)
    close(unit)
 
-   relativestress(2,1)=relativestress(1,2)
-   relativestress(3,1)=relativestress(1,3)
-   relativestress(3,2)=relativestress(2,3)
+   relativestress(2,1) = relativestress(1,2)
+   relativestress(3,1) = relativestress(1,3)
+   relativestress(3,2) = relativestress(2,3)
 
-   open(unit,file="scalars.conf",status="old",action="read")
-   call get(num_of_scalars)
-   call get(computedeposition)
-   call get(computegravsettling)
-   call get(partdistrib)
-   call get(totalscalsource)
-   call get(scalsourcetype)
+   open(unit,file="scalars.conf",status="old",action="read",iostat=io)
+   if (io==0) then
+     call get(num_of_scalars)
+     call get(computedeposition)
+     call get(computegravsettling)
+     call get(partdistrib)
+     call get(totalscalsource)
+     call get(scalsourcetype)
 
-   call get(ScalBtype(We))
-   call get(ScalBtype(Ea))
-   call get(ScalBtype(So))
-   call get(ScalBtype(No))
-   call get(ScalBtype(Bo))
-   call get(ScalBtype(To))
-   call get(sideScal(We))
-   call get(sideScal(Ea))
-   call get(sideScal(So))
-   call get(sideScal(No))
-   call get(sideScal(Bo))
-   call get(sideScal(To))
+     call get(ScalBtype(We))
+     call get(ScalBtype(Ea))
+     call get(ScalBtype(So))
+     call get(ScalBtype(No))
+     call get(ScalBtype(Bo))
+     call get(ScalBtype(To))
+     call get(sideScal(We))
+     call get(sideScal(Ea))
+     call get(sideScal(So))
+     call get(sideScal(No))
+     call get(sideScal(Bo))
+     call get(sideScal(To))
 
-   if (partdistrib>0) then
+     if (partdistrib>0) then
 
-      allocate(partdiam(partdistrib),partrho(partdistrib),percdistrib(partdistrib))
-      allocate(scalsrcx(partdistrib),scalsrcy(partdistrib),scalsrcz(partdistrib))
-      allocate(scalsrci(partdistrib),scalsrcj(partdistrib),scalsrck(partdistrib))
+        allocate(partdiam(partdistrib),partrho(partdistrib),percdistrib(partdistrib))
+        allocate(scalsrcx(partdistrib),scalsrcy(partdistrib),scalsrcz(partdistrib))
+        allocate(scalsrci(partdistrib),scalsrcj(partdistrib),scalsrck(partdistrib))
 
-      do i=1,partdistrib
-        call get(partdiam(i))
-        call get(partrho(i))
-        call get(percdistrib(i))
-        call get(scalsrcx(i))
-        call get(scalsrcy(i))
-        call get(scalsrcz(i))
-      enddo
+        do i=1,partdistrib
+          call get(partdiam(i))
+          call get(partrho(i))
+          call get(percdistrib(i))
+          call get(scalsrcx(i))
+          call get(scalsrcy(i))
+          call get(scalsrcz(i))
+        enddo
 
+     else
+
+        allocate(partdiam(num_of_scalars),partrho(num_of_scalars),percdistrib(num_of_scalars))
+        allocate(scalsrcx(num_of_scalars),scalsrcy(num_of_scalars),scalsrcz(num_of_scalars))
+        allocate(scalsrci(num_of_scalars),scalsrcj(num_of_scalars),scalsrck(num_of_scalars))
+
+        do i=1,num_of_scalars
+          call get(partdiam(i))
+          call get(partrho(i))
+          call get(percdistrib(i))
+          call get(scalsrcx(i))
+          call get(scalsrcy(i))
+          call get(scalsrcz(i))
+        enddo
+
+     endif
+     close(unit)
    else
-
-      allocate(partdiam(num_of_scalars),partrho(num_of_scalars),percdistrib(num_of_scalars))
-      allocate(scalsrcx(num_of_scalars),scalsrcy(num_of_scalars),scalsrcz(num_of_scalars))
-      allocate(scalsrci(num_of_scalars),scalsrcj(num_of_scalars),scalsrck(num_of_scalars))
-
-      do i=1,num_of_scalars
-        call get(partdiam(i))
-        call get(partrho(i))
-        call get(percdistrib(i))
-        call get(scalsrcx(i))
-        call get(scalsrcy(i))
-        call get(scalsrcz(i))
-      enddo
-
-   endif
-   close(unit)
+     num_of_scalars = 0
+     write (*,*) "scalars.conf not found, no passive scalars for computation."
+   end if
 
    if (poissmet==3.or.poissmet==4.or.poissmet==5) then
      open(unit,file="mgopts.conf",status="old",action="read")
@@ -389,21 +455,33 @@ contains
      endif
    endif
 
-   open(unit,file="frames.conf",status="old",action="read")
-   call get(frames)
-   call get(timefram1)
-   call get(timefram2)
-   read(unit,fmt='(/)')
+   open(unit,file="frames.conf",status="old",action="read",iostat=io)
+   if (io==0) then
+     call get(frames)
+     call get(timefram1)
+     call get(timefram2)
+     read(unit,fmt='(/)')
 
-   read(unit,*) store%frame_U
-   call get(store%frame_vort)
-   call get(store%frame_Pr)
-   call get(store%frame_lambda2)
-   call get(store%frame_scalars)
-   call get(store%frame_sumscalars)
-   call get(store%frame_T)
-   call get(store%frame_tempfl)
-   call get(store%frame_scalfl)
+     read(unit,*) store%frame_U
+     call get(store%frame_vort)
+     call get(store%frame_Pr)
+     call get(store%frame_lambda2)
+     call get(store%frame_scalars)
+     if (num_of_scalars < 1) store%frame_scalars = 0
+     call get(store%frame_sumscalars)
+     if (num_of_scalars < 1) store%frame_sumscalars = 0
+     call get(store%frame_temperature)
+     if (enable_buoyancy /= 1) store%frame_temperature = 0
+     call get(store%frame_moisture)
+     if (enable_buoyancy /= 1) store%frame_moisture = 0
+     call get(store%frame_tempfl)
+     if (enable_buoyancy /= 1) store%frame_tempfl = 0
+     call get(store%frame_scalfl)
+     if (num_of_scalars < 1) store%frame_scalfl = 0
+   else
+     frames = 0
+     write (*,*) "frames.conf not found, no vtk frames will be saved."
+   end if
 
 
    call get(numframeslices)
@@ -436,9 +514,11 @@ contains
        call get(frame_save_flags%U, frame_save_flags%V, frame_save_flags%W)
        call get(frame_save_flags%Pr)
        call get(frame_save_flags%Temperature)
-       if (enable_buoyancy == 0) frame_save_flags%Temperature = .false.
+       if (enable_buoyancy /= 1) frame_save_flags%Temperature = .false.
+       call get(frame_save_flags%Moisture)
+       if (enable_moisture /= 1) frame_save_flags%Moisture = .false.
        call get(frame_save_flags%Scalar)
-       if (num_of_scalars == 0) frame_save_flags%Scalar = .false.
+       if (num_of_scalars < 1) frame_save_flags%Scalar = .false.
 
        call Init(StaggeredFrameDomains(i), trim(domain_label), &
                  range, &
@@ -448,6 +528,7 @@ contains
      close(unit)
    else
      allocate(StaggeredFrameDomains(0))
+     write (*,*) "stagframes.conf not found, no staggered frames will be saved."
    end if
 
 
@@ -473,7 +554,10 @@ contains
      call get(store%out_Pr)
      call get(store%out_Prtype)
      call get(store%out_lambda2)
-     call get(store%out_T)
+     call get(store%out_temperature)
+     if (enable_buoyancy /= 1) store%out_temperature = 0
+     call get(store%out_moisture)
+     if (enable_moisture /= 1) store%out_moisture = 0
      call get(store%out_div)
      call get(store%out_visc)
 
@@ -483,10 +567,15 @@ contains
      call get(store%avg_vort)
      call get(store%avg_Pr)
      call get(store%avg_Prtype)
-     call get(store%avg_T)
+     call get(store%avg_temperature)
+     if (enable_buoyancy/=1) store%avg_temperature = 0
+     call get(store%avg_moisture)
+     if (enable_moisture/=1) store%avg_moisture = 0
 
      call get(store%scalars)
+     if (num_of_scalars < 1) store%scalars = 0
      call get(store%scalarsavg)
+     if (num_of_scalars < 1) store%scalarsavg = 0
 
      call get(store%deposition)
 
@@ -494,7 +583,9 @@ contains
      call get(store%tke)
      call get(store%dissip)
      call get(store%scalsumtime)
+     if (num_of_scalars < 1) store%scalsumtime = 0
      call get(store%scaltotsumtime)
+     if (num_of_scalars < 1) store%scaltotsumtime = 0
      call get(store%ustar)
      call get(store%tstar)
      call get(store%blprofiles)
@@ -772,7 +863,7 @@ contains
        read(unit,fmt='(/)')
        read(unit,*) x,y,z
      end subroutine
- end subroutine ReadParams
+ end subroutine ReadConfiguration
 
 
 
@@ -851,9 +942,10 @@ contains
 
 
 
-  subroutine INITCONDS(U,V,W,Pr,Temperature,Scalar)
+  subroutine InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
   real(knd),intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(knd),intent(inout) :: Temperature(-1:,-1:,:)
+  real(knd),intent(inout) :: Temperature(-1:,-1:,-1:)
+  real(knd),intent(inout) :: Moisture(-1:,-1:,-1:)
   real(knd),intent(inout) :: Scalar(-1:,-1:,-1:,:)
   integer i,j,k
   real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
@@ -861,14 +953,14 @@ contains
 
     call init_random_seed
 
-    Pr(1:Prnx,1:Prny,1:Prnz)=0
+    Pr(1:Prnx,1:Prny,1:Prnz) = 0
 
     U=huge(1._knd)
     V=huge(1._knd)
     W=huge(1._knd)
 
-    V(1:Vnx,1:Vny,1:Vnz)=0
-    W(1:Wnx,1:Wny,1:Wnz)=0
+    V(1:Vnx,1:Vny,1:Vnz) = 0
+    W(1:Wnx,1:Wny,1:Wnz) = 0
 
     if (initcondsfromfile==1) then
 
@@ -879,7 +971,9 @@ contains
        else
          Visc=0
        endif
-       if (enable_buoyancy==1.or.num_of_scalars>0) TDiff=1._knd/(Re*Prandtl)
+       if (enable_buoyancy==1.or. &
+           enable_moisture==1.or. &
+           num_of_scalars>0)        TDiff=1._knd/(Re*Prandtl)
 
        call BoundU(1,U)
        call BoundU(2,V)
@@ -889,7 +983,7 @@ contains
     else   !init conditions not from file
 
        if (tasktype==2) then
-         U(1:Unx,1:Uny,1:Unz)=0
+         U(1:Unx,1:Uny,1:Unz) = 0
          do k=1,Unz
           do j=1,Uny
            do i=1,Unx
@@ -901,7 +995,7 @@ contains
                   U(i,j,k)=-2*pi*y!*(1+0.1*(p-0.5))!-Uinlet*cos(z)*sin(x)*cos(y)!
               !0.5_knd*(p-0.5_knd)z
              !else
-             !  V(i,j,k)=0
+             !  V(i,j,k) = 0
             !endif
            enddo
           enddo
@@ -913,7 +1007,7 @@ contains
                   x=xPr(i)
                   y=yV(j)
                   z=zPr(k)
-                  V(i,j,k)=2*pi*x!*(1+0.1*(p-0.5))!0
+                  V(i,j,k) = 2*pi*x!*(1+0.1*(p-0.5))!0
            enddo
           enddo
          enddo
@@ -923,7 +1017,7 @@ contains
                   x=xPr(i)
                   y=yPr(j)
                   z=zW(k)
-                  W(i,j,k)=0
+                  W(i,j,k) = 0
            enddo
           enddo
          enddo
@@ -933,13 +1027,13 @@ contains
                   x=xPr(i)
                   y=yPr(j)
                   z=zPr(k)
-                  Pr(i,j,k)=0!(Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(x))+cos(2*(y)))-2)
+                  Pr(i,j,k) = 0!(Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(x))+cos(2*(y)))-2)
            enddo
           enddo
          enddo
 
        elseif (tasktype==3) then
-         U(1:Unx,1:Uny,1:Unz)=0
+         U(1:Unx,1:Uny,1:Unz) = 0
          do k=1,Unz
           do j=1,Uny
            do i=1,Unx
@@ -948,10 +1042,10 @@ contains
                   x=xU(i)
                   y=yPr(j)
                   z=zPr(k)
-                  U(i,j,k)=Uinlet*sin(x)*cos(z)*cos(-y)!*(1+0.1*(p-0.5))!-Uinlet*cos(z)*sin(x)*cos(y)!
+                  U(i,j,k) = Uinlet*sin(x)*cos(z)*cos(-y)!*(1+0.1*(p-0.5))!-Uinlet*cos(z)*sin(x)*cos(y)!
               !0.5_knd*(p-0.5_knd)z
              !else
-             !  V(i,j,k)=0
+             !  V(i,j,k) = 0
             !endif
            enddo
           enddo
@@ -963,7 +1057,7 @@ contains
                   x=xPr(i)
                   y=yV(j)
                   z=zPr(k)
-                  V(i,j,k)=0!*(1+0.1*(p-0.5))!0
+                  V(i,j,k) = 0!*(1+0.1*(p-0.5))!0
            enddo
           enddo
          enddo
@@ -1012,7 +1106,7 @@ contains
                    if (abs(x2-x1)>0.000001_knd) then
                     U(i,j,k)=(log(x2)-log(x1))/(y2-y1)
                    else
-                    U(i,j,k)=0
+                    U(i,j,k) = 0
                    endif
                       !Uinlet*tanh(y+0.1*sin(pi*(xU(i)/10)*sin(pi*zPr(k)/10)-yPr(Uny/2)) by mean of integrals
            enddo
@@ -1028,7 +1122,7 @@ contains
                    p=sin(2*pi*xPr(i)/10)*(1+0.3*sin(3*pi*zPr(k)/10))*exp(-(yV(j)-yPr(Uny/2))*(yV(j)-yPr(Uny/2)))
                   !endif
 
-                   V(i,j,k)=0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_knd*(p-0.5_knd)
+                   V(i,j,k) = 0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_knd*(p-0.5_knd)
            enddo
           enddo
          enddo
@@ -1042,7 +1136,7 @@ contains
                    p=cos(2*pi*xPr(i)/10)*(1+0.3*cos(3*pi*zW(k)/10))*exp(-(yPr(j)-yPr(Uny/2))*(yPr(j)-yPr(Uny/2)))
                   !endif
 
-                   W(i,j,k)=0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_knd*(p-0.5_knd)
+                   W(i,j,k) = 0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_knd*(p-0.5_knd)
            enddo
           enddo
          enddo
@@ -1059,14 +1153,14 @@ contains
       !     do j=1,Vny
       !      do i=1,Vnx
       !               call RANDOM_NUMBER(p)
-      !      V(i,j,k)=prgradientx/(coriolisparam)*(1+0.1_knd*(p-0.5_knd))
+      !      V(i,j,k) = prgradientx/(coriolisparam)*(1+0.1_knd*(p-0.5_knd))
       !      enddo
       !     enddo
       !    enddo
       !    do k=1,Wnz
       !     do j=1,Wny
       !      do i=1,Wnx
-      !       W(i,j,k)=0
+      !       W(i,j,k) = 0
       !      enddo
       !     enddo
       !    enddo
@@ -1081,9 +1175,9 @@ contains
            do k=1,Unz
             do j=1,Uny
               if (Utype(i,j,k)<=0) then
-                    U(i,j,k)=Uin(j,k)
+                    U(i,j,k) = Uin(j,k)
               else
-                 U(i,j,k)=0
+                 U(i,j,k) = 0
               endif
             enddo
            enddo
@@ -1092,9 +1186,9 @@ contains
            do k=1,Vnz
             do j=1,Vny
               if (Vtype(i,j,k)<=0) then
-                    V(i,j,k)=Vin(j,k)
+                    V(i,j,k) = Vin(j,k)
               else
-                 V(i,j,k)=0
+                 V(i,j,k) = 0
               endif
             enddo
            enddo
@@ -1103,9 +1197,9 @@ contains
            do k=1,Wnz
             do j=1,Wny
               if (Wtype(i,j,k)<=0) then
-                    W(i,j,k)=Win(j,k)
+                    W(i,j,k) = Win(j,k)
               else
-                 W(i,j,k)=0
+                 W(i,j,k) = 0
               endif
             enddo
            enddo
@@ -1122,9 +1216,9 @@ contains
            do i=1,Unx
             if (Utype(i,j,k)<=0) then
                   call RANDOM_NUMBER(p)
-                  U(i,j,k)=Uin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_knd*(p-0.5_knd)!sin(2.*pi*xU(i)+1)*cos(2.*pi*yPr(j)-2)!Uin(j,k)!*(1+0.03_knd*(p-0.5_knd))
+                  U(i,j,k) = Uin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_knd*(p-0.5_knd)!sin(2.*pi*xU(i)+1)*cos(2.*pi*yPr(j)-2)!Uin(j,k)!*(1+0.03_knd*(p-0.5_knd))
              else
-               U(i,j,k)=0
+               U(i,j,k) = 0
             endif
            enddo
           enddo
@@ -1136,9 +1230,9 @@ contains
            do i=1,Vnx
             if (Vtype(i,j,k)<=0) then
                   call RANDOM_NUMBER(p)
-                  V(i,j,k)=Vin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_knd*(p-0.5_knd)!-cos(2.*pi*xPr(i)+1)*sin(2.*pi*yV(j)-2)!Uinlet*(0.3_knd*(p-0.5_knd))
+                  V(i,j,k) = Vin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_knd*(p-0.5_knd)!-cos(2.*pi*xPr(i)+1)*sin(2.*pi*yV(j)-2)!Uinlet*(0.3_knd*(p-0.5_knd))
              else
-               V(i,j,k)=0
+               V(i,j,k) = 0
             endif
            enddo
           enddo
@@ -1150,9 +1244,9 @@ contains
            do i=1,Wnx
             if (Wtype(i,j,k)<=0) then
                   call RANDOM_NUMBER(p)
-                  W(i,j,k)=Win(j,k)!Uinlet*(0.00001_knd*(p-0.5_knd))
+                  W(i,j,k) = Win(j,k)!Uinlet*(0.00001_knd*(p-0.5_knd))
              else
-               W(i,j,k)=0
+               W(i,j,k) = 0
             endif
            enddo
           enddo
@@ -1166,7 +1260,7 @@ contains
        if (num_of_scalars>0) then
          !$omp parallel
          !$omp workshare
-         SCALAR(1:Prnx,1:Prny,1:Prnz,:)=0
+         SCALAR(1:Prnx,1:Prny,1:Prnz,:) = 0
          !$omp end workshare
          !$omp end parallel
        end if
@@ -1180,9 +1274,9 @@ contains
             y=yPr(j)
             z=zPr(k)
             if ((x)**2+(y-0.5)**2<0.2_knd**2) then
-             temperature(i,j,k)=cos(sqrt(x**2+(y-0.5)**2)*pi/2/0.2_knd)**2
+             temperature(i,j,k) = cos(sqrt(x**2+(y-0.5)**2)*pi/2/0.2_knd)**2
             else
-             temperature(i,j,k)=0
+             temperature(i,j,k) = 0
             endif
            enddo
           enddo
@@ -1196,38 +1290,34 @@ contains
             x=xPr(i)
             y=yPr(j)
             z=zPr(k)
-            temperature(i,j,k)=temperature_ref+(temperature_ref/100._knd)*((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
+            temperature(i,j,k) = temperature_ref + &
+               (temperature_ref/100._knd) * ((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
            enddo
           enddo
          enddo
 
        elseif (enable_buoyancy==1) then
 
-         call InitTemperatureProfile(TempIn)
+         call InitScalarProfile(TempIn,TemperatureProfile,temperature_ref)
 
-         call InitTemperature(TempIn,Temperature)
-
-         !$omp parallel private(i,j,k)
-         !$omp workshare
-         Pr(:,:,1)=0
-         !$omp end workshare
-         !$omp end parallel
-         do k=2,Prnz
-          !$omp parallel
-          !$omp do
-          do j=1,Vny+1
-           do i=1,Unx+1
-            Pr(i,j,k)=Pr(i,j,k-1) + &
-                   grav_acc*dzW(k-1) * &
-                  ( (temperature(i,j,k-1)+temperature(i,j,k))/2._knd - temperature_ref )&
-                  / temperature_ref
-           enddo
-          enddo
-          !$omp end do
-          !$omp end parallel
-         enddo
+         call InitScalar(TempIn,TemperatureProfile,Temperature)
 
        endif !byoyancy and tasktype
+
+       if (enable_moisture==1) then
+
+         call InitScalarProfile(MoistIn,MoistureProfile,0._knd)
+
+         call InitScalar(MoistIn,MoistureProfile,Moisture)
+
+       end if
+
+       if (enable_buoyancy==1) then
+
+         call InitHydrostaticPressure(Pr,Temperature,Moisture)
+
+       end if
+
 
        if (Re>0) then
          !$omp parallel
@@ -1243,7 +1333,10 @@ contains
          !$omp end parallel
        endif
 
-       if (Re>0.and.(enable_buoyancy==1.or.num_of_scalars>0)) then
+       if (Re>0 .and.&
+             (enable_buoyancy==1.or. &
+              enable_moisture==1.or. &
+              num_of_scalars>0))     then
          !$omp parallel
          !$omp workshare
          TDiff=1._knd/(Re*Prandtl)
@@ -1284,23 +1377,33 @@ contains
          endif
        endif
 
-       call Bound_Visc(Visc)
+       call BoundViscosity(Visc)
 
-       if (enable_buoyancy>0) then
+       if (enable_buoyancy==1.or. &
+           enable_moisture==1.or. &
+           num_of_scalars>0)     then
+
          !$omp parallel
          !$omp workshare
          forall(k=1:Prnz,j=1:Prny,i=1:Prnx)
-           TDiff(i,j,k)=1.35*(Visc(i,j,k)-1._knd/Re)+(1._knd/(Re*constPrt))
+           TDiff(i,j,k) = 1.35*(Visc(i,j,k)-1._knd/Re)+(1._knd/(Re*constPrt))
          endforall
          !$omp end workshare
          !$omp end parallel
 
-         call Bound_Visc(TDiff)
-         call BoundTemperature(temperature)
+         call BoundViscosity(TDiff)
+       end if
+
+       if (enable_buoyancy==1) then
+         call BoundTemperature(Temperature)
+       endif
+
+       if (enable_moisture==1) then
+         call BoundMoisture(Moisture)
        endif
 
        do i=1,num_of_scalars
-         call Bound_PassScalar(Scalar(:,:,:,i))
+         call BoundScalar(Scalar(:,:,:,i))
        enddo
 
        call InitTempFL(Temperature)
@@ -1309,7 +1412,7 @@ contains
                       call ComputeViscsWM(U,V,W,Pr,Temperature)
        endif
 
-       call Bound_Visc(Visc)
+       call BoundViscosity(Visc)
 
     endif !init conditions not from file
 
@@ -1332,14 +1435,14 @@ contains
 
 
     write(*,*) "set"
-  endsubroutine INITCONDS
+  endsubroutine InitialConditions
 
 
 
 
 
 
-  subroutine READBOUNDS
+  subroutine InitBoundaryConditions
   real(knd),allocatable:: xU2(:),yV2(:),zW2(:)
   integer i,j,k,nx,ny,nz,nxup,nxdown,nyup,nydown,nzup,nzdown,io
   real(knd) P
@@ -1463,21 +1566,21 @@ contains
 
       if (Btype(We)==PERIODIC) then
         do j=-1,-3,-1
-          xU2(j)=xU2(0)-(xU2(nx)-xU2(nx+j))
+          xU2(j) = xU2(0)-(xU2(nx)-xU2(nx+j))
         enddo
       else
         do j=-1,-3,-1
-          xU2(j)=xU2(0)-(xU2(0-j)-xU2(0))
+          xU2(j) = xU2(0)-(xU2(0-j)-xU2(0))
         enddo
       endif
 
       if (Btype(Ea)==PERIODIC) then
         do j=nx+1,nx+4
-          xU2(j)=xU2(nx)+(xU2(j-nx)-xU2(0))
+          xU2(j) = xU2(nx)+(xU2(j-nx)-xU2(0))
         enddo
       else
         do j=nx+1,nx+4
-          xU2(j)=xU2(nx)+(xU2(nx)-xU2(nx-(j-nx)))
+          xU2(j) = xU2(nx)+(xU2(nx)-xU2(nx-(j-nx)))
         enddo
       endif
 
@@ -1504,21 +1607,21 @@ contains
 
       if (Btype(So)==PERIODIC) then
         do j=-1,-3,-1
-          yV2(j)=yV2(0)-(yV2(ny)-yV2(ny+j))
+          yV2(j) = yV2(0)-(yV2(ny)-yV2(ny+j))
         enddo
       else
         do j=-1,-3,-1
-          yV2(j)=yV2(0)-(yV2(0-j)-yV2(0))
+          yV2(j) = yV2(0)-(yV2(0-j)-yV2(0))
         enddo
       endif
 
       if (Btype(No)==PERIODIC) then
         do j=ny+1,ny+4
-          yV2(j)=yV2(ny)+(yV2(j-ny)-yV2(0))
+          yV2(j) = yV2(ny)+(yV2(j-ny)-yV2(0))
         enddo
       else
         do j=ny+1,ny+4
-          yV2(j)=yV2(ny)+(yV2(ny)-yV2(ny-(j-ny)))
+          yV2(j) = yV2(ny)+(yV2(ny)-yV2(ny-(j-ny)))
         enddo
       endif
 
@@ -1545,21 +1648,21 @@ contains
 
       if (Btype(Bo)==PERIODIC) then
         do j=-1,-3,-1
-          zW2(j)=zW2(0)-(zW2(nz)-zW2(nz+j))
+          zW2(j) = zW2(0)-(zW2(nz)-zW2(nz+j))
         enddo
       else
         do j=-1,-3,-1
-          zW2(j)=zW2(0)-(zW2(0-j)-zW2(0))
+          zW2(j) = zW2(0)-(zW2(0-j)-zW2(0))
         enddo
       endif
 
       if (Btype(To)==PERIODIC) then
         do j=nz+1,nz+4
-          zW2(j)=zW2(nz)+(zW2(j-nz)-zW2(0))
+          zW2(j) = zW2(nz)+(zW2(j-nz)-zW2(0))
         enddo
       else
         do j=nz+1,nz+4
-          zW2(j)=zW2(nz)+(zW2(nz)-zW2(nz-(j-nz)))
+          zW2(j) = zW2(nz)+(zW2(nz)-zW2(nz-(j-nz)))
         enddo
       endif
 
@@ -1598,29 +1701,29 @@ contains
 
     forall (i=-2:nx+4)
       xPr(i)=(xU(i-1)+xU(i))/2._knd
-      dxPr(i)=xU(i)-xU(i-1)
+      dxPr(i) = xU(i)-xU(i-1)
     endforall
 
     forall (j=-2:ny+4)
       yPr(j)=(yV(j-1)+yV(j))/2._knd
-      dyPr(j)=yV(j)-yV(j-1)
+      dyPr(j) = yV(j)-yV(j-1)
     endforall
 
     forall (k=-2:nz+4)
       zPr(k)=(zW(k-1)+zW(k))/2._knd
-      dzPr(k)=zW(k)-zW(k-1)
+      dzPr(k) = zW(k)-zW(k-1)
     endforall
 
     forall (i=-2:nx+3)
-      dxU(i)=xPr(i+1)-xPr(i)
+      dxU(i) = xPr(i+1)-xPr(i)
     endforall
 
     forall (j=-2:ny+3)
-      dyV(j)=yPr(j+1)-yPr(j)
+      dyV(j) = yPr(j+1)-yPr(j)
     endforall
 
     forall (k=-2:nz+3)
-      dzW(k)=zPr(k+1)-zPr(k)
+      dzW(k) = zPr(k+1)-zPr(k)
     endforall
 
     deallocate(xU2)
@@ -1644,7 +1747,9 @@ contains
     Vin = huge(1._knd)
     Win = huge(1._knd)
 
-    if (enable_buoyancy>0) allocate(Tempin(-1:Prny+2,-1:Prnz+2))
+    if (enable_buoyancy>0) allocate(TempIn(-1:Prny+2,-1:Prnz+2))
+
+    if (enable_moisture>0) allocate(MoistIn(-1:Prny+2,-1:Prnz+2))
 
     select case (inlettype)
       case (NOINLET)
@@ -1665,17 +1770,17 @@ contains
 
 
     if (enable_buoyancy==1) then
-       if (TBtype(Bo)==CONSTFLUX.or.TBtype(Bo)==DIRICHLET) then
+       if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==DIRICHLET) then
 
          allocate(BsideTFLArr(-1:Prnx+2,-1:Prny+2))
 
-         if (TBtype(Bo)==CONSTFLUX) then
+         if (TempBtype(Bo)==CONSTFLUX) then
            BsideTFLArr = sideTemp(Bo)
          else
            BsideTFLArr = 0
          endif
 
-         if (TBtype(Bo)==DIRICHLET) then
+         if (TempBtype(Bo)==DIRICHLET) then
            allocate(BsideTArr(-1:Prnx+2,-1:Prny+2))
            BsideTArr = sideTemp(Bo)
          endif
@@ -1719,7 +1824,7 @@ contains
    call SetFrameDomain(store%frame_domains)
 
     write (*,*) "set"
-  end subroutine READBOUNDS
+  end subroutine InitBoundaryConditions
 
 
 
@@ -1846,4 +1951,4 @@ contains
   endsubroutine
 
 
-endmodule INITIAL
+endmodule Initial

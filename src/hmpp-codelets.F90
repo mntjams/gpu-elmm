@@ -9,7 +9,7 @@ contains
 !$hmpp <tsteps> group, target = CUDA
 
   !$hmpp <tsteps> mapbyname, Prnx,Prny,Prnz
-  !$hmpp <tsteps> mapbyname, Btype,sideU,Re,sideTemp,TBtype,TempIn,BsideTArr,BsideTFLArr
+  !$hmpp <tsteps> mapbyname, Btype,sideU,Re,sideTemp,TempBtype,TempIn,BsideTArr,BsideTFLArr
   !$hmpp <tsteps> mapbyname, dt,dt2
   !$hmpp <tsteps> mapbyname, dxPr,dyPr,dzPr,dxU,dyV,dzW
   !$hmpp <tsteps> mapbyname, xPr,zPr,xU,zW

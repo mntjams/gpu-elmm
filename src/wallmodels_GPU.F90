@@ -147,7 +147,7 @@
   !$hmpp <tsteps> ComputeViscWM codelet
   subroutine ComputeViscsWM_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                                 nWMPoints,WMPoints,&
-                                TBtype,Re,temperature_ref,grav_acc,&
+                                TempBtype,Re,temperature_ref,grav_acc,&
                                 U,V,W,Visc)
    implicit none
 #include "hmpp-include.f90"
@@ -172,7 +172,7 @@
    integer,intent(in)    :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
    integer,intent(in)              :: nWMPoints
    type(hmppWMPoint),intent(inout) :: WMPoints(nWMPoints)
-   integer,intent(in)              :: TBtype(6)
+   integer,intent(in)              :: TempBtype(6)
    real(knd),intent(in)            :: Re,temperature_ref,grav_acc
    real(knd),intent(in)            :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
    real(knd),intent(in)            :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
@@ -194,7 +194,7 @@
 
 
 
-        if (TBtype(Bo)==CONSTFLUX) then
+        if (TempBtype(Bo)==CONSTFLUX) then
 
            call WM_MO_FLUX_GPU(Visc(xi,yj,zk) ,&
                              xi, yj, zk,&
