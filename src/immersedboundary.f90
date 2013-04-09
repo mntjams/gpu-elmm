@@ -41,7 +41,7 @@ contains
            o=neighbours(3,p)
            if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs((/m,n,o/)))==1)) then
              call SetCurrentSB(CurrentSB,Prtype(i+m,j+n,k+o))
-             call CurrentSB%Nearest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
+             call CurrentSB%Closest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
              if (SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
               dist = SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
               nb = Prtype(i+m,j+n,k+o)
@@ -323,7 +323,7 @@ contains
     y = yU(yj)
     z = zU(zk)
     call SetCurrentSB(SB,Utype(xi,yj,zk))
-    call SB%NearestOut(xnear,ynear,znear,x,y,z)
+    call SB%ClosestOut(xnear,ynear,znear,x,y,z)
     IBP%component = component
     IBP%xi = xi                                !integer grid coordinates
     IBP%yj = yj
@@ -484,7 +484,7 @@ contains
       IBP%interpdir = 1
 
       if (dirx==1) then                                       !If dirx /= 0 then forget the x component of dist vector
-        t = SB%NearestOnLineOut(x,y,z,x,y+IBP%disty,z+IBP%distz) ! and find an intersection of the new vector with the boundary
+        t = SB%ClosestOnLineOut(x,y,z,x,y+IBP%disty,z+IBP%distz) ! and find an intersection of the new vector with the boundary
         dirx = 0
         IBP%dirx = 0
         IBP%distx = 0
@@ -498,7 +498,7 @@ contains
       IBP%interpdir = 2
 
       if (diry==1) then
-        t = SB%NearestOnLineOut(x,y,z,x+IBP%distx,y,z+IBP%distz)
+        t = SB%ClosestOnLineOut(x,y,z,x+IBP%distx,y,z+IBP%distz)
         diry = 0
         IBP%diry = 0
         IBP%distx = IBP%distx*t
@@ -512,7 +512,7 @@ contains
       IBP%interpdir = 3
 
       if (dirz==1) then
-        t = SB%NearestOnLineOut(x,y,z,x+IBP%distx,y+IBP%disty,z)
+        t = SB%ClosestOnLineOut(x,y,z,x+IBP%distx,y+IBP%disty,z)
         dirz = 0
         IBP%dirz = 0
         IBP%distx = IBP%distx*t
@@ -526,7 +526,7 @@ contains
       IBP%interpdir = 1
 
       if (diry==1.or.dirz==1) then                   !If other dir components nonzero, delete them and
-        t = SB%NearestOnLineOut(x,y,z,x+IBP%distx,y,z)  !find an intersection of the new vector with the boundary
+        t = SB%ClosestOnLineOut(x,y,z,x+IBP%distx,y,z)  !find an intersection of the new vector with the boundary
         diry = 0
         dirz = 0
         IBP%diry = 0
@@ -542,7 +542,7 @@ contains
       IBP%interpdir = 2
 
       if (dirx==1.or.dirz==1) then
-        t = SB%NearestOnLineOut(x,y,z,x,y+IBP%disty,z)
+        t = SB%ClosestOnLineOut(x,y,z,x,y+IBP%disty,z)
         dirx = 0
         dirz = 0
         IBP%dirx = 0
@@ -558,7 +558,7 @@ contains
       IBP%interpdir = 3
 
       if (dirx==1.or.diry==1) then
-        t = SB%NearestOnLineOut(x,y,z,x,y,z+IBP%distz)
+        t = SB%ClosestOnLineOut(x,y,z,x,y,z+IBP%distz)
         dirx = 0
         diry = 0
         IBP%dirx = 0
@@ -866,7 +866,7 @@ contains
     y = yPr(yj)
     z = zPr(zk)
     call SetCurrentSB(SB,Prtype(xi,yj,zk))
-    call SB%NearestOut(xnear,ynear,znear,x,y,z)
+    call SB%ClosestOut(xnear,ynear,znear,x,y,z)
 
     IBP%xi = xi
     IBP%yj = yj
@@ -1251,12 +1251,20 @@ contains
     integer,intent(in)    :: nx,ny,nz,s
     integer,intent(inout) :: Xtype(s:,s:,s:)
     integer i,j,k
+    if (Btype(We)==DIRICHLET.or.Btype(We)==NOSLIP) Xtype(:0,:,:) = -2
+    if (Btype(Ea)==DIRICHLET.or.Btype(Ea)==NOSLIP) Xtype(nx+1:,:,:) = -2
+    if (Btype(So)==DIRICHLET.or.Btype(So)==NOSLIP) Xtype(:,:0,:) = -2
+    if (Btype(No)==DIRICHLET.or.Btype(No)==NOSLIP) Xtype(:,ny+1:,:) = -2
+    if (Btype(Bo)==DIRICHLET.or.Btype(Bo)==NOSLIP) Xtype(:,:,:0) = -2
+    if (Btype(To)==DIRICHLET.or.Btype(To)==NOSLIP) Xtype(:,:,nz+1:) = -2
     !$omp parallel do private(i,j,k)
     do k = 1,nz
       do j = 1,ny
         do i = 1,nx
-          if (Xtype(i,j,k)==0.and.any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)>0)) &
-              Xtype(i,j,k) = -1
+          if (Xtype(i,j,k)==0.and. &
+              any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)>0.or. &
+                  Xtype(i-1:i+1,j-1:j+1,k-1:k+1)<-1 )) &
+                                                        Xtype(i,j,k) = -1
         end do
       end do
     end do

@@ -562,7 +562,7 @@ implicit none
   end subroutine WMFlatUstar
 
 
-  pure subroutine WMFlatVisc(visc,ustar,distvect,uvect,walluvect)
+   subroutine WMFlatVisc(visc,ustar,distvect,uvect,walluvect)
     real(knd),intent(out)   :: visc
     real(knd),intent(inout) :: ustar
     real(knd),intent(in)    :: distvect(3),uvect(3),walluvect(3)
@@ -772,7 +772,6 @@ implicit none
     end if
 
     call WMFlatPrGradUstar(ustar,vel,prgrad,dist)
-
 
     if (ustar<0) ustar = 0
 

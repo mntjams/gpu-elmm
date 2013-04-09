@@ -55,7 +55,7 @@ module Filters
                    q = q + w(ii-i)
                  end if
                end do
-               if (abs(q)>0) U(i,j,k) = S / q
+               if (abs(q)>0.74) U(i,j,k) = S / q
              end if
            end do
          end do
@@ -76,7 +76,7 @@ module Filters
                    q = q + w(jj-j)
                  end if
                end do
-               if (abs(q)>0) U(i,j,k) = S / q
+               if (abs(q)>.74) U(i,j,k) = S / q
              end if
            end do
          end do
@@ -88,7 +88,7 @@ module Filters
          do i = mini,maxi
            tmp = U(i,j,:)
            do k = 1,maxk
-             if (Utype(i,j,k) == 0) then
+             if (Utype(i,j,k) == 0) then               
                S = 0
                q = 0
                do kk = k-3,k+3
@@ -97,7 +97,7 @@ module Filters
                    q = q + w(kk-k)
                  end if
                end do
-               if (abs(q)>0) U(i,j,k) = S / q
+               if (abs(q)>.74) U(i,j,k) = S / q
              end if
            end do
          end do

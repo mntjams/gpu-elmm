@@ -79,11 +79,13 @@ contains
 
         select type (CurrentSB)
           type is (TSolidBody)
-            !$omp parallel do private(i,j,k)
+            !$omp parallel do private(i,j,k) schedule(dynamic)
             do k = 0,Prnz+1
+            print *,k
              do j = 0,Prny+1
               do i = 0,Prnx+1
-                 if (CurrentSB%Inside(xPr(i),yPr(j),zPr(k))) Prtype(i,j,k) = CurrentSB%numofbody
+                 if (CurrentSB%Inside(xPr(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000)) &
+                          Prtype(i,j,k) = CurrentSB%numofbody
               enddo
              enddo
             enddo
@@ -97,7 +99,7 @@ contains
 
         select type (CurrentSB)
           type is (TSolidBody)
-            !$omp parallel do private(i,j,k)
+            !$omp parallel do private(i,j,k) schedule(dynamic)
             do k = 0,Unz+1
              do j = 0,Uny+1
                do i = 0,Unx+1
@@ -116,7 +118,7 @@ contains
 
         select type (CurrentSB)
           type is (TSolidBody)
-            !$omp parallel do private(i,j,k)
+            !$omp parallel do private(i,j,k) schedule(dynamic)
             do k = 0,Vnz+1
              do j = 0,Vny+1
               do i = 0,Vnx+1
@@ -135,7 +137,7 @@ contains
 
          select type (CurrentSB)
           type is (TSolidBody)
-            !$omp parallel do private(i,j,k)
+            !$omp parallel do private(i,j,k) schedule(dynamic)
             do k = 0,Wnz+1
              do j = 0,Wny+1
               do i = 0,Wnx+1
@@ -166,15 +168,25 @@ contains
 #endif
 
     if (len_trim(obstaclefile)>0) then
-      call ReadSolidBodiesFromFile(obstaclefile)
+      call ReadSolidBodiesFromFile(trim(obstaclefile))
     end if
 
   end subroutine InitSolidBodies
 
 
-
-
   subroutine ReadSolidBodiesFromFile(filename)
+    use Strings
+    character(*),intent(in) :: filename
+
+    if (filename(len(filename)-4:len(filename))=='.obst') then
+      call ReadObst(filename)
+    else if (filename(len(filename)-3:len(filename))=='.off') then
+      call ReadOff(filename)
+    end if
+    
+  end subroutine ReadSolidBodiesFromFile
+
+  subroutine ReadObst(filename)
     use Strings
     character(*),intent(in) :: filename
     integer unit,io
@@ -182,7 +194,6 @@ contains
     type(TSolidBody),pointer :: SB => null()
 
     unit=20
-    !provisional, Solaris Studio still doesn't support newunit.
     open(unit=unit,file=filename,action='read',status='old',iostat=io)
 
     if (io==0) then
@@ -219,7 +230,7 @@ contains
       stop
 
     end if
-  end subroutine ReadSolidBodiesFromFile
+  end subroutine ReadObst
 
 
   subroutine ReadPolyhedron(unit,restline,SB)
@@ -277,6 +288,33 @@ contains
       stop
     end if
   end subroutine ReadPlane
+
+  
+  subroutine ReadOff(filename)
+    character(*),intent(in) :: filename
+    logical :: ex
+    type(TSolidBody) :: SB
+
+    inquire(file=filename,exist=ex)
+
+    if (ex) then
+      allocate(TCGALPolyhedron :: SB%GeometricShape)
+      
+      select type (geomshape => SB%GeometricShape)
+        type is (TCGALPolyhedron)
+       
+          call geomshape%ReadOff(filename)
+          
+          call geomshape%InitBbox
+      
+          call AddBody(SolidBodiesList,SB)
+      end select
+    else
+      write(*,*) "Error, file ",filename," does not exist."
+      stop
+    end if
+
+  end subroutine ReadOff
 
 
 

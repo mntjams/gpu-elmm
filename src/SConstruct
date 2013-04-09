@@ -139,7 +139,7 @@ env.Append(LINKFLAGS= fast_flag + omp_flag + lto_flag + extra_flag)
     
 env.Append(FORTRANMODDIR = '${TARGET.dir}')
 
-env.Append(LIBS = ['poisfft','lapack','fftw3','fftw3f','fftw3_omp','fftw3f_omp','pthread'])
+env.Append(LIBS = ['poisfft','lapack','fftw3','fftw3f','fftw3_omp','fftw3f_omp','pthread','CGAL','stdc++'])
 
 if customSB=='yes':
  env.Append(F90FLAGS='-DCUSTOMSB')
@@ -175,6 +175,8 @@ objs += env.Object(target=target_dir+'multigrid2d',    source='multigrid2d.f90')
 objs += env.Object(target=target_dir+'wallmodels',     source='wallmodels.f90')
 objs += env.Object(target=target_dir+'volumesources',  source='volumesources.f90')
 objs += env.Object(target=target_dir+'plantcanopy',    source='plantcanopy.f90')
+objs += env.Object(target=target_dir+'cgal_polyhedra_cc',  source='cgal_polyhedra.cc', CPPFLAGS=" -Ofast -frounding-math -std=c++11")
+objs += env.Object(target=target_dir+'cgal_polyhedra',  source='cgal_polyhedra.f90')
 objs += env.Object(target=target_dir+'geometricshapes',  source='geometricshapes.f90')
 objs += env.Object(target=target_dir+'solidbodies',    source='solidbodies.f90')
 objs += env.Object(target=target_dir+'immersedboundary', source='immersedboundary.f90')

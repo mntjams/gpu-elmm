@@ -40,7 +40,7 @@ module VolumeSources
   end type TScalarFlVolume
 
   type TScalarFlVolumesContainer
-    type(TScalarFlVolume) ,allocatable :: Volumes(:)
+    type(TScalarFlVolume), allocatable :: Volumes(:)
   end type
 
   type TScalarFlVolumesListContainer
@@ -96,15 +96,22 @@ module VolumeSources
     subroutine InsideCellsToLists
       !find cells inside the canopy and store them in a list
 
+      !$omp parallel sections
+      !$omp section
       call SourceBodiesList%ForEach(GetUCells)
 
+      !$omp section
       call SourceBodiesList%ForEach(GetVCells)
 
+      !$omp section
       call SourceBodiesList%ForEach(GetWCells)
 
+      !$omp section
       allocate(ScalarFlVolumesLists(num_of_scalars))
-      
+
       call SourceBodiesList%ForEach(GetOtherCells)
+      !$omp end parallel sections
+
       contains
 
         subroutine GetUCells(PB)
@@ -176,6 +183,7 @@ module VolumeSources
                        elem%xi = i
                        elem%yj = j
                        elem%zk = k
+                       elem%flux = PB%get_resistance(xPr(i),yPr(j),zW(k))
                        call WResistanceVolumesList%Add(elem)
                      end if
                   enddo
@@ -303,9 +311,11 @@ module VolumeSources
 
 
     subroutine InitVolumeSources
-    
+ 
       call InsideCellsToLists
+ 
       call MovePointsToArray
+
     end subroutine InitVolumeSources
 
     
@@ -315,7 +325,9 @@ module VolumeSources
       real(knd),dimension(-2:,-2:,-2:),intent(in)    :: U,V,W
 
       call apply(U2,U,UResistanceVolumes,totU_u)
+
       call apply(V2,V,VResistanceVolumes,totU_v)
+
       call apply(W2,W,WResistanceVolumes,totU_w)
 
       contains
@@ -354,7 +366,7 @@ module VolumeSources
            if (allocated(src)) then
              do i=1,size(src)
                associate (xi => src(i)%xi, yj => src(i)%yj, zk => src(i)%zk)
-                 X2(xi,yj,zk) = X2(xi,yj,zk) - dt * src(i)%flux * fun(xi,yj,zk) * X(xi,yj,zk)
+                 X2(xi,yj,zk) = X2(xi,yj,zk) - dt * src(i)%flux * fun(xi,yj,zk) * X(xi,yj,zk)              
                end associate
              end do
            end if

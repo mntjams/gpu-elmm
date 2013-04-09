@@ -4,7 +4,7 @@ module Outputs
   use Scalars
   use Wallmodels, only: GroundDeposition, GroundUstar, wallmodeltype
   use ImmersedBoundary
-  use Turbinlet, only: ustarinlet
+  use Turbinlet, only: Ustar_inlet
   use Endianness
   use FreeUnit
   use StaggeredFrames
@@ -290,6 +290,10 @@ contains
      profvw = 0
      profuwavg = 0
      profvwavg = 0
+     profuwsgs = 0
+     profvwsgs = 0
+     profuwsgsavg = 0
+     profvwsgsavg = 0
 
      proftemp = 0
      proftempavg = 0
@@ -521,8 +525,8 @@ contains
      S2 = S*Re
 
      if (display%ustar==1) then
-       if (allocated(ustarinlet)) then
-        write(*,*) "ustar:",S,"Re_tau:",S2,"u*inlet",ustarinlet(1)
+       if (allocated(Ustar_inlet)) then
+        write(*,*) "ustar:",S,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
        else
         write(*,*) "ustar:",S,"Re_tau:",S2
        end if

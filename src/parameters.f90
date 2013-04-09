@@ -61,11 +61,9 @@ module PARAMETERS
   real(knd) :: top_pressure !mean pressure at the top boundary - calculated
   real(knd) :: bottom_pressure = 0
 
-  real(knd) :: SHEARG,Uinlet,ustarsurfin
+  real(knd) :: ShearInletTypeParameter,Uinlet
 
-  real(knd) :: z0inlet,z0W,z0E,z0S,z0N,z0B,z0T
-
-  real(knd) :: stressgradin,urefin,zrefin,powerexpin
+  real(knd) :: z0W,z0E,z0S,z0N,z0B,z0T
 
   real(knd) :: windangle
 
@@ -76,8 +74,6 @@ module PARAMETERS
   integer,dimension(:),allocatable :: scalsrci,scalsrcj,scalsrck
 
   integer :: scalsourcetype
-
-  real(knd),dimension(1:3,1:3) :: relativestress
 
 
   real(knd) :: epsCN,epsPoisson,eps,debugparam
@@ -142,7 +138,11 @@ module PARAMETERS
 
   integer,parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
                         TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
-  integer,parameter :: NOINLET=0,CONSTANT=1,SHEAR=2,PARABOLIC=3,CONSTPROF=1,LOGPROF=2,POWERPROF=3  !inlet profile types
+  !inlet types
+  integer,parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
+                       ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5
+  !inlet profile types
+  integer,parameter :: CONSTPROF=1,LOGPROF=2,POWERPROF=3 
   integer,parameter :: GENERALGRID=1,UNIFORMGRID=2
   integer,parameter :: SubgridModel=1,SigmaModel=2,VremanModel=3,StabSubgridModel=4
   integer,parameter :: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4

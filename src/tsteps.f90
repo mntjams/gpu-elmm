@@ -11,7 +11,7 @@ module TSTEPS
   use OUTPUTS, only: store,display,proftempfl
   use SCALARS, only: ScalarRK3, ComputeTDiff
   use Subgrid, only: sgstype, SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma
-  use TURBINLET, only: GetTurbInlet, GetInletFromFile
+  use TURBINLET, only: GetTurbulentInlet, GetInletFromFile
   use Wallmodels
   use Tiling, only: tilenx, tileny, tilenz
 #ifdef __HMPP
@@ -142,7 +142,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
   end if
 
   if ((Btype(We) ==TurbulentInlet).or.(Btype(Ea) ==TurbulentInlet)) then
-    call GetTurbInlet
+    call GetTurbulentInlet
     !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
   else if (Btype(We) ==InletFromFile) then
     call GetInletFromFile(time)
