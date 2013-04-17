@@ -1,16 +1,18 @@
 module ImmersedBoundaryWM
   use Parameters
   use SolidBodies
-  use GeometricShapes, only: TTerrain
-  use WallModels, only: WMPoint, AddWMPoint
+  use GeometricShapes, only: TTerrain, TRay
+  use WallModels, only: WMPoint, AddWMPoint, WMPoints
+  
+  implicit none
 
   private
-  public GetSolidBodiesWM
+  public GetSolidBodiesWM, GetWMFluxes
  
 contains
   
   subroutine GetSolidBodiesWM
-    type(WMPOINT)            :: WMP
+    type(WMPoint)            :: WMP
     type(TSolidBody),pointer :: CurrentSB => null()
     integer                  :: neighbours(3,6)
     real(knd)     :: dist,nearx,neary,nearz
@@ -81,7 +83,142 @@ contains
      enddo
     enddo
 
+    
   end subroutine GetSolidBodiesWM
+  
+  subroutine GetWMFluxes
+    use SolarRadiation
+    use PhysicalProperties
+    use VolumeSources
+    
+    real(knd) :: inc_radiation_flux, radiation_balance, angle_to_sun, &
+                 total_heat_flux, sensible_heat_flux, latent_heat_flux
+    real(knd) :: out_norm(3), xr, yr, zr, svf
+    
+    type(TRay) :: ray
+    
+    integer :: i
+    
+    enable_radiation = 1
+    
+    if (enable_buoyancy==1 .and. enable_radiation==1) then
+      do i=1,size(WMPoints)
+      
+        associate(p => WMPoints(i))
+          out_norm = [-p%distx, -p%disty, -p%distz] / &
+                     hypot(hypot(p%distx,p%disty),p%distz)
+      
+          angle_to_sun = max(0._knd, dot_product(out_norm, vector_to_sun))
+
+
+          xr = xPr(p%xi)+p%distx*0.9_knd
+          yr = yPr(p%yj)+p%disty*0.9_knd
+          zr = zPr(p%zk)+p%distz*0.9_knd
+          if (angle_to_sun>0._knd) then
+            ray = TRay([xr, &
+                        yr, &
+                        zr], &
+                       vector_to_sun)
+                     
+            if ((SolidBodiesList%Any(DoIntersect)) .or. &
+                (SourceBodiesList%Any(DoIntersectPlants))) then
+              angle_to_sun = 0
+            end if
+          end if
+
+          !temporary
+          svf = sky_view_factor(xr,yr,zr)
+          inc_radiation_flux = angle_to_sun * solar_direct_flux() + &
+                               solar_diffuse_flux()*svf
+
+          radiation_balance = inc_radiation_flux * (1-p%albedo) - &
+                              longwave_radiation(temperature_ref) * svf * p%emmissivity
+
+          total_heat_flux = radiation_balance - &
+                            (0.2 * radiation_balance) !crude guess of the storage flux
+
+                            if (enable_moisture==1) then
+            latent_heat_flux = total_heat_flux * p%evaporative_fraction
+            sensible_heat_flux = total_heat_flux - latent_heat_flux
+            p%moisture_flux = latent_heat_flux / (rho_air_ref * Lv_water_ref)
+          else
+            sensible_heat_flux = total_heat_flux
+          end if
+          
+          p%temperature_flux = sensible_heat_flux / (rho_air_ref * Cp_air_ref)
+
+        end associate  
+        
+      end do
+      
+      call SaveFluxes
+    end if
+    
+    
+    contains
+    
+      real(knd) function sky_view_factor(x,y,z)
+        real(knd),intent(in) :: x,y,z
+        integer :: i,nfree
+
+        
+        nfree = 0
+        
+        do i=1,svf_nrays
+          ray = TRay([x,y,z],svf_vecs(:,i))
+        
+          if (.not.((SolidBodiesList%Any(DoIntersect)) .or. &
+                    (SourceBodiesList%Any(DoIntersectPlants)))) then
+            nfree = nfree + 1
+          end if
+        end do
+        
+        sky_view_factor = real(nfree,knd) / svf_nrays
+        
+      end function
+  
+      logical function DoIntersect(item) result(res)
+        class(TListable) :: item
+        
+        select type (item)
+          class is (TSolidBody)
+            res = item%IntersectsRay(ray)
+          class default
+            stop "Non-TSolidBody i the list."
+        end select
+      end function
+      
+      logical function DoIntersectPlants(item) result(res)
+        class(TListable) :: item
+        
+        select type (item)
+          class is (TPlantBody)
+            res = item%IntersectsRay(ray)
+          class is (TVolumeSourceBody)
+            res = .false.
+          class default
+            stop "Non-TVolumeSourceBody i the list."
+        end select
+      end function
+      
+      subroutine SaveFluxes
+        use VTKArray
+        real(knd),allocatable :: temperature_flux(:,:,:)
+        allocate(temperature_flux(1:Prnx,1:Prny,1:Prnz))
+        
+        temperature_flux = 0
+        
+        do i=1,size(WMPoints)
+          associate(p => WMPoints(i))
+            temperature_flux(p%xi,p%yj,p%zk) = p%temperature_flux
+          end associate
+        end do
+        
+        call VtkArraySimple("tempfl.vtk",temperature_flux)
+        
+      end subroutine
+      
+  end subroutine GetWMFluxes
 
 end module ImmersedBoundaryWM
 
@@ -101,7 +238,7 @@ module ImmersedBoundary
 
   public TIBPoint, TIBPoint_MomentumSource, TIBPoint_ScalFlSource, TIBPoint_Viscosity, &
          UIBPoints, VIBPoints, WIBPoints, ScalFlIBPoints, &
-         GetSolidBodiesBC
+         GetSolidBodiesBC, InitIBPFluxes, SetIBPFluxes
          !InitSolidBodies imported from SolidBodies
 
 
@@ -140,8 +277,9 @@ module ImmersedBoundary
     real(knd)              :: dist                     !distance to the boundary
     type(TInterpolationPoint),dimension(:),allocatable :: IntPoints !array of interpolation points
     integer                :: interp                   !kind of interpolation 1.. none (1 point outside), 2..linear, 4..bilinear  other values not allowed
-    real(knd)              :: temperatureflux = 0      !desired temperature flux
- !  contains
+    real(knd)              :: temperature_flux = 0      !desired temperature flux
+    real(knd)              :: moisture_flux = 0      !desired temperature flux
+    integer :: n_WMPs = 0 !number of associated wall model points feeding the  !  contains
  !    procedure Create         => TScalFlIBPoint_Create
   end type TScalFlIBPoint
 
@@ -158,9 +296,11 @@ module ImmersedBoundary
     integer   :: yj
     integer   :: zk
     real(knd) :: dist
-    real(knd) :: temperatureflux = 0
+    real(knd) :: temperature_flux = 0
+    real(knd) :: moisture_flux = 0
     integer   :: interp
     type(TInterpolationPoint),dimension(:),allocatable :: IntPoints !array of interpolation points
+    integer :: n_WMPs = 0 !number of associated wall model points feeding the fluxes
  !   contains
  !     procedure Interpolate      => TIBPoint_Interpolate
  !     procedure InterpolateTDiff => TIBPoint_Interpolate_TDiff
@@ -208,12 +348,15 @@ contains
     IBP%yj = ScalFlIBP%yj
     IBP%zk = ScalFlIBP%zk
     IBP%dist = ScalFlIBP%dist
-    IBP%temperatureflux = ScalFlIBP%temperatureflux
+    IBP%temperature_flux = ScalFlIBP%temperature_flux
+    IBP%moisture_flux = ScalFlIBP%moisture_flux
     IBP%interp = ScalFlIBP%interp
 
     allocate(IBP%IntPoints(size(ScalFlIBP%IntPoints)))
 
     IBP%IntPoints = ScalFlIBP%IntPoints
+    
+    IBP%n_WMPs = ScalFlIBP%n_WMPs
   end subroutine ScalFlIBPtoIBP
 
 
@@ -269,10 +412,14 @@ contains
 
     intscal = TIBPoint_Interpolate(IBP,Scalar,-1)
 
-    if (sctype==scalar_type_temperature) then
+    if (sctype==ScalarTypeTemperature) then
       intTDiff = TIBPoint_InterpolateTDiff(IBP,TDiff)
 
-      if (intTDiff>0)  intscal = intscal + IBP%temperatureflux * IBP%dist / intTDiff
+      if (intTDiff>0)  intscal = intscal + IBP%temperature_flux * IBP%dist / intTDiff
+    else if (sctype==ScalarTypeMoisture) then
+      intTDiff = TIBPoint_InterpolateTDiff(IBP,TDiff)
+
+      if (intTDiff>0)  intscal = intscal + IBP%moisture_flux * IBP%dist / intTDiff
     endif
 
     src = (intscal - Scalar(IBP%xi,IBP%yj,IBP%zk)) / dt
@@ -823,7 +970,6 @@ contains
 
     endif
 
-    IBP%Intpoints%coef = 0
   end subroutine TVelIBPoint_InterpolationCoefs
 
 
@@ -1197,7 +1343,7 @@ contains
 
     endif
 
-    IBP%temperatureflux = SB%temperatureflux
+    IBP%temperature_flux = SB%temperature_flux
 
   end subroutine TScalFlIBPoint_Create
 
@@ -1280,7 +1426,144 @@ contains
   end subroutine FindNeighbouringCells
 
   
+  integer function FindScalarIBCellIndex(xi,yj,zk) result(res)
+    !binary search of the immersed boundary cell index with the prescribed coordinates
+    integer,intent(in) :: xi,yj,zk
+    integer :: idx,d,u,i,idx_d,idx_u,idx_i
+    
+    idx = f_ijk(xi,yj,zk)
+    
+    d = 1
+    u = size(ScalFlIBPoints)
+    
+    idx_d = f(d)
+    if (idx_d==idx) then
+      res = d
+      return
+    end if
+    
+    idx_u = f(u)
+    if (idx_u==idx) then
+      res = u
+      return
+    end if
+    
+    res = -1
+    
+    do while (u-d>1)
+      i = (d+u)/2
+      idx_i = f(i)
+      if (idx_i == idx) then
+        res = i
+        return
+      else if (idx_i<idx) then
+        d = i
+      else
+        u = i
+      end if
+    end do
+    
+    contains
+      
+      pure integer function f_ijk(i,j,k)
+        integer,intent(in) :: i,j,k
+        f_ijk = (i-1) + Prnx * (j-1) + Prnx * Prny * (k-1)
+      end function
+      pure integer function f(n)
+        integer,intent(in) :: n
+        f = (ScalFlIBPoints(n)%xi-1) + &
+            Prnx * (ScalFlIBPoints(n)%yj-1) + &
+            Prnx * Prny * (ScalFlIBPoints(n)%zk-1)
+      end function
+  end function FindScalarIBCellIndex
+  
+  
+  subroutine BindWMstoIBPs
+    use ArrayUtilities, only: add_element
+    use WallModels, only: WMPoints
+    integer :: neighbours(3,6)
+    integer :: i, j
+    integer :: xn, yn, zn, idx
+    
+    neighbours = 0
+    neighbours(1,1) =  1
+    neighbours(1,2) = -1
+    neighbours(2,3) =  1
+    neighbours(2,4) = -1
+    neighbours(3,5) =  1
+    neighbours(3,6) = -1
+    
+    do i=1,size(WMPoints)
+      associate (p => WMPoints(i)) !gfortran 4.8 bug prevents more items here
+        do j=1,6
+          xn = p%xi+neighbours(1,j)
+          yn = p%yj+neighbours(2,j)
+          zn = p%zk+neighbours(3,j)
+          if (Prtype(xn,yn,zn)>0.and. &
+              xn>0 .and. xn<=Prnx .and. &
+              yn>0 .and. yn<=Prny .and. &
+              zn>0 .and. zn<=Prnz) then
 
+            idx = FindScalarIBCellIndex(xn, &
+                                        yn, &
+                                        zn)
+            if (idx>0) then
+              ScalFlIBPoints(idx)%n_WMPs = ScalFlIBPoints(idx)%n_WMPs + 1
+              call add_element(p%bound_IBPs, idx)
+            else
+              stop "This point does not have an IBP!"
+            end if
+          end if
+
+        end do
+        
+      end associate
+    end do
+  end subroutine BindWMstoIBPs
+  
+  
+  subroutine InitIBPFluxes
+  
+    !find the corresponding immersed boundary points to wall model points
+    call BindWMstoIBPs
+    !compute initial temperature and moisture fluxes
+    call GetWMFluxes
+  end subroutine
+  
+  subroutine SetIBPFluxes
+    use WallModels, only: WMPoints
+    integer i,j
+         
+    ScalFlIBPoints%temperature_flux = 0
+    print *,"!!!!!!!!!!!!!!!"
+    do i=1,size(WMPoints)
+      associate (p => WMPoints(i))
+        if (enable_buoyancy==1) then
+          do j=1,size(p%bound_IBPs)
+            associate (IBP => ScalFlIBPoints(p%bound_IBPs(j)))
+              IBP%temperature_flux = IBP%temperature_flux + p%temperature_flux/IBP%n_WMPs
+            end associate
+          end do
+        end if
+        
+        if (enable_moisture==1) then
+          do j=1,size(p%bound_IBPs)
+            associate (IBP => ScalFlIBPoints(p%bound_IBPs(j)))
+              IBP%moisture_flux = IBP%moisture_flux + p%moisture_flux/IBP%n_WMPs
+            end associate
+          end do
+        end if
+        
+        if (p%zk==1) then
+          if (enable_buoyancy==1) BsideTFlArr(p%xi,p%yj) = p%temperature_flux
+          if (enable_moisture==1) BsideMFlArr(p%xi,p%yj) = p%moisture_flux
+        end if
+      end associate
+    end do
+  
+  end subroutine SetIBPFluxes
+  
+  
 
 
   subroutine InitImBoundaries
@@ -1364,7 +1647,7 @@ contains
     call InitImBoundaries
 
     call GetSolidBodiesWM
-
+    
   end subroutine GetSolidBodiesBC
 
 

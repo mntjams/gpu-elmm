@@ -8,6 +8,7 @@ module CGAL_Polyhedra
   public cgal_polyhedron_read, &
          cgal_polyhedron_closest, &
          cgal_polyhedron_inside, &
+         cgal_polyhedron_intersects_ray, &
          cgal_polyhedron_bbox, &
          cgal_polyhedron_finalize
   
@@ -30,11 +31,18 @@ module CGAL_Polyhedra
       type(d3),intent(out) :: near
     end subroutine
     
-    pure function polyhedron_inside(ptree, query, outside_ref) result(res) bind(C,name="polyhedron_inside")
+    function polyhedron_inside(ptree, query, outside_ref) result(res) bind(C,name="polyhedron_inside")
       import
       logical(c_bool) :: res
       type(c_ptr),value :: ptree
       type(d3),intent(in) :: query, outside_ref
+    end function
+    
+    function polyhedron_intersects_ray(ptree, origin, vec) result(res) bind(C,name="polyhedron_intersects_ray")
+      import
+      logical(c_bool) :: res
+      type(c_ptr),value :: ptree
+      type(d3),intent(in) :: origin, vec
     end function
     
     subroutine polyhedron_bbox(ptree, min, max) bind(C,name="polyhedron_bbox")
@@ -58,6 +66,11 @@ module CGAL_Polyhedra
   interface cgal_polyhedron_inside
     module procedure cgal_polyhedron_inside_s
     module procedure cgal_polyhedron_inside_d
+  end interface
+  
+  interface cgal_polyhedron_intersects_ray
+    module procedure cgal_polyhedron_intersects_ray_s
+    module procedure cgal_polyhedron_intersects_ray_d
   end interface
   
   interface cgal_polyhedron_bbox
@@ -132,7 +145,7 @@ contains
     zmax = max%z
   end subroutine
   
-  pure function cgal_polyhedron_inside_s(ptree, xq,yq,zq, xr,yr,zr) result(res)
+  function cgal_polyhedron_inside_s(ptree, xq,yq,zq, xr,yr,zr) result(res)
     logical :: res
     type(c_ptr),intent(in) :: ptree
     real(c_float),intent(in) :: xq,yq,zq, xr,yr,zr
@@ -143,7 +156,7 @@ contains
     res = polyhedron_inside(ptree, query, ref)
   end function
 
-  pure function cgal_polyhedron_inside_d(ptree, xq,yq,zq, xr,yr,zr) result(res)
+  function cgal_polyhedron_inside_d(ptree, xq,yq,zq, xr,yr,zr) result(res)
     logical :: res
     type(c_ptr),intent(in) :: ptree
     real(c_double),intent(in) :: xq,yq,zq, xr,yr,zr
@@ -155,6 +168,28 @@ contains
 
   end function
   
+  function cgal_polyhedron_intersects_ray_s(ptree, xc,yc,zc, a,b,c) result(res)
+    logical :: res
+    type(c_ptr),intent(in) :: ptree
+    real(c_float),intent(in) :: xc,yc,zc, a,b,c
+    type(d3) :: origin, vec
+    
+    origin = d3(real(xc,c_double),real(yc,c_double),real(zc,c_double))
+    vec = d3(real(a,c_double),real(b,c_double),real(c,c_double))
+    res = polyhedron_intersects_ray(ptree, origin, vec)
+  end function
+
+  function cgal_polyhedron_intersects_ray_d(ptree, xc,yc,zc, a,b,c) result(res)
+    logical :: res
+    type(c_ptr),intent(in) :: ptree
+    real(c_double),intent(in) :: xc,yc,zc, a,b,c
+    type(d3) :: origin, vec
+    
+    origin = d3(xc,yc,zc)
+    vec = d3(a,b,c)
+    res = polyhedron_intersects_ray(ptree, origin, vec)
+  end function
+
   subroutine cgal_polyhedron_finalize(ptree)
     type(c_ptr),intent(inout) :: ptree
     

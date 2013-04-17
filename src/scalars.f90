@@ -59,6 +59,7 @@ contains
 
   subroutine ScalarRK3(U,V,W,Temperature,Moisture,Scalar,RK_stage,fluxprofile)
     use RK3
+    use VolumeSources, only: ScalarVolumeSources
     real(knd),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd),intent(inout) :: Temperature(-1:,-1:,-1:),Moisture(-1:,-1:,-1:)
     real(knd),intent(inout) :: Scalar(-1:,-1:,-1:,1:)
@@ -126,6 +127,8 @@ contains
 
       end do
 
+      call ScalarVolumeSources(Scalar_adv)
+
       !$omp parallel workshare
       Scalar_2 = Scalar_2+Scalar_adv*RK_beta(RK_stage)
       !$omp end parallel workshare
@@ -156,7 +159,7 @@ contains
 
       do i=1,num_of_scalars
          call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i), &
-                         scalar_type_passive,BoundScalar,2._knd*RK_alpha(RK_stage))
+                         ScalarTypePassive,BoundScalar,2._knd*RK_alpha(RK_stage))
       end do
 
       if (computedeposition>0) call Deposition(Scalar_2,2._knd*RK_alpha(RK_stage))
@@ -185,14 +188,14 @@ contains
     if (enable_buoyancy>0) then
 print *,"temp"
       call stage(Temperature,Temperature2,Temperature_adv, &
-                 scalar_type_temperature,BoundTemperature,TemperatureExtra,fluxProfile)
+                 ScalarTypeTemperature,BoundTemperature,TemperatureExtra,fluxProfile)
         where (Prtype>0) Temperature(0:Prnx+1,0:Prny+1,0:Prnz+1) = temperature_ref
     end if
 
     if (enable_moisture>0) then
 print *,"moist"
       call stage(Moisture,Moisture2,Moisture_adv, &
-                 scalar_type_moisture,BoundMoisture,MoistureExtra)
+                 ScalarTypeMoisture,BoundMoisture,MoistureExtra)
     end if
 #endif
 
@@ -1491,8 +1494,8 @@ print *,"moist"
     integer i,j,k,xi,yj,zk,nprobx,nproby,nprobz
     ct = 7
     cr = 1.5
-    xc = 3*cos((xheading-70)*pi/180.)
-    yc = 3*sin((xheading-70)*pi/180.)
+    xc = 3*cos((x_axis_azimuth-70)*pi/180.)
+    yc = 3*sin((x_axis_azimuth-70)*pi/180.)
     xs = xc-cr
     ys = yc-cr
     zs = 0

@@ -35,24 +35,24 @@
   endsubroutine PsiH_MO
 
 
-  subroutine Obukhov_zL(zL,ustar,tempfl,tempref,g,z)
+  subroutine Obukhov_zL(zL,ustar,temperature_flux,tempref,g,z)
    implicit none
 #include "hmpp-include.f90"
 
    real(knd),intent(out) :: zL
-   real(knd),intent(in):: ustar,tempfl,tempref,g,z
+   real(knd),intent(in):: ustar,temperature_flux,tempref,g,z
 
-   zL=z*(0.4_knd*(g/tempref)*tempfl)/(-ustar**3)
+   zL=z*(0.4_knd*(g/tempref)*temperature_flux)/(-ustar**3)
   endsubroutine Obukhov_zL
 
-  subroutine WM_MO_FLUX_ustar(vel,dist,ustar,z0,tempflux,Re,temperature_ref,grav_acc)
+  subroutine WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_fluxux,Re,temperature_ref,grav_acc)
    implicit none
 #include "hmpp-include.f90"
 
    real(knd),intent(inout) :: ustar
    real(knd),parameter  :: eps=1e-3
    real(knd),parameter  :: yplcrit=11.225_knd
-   real(knd),intent(in) :: vel,dist,z0,tempflux
+   real(knd),intent(in) :: vel,dist,z0,temperature_fluxux
    real(knd),intent(in) :: Re,temperature_ref,grav_acc
    real(knd) ustar2,zL,zL2,Psi
    integer i
@@ -85,7 +85,7 @@
      if (ustar<1E-4) then
       zL=-10000
      else
-      call Obukhov_zL(zL2,ustar,tempflux,temperature_ref,grav_acc,dist)
+      call Obukhov_zL(zL2,ustar,temperature_fluxux,temperature_ref,grav_acc,dist)
       zL=zL+(zL2-zL)/2
      endif
 
@@ -106,14 +106,14 @@
 
 
 
-  subroutine WM_MO_FLUX_GPU(visc,i,j,k,distx,disty,distz,z0,tempfl,ustar,u,v,w,Re,temperature_ref,grav_acc)
+  subroutine WM_MO_FLUX_GPU(visc,i,j,k,distx,disty,distz,z0,temperature_flux,ustar,u,v,w,Re,temperature_ref,grav_acc)
    implicit none
 #include "hmpp-include.f90"
    real(knd),intent(out) :: visc
 
    integer,intent(in)      :: i,j,k
    real(knd),intent(inout) :: ustar
-   real(knd),intent(in)    :: distx,disty,distz,z0,tempfl
+   real(knd),intent(in)    :: distx,disty,distz,z0,temperature_flux
    real(knd),intent(in)    :: u,v,w
    real(knd),intent(in)    :: Re,temperature_ref,grav_acc
    real(knd) vel,dist
@@ -129,7 +129,7 @@
    vel=sqrt(vel)
 
    if (vel/=0) then
-     call WM_MO_FLUX_ustar(vel,dist,ustar,z0,tempfl,Re,temperature_ref,grav_acc)
+     call WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_flux,Re,temperature_ref,grav_acc)
      if (ustar<0) ustar=0
    endif
 
@@ -165,7 +165,7 @@
 !     real(knd) :: z0=0
 !     real(knd) :: ustar=1
 !     real(knd) :: temp=0
-!     real(knd) :: tempfl=0
+!     real(knd) :: temperature_flux=0
 !
 !    endtype hmppWMpoint
 
@@ -182,7 +182,7 @@
    real(knd) up,vp,wp
 
    !$hmppcg grid blocksize 512x1
-   !$hmppcg gridify(i),private(xi,yj,zk,distx,disty,distz,z0,tempfl,ustar,up,vp,wp)
+   !$hmppcg gridify(i),private(xi,yj,zk,distx,disty,distz,z0,temperature_flux,ustar,up,vp,wp)
    do i = 1,nWMPoints
 
         xi = WMPoints(i)%xi
@@ -199,7 +199,7 @@
            call WM_MO_FLUX_GPU(Visc(xi,yj,zk) ,&
                              xi, yj, zk,&
                              WMPoints(i)%distx, WMPoints(i)%disty, WMPoints(i)%distz,&
-                             WMPoints(i)%z0, WMPoints(i)%tempfl, WMPoints(i)%ustar,&
+                             WMPoints(i)%z0, WMPoints(i)%temperature_flux, WMPoints(i)%ustar,&
                              up, vp, wp,&
                              Re, temperature_ref, grav_acc)
 

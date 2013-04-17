@@ -106,7 +106,7 @@ module Outputs
     integer :: frame_sumscalars = 1
     integer :: frame_temperature = 1
     integer :: frame_moisture = 1
-    integer :: frame_tempfl = 0
+    integer :: frame_temperature_flux = 0
     integer :: frame_scalfl = 0
     type(TFrameDomain),dimension(:),allocatable :: frame_domains
 
@@ -827,7 +827,7 @@ contains
              nom=(grav_acc/temperature_ref)*(proftempflavg(k)+proftempflsgsavg(k))
              denom=((profuwavg(k)+profuwsgsavg(k))*S + (profvwavg(k)+profvwsgsavg(k))*S2)
 
-             if (abs(denom)>1E-5_knd*abs(nom)) then
+             if (abs(denom)>1E-5_knd*abs(nom).and.abs(nom)>epsilon(1._knd)) then
                S = nom/denom
              else
                S = 100000._knd*sign(1.0_knd,nom)*sign(1.0_knd,denom)
@@ -1873,8 +1873,8 @@ contains
         write (unit) lf
       end if
 
-      if (enable_buoyancy==1.and.store%frame_tempfl==1) then
-        write (unit) "SCALARS tempfl float", lf
+      if (enable_buoyancy==1.and.store%frame_temperature_flux==1) then
+        write (unit) "SCALARS temperature_flux float", lf
         write (unit) "LOOKUP_TABLE default", lf
 
         do k = mink,maxk
@@ -2599,124 +2599,3 @@ contains
 
 
 end module Outputs
-
-
-module vtkarray
- !Simple module to output arrays for visualization. No physical coordinates are used, only the position in the array.
- !Mostly only for debugging.
-
-!   use iso_fortran_env, only: real32, real64
-  use FreeUnit
-
-  implicit none
-
-  integer,parameter :: real32=selected_real_kind(p=6,r=37)
-  integer,parameter :: real64=selected_real_kind(p=15,r=200)
-
-  interface VtkArraySimple
-    module procedure SVtkArraySimple
-    module procedure DVtkArraySimple
-  end interface
-
-  contains
-
-    subroutine SVtkArraySimple(fname,A)
-      character(len=*)              :: fname
-      real(real32),dimension(:,:,:) :: A
-      integer                       :: nx,ny,nz
-      integer                       :: i
-      integer                       :: unit
-      character(len=40)             :: str
-
-      nx=Ubound(A,1)
-      ny=Ubound(A,2)
-      nz=Ubound(A,3)
-
-      call newunit(unit)
-
-      open(unit,file=fname)
-      write (unit,"(A)") "# vtk DataFile Version 2.0"
-      write (unit,"(A)") "CLMM output file"
-      write (unit,"(A)") "ASCII"
-      write (unit,"(A)") "DATASET RECTILINEAR_GRID"
-      str="DIMENSIONS"
-      write (str(12:),'(i0,1x,i0,1x,i0)') nx,ny,nz
-      write (unit,"(A)") trim(str)
-      str="X_COORDINATES"
-      write (str(15:),'(i5,2x,a)') nx,"float"
-      write (unit,"(A)") str
-      write (unit,*) (i, i=1,nx)
-      str="Y_COORDINATES"
-      write (str(15:),'(i5,2x,a)') ny,"float"
-      write (unit,"(A)") trim(str)
-      write (unit,*) (i, i=1,ny)
-      str="Z_COORDINATES"
-      write (str(15:),'(i5,2x,a)') nz,"float"
-      write (unit,"(A)") trim(str)
-      write (unit,*) (i, i=1,nz)
-      str="POINT_DATA"
-      write (str(12:),*) nx*ny*nz
-      write (unit,"(A)") trim(str)
-
-
-      write (unit,"(A)") "SCALARS array float"
-      write (unit,"(A)") "LOOKUP_TABLE default"
-
-      write (unit,'(99999999(g0,/))') A(1:nx,1:ny,1:nz)
-
-      write (unit,*)
-      close(unit)
-
-    end subroutine SVtkArraySimple
-
-    subroutine DVtkArraySimple(fname,A)
-      character(len=*)              :: fname
-      real(real64),dimension(:,:,:) :: A
-      integer                       :: nx,ny,nz
-      integer                       :: i
-      integer                       :: unit
-      character(len=40)             :: str
-
-      nx=Ubound(A,1)
-      ny=Ubound(A,2)
-      nz=Ubound(A,3)
-
-      call newunit(unit)
-
-      open(unit,file=fname)
-      write (unit,"(A)") "# vtk DataFile Version 2.0"
-      write (unit,"(A)") "CLMM output file"
-      write (unit,"(A)") "ASCII"
-      write (unit,"(A)") "DATASET RECTILINEAR_GRID"
-      str="DIMENSIONS"
-      write (str(12:),'(i0,1x,i0,1x,i0)') nx,ny,nz
-      write (unit,"(A)") trim(str)
-      str="X_COORDINATES"
-      write (str(15:),'(i5,2x,a)') nx,"float"
-      write (unit,"(A)") str
-      write (unit,*) (i, i=1,nx)
-      str="Y_COORDINATES"
-      write (str(15:),'(i5,2x,a)') ny,"float"
-      write (unit,"(A)") trim(str)
-      write (unit,*) (i, i=1,ny)
-      str="Z_COORDINATES"
-      write (str(15:),'(i5,2x,a)') nz,"float"
-      write (unit,"(A)") trim(str)
-      write (unit,*) (i, i=1,nz)
-      str="POINT_DATA"
-      write (str(12:),*) nx*ny*nz
-      write (unit,"(A)") trim(str)
-
-
-      write (unit,"(A)") "SCALARS array float"
-      write (unit,"(A)") "LOOKUP_TABLE default"
-
-      write (unit,'(99999999(g0,/))') A(1:nx,1:ny,1:nz)
-
-      write (unit,*)
-      close(unit)
-
-    end subroutine DVtkArraySimple
-end module vtkarray
-
-

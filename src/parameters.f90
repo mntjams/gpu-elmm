@@ -1,4 +1,4 @@
-module KINDS
+module Kinds
 !   use iso_fortran_env
   implicit none
 
@@ -23,11 +23,11 @@ module KINDS
   integer,parameter :: SLOG = SINT                                     ! and logical arrays. Note the same KIND value is guaranteed
                                                                        ! the default intrinsic types.
                                                                        !This can have some negative effect on speed however
-end module KINDS
+end module Kinds
 
-module PARAMETERS
+module Parameters
 
-  use KINDS
+  use Kinds
 
   implicit none
 
@@ -88,6 +88,8 @@ module PARAMETERS
   integer :: enable_liquid   = 0 !enable condensation of water vapor
   integer :: num_of_scalars  = 0
 
+  integer :: enable_radiation = 1
+
   integer :: partdistrib,computedeposition,computegravsettling
   integer :: maxCNiter,maxPOISSONiter,maxiter,endstep
   integer :: projectiontype,correctcompatibility = 0
@@ -102,7 +104,7 @@ module PARAMETERS
   real(knd),allocatable :: xU(:),xPr(:),yV(:),yPr(:),zW(:),zPr(:)          !coordinates of grid points
   real(knd),allocatable :: dxU(:),dxPr(:),dyV(:),dyPr(:),dzW(:),dzPr(:)    !dxPr(i)=xU(i)-xU(i-1), dxU(i)=xPr(i+1)-xPr(i)
 
-  real(knd) :: xheading !true geographic heading of the x axis
+  real(knd) :: x_axis_azimuth = 90!true geographic heading of the x axis in degrees
 
   real(knd),allocatable :: Visc(:,:,:),TDiff(:,:,:)  !(turbulent) viscosity, (turbulent) thermal diffusivity
 
@@ -130,14 +132,15 @@ module PARAMETERS
   real(knd),dimension(6)     :: sideScal  !scalars or scalar fluxes on boundaries
 
   real(knd),allocatable      :: BsideTArr(:,:),BsideTFLArr(:,:)
+  real(knd),allocatable      :: BsideMArr(:,:),BsideMFLArr(:,:)
 
 
-  integer,parameter :: scalar_type_temperature = 1, &
-                       scalar_type_moisture = 2, &
-                       scalar_type_passive = 3
+  integer,parameter :: ScalarTypeTemperature = 1, &
+                       ScalarTypeMoisture = 2, &
+                       ScalarTypePassive = 3
 
   integer,parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
-                        TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10
+                        TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10, RADIATION=7
   !inlet types
   integer,parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
                        ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5
@@ -146,6 +149,7 @@ module PARAMETERS
   integer,parameter :: GENERALGRID=1,UNIFORMGRID=2
   integer,parameter :: SubgridModel=1,SigmaModel=2,VremanModel=3,StabSubgridModel=4
   integer,parameter :: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4
+
   integer :: debuglevel = 0 !amount of information to write out
 
 ! #ifdef __HMPP
@@ -164,15 +168,34 @@ module PARAMETERS
   real(knd) :: z0=0
   real(knd) :: ustar=1
   real(knd) :: temp=0
-  real(knd) :: tempfl=0
+  real(knd) :: temperature_flux=0
 
  endtype hmppWMpoint
 ! #endif
 
-endmodule PARAMETERS
+end module Parameters
+
+
+module PhysicalProperties
+  use Parameters
+
+  implicit none
+
+  real(knd),parameter :: rho_air_ref = 1.196 !kg.m^-3
+
+  real(knd),parameter :: Cp_air_ref = 1005 !J.kg^-1.K^-1
+
+  real(knd),parameter :: Cv_air_ref = 718 !J.kg^-1.K^-1
+
+  real(knd),parameter :: Lv_water_ref = 2442000 !J.kg^-1
+
+end module
+
 
 module RK3
   use Kinds
+
+  implicit none
 
   real(knd),parameter :: RK_alpha(3) = [ 4._knd/15._knd, 1._knd/15._knd,  1._knd/6._knd  ]
   real(knd),parameter :: RK_beta(3)  = [ 8._knd/15._knd, 5._knd/12._knd,  3._knd/4._knd  ]

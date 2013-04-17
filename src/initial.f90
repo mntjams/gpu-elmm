@@ -13,10 +13,10 @@ module Initial
   use Subgrid
   use TURBINLET, only: GetTurbulentInlet, GetInletFromFile, TLag, Lturby, Lturbz, Ustar_inlet, relative_stress, &
                Ustar_surf_inlet, stress_gradient_inlet, U_ref_inlet, z_ref_inlet, z0_inlet, power_exponent_inlet
+  use SolarRadiation, only: InitSolarRadiation
   use SolidBodies, only: obstaclefile, InitSolidBodies
-  use ImmersedBoundary, only: GetSolidBodiesBC
-  use VolumeSources, only: InitVolumeSources
-  use PlantCanopy, only: InitPlantBodies
+  use ImmersedBoundary, only: GetSolidBodiesBC, InitIBPFluxes, SetIBPFluxes
+  use VolumeSources, only: InitVolumeSources, InitVolumeSourceBodies
   use WALLMODELS
   use TILING, only: tilesize,InitTiles
   use FreeUnit, only: newunit
@@ -475,8 +475,8 @@ contains
      if (enable_buoyancy /= 1) store%frame_temperature = 0
      call get(store%frame_moisture)
      if (enable_buoyancy /= 1) store%frame_moisture = 0
-     call get(store%frame_tempfl)
-     if (enable_buoyancy /= 1) store%frame_tempfl = 0
+     call get(store%frame_temperature_flux)
+     if (enable_buoyancy /= 1) store%frame_temperature_flux = 0
      call get(store%frame_scalfl)
      if (num_of_scalars < 1) store%frame_scalfl = 0
    else
@@ -1409,7 +1409,7 @@ contains
          call BoundScalar(Scalar(:,:,:,i))
        enddo
 
-       call InitTempFL(Temperature)
+       call InitTempFl(Temperature)
 
        if (wallmodeltype>0) then
                       call ComputeViscsWM(U,V,W,Pr,Temperature)
@@ -1775,12 +1775,14 @@ contains
     if (enable_buoyancy==1) then
        if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==DIRICHLET) then
 
-         allocate(BsideTFLArr(-1:Prnx+2,-1:Prny+2))
+         allocate(BsideTFlArr(-1:Prnx+2,-1:Prny+2))
 
-         if (TempBtype(Bo)==CONSTFLUX) then
-           BsideTFLArr = sideTemp(Bo)
+         if (enable_radiation==1) then
+           BsideTFlArr = 0
+         else if (TempBtype(Bo)==CONSTFLUX) then
+           BsideTFlArr = sideTemp(Bo)
          else
-           BsideTFLArr = 0
+           BsideTFlArr = 0
          endif
 
          if (TempBtype(Bo)==DIRICHLET) then
@@ -1792,7 +1794,32 @@ contains
     endif
 
     if (.not.allocated(BsideTArr))  allocate(BsideTArr(0,0))
-    if (.not.allocated(BsideTFLArr))  allocate(BsideTFLArr(0,0))
+    if (.not.allocated(BsideTFlArr))  allocate(BsideTFlArr(0,0))
+
+
+    if (enable_moisture==1) then
+       if (MoistBtype(Bo)==CONSTFLUX.or.MoistBtype(Bo)==DIRICHLET) then
+
+         allocate(BsideMFlArr(-1:Prnx+2,-1:Prny+2))
+
+         if (enable_radiation==1) then
+           BsideMFlArr = 0
+         else if (MoistBtype(Bo)==CONSTFLUX) then
+           BsideMFlArr = sideMoist(Bo)
+         else
+           BsideMFlArr = 0
+         endif
+
+         if (MoistBtype(Bo)==DIRICHLET) then
+           allocate(BsideMArr(-1:Prnx+2,-1:Prny+2))
+           BsideMArr = sideMoist(Bo)
+         endif
+
+        endif
+    endif
+
+    if (.not.allocated(BsideMArr))  allocate(BsideMArr(0,0))
+    if (.not.allocated(BsideMFlArr))  allocate(BsideMFlArr(0,0))
 
 
     call InitSubsidenceProfile
@@ -1804,8 +1831,13 @@ contains
 
    call InitTiles(Prnx,Prny,Prnz)
 
+   call InitSolarRadiation
+
    !prepare the geometry of the solid bodies
    call InitSolidBodies
+
+   !prepare the geometry of the plant bodies
+   call InitVolumeSourceBodies
 
    !create actual immersed boundary and wall model points, i.m. points end up in an array
    call GetSolidBodiesBC
@@ -1816,10 +1848,14 @@ contains
    !create arrays of w.m. points from the list
    call MoveWMPointsToArray
 
-   call SetNullifiedPoints
+   if (enable_radiation==1) then
+     !compute the radiation balance and prepare the wall fluxes 
+     call InitIBPFluxes
+     !set the immersed boundary values for fluxes
+     call SetIBPFluxes
+   end if
 
-   !prepare the geometry of the plant bodies
-   call InitPlantBodies
+   call SetNullifiedPoints
 
    !create actual arrays of the source points
    call InitVolumeSources

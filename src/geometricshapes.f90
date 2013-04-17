@@ -8,7 +8,7 @@ module GeometricShapes
 
   private
 
-  public TGeometricShape, TLine, TPlane, TPolyhedron, TCGALPolyhedron, &
+  public TGeometricShape, TLine, TRay, TPlane, TConvexPolyhedron, TPolyhedron, &
          TSphere, TEllipsoid, TCylJacket, TCylinder, TTerrainPoint, TTerrain
 
          
@@ -17,23 +17,24 @@ module GeometricShapes
   end type
   
   type TBbox
-    real(knd) :: xmin,ymin,zmin,xmax,ymax,zmax
+    real(knd) :: xmin = 0,ymin = 0,zmin = 0,xmax = 0,ymax = 0,zmax = 0
   end type
 
          
   type,abstract :: TGeometricShape
     private
-    type(TBbox) :: bbox
+    type(TBbox) :: bbox = TBbox()
   contains
     procedure,private :: in_bbox
     procedure :: Inside => TGeometricShape_Inside
     procedure(Inside_interface),private,deferred :: InsideEps
     procedure(Closest_interface), deferred :: Closest
-    procedure(Closest_interface), deferred :: ClosestOut
+    procedure :: ClosestOut => TGeometricShape_ClosestOut
+    procedure :: IntersectsRay => TGeometricShape_IntersectsRay
   end type
 
   abstract interface
-     pure logical function Inside_interface(self,x,y,z,eps)
+     logical function Inside_interface(self,x,y,z,eps)
       import
       class(TGeometricShape),intent(in) :: self
       real(knd),intent(in) :: x,y,z
@@ -53,10 +54,16 @@ module GeometricShapes
   contains
     procedure :: InsideEps => TLine_Inside
     procedure :: Closest => TLine_Closest
-    procedure :: ClosestOut => TLine_Closest
-  end type TLine
+  end type
 
-
+  type,extends(TGeometricShape) :: TRay
+    real(knd) xc,yc,zc
+    real(knd) a,b,c
+  contains
+    procedure :: InsideEps => TRay_Inside
+    procedure :: Closest => TRay_Closest
+  end type
+  
   type,extends(TGeometricShape) :: TPlane
     real(knd) a,b,c,d      !ax+by+cz+d/=0 for inner half-space
     logical gl             !T > in ineq. above F < in ineq. above
@@ -65,41 +72,40 @@ module GeometricShapes
   contains
     procedure :: InsideEps => TPlane_Inside
     procedure :: Closest => TPlane_Closest
-    procedure :: ClosestOut => TPlane_Closest
-  end type TPlane
+  end type
 
 
-  type,extends(TGeometricShape) :: TPolyhedron
+  type,extends(TGeometricShape) :: TConvexPolyhedron
     integer :: nplanes = 0
     type(TPlane),dimension(:),allocatable :: Planes !intersection of half-spaces
   contains
-    procedure,private :: InsideEps => TPolyhedron_Inside
-    procedure :: Closest => TPolyhedron_Closest
-    procedure :: ClosestOut => TPolyhedron_ClosestOut
-  end type TPolyhedron
+    procedure,private :: InsideEps => TConvexPolyhedron_Inside
+    procedure :: Closest => TConvexPolyhedron_Closest
+    procedure :: ClosestOut => TConvexPolyhedron_ClosestOut
+  end type
 
 
-  type,extends(TGeometricShape) :: TCGALPolyhedron
+  type,extends(TGeometricShape) :: TPolyhedron
     type(c_ptr) :: cgalptr
     type(r3)    :: ref
   contains
-    procedure,private :: InsideEps => TCGALPolyhedron_Inside
-    procedure :: Closest => TCGALPolyhedron_Closest
-    procedure :: ClosestOut => TCGALPolyhedron_ClosestOut
-    procedure :: ReadOff => TCGALPolyhedron_ReadOff
-    procedure :: InitBbox => TCGALPolyhedron_InitBbox
-  end type TCGALPolyhedron
+    procedure,private :: ReadOff => TPolyhedron_ReadOff
+    procedure,private :: InitBbox => TPolyhedron_InitBbox
+    procedure,private :: InsideEps => TPolyhedron_Inside
+    procedure :: Closest => TPolyhedron_Closest
+    procedure :: IntersectsRay => TPolyhedron_IntersectsRay
+  end type
 
 
   type,extends(TGeometricShape) :: TSphere
     real(knd) xc,yc,zc,r
     logical :: rough = .false. !T rough surface, F flat surface
-    real(knd) z0            !roughness parameter
+    real(knd) :: z0 = 0           !roughness parameter
   contains
     procedure,private :: InsideEps => TSphere_Inside
     procedure :: Closest => TSphere_Closest
-    procedure :: ClosestOut => TSphere_ClosestOut
-  end type TSphere
+    procedure :: IntersectsRay => TSphere_IntersectsRay
+  end type
 
 
   type,extends(TGeometricShape) :: TEllipsoid
@@ -109,8 +115,8 @@ module GeometricShapes
   contains
     procedure,private :: InsideEps => TEllipsoid_Inside
     procedure :: Closest => TEllipsoid_Closest
-    procedure :: ClosestOut => TEllipsoid_ClosestOut
-  end type TEllipsoid
+    procedure :: IntersectsRay => TEllipsoid_IntersectsRay
+  end type
 
 
   type,extends(TGeometricShape) :: TCylJacket
@@ -122,8 +128,7 @@ module GeometricShapes
   contains
     procedure :: InsideEps => TCylJacket_Inside
     procedure :: Closest => TCylJacket_Closest
-    procedure :: ClosestOut => TCylJacket_Closest
-  end type TCylJacket
+  end type
 
 
   type,extends(TGeometricShape) :: TCylinder
@@ -133,23 +138,23 @@ module GeometricShapes
     procedure,private :: InsideEps => TCylinder_Inside
     procedure :: Closest => TCylinder_Closest
     procedure :: ClosestOut => TCylinder_ClosestOut
-  end type TCylinder
+  end type
 
 
   type TTerrainPoint
     real(knd) :: elev = 0
     logical :: rough = .false.
     real(knd) z0
-  end type TTerrainPoint
+  end type
 
 
   type,extends(TGeometricShape) :: TTerrain
     type(TTerrainPoint),dimension(:,:),allocatable :: UPoints,VPoints,PrPoints !allocate with a buffer of width 1 (i.e. 0:Xnx)
   contains
     procedure,private :: InsideEps => TTerrain_Inside
+    procedure,private,nopass,non_overridable :: GridCoords => TTerrain_GridCoords
     procedure :: Closest => TTerrain_Closest
-    procedure :: ClosestOut => TTerrain_ClosestOut
-  end type TTerrain
+  end type
    
   interface Closest
     module procedure TLine_Closest
@@ -160,13 +165,91 @@ module GeometricShapes
     module procedure TLine_Init
   end interface
 
+  interface TRay
+    module procedure TRay_Init
+    module procedure TRay_Init_v3
+    module procedure TRay_Init_r3
+  end interface
+
+  interface TPlane
+    module procedure TPlane_Init
+  end interface
+
+  interface TConvexPolyhedron
+    module procedure TConvexPolyhedron_Init
+  end interface
+
+  interface TPolyhedron
+    module procedure TPolyhedron_Init
+  end interface
+
   interface TEllipsoid
     module procedure TEllipsoid_Init
   end interface
 
 contains
 
-  pure logical function in_bbox(self,x,y,z,eps)
+  !defaults
+  
+  logical function TGeometricShape_Inside(self,x,y,z,eps) result(ins)
+    class(TGeometricShape),intent(in) :: self
+    real(knd),intent(in) :: x,y,z
+    real(knd),optional,intent(in) ::eps
+    
+    if (present(eps)) then
+      ins = self%InsideEps(x,y,z,eps)
+    else
+      ins = self%InsideEps(x,y,z,epsilon(1._knd))
+    end if
+    
+  end function
+  
+  subroutine TGeometricShape_ClosestOut(self,xnear,ynear,znear,x,y,z)
+    class(TGeometricShape),intent(in) :: self
+    real(knd),intent(out)  :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
+    
+    call self%Closest(xnear,ynear,znear,x,y,z)
+  end subroutine  
+    
+  logical function TGeometricShape_IntersectsRay(self,ray) result(intersects)
+    class(TGeometricShape),intent(in) :: self
+    class(TRay),intent(in) :: ray
+    
+    !shapes will be transparent for (solar) rays if they do not override this method.
+    intersects = .false.
+ 
+  end function
+  
+
+  
+  
+  !helpers
+  
+  real(knd) function PointDist(x1,y1,z1,x2,y2,z2)
+    real(knd),intent(in) :: x1,y1,z1,x2,y2,z2
+
+    PointDist = sqrt((x1-x2)**2+(y1-y2)**2+(z1-z2)**2)
+  end function
+  
+   real(knd) function LineDist(x,y,z,xl,yl,zl,a,b,c)
+    real(knd),intent(in) :: x,y,z,xl,yl,zl,a,b,c
+    real(knd) t
+
+    if (((a/=0).or.(b/=0)).or.(c/=0)) then
+     t = (a*(x-xl)+b*(y-yl)+c*(z-zl))/(a**2+b**2+c**2)
+    else
+     t = 0
+    endif
+
+    LineDist = sqrt((xl+a*t-x)**2+(yl+b*t-y)**2+(zl+c*t-z)**2)
+  end function LineDist
+ 
+  
+  
+
+  
+  logical function in_bbox(self,x,y,z,eps)
     class(TGeometricShape),intent(in) :: self
     real(knd),intent(in) :: x,y,z,eps
     
@@ -180,27 +263,35 @@ contains
     end associate
   end function
   
- pure logical function TGeometricShape_Inside(self,x,y,z,eps) result(ins)
-    class(TGeometricShape),intent(in) :: self
-    real(knd),intent(in) :: x,y,z
-    real(knd),optional,intent(in) ::eps
-    
-    if (present(eps)) then
-      ins = self%InsideEps(x,y,z,eps)
-    else
-      ins = self%InsideEps(x,y,z,epsilon(1._knd))
-    end if
-    
-  end function
+  
   
 
-  real(knd) function PointDist(x1,y1,z1,x2,y2,z2)
-    real(knd),intent(in) :: x1,y1,z1,x2,y2,z2
-
-    PointDist = sqrt((x1-x2)**2+(y1-y2)**2+(z1-z2)**2)
-  end function PointDist
+  
+  
 
 
+
+  function TLine_Init(xc,yc,zc,a,b,c) result(res)
+    type(TLine) :: res
+    real(knd),intent(in) :: xc, yc, zc, a, b, c
+    
+    res%xc = xc
+    res%yc = yc
+    res%zc = zc
+    res%a  = a
+    res%b  = b
+    res%c  = c
+
+  end function
+  
+  logical function TLine_Inside(self,x,y,z,eps) result(ins)
+    class(TLine),intent(in) :: self
+    real(knd),intent(in) :: x,y,z
+    real(knd),intent(in) ::eps
+
+    ins = .false.
+  end function
+  
 
   subroutine TLine_Closest(self,xnear,ynear,znear,x,y,z)
     class(TLine),intent(in) :: self
@@ -217,19 +308,107 @@ contains
     xnear = self%xc + self%a * t
     ynear = self%yc + self%b * t
     znear = self%zc + self%c * t
-  end subroutine TLine_Closest
+  end subroutine
 
 
   
-  pure logical function TLine_Inside(self,x,y,z,eps) result(ins)
-    class(TLine),intent(in) :: self
+  
+  
+  
+  
+  
+  
+  function TRay_Init(xc,yc,zc,a,b,c) result(res)
+    type(TRay) :: res
+    real(knd),intent(in) :: xc, yc, zc, a, b, c
+    
+    res%xc = xc
+    res%yc = yc
+    res%zc = zc
+    res%a  = a
+    res%b  = b
+    res%c  = c
+
+  end function
+  
+  function TRay_Init_v3(c,v) result(res)
+    type(TRay) :: res
+    real(knd),intent(in) :: c(3),v(3)
+    
+    res%xc = c(1)
+    res%yc = c(2)
+    res%zc = c(3)
+    res%a  = v(1)
+    res%b  = v(2)
+    res%c  = v(3)
+
+  end function
+  
+  function TRay_Init_r3(c,v) result(res)
+    type(TRay) :: res
+    type(r3),intent(in) :: c,v
+    
+    res%xc = c%x
+    res%yc = c%y
+    res%zc = c%z
+    res%a  = v%x
+    res%b  = v%y
+    res%c  = v%z
+
+  end function
+  
+  
+  logical function TRay_Inside(self,x,y,z,eps) result(ins)
+    class(TRay),intent(in) :: self
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in) ::eps
 
     ins = .false.
-  end function TLine_Inside
+  end function
   
-  pure logical function TPlane_Inside(self,x,y,z,eps) result(ins)
+  
+  subroutine TRay_Closest(self,xnear,ynear,znear,x,y,z)
+    class(TRay),intent(in) :: self
+    real(knd),intent(out)  :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
+    real(knd) t
+
+    if (self%a/=0 .or. self%b/=0 .or. self%c/=0) then
+      t = ( self%a*(x-self%xc) + self%b*(y-self%yc) + self%c*(z-self%zc) ) / (self%a**2 + self%b**2 + self%c**2)
+    else
+      t = 0
+    endif
+
+    xnear = self%xc + self%a * max(t,0._knd)
+    ynear = self%yc + self%b * max(t,0._knd)
+    znear = self%zc + self%c * max(t,0._knd)
+  end subroutine
+
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  function TPlane_Init(xc,yc,zc,a,b,c) result(res)
+    !Point and an outward normal
+    type(TPlane) :: res
+    real(knd),intent(in) :: xc, yc, zc, a, b, c
+    
+    res%a  = a
+    res%b  = b
+    res%c  = c
+    res%gl = .false.
+    res%d = - (a*xc + b*yc + c*zc)
+
+  end function
+  
+  logical function TPlane_Inside(self,x,y,z,eps) result(ins)
     class(TPlane),intent(in) :: self
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in) ::eps
@@ -247,252 +426,7 @@ contains
        ins = .false.
       endif
     endif
-  end function TPlane_Inside
-
-
-
-  pure logical function TPolyhedron_Inside(self,x,y,z,eps) result(ins)
-    class(TPolyhedron),intent(in) :: self
-    real(knd),intent(in) :: x,y,z
-    real(knd),intent(in) :: eps
-    integer i
-
-    if (self%nplanes>0) then
-      ins = .true.
-      do i = 1,self%nplanes
-
-       ins = self%Planes(i)%Inside(x,y,z,eps)
-
-       if (.not. ins) exit
-      enddo
-    else
-      ins = .false.
-    endif
-  end function TPolyhedron_Inside
-
-  
-  pure logical function TCGALPolyhedron_Inside(self,x,y,z,eps) result(ins)
-    class(TCGALPolyhedron),intent(in) :: self
-    real(knd),intent(in) :: x,y,z
-    real(knd),intent(in) :: eps
-    
-    !it is probably better to use one fixed reference point, 
-    !because test segment aligned with probable walls could cause problems
-    if (self%in_bbox(x,y,z,eps)) then
-      ins = &
-           cgal_polyhedron_inside(self%cgalptr, &
-                                  x,y,z, &
-                                  self%ref%x,self%ref%y,self%ref%z)
-      if (eps>0) then                            
-        if (.not.ins) ins = &
-             cgal_polyhedron_inside(self%cgalptr, &
-                                    x-eps,y,z, &
-                                    self%ref%x,self%ref%y,self%ref%z)
-        if (.not.ins) ins = &
-             cgal_polyhedron_inside(self%cgalptr, &
-                                    x+eps,y,z, &
-                                    self%ref%x,self%ref%y,self%ref%z)
-        if (.not.ins) ins = &
-             cgal_polyhedron_inside(self%cgalptr, &
-                                    x,y-eps,z, &
-                                    self%ref%x,self%ref%y,self%ref%z)
-        if (.not.ins) ins = &
-             cgal_polyhedron_inside(self%cgalptr, &
-                                    x,y-eps,z, &
-                                    self%ref%x,self%ref%y,self%ref%z)
-        if (.not.ins) ins = &
-             cgal_polyhedron_inside(self%cgalptr, &
-                                    x,y,z-eps, &
-                                    self%ref%x,self%ref%y,self%ref%z)
-        if (.not.ins) ins = &
-             cgal_polyhedron_inside(self%cgalptr, &
-                                    x,y,z+eps, &
-                                    self%ref%x,self%ref%y,self%ref%z)
-      end if
-    else
-      ins = .false.
-    end if
-  
-  end function TCGALPolyhedron_Inside
-
-
-
-  pure logical function TSphere_Inside(self,x,y,z,eps) result(ins)
-    class(TSphere),intent(in) :: self
-    real(knd),intent(in) :: x,y,z
-    real(knd),intent(in) :: eps
-
-    if ((self%xc-x)**2+(self%yc-y)**2+(self%zc-z)**2<=(self%r+eps)**2) then
-     ins = .true.
-    else
-     ins = .false.
-    endif
-
-  end function TSphere_Inside
-
-
-
-  pure logical function TEllipsoid_Inside(self,x,y,z,eps) result(ins)
-    class(TEllipsoid),intent(in) :: self
-    real(knd),intent(in) :: x,y,z
-    real(knd),intent(in) :: eps
-    
-    if (self%in_bbox(x,y,z,eps)) then
-      ins =  ((self%xc-x)**2/(self%a)**2 + &
-            (self%yc-y)**2/(self%b)**2 + &
-            (self%zc-z)**2/(self%c)**2 <= 1._knd+sqrt(eps))
-    else
-        ins = .false.
-    end if
-  end function TEllipsoid_Inside
-
-
-
-  pure real(knd) function LineDist(x,y,z,xl,yl,zl,a,b,c)
-    real(knd),intent(in) :: x,y,z,xl,yl,zl,a,b,c
-    real(knd) t
-
-    if (((a/=0).or.(b/=0)).or.(c/=0)) then
-     t = (a*(x-xl)+b*(y-yl)+c*(z-zl))/(a**2+b**2+c**2)
-    else
-     t = 0
-    endif
-
-    LineDist = sqrt((xl+a*t-x)**2+(yl+b*t-y)**2+(zl+c*t-z)**2)
-  end function LineDist
-
-
-
-  pure logical function TCylJacket_Inside(self,x,y,z,eps) result(ins)
-    class(TCylJacket),intent(in) :: self
-    real(knd),intent(in) :: x,y,z
-    real(knd),intent(in) :: eps
-
-    if (LineDist(x,y,z,self%xc,self%yc,self%zc,self%a,self%b,self%c)<=self%r+eps) then
-     ins = .true.
-    else
-     ins = .false.
-    endif
-  end function TCylJacket_Inside
-
-
-
-  pure logical function TCylinder_Inside(self,x,y,z,eps) result(ins)
-    class(TCylinder),intent(in) :: self
-    real(knd),intent(in) :: x,y,z
-    real(knd),intent(in) :: eps
-
-    ins = .true.
-
-    if (.not.self%Jacket%Inside(x,y,z,eps)) ins = .false.
-
-    if (ins.and.allocated(self%Plane1)) then
-           if (.not.self%Plane1%Inside(x,y,z,eps)) ins = .false.
-    endif
-    if (ins.and.allocated(self%Plane2)) then
-          if (.not.self%Plane2%Inside(x,y,z,eps)) ins = .false.
-    endif
-  end function TCylinder_Inside
-
-
-
-  pure subroutine TTerrain_GridCoords(x2,y2,xi,yj,comp)
-    real(knd),intent(in) :: x2,y2
-    integer,intent(out) :: xi,yj,comp
-    real(knd) x,y,distPr,distU,distV
-    integer xPri,yPrj,xUi,yVj,i
-
-    x = x2
-    y = y2
-
-    if (gridtype==uniformgrid) then
-
-        xPri = min(max(nint( (x - xU(0))/dxmin + 0.5_knd ),1),Prnx+1)
-
-        yPrj = min(max(nint( (y - yV(0))/dymin + 0.5_knd ),1),Prny+1)
-
-        xUi = min(max(nint( (x-xU(0))/dxmin ),0), Unx+1)
-
-        yVj = min(max(nint( (y-yV(0))/dymin ),0), Vny+1)
-    else
-
-
-        xPri = Prnx+1
-        do i=0,Prnx+1
-         if (xU(i)>=x) then
-                       xPri = i
-                       exit
-                      endif
-        enddo
-
-        yPrj = Prny+1
-        do i=0,Prny+1
-         if (yV(i)>=y) then
-                       yPrj = i
-                       exit
-                      endif
-        enddo
-
-        xUi = Prnx+1
-        do i = 0,Prnx+1
-         if (xPr(i+1)>=x) then
-                       xUi = i
-                       exit
-                      endif
-        enddo
-
-        yVj = Prny+1
-        do i = 0,Prny+1
-         if (yPr(i+1)>=y) then
-                       yVj = i
-                       exit
-                      endif
-        enddo
-
-    endif
-
-    distPr = (x-xPr(xPri))**2+(y-yPr(yPrj))**2
-    distU = (x-xU(xUi))**2+(y-yPr(yPrj))**2
-    distV = (x-xPr(xPri))**2+(y-yV(yVj))**2
-
-    if (distU<distPr.and.distU<distV) then
-     xi = xUi
-     yj = yPrj
-     comp = 1
-    elseif (distV<distPr.and.distV<distU) then
-     xi = xPri
-     yj = yVj
-     comp = 2
-    else
-     xi = xPri
-     yj = yPrj
-     comp = 3
-    endif
-  end subroutine TTerrain_GridCoords
-
-
-
-  pure logical function TTerrain_Inside(self,x,y,z,eps)
-    class(TTerrain),intent(in) :: self
-    real(knd),intent(in) :: x,y,z
-    real(knd),intent(in) :: eps
-    logical ins
-    integer xi,yj,comp
-
-    ins = .false.
-    call TTerrain_GridCoords(x,y,xi,yj,comp)
-
-    if (comp==1) then
-     if (z<=self%UPoints(xi,yj)%elev+eps) ins = .true.
-    elseif (comp==2) then
-     if (z<=self%VPoints(xi,yj)%elev+eps) ins = .true.
-    elseif (comp==3) then
-     if (z<=self%PrPoints(xi,yj)%elev+eps) ins = .true.
-    endif
-
-    TTerrain_Inside = ins
-  end function TTerrain_Inside
-
+  end function
 
   subroutine TPlane_Closest(self,xnear,ynear,znear,x,y,z)
     class(TPlane),intent(in) :: self
@@ -512,117 +446,45 @@ contains
 
 
 
-  subroutine TCylJacket_Closest(self,xnear,ynear,znear,x,y,z)
-    class(TCylJacket),intent(in) :: self
-    real(knd),intent(out) :: xnear,ynear,znear
+  
+  
+  
+  
+  
+  
+  
+  function TConvexPolyhedron_Init(Planes) result(res)
+    !Point and an outward normal
+    type(TConvexPolyhedron) :: res
+    type(TPlane),intent(in) :: Planes(:)
+    !limitation of gfortran 4.8 http://gcc.gnu.org/bugzilla/show_bug.cgi?id=44672
+    allocate(res%Planes(size(Planes)), source=Planes)
+    res%nplanes = size(Planes)
+
+  end function
+  
+  logical function TConvexPolyhedron_Inside(self,x,y,z,eps) result(ins)
+    class(TConvexPolyhedron),intent(in) :: self
     real(knd),intent(in) :: x,y,z
-    real(knd) t,xl,yl,zl,a,b,c
+    real(knd),intent(in) :: eps
+    integer i
 
-    call Closest(TLine(self%xc,self%yc,self%zc,self%a,self%b,self%c),xl,yl,zl,x,y,z)
+    if (self%nplanes>0) then
+      ins = .true.
+      do i = 1,self%nplanes
 
-    a = x-xl
-    b = y-yl
-    c = z-zl
-    t = self%r/sqrt(a**2+b**2+c**2)
+       ins = self%Planes(i)%Inside(x,y,z,eps)
 
-    xnear = a*t+xl
-    ynear = b*t+yl
-    znear = c*t+zl
-  end subroutine TCylJacket_Closest
-
-
-
-  subroutine TCylinder_Closest(self,xnear,ynear,znear,x,y,z) !only for planes perpendicular to the axis
-   class(TCylinder),intent(in) :: self
-   real(knd),intent(out) :: xnear,ynear,znear
-   real(knd),intent(in) :: x,y,z
-   real(knd) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
-
-   !!!Only for Planes perpendicular to jacket!!!!
-
-   if (allocated(self%Plane1)) then
-       if (allocated(self%Plane2)) then
-          call self%Jacket%Closest(xJ,yJ,zJ,x,y,z)
-          call self%Plane1%Closest(xP1,yP1,zP1,x,y,z)
-          call self%Plane2%Closest(xP2,yP2,zP2,x,y,z)
-          if (self%Jacket%Inside(x,y,z)) then
-             if (PointDist(x,y,z,xP1,yP1,zP1)<=PointDist(x,y,z,xP2,yP2,zP2)) then
-                xnear = xP1
-                ynear = yP1
-                znear = zP1
-             else
-                xnear = xP2
-                ynear = yP2
-                znear = zP2
-             endif
-          elseif (self%Plane1%Inside(x,y,z).and.self%Plane2%Inside(x,y,z)) then
-                xnear = xJ
-                ynear = yJ
-                znear = zJ
-          elseif (PointDist(x,y,z,xP1,yP1,zP1)<=PointDist(x,y,z,xP2,yP2,zP2)) then
-           call self%Jacket%Closest(xnear,ynear,znear,xP1,yP1,zP1)
-          else
-           call self%Jacket%Closest(xnear,ynear,znear,xP2,yP2,zP2)
-          endif
-       else
-          call self%Jacket%Closest(xJ,yJ,zJ,x,y,z)
-          call self%Plane1%Closest(xP1,yP1,zP1,x,y,z)
-          if (self%Jacket%Inside(x,y,z)) then
-                xnear = xP1
-                ynear = yP1
-                znear = zP1
-          elseif (self%Plane1%Inside(x,y,z)) then
-                xnear = xJ
-                ynear = yJ
-                znear = zJ
-          else
-           call self%Jacket%Closest(xnear,ynear,znear,xP1,yP1,zP1)
-         endif
-       endif
-
+       if (.not. ins) exit
+      enddo
     else
-
-      call self%Jacket%Closest(xnear,ynear,znear,x,y,z)
-
+      ins = .false.
     endif
-  end subroutine TCylinder_Closest
-
-  subroutine TSphere_Closest(self,xnear,ynear,znear,x,y,z)
-    class(TSphere),intent(in) :: self
-    real(knd),intent(out) :: xnear,ynear,znear
-    real(knd),intent(in) :: x,y,z
-    real(knd) t,a,b,c
-
-    a = x-self%xc
-    b = y-self%yc
-    c = z-self%zc
-    t = self%r/sqrt(a**2+b**2+c**2)
-    xnear = a*t+self%xc
-    ynear = b*t+self%yc
-    znear = c*t+self%zc
-  end subroutine TSphere_Closest
-
-
-  subroutine TEllipsoid_Closest(self,xnear,ynear,znear,x,y,z)
-    class(TEllipsoid),intent(in) :: self
-    real(knd),intent(out) :: xnear,ynear,znear
-    real(knd),intent(in) :: x,y,z
-    real(knd) t,a,b,c
-
-    stop "Error, closest point on an ellipsoid not implemented!"
-    a = (x-self%xc)/self%a
-    b = (y-self%yc)/self%b
-    c = (z-self%zc)/self%c
-    t = 1._knd/sqrt(a**2+b**2+c**2)
-    xnear = self%a*a*t+self%xc
-    ynear = self%b*b*t+self%yc
-    znear = self%c*c*t+self%zc
-  end subroutine TEllipsoid_Closest
-
-
-  subroutine TPolyhedron_Closest(self,xnear,ynear,znear,x,y,z)
+  end function
+  
+  subroutine TConvexPolyhedron_Closest(self,xnear,ynear,znear,x,y,z)
     use Lapack
-    class(TPolyhedron),intent(in) :: self
+    class(TConvexPolyhedron),intent(in) :: self
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
 
@@ -803,12 +665,129 @@ contains
     ynear = xg(2)
     znear = xg(3)
 
-  end subroutine TPolyhedron_Closest
+  end subroutine TConvexPolyhedron_Closest
+
+  subroutine TConvexPolyhedron_ClosestOut(self,xnear,ynear,znear,x,y,z)
+    class(TConvexPolyhedron),intent(in) :: self
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
+    real(knd) dists(self%nplanes),xP(self%nplanes),yP(self%nplanes),zP(self%nplanes),minv
+    integer inearest,i
+
+    dists = huge(minv)
+    do i = 1,self%nplanes
+     call self%Planes(i)%Closest(xP(i),yP(i),zP(i),x,y,z)
+     dists(i) = sqrt((x-xP(i))**2+(y-yP(i))**2+(z-zp(i))**2)
+    enddo
+
+    inearest = 0
+    minv = huge(minv)
+    do i = 1,self%nplanes
+     if (dists(i)>=0.and.dists(i)<minv) then
+       inearest = i
+       minv = dists(i)
+     endif
+    enddo
+
+    xnear = xP(inearest)
+    ynear = yP(inearest)
+    znear = zP(inearest)
+  end subroutine
+
 
   
   
-  subroutine TCGALPolyhedron_Closest(self,xnear,ynear,znear,x,y,z)
-    class(TCGALPolyhedron),intent(in) :: self
+  
+  
+  
+  
+  
+  function TPolyhedron_Init(filename) result (res)
+    type(TPolyhedron) :: res
+    character(*) :: filename
+    
+    call res%ReadOff(filename)
+    call res%InitBbox
+  end function
+  
+  
+  subroutine TPolyhedron_ReadOff(self,filename)
+    !reads geometry from an .off file
+    use iso_c_binding, only: c_ptr,c_associated
+    class(TPolyhedron),intent(out) :: self
+    character(*),intent(in) :: filename
+
+    call cgal_polyhedron_read(self%cgalptr, filename)
+    
+    if (.not.c_associated(self%cgalptr)) then
+      write(*,*) "Error reading polyhedron from ",filename
+      stop
+    end if
+  end subroutine
+  
+  subroutine TPolyhedron_InitBbox(self)
+    class(TPolyhedron),intent(inout) :: self
+
+    associate(b=>self%bbox)
+      call cgal_polyhedron_bbox(self%cgalptr, b%xmin, b%ymin, b%zmin, b%xmax, b%ymax, b%zmax)
+
+      b%xmin=max(b%xmin,xU(-2))
+      b%ymin=max(b%ymin,yV(-2))
+      b%zmin=max(b%zmin,zW(-2))
+      b%xmax=min(b%xmax,xU(Prnx+2))
+      b%ymax=min(b%ymax,yV(Prny+2))
+      b%zmax=min(b%zmax,zW(Prnz+2))
+      
+      self%ref = r3((b%xmin+b%xmax)/2, (b%ymin+b%ymax)/2, b%zmax + (b%zmax-b%zmin))
+    end associate
+  end subroutine
+  
+  logical function TPolyhedron_Inside(self,x,y,z,eps) result(ins)
+    class(TPolyhedron),intent(in) :: self
+    real(knd),intent(in) :: x,y,z
+    real(knd),intent(in) :: eps
+    
+    !it is probably better to use one fixed reference point, 
+    !because test segment aligned with probable walls could cause problems
+    if (self%in_bbox(x,y,z,eps)) then
+      ins = &
+           cgal_polyhedron_inside(self%cgalptr, &
+                                  x,y,z, &
+                                  self%ref%x,self%ref%y,self%ref%z)
+      if (eps>0) then                            
+        if (.not.ins) ins = &
+             cgal_polyhedron_inside(self%cgalptr, &
+                                    x-eps,y,z, &
+                                    self%ref%x,self%ref%y,self%ref%z)
+        if (.not.ins) ins = &
+             cgal_polyhedron_inside(self%cgalptr, &
+                                    x+eps,y,z, &
+                                    self%ref%x,self%ref%y,self%ref%z)
+        if (.not.ins) ins = &
+             cgal_polyhedron_inside(self%cgalptr, &
+                                    x,y-eps,z, &
+                                    self%ref%x,self%ref%y,self%ref%z)
+        if (.not.ins) ins = &
+             cgal_polyhedron_inside(self%cgalptr, &
+                                    x,y-eps,z, &
+                                    self%ref%x,self%ref%y,self%ref%z)
+        if (.not.ins) ins = &
+             cgal_polyhedron_inside(self%cgalptr, &
+                                    x,y,z-eps, &
+                                    self%ref%x,self%ref%y,self%ref%z)
+        if (.not.ins) ins = &
+             cgal_polyhedron_inside(self%cgalptr, &
+                                    x,y,z+eps, &
+                                    self%ref%x,self%ref%y,self%ref%z)
+      end if
+    else
+      ins = .false.
+    end if
+  
+  end function TPolyhedron_Inside
+
+  subroutine TPolyhedron_Closest(self,xnear,ynear,znear,x,y,z)
+    class(TPolyhedron),intent(in) :: self
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
 
@@ -816,10 +795,414 @@ contains
                                  x,y,z, &
                                  xnear, ynear, znear)
   
-  end subroutine TCGALPolyhedron_Closest
+  end subroutine
+  
+  logical function TPolyhedron_IntersectsRay(self,ray) result(intersects)
+    class(TPolyhedron),intent(in) :: self
+    class(TRay),intent(in) :: ray
+
+      intersects = &
+           cgal_polyhedron_intersects_ray(self%cgalptr, &
+                                          ray%xc, ray%yc, ray%zc, &
+                                          ray%a,  ray%b,  ray%c )
+ 
+  end function
+
+
+
   
   
   
+  
+  
+  
+  
+  
+  
+  
+
+  logical function TSphere_Inside(self,x,y,z,eps) result(ins)
+    class(TSphere),intent(in) :: self
+    real(knd),intent(in) :: x,y,z
+    real(knd),intent(in) :: eps
+
+    if ((self%xc-x)**2+(self%yc-y)**2+(self%zc-z)**2<=(self%r+eps)**2) then
+     ins = .true.
+    else
+     ins = .false.
+    endif
+
+  end function
+
+  subroutine TSphere_Closest(self,xnear,ynear,znear,x,y,z)
+    class(TSphere),intent(in) :: self
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
+    real(knd) t,a,b,c
+
+    a = x - self%xc
+    b = y - self%yc
+    c = z - self%zc
+    t = self%r / sqrt(a**2+b**2+c**2)
+    xnear = a*t + self%xc
+    ynear = b*t + self%yc
+    znear = c*t + self%zc
+  end subroutine
+  
+  logical function TSphere_IntersectsRay(self,ray) result(res)
+     class(TSphere),intent(in) :: self
+     class(TRay),intent(in) :: ray
+     real(knd) rc(3),rv(3) !transformed ray center and vector
+     real(knd) a,b,c,D,t1,t2
+     
+     rc = [ray%xc - self%xc, ray%yc - self%yc, ray%zc - self%zc]
+     rv = [ray%a, ray%b, ray%c]
+     
+     a = dot_product(rv,rv)
+     b = 2 * dot_product(rc,rv)
+     c = dot_product(rc,rc) - self%r**2
+     
+     D = b**2 - 4*a*c
+     
+     if (D<0) then
+       res = .false.
+     else
+       t1 = (-b - sqrt(D)) / (2*a)
+       t2 = (-b + sqrt(D)) / (2*a)
+       res = (t1>=0 .or. t2>=0)
+     end if
+  end function
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+  function TEllipsoid_Init(xc,yc,zc,a,b,c,rough,z0) result(res)
+    type(TEllipsoid) :: res
+    real(knd),intent(in) :: xc, yc, zc, a, b, c
+    logical,intent(in),optional :: rough
+    real(knd),intent(in),optional :: z0
+    
+    res%xc = xc
+    res%yc = yc
+    res%zc = zc
+    res%a  = a
+    res%b  = b
+    res%c  = c
+    if (present(rough)) res%rough = rough
+    if (present(z0)) res%z0 = z0
+    
+    res%bbox%xmin = xc - a
+    res%bbox%xmax = xc + a
+    res%bbox%ymin = yc - b
+    res%bbox%ymax = yc + b
+    res%bbox%zmin = zc - c
+    res%bbox%zmax = zc + c    
+
+  end function
+  
+  logical function TEllipsoid_Inside(self,x,y,z,eps) result(ins)
+    class(TEllipsoid),intent(in) :: self
+    real(knd),intent(in) :: x,y,z
+    real(knd),intent(in) :: eps
+    
+    if (self%in_bbox(x,y,z,eps)) then
+      ins =  ((self%xc-x)**2/(self%a)**2 + &
+            (self%yc-y)**2/(self%b)**2 + &
+            (self%zc-z)**2/(self%c)**2 <= 1._knd+sqrt(eps))
+    else
+        ins = .false.
+    end if
+  end function
+
+  subroutine TEllipsoid_Closest(self,xnear,ynear,znear,x,y,z)
+    class(TEllipsoid),intent(in) :: self
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
+    real(knd) t,a,b,c !auxiliary ray parameters
+
+    ! NOT EXACT!
+    a = (x - self%xc)/self%a
+    b = (y - self%yc)/self%b
+    c = (z - self%zc)/self%c
+    t = 1._knd / sqrt(a**2+b**2+c**2)
+    xnear = self%a * a*t + self%xc
+    ynear = self%b * b*t + self%yc
+    znear = self%c * c*t + self%zc
+  end subroutine
+  
+  logical function TEllipsoid_IntersectsRay(self,ray) result(res)
+     class(TEllipsoid),intent(in) :: self
+     class(TRay),intent(in) :: ray
+     type(TRay) :: ray2
+     type(TSphere),parameter :: unit_sphere = TSphere(xc = 0._knd, yc = 0._knd, zc = 0._knd, r = 1._knd)
+     
+     ray2 = TRay((ray%xc - self%xc)/self%a, (ray%yc - self%yc)/self%b, (ray%zc - self%zc)/self%c, &
+                  ray%a/self%a, ray%b/self%b, ray%c/self%c )
+     
+     res = unit_sphere%IntersectsRay(ray2)
+
+  end function
+  
+
+
+
+
+
+
+  logical function TCylJacket_Inside(self,x,y,z,eps) result(ins)
+    class(TCylJacket),intent(in) :: self
+    real(knd),intent(in) :: x,y,z
+    real(knd),intent(in) :: eps
+
+    if (LineDist(x,y,z,self%xc,self%yc,self%zc,self%a,self%b,self%c)<=self%r+eps) then
+     ins = .true.
+    else
+     ins = .false.
+    endif
+  end function
+
+  subroutine TCylJacket_Closest(self,xnear,ynear,znear,x,y,z)
+    class(TCylJacket),intent(in) :: self
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
+    real(knd) t,xl,yl,zl,a,b,c
+
+    call Closest(TLine(self%xc,self%yc,self%zc,self%a,self%b,self%c),xl,yl,zl,x,y,z)
+
+    a = x-xl
+    b = y-yl
+    c = z-zl
+    t = self%r/sqrt(a**2+b**2+c**2)
+
+    xnear = a*t+xl
+    ynear = b*t+yl
+    znear = c*t+zl
+  end subroutine
+
+  
+  
+  
+  
+  logical function TCylinder_Inside(self,x,y,z,eps) result(ins)
+    class(TCylinder),intent(in) :: self
+    real(knd),intent(in) :: x,y,z
+    real(knd),intent(in) :: eps
+
+    ins = .true.
+
+    if (.not.self%Jacket%Inside(x,y,z,eps)) ins = .false.
+
+    if (ins.and.allocated(self%Plane1)) then
+           if (.not.self%Plane1%Inside(x,y,z,eps)) ins = .false.
+    endif
+    if (ins.and.allocated(self%Plane2)) then
+          if (.not.self%Plane2%Inside(x,y,z,eps)) ins = .false.
+    endif
+  end function
+
+  subroutine TCylinder_Closest(self,xnear,ynear,znear,x,y,z) !only for planes perpendicular to the axis
+   class(TCylinder),intent(in) :: self
+   real(knd),intent(out) :: xnear,ynear,znear
+   real(knd),intent(in) :: x,y,z
+   real(knd) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
+
+   !!!Only for Planes perpendicular to jacket!!!!
+
+   if (allocated(self%Plane1)) then
+       if (allocated(self%Plane2)) then
+          call self%Jacket%Closest(xJ,yJ,zJ,x,y,z)
+          call self%Plane1%Closest(xP1,yP1,zP1,x,y,z)
+          call self%Plane2%Closest(xP2,yP2,zP2,x,y,z)
+          if (self%Jacket%Inside(x,y,z)) then
+             if (PointDist(x,y,z,xP1,yP1,zP1)<=PointDist(x,y,z,xP2,yP2,zP2)) then
+                xnear = xP1
+                ynear = yP1
+                znear = zP1
+             else
+                xnear = xP2
+                ynear = yP2
+                znear = zP2
+             endif
+          elseif (self%Plane1%Inside(x,y,z).and.self%Plane2%Inside(x,y,z)) then
+                xnear = xJ
+                ynear = yJ
+                znear = zJ
+          elseif (PointDist(x,y,z,xP1,yP1,zP1)<=PointDist(x,y,z,xP2,yP2,zP2)) then
+           call self%Jacket%Closest(xnear,ynear,znear,xP1,yP1,zP1)
+          else
+           call self%Jacket%Closest(xnear,ynear,znear,xP2,yP2,zP2)
+          endif
+       else
+          call self%Jacket%Closest(xJ,yJ,zJ,x,y,z)
+          call self%Plane1%Closest(xP1,yP1,zP1,x,y,z)
+          if (self%Jacket%Inside(x,y,z)) then
+                xnear = xP1
+                ynear = yP1
+                znear = zP1
+          elseif (self%Plane1%Inside(x,y,z)) then
+                xnear = xJ
+                ynear = yJ
+                znear = zJ
+          else
+           call self%Jacket%Closest(xnear,ynear,znear,xP1,yP1,zP1)
+         endif
+       endif
+
+    else
+
+      call self%Jacket%Closest(xnear,ynear,znear,x,y,z)
+
+    endif
+  end subroutine TCylinder_Closest
+
+  subroutine TCylinder_ClosestOut(self,xnear,ynear,znear,x,y,z) !only for planes perpendicular to the axis
+    class(TCylinder),intent(in) :: self
+    real(knd),intent(out) :: xnear,ynear,znear
+    real(knd),intent(in) :: x,y,z
+    real(knd) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
+
+    if (allocated(self%Plane1)) then
+      call self%Plane1%Closest(xP1,yP1,zP1,x,y,z)
+    else
+     xP1 = sqrt(huge(xP1))/10
+     yP1 = sqrt(huge(yP1))/10
+     zP1 = sqrt(huge(zP1))/10
+    endif
+    if (allocated(self%Plane2)) then
+      call self%Plane2%Closest(xP2,yP2,zP2,x,y,z)
+    else
+     xP2 = sqrt(huge(xP2))/10
+     yP2 = sqrt(huge(yP2))/10
+     zP2 = sqrt(huge(zP2))/10
+    endif
+    call self%Jacket%Closest(xJ,yJ,zJ,x,y,z)
+
+    if (PointDist(x,y,z,xP1,yP1,zP1)<=PointDist(x,y,z,xP2,yP2,zP2).and.&
+         PointDist(x,y,z,xP1,yP1,zP1)<=PointDist(x,y,z,xJ,yJ,zJ)) then
+                 xnear = xP1
+                 ynear = yP1
+                 znear = zP1
+    elseif (PointDist(x,y,z,xP2,yP2,zP2)<=PointDist(x,y,z,xP1,yP1,zP1).and.&
+             PointDist(x,y,z,xP2,yP2,zP2)<=PointDist(x,y,z,xJ,yJ,zJ)) then
+                 xnear = xP2
+                 ynear = yP2
+                 znear = zP2
+    elseif (PointDist(x,y,z,xJ,yJ,zJ)<=PointDist(x,y,z,xP2,yP2,zP2).and.&
+             PointDist(x,y,z,xJ,yJ,zJ)<=PointDist(x,y,z,xP1,yP1,zP1)) then
+                 xnear = xJ
+                 ynear = yJ
+                 znear = zJ
+    endif
+  end subroutine TCylinder_ClosestOut
+
+
+  
+  
+  
+  
+  
+  
+  
+  subroutine TTerrain_GridCoords(x2,y2,xi,yj,comp)
+    real(knd),intent(in) :: x2,y2
+    integer,intent(out) :: xi,yj,comp
+    real(knd) x,y,distPr,distU,distV
+    integer xPri,yPrj,xUi,yVj,i
+
+    x = x2
+    y = y2
+
+    if (gridtype==uniformgrid) then
+
+        xPri = min(max(nint( (x - xU(0))/dxmin + 0.5_knd ),1),Prnx+1)
+
+        yPrj = min(max(nint( (y - yV(0))/dymin + 0.5_knd ),1),Prny+1)
+
+        xUi = min(max(nint( (x-xU(0))/dxmin ),0), Unx+1)
+
+        yVj = min(max(nint( (y-yV(0))/dymin ),0), Vny+1)
+    else
+
+
+        xPri = Prnx+1
+        do i=0,Prnx+1
+         if (xU(i)>=x) then
+                       xPri = i
+                       exit
+                      endif
+        enddo
+
+        yPrj = Prny+1
+        do i=0,Prny+1
+         if (yV(i)>=y) then
+                       yPrj = i
+                       exit
+                      endif
+        enddo
+
+        xUi = Prnx+1
+        do i = 0,Prnx+1
+         if (xPr(i+1)>=x) then
+                       xUi = i
+                       exit
+                      endif
+        enddo
+
+        yVj = Prny+1
+        do i = 0,Prny+1
+         if (yPr(i+1)>=y) then
+                       yVj = i
+                       exit
+                      endif
+        enddo
+
+    endif
+
+    distPr = (x-xPr(xPri))**2+(y-yPr(yPrj))**2
+    distU = (x-xU(xUi))**2+(y-yPr(yPrj))**2
+    distV = (x-xPr(xPri))**2+(y-yV(yVj))**2
+
+    if (distU<distPr.and.distU<distV) then
+     xi = xUi
+     yj = yPrj
+     comp = 1
+    elseif (distV<distPr.and.distV<distU) then
+     xi = xPri
+     yj = yVj
+     comp = 2
+    else
+     xi = xPri
+     yj = yPrj
+     comp = 3
+    endif
+  end subroutine TTerrain_GridCoords
+
+  logical function TTerrain_Inside(self,x,y,z,eps)
+    class(TTerrain),intent(in) :: self
+    real(knd),intent(in) :: x,y,z
+    real(knd),intent(in) :: eps
+    logical ins
+    integer xi,yj,comp
+
+    ins = .false.
+    call self%GridCoords(x,y,xi,yj,comp)
+
+    if (comp==1) then
+     if (z<=self%UPoints(xi,yj)%elev+eps) ins = .true.
+    elseif (comp==2) then
+     if (z<=self%VPoints(xi,yj)%elev+eps) ins = .true.
+    elseif (comp==3) then
+     if (z<=self%PrPoints(xi,yj)%elev+eps) ins = .true.
+    endif
+
+    TTerrain_Inside = ins
+  end function
 
   subroutine TTerrain_Closest(self,xnear,ynear,znear,x,y,z)
     class(TTerrain),intent(in) :: self
@@ -880,185 +1263,8 @@ contains
 
 
 
-  subroutine TPolyhedron_ClosestOut(self,xnear,ynear,znear,x,y,z)
-    class(TPolyhedron),intent(in) :: self
-    real(knd),intent(out) :: xnear,ynear,znear
-    real(knd),intent(in) :: x,y,z
-    real(knd) dists(self%nplanes),xP(self%nplanes),yP(self%nplanes),zP(self%nplanes),minv
-    integer inearest,i
-
-    dists = huge(minv)
-    do i = 1,self%nplanes
-     call self%Planes(i)%Closest(xP(i),yP(i),zP(i),x,y,z)
-     dists(i) = sqrt((x-xP(i))**2+(y-yP(i))**2+(z-zp(i))**2)
-    enddo
-
-    inearest = 0
-    minv = huge(minv)
-    do i = 1,self%nplanes
-     if (dists(i)>=0.and.dists(i)<minv) then
-       inearest = i
-       minv = dists(i)
-     endif
-    enddo
-
-    xnear = xP(inearest)
-    ynear = yP(inearest)
-    znear = zP(inearest)
-  end subroutine TPolyhedron_ClosestOut
-
-
-  subroutine TCGALPolyhedron_ClosestOut(self,xnear,ynear,znear,x,y,z)
-    class(TCGALPolyhedron),intent(in) :: self
-    real(knd),intent(out) :: xnear,ynear,znear
-    real(knd),intent(in) :: x,y,z
-
-    call self%Closest(xnear,ynear,znear,x,y,z)
-  
-  end subroutine TCGALPolyhedron_ClosestOut
-
-  
-  subroutine TCylinder_ClosestOut(self,xnear,ynear,znear,x,y,z) !only for planes perpendicular to the axis
-    class(TCylinder),intent(in) :: self
-    real(knd),intent(out) :: xnear,ynear,znear
-    real(knd),intent(in) :: x,y,z
-    real(knd) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
-
-    if (allocated(self%Plane1)) then
-      call self%Plane1%Closest(xP1,yP1,zP1,x,y,z)
-    else
-     xP1 = sqrt(huge(xP1))/10
-     yP1 = sqrt(huge(yP1))/10
-     zP1 = sqrt(huge(zP1))/10
-    endif
-    if (allocated(self%Plane2)) then
-      call self%Plane2%Closest(xP2,yP2,zP2,x,y,z)
-    else
-     xP2 = sqrt(huge(xP2))/10
-     yP2 = sqrt(huge(yP2))/10
-     zP2 = sqrt(huge(zP2))/10
-    endif
-    call self%Jacket%Closest(xJ,yJ,zJ,x,y,z)
-
-    if (PointDist(x,y,z,xP1,yP1,zP1)<=PointDist(x,y,z,xP2,yP2,zP2).and.&
-         PointDist(x,y,z,xP1,yP1,zP1)<=PointDist(x,y,z,xJ,yJ,zJ)) then
-                 xnear = xP1
-                 ynear = yP1
-                 znear = zP1
-    elseif (PointDist(x,y,z,xP2,yP2,zP2)<=PointDist(x,y,z,xP1,yP1,zP1).and.&
-             PointDist(x,y,z,xP2,yP2,zP2)<=PointDist(x,y,z,xJ,yJ,zJ)) then
-                 xnear = xP2
-                 ynear = yP2
-                 znear = zP2
-    elseif (PointDist(x,y,z,xJ,yJ,zJ)<=PointDist(x,y,z,xP2,yP2,zP2).and.&
-             PointDist(x,y,z,xJ,yJ,zJ)<=PointDist(x,y,z,xP1,yP1,zP1)) then
-                 xnear = xJ
-                 ynear = yJ
-                 znear = zJ
-    endif
-  end subroutine TCylinder_ClosestOut
-
-
-
-  subroutine TSphere_ClosestOut(self,xnear,ynear,znear,x,y,z)
-    class(TSphere),intent(in) :: self
-    real(knd),intent(out) :: xnear,ynear,znear
-    real(knd),intent(in) :: x,y,z
-
-    call self%Closest(xnear,ynear,znear,x,y,z)
-  end subroutine TSphere_ClosestOut
-
-
-
-  subroutine TEllipsoid_ClosestOut(self,xnear,ynear,znear,x,y,z)
-    class(TEllipsoid),intent(in) :: self
-    real(knd),intent(out) :: xnear,ynear,znear
-    real(knd),intent(in) :: x,y,z
-
-    call self%Closest(xnear,ynear,znear,x,y,z)
-  end subroutine TEllipsoid_ClosestOut
-
-
-
-  subroutine TTerrain_ClosestOut(self,xnear,ynear,znear,x,y,z)
-    class(TTerrain),intent(in) :: self
-    real(knd),intent(out) :: xnear,ynear,znear
-    real(knd),intent(in) :: x,y,z
-
-    call self%Closest(xnear,ynear,znear,x,y,z)
-  end subroutine TTerrain_ClosestOut
-
-
-  subroutine TCGALPolyhedron_ReadOff(self,filename)
-    !reads geometry from an .off file
-    use iso_c_binding, only: c_ptr,c_associated
-    class(TCGALPolyhedron),intent(out) :: self
-    character(*),intent(in) :: filename
-
-    call cgal_polyhedron_read(self%cgalptr, filename)
-    
-    if (.not.c_associated(self%cgalptr)) then
-      write(*,*) "Error reading polyhedron from ",filename
-      stop
-    end if
-  end subroutine TCGALPolyhedron_ReadOff
-  
-  subroutine TCGALPolyhedron_InitBbox(self)
-    class(TCGALPolyhedron),intent(inout) :: self
-
-    associate(b=>self%bbox)
-      call cgal_polyhedron_bbox(self%cgalptr, b%xmin, b%ymin, b%zmin, b%xmax, b%ymax, b%zmax)
-
-      b%xmin=max(b%xmin,xU(-2))
-      b%ymin=max(b%ymin,yV(-2))
-      b%zmin=max(b%zmin,zW(-2))
-      b%xmax=min(b%xmax,xU(Prnx+2))
-      b%ymax=min(b%ymax,yV(Prny+2))
-      b%zmax=min(b%zmax,zW(Prnz+2))
-      
-      self%ref = r3((b%xmin+b%xmax)/2, (b%ymin+b%ymax)/2, b%zmax + (b%zmax-b%zmin))
-    end associate
-  end subroutine TCGALPolyhedron_InitBbox
   
   
-  
-  
-  function TLine_Init(xc,yc,zc,a,b,c) result(res)
-    type(TLine) :: res
-    real(knd),intent(in) :: xc, yc, zc, a, b, c
-    
-    res%xc = xc
-    res%yc = yc
-    res%zc = zc
-    res%a  = a
-    res%b  = b
-    res%c  = c
-
-  end function
-  
-  function TEllipsoid_Init(xc,yc,zc,a,b,c,rough,z0) result(res)
-    type(TEllipsoid) :: res
-    real(knd),intent(in) :: xc, yc, zc, a, b, c
-    logical,intent(in),optional :: rough
-    real(knd),intent(in),optional :: z0
-    
-    res%xc = xc
-    res%yc = yc
-    res%zc = zc
-    res%a  = a
-    res%b  = b
-    res%c  = c
-    if (present(rough)) res%rough = rough
-    if (present(z0)) res%z0 = z0
-    
-    res%bbox%xmin = xc - a
-    res%bbox%xmax = xc + a
-    res%bbox%ymin = yc - b
-    res%bbox%ymax = yc + b
-    res%bbox%zmin = zc - c
-    res%bbox%zmax = zc + c    
-
-  end function
   
 end module GeometricShapes
 
@@ -1071,7 +1277,7 @@ end module GeometricShapes
 module TBody_class
   use Kinds, only: knd
   use Lists, only: TListable
-  use GeometricShapes, only: TGeometricShape
+  use GeometricShapes, only: TGeometricShape, TRay
   use Parameters
   
   implicit none
@@ -1081,7 +1287,7 @@ module TBody_class
   public TBody,Inside
 
 
-  type, extends(TListable) :: TBody
+  type, extends(TListable),abstract :: TBody
      integer numofbody
      class(TGeometricShape),allocatable :: GeometricShape
   contains
@@ -1089,6 +1295,7 @@ module TBody_class
      procedure :: Closest
      procedure :: ClosestOut
      procedure :: ClosestOnLineOut
+     procedure :: IntersectsRay
   end type
   interface Inside
     module procedure CInside
@@ -1097,7 +1304,7 @@ module TBody_class
 contains
 
 
-   logical function CInside(self,x,y,z,eps)
+  logical function CInside(self,x,y,z,eps)
     class(TBody),intent(in) :: self
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in),optional :: eps
@@ -1182,7 +1389,14 @@ contains
     ClosestOnLineOut = t
   end function ClosestOnLineOut
 
-  
+  logical function IntersectsRay(self,ray) result(intersects)
+    class(TBody),intent(in) :: self
+    class(TRay),intent(in) :: ray
+
+    intersects = self%GeometricShape%IntersectsRay(ray)
+ 
+  end function
+
 end module TBody_class
 
 

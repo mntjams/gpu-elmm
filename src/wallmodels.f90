@@ -42,12 +42,20 @@ implicit none
    real(knd) :: z0 = 0
    real(knd) :: ustar = 1
    real(knd) :: temp = 0
-   real(knd) :: tempfl = 0
+   real(knd) :: temperature_flux = 0
+   real(knd) :: moisture_flux = 0
    real(knd) :: wallu = 0
    real(knd) :: wallv = 0
    real(knd) :: wallw = 0
 
+   real(knd) :: albedo = 0.2 !for shortwave radiation
+   real(knd) :: emmissivity = 0.8 !for longwave radiation
+   
+   real(knd) :: evaporative_fraction = 0
+
    real(knd),allocatable:: depscalar(:)
+
+   integer,allocatable :: bound_IBPs(:)   
 
    type(WMpoint),pointer:: next=>null()
 
@@ -85,7 +93,7 @@ implicit none
     ToWMP%z0     = FromWMP%z0
     ToWMP%ustar  = FromWMP%ustar
     ToWMP%temp   = FromWMP%temp
-    ToWMP%tempfl = FromWMP%tempfl
+    ToWMP%temperature_flux = FromWMP%temperature_flux
 
   end subroutine WMPtoHMPP
 #endif
@@ -105,14 +113,18 @@ implicit none
     ToWMP%z0     = FromWMP%z0
     ToWMP%ustar  = FromWMP%ustar
     ToWMP%temp   = FromWMP%temp
-    ToWMP%tempfl = FromWMP%tempfl
+    ToWMP%temperature_flux = FromWMP%temperature_flux
+    ToWMP%moisture_flux = FromWMP%moisture_flux
     ToWMP%wallu  = FromWMP%wallu
     ToWMP%wallv  = FromWMP%wallv
     ToWMP%wallw  = FromWMP%wallw
 
-    allocate(ToWMP%depscalar(size(FromWMP%depscalar)))
+    allocate(ToWMP%depscalar(size(FromWMP%depscalar)), source=FromWMP%depscalar)
 
-    ToWMP%depscalar = FromWMP%depscalar
+    associate(src => FromWMP%bound_IBPs)
+      if (allocated(FromWMP%bound_IBPs)) allocate(ToWMP%bound_IBPs(size(src)), source=src)
+    end associate
+
 
   end subroutine WMPtoWMP
 
@@ -129,6 +141,8 @@ implicit none
        FirstWMPoint%depscalar = 0
      end if
 
+     if (enable_radiation==1) allocate(FirstWMPoint%bound_IBPs(0))
+
      FirstWMPoint = WMP
      LastWMPoint=>FirstWMPoint
 
@@ -140,6 +154,8 @@ implicit none
        allocate( LastWMPoint%next%depscalar(size(WMP%depscalar)) )
        LastWMPoint%next%depscalar = 0
      end if
+
+     if (enable_radiation==1) allocate(LastWMPoint%next%bound_IBPs(0))
 
      LastWMPoint%next = WMP
      LastWMPoint=>LastWMPoint%next
@@ -336,6 +352,7 @@ implicit none
 
     allocate(WMP%depscalar(nscalars))
     WMP%depscalar = 0
+    WMP%evaporative_fraction = 0.1
 
     if (Btype(We)==NOSLIP) then
       do k = 1,Prnz
@@ -344,7 +361,7 @@ implicit none
            WMP%xi = 1
            WMP%yj = j
            WMP%zk = k
-           WMP%distx = (xPr(1)-xU(0))
+           WMP%distx = xU(0) - xPr(1)
            WMP%disty = 0
            WMP%distz = 0
            WMP%ustar = 1
@@ -363,7 +380,7 @@ implicit none
            WMP%xi = Prnx
            WMP%yj = j
            WMP%zk = k
-           WMP%distx = (xPr(Prnx)-xU(Unx+1))
+           WMP%distx = xU(Unx+1) - xPr(Prnx)
            WMP%disty = 0
            WMP%distz = 0
            WMP%ustar = 1
@@ -383,7 +400,7 @@ implicit none
            WMP%yj = 1
            WMP%zk = k
            WMP%distx = 0
-           WMP%disty = (yPr(1)-yV(0))
+           WMP%disty = yV(0) - yPr(1)
            WMP%distz = 0
            WMP%ustar = 1
 
@@ -408,7 +425,7 @@ implicit none
            WMP%yj = Prny
            WMP%zk = k
            WMP%distx = 0
-           WMP%disty = (yPr(Prny)-yV(Vny+1))
+           WMP%disty = yV(Vny+1) - yPr(Prny)
            WMP%distz = 0
            WMP%ustar = 1
 
@@ -435,7 +452,7 @@ implicit none
            WMP%zk = 1
            WMP%distx = 0
            WMP%disty = 0
-           WMP%distz = (zPr(1)-zW(0))
+           WMP%distz = zW(0) - zPr(1)
            WMP%ustar = 1
 
            if (Btype(Bo)==DIRICHLET) then
@@ -447,7 +464,7 @@ implicit none
            WMP%z0 = z0B
 
            if (TempBtype(Bo)==CONSTFLUX) then
-             WMP%tempfl = sideTemp(Bo)
+             WMP%temperature_flux = sideTemp(Bo)
            else
              WMP%temp = 0
            end if
@@ -473,7 +490,7 @@ implicit none
            WMP%zk = Prnz
            WMP%distx = 0
            WMP%disty = 0
-           WMP%distz = (zPr(Prnz)-zW(Wnz+1))
+           WMP%distz = zW(Wnz+1) - zPr(Prnz)
            WMP%ustar = 1
 
            if (Btype(To)==DIRICHLET) then
@@ -841,21 +858,21 @@ implicit none
   end function PsiH_MO
 
 
-  pure real(knd) function Obukhov_zL(ustar,tempfl,tempref,g,z)
-    real(knd),intent(in):: ustar,tempfl,tempref,g,z
+  pure real(knd) function Obukhov_zL(ustar,temperature_flux,tempref,g,z)
+    real(knd),intent(in):: ustar,temperature_flux,tempref,g,z
 
-    Obukhov_zL = z*(0.4_knd*(g/tempref)*tempfl)/(-ustar**3)
+    Obukhov_zL = z*(0.4_knd*(g/tempref)*temperature_flux)/(-ustar**3)
   end function Obukhov_zL
 
 
 
-  pure subroutine WM_MO_FLUX_ustar(vel,dist,ustar,z0,tempflux,Re,temperature_ref,grav_acc)
+  pure subroutine WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_fluxux,Re,temperature_ref,grav_acc)
     implicit none
 
     real(knd),intent(inout) :: ustar
     real(knd),parameter  :: eps = 1e-3
     real(knd),parameter  :: yplcrit = 11.225_knd
-    real(knd),intent(in) :: vel,dist,z0,tempflux
+    real(knd),intent(in) :: vel,dist,z0,temperature_fluxux
     real(knd),intent(in) :: Re,temperature_ref,grav_acc
     real(knd) ustar2,zL,zL2,Psi
     integer i
@@ -888,7 +905,7 @@ implicit none
       if (ustar<1E-4) then
        zL = -10000
       else
-       zL2 = Obukhov_zL(ustar,tempflux,temperature_ref,grav_acc,dist)
+       zL2 = Obukhov_zL(ustar,temperature_fluxux,temperature_ref,grav_acc,dist)
        zL = zL+(zL2-zL)/2
       end if
 
@@ -909,8 +926,8 @@ implicit none
 
 
 
-  pure subroutine WM_MO_DIRICHLET_ustar_tfl(ustar,tempflux,vel,dist,z0,tempdif)
-    real(knd),intent(inout) :: ustar,tempflux
+  pure subroutine WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_fluxux,vel,dist,z0,tempdif)
+    real(knd),intent(inout) :: ustar,temperature_fluxux
     real(knd),intent(in) :: vel,dist,z0,tempdif
     real(knd),parameter :: eps = 1e-3
     real(knd),parameter :: yplcrit = 11.225
@@ -938,7 +955,7 @@ implicit none
       i = 0
       if (Rib>0.34_knd) then
                           ustar = 0
-                          tempflux = 0
+                          temperature_fluxux = 0
       else
         do
           i = i+1
@@ -950,10 +967,10 @@ implicit none
 
         if (i>=50.or.zL>100) then
           ustar = 0
-          tempflux = 0
+          temperature_fluxux = 0
         else
           ustar = vel*0.4_knd/(log(dist/z0)-PsiM_MO(zL))
-          tempflux = 0.4_knd*ustar*tempdif/(log(dist/z0)-PsiH_MO(zL))
+          temperature_fluxux = 0.4_knd*ustar*tempdif/(log(dist/z0)-PsiH_MO(zL))
         end if
       end if
     end if
@@ -965,10 +982,10 @@ implicit none
 
 
 
-  pure subroutine WM_MO_FLUX(visc,ustar,tempfl,z0,distvect,uvect)
+  pure subroutine WM_MO_FLUX(visc,ustar,temperature_flux,z0,distvect,uvect)
     real(knd),intent(out) :: visc
     real(knd),intent(inout) :: ustar
-    real(knd),intent(in)    :: z0,tempfl
+    real(knd),intent(in)    :: z0,temperature_flux
     real(knd),intent(in)    :: distvect(3),uvect(3)
     real(knd) vect(3),vel,dist
 
@@ -979,7 +996,7 @@ implicit none
     vel = sqrt(sum(vect**2))
 
     if (vel/=0) then
-      call WM_MO_FLUX_ustar(vel,dist,ustar,z0,tempfl,Re,temperature_ref,grav_acc)
+      call WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_flux,Re,temperature_ref,grav_acc)
       if (ustar<0) ustar = 0
     end if
 
@@ -995,9 +1012,9 @@ implicit none
 
 
 
-  pure subroutine WM_MO_DIRICHLET(visc,ustar,tempfl,z0,tempdif,distvect,uvect)
+  pure subroutine WM_MO_DIRICHLET(visc,ustar,temperature_flux,z0,tempdif,distvect,uvect)
     real(knd),intent(out)   :: visc
-    real(knd),intent(inout) :: ustar,tempfl
+    real(knd),intent(inout) :: ustar,temperature_flux
     real(knd),intent(in)    :: z0
     real(knd),intent(in)    :: tempdif ! temperature difference surface - nearest point
     real(knd),intent(in)    :: distvect(3),uvect(3)
@@ -1009,11 +1026,11 @@ implicit none
 
     vel = sqrt(sum(vect**2))
 
-    call WM_MO_DIRICHLET_ustar_tfl(ustar,tempfl,vel,dist,z0,tempdif)
+    call WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,tempdif)
 
     if (ustar<0) ustar = 0
 
-    if ((vel>0.or.tempfl/=0)) then
+    if ((vel>0.or.temperature_flux/=0)) then
       visc = max(ustar*ustar*dist/vel,1._knd/Re)
     else if (Re>0) then
       visc = 1._knd/Re
@@ -1025,7 +1042,7 @@ implicit none
 
 
 
-  pure subroutine BOUND_tempfl(Nu)
+  pure subroutine BOUND_temperature_flux(Nu)
     real(knd),intent(inout):: Nu(-1:,-1:)
     integer i,j,nx,ny
 
@@ -1055,7 +1072,7 @@ implicit none
         Nu(i,ny+1) = Nu(i,ny)
       end do
     end if
-  end subroutine BOUND_tempfl
+  end subroutine BOUND_temperature_flux
 
 
 
@@ -1067,7 +1084,7 @@ implicit none
 
     if (enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET) then
       do i = 1,size(WMPoints)
-        if (WMPoints(i)%zk==1) WMPoints(i)%tempfl = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&
+        if (WMPoints(i)%zk==1) WMPoints(i)%temperature_flux = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&
                        (temperature(WMPoints(i)%xi,WMPoints(i)%yj,1) - temperature(WMPoints(i)%xi,WMPoints(i)%yj,0))
       end do
     end if
@@ -1166,7 +1183,7 @@ implicit none
 
          if (enable_buoyancy==1 .and. TempBtype(Bo)==CONSTFLUX) then
 
-           call WM_MO_FLUX(Visc(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%tempfl,&
+           call WM_MO_FLUX(Visc(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%temperature_flux,&
                            WMPoints(i)%z0, dist, vel)
 
          else if (enable_buoyancy==1 .and. TempBtype(Bo)==DIRICHLET) then
@@ -1175,10 +1192,10 @@ implicit none
 
            tdif = WMPoints(i)%temp - Temperature(xi,yj,zk)
 
-           call WM_MO_DIRICHLET(Visc(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%tempfl,&
+           call WM_MO_DIRICHLET(Visc(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%temperature_flux,&
                                 WMPoints(i)%z0, tdif, dist, vel)
 
-           if (zk==1) BsideTFLArr(xi,yj) = WMPoints(i)%tempfl
+           if (zk==1) BsideTFLArr(xi,yj) = WMPoints(i)%temperature_flux
 
          else
 
@@ -1214,7 +1231,7 @@ implicit none
     end do
     !$omp end parallel do
 
-    if (enable_buoyancy==1.and. TempBtype(Bo)==DIRICHLET) call Bound_tempfl(BsideTFLArr)
+    if (enable_buoyancy==1.and. TempBtype(Bo)==DIRICHLET) call Bound_temperature_flux(BsideTFLArr)
 
 
   end subroutine ComputeViscsWM

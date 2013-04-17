@@ -17,7 +17,9 @@ module SolidBodies
   type, extends(TBody) :: TSolidBody
     logical   :: rough = .false.                             !T rough surface, F flat surface
     real(knd) :: z0 = 0                                      !roughness parameter
-    real(knd) :: temperatureflux = 0
+    real(knd) :: temperature_flux = 0
+    real(knd) :: moisture_flux = 0
+    !other scalar fluxes assumed zero
   end type TSolidbody
 
   type(TList) :: SolidBodiesList
@@ -81,7 +83,6 @@ contains
           type is (TSolidBody)
             !$omp parallel do private(i,j,k) schedule(dynamic)
             do k = 0,Prnz+1
-            print *,k
              do j = 0,Prny+1
               do i = 0,Prnx+1
                  if (CurrentSB%Inside(xPr(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000)) &
@@ -247,10 +248,10 @@ contains
     end if
 
     allocate(SB)
-    allocate(TPolyhedron :: SB%GeometricShape)
+    allocate(TConvexPolyhedron :: SB%GeometricShape)
 
     select type (geomshape => SB%GeometricShape)
-      type is (TPolyhedron)
+      type is (TConvexPolyhedron)
         allocate(geomshape%Planes(nPlanes))
 
         geomshape%nplanes = nPlanes
@@ -298,17 +299,16 @@ contains
     inquire(file=filename,exist=ex)
 
     if (ex) then
-      allocate(TCGALPolyhedron :: SB%GeometricShape)
+      allocate(TPolyhedron :: SB%GeometricShape)
       
       select type (geomshape => SB%GeometricShape)
-        type is (TCGALPolyhedron)
+        type is (TPolyhedron)
        
-          call geomshape%ReadOff(filename)
-          
-          call geomshape%InitBbox
+          geomshape = TPolyhedron(filename)
       
           call AddBody(SolidBodiesList,SB)
       end select
+      
     else
       write(*,*) "Error, file ",filename," does not exist."
       stop

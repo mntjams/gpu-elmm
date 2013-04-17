@@ -8,6 +8,7 @@ module CGAL_Polyhedra
   public cgal_polyhedron_read, &
          cgal_polyhedron_closest, &
          cgal_polyhedron_inside, &
+         cgal_polyhedron_intersects_ray, &
          cgal_polyhedron_bbox, &
          cgal_polyhedron_finalize
   
@@ -23,6 +24,11 @@ module CGAL_Polyhedra
   interface cgal_polyhedron_inside
     module procedure cgal_polyhedron_inside_s
     module procedure cgal_polyhedron_inside_d
+  end interface
+  
+  interface cgal_polyhedron_intersects_ray
+    module procedure cgal_polyhedron_intersects_ray_s
+    module procedure cgal_polyhedron_intersects_ray_d
   end interface
   
   interface cgal_polyhedron_bbox
@@ -76,7 +82,7 @@ contains
     stop "Dummy CGAL!"
   end subroutine
   
-  pure function cgal_polyhedron_inside_s(ptree, xq,yq,zq, xr,yr,zr) result(res)
+  function cgal_polyhedron_inside_s(ptree, xq,yq,zq, xr,yr,zr) result(res)
     logical :: res
     type(c_ptr),intent(in) :: ptree
     real(c_float),intent(in) :: xq,yq,zq, xr,yr,zr
@@ -85,7 +91,7 @@ contains
     res = .false.
   end function
 
-  pure function cgal_polyhedron_inside_d(ptree, xq,yq,zq, xr,yr,zr) result(res)
+  function cgal_polyhedron_inside_d(ptree, xq,yq,zq, xr,yr,zr) result(res)
     logical :: res
     type(c_ptr),intent(in) :: ptree
     real(c_double),intent(in) :: xq,yq,zq, xr,yr,zr
@@ -94,6 +100,22 @@ contains
     res = .false.
   end function
   
+  function cgal_polyhedron_intersects_ray_s(ptree, xc,yc,zc, a,b,c) result(res)
+    logical :: res
+    type(c_ptr),intent(in) :: ptree
+    real(c_float),intent(in) :: xc,yc,zc, a,b,c
+    
+    res = .false.
+  end function
+
+  function cgal_polyhedron_intersects_ray_d(ptree, xc,yc,zc, a,b,c) result(res)
+    logical :: res
+    type(c_ptr),intent(in) :: ptree
+    real(c_double),intent(in) :: xc,yc,zc, a,b,c
+    
+    res = .false.
+  end function
+
   subroutine cgal_polyhedron_finalize(ptree)
     type(c_ptr),intent(inout) :: ptree
     

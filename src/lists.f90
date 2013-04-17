@@ -21,6 +21,8 @@ module Lists
       procedure :: IterNext => TList_IterNext
       procedure :: IterRestart => TList__IterRestart
       procedure :: ForEach => TList_ForEach
+      procedure :: All => TList_All
+      procedure :: Any => TList_Any
       procedure :: Len => TList_Len
   end type TList
 
@@ -29,6 +31,10 @@ module Lists
       import
       class(TListable) :: item
     end subroutine
+    logical function elem_logical_fun(item)
+      import
+      class(TListable) :: item
+    end function
   end interface
 
 
@@ -111,6 +117,44 @@ module Lists
       end do
 
     end subroutine
+
+    logical function TList_All(self,proc) result(res)
+      class(TList),intent(inout) :: self
+      procedure(elem_logical_fun) :: proc
+      type(TListNode),pointer :: node
+
+      res = .true.
+      
+      node => self%first
+
+      do while (associated(node))
+        if (allocated(node%item)) then
+          res =  proc(node%item)
+          if (.not.res) return
+        end if
+        node => node%next
+      end do
+
+    end function
+
+    logical function TList_Any(self,proc) result(res)
+      class(TList),intent(inout) :: self
+      procedure(elem_logical_fun) :: proc
+      type(TListNode),pointer :: node
+
+      res = .false.
+      
+      node => self%first
+
+      do while (associated(node))
+        if (allocated(node%item)) then
+          res =  proc(node%item)
+          if (res) return
+        end if
+        node => node%next
+      end do
+
+    end function
 
     pure integer function TList_Len(self)
       class(TList),intent(in) :: self

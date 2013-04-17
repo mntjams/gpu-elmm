@@ -99,7 +99,8 @@ module ArrayUtilities
   private
   public exchange_alloc, assign, add, &
          set, multiply, add_multiplied, &
-         multiply_and_add_scalar, reciprocal
+         multiply_and_add_scalar, reciprocal, &
+         add_element
 
   interface exchange_alloc
     module procedure exchange_alloc_1D
@@ -147,6 +148,10 @@ module ArrayUtilities
     module procedure reciprocal_1D
     module procedure reciprocal_2D
     module procedure reciprocal_3D
+  end interface
+  
+  interface add_element
+    module procedure add_element_int
   end interface
 
   contains
@@ -452,5 +457,23 @@ module ArrayUtilities
       !$omp end parallel do
     end subroutine
 
+    subroutine add_element_int(a,e)
+      integer,allocatable,intent(inout) :: a(:)
+      integer,intent(in) :: e
+      integer,allocatable :: tmp(:)
 
+      !usses automatic lhs reallocation
+      if (.not.allocated(a)) then
+        allocate(a(1))
+        a(1) = e
+      else
+        allocate(tmp(size(a)))
+        tmp(:) = a
+        deallocate(a)
+        allocate(a(size(tmp)+1))
+        a(1:size(tmp)) = tmp
+        a(size(tmp)+1) = e
+      end if
+    end subroutine
+    
 end module ArrayUtilities

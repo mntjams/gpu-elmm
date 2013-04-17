@@ -2,7 +2,6 @@ module VolumeSources
   use Parameters
   use Lists
   use TBody_class
-  use ImmersedBoundary
 
   implicit none
 ! 
@@ -63,7 +62,7 @@ module VolumeSources
     end function
     function scalar_flux_interface(self,x,y,z,num_of_scalar) result(res)
       import
-      real(knd) :: res !allocatable causes ICE in gfortran 4.7.1, ok in repository since March 2013
+      real(knd) :: res
       class(TVolumeSourceBody),intent(in) :: self
       real(knd),intent(in) :: x,y,z
       integer,intent(in) :: num_of_scalar
@@ -90,27 +89,49 @@ module VolumeSources
   type(TMoistureFlVolume)   ,allocatable :: MoistureFlVolumes(:)
   type(TScalarFlVolumesContainer) ,allocatable :: ScalarFlVolumes(:)
   
-
+  type, extends(TVolumeSourceBody) :: TPlantBody
+    integer :: plant_type !problem specific, used by custom routines
+    real(knd) :: albedo = 0.3_knd
+    real(knd) :: emmissivity = 0.7_knd
+    real(knd) :: evaporative_fraction = 0.6_knd
+  end type TPlantBody
+  
   contains
 
+      subroutine InitVolumeSourceBodies
+#ifdef CUSTOMPB
+        interface
+          subroutine CustomVolumeSourceBodies
+          end subroutine
+        end interface
+      !An external subroutine, it should use this module and use AddBody to supply
+      ! pointers to the new solid bodies.
+      call CustomVolumeSourceBodies
+#endif
+    end subroutine InitVolumeSourceBodies
+
+    
     subroutine InsideCellsToLists
       !find cells inside the canopy and store them in a list
-
-      !$omp parallel sections
-      !$omp section
+      logical,allocatable :: InsidePr(:,:,:)
+      
+!       !$omp parallel sections
+!       !$omp section
       call SourceBodiesList%ForEach(GetUCells)
 
-      !$omp section
+!       !$omp section
       call SourceBodiesList%ForEach(GetVCells)
 
-      !$omp section
+!       !$omp section
       call SourceBodiesList%ForEach(GetWCells)
 
-      !$omp section
+!       !$omp section
       allocate(ScalarFlVolumesLists(num_of_scalars))
 
+      allocate(InsidePr(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+      
       call SourceBodiesList%ForEach(GetOtherCells)
-      !$omp end parallel sections
+!       !$omp end parallel sections
 
       contains
 
@@ -196,38 +217,83 @@ module VolumeSources
         end subroutine
 
         subroutine GetOtherCells(PB)
+          use SolarRadiation, only: enable_radiation
           class(TListable) :: PB
           type(TTemperatureFlVolume) :: Telem
           type(TMoistureFlVolume) :: Melem
           type(TScalarFlVolume) :: Selem
           integer i,j,k,sc
-
+          
           select type (PB)
             class is (TVolumeSourceBody)
+              InsidePr = .false.
+              
               do k = 0,Prnz+1
                do j = 0,Prny+1
                 do i = 0,Prnx+1
-                   if (Inside(PB,xPr(i),yPr(j),zPr(k))) then
-                     if (associated(PB%get_temperature_flux)) then
-                       Telem%xi = i
-                       Telem%yj = j
-                       Telem%zk = k
-                       Telem%flux = PB%get_temperature_flux(xPr(i),yPr(j),zPr(k))
-                       if (Telem%flux/=0) call TemperatureFlVolumesList%Add(Telem)
+                   InsidePr(i,j,k) = PB%Inside(xPr(i),yPr(j),zPr(k))
+                end do
+               end do
+              end do
+              
+            
+              do k = 0,Prnz+1
+               do j = 0,Prny+1
+                do i = 0,Prnx+1
+                   if (InsidePr(i,j,k)) then
+                   
+                     Telem%xi = i
+                     Telem%yj = j
+                     Telem%zk = k
+                     Melem%xi = i
+                     Melem%yj = j
+                     Melem%zk = k
+                       
+                     if (enable_buoyancy==1 .and. enable_radiation==1) then
+
+                       associate (p=>PB) !workaround for gfortran 4.8 bug
+                       select type (p)
+                         class is (TPlantBody)
+                           if (on_border(i,j,k)) then
+                             call GetRadiationFluxes(p,Telem,Melem,xPr(i),yPr(j),zPr(k))
+                           else
+                             Telem%flux = 0
+                             Melem%flux = 0
+                           end if
+                         class default
+                           Telem%flux = 0
+                           Melem%flux = 0
+                       end select
+                       end associate
+                     else
+                       Telem%flux = 0
+                       Melem%flux = 0
                      end if
-                     if (associated(PB%get_moisture_flux)) then
-                       Melem%xi = i
-                       Melem%yj = j
-                       Melem%zk = k
-                       Melem%flux = PB%get_moisture_flux(xPr(i),yPr(j),zPr(k))
-                       if (Melem%flux/=0) call MoistureFlVolumesList%Add(Melem)
+                     
+                     if (enable_buoyancy==1 .and. associated(PB%get_temperature_flux)) then
+                     
+                         Telem%flux = Telem%flux + &
+                                      PB%get_temperature_flux(xPr(i),yPr(j),zPr(k))
                      end if
+                     
+                     if (enable_moisture==1 .and. associated(PB%get_moisture_flux)) then
+
+                         Melem%flux = Melem%flux + &
+                                      PB%get_moisture_flux(xPr(i),yPr(j),zPr(k))
+                       
+                     end if
+
+                     if (Telem%flux/=0) call TemperatureFlVolumesList%Add(Telem)
+
+                     if (Melem%flux/=0) call MoistureFlVolumesList%Add(Melem)
+                      
+                     
                      if (associated(PB%get_scalar_flux)) then
                        do sc = 1,num_of_scalars
                          Selem%xi = i
                          Selem%yj = j
                          Selem%zk = k
-                         Selem%flux = PB%get_scalar_flux(xPr(i),yPr(j),zPr(k),sc) !(:) avoiding reallocation
+                         Selem%flux = PB%get_scalar_flux(xPr(i),yPr(j),zPr(k),sc)
                          if (Selem%flux/=0) call ScalarFlVolumesLists(sc)%list%Add(Selem)
                        end do
                      end if
@@ -240,9 +306,161 @@ module VolumeSources
           end select
         end subroutine
 
+        
+        
+        logical function on_border(xi,yj,zk)
+          integer xi,yj,zk
+          on_border = InsidePr(xi,yj,zk) .and. &
+                      .not. all([InsidePr(xi-1,yj,zk), &
+                                 InsidePr(xi+1,yj,zk), &
+                                 InsidePr(xi,yj-1,zk), &
+                                 InsidePr(xi,yj+1,zk), &
+                                 InsidePr(xi,yj,zk-1), &
+                                 InsidePr(xi,yj,zk+1)])
+        end function
     end subroutine InsideCellsToLists
 
 
+    
+    
+    
+    subroutine GetRadiationFluxes(PB,Telem,Melem,x,y,z)
+      use SolarRadiation
+      use PhysicalProperties
+      use GeometricShapes, only: TRay
+      use SolidBodies, only: SolidBodiesList, TSolidBody
+      class(TPlantBody),intent(inout) :: PB
+      type(TTemperatureFlVolume),intent(inout) :: Telem
+      type(TMoistureFlVolume),intent(inout)    :: Melem
+      real(knd),intent(in) :: x, y, z
+      
+      type(TRay) :: ray
+      real(knd) :: out_norm(3)
+      real(knd) :: inc_radiation_flux, radiation_balance, angle_to_sun, &
+                   total_heat_flux, sensible_heat_flux, latent_heat_flux,&
+                   xnear, ynear, znear, distx, disty, distz
+      real(knd) :: xr, yr, zr, svf
+                   
+      call PB%ClosestOut(xnear,ynear,znear,x,y,z)
+
+      distx = xnear - x
+      disty = ynear - y
+      distz = znear - z
+      
+      out_norm = [distx, disty, distz] / &
+                 hypot(hypot(distx,disty),distz)
+  
+      angle_to_sun = max(0._knd, dot_product(out_norm, vector_to_sun))
+
+      xr = x + distx * 1.1_knd
+      yr = y + disty * 1.1_knd
+      zr = z + distz * 1.1_knd
+      if (angle_to_sun>0._knd) then
+        ray = TRay([xr, &
+                    yr, &
+                    zr], &
+                   vector_to_sun)
+
+        if ((SolidBodiesList%Any(DoIntersect)) .or. &
+            (SourceBodiesList%Any(DoIntersectPlants))) then
+          angle_to_sun = 0
+        end if
+      end if
+      
+      !temporary
+      svf = sky_view_factor(xr,yr,zr)
+      
+      inc_radiation_flux = angle_to_sun * solar_direct_flux() + &
+                           solar_diffuse_flux()*svf
+
+      radiation_balance = inc_radiation_flux * (1-PB%albedo) - &
+                          longwave_radiation(temperature_ref) * svf * PB%emmissivity
+
+      total_heat_flux = radiation_balance - &
+                        (0.2 * radiation_balance) !crude guess of the storage flux
+
+      !surface flux to volume flux APPROXIMATE!                  
+      total_heat_flux = total_heat_flux/dot_product([dxmin,dymin,dzmin],abs(out_norm))
+                        
+      if (enable_moisture==1) then
+        latent_heat_flux = total_heat_flux * PB%evaporative_fraction
+        sensible_heat_flux = total_heat_flux - latent_heat_flux
+        Melem%flux  = latent_heat_flux / (rho_air_ref * Lv_water_ref)
+      else
+        sensible_heat_flux = total_heat_flux
+        Melem%flux  = 0
+      end if
+      
+      Telem%flux = sensible_heat_flux / (rho_air_ref * Cp_air_ref)
+
+      contains
+          
+        real(knd) function sky_view_factor(x,y,z)
+          real(knd),intent(in) :: x,y,z
+          integer :: i,nfree
+
+          
+          nfree = 0
+          
+          do i=1,svf_nrays
+            ray = TRay([x,y,z],svf_vecs(:,i))
+          
+            if (.not.((SolidBodiesList%Any(DoIntersect)) .or. &
+                      (SourceBodiesList%Any(DoIntersectPlants)))) then
+              nfree = nfree + 1
+            end if
+          end do
+          
+          sky_view_factor = real(nfree,knd) / svf_nrays
+          
+        end function
+  
+        logical function DoIntersect(item) result(res)
+          class(TListable) :: item
+          
+          select type (item)
+            class is (TSolidBody)
+              res = item%IntersectsRay(ray)
+            class default
+              stop "Non-TSolidBody i the list."
+          end select
+        end function
+        
+        logical function DoIntersectPlants(item) result(res)
+          class(TListable) :: item
+          
+          select type (item)
+            class is (TPlantBody)
+              res = item%IntersectsRay(ray)
+            class is (TVolumeSourceBody)
+              res = .false.
+            class default
+              stop "Non-TSolidBody i the list."
+          end select
+        end function
+      
+
+    end subroutine
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     subroutine MovePointsToArray
     !It would be posible call a generic procedure with the list and array
     ! as an argument, but we want the final arrays not polymorphic.
@@ -278,6 +496,8 @@ module VolumeSources
         i = 0
         call ScalarFlVolumesLists(j)%list%ForEach(CopyPoint)
       end do
+      
+      call SaveFluxes
 
       contains
 
@@ -306,6 +526,23 @@ module VolumeSources
           end select
         end subroutine
 
+        subroutine SaveFluxes
+          use VTKArray
+          real(knd),allocatable :: temperature_flux(:,:,:)
+          allocate(temperature_flux(0:Prnx+1,0:Prny+1,0:Prnz+1))
+          
+          temperature_flux = 0
+          
+          do i=1,size(TemperatureFlVolumes)
+            associate(p => TemperatureFlVolumes(i))
+              temperature_flux(p%xi,p%yj,p%zk) = p%flux
+            end associate
+          end do
+          
+          call VtkArraySimple("tempflplants.vtk",temperature_flux)
+          
+        end subroutine
+        
     end subroutine MovePointsToArray
 
 
@@ -401,7 +638,7 @@ module VolumeSources
     end subroutine MoistureVolumeSources
 
     subroutine ScalarVolumeSources(Scalar)
-      real(knd),dimension(-1:,-1:,-1:,-1:),intent(inout) :: Scalar
+      real(knd),dimension(-1:,-1:,-1:,1:),intent(inout) :: Scalar
       integer j
 
       if (allocated(ScalarFlVolumes)) then
