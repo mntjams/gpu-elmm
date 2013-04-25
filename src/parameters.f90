@@ -88,7 +88,7 @@ module Parameters
   integer :: enable_liquid   = 0 !enable condensation of water vapor
   integer :: num_of_scalars  = 0
 
-  integer :: enable_radiation = 1
+  integer :: enable_radiation = 0
 
   integer :: partdistrib,computedeposition,computegravsettling
   integer :: maxCNiter,maxPOISSONiter,maxiter,endstep

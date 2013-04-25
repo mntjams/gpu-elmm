@@ -424,6 +424,8 @@
     else
      dt = dxmin/Uref
     endif
+    
+!     if (step<3) dt = dt/100
 
     if (steady/=1.and.dt+time>endtime)  dt = endtime-time
 

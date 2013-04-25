@@ -497,7 +497,7 @@ module VolumeSources
         call ScalarFlVolumesLists(j)%list%ForEach(CopyPoint)
       end do
       
-      call SaveFluxes
+      if (enable_radiation==1) call SaveFluxes
 
       contains
 
@@ -539,7 +539,7 @@ module VolumeSources
             end associate
           end do
           
-          call VtkArraySimple("tempflplants.vtk",temperature_flux)
+          call VtkArraySimple("output/tempflplants.vtk",temperature_flux)
           
         end subroutine
         

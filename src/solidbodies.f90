@@ -9,7 +9,7 @@ module SolidBodies
 
   private
 
-  public TSolidBody, InitSolidBodies, SetCurrentSB, FindInsideCells, obstaclefile
+  public TSolidBody, InitSolidBodies, SetCurrentSB, FindInsideCells, obstacles_file
 #ifdef CUSTOMSB
   public  AddBody, SolidBodiesList
 #endif
@@ -24,7 +24,7 @@ module SolidBodies
 
   type(TList) :: SolidBodiesList
 
-  character(80) :: obstaclefile = ''
+  character(80) :: obstacles_file = ''
 
 contains
 
@@ -168,8 +168,8 @@ contains
     call CustomSolidBodies
 #endif
 
-    if (len_trim(obstaclefile)>0) then
-      call ReadSolidBodiesFromFile(trim(obstaclefile))
+    if (len_trim(obstacles_file)>0) then
+      call ReadSolidBodiesFromFile(trim(obstacles_file))
     end if
 
   end subroutine InitSolidBodies

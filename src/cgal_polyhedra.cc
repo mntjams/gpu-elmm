@@ -41,11 +41,13 @@ extern "C" {
     std::ifstream in(fname);
     in >> *polyhedron;
     
+    cout << " Reading file " << fname << " " << endl;
+
     Tree *tree = new Tree(polyhedron->facets_begin(),polyhedron->facets_end());
     
-    cout << "facets: " << polyhedron->size_of_facets() << endl;
-    cout << "halfedges: " << polyhedron->size_of_halfedges() << endl;
-    cout << "vertices: " << polyhedron->size_of_vertices() << endl;
+    cout << " facets: " << polyhedron->size_of_facets() << endl;
+    cout << " halfedges: " << polyhedron->size_of_halfedges() << endl;
+    cout << " vertices: " << polyhedron->size_of_vertices() << endl;
     
     tree->accelerate_distance_queries();
     

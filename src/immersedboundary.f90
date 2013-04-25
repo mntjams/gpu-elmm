@@ -99,6 +99,9 @@ contains
     
     integer :: i
     
+real(knd),allocatable :: svf_array(:,:,:)   
+allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
+    
     enable_radiation = 1
     
     if (enable_buoyancy==1 .and. enable_radiation==1) then
@@ -128,6 +131,7 @@ contains
 
           !temporary
           svf = sky_view_factor(xr,yr,zr)
+
           inc_radiation_flux = angle_to_sun * solar_direct_flux() + &
                                solar_diffuse_flux()*svf
 
@@ -137,7 +141,7 @@ contains
           total_heat_flux = radiation_balance - &
                             (0.2 * radiation_balance) !crude guess of the storage flux
 
-                            if (enable_moisture==1) then
+          if (enable_moisture==1) then
             latent_heat_flux = total_heat_flux * p%evaporative_fraction
             sensible_heat_flux = total_heat_flux - latent_heat_flux
             p%moisture_flux = latent_heat_flux / (rho_air_ref * Lv_water_ref)
@@ -214,7 +218,9 @@ contains
           end associate
         end do
         
-        call VtkArraySimple("tempfl.vtk",temperature_flux)
+        call VtkArraySimple("output/tempfl.vtk",temperature_flux)
+        
+        call VtkArraySimple("output/svf.vtk",svf_array)
         
       end subroutine
       
@@ -1535,7 +1541,7 @@ contains
     integer i,j
          
     ScalFlIBPoints%temperature_flux = 0
-    print *,"!!!!!!!!!!!!!!!"
+
     do i=1,size(WMPoints)
       associate (p => WMPoints(i))
         if (enable_buoyancy==1) then

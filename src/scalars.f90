@@ -186,14 +186,14 @@ contains
     end if
 #else
     if (enable_buoyancy>0) then
-print *,"temp"
+
       call stage(Temperature,Temperature2,Temperature_adv, &
                  ScalarTypeTemperature,BoundTemperature,TemperatureExtra,fluxProfile)
         where (Prtype>0) Temperature(0:Prnx+1,0:Prny+1,0:Prnz+1) = temperature_ref
     end if
 
     if (enable_moisture>0) then
-print *,"moist"
+
       call stage(Moisture,Moisture2,Moisture_adv, &
                  ScalarTypeMoisture,BoundMoisture,MoistureExtra)
     end if

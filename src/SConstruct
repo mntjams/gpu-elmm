@@ -25,42 +25,9 @@ if str(prec)=='dp':
 else:
   prec_dir = 'sp/'
   prec_flag = ''
-  
-
-if str(comp)=='sun':
-  env = Environment(tools=['default','sunf90','sunf95'])
-
-  if str(omp)!='no':
-    omp_flag = ' -openmp'
-  else:
-    omp_flag = ''
-
-  if str(fast)=='yes':
-    fast_flag = ' -fast'
-  else:
-    fast_flag = ' -C'
-
-  if str(lto)=='yes':
-    lto_flag = ' -xipo'
-  else:
-    lto_flag = ''
-
-  if str(dtrace)=='yes':
-    env.Append(F90FLAGS=' -xinstrument=datarace')
-    env.Append(LINKFLAGS=' -xinstrument=datarace')
-
-  env.Append(F90FLAGS='-fpp -xpp=cpp -DNO_INTERNAL_NML -g -dalign')
-
-  env.Append(LIBPATH = ['/usr/local/poisfft_sun/'])
-
-  env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_sun/'])
-
-  env.Append(FORTRANMODDIRPREFIX = '-moddir=')
-
-  env.Append(INCPREFIX = '-M')
 
 
-elif str(comp)=='intel':
+if str(comp)=='intel':
   env = Environment(tools=['default','ifort'])
 
   if str(omp)!='no':
@@ -71,14 +38,14 @@ elif str(comp)=='intel':
   if str(fast)=='yes':
     fast_flag = ' -O3' # -shared-intel
   else:
-    fast_flag = '-O0 -check all -traceback -warn all -fstack-protector'
+    fast_flag = '-O0 -check all -traceback -warn nounused -fstack-protector -ftrapuv'
 
   if str(lto)=='yes':
     lto_flag = ' -ipo'
   else:
     lto_flag = ''
 
-  env.Append(F90FLAGS='-cpp -g')
+  env.Append(F90FLAGS='-cpp -g -debug')
 
   env.Append(LIBPATH = ['/usr/local/poisfft_intel/'])
 
@@ -108,7 +75,7 @@ else:
 
   env.Replace(F90='gfortran')
   
-  env.Append(F90FLAGS='-cpp -fbacktrace -g -ffpe-trap=zero,overflow,invalid -fstack-arrays')
+  env.Append(F90FLAGS='-cpp -fbacktrace -g -ffpe-trap=zero,overflow,invalid -fstack-arrays -static-libgcc -static-libstdc++ -static-libgfortran')
 
   env.Append(LIBPATH = ['/usr/local/poisfft_gcc/'])
 
@@ -139,7 +106,9 @@ env.Append(LINKFLAGS= fast_flag + omp_flag + lto_flag + extra_flag)
     
 env.Append(FORTRANMODDIR = '${TARGET.dir}')
 
-env.Append(LIBS = ['poisfft','lapack','fftw3','fftw3f','fftw3_omp','fftw3f_omp','pthread','CGAL','stdc++'])
+env.Append(LIBS = ['poisfft','lapack','fftw3','fftw3f','fftw3_omp','fftw3f_omp','pthread','stdc++'])
+
+env.Append(LIBS = ['CGAL'])
 
 if customSB=='yes':
  env.Append(F90FLAGS='-DCUSTOMSB')
@@ -178,7 +147,7 @@ objs += env.Object(target=target_dir+'wallmodels',     source='wallmodels.f90')
 objs += env.Object(target=target_dir+'volumesources',  source='volumesources.f90')
 objs += env.Object(target=target_dir+'cgal_polyhedra_cc',  source='cgal_polyhedra.cc', CPPFLAGS=" -Ofast -frounding-math -std=c++11")
 objs += env.Object(target=target_dir+'cgal_polyhedra',  source='cgal_polyhedra.f90')
-#objs += env.Object(target=target_dir+'dummy_cgal_polyhedra',  source='dummy_cgal_polyhedra.f90')
+#objs += env.Object(target=target_dir+'dummy_cgal_polyh4edra',  source='dummy_cgal_polyhedra.f90')
 objs += env.Object(target=target_dir+'geometricshapes',  source='geometricshapes.f90')
 objs += env.Object(target=target_dir+'solidbodies',    source='solidbodies.f90')
 objs += env.Object(target=target_dir+'immersedboundary', source='immersedboundary.f90')

@@ -1,3 +1,0 @@
-#!/bin/bash
-scons -j 8 comp=sun lto=yes fast=yes openmp=no prec=sp dir=../bin/sun/serial customSB=yes $1 $2 $3
-

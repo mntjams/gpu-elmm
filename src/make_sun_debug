@@ -1,3 +1,0 @@
-#!/bin/bash
-scons -j 8 comp=sun lto=no fast=no openmp=yes prec=sp dir=../bin/sun/debug customSB=yes $1 $2 $3
-

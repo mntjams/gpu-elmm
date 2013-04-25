@@ -7,14 +7,15 @@ module Initial
   use POISSON
   use BOUNDARIES
   use ScalarBoundaries
-  use OUTPUTS, only: store, display, probes, NumProbes, SetFrameDomain, StaggeredFrameDomains
+  use OUTPUTS, only: store, display, probes, scalar_probes, number_of_probes, number_of_scalar_probes, &
+                     SetFrameDomain, StaggeredFrameDomains, ReadProbes
   use SCALARS
   use Filters, only: filtertype, filter_ratios
   use Subgrid
   use TURBINLET, only: GetTurbulentInlet, GetInletFromFile, TLag, Lturby, Lturbz, Ustar_inlet, relative_stress, &
                Ustar_surf_inlet, stress_gradient_inlet, U_ref_inlet, z_ref_inlet, z0_inlet, power_exponent_inlet
   use SolarRadiation, only: InitSolarRadiation
-  use SolidBodies, only: obstaclefile, InitSolidBodies
+  use SolidBodies, only: obstacles_file, InitSolidBodies
   use ImmersedBoundary, only: GetSolidBodiesBC, InitIBPFluxes, SetIBPFluxes
   use VolumeSources, only: InitVolumeSources, InitVolumeSourceBodies
   use WALLMODELS
@@ -38,8 +39,12 @@ contains
    real(knd) mgepsinnerGS
    integer   i,io,io2,itmp
    integer numframeslices
+
+   character(80), save :: probes_file = ""
+   character(80), save :: scalar_probes_file = ""
+
    namelist /cmd/ tilesize, debugparam, debuglevel, windangle, projectiontype, Prnx, Prny, Prnz,&
-                   obstaclefile
+                   obstacles_file, probes_file, scalar_probes_file
    character(len = 1024) :: commandline,msg
    integer :: exenamelength
    integer :: unit
@@ -56,6 +61,10 @@ contains
      procedure iget1, iget2, iget3
      procedure rget1, rget2, rget3
    end interface
+
+   call read_command_line
+
+   call parse_command_line
 
    call newunit(unit)
 
@@ -221,7 +230,7 @@ contains
 
      write(*,*) "Warning! Could not open file large_scale.conf. Using defaults."
 
-   endif
+   end if
 
 
    open(unit,file="thermal.conf",status="old",action="read",iostat = io)
@@ -263,7 +272,7 @@ contains
          call get(TemperatureProfile%Sections(i)%top)
          call get(TemperatureProfile%Sections(i)%jump)
          call get(TemperatureProfile%Sections(i)%gradient)
-       enddo
+       end do
 
        close(unit)
 
@@ -274,13 +283,13 @@ contains
 
        allocate(TemperatureProfile%Sections(0))
 
-     endif
+     end if
 
    else
 
      TempBtype = 0
 
-   endif
+   end if
 
 
 
@@ -320,7 +329,7 @@ contains
          call get(MoistureProfile%Sections(i)%top)
          call get(MoistureProfile%Sections(i)%jump)
          call get(MoistureProfile%Sections(i)%gradient)
-       enddo
+       end do
 
        close(unit)
 
@@ -331,13 +340,13 @@ contains
 
        allocate(MoistureProfile%Sections(0))
 
-     endif
+     end if
 
    else
 
      MoistBtype = 0
 
-   endif
+   end if
 
    open(unit,file="inlet.conf",status="old",action="read")
    call get(inlettype)
@@ -402,7 +411,7 @@ contains
           call get(scalsrcx(i))
           call get(scalsrcy(i))
           call get(scalsrcz(i))
-        enddo
+        end do
 
      else
 
@@ -417,9 +426,9 @@ contains
           call get(scalsrcx(i))
           call get(scalsrcy(i))
           call get(scalsrcz(i))
-        enddo
+        end do
 
-     endif
+     end if
      close(unit)
    else
      num_of_scalars = 0
@@ -452,9 +461,9 @@ contains
                            lbnx = bnx,lbny = bny,lbnz = bnz,&
                            lmgncgc = mgncgc,lmgnpre = mgnpre,lmgnpost = mgnpost,&
                            lmgmaxinnerGSiter = mgmaxinnerGSiter,lmgepsinnerGS = mgepsinnerGS)
-       endif
-     endif
-   endif
+       end if
+     end if
+   end if
 
    open(unit,file="frames.conf",status="old",action="read",iostat = io)
    if (io==0) then
@@ -493,7 +502,7 @@ contains
      call get(store%frame_domains(i)%dimension)
      call get(store%frame_domains(i)%direction)
      call get(store%frame_domains(i)%position)
-   enddo
+   end do
 
    close(unit)
 
@@ -590,58 +599,49 @@ contains
      call get(store%ustar)
      call get(store%tstar)
      call get(store%blprofiles)
+print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
+     if (probes_file == "" .and. scalar_probes_file == "") then
+       call get(number_of_probes)
 
-     call get(NumProbes)
-     allocate(probes(Numprobes))
+       allocate(probes(number_of_probes))
 
-     do i = 1,NumProbes
-       call get(probes(i)%x)
-       call get(probes(i)%y)
-       call get(probes(i)%z)
-     enddo
-     close(unit)
-   endif
+       do i = 1,number_of_probes
+         call get(probes(i)%x)
+         call get(probes(i)%y)
+         call get(probes(i)%z)
+       end do
+
+       number_of_scalar_probes = number_of_probes
+       allocate(scalar_probes(number_of_scalar_probes))
+       scalar_probes(:) = probes
+       close(unit)
+     else
+       close(unit)
+
+       if (len_trim(probes_file)>0) then
+         call ReadProbes(probes,number_of_probes,probes_file)
+       end if
+
+       if (len_trim(scalar_probes_file)>0) then
+         call ReadProbes(scalar_probes,number_of_scalar_probes,scalar_probes_file)
+       end if
+     end if
+   end if
 
    open(unit,file="obstacles.conf",status="old",action="read",iostat = io)
    if (io==0) then
      read(unit,fmt='(/)')
-     read(unit,'(a)') obstaclefile
+     read(unit,'(a)') obstacles_file
      close(unit)
    end if
 
    write(*,*) "num_of_scalars",num_of_scalars
-   write(*,*) "partdiam",partdiam
-
-
-
 
    windangle = 0._knd
 
    projectiontype = 1
 
-#ifndef NO_INTERNAL_NML
-   !Parsing of command line uses namelist input on an internal file (Fortran 2003).
-   !If not supported by the processor yet, define macro NO_INTERNAL_NML.
-   call get_command(command = commandline,status = io)
-   call get_command_argument(0,length = exenamelength,status = io2)
-   if (io2==0) then
-     commandline="&cmd "//adjustl(trim(commandline(exenamelength+1:)))//" /"
-   else
-     commandline="&cmd "//adjustl(trim(commandline))//" /"
-   end if
-
-   if (io==0) then
-     msg = ''
-     read(commandline,nml = cmd,iostat = io,iomsg = msg)
-     if (io/=0) then
-       write(*,*) io,"Error parsing command line."
-       write(*,*) msg
-       write(*,*) commandline
-     end if
-   else
-     write(*,*) io,"Error getting command line."
-   end if
-#endif
+   call parse_command_line
 
    if (CFL<=0)  CFL = 0.5
 
@@ -749,7 +749,7 @@ contains
    elseif (Prnz==1) then
      dzmin = sqrt(dxmin*dymin)
      lz = dzmin
-   endif
+   end if
 
    write(*,*) "dxmin ",dxmin
    write(*,*) "dymin ",dymin
@@ -766,7 +766,7 @@ contains
                           Unx = Prnx
    else
                           Unx = Prnx-1
-   endif
+   end if
    Uny = Prny
    Unz = Prnz
 
@@ -775,7 +775,7 @@ contains
                           Vny = Prny
    else
                           Vny = Prny-1
-   endif
+   end if
    Vnz = Prnz
 
    Wnx = Prnx
@@ -784,7 +784,7 @@ contains
                           Wnz = Prnz
    else
                           Wnz = Prnz-1
-   endif
+   end if
 
    if (Btype(We)==TURBULENTINLET) inlettype = TurbulentInletType
    if (Btype(We)==INLETFROMFILE) inlettype = FromFileInletType
@@ -794,13 +794,13 @@ contains
      dt = Abs(dxmin/Uinlet)
    else
      dt = dxmin
-   endif
+   end if
 
    if ((timeavg1>=0).and.(timeavg2>=timeavg1)) then
      averaging = 1
    else
      averaging = 0
-   endif
+   end if
 
    if (.not.xgridfromfile.and..not.ygridfromfile.and..not.zgridfromfile) then
      gridtype = UNIFORMGRID
@@ -808,7 +808,7 @@ contains
    else
      gridtype = GENERALGRID
      write(*,*) "General grid"
-   endif
+   end if
 
 
    write(*,*) "set"
@@ -864,6 +864,36 @@ contains
        read(unit,fmt='(/)')
        read(unit,*) x,y,z
      end subroutine
+
+     subroutine read_command_line
+       commandline = ""
+       call get_command(command = commandline,status = io)
+       if (io==0) then
+         call get_command_argument(0,length = exenamelength,status = io2)
+         if (io2==0) then
+           commandline="&cmd "//adjustl(trim(commandline(exenamelength+1:)))//" /"
+         else
+           commandline="&cmd "//adjustl(trim(commandline))//" /"
+         end if
+       else
+         write(*,*) io,"Error getting command line."
+       end if
+     end subroutine
+
+     subroutine parse_command_line
+       if (len_trim(commandline)>0) then
+         msg = ''
+         read(commandline,nml = cmd,iostat = io,iomsg = msg)
+         if (io/=0) then
+           write(*,*) io,"Error parsing command line."
+           write(*,*) msg
+           write(*,*) commandline
+         end if
+       else
+         write(*,*) io,"Error getting command line."
+       end if
+     end subroutine
+
  end subroutine ReadConfiguration
 
 
@@ -880,65 +910,65 @@ contains
    open(unit,file="in.vtk",position="rewind",status="old",action="read")
    do i = 1,14
     read(unit,*)
-   enddo
+   end do
    do k = 1,Prnz
     do j = 1,Prny
      do i = 1,Prnx
       read(unit,*) Pr(i,j,k)
-     enddo
-    enddo
-   enddo
+     end do
+    end do
+   end do
    if (enable_buoyancy==1) then
     do i = 1,3
      read(unit,*)
-    enddo
+    end do
     do k = 1,Prnz
      do j = 1,Prny
       do i = 1,Prnx
        read(unit,*) temperature(i,j,k)
-      enddo
-     enddo
-    enddo
-   endif
+      end do
+     end do
+    end do
+   end if
    close(unit)
 
    open(unit,file="Uin.vtk",position="rewind",status="old",action="read")
    do i = 1,14
     read(unit,*)
-   enddo
+   end do
    do k = 1,Unz
     do j = 1,Uny
      do i = 1,Unx
       read(unit,*) U(i,j,k)
-     enddo
-    enddo
-   enddo
+     end do
+    end do
+   end do
    close(unit)
 
    open(unit,file="Vin.vtk",position="rewind",status="old",action="read")
    do i = 1,14
     read(unit,*)
-   enddo
+   end do
    do k = 1,Vnz
     do j = 1,Vny
      do i = 1,Vnx
       read(unit,*) V(i,j,k)
-     enddo
-    enddo
-   enddo
+     end do
+    end do
+   end do
    close(unit)
 
    open(unit,file="Win.vtk",position="rewind",status="old",action="read")
    do i = 1,14
     read(unit,*)
-   enddo
+   end do
    do k = 1,Wnz
     do j = 1,Wny
      do i = 1,Wnx
       read(unit,*) W(i,j,k)
-     enddo
-    enddo
-   enddo
+     end do
+    end do
+   end do
  endsubroutine ReadIC
 
 
@@ -971,7 +1001,7 @@ contains
          Visc = 1._knd/Re
        else
          Visc = 0
-       endif
+       end if
        if (enable_buoyancy==1.or. &
            enable_moisture==1.or. &
            num_of_scalars>0)        TDiff = 1._knd/(Re*Prandtl)
@@ -997,10 +1027,10 @@ contains
               !0.5_knd*(p-0.5_knd)z
              !else
              !  V(i,j,k) = 0
-            !endif
-           enddo
-          enddo
-         enddo
+            !end if
+           end do
+          end do
+         end do
          do k = 1,Vnz
           do j = 1,Vny
            do i = 1,Vnx
@@ -1009,9 +1039,9 @@ contains
                   y = yV(j)
                   z = zPr(k)
                   V(i,j,k) = 2*pi*x!*(1+0.1*(p-0.5))!0
-           enddo
-          enddo
-         enddo
+           end do
+          end do
+         end do
          do k = 1,Wnz
           do j = 1,Wny
            do i = 1,Wnx
@@ -1019,9 +1049,9 @@ contains
                   y = yPr(j)
                   z = zW(k)
                   W(i,j,k) = 0
-           enddo
-          enddo
-         enddo
+           end do
+          end do
+         end do
          do k = 1,Prnz
           do j = 1,Prny
            do i = 1,Prnx
@@ -1029,9 +1059,9 @@ contains
                   y = yPr(j)
                   z = zPr(k)
                   Pr(i,j,k) = 0!(Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(x))+cos(2*(y)))-2)
-           enddo
-          enddo
-         enddo
+           end do
+          end do
+         end do
 
        elseif (tasktype==3) then
          U(1:Unx,1:Uny,1:Unz) = 0
@@ -1047,10 +1077,10 @@ contains
               !0.5_knd*(p-0.5_knd)z
              !else
              !  V(i,j,k) = 0
-            !endif
-           enddo
-          enddo
-         enddo
+            !end if
+           end do
+          end do
+         end do
          do k = 1,Vnz
           do j = 1,Vny
            do i = 1,Vnx
@@ -1059,9 +1089,9 @@ contains
                   y = yV(j)
                   z = zPr(k)
                   V(i,j,k) = 0!*(1+0.1*(p-0.5))!0
-           enddo
-          enddo
-         enddo
+           end do
+          end do
+         end do
          do k = 1,Wnz
           do j = 1,Wny
            do i = 1,Wnx
@@ -1069,9 +1099,9 @@ contains
                   y = yPr(j)
                   z = zW(k)
                   W(i,j,k)=-Uinlet*cos(x)*sin(z)*cos(-y)!Uinlet*sin(z)*cos(x)*cos(y)!
-           enddo
-          enddo
-         enddo
+           end do
+          end do
+         end do
          do k = 1,Prnz
           do j = 1,Prny
            do i = 1,Prnx
@@ -1079,9 +1109,9 @@ contains
                   y = yPr(j)
                   z = zPr(k)
                   Pr(i,j,k)=(Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)!(Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(x))+cos(2*(y)))-2)
-           enddo
-          enddo
-         enddo
+           end do
+          end do
+         end do
 
        elseif (tasktype==5) then!temporal mixing layer
          do k = 1,Unz
@@ -1092,7 +1122,7 @@ contains
                    call RANDOM_NUMBER(p)
                   else
                    p = 0
-                  endif
+                  end if
                    x1 = xPr(i)
                    x2 = xPr(i+1)
                    y1 = yV(j-1)
@@ -1108,11 +1138,11 @@ contains
                     U(i,j,k)=(log(x2)-log(x1))/(y2-y1)
                    else
                     U(i,j,k) = 0
-                   endif
+                   end if
                       !Uinlet*tanh(y+0.1*sin(pi*(xU(i)/10)*sin(pi*zPr(k)/10)-yPr(Uny/2)) by mean of integrals
-           enddo
-          enddo
-         enddo
+           end do
+          end do
+         end do
          do k = 1,Vnz
           do j = 1,Vny
            do i = 1,Vnx
@@ -1121,12 +1151,12 @@ contains
                   ! call RANDOM_NUMBER(p)
                   !else
                    p = sin(2*pi*xPr(i)/10)*(1+0.3*sin(3*pi*zPr(k)/10))*exp(-(yV(j)-yPr(Uny/2))*(yV(j)-yPr(Uny/2)))
-                  !endif
+                  !end if
 
                    V(i,j,k) = 0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_knd*(p-0.5_knd)
-           enddo
-          enddo
-         enddo
+           end do
+          end do
+         end do
          do k = 1,Wnz
           do j = 1,Wny
            do i = 1,Wnx
@@ -1135,36 +1165,36 @@ contains
                   ! call RANDOM_NUMBER(p)
                   !else
                    p = cos(2*pi*xPr(i)/10)*(1+0.3*cos(3*pi*zW(k)/10))*exp(-(yPr(j)-yPr(Uny/2))*(yPr(j)-yPr(Uny/2)))
-                  !endif
+                  !end if
 
                    W(i,j,k) = 0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_knd*(p-0.5_knd)
-           enddo
-          enddo
-         enddo
+           end do
+          end do
+         end do
       !   elseif (tasktype==8) then
       !    do k = 1,Unz
       !     do j = 1,Uny
       !      do i = 1,Unx
       !             call RANDOM_NUMBER(p)
       !       U(i,j,k)=-prgradienty/(coriolisparam)*(1+0.1_knd*(p-0.5_knd))
-      !      enddo
-      !     enddo
-      !    enddo
+      !      end do
+      !     end do
+      !    end do
       !    do k = 1,Vnz
       !     do j = 1,Vny
       !      do i = 1,Vnx
       !               call RANDOM_NUMBER(p)
       !      V(i,j,k) = prgradientx/(coriolisparam)*(1+0.1_knd*(p-0.5_knd))
-      !      enddo
-      !     enddo
-      !    enddo
+      !      end do
+      !     end do
+      !    end do
       !    do k = 1,Wnz
       !     do j = 1,Wny
       !      do i = 1,Wnx
       !       W(i,j,k) = 0
-      !      enddo
-      !     enddo
-      !    enddo
+      !      end do
+      !     end do
+      !    end do
 
        elseif (InletType==TurbulentInletType) then
 
@@ -1181,9 +1211,9 @@ contains
                     U(i,j,k) = Uin(j,k)
               else
                  U(i,j,k) = 0
-              endif
-            enddo
-           enddo
+              end if
+            end do
+           end do
            !$omp end do nowait
            !$omp do
            do k = 1,Vnz
@@ -1192,9 +1222,9 @@ contains
                     V(i,j,k) = Vin(j,k)
               else
                  V(i,j,k) = 0
-              endif
-            enddo
-           enddo
+              end if
+            end do
+           end do
            !$omp end do nowait
            !$omp do
            do k = 1,Wnz
@@ -1203,12 +1233,12 @@ contains
                     W(i,j,k) = Win(j,k)
               else
                  W(i,j,k) = 0
-              endif
-            enddo
-           enddo
+              end if
+            end do
+           end do
            !$omp end do
            !$omp end parallel
-         enddo
+         end do
 
        else
 
@@ -1222,10 +1252,10 @@ contains
                   U(i,j,k) = Uin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_knd*(p-0.5_knd)!sin(2.*pi*xU(i)+1)*cos(2.*pi*yPr(j)-2)!Uin(j,k)!*(1+0.03_knd*(p-0.5_knd))
              else
                U(i,j,k) = 0
-            endif
-           enddo
-          enddo
-         enddo
+            end if
+           end do
+          end do
+         end do
 !          !$omp end do
 !          !$omp do
          do k = 1,Vnz
@@ -1236,10 +1266,10 @@ contains
                   V(i,j,k) = Vin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_knd*(p-0.5_knd)!-cos(2.*pi*xPr(i)+1)*sin(2.*pi*yV(j)-2)!Uinlet*(0.3_knd*(p-0.5_knd))
              else
                V(i,j,k) = 0
-            endif
-           enddo
-          enddo
-         enddo
+            end if
+           end do
+          end do
+         end do
 !          !$omp end do
 !          !$omp do
          do k = 1,Wnz
@@ -1250,13 +1280,13 @@ contains
                   W(i,j,k) = Win(j,k)!Uinlet*(0.00001_knd*(p-0.5_knd))
              else
                W(i,j,k) = 0
-            endif
-           enddo
-          enddo
-         enddo
+            end if
+           end do
+          end do
+         end do
 !          !$omp end do
 !          !$omp end parallel
-       endif  !tasktype
+       end if  !tasktype
 
 
 
@@ -1280,10 +1310,10 @@ contains
              temperature(i,j,k) = cos(sqrt(x**2+(y-0.5)**2)*pi/2/0.2_knd)**2
             else
              temperature(i,j,k) = 0
-            endif
-           enddo
-          enddo
-         enddo
+            end if
+           end do
+          end do
+         end do
 
        elseif (enable_buoyancy==1.and.tasktype==3) then
 
@@ -1295,9 +1325,9 @@ contains
             z = zPr(k)
             temperature(i,j,k) = temperature_ref + &
                (temperature_ref/100._knd) * ((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
-           enddo
-          enddo
-         enddo
+           end do
+          end do
+         end do
 
        elseif (enable_buoyancy==1) then
 
@@ -1305,7 +1335,7 @@ contains
 
          call InitScalar(TempIn,TemperatureProfile,Temperature)
 
-       endif !byoyancy and tasktype
+       end if !byoyancy and tasktype
 
        if (enable_moisture==1) then
 
@@ -1334,7 +1364,7 @@ contains
          Visc = 0
          !$omp end workshare
          !$omp end parallel
-       endif
+       end if
 
        if (Re>0 .and.&
              (enable_buoyancy==1.or. &
@@ -1345,7 +1375,7 @@ contains
          TDiff = 1._knd/(Re*Prandtl)
          !$omp end workshare
          !$omp end parallel
-       endif  !Re>0
+       end if  !Re>0
 
        !$omp parallel
        !$omp sections
@@ -1377,8 +1407,8 @@ contains
            Visc = 1._knd/Re
          else
            Visc = 0
-         endif
-       endif
+         end if
+       end if
 
        call BoundViscosity(Visc)
 
@@ -1399,25 +1429,25 @@ contains
 
        if (enable_buoyancy==1) then
          call BoundTemperature(Temperature)
-       endif
+       end if
 
        if (enable_moisture==1) then
          call BoundMoisture(Moisture)
-       endif
+       end if
 
        do i = 1,num_of_scalars
          call BoundScalar(Scalar(:,:,:,i))
-       enddo
+       end do
 
        call InitTempFl(Temperature)
 
        if (wallmodeltype>0) then
                       call ComputeViscsWM(U,V,W,Pr,Temperature)
-       endif
+       end if
 
        call BoundViscosity(Visc)
 
-    endif !init conditions not from file
+    end if !init conditions not from file
 
 
     !prepare arrays with indexes of points to be nulled every timestep
@@ -1431,9 +1461,9 @@ contains
        if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
            .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
            .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  nUnull = nUnull+1
-      enddo
-     enddo
-    enddo
+      end do
+     end do
+    end do
     !$omp end parallel do
 
 
@@ -1467,8 +1497,8 @@ contains
           j = j+1
         else
           exit
-        endif
-      enddo
+        end if
+      end do
 
       nx = j
       Prnx = nx
@@ -1479,11 +1509,11 @@ contains
                             Unx = Prnx
       else
                             Unx = Prnx-1
-      endif
+      end if
 
       close(unit)
 
-    endif
+    end if
 
     if (ygridfromfile) then
 
@@ -1497,8 +1527,8 @@ contains
           j = j+1
         else
           exit
-        endif
-      enddo
+        end if
+      end do
 
       ny = j
       Prny = ny
@@ -1509,11 +1539,11 @@ contains
                             Vny = Prny
       else
                             Vny = Prny-1
-      endif
+      end if
 
       close(unit)
 
-    endif
+    end if
 
     if (zgridfromfile) then
 
@@ -1528,8 +1558,8 @@ contains
           write(*,*) j
         else
           exit
-        endif
-      enddo
+        end if
+      end do
 
       nz = j
       Prnz = nz
@@ -1540,11 +1570,11 @@ contains
                             Wnz = Prnz
       else
                             Wnz = Prnz-1
-      endif
+      end if
 
       close(unit)
 
-    endif
+    end if
 
 
 
@@ -1564,28 +1594,28 @@ contains
       do j = 0,nx
         write(*,*) j
         read(unit,*) xU2(j)
-      enddo
+      end do
       close(unit)
 
       if (Btype(We)==PERIODIC) then
         do j=-1,-3,-1
           xU2(j) = xU2(0)-(xU2(nx)-xU2(nx+j))
-        enddo
+        end do
       else
         do j=-1,-3,-1
           xU2(j) = xU2(0)-(xU2(0-j)-xU2(0))
-        enddo
-      endif
+        end do
+      end if
 
       if (Btype(Ea)==PERIODIC) then
         do j = nx+1,nx+4
           xU2(j) = xU2(nx)+(xU2(j-nx)-xU2(0))
-        enddo
+        end do
       else
         do j = nx+1,nx+4
           xU2(j) = xU2(nx)+(xU2(nx)-xU2(nx-(j-nx)))
-        enddo
-      endif
+        end do
+      end if
 
       x0 = xU2(0)
 
@@ -1595,7 +1625,7 @@ contains
          xU2(i)=(i)*dxmin+x0
       endforall
 
-    endif
+    end if
 
 
     if (ygridfromfile) then
@@ -1605,28 +1635,28 @@ contains
       open(unit,file="ygrid.txt")
       do j = 0,ny
         read(unit,*) yV2(j)
-      enddo
+      end do
       close(unit)
 
       if (Btype(So)==PERIODIC) then
         do j=-1,-3,-1
           yV2(j) = yV2(0)-(yV2(ny)-yV2(ny+j))
-        enddo
+        end do
       else
         do j=-1,-3,-1
           yV2(j) = yV2(0)-(yV2(0-j)-yV2(0))
-        enddo
-      endif
+        end do
+      end if
 
       if (Btype(No)==PERIODIC) then
         do j = ny+1,ny+4
           yV2(j) = yV2(ny)+(yV2(j-ny)-yV2(0))
-        enddo
+        end do
       else
         do j = ny+1,ny+4
           yV2(j) = yV2(ny)+(yV2(ny)-yV2(ny-(j-ny)))
-        enddo
-      endif
+        end do
+      end if
 
       y0 = yV2(0)
 
@@ -1636,7 +1666,7 @@ contains
         yV2(j)=(j)*dymin+y0
       endforall
 
-    endif
+    end if
 
 
     if (zgridfromfile) then
@@ -1646,28 +1676,28 @@ contains
       open(unit,file="zgrid.txt")
       do j = 0,nz
         read(unit,*) zW2(j)
-      enddo
+      end do
       close(unit)
 
       if (Btype(Bo)==PERIODIC) then
         do j=-1,-3,-1
           zW2(j) = zW2(0)-(zW2(nz)-zW2(nz+j))
-        enddo
+        end do
       else
         do j=-1,-3,-1
           zW2(j) = zW2(0)-(zW2(0-j)-zW2(0))
-        enddo
-      endif
+        end do
+      end if
 
       if (Btype(To)==PERIODIC) then
         do j = nz+1,nz+4
           zW2(j) = zW2(nz)+(zW2(j-nz)-zW2(0))
-        enddo
+        end do
       else
         do j = nz+1,nz+4
           zW2(j) = zW2(nz)+(zW2(nz)-zW2(nz-(j-nz)))
-        enddo
-      endif
+        end do
+      end if
 
       z0 = zW2(0)
 
@@ -1677,7 +1707,7 @@ contains
          zW2(k)=(k)*dzmin+z0
        endforall
 
-    endif
+    end if
 
 
     nxup = nx+1
@@ -1783,15 +1813,15 @@ contains
            BsideTFlArr = sideTemp(Bo)
          else
            BsideTFlArr = 0
-         endif
+         end if
 
          if (TempBtype(Bo)==DIRICHLET) then
            allocate(BsideTArr(-1:Prnx+2,-1:Prny+2))
            BsideTArr = sideTemp(Bo)
-         endif
+         end if
 
-        endif
-    endif
+        end if
+    end if
 
     if (.not.allocated(BsideTArr))  allocate(BsideTArr(0,0))
     if (.not.allocated(BsideTFlArr))  allocate(BsideTFlArr(0,0))
@@ -1808,15 +1838,15 @@ contains
            BsideMFlArr = sideMoist(Bo)
          else
            BsideMFlArr = 0
-         endif
+         end if
 
          if (MoistBtype(Bo)==DIRICHLET) then
            allocate(BsideMArr(-1:Prnx+2,-1:Prny+2))
            BsideMArr = sideMoist(Bo)
-         endif
+         end if
 
-        endif
-    endif
+        end if
+    end if
 
     if (.not.allocated(BsideMArr))  allocate(BsideMArr(0,0))
     if (.not.allocated(BsideMFlArr))  allocate(BsideMFlArr(0,0))
@@ -1827,7 +1857,7 @@ contains
 
    if (num_of_scalars>0.and.scalsourcetype==pointsource) then
         call Gridcoords(scalsrci(:),scalsrcj(:),scalsrck(:),scalsrcx(:),scalsrcy(:),scalsrcz(:))
-   endif
+   end if
 
    call InitTiles(Prnx,Prny,Prnz)
 
@@ -1878,9 +1908,9 @@ contains
        if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
            .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
            .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  nUnull = nUnull+1
-      enddo
-     enddo
-    enddo
+      end do
+     end do
+    end do
     !$omp end parallel do
 
     allocate(Unull(3,nUnull))
@@ -1897,10 +1927,10 @@ contains
             n = n+1
             Unull(:,n) = (/ i,j,k /)
 
-       endif
-      enddo
-     enddo
-    enddo
+       end if
+      end do
+     end do
+    end do
 
     nVnull = 0
 
@@ -1911,9 +1941,9 @@ contains
        if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
            .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
            .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  nVnull = nVnull+1
-      enddo
-     enddo
-    enddo
+      end do
+     end do
+    end do
     !$omp end parallel do
 
     allocate(Vnull(3,nVnull))
@@ -1930,10 +1960,10 @@ contains
             n = n+1
             Vnull(:,n) = (/ i,j,k /)
 
-       endif
-      enddo
-     enddo
-    enddo
+       end if
+      end do
+     end do
+    end do
 
     nWnull = 0
 
@@ -1944,9 +1974,9 @@ contains
        if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
            .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
            .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  nWnull = nWnull+1
-      enddo
-     enddo
-    enddo
+      end do
+     end do
+    end do
     !$omp end parallel do
 
     allocate(Wnull(3,nWnull))
@@ -1964,10 +1994,10 @@ contains
             n = n+1
             Wnull(:,n) = (/ i,j,k /)
 
-       endif
-      enddo
-     enddo
-    enddo
+       end if
+      end do
+     end do
+    end do
 
   end subroutine SetNullifiedPoints
 

@@ -79,7 +79,7 @@ program CLMM
         exit
       endif
 
-      if (dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/50._knd)) then
+      if (step>=3 .and. dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/50._knd)) then
         write (*,*) "Solution diverged."
         exit
       endif

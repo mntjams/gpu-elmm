@@ -13,8 +13,8 @@ module Outputs
 
 
   private
-  public OutTStep, Output, store, display, probes, NumProbes, AllocateOutputs,&
-         Tprobe, TOutputSwitches, TDisplaySwitches, SetFrameDomain, proftempfl,&
+  public store, display, probes, scalar_probes, number_of_probes, number_of_scalar_probes, &
+         OutTStep, Output, AllocateOutputs, SetFrameDomain, ReadProbes, proftempfl,&
          StaggeredFrameDomains
 
   real(knd),dimension(:),allocatable :: profuavg,profuavg2,profvavg,profvavg2,profuuavg,profvvavg,profwwavg,&
@@ -47,7 +47,8 @@ module Outputs
   real(knd),allocatable,dimension(:,:,:) :: scalptime                        !which scalar, position, time
   real(knd),allocatable,dimension(:,:) :: scalsumtime                        !which scalar, time
 
-  integer :: NumProbes                        !number of probes in space to collect timed data
+  !number of probes in space to collect timed data
+  integer :: number_of_probes = 0, number_of_scalar_probes = 0
 
   type TProbe
     integer :: Ui,Uj,Uk,Vi,Vj,Vk,Wi,Wj,Wk    !grid coordinates of probes in the U,V,W grids
@@ -55,7 +56,11 @@ module Outputs
     real(knd) :: x,y,z                       !physical coordinates of probes
   end type TProbe
 
+  !for flow variables including scalar ones (temperature, moisture)
   type(TProbe),allocatable,dimension(:),save :: probes
+
+  !for passive scalars
+  type(TProbe),allocatable,dimension(:),save :: scalar_probes
 
   type TFrameDomain
     integer   :: dimension,direction
@@ -73,7 +78,7 @@ module Outputs
     integer :: W_interp = 0
 
     integer :: out = 1
-    integer :: avg = 1
+    integer :: avg = 1 !1..one avg.vtk, 2.. velocity only in separate Xavg.vtk, 3.. both
 
     integer :: scalars = 1
     integer :: scalarsavg = 1
@@ -140,6 +145,35 @@ module Outputs
 contains
 
 
+ subroutine ReadProbes(ps,nps,pfile)
+    type(TProbe),allocatable,intent(out) :: ps(:)
+    integer,intent(out)     :: nps
+    character(*),intent(in) ::pfile
+    integer i,io,unit
+    real(knd) :: tmp3(3)
+
+    open(newunit=unit, file=pfile, status="old", action="read",iostat=io)
+    if (io/=0) then
+      write(*,*) "Error: File ",pfile," could not be opened!"
+      stop
+    else
+      nps = 0
+      do
+        read(unit,*,iostat=io) tmp3
+        if (io/=0) exit
+        nps = nps + 1
+      end do
+
+      allocate(ps(nps))
+
+      rewind(unit)
+      do i=1,nps
+        read(unit,*) ps(i)%x,ps(i)%y,ps(i)%z
+      end do
+      close(unit)
+    end if
+  end subroutine
+
   subroutine AllocateOutputs
     integer :: k
 
@@ -183,8 +217,8 @@ contains
 
    allocate(times(0:nt))
 
-   if (NumProbes>0) then
-     allocate(Utime(NumProbes,0:nt),Vtime(NumProbes,0:nt),Wtime(NumProbes,0:nt),Prtime(NumProbes,0:nt))
+   if (number_of_probes>0) then
+     allocate(Utime(number_of_probes,0:nt),Vtime(number_of_probes,0:nt),Wtime(number_of_probes,0:nt),Prtime(number_of_probes,0:nt))
      times = huge(1.0_knd)
      Utime = huge(1.0_knd)
      Vtime = huge(1.0_knd)
@@ -192,12 +226,12 @@ contains
      Prtime = huge(1.0_knd)
 
      if (enable_buoyancy==1) then
-       allocate(temptime(NumProbes,0:nt))
+       allocate(temptime(number_of_probes,0:nt))
        temptime = huge(1.0_knd)
      end if
 
       if (enable_moisture==1) then
-       allocate(moisttime(NumProbes,0:nt))
+       allocate(moisttime(number_of_probes,0:nt))
        moisttime = huge(1.0_knd)
      end if
 
@@ -236,25 +270,40 @@ contains
        scalsumtime = huge(1.0_knd)
      end if
 
-     if (NumProbes>0) then
-       allocate(scalptime(1:num_of_scalars,1:NumProbes,0:nt))
+     if (number_of_scalar_probes>0) then
+       allocate(scalptime(1:num_of_scalars,1:number_of_scalar_probes,0:nt))
        scalptime = huge(1.0_knd)
     end if
    end if
 
-   do k = 1,NumProbes
-     call GridCoords(probes(k)%i,probes(k)%j,probes(k)%k,probes(k)%x,probes(k)%y,probes(k)%z)
+   do k = 1,number_of_probes
+     associate(p => probes(k))
+       call GridCoords(p%i,p%j,p%k,p%x,p%y,p%z)
 
-     probes(k)%i = max(probes(k)%i,1)
-     probes(k)%j = max(probes(k)%j,1)
-     probes(k)%k = max(probes(k)%k,1)
-     probes(k)%i = min(probes(k)%i,Prnx)
-     probes(k)%j = min(probes(k)%j,Prny)
-     probes(k)%k = min(probes(k)%k,Prnz)
+       p%i = max(p%i,1)
+       p%j = max(p%j,1)
+       p%k = max(p%k,1)
+       p%i = min(p%i,Prnx)
+       p%j = min(p%j,Prny)
+       p%k = min(p%k,Prnz)
 
-     call GridCoordsU(probes(k)%Ui,probes(k)%Uj,probes(k)%Uk,probes(k)%x,probes(k)%y,probes(k)%z)
-     call GridCoordsV(probes(k)%Vi,probes(k)%Vj,probes(k)%Vk,probes(k)%x,probes(k)%y,probes(k)%z)
-     call GridCoordsW(probes(k)%Wi,probes(k)%Wj,probes(k)%Wk,probes(k)%x,probes(k)%y,probes(k)%z)
+       call GridCoordsU(p%Ui,p%Uj,p%Uk,p%x,p%y,p%z)
+       call GridCoordsV(p%Vi,p%Vj,p%Vk,p%x,p%y,p%z)
+       call GridCoordsW(p%Wi,p%Wj,p%Wk,p%x,p%y,p%z)
+     end associate
+   end do
+
+   do k = 1,number_of_scalar_probes
+     associate(p => scalar_probes(k))
+       call GridCoords(p%i,p%j,p%k,p%x,p%y,p%z)
+
+       p%i = max(p%i,1)
+       p%j = max(p%j,1)
+       p%k = max(p%k,1)
+       p%i = min(p%i,Prnx)
+       p%j = min(p%j,Prny)
+       p%k = min(p%k,Prnz)
+     end associate
    end do
 
    if (store%BLprofiles==1.and.averaging==1) then
@@ -337,6 +386,18 @@ contains
 
    call GetEndianness
 
+#if _WIN32 || _WIN64
+   call execute_command_line("mkdir output")
+#else
+   call execute_command_line("mkdir -p output")
+#endif
+
+   contains 
+     !FIXME: delete this as soon as supported by ifort
+     subroutine execute_command_line(cmd)
+       character(*) :: cmd
+       call system(cmd)
+     end subroutine
   end subroutine AllocateOutputs
 
 
@@ -382,84 +443,90 @@ contains
 
 
 
-    do k = 1,NumProbes
-      Utime(k,step)=Trilinint((probes(k)%x-xU(probes(k)%Ui))/(xU(probes(k)%Ui+1)-xU(probes(k)%Ui)),&
-                           (probes(k)%y-yPr(probes(k)%Uj))/(yPr(probes(k)%Uj+1)-yPr(probes(k)%Uj)),&
-                           (probes(k)%z-zPr(probes(k)%Uk))/(zPr(probes(k)%Uk+1)-zPr(probes(k)%Uk)),&
-                           U(probes(k)%Ui,probes(k)%Uj,probes(k)%Uk),U(probes(k)%Ui+1,probes(k)%Uj,probes(k)%Uk),&
-                           U(probes(k)%Ui,probes(k)%Uj+1,probes(k)%Uk),U(probes(k)%Ui,probes(k)%Uj,probes(k)%Uk+1),&
-                           U(probes(k)%Ui+1,probes(k)%Uj+1,probes(k)%Uk),U(probes(k)%Ui+1,probes(k)%Uj,probes(k)%Uk+1),&
-                           U(probes(k)%Ui,probes(k)%Uj+1,probes(k)%Uk+1),U(probes(k)%Ui+1,probes(k)%Uj+1,probes(k)%Uk+1))
+    do k = 1,number_of_probes
+      associate (p=> probes(k))
+        Utime(k,step)=Trilinint((p%x-xU(p%Ui))/(xU(p%Ui+1)-xU(p%Ui)),&
+                             (p%y-yPr(p%Uj))/(yPr(p%Uj+1)-yPr(p%Uj)),&
+                             (p%z-zPr(p%Uk))/(zPr(p%Uk+1)-zPr(p%Uk)),&
+                             U(p%Ui,p%Uj,p%Uk),U(p%Ui+1,p%Uj,p%Uk),&
+                             U(p%Ui,p%Uj+1,p%Uk),U(p%Ui,p%Uj,p%Uk+1),&
+                             U(p%Ui+1,p%Uj+1,p%Uk),U(p%Ui+1,p%Uj,p%Uk+1),&
+                             U(p%Ui,p%Uj+1,p%Uk+1),U(p%Ui+1,p%Uj+1,p%Uk+1))
 
-      Vtime(k,step)=Trilinint((probes(k)%x-xPr(probes(k)%Vi))/(xPr(probes(k)%Vi+1)-xPr(probes(k)%Vi)),&
-                           (probes(k)%y-yV(probes(k)%Vj))/(yV(probes(k)%Vj+1)-yV(probes(k)%Vj)),&
-                           (probes(k)%z-zPr(probes(k)%Vk))/(zPr(probes(k)%Vk+1)-zPr(probes(k)%Vk)),&
-                           V(probes(k)%Vi,probes(k)%Vj,probes(k)%Vk),V(probes(k)%Vi+1,probes(k)%Vj,probes(k)%Vk),&
-                           V(probes(k)%Vi,probes(k)%Vj+1,probes(k)%Vk),V(probes(k)%Vi,probes(k)%Vj,probes(k)%Vk+1),&
-                           V(probes(k)%Vi+1,probes(k)%Vj+1,probes(k)%Vk),V(probes(k)%Vi+1,probes(k)%Vj,probes(k)%Vk+1),&
-                           V(probes(k)%Vi,probes(k)%Vj+1,probes(k)%Vk+1),V(probes(k)%Vi+1,probes(k)%Vj+1,probes(k)%Vk+1))
+        Vtime(k,step)=Trilinint((p%x-xPr(p%Vi))/(xPr(p%Vi+1)-xPr(p%Vi)),&
+                             (p%y-yV(p%Vj))/(yV(p%Vj+1)-yV(p%Vj)),&
+                             (p%z-zPr(p%Vk))/(zPr(p%Vk+1)-zPr(p%Vk)),&
+                             V(p%Vi,p%Vj,p%Vk),V(p%Vi+1,p%Vj,p%Vk),&
+                             V(p%Vi,p%Vj+1,p%Vk),V(p%Vi,p%Vj,p%Vk+1),&
+                             V(p%Vi+1,p%Vj+1,p%Vk),V(p%Vi+1,p%Vj,p%Vk+1),&
+                             V(p%Vi,p%Vj+1,p%Vk+1),V(p%Vi+1,p%Vj+1,p%Vk+1))
 
-      Wtime(k,step)=Trilinint((probes(k)%x-xPr(probes(k)%Wi))/(xPr(probes(k)%Wi+1)-xPr(probes(k)%Wi)),&
-                           (probes(k)%y-yPr(probes(k)%Wj))/(yPr(probes(k)%Wj+1)-yPr(probes(k)%Wj)),&
-                           (probes(k)%z-zW(probes(k)%Wk))/(zW(probes(k)%Wk+1)-zW(probes(k)%Wk)),&
-                           W(probes(k)%Wi,probes(k)%Wj,probes(k)%Wk),W(probes(k)%Wi+1,probes(k)%Wj,probes(k)%Wk),&
-                           W(probes(k)%Wi,probes(k)%Wj+1,probes(k)%Wk),W(probes(k)%Wi,probes(k)%Wj,probes(k)%Wk+1),&
-                           W(probes(k)%Wi+1,probes(k)%Wj+1,probes(k)%Wk),W(probes(k)%Wi+1,probes(k)%Wj,probes(k)%Wk+1),&
-                           W(probes(k)%Wi,probes(k)%Wj+1,probes(k)%Wk+1),W(probes(k)%Wi+1,probes(k)%Wj+1,probes(k)%Wk+1))
+        Wtime(k,step)=Trilinint((p%x-xPr(p%Wi))/(xPr(p%Wi+1)-xPr(p%Wi)),&
+                             (p%y-yPr(p%Wj))/(yPr(p%Wj+1)-yPr(p%Wj)),&
+                             (p%z-zW(p%Wk))/(zW(p%Wk+1)-zW(p%Wk)),&
+                             W(p%Wi,p%Wj,p%Wk),W(p%Wi+1,p%Wj,p%Wk),&
+                             W(p%Wi,p%Wj+1,p%Wk),W(p%Wi,p%Wj,p%Wk+1),&
+                             W(p%Wi+1,p%Wj+1,p%Wk),W(p%Wi+1,p%Wj,p%Wk+1),&
+                             W(p%Wi,p%Wj+1,p%Wk+1),W(p%Wi+1,p%Wj+1,p%Wk+1))
 
-      Prtime(k,step)=Trilinint((probes(k)%x-xPr(probes(k)%i))/(xPr(probes(k)%i+1)-xPr(probes(k)%i)),&
-                           (probes(k)%y-yPr(probes(k)%j))/(yPr(probes(k)%j+1)-yPr(probes(k)%j)),&
-                           (probes(k)%z-zPr(probes(k)%k))/(zPr(probes(k)%k+1)-zPr(probes(k)%k)),&
-                            Pr(probes(k)%i,probes(k)%j,probes(k)%k),&
-                            Pr(min(probes(k)%i+1,Unx+1),probes(k)%j,probes(k)%k),&
-                            Pr(probes(k)%i,min(probes(k)%j+1,Vny+1),probes(k)%k),&
-                            Pr(probes(k)%i,probes(k)%j,min(probes(k)%k+1,Wnz+1)),&
-                            Pr(min(probes(k)%i+1,Unx+1),min(probes(k)%j+1,Vny+1),probes(k)%k),&
-                            Pr(min(probes(k)%i+1,Unx+1),probes(k)%j,min(probes(k)%k+1,Wnz+1)),&
-                            Pr(probes(k)%i,min(probes(k)%j+1,Vny+1),min(probes(k)%k+1,Wnz+1)),&
-                            Pr(min(probes(k)%i+1,Unx+1),min(probes(k)%j+1,Vny+1),min(probes(k)%k+1,Wnz+1)))
+        Prtime(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)),&
+                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)),&
+                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)),&
+                              Pr(p%i,p%j,p%k),&
+                              Pr(min(p%i+1,Unx+1),p%j,p%k),&
+                              Pr(p%i,min(p%j+1,Vny+1),p%k),&
+                              Pr(p%i,p%j,min(p%k+1,Wnz+1)),&
+                              Pr(min(p%i+1,Unx+1),min(p%j+1,Vny+1),p%k),&
+                              Pr(min(p%i+1,Unx+1),p%j,min(p%k+1,Wnz+1)),&
+                              Pr(p%i,min(p%j+1,Vny+1),min(p%k+1,Wnz+1)),&
+                              Pr(min(p%i+1,Unx+1),min(p%j+1,Vny+1),min(p%k+1,Wnz+1)))
 
-      if (enable_buoyancy==1) then
-        temptime(k,step)=Trilinint((probes(k)%x-xPr(probes(k)%i))/(xPr(probes(k)%i+1)-xPr(probes(k)%i)),&
-                           (probes(k)%y-yPr(probes(k)%j))/(yPr(probes(k)%j+1)-yPr(probes(k)%j)),&
-                           (probes(k)%z-zPr(probes(k)%k))/(zPr(probes(k)%k+1)-zPr(probes(k)%k)),&
-                           Temperature(probes(k)%i,probes(k)%j,probes(k)%k),&
-                           Temperature(probes(k)%i+1,probes(k)%j,probes(k)%k),&
-                           Temperature(probes(k)%i,probes(k)%j+1,probes(k)%k),&
-                           Temperature(probes(k)%i,probes(k)%j,probes(k)%k+1),&
-                           Temperature(probes(k)%i+1,probes(k)%j+1,probes(k)%k),&
-                           Temperature(probes(k)%i+1,probes(k)%j,probes(k)%k+1),&
-                           Temperature(probes(k)%i,probes(k)%j+1,probes(k)%k+1),&
-                           Temperature(probes(k)%i+1,probes(k)%j+1,probes(k)%k+1))
-      end if
+        if (enable_buoyancy==1) then
+          temptime(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)),&
+                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)),&
+                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)),&
+                             Temperature(p%i,p%j,p%k),&
+                             Temperature(p%i+1,p%j,p%k),&
+                             Temperature(p%i,p%j+1,p%k),&
+                             Temperature(p%i,p%j,p%k+1),&
+                             Temperature(p%i+1,p%j+1,p%k),&
+                             Temperature(p%i+1,p%j,p%k+1),&
+                             Temperature(p%i,p%j+1,p%k+1),&
+                             Temperature(p%i+1,p%j+1,p%k+1))
+        end if
 
-      if (enable_moisture==1) then
-        moisttime(k,step)=Trilinint((probes(k)%x-xPr(probes(k)%i))/(xPr(probes(k)%i+1)-xPr(probes(k)%i)),&
-                           (probes(k)%y-yPr(probes(k)%j))/(yPr(probes(k)%j+1)-yPr(probes(k)%j)),&
-                           (probes(k)%z-zPr(probes(k)%k))/(zPr(probes(k)%k+1)-zPr(probes(k)%k)),&
-                           Moisture(probes(k)%i,probes(k)%j,probes(k)%k),&
-                           Moisture(probes(k)%i+1,probes(k)%j,probes(k)%k),&
-                           Moisture(probes(k)%i,probes(k)%j+1,probes(k)%k),&
-                           Moisture(probes(k)%i,probes(k)%j,probes(k)%k+1),&
-                           Moisture(probes(k)%i+1,probes(k)%j+1,probes(k)%k),&
-                           Moisture(probes(k)%i+1,probes(k)%j,probes(k)%k+1),&
-                           Moisture(probes(k)%i,probes(k)%j+1,probes(k)%k+1),&
-                           Moisture(probes(k)%i+1,probes(k)%j+1,probes(k)%k+1))
-      end if
+        if (enable_moisture==1) then
+          moisttime(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)),&
+                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)),&
+                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)),&
+                             Moisture(p%i,p%j,p%k),&
+                             Moisture(p%i+1,p%j,p%k),&
+                             Moisture(p%i,p%j+1,p%k),&
+                             Moisture(p%i,p%j,p%k+1),&
+                             Moisture(p%i+1,p%j+1,p%k),&
+                             Moisture(p%i+1,p%j,p%k+1),&
+                             Moisture(p%i,p%j+1,p%k+1),&
+                             Moisture(p%i+1,p%j+1,p%k+1))
+        end if
+      end associate
+    end do
 
-      do l = 1,num_of_scalars
-        scalptime(l,k,step)=Trilinint((probes(k)%x-xPr(probes(k)%i))/(xPr(probes(k)%i+1)-xPr(probes(k)%i)),&
-                           (probes(k)%y-yPr(probes(k)%j))/(yPr(probes(k)%j+1)-yPr(probes(k)%j)),&
-                           (probes(k)%z-zPr(probes(k)%k))/(zPr(probes(k)%k+1)-zPr(probes(k)%k)),&
-                           Scalar(probes(k)%i,probes(k)%j,probes(k)%k,l),&
-                           Scalar(probes(k)%i+1,probes(k)%j,probes(k)%k,l),&
-                           Scalar(probes(k)%i,probes(k)%j+1,probes(k)%k,l),&
-                           Scalar(probes(k)%i,probes(k)%j,probes(k)%k+1,l),&
-                           Scalar(probes(k)%i+1,probes(k)%j+1,probes(k)%k,l),&
-                           Scalar(probes(k)%i+1,probes(k)%j,probes(k)%k+1,l),&
-                           Scalar(probes(k)%i,probes(k)%j+1,probes(k)%k+1,l),&
-                           Scalar(probes(k)%i+1,probes(k)%j+1,probes(k)%k+1,l))
-      end do
+    do k = 1,number_of_scalar_probes    
+      associate (p=> scalar_probes(k))
+        do l = 1,num_of_scalars
+          scalptime(l,k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)),&
+                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)),&
+                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)),&
+                             Scalar(p%i,p%j,p%k,l),&
+                             Scalar(p%i+1,p%j,p%k,l),&
+                             Scalar(p%i,p%j+1,p%k,l),&
+                             Scalar(p%i,p%j,p%k+1,l),&
+                             Scalar(p%i+1,p%j+1,p%k,l),&
+                             Scalar(p%i+1,p%j,p%k+1,l),&
+                             Scalar(p%i,p%j+1,p%k+1,l),&
+                             Scalar(p%i+1,p%j+1,p%k+1,l))
+        end do
+      end associate
     end do
 
     if (store%tke==1) then
@@ -619,38 +686,38 @@ contains
     real(knd) :: S,S2,nom,denom
     integer :: i,j,k,unit
 
-    do k = 1,NumProbes
+    call newunit(unit)
+
+    do k = 1,number_of_probes
 
       write(prob,"(i2.2)") k
 
-      call newunit(unit)
-
-      open(unit,file="Prtimep"//prob//".txt")
+      open(unit,file="output/Prtimep"//prob//".txt")
       do j = 0,endstep
        write (unit,*) times(j),Prtime(k,j)
       end do
       close(unit)
 
-      open(unit,file="Utimep"//prob//".txt")
+      open(unit,file="output/Utimep"//prob//".txt")
       do j = 0,endstep
        write (unit,*) times(j),Utime(k,j)
       end do
       close(unit)
 
-      open(unit,file="Vtimep"//prob//".txt")
+      open(unit,file="output/Vtimep"//prob//".txt")
       do j = 0,endstep
        write (unit,*) times(j),Vtime(k,j)
       end do
       close(unit)
 
-      open(unit,file="Wtimep"//prob//".txt")
+      open(unit,file="output/Wtimep"//prob//".txt")
       do j = 0,endstep
        write (unit,*) times(j),Wtime(k,j)
       end do
       close(unit)
 
       if (enable_buoyancy==1) then
-        open(unit,file="temptimep"//prob//".txt")
+        open(unit,file="output/temptimep"//prob//".txt")
         do j = 0,endstep
          write (unit,*) times(j),temptime(k,j)
         end do
@@ -658,17 +725,23 @@ contains
       end if
 
       if (enable_moisture==1) then
-        open(unit,file="moisttimep"//prob//".txt")
+        open(unit,file="output/moisttimep"//prob//".txt")
         do j = 0,endstep
          write (unit,*) times(j),moisttime(k,j)
         end do
         close(unit)
       end if
 
+    end do
+
+    do k = 1,number_of_scalar_probes
+
+      write(prob,"(i2.2)") k
+
       if (num_of_scalars>0) then
-        open(unit,file="scaltimep"//prob//".txt")
+        open(unit,file="output/scaltimep"//prob//".txt")
         do j = 1,endstep
-         write (unit,*) times(j),scalptime(:,k,j)
+         write (unit,'(99(g0,tr3))') times(j),scalptime(:,k,j)
         end do
         close(unit)
       end if
@@ -676,7 +749,7 @@ contains
     end do
 
     if (store%deltime==1) then
-      open(unit,file="deltime.txt")
+      open(unit,file="output/deltime.txt")
       do j = 1,endstep
        write (unit,*) times(j),deltime(j)
       end do
@@ -684,7 +757,7 @@ contains
     end if
 
     if (store%tke==1) then
-      open(unit,file="tke.txt")
+      open(unit,file="output/tke.txt")
       do j = 0,endstep
        write (unit,*) times(j),tke(j)
       end do
@@ -692,7 +765,7 @@ contains
     end if
 
     if (store%tke==1.and.store%dissip==1) then
-     open(unit,file="dissip.txt")
+     open(unit,file="output/dissip.txt")
       do j = 1,endstep
        write (unit,*) times(j),dissip(j)
       end do
@@ -700,7 +773,7 @@ contains
     end if
 
     if (wallmodeltype>0.and.display%ustar==1) then
-      open(unit,file="Retau.txt")
+      open(unit,file="output/Retau.txt")
       do j = 0,endstep
        write (unit,*) times(j),ustar(:,j)
       end do
@@ -708,7 +781,7 @@ contains
     end if
 
     if (wallmodeltype>0.and.enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET.and.store%tstar==1) then
-      open(unit,file="tflux.txt")
+      open(unit,file="output/tflux.txt")
       do j = 0,endstep
        write (unit,*) times(j),tstar(:,j)
       end do
@@ -717,7 +790,7 @@ contains
 
 
     if (num_of_scalars>0.and.store%scalsumtime==1) then
-      open(unit,file="scalsumtime.txt")
+      open(unit,file="output/scalsumtime.txt")
       do j = 1,endstep
        write (unit,*) times(j),scalsumtime(:,j)
       end do
@@ -725,7 +798,7 @@ contains
     end if
 
     if (num_of_scalars>0.and.store%scaltotsumtime==1) then
-      open(unit,file="scaltotsumtime.txt")
+      open(unit,file="output/scaltotsumtime.txt")
       do j = 1,endstep
        write (unit,*) times(j),sum(scalsumtime(:,j))
       end do
@@ -735,43 +808,43 @@ contains
 
     if (store%BLprofiles==1.and.averaging==1) then
 
-       open(unit,file="profu.txt")
+       open(unit,file="output/profu.txt")
        do k = 1,Unz
         write (unit,*) zPr(k),profuavg(k)
        end do
        close(unit)
 
-       open(unit,file="profv.txt")
+       open(unit,file="output/profv.txt")
        do k = 1,Vnz
         write (unit,*) zPr(k),profvavg(k)
        end do
        close(unit)
 
-       open(unit,file="profuu.txt")
+       open(unit,file="output/profuu.txt")
        do k = 1,Unz
         write (unit,*) zPr(k),profuuavg(k)
        end do
        close(unit)
 
-       open(unit,file="profvv.txt")
+       open(unit,file="output/profvv.txt")
        do k = 1,Vnz
         write (unit,*) zPr(k),profvvavg(k)
        end do
        close(unit)
 
-       open(unit,file="profww.txt")
+       open(unit,file="output/profww.txt")
        do k = 1,Wnz
         write (unit,*) zW(k),profwwavg(k)
        end do
        close(unit)
 
-       open(unit,file="profuw.txt")
+       open(unit,file="output/profuw.txt")
        do k = 0,Prnz
         write (unit,*) zW(k),profuwavg(k),profuwsgsavg(k)
        end do
        close(unit)
 
-       open(unit,file="profvw.txt")
+       open(unit,file="output/profvw.txt")
        do k = 0,Prnz
         write (unit,*) zW(k),profvwavg(k),profvwsgsavg(k)
        end do
@@ -779,26 +852,26 @@ contains
 
        if (enable_buoyancy==1) then
 
-          open(unit,file="proftemp.txt")
+          open(unit,file="output/proftemp.txt")
           do k = 1,Prnz
            write (unit,*) zPr(k),proftempavg(k)
           end do
           close(unit)
 
-          open(unit,file="proftempfl.txt")
+          open(unit,file="output/proftempfl.txt")
           do k = 0,Prnz
            write (unit,*) zW(k),proftempflavg(k),proftempflsgsavg(k)
           end do
           close(unit)
 
-          open(unit,file="proftt.txt")
+          open(unit,file="output/proftt.txt")
           do k = 1,Prnz
            write (unit,*) zPr(k),profttavg(k)
           end do
           close(unit)
 
           if (allocated(U_avg).and.allocated(V_avg).and.allocated(Temperature_avg)) then
-            open(unit,file="profRig.txt")
+            open(unit,file="output/profRig.txt")
             do k = 1,Prnz
              S = 0
              do j = 1,Prny
@@ -811,7 +884,7 @@ contains
             end do
             close(unit)
 
-            open(unit,file="profRf.txt")
+            open(unit,file="output/profRf.txt")
             do k = 1,Prnz
              S = 0
              S2 = 0
@@ -843,19 +916,19 @@ contains
 
        if (enable_moisture==1) then
 
-          open(unit,file="profmoist.txt")
+          open(unit,file="output/profmoist.txt")
           do k = 1,Prnz
            write (unit,*) zPr(k),profmoistavg(k)
           end do
           close(unit)
 
-          open(unit,file="profmoistfl.txt")
+          open(unit,file="output/profmoistfl.txt")
           do k = 0,Prnz
            write (unit,*) zW(k),profmoistflavg(k),profmoistflsgsavg(k)
           end do
           close(unit)
 
-          open(unit,file="profmm.txt")
+          open(unit,file="output/profmm.txt")
           do k = 1,Prnz
            write (unit,*) zPr(k),profmmavg(k)
           end do
@@ -866,19 +939,19 @@ contains
 
        if (num_of_scalars>0) then
 
-          open(unit,file="profscal.txt")
+          open(unit,file="output/profscal.txt")
           do k = 1,Prnz
            write (unit,*) zPr(k),(profscalavg(i,k), i = 1,num_of_scalars)
           end do
           close(unit)
 
-          open(unit,file="profscalfl.txt")
+          open(unit,file="output/profscalfl.txt")
           do k = 0,Prnz
            write (unit,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i = 1,num_of_scalars)
           end do
           close(unit)
 
-          open(unit,file="profss.txt")
+          open(unit,file="output/profss.txt")
           do k = 1,Prnz
            write (unit,*) zPr(k),(profssavg(i,k), i = 1,num_of_scalars)
           end do
@@ -909,7 +982,7 @@ contains
 
        call newunit(unit);
 
-       open(unit,file="out.vtk", &
+       open(unit,file="output/out.vtk", &
          access='stream',status='replace',form="unformatted",action="write")
 
        write (unit) "# vtk DataFile Version 2.0",lf
@@ -1090,7 +1163,7 @@ contains
 
           call newunit(unit)
 
-          open(unit,file="scalars.vtk",&
+          open(unit,file="output/scalars.vtk",&
             access='stream',status='replace',form="unformatted",action="write")
 
           write (unit) "# vtk DataFile Version 2.0",lf
@@ -1135,7 +1208,7 @@ contains
 
           call newunit(unit)
 
-          open(unit,file="deposition.vtk",&
+          open(unit,file="output/deposition.vtk",&
             access='stream',status='replace',form="unformatted",action="write")
 
           write (unit) "CLMM output file",lf
@@ -1198,12 +1271,12 @@ contains
     integer i,j,k,l,unit
     real(real32),allocatable :: tmp(:,:,:,:)
 
-    if (averaging==1.and.store%avg==1) then
+    if (averaging==1.and.btest(store%avg,0)) then
         allocate(tmp(1:3,1:Prnx,1:Prny,1:Prnz))
 
         call newunit(unit)
 
-        open(unit,file="avg.vtk",&
+        open(unit,file="output/avg.vtk",&
           access='stream',status='replace',form="unformatted",action="write")
 
         write (unit) "# vtk DataFile Version 2.0",lf
@@ -1307,9 +1380,11 @@ contains
         close(unit)
     end if !averaging
 
+    if (averaging==1.and.btest(store%avg,1)) call OutputUVW(U,V,W,"output/Uavg.vtk","output/Vavg.vtk","output/Wavg.vtk",.true.)
+
     if (averaging==1.and.store%scalarsavg==1) then
         if (num_of_scalars>0) then
-            open(unit,file="scalarsavg.vtk",&
+            open(unit,file="output/scalarsavg.vtk",&
               access='stream',status='replace',form="unformatted",action="write")
 
             write (unit) "# vtk DataFile Version 2.0",lf
@@ -1353,17 +1428,25 @@ contains
 
 
 
-  subroutine OutputUVW(U,V,W)
+  subroutine OutputUVW(U,V,W,fnameU,fnameV,fnameW,avg_mode_arg)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    character(*),intent(in) :: fnameU,fnameV,fnameW
+    logical,optional,intent(in) :: avg_mode_arg
     character(70) :: str
-    integer i,unit
+    integer :: i,unit
+    logical :: avg_mode
 
+    if (present(avg_mode_arg)) then
+      avg_mode = avg_mode_arg
+    else
+      avg_mode = .false.
+    end if
 
-    if (store%U==1) then
+    if (store%U==1.or.avg_mode) then
 
         call newunit(unit)
 
-        open(unit,file="U.vtk",&
+        open(unit,file=fnameU,&
           access='stream',status='replace',form="unformatted",action="write")
 
         write (unit) "# vtk DataFile Version 2.0",lf
@@ -1409,11 +1492,11 @@ contains
         close(unit)
     end if
 
-    if (store%V==1) then
+    if (store%V==1.or.avg_mode) then
 
         call newunit(unit)
 
-        open(unit,file="V.vtk",&
+        open(unit,file=fnameV,&
           access='stream',status='replace',form="unformatted",action="write")
 
         write (unit) "# vtk DataFile Version 2.0",lf
@@ -1459,11 +1542,11 @@ contains
         close(unit)
     end if !store%V
 
-    if (store%W==1) then
+    if (store%W==1.or.avg_mode) then
 
         call newunit(unit)
 
-        open(unit,file="W.vtk",&
+        open(unit,file=fnameW,&
           access='stream',status='replace',form="unformatted",action="write")
 
         write (unit) "# vtk DataFile Version 2.0",lf
@@ -1509,11 +1592,11 @@ contains
         close(unit)
     end if !store%W
 
-    if (store%U_interp/=0) then
+    if (store%U_interp/=0 .and. .not.avg_mode) then
 
       call newunit(unit)
 
-      open(unit,file="Uinterp.txt")
+      open(unit,file="output/Uinterp.txt")
       do i = 1,size(UIBPoints)
         write(unit,*) "xi,yj,zk",UIBPoints(i)%xi,UIBPoints(i)%yj,UIBPoints(i)%zk
         write(unit,*) "interp",UIBPoints(i)%interp
@@ -1525,11 +1608,11 @@ contains
       close(unit)
     end if
 
-    if (store%V_interp/=0) then
+    if (store%V_interp/=0 .and. .not.avg_mode) then
 
       call newunit(unit)
 
-      open(unit,file="Vinterp.txt")
+      open(unit,file="output/Vinterp.txt")
       do i = 1,size(VIBPoints)
         write(unit,*) "xi,yj,zk",VIBPoints(i)%xi,VIBPoints(i)%yj,VIBPoints(i)%zk
         write(unit,*) "interp",VIBPoints(i)%interp
@@ -1545,7 +1628,7 @@ contains
 
       call newunit(unit)
 
-      open(unit,file="Winterp.txt")
+      open(unit,file="output/Winterp.txt")
       do i = 1,size(WIBPoints)
         write(unit,*) "xi,yj,zk",WIBPoints(i)%xi,WIBPoints(i)%yj,WIBPoints(i)%zk
         write(unit,*) "interp",WIBPoints(i)%interp
@@ -1561,7 +1644,7 @@ contains
 
       call newunit(unit)
 
-      open(unit,file="Scinterp.txt")
+      open(unit,file="output/Scinterp.txt")
       do i = 1,size(ScalFlIBPoints)
         write(unit,*) "xi,yj,zk",ScalFlIBPoints(i)%xi,ScalFlIBPoints(i)%yj,ScalFlIBPoints(i)%zk
         write(unit,*) "interp",ScalFlIBPoints(i)%interp
@@ -1598,7 +1681,7 @@ contains
 
     if (time>=timeavg1) call OutputAvg(U_avg,V_avg,W_avg,Pr_avg,Temperature_avg,Moisture_avg,Scalar_avg)
 
-    call OutputUVW(U,V,W)
+    call OutputUVW(U,V,W,"U.vtk","V.vtk","W.vtk")
 
     if (time>=timeavg1) call OutputProfiles
 
@@ -1697,8 +1780,8 @@ contains
     real(knd),intent(in) :: Scalar(-1:,-1:,-1:,:)
     integer,intent(in)   :: n
     integer i,j,k,l,m
-    character(20) :: fname,fnumber
-    character(20) :: fsuffix
+    character(40) :: fname
+    character(4) :: fsuffix,fnumber
     character(70) :: str
     character(8) ::  scalname="scalar00"
     integer mini,maxi,minj,maxj,mink,maxk
@@ -1713,7 +1796,7 @@ contains
     !$omp    dxmin,dymin,dzmin,temperature_ref)
     do m = 1,size(store%frame_domains)
 
-      fname="frame-"//achar(iachar('a')+m-1)//"-"
+      fname="output/frame-"//achar(iachar('a')+m-1)//"-"
       write(fnumber,"(I4.4)") n
       write(*,*) "Saving frame:",fnumber,"   time:",time
 
@@ -1982,7 +2065,8 @@ contains
 
       end if
       close(unit)
-
+      if (allocated(buffer)) deallocate(buffer)
+      if (allocated(vbuffer)) deallocate(vbuffer)
     end do   !frame_domains
     !$omp end parallel do
   end subroutine Frame
@@ -2414,7 +2498,7 @@ contains
 
     call newunit(unit)
 
-    open(unit,file="U2.vtk")
+    open(unit,file="output/U2.vtk")
     write (unit) "# vtk DataFile Version 2.0",lf
     write (unit) "CLMM output file",lf
     write (unit) "BINARY",lf
@@ -2448,7 +2532,7 @@ contains
     close(unit)
 
 
-    open(unit,file="V2.vtk")
+    open(unit,file="output/V2.vtk")
     write (unit) "# vtk DataFile Version 2.0",lf
     write (unit) "CLMM output file",lf
     write (unit) "BINARY",lf
@@ -2482,7 +2566,7 @@ contains
     close(unit)
 
 
-    open(unit,file="W2.vtk")
+    open(unit,file="output/W2.vtk")
     write (unit) "# vtk DataFile Version 2.0",lf
     write (unit) "CLMM output file",lf
     write (unit) "BINARY",lf
@@ -2527,7 +2611,7 @@ contains
     if ((time>=timefram1).and.(time<=timefram2+(timefram2-timefram1)/(frames-1))&
         .and.(time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
      if (called==0) then
-      open(101,file="inletframeinfo.unf",form='unformatted',status='replace',action='write')
+      open(101,file="output/inletframeinfo.unf",form='unformatted',status='replace',action='write')
       write(101) Prny,Prnz  !for check of consistency of grids before use
       write(101) Vny
       write(101) Wnz

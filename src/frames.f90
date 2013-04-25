@@ -92,7 +92,7 @@ module StaggeredFrames
     integer :: buffer_size = 0
     real(knd),allocatable :: buffer(:)
 
-    character(20) :: base_name
+    character(40) :: base_name
     character(4)  :: suffix = ".unf"
     integer       :: ndigits
 
@@ -204,7 +204,7 @@ module StaggeredFrames
       type(TFrameTimes),intent(in) :: time_params
       type(TSaveFlags),intent(in) :: save_flags
 
-      D%base_name = "stagframe-"//label
+      D%base_name = "output/stagframe-"//label
 
       D%frame_times = time_params
 

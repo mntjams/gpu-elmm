@@ -7,11 +7,8 @@ module SolarRadiation
 
   real(knd) :: sun_azimuth, sun_elevation !in degrees
   real(knd) :: vector_to_sun(3) !unit vector pointing to sun in grid coordinates
-  real(knd) :: diffuse_to_direct = 0.2
-  real(knd) :: direct_radiation = 800 !W/m^2
-  real(knd) :: diffuse_radiation = 200 !W/m^2
   
-  integer :: svf_nrays = 30
+  integer :: svf_nrays = 50
   
   real(knd),allocatable :: svf_vecs(:,:)
   
@@ -19,16 +16,17 @@ contains
   
   pure function solar_direct_flux() result(res)
     real(knd) :: res
-    res = 800._knd
+    res = 0!800._knd
   end function
 
   pure function solar_diffuse_flux() result(res)
     real(knd) :: res
-    res = 200._knd
+    res = 0!200._knd
   end function
 
   subroutine InitSolarRadiation
     real(knd) :: horiz_component, horiz_angle
+    real(knd) :: azimuth,elevation
     integer i
    
     sun_azimuth = 237
@@ -44,11 +42,16 @@ contains
     allocate(svf_vecs(3,svf_nrays))
     
     do i=1,svf_nrays
-      call random_number(svf_vecs(1,i))
-      svf_vecs(1,i) = svf_vecs(1,i)*2 - 1
-      call random_number(svf_vecs(2,i))
-      svf_vecs(2,i) = svf_vecs(2,i)*2 - 1
-      call random_number(svf_vecs(3,i))
+    
+      call random_number(azimuth)
+      call random_number(elevation)
+      elevation = elevation * pi / 2
+      azimuth = azimuth * pi * 2
+      horiz_component = cos(elevation)
+
+      svf_vecs(1,i) = horiz_component * cos(azimuth)
+      svf_vecs(2,i) = horiz_component * sin(azimuth)
+      svf_vecs(3,i) = sin(elevation)
     end do
     
   end subroutine
