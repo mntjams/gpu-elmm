@@ -39,6 +39,8 @@ implicit none
    real(knd) :: disty
    real(knd) :: distz
 
+   real(knd) :: area_factor ![m^-1] area of the solid wall divided by the volume of the cell(xi,yj,zk)
+
    real(knd) :: z0 = 0
    real(knd) :: ustar = 1
    real(knd) :: temp = 0
@@ -55,7 +57,7 @@ implicit none
 
    real(knd),allocatable:: depscalar(:)
 
-   integer,allocatable :: bound_IBPs(:)   
+!    integer,allocatable :: bound_IBPs(:)   
 
    type(WMpoint),pointer:: next=>null()
 
@@ -110,6 +112,8 @@ implicit none
     ToWMP%disty = FromWMP%disty
     ToWMP%distz = FromWMP%distz
 
+    ToWMP%area_factor = FromWMP%area_factor
+
     ToWMP%z0     = FromWMP%z0
     ToWMP%ustar  = FromWMP%ustar
     ToWMP%temp   = FromWMP%temp
@@ -121,12 +125,25 @@ implicit none
 
     allocate(ToWMP%depscalar(size(FromWMP%depscalar)), source=FromWMP%depscalar)
 
-    associate(src => FromWMP%bound_IBPs)
-      if (allocated(FromWMP%bound_IBPs)) allocate(ToWMP%bound_IBPs(size(src)), source=src)
-    end associate
+!     associate(src => FromWMP%bound_IBPs)
+!       if (allocated(FromWMP%bound_IBPs)) allocate(ToWMP%bound_IBPs(size(src)), source=src)
+!     end associate
 
 
   end subroutine WMPtoWMP
+
+
+
+  subroutine ComputeAreaFactor(p)
+    type(WMpoint),intent(inout):: p
+    real(knd) :: out_norm(3)
+    !FIXME: Not accurate!!!
+    if (all([-p%distx, -p%disty, -p%distz]==0)) return !HACK!!!
+    out_norm = [-p%distx, -p%disty, -p%distz] / &
+                     hypot(hypot(p%distx,p%disty),p%distz)
+    p%area_factor = 1._knd/dot_product([dxmin,dymin,dzmin],abs(out_norm))
+  end subroutine  
+
 
 
   subroutine AddWMpoint(WMP)
@@ -141,8 +158,6 @@ implicit none
        FirstWMPoint%depscalar = 0
      end if
 
-     if (enable_radiation==1) allocate(FirstWMPoint%bound_IBPs(0))
-
      FirstWMPoint = WMP
      LastWMPoint=>FirstWMPoint
 
@@ -155,12 +170,13 @@ implicit none
        LastWMPoint%next%depscalar = 0
      end if
 
-     if (enable_radiation==1) allocate(LastWMPoint%next%bound_IBPs(0))
-
      LastWMPoint%next = WMP
      LastWMPoint=>LastWMPoint%next
 
     end if
+
+    call ComputeAreaFactor(LastWMPoint)
+
   end subroutine AddWMPoint
 
 
@@ -1183,7 +1199,7 @@ implicit none
 
          if (enable_buoyancy==1 .and. TempBtype(Bo)==CONSTFLUX) then
 
-           call WM_MO_FLUX(Visc(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%temperature_flux,&
+           call WM_MO_FLUX(Viscosity(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%temperature_flux,&
                            WMPoints(i)%z0, dist, vel)
 
          else if (enable_buoyancy==1 .and. TempBtype(Bo)==DIRICHLET) then
@@ -1192,14 +1208,14 @@ implicit none
 
            tdif = WMPoints(i)%temp - Temperature(xi,yj,zk)
 
-           call WM_MO_DIRICHLET(Visc(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%temperature_flux,&
+           call WM_MO_DIRICHLET(Viscosity(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%temperature_flux,&
                                 WMPoints(i)%z0, tdif, dist, vel)
 
            if (zk==1) BsideTFLArr(xi,yj) = WMPoints(i)%temperature_flux
 
          else
 
-           call WMRoughVisc(Visc(xi, yj, zk),&
+           call WMRoughVisc(Viscosity(xi, yj, zk),&
                             WMPoints(i)%ustar, WMPoints(i)%z0,&
                             dist, vel, wallvel)
          end if
@@ -1214,14 +1230,14 @@ implicit none
 
            call WallPrGradient(prgrad,xi,yj,zk,Pr,Prtype)
 
-           call WMFlatPrGradVisc(Visc(xi, yj, zk),&
+           call WMFlatPrGradVisc(Viscosity(xi, yj, zk),&
                            WMPoints(i)%ustar,&
                            dist, vel, wallvel, prgrad)
 
          else
 
 
-           call WMFlatVisc(Visc(xi, yj, zk),&
+           call WMFlatVisc(Viscosity(xi, yj, zk),&
                            WMPoints(i)%ustar,&
                            dist, vel, wallvel)
 

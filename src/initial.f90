@@ -1,14 +1,15 @@
 module Initial
 
   use PARAMETERS
+  use ArrayUtilities, only: avg
   use LIMITERS, only: limparam, limitertype
   use MULTIGRID, only: SetMGParams
   use MULTIGRID2d, only: SetMGParams2d
   use POISSON
   use BOUNDARIES
   use ScalarBoundaries
-  use OUTPUTS, only: store, display, probes, scalar_probes, number_of_probes, number_of_scalar_probes, &
-                     SetFrameDomain, StaggeredFrameDomains, ReadProbes
+  use OUTPUTS, only: store, display, probes, scalar_probes, frame_flags, &
+                     AddFrameDomain, SetFrameDomains, StaggeredFrameDomains, ReadProbes
   use SCALARS
   use Filters, only: filtertype, filter_ratios
   use Subgrid
@@ -16,8 +17,9 @@ module Initial
                Ustar_surf_inlet, stress_gradient_inlet, U_ref_inlet, z_ref_inlet, z0_inlet, power_exponent_inlet
   use SolarRadiation, only: InitSolarRadiation
   use SolidBodies, only: obstacles_file, InitSolidBodies
-  use ImmersedBoundary, only: GetSolidBodiesBC, InitIBPFluxes, SetIBPFluxes
+  use ImmersedBoundary, only: GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
   use VolumeSources, only: InitVolumeSources, InitVolumeSourceBodies
+  use LineSources, only: InitLineSources
   use WALLMODELS
   use TILING, only: tilesize,InitTiles
   use FreeUnit, only: newunit
@@ -43,8 +45,6 @@ contains
    character(80), save :: probes_file = ""
    character(80), save :: scalar_probes_file = ""
 
-   namelist /cmd/ tilesize, debugparam, debuglevel, windangle, projectiontype, Prnx, Prny, Prnz,&
-                   obstacles_file, probes_file, scalar_probes_file
    character(len = 1024) :: commandline,msg
    integer :: exenamelength
    integer :: unit
@@ -54,12 +54,17 @@ contains
    type(TSaveFlags) :: frame_save_flags
    character(10) :: domain_label
    integer :: num_staggered_domains
+   integer :: number_of_probes, number_of_scalar_probes
+
+   integer :: dimension,direction
+   real(knd) :: position
 
    interface get
      procedure chget1
      procedure lget1, lget2, lget3
      procedure iget1, iget2, iget3
      procedure rget1, rget2, rget3
+     procedure rgetv3
    end interface
 
    call read_command_line
@@ -84,12 +89,12 @@ contains
    call get(timeavg2)
    call get(Re)
    write(*,*) "Re=",Re
-   call get(starttime)
-   write(*,*) "starttime=",starttime
-   call get(endtime)
-   write(*,*) "endtime=",endtime
-   call get(maxiter)
-   write(*,*) "maxiter=",maxiter
+   call get(start_time)
+   write(*,*) "start_time=",start_time
+   call get(end_time)
+   write(*,*) "end_time=",end_time
+   call get(max_number_of_time_steps)
+   write(*,*) "max_number_of_time_steps=",max_number_of_time_steps
    call get(eps)
    write(*,*) "eps=",eps
    call get(maxCNiter)
@@ -296,6 +301,7 @@ contains
    open(unit,file="moisture.conf",status="old",action="read",iostat = io)
    if (io==0) then
      call get(enable_moisture)
+     call get(moisture_ref)
      call get(MoistBtype(We))
      call get(MoistBtype(Ea))
      call get(MoistBtype(So))
@@ -435,6 +441,16 @@ contains
      write (*,*) "scalars.conf not found, no passive scalars for computation."
    end if
 
+
+   if (num_of_scalars>0) then
+      open(unit, file="line_sources.conf",status="old",action="read",iostat=io)
+      
+      if (io==0) then
+        call get_line_sources
+        close(unit)
+      end if
+   end if
+
    if (poissmet==3.or.poissmet==4.or.poissmet==5) then
      open(unit,file="mgopts.conf",status="old",action="read")
      call get(lmg)
@@ -472,38 +488,36 @@ contains
      call get(timefram2)
      read(unit,fmt='(/)')
 
-     read(unit,*) store%frame_U
-     call get(store%frame_vort)
-     call get(store%frame_Pr)
-     call get(store%frame_lambda2)
-     call get(store%frame_scalars)
-     if (num_of_scalars < 1) store%frame_scalars = 0
-     call get(store%frame_sumscalars)
-     if (num_of_scalars < 1) store%frame_sumscalars = 0
-     call get(store%frame_temperature)
-     if (enable_buoyancy /= 1) store%frame_temperature = 0
-     call get(store%frame_moisture)
-     if (enable_buoyancy /= 1) store%frame_moisture = 0
-     call get(store%frame_temperature_flux)
-     if (enable_buoyancy /= 1) store%frame_temperature_flux = 0
-     call get(store%frame_scalfl)
-     if (num_of_scalars < 1) store%frame_scalfl = 0
+     read(unit,*) frame_flags%U
+     call get(frame_flags%vort)
+     call get(frame_flags%Pr)
+     call get(frame_flags%lambda2)
+     call get(frame_flags%scalars)
+     if (num_of_scalars < 1) frame_flags%scalars = 0
+     call get(frame_flags%sumscalars)
+     if (num_of_scalars < 1) frame_flags%sumscalars = 0
+     call get(frame_flags%temperature)
+     if (enable_buoyancy /= 1) frame_flags%temperature = 0
+     call get(frame_flags%moisture)
+     if (enable_buoyancy /= 1) frame_flags%moisture = 0
+     call get(frame_flags%temperature_flux)
+     if (enable_buoyancy /= 1) frame_flags%temperature_flux = 0
+     call get(frame_flags%scalfl)
+     if (num_of_scalars < 1) frame_flags%scalfl = 0
+
+     call get(numframeslices)
+
+     do i = 1,numframeslices
+       call get(dimension)
+       call get(direction)
+       call get(position)
+       call AddFrameDomain(dimension,direction,position)
+     end do
+
    else
      frames = 0
      write (*,*) "frames.conf not found, no vtk frames will be saved."
    end if
-
-
-   call get(numframeslices)
-
-   allocate(store%frame_domains(numframeslices))
-
-   do i = 1,numframeslices
-     call get(store%frame_domains(i)%dimension)
-     call get(store%frame_domains(i)%direction)
-     call get(store%frame_domains(i)%position)
-   end do
-
    close(unit)
 
 
@@ -523,6 +537,7 @@ contains
        call get(frame_times%start, frame_times%end)
        call get(frame_save_flags%U, frame_save_flags%V, frame_save_flags%W)
        call get(frame_save_flags%Pr)
+       call get(frame_save_flags%Viscosity)
        call get(frame_save_flags%Temperature)
        if (enable_buoyancy /= 1) frame_save_flags%Temperature = .false.
        call get(frame_save_flags%Moisture)
@@ -546,61 +561,34 @@ contains
 
    open(unit,file="output.conf",status="old",action="read",iostat = io)
    if (io==0) then
-     call get(display%delta)
-     call get(display%ustar)
-     call get(display%tstar)
+     call read_namelist_output
 
-     call get(store%U)
-     call get(store%U_interp)
-     call get(store%V)
-     call get(store%V_interp)
-     call get(store%W)
-     call get(store%W_interp)
+     if (enable_buoyancy /= 1) then
+       store%out_temperature = 0
+       store%out_moisture = 0
+     end if
 
-     call get(store%out)
+     if (enable_buoyancy/=1) then
+       store%avg_temperature = 0
+       store%avg_moisture = 0
+     end if
 
-     call get(store%out_U)
-     call get(store%out_vort)
-     call get(store%out_Pr)
-     call get(store%out_Prtype)
-     call get(store%out_lambda2)
-     call get(store%out_temperature)
-     if (enable_buoyancy /= 1) store%out_temperature = 0
-     call get(store%out_moisture)
-     if (enable_moisture /= 1) store%out_moisture = 0
-     call get(store%out_div)
-     call get(store%out_visc)
+     if (num_of_scalars < 1) then
+       store%scalars = 0
+       store%scalars_avg = 0
+       store%scalsum_time = 0
+       store%scaltotsum_time = 0
+     end if
+     close(unit)
+   else
+     write(*,*) "No output.conf found, defaults will be used."
+   end if
 
-     call get(store%avg)
+   !probes_file and scalar_probes_file read from command line
+   if (probes_file == "" .and. scalar_probes_file == "") then
 
-     call get(store%avg_U)
-     call get(store%avg_vort)
-     call get(store%avg_Pr)
-     call get(store%avg_Prtype)
-     call get(store%avg_temperature)
-     if (enable_buoyancy/=1) store%avg_temperature = 0
-     call get(store%avg_moisture)
-     if (enable_moisture/=1) store%avg_moisture = 0
-
-     call get(store%scalars)
-     if (num_of_scalars < 1) store%scalars = 0
-     call get(store%scalarsavg)
-     if (num_of_scalars < 1) store%scalarsavg = 0
-
-     call get(store%deposition)
-
-     call get(store%deltime)
-     call get(store%tke)
-     call get(store%dissip)
-     call get(store%scalsumtime)
-     if (num_of_scalars < 1) store%scalsumtime = 0
-     call get(store%scaltotsumtime)
-     if (num_of_scalars < 1) store%scaltotsumtime = 0
-     call get(store%ustar)
-     call get(store%tstar)
-     call get(store%blprofiles)
-print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
-     if (probes_file == "" .and. scalar_probes_file == "") then
+     open(unit,file="probes.conf",status="old",action="read",iostat = io)
+     if (io==0) then
        call get(number_of_probes)
 
        allocate(probes(number_of_probes))
@@ -611,22 +599,26 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
          call get(probes(i)%z)
        end do
 
-       number_of_scalar_probes = number_of_probes
-       allocate(scalar_probes(number_of_scalar_probes))
-       scalar_probes(:) = probes
-       close(unit)
+       scalar_probes = probes
+     end if
+
+   else
+
+     close(unit)
+
+     if (len_trim(probes_file)>0) then
+       call ReadProbes(probes,number_of_probes,probes_file)
      else
-       close(unit)
+       allocate(probes(0))
+     end if
 
-       if (len_trim(probes_file)>0) then
-         call ReadProbes(probes,number_of_probes,probes_file)
-       end if
-
-       if (len_trim(scalar_probes_file)>0) then
-         call ReadProbes(scalar_probes,number_of_scalar_probes,scalar_probes_file)
-       end if
+     if (len_trim(scalar_probes_file)>0) then
+       call ReadProbes(scalar_probes,number_of_scalar_probes,scalar_probes_file)
+     else
+       allocate(scalar_probes(0))
      end if
    end if
+
 
    open(unit,file="obstacles.conf",status="old",action="read",iostat = io)
    if (io==0) then
@@ -760,8 +752,6 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
    write(*,*) "lz:",lz
 
 
-   nt = maxiter
-
    if (Btype(Ea)==PERIODIC) then
                           Unx = Prnx
    else
@@ -814,6 +804,7 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
    write(*,*) "set"
 
    contains
+
      subroutine chget1(x)
        character(*),intent(out) :: x
        read(unit,fmt='(/)')
@@ -864,6 +855,11 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
        read(unit,fmt='(/)')
        read(unit,*) x,y,z
      end subroutine
+     subroutine rgetv3(v)
+       real(knd),intent(out) :: v(3)
+       read(unit,fmt='(/)')
+       read(unit,*) v
+     end subroutine
 
      subroutine read_command_line
        commandline = ""
@@ -881,6 +877,10 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
      end subroutine
 
      subroutine parse_command_line
+       namelist /cmd/ tilesize, debugparam, debuglevel, windangle, projectiontype, &
+                       Prnx, Prny, Prnz,&
+                       obstacles_file, probes_file, scalar_probes_file
+
        if (len_trim(commandline)>0) then
          msg = ''
          read(commandline,nml = cmd,iostat = io,iomsg = msg)
@@ -894,9 +894,31 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
        end if
      end subroutine
 
+     subroutine get_line_sources
+        use LineSources, only: ScalarLineSource, ScalarLineSources
+        type(ScalarLineSource) :: src
+        integer n
+
+        call get(n)
+        allocate(ScalarLineSources(0))
+        do i=1,n
+          read(unit,fmt=*)
+          call get(src%scalar_number)
+          call get(src%start)
+          call get(src%end)
+          call get(src%flux)
+          src%number_of_points = 20 * max(Prnx,Prny,Prnz)
+          ScalarLineSources = [ScalarLineSources, src]
+        end do
+     end subroutine
+
+     subroutine read_namelist_output
+       namelist /output/ store, display
+
+       read(unit,nml = output,iostat = io,iomsg = msg)
+     end subroutine
+
  end subroutine ReadConfiguration
-
-
 
 
  subroutine ReadIC(U,V,W,Pr,Temperature)
@@ -986,9 +1008,9 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
 
     Pr(1:Prnx,1:Prny,1:Prnz) = 0
 
-    U = huge(1._knd)
-    V = huge(1._knd)
-    W = huge(1._knd)
+    U = huge(1._knd)/2
+    V = huge(1._knd)/2
+    W = huge(1._knd)/2
 
     V(1:Vnx,1:Vny,1:Vnz) = 0
     W(1:Wnx,1:Wny,1:Wnz) = 0
@@ -998,17 +1020,17 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
        call ReadIC(U,V,W,Pr,Temperature)
 
        if (Re>0) then
-         Visc = 1._knd/Re
+         Viscosity = 1._knd/Re
        else
-         Visc = 0
+         Viscosity = 0
        end if
        if (enable_buoyancy==1.or. &
            enable_moisture==1.or. &
            num_of_scalars>0)        TDiff = 1._knd/(Re*Prandtl)
 
-       call BoundU(1,U)
-       call BoundU(2,V)
-       call BoundU(3,W)
+       call BoundU(1,U,Uin)
+       call BoundU(2,V,Vin)
+       call BoundU(3,W,Win)
        call Bound_Pr(Pr)
 
     else   !init conditions not from file
@@ -1198,7 +1220,7 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
 
        elseif (InletType==TurbulentInletType) then
 
-         dt = dxmin / (sum(Uin(1:Uny,1:Unz))/(Uny*Unz))
+         dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Uny,1:Unz)),avg(Vin(1:Vny,1:Vnz)))
 
          do i = 1,Prnx
            
@@ -1339,7 +1361,7 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
 
        if (enable_moisture==1) then
 
-         call InitScalarProfile(MoistIn,MoistureProfile,0._knd)
+         call InitScalarProfile(MoistIn,MoistureProfile,moisture_ref)
 
          call InitScalar(MoistIn,MoistureProfile,Moisture)
 
@@ -1355,13 +1377,13 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
        if (Re>0) then
          !$omp parallel
          !$omp workshare
-         Visc = 1._knd/Re
+         Viscosity = 1._knd/Re
          !$omp end workshare
          !$omp end parallel
        else
          !$omp parallel
          !$omp workshare
-         Visc = 0
+         Viscosity = 0
          !$omp end workshare
          !$omp end parallel
        end if
@@ -1380,11 +1402,11 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
        !$omp parallel
        !$omp sections
        !$omp section
-       call BoundU(1,U)
+       call BoundU(1,U,Uin)
        !$omp section
-       call BoundU(2,V)
+       call BoundU(2,V,Vin)
        !$omp section
-       call BoundU(3,W)
+       call BoundU(3,W,Win)
        !$omp section
        call Bound_Pr(Pr)
        !$omp end sections
@@ -1404,13 +1426,13 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
                          call SGS_StabSmag(U,V,W,Temperature,2._knd)
        else
          if (Re>0) then
-           Visc = 1._knd/Re
+           Viscosity = 1._knd/Re
          else
-           Visc = 0
+           Viscosity = 0
          end if
        end if
 
-       call BoundViscosity(Visc)
+       call BoundViscosity(Viscosity)
 
        if (enable_buoyancy==1.or. &
            enable_moisture==1.or. &
@@ -1419,7 +1441,7 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
          !$omp parallel
          !$omp workshare
          forall(k = 1:Prnz,j = 1:Prny,i = 1:Prnx)
-           TDiff(i,j,k) = 1.35*(Visc(i,j,k)-1._knd/Re)+(1._knd/(Re*constPrt))
+           TDiff(i,j,k) = 1.35*(Viscosity(i,j,k)-1._knd/Re)+(1._knd/(Re*constPrt))
          endforall
          !$omp end workshare
          !$omp end parallel
@@ -1445,7 +1467,7 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
                       call ComputeViscsWM(U,V,W,Pr,Temperature)
        end if
 
-       call BoundViscosity(Visc)
+       call BoundViscosity(Viscosity)
 
     end if !init conditions not from file
 
@@ -1776,9 +1798,9 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
 
 
     allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
-    Uin = huge(1._knd)
-    Vin = huge(1._knd)
-    Win = huge(1._knd)
+    Uin = 0
+    Vin = 0
+    Win = 0
 
     if (enable_buoyancy>0) allocate(TempIn(-1:Prny+2,-1:Prnz+2))
 
@@ -1796,7 +1818,7 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
       case (TurbulentInletType)
         call GetTurbulentInlet
       case (FromFileInletType)
-        call GetInletFromFile(starttime)
+        call GetInletFromFile(start_time)
       case default
         call CONSTINLET
     endselect
@@ -1856,7 +1878,7 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
 
 
    if (num_of_scalars>0.and.scalsourcetype==pointsource) then
-        call Gridcoords(scalsrci(:),scalsrcj(:),scalsrck(:),scalsrcx(:),scalsrcy(:),scalsrcz(:))
+        call GridCoords(scalsrci(:),scalsrcj(:),scalsrck(:),scalsrcx(:),scalsrcy(:),scalsrcz(:))
    end if
 
    call InitTiles(Prnx,Prny,Prnz)
@@ -1882,7 +1904,7 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
      !compute the radiation balance and prepare the wall fluxes 
      call InitIBPFluxes
      !set the immersed boundary values for fluxes
-     call SetIBPFluxes
+!      call SetIBPFluxes
    end if
 
    call SetNullifiedPoints
@@ -1890,7 +1912,10 @@ print *,"probes_file",probes_file,"scalar_probes_file",scalar_probes_file
    !create actual arrays of the source points
    call InitVolumeSources
 
-   call SetFrameDomain(store%frame_domains)
+   !add arrays of the line source points
+   call InitLineSources
+
+   call SetFrameDomains
 
     write (*,*) "set"
   end subroutine InitBoundaryConditions

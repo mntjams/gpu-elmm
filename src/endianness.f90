@@ -1,13 +1,13 @@
 module Endianness
-!   use iso_fortran_env
+
+  use iso_fortran_env
+  
   implicit none
 
   private
   public :: GetEndianness, BigEnd
 
-  integer,parameter :: int8=selected_int_kind(1),int32=selected_int_kind(9),int64=selected_int_kind(10)
-  integer,parameter :: real32=selected_real_kind(p=6,r=37),real64=selected_real_kind(p=15,r=200)
-  logical,save :: littleendian
+  logical,save :: littleendian = .true.
 
   interface BigEnd
     module procedure BigEnd32

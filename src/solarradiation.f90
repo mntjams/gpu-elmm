@@ -16,12 +16,12 @@ contains
   
   pure function solar_direct_flux() result(res)
     real(knd) :: res
-    res = 0!800._knd
+    res = 800._knd
   end function
 
   pure function solar_diffuse_flux() result(res)
     real(knd) :: res
-    res = 0!200._knd
+    res = 200._knd
   end function
 
   subroutine InitSolarRadiation

@@ -70,7 +70,28 @@
   end subroutine PressureGrad
 
 
-
+  
+  
+  subroutine StressBoundaryFlux(U2,V2)
+    use ArrayUtilities,only: add
+    use Outputs,only: profuw,profvw, profuwsgs, profvwsgs
+    real(knd),dimension(-2:,-2:,-2:),intent(inout) :: U2,V2
+    real(knd) :: flux
+    integer :: first,last
+    
+    if (Btype(To)==AUTOMATICFLUX) then
+      first = min(Prnz*5/6,Prnz-5)
+      last = Prnz-5
+      
+      flux = sum(profuw(first:last)) + sum(profuwsgs(first:last))
+      flux = flux / (last-first+1)
+      call add(U2(:,:,Unz), -dt*flux/dzPr(Unz))
+      
+      flux = sum(profvw(first:last)) + sum(profvwsgs(first:last))
+      flux = flux / (last-first+1)
+      call add(V2(:,:,Vnz), -dt*flux/dzPr(Vnz))
+    end if
+  end subroutine
 
 
 
@@ -299,7 +320,9 @@
                                 grav_acc,temperature_ref,Wstar,Temperature,Moisture,dt)
 
       call ResistanceForce(Ustar,Vstar,Wstar,U,V,W)
-
+      
+      call StressBoundaryFlux(Ustar,Vstar)
+      
 
       !$omp parallel private(i,j,k)
       !$omp do
@@ -347,9 +370,9 @@
           use Filters, only: filtertype, Filter
 
           if (filtertype/=0) then
-            call BoundU(1,Ustar,2)
-            call BoundU(2,Vstar,2)
-            call BoundU(3,Wstar,2)
+            call BoundU(1,Ustar,Uin,2)
+            call BoundU(2,Vstar,Vin,2)
+            call BoundU(3,Wstar,Win,2)
 
 
             call Filter(Ustar,Utype)
@@ -358,9 +381,9 @@
 
             call Filter(Wstar,Wtype)
 
-            call BoundU(1,Ustar,2)
-            call BoundU(2,Vstar,2)
-            call BoundU(3,Wstar,2)
+            call BoundU(1,Ustar,Uin,2)
+            call BoundU(2,Vstar,Vin,2)
+            call BoundU(3,Wstar,Win,2)
           end if
 
         end subroutine
@@ -585,7 +608,7 @@
   real(knd),intent(in):: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
   real(knd),intent(in):: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3),V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
   real(knd),intent(out):: U3(-2:Unx+3,-2:Uny+3,-2:Unz+3),V3(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W3(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(knd),intent(in):: Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+  real(knd),intent(in):: Viscosity(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
   real(knd),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
   real(knd),intent(in) :: dxPr(-2:Prnx+3),dyPr(-2:Prny+3),dzPr(-2:Prnz+3),dt,coef
   real(knd) :: Ap,Ax,Ay,Az,dxmin,dymin,dzmin
@@ -610,14 +633,14 @@
       do j=1,Uny
        do i=1,Unx
          U3(i,j,k) =&
-             (Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
-             Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*Ax
+             (Viscosity(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
+             Viscosity(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*Ax
          U3(i,j,k) = U3(i,j,k) +&
-             Ay*0.25_knd*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
-             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))
+             Ay*0.25_knd*((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
+             (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))
          U3(i,j,k) = U3(i,j,k) +&
-             Az*0.25_knd*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
-             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))
+             Az*0.25_knd*((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
+             (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))
          U3(i,j,k) = U3(i,j,k) * Ap
        enddo
       enddo
@@ -640,14 +663,14 @@
       do j=1,Vny
        do i=1,Vnx
          V3(i,j,k) =&
-             (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
-             Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*Ay
+             (Viscosity(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
+             Viscosity(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*Ay
          V3(i,j,k) = V3(i,j,k) +&
-             Ax*0.25_knd*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
-             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))
+             Ax*0.25_knd*((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
+             (Viscosity(i,j+1,k)+Viscosity(i,j,k)+Viscosity(i-1,j+1,k)+Viscosity(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))
          V3(i,j,k) = V3(i,j,k) +&
-             Az*0.25_knd*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
-             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))
+             Az*0.25_knd*((Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
+             (Viscosity(i,j+1,k)+Viscosity(i,j+1,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))
          V3(i,j,k) = V3(i,j,k) * Ap
        enddo
       enddo
@@ -670,14 +693,14 @@
       do j=1,Wny
        do i=1,Wnx
          W3(i,j,k) =&
-             Ax*0.25_knd*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
-             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))
+             Ax*0.25_knd*((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
+             (Viscosity(i,j,k+1)+Viscosity(i,j,k)+Viscosity(i-1,j,k+1)+Viscosity(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))
          W3(i,j,k) = W3(i,j,k) +&
-             Ay*0.25_knd*((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
-             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))
+             Ay*0.25_knd*((Viscosity(i,j+1,k+1)+Viscosity(i,j,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
+             (Viscosity(i,j,k+1)+Viscosity(i,j-1,k+1)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))
          W3(i,j,k) = W3(i,j,k) +&
-             (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
-             Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*Az
+             (Viscosity(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
+             Viscosity(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*Az
          W3(i,j,k) = W3(i,j,k) * Ap
        enddo
       enddo
@@ -737,14 +760,14 @@
         do j=1,Uny
          do i=1,Unx
            U3(i,j,k) =&
-               (Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
-               Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*Ax
+               (Viscosity(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
+               Viscosity(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*Ax
            U3(i,j,k) = U3(i,j,k) +&
-               Ay*0.25_knd*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
-               (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))
+               Ay*0.25_knd*((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
+               (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))
            U3(i,j,k) = U3(i,j,k) +&
-               Az*0.25_knd*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
-               (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))
+               Az*0.25_knd*((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
+               (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))
            U3(i,j,k) = U3(i,j,k) * Ap
          enddo
         enddo
@@ -766,14 +789,14 @@
         do j=1,Vny
          do i=1,Vnx
            V3(i,j,k) =&
-               (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
-               Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*Ay
+               (Viscosity(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
+               Viscosity(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*Ay
            V3(i,j,k) = V3(i,j,k) +&
-               Ax*0.25_knd*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
-               (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))
+               Ax*0.25_knd*((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
+               (Viscosity(i,j+1,k)+Viscosity(i,j,k)+Viscosity(i-1,j+1,k)+Viscosity(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))
            V3(i,j,k) = V3(i,j,k) +&
-               Az*0.25_knd*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
-               (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))
+               Az*0.25_knd*((Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
+               (Viscosity(i,j+1,k)+Viscosity(i,j+1,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))
            V3(i,j,k) = V3(i,j,k) * Ap
          enddo
         enddo
@@ -795,14 +818,14 @@
         do j=1,Wny
          do i=1,Wnx
            W3(i,j,k) =+&
-               Ax*0.25_knd*((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
-               (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))
+               Ax*0.25_knd*((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
+               (Viscosity(i,j,k+1)+Viscosity(i,j,k)+Viscosity(i-1,j,k+1)+Viscosity(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))
            W3(i,j,k) = W3(i,j,k) +&
-               Ay*0.25_knd*((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
-               (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))
+               Ay*0.25_knd*((Viscosity(i,j+1,k+1)+Viscosity(i,j,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
+               (Viscosity(i,j,k+1)+Viscosity(i,j-1,k+1)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))
            W3(i,j,k) = W3(i,j,k) +&
-               (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
-               Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*Az
+               (Viscosity(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
+               Viscosity(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*Az
            W3(i,j,k) = W3(i,j,k) * Ap
          enddo
         enddo
@@ -827,12 +850,12 @@
         do j=1,Uny
          do i=1,Unx
           U3(i,j,k) = U(i,j,k)+U2(i,j,k)+Ap*(&
-          ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
-          Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
-           0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
-           (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-           ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
-           (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))))
+          ((Viscosity(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
+          Viscosity(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
+           0.25_knd*(((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
+           (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
+           ((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
+           (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))))
          enddo
         enddo
        enddo
@@ -842,12 +865,12 @@
         do j=1,Vny
          do i=1,Vnx
           V3(i,j,k) = V(i,j,k)+V2(i,j,k)+Ap*(&
-          ((Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
-           Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
-           0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
-          (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-           ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
-           (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k))))
+          ((Viscosity(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
+           Viscosity(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
+           0.25_knd*(((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
+          (Viscosity(i,j+1,k)+Viscosity(i,j,k)+Viscosity(i-1,j+1,k)+Viscosity(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+           ((Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
+           (Viscosity(i,j+1,k)+Viscosity(i,j+1,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k))))
          enddo
         enddo
        enddo
@@ -857,12 +880,12 @@
         do j=1,Wny
          do i=1,Wnx
           W3(i,j,k) = W(i,j,k)+W2(i,j,k)+Ap*(&
-          0.25_knd*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
-          (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-           ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
-           (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j))+&
-           (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))/dzPr(k+1)-&
-           Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k))
+          0.25_knd*(((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
+          (Viscosity(i,j,k+1)+Viscosity(i,j,k)+Viscosity(i-1,j,k+1)+Viscosity(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
+           ((Viscosity(i,j+1,k+1)+Viscosity(i,j,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
+           (Viscosity(i,j,k+1)+Viscosity(i,j-1,k+1)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j))+&
+           (Viscosity(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))/dzPr(k+1)-&
+           Viscosity(i,j,k)*(W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k))
          enddo
         enddo
        enddo

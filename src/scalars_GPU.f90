@@ -529,7 +529,7 @@
 #include "hmpp-include.f90"
     integer,intent(in)      :: Prnx,Prny,Prnz,enable_buoyancy,Btype(6)
     real(knd),intent(in)    :: Re,Prandtl
-    real(knd),intent(inout) :: Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+    real(knd),intent(inout) :: Viscosity(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
     integer                 :: i,j,k
     real(knd),parameter     :: Prt = 0.6
 
@@ -544,7 +544,7 @@
        do k=1,Prnz
          do j=1,Prny
            do i=1,Prnx
-             TDiff(i,j,k) = (Visc(i,j,k)-1._knd/Re)/Prt + (1._knd/(Re*Prandtl))
+             TDiff(i,j,k) = (Viscosity(i,j,k)-1._knd/Re)/Prt + (1._knd/(Re*Prandtl))
            end do
          end do
        end do
@@ -555,7 +555,7 @@
        do k=1,Prnz
          do j=1,Prny
            do i=1,Prnx
-             TDiff(i,j,k) = Visc(i,j,k)/Prt
+             TDiff(i,j,k) = Viscosity(i,j,k)/Prt
            end do
          end do
        end do

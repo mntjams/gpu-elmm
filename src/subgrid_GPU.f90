@@ -60,7 +60,7 @@
 
 
 
-      Visc(i,j,k)=0._knd
+      Viscosity(i,j,k)=0._knd
 
       !$hmppcg unroll jj:3, ii:3, noremainder
       do jj=1,3
@@ -71,10 +71,10 @@
 
 
 
-      if (abs(aa)>1e-5.and.bb>0)  Visc(i,j,k)=c*sqrt(bb/aa)
+      if (abs(aa)>1e-5.and.bb>0)  Viscosity(i,j,k)=c*sqrt(bb/aa)
 
 
-      if (Re>0)  Visc(i,j,k)=Visc(i,j,k)+1._knd/Re
+      if (Re>0)  Viscosity(i,j,k)=Viscosity(i,j,k)+1._knd/Re
 
      enddo
     enddo

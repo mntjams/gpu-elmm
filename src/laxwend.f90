@@ -14,9 +14,9 @@ module LAXWEND
  integer i,j,k
  real(knd) Uloc,Uloce,Ulocw,Vloc,Vlocn,Vlocs,Wloc,Wloct,Wlocb
 
-  call BoundU(1,U)
-  call BoundU(2,V)
-  call BoundU(3,W)
+  call BoundU(1,U,Uin)
+  call BoundU(2,V,Vin)
+  call BoundU(3,W,Win)
 
   do k=1,Unz
    do j=1,Uny
@@ -63,9 +63,9 @@ module LAXWEND
    enddo
   enddo
 
-  call BoundU(1,U1)
-  call BoundU(2,V1)
-  call BoundU(3,W1)
+  call BoundU(1,U1,Uin)
+  call BoundU(2,V1,Vin)
+  call BoundU(3,W1,Win)
 
   do k=1,Unz
    do j=1,Uny
@@ -128,9 +128,9 @@ module LAXWEND
  integer i,j,k
  real(knd) Uloc,Uloce,Ulocw,Vloc,Vlocn,Vlocs,Wloc,Wloct,Wlocb
 
-  call BoundU(1,U)
-  call BoundU(2,V)
-  call BoundU(3,W)
+  call BoundU(1,U,Uin)
+  call BoundU(2,V,Vin)
+  call BoundU(3,W,Win)
 
   do k=1,Unz
    do j=1,Uny
@@ -177,9 +177,9 @@ module LAXWEND
    enddo
   enddo
 
-  call BoundU(1,U1)
-  call BoundU(2,V1)
-  call BoundU(3,W1)
+  call BoundU(1,U1,Uin)
+  call BoundU(2,V1,Vin)
+  call BoundU(3,W1,Win)
 
   do k=1,Unz
    do j=1,Uny

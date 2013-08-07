@@ -12,9 +12,9 @@ module LAXFRIED
  subroutine LF(U2,V2,W2,U,V,W)
   real(knd),dimension(-2:,-2:,-2:):: U2,V2,W2,U,V,W
 
-  call BoundU(1,U)
-  call BoundU(2,V)
-  call BoundU(3,W)
+  call BoundU(1,U,Uin)
+  call BoundU(2,V,Vin)
+  call BoundU(3,W,Win)
 
   call FLUXESU(U2,U,V,W)
   call FLUXESV(V2,U,V,W)

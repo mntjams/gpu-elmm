@@ -247,7 +247,7 @@ contains
           arr(i,j,nz+2) = arr(i,j,nz) + side(To)*(dzW(nz+1)+dzW(nz+2))
         end do
       end do
-    else if (btype(To)==CONSTFLUX) then
+    else if (btype(To)==CONSTFLUX.or.btype(To)==AUTOMATICFLUX) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,nz+1) = arr(i,j,nz) - &

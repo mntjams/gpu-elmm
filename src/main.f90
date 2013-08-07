@@ -1,9 +1,10 @@
 program CLMM
 
-  use TSTEPS, only: TMarchRK3
-  use PARAMETERS
+  use Parameters
   use Initial
-  use OUTPUTS, only: AllocateOutputs, OutTStep, Output
+  use TSteps, only: TMarchRK3, TSteps_Deallocate
+  use Scalars, only: Scalars_Deallocate
+  use Outputs, only: AllocateOutputs, OutTStep, Output
 
   implicit none
 
@@ -31,24 +32,23 @@ program CLMM
   write (*,*) "Allocating arrays..."
   call AllocateGlobals
 
+  call AllocateOutputs
 
   write (*,*) "Setting up initial conditions..."
   call InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
 
-  time=starttime
-  step=0
-
-  call AllocateOutputs
+  time = start_time
+  step = 0
 
   call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
 
 
 
-  if (endtime>starttime) then
+  if (end_time > start_time) then
 
     write (*,*) "Computing..."
 
-    do step = 1,nt
+    do step = 1, max_number_of_time_steps
 
       write (*,*) "-----------"
       write (*,*) " "
@@ -74,12 +74,12 @@ program CLMM
         exit
       endif
 
-      if ((steady==0) .and. (time>=endtime)) then
+      if ((steady==0) .and. (time>=end_time)) then
         write (*,*) "Time limit reached."
         exit
       endif
 
-      if (step>=3 .and. dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/50._knd)) then
+      if (step>=3 .and. dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/20._knd)) then
         write (*,*) "Solution diverged."
         exit
       endif
@@ -93,6 +93,8 @@ program CLMM
                       U,     V,     W,     Pr,    Temperature)
 #endif
 
+  call TSteps_Deallocate
+  call Scalars_Deallocate
 
   write (*,*) "Saving results..."
 
@@ -137,7 +139,7 @@ program CLMM
      endif
 
 
-     allocate(Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+     allocate(Viscosity(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
 
      if (enable_buoyancy==1 .or. &
          enable_moisture==1 .or. &

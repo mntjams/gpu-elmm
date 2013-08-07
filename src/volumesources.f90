@@ -1,83 +1,96 @@
 module VolumeSources
   use Parameters
   use Lists
-  use TBody_class
+  use Body_class
 
   implicit none
 ! 
 !   private
 ! 
 !   public UResistanceVolumes, VResistanceVolumes, WResistanceVolumes, &
-!          TemperatureFlVolumes, MoistureFlVolumes, ScalarFlVolumes, TVolumeSourceBody
+!          TemperatureFlVolumes, MoistureFlVolumes, ScalarFlVolumes, VolumeSourceBody
 
-  type,extends(TListable) :: TGridVolume
+  type,extends(Listable) :: GridVolume
     integer   :: xi, yj, zk
-  end type TGridVolume
+  end type GridVolume
 
-  type,extends(TGridVolume) :: TFluxVolume
+  type,extends(GridVolume) :: FluxVolume
     real(knd) :: flux
-  end type TFluxVolume
+  end type FluxVolume
+  
+  interface FluxVolume
+    module procedure FluxVolume_v3
+  end interface
 
-  type,extends(TFluxVolume) :: TResistanceVolume
+  type,extends(FluxVolume) :: TResistanceVolume
     ! f_drag_i = - Cd * a * V * u_i , V = sqrt(sum(u_i**2))
     !flux = Cd * a
   end type TResistanceVolume
 
-  type,extends(TFluxVolume) :: TTemperatureFlVolume
+  type,extends(FluxVolume) :: TemperatureFlVolume
     ! <T'w'> = temperature_flux, Qh = rho*Cp*temperature_flux
     !flux = temperature_flux
-  end type TTemperatureFlVolume
+  end type TemperatureFlVolume
 
-  type,extends(TFluxVolume) :: TMoistureFlVolume
+  type,extends(FluxVolume) :: MoistureFlVolume
     ! <q'w'> = moisture_flux, Qe = rho*Lv*moisture_flux
     !flux = moisture_flux
-  end type TMoistureFlVolume
+  end type MoistureFlVolume
 
-  type,extends(TFluxVolume) :: TScalarFlVolume
+  type,extends(FluxVolume) :: ScalarFlVolume
     ! <c'w'> = scalar_flux
     !flux = flux
-  end type TScalarFlVolume
+  end type ScalarFlVolume
 
-  type TScalarFlVolumesContainer
-    type(TScalarFlVolume), allocatable :: Volumes(:)
+  interface ScalarFlVolume
+    module procedure ScalarFlVolume_v3
+  end interface
+
+  type ScalarFlVolumesContainer
+    integer :: scalar_number
+    type(ScalarFlVolume), allocatable :: Volumes(:)
   end type
 
-  type TScalarFlVolumesListContainer
-    type(TList) :: list
-  end type
+  interface Add
+    module procedure AddScalarFlVolumesContainer
+  end interface
 
-  type, extends(TBody) :: TVolumeSourceBody
+  type ScalarFlVolumesListContainer
+    type(List) :: list
+  end type
+  
+  type, extends(Body) :: VolumeSourceBody
     procedure(resistance_interface),pointer  :: get_resistance       => null()
     procedure(resistance_interface),pointer  :: get_temperature_flux => null()
     procedure(resistance_interface),pointer  :: get_moisture_flux    => null()
     procedure(scalar_flux_interface),pointer :: get_scalar_flux      => null()
-  end type TVolumeSourceBody
+  end type VolumeSourceBody
 
   abstract interface
     function resistance_interface(self,x,y,z) result(res)
       import
       real(knd) :: res
-      class(TVolumeSourceBody),intent(in) :: self
+      class(VolumeSourceBody),intent(in) :: self
       real(knd),intent(in) :: x,y,z
     end function
     function scalar_flux_interface(self,x,y,z,num_of_scalar) result(res)
       import
       real(knd) :: res
-      class(TVolumeSourceBody),intent(in) :: self
+      class(VolumeSourceBody),intent(in) :: self
       real(knd),intent(in) :: x,y,z
       integer,intent(in) :: num_of_scalar
     end function
   end interface
 
-  type(TList) :: SourceBodiesList
+  type(List) :: SourceBodiesList
 
-  type(TList) :: UResistanceVolumesList, &
+  type(List) :: UResistanceVolumesList, &
                  VResistanceVolumesList, &
                  WResistanceVolumesList, &
                  TemperatureFlVolumesList, &
                  MoistureFlVolumesList
                  
-  type(TScalarFlVolumesListContainer),allocatable :: ScalarFlVolumesLists(:)
+  type(ScalarFlVolumesListContainer),allocatable :: ScalarFlVolumesLists(:)
 
   !final volume momentum sinks - resistances
   type(TResistanceVolume),allocatable :: UResistanceVolumes(:), &
@@ -85,16 +98,16 @@ module VolumeSources
                                          WResistanceVolumes(:)
 
   !final scalar quantities sources/sinks
-  type(TTemperatureFlVolume),allocatable :: TemperatureFlVolumes(:)
-  type(TMoistureFlVolume)   ,allocatable :: MoistureFlVolumes(:)
-  type(TScalarFlVolumesContainer) ,allocatable :: ScalarFlVolumes(:)
+  type(TemperatureFlVolume),allocatable :: TemperatureFlVolumes(:)
+  type(MoistureFlVolume)   ,allocatable :: MoistureFlVolumes(:)
+  type(ScalarFlVolumesContainer),allocatable :: ScalarFlVolumes(:)
   
-  type, extends(TVolumeSourceBody) :: TPlantBody
+  type, extends(VolumeSourceBody) :: PlantBody
     integer :: plant_type !problem specific, used by custom routines
     real(knd) :: albedo = 0.3_knd
     real(knd) :: emmissivity = 0.7_knd
     real(knd) :: evaporative_fraction = 0.6_knd
-  end type TPlantBody
+  end type PlantBody
   
   contains
 
@@ -104,11 +117,29 @@ module VolumeSources
           subroutine CustomVolumeSourceBodies
           end subroutine
         end interface
-      !An external subroutine, it should use this module and use AddBody to supply
-      ! pointers to the new solid bodies.
+
       call CustomVolumeSourceBodies
 #endif
     end subroutine InitVolumeSourceBodies
+    
+    
+    function FluxVolume_v3(pos,flux) result(res)
+      type(FluxVolume) :: res
+      integer,intent(in) :: pos(3)
+      real(knd),intent(in) :: flux
+      res%xi = pos(1)
+      res%yj = pos(2)
+      res%zk = pos(3)
+      res%flux = flux
+    end function
+
+    
+    function ScalarFlVolume_v3(pos,flux) result(res)
+      type(ScalarFlVolume) :: res
+      integer,intent(in) :: pos(3)
+      real(knd),intent(in) :: flux
+      res%FluxVolume = FluxVolume(pos,flux)
+    end function
 
     
     subroutine InsideCellsToLists
@@ -136,12 +167,12 @@ module VolumeSources
       contains
 
         subroutine GetUCells(PB)
-          class(TListable) :: PB
+          class(Listable) :: PB
           type(TResistanceVolume) :: elem
           integer i,j,k
 
           select type (PB)
-            class is (TVolumeSourceBody)
+            class is (VolumeSourceBody)
               if (associated(PB%get_resistance)) then
                 do k = 0,Unz+1
                  do j = 0,Uny+1
@@ -158,17 +189,17 @@ module VolumeSources
                 enddo
               end if
             class default
-              stop "Not a TVolumeSourceBody."
+              stop "Not a VolumeSourceBody."
           end select
         end subroutine
 
         subroutine GetVCells(PB)
-          class(TListable) :: PB
+          class(Listable) :: PB
           type(TResistanceVolume) :: elem
           integer i,j,k
 
           select type (PB)
-            class is (TVolumeSourceBody)
+            class is (VolumeSourceBody)
               if (associated(PB%get_resistance)) then
                 do k = 0,Vnz+1
                  do j = 0,Vny+1
@@ -185,17 +216,17 @@ module VolumeSources
                 enddo
               end if
             class default
-              stop "Not a TVolumeSourceBody."
+              stop "Not a VolumeSourceBody."
           end select
         end subroutine
 
         subroutine GetWCells(PB)
-          class(TListable) :: PB
+          class(Listable) :: PB
           type(TResistanceVolume) :: elem
           integer i,j,k
 
           select type (PB)
-            class is (TVolumeSourceBody)
+            class is (VolumeSourceBody)
               if (associated(PB%get_resistance)) then
                 do k = 0,Wnz+1
                  do j = 0,Wny+1
@@ -212,20 +243,20 @@ module VolumeSources
                 enddo
               end if
             class default
-              stop "Not a TVolumeSourceBody."
+              stop "Not a VolumeSourceBody."
           end select
         end subroutine
 
         subroutine GetOtherCells(PB)
           use SolarRadiation, only: enable_radiation
-          class(TListable) :: PB
-          type(TTemperatureFlVolume) :: Telem
-          type(TMoistureFlVolume) :: Melem
-          type(TScalarFlVolume) :: Selem
+          class(Listable) :: PB
+          type(TemperatureFlVolume) :: Telem
+          type(MoistureFlVolume) :: Melem
+          type(ScalarFlVolume) :: Selem
           integer i,j,k,sc
           
           select type (PB)
-            class is (TVolumeSourceBody)
+            class is (VolumeSourceBody)
               InsidePr = .false.
               
               do k = 0,Prnz+1
@@ -253,7 +284,7 @@ module VolumeSources
 
                        associate (p=>PB) !workaround for gfortran 4.8 bug
                        select type (p)
-                         class is (TPlantBody)
+                         class is (PlantBody)
                            if (on_border(i,j,k)) then
                              call GetRadiationFluxes(p,Telem,Melem,xPr(i),yPr(j),zPr(k))
                            else
@@ -302,7 +333,7 @@ module VolumeSources
                enddo
               enddo
             class default
-              stop "Not a TVolumeSourceBody."
+              stop "Not a VolumeSourceBody."
           end select
         end subroutine
 
@@ -327,14 +358,14 @@ module VolumeSources
     subroutine GetRadiationFluxes(PB,Telem,Melem,x,y,z)
       use SolarRadiation
       use PhysicalProperties
-      use GeometricShapes, only: TRay
-      use SolidBodies, only: SolidBodiesList, TSolidBody
-      class(TPlantBody),intent(inout) :: PB
-      type(TTemperatureFlVolume),intent(inout) :: Telem
-      type(TMoistureFlVolume),intent(inout)    :: Melem
+      use GeometricShapes, only: Ray
+      use SolidBodies, only: SolidBodiesList, SolidBody
+      class(PlantBody),intent(inout) :: PB
+      type(TemperatureFlVolume),intent(inout) :: Telem
+      type(MoistureFlVolume),intent(inout)    :: Melem
       real(knd),intent(in) :: x, y, z
       
-      type(TRay) :: ray
+      type(Ray) :: r
       real(knd) :: out_norm(3)
       real(knd) :: inc_radiation_flux, radiation_balance, angle_to_sun, &
                    total_heat_flux, sensible_heat_flux, latent_heat_flux,&
@@ -356,10 +387,8 @@ module VolumeSources
       yr = y + disty * 1.1_knd
       zr = z + distz * 1.1_knd
       if (angle_to_sun>0._knd) then
-        ray = TRay([xr, &
-                    yr, &
-                    zr], &
-                   vector_to_sun)
+        r = Ray([xr, yr, zr], &
+                vector_to_sun)
 
         if ((SolidBodiesList%Any(DoIntersect)) .or. &
             (SourceBodiesList%Any(DoIntersectPlants))) then
@@ -379,7 +408,7 @@ module VolumeSources
       total_heat_flux = radiation_balance - &
                         (0.2 * radiation_balance) !crude guess of the storage flux
 
-      !surface flux to volume flux APPROXIMATE!                  
+      !FIXME: surface flux to volume flux APPROXIMATE!                  
       total_heat_flux = total_heat_flux/dot_product([dxmin,dymin,dzmin],abs(out_norm))
                         
       if (enable_moisture==1) then
@@ -403,7 +432,7 @@ module VolumeSources
           nfree = 0
           
           do i=1,svf_nrays
-            ray = TRay([x,y,z],svf_vecs(:,i))
+            r = Ray([x,y,z],svf_vecs(:,i))
           
             if (.not.((SolidBodiesList%Any(DoIntersect)) .or. &
                       (SourceBodiesList%Any(DoIntersectPlants)))) then
@@ -416,26 +445,26 @@ module VolumeSources
         end function
   
         logical function DoIntersect(item) result(res)
-          class(TListable) :: item
+          class(Listable) :: item
           
           select type (item)
-            class is (TSolidBody)
-              res = item%IntersectsRay(ray)
+            class is (SolidBody)
+              res = item%IntersectsRay(r)
             class default
-              stop "Non-TSolidBody i the list."
+              stop "Non-SolidBody i the list."
           end select
         end function
         
         logical function DoIntersectPlants(item) result(res)
-          class(TListable) :: item
+          class(Listable) :: item
           
           select type (item)
-            class is (TPlantBody)
-              res = item%IntersectsRay(ray)
-            class is (TVolumeSourceBody)
+            class is (PlantBody)
+              res = item%IntersectsRay(r)
+            class is (VolumeSourceBody)
               res = .false.
             class default
-              stop "Non-TSolidBody i the list."
+              stop "Non-SolidBody i the list."
           end select
         end function
       
@@ -475,7 +504,7 @@ module VolumeSources
       allocate(ScalarFlVolumes(num_of_scalars))
       
       do j=1,num_of_scalars
-        allocate(ScalarFlVolumes(j)%Volumes(ScalarFlVolumesLists(j)%list%Len()))
+        allocate(ScalarFlVolumes(j)%volumes(ScalarFlVolumesLists(j)%list%Len()))
       end do
 
       i = 0
@@ -502,7 +531,7 @@ module VolumeSources
       contains
 
         subroutine CopyPoint(elem)
-          class(TListable) :: elem
+          class(Listable) :: elem
 
           i = i + 1
 
@@ -515,12 +544,12 @@ module VolumeSources
               else
                 WResistanceVolumes(i) = elem
               endif
-            type is (TTemperatureFlVolume)
+            type is (TemperatureFlVolume)
               TemperatureFlVolumes(i) = elem
-            type is (TMoistureFlVolume)
+            type is (MoistureFlVolume)
               MoistureFlVolumes(i) = elem
-            type is (TScalarFlVolume)
-              ScalarFlVolumes(j)%Volumes(i) = elem
+            type is (ScalarFlVolume)
+              ScalarFlVolumes(j)%volumes(i) = elem
             class default
               stop "Type error in volume source list."
           end select
@@ -643,7 +672,7 @@ module VolumeSources
 
       if (allocated(ScalarFlVolumes)) then
         do j=1,num_of_scalars
-          call FluxKernel(Scalar(:,:,:,j),ScalarFlVolumes(j)%Volumes)
+          call FluxKernel(Scalar(:,:,:,j),ScalarFlVolumes(j)%volumes)
         end do
       end if
 
@@ -651,7 +680,7 @@ module VolumeSources
 
     subroutine FluxKernel(X,src)
       real(knd),intent(inout) :: X(-1:,-1:,-1:)
-      class(TFluxVolume),intent(in) :: src(:)
+      class(FluxVolume),intent(in) :: src(:)
       integer i
       !Assume src is allocated. It must hold if we called MovePointsToArray properly.
        do i=1,size(src)
@@ -661,6 +690,28 @@ module VolumeSources
        end do
 
     end subroutine FluxKernel
+    
+    
+    
+    
+    subroutine AddScalarFlVolumesContainer(l,r)
+      type(ScalarFlVolumesContainer),intent(inout) :: l(:)
+      type(ScalarFlVolumesContainer),intent(in)    :: r
+      type(ScalarFlVolume),allocatable :: tmp(:)
+      integer i
+      associate (sn => r%scalar_number)
+        if (size(r%volumes)>0) then
+          !NOTE: the shorter version problematic in gfortran4.8 and ifort 13
+          !l(sn)%volumes = [l(sn)%volumes, r%volumes]
+          allocate(tmp( size(l(sn)%volumes) + size(r%volumes) ))
+          
+          tmp(1:size(l(sn)%volumes)) = l(sn)%volumes
+          tmp(size(l(sn)%volumes)+1:) = r%volumes
+          
+          call move_alloc(tmp,l(sn)%volumes)
+        end if
+      end associate
+    end subroutine
 
 end module VolumeSources
 

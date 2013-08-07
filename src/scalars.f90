@@ -18,7 +18,9 @@ implicit none
      ComputeTDiff, &
      TemperatureProfile, MoistureProfile, &
      InitScalarProfile, InitScalar, InitHydrostaticPressure, &
-     SubsidenceProfile, SubsidenceGradient, InitSubsidenceProfile
+     SubsidenceProfile, SubsidenceGradient, InitSubsidenceProfile, &
+     AddScalarAdvVector, AddScalarDiffVector, &
+     Scalars_Deallocate
 
 
   real(knd),dimension(:),allocatable :: partdiam,partrho,percdistrib !diameter of particles <=0 for gas
@@ -45,6 +47,16 @@ implicit none
 
   real(knd),parameter :: constPrt = 0.6 !constant value of Prt, which may be refined further in this module
 
+  !module variables to enable deallocation before program end
+  real(knd),dimension(:,:,:),  allocatable :: Temperature_adv, Temperature_2
+  real(knd),dimension(:,:,:),  allocatable :: Moisture_adv,    Moisture_2
+  real(knd),dimension(:,:,:,:),allocatable,save :: Scalar_adv,      Scalar_2
+
+  real(knd),allocatable :: Slope(:,:,:)
+
+  real(knd),allocatable :: Scal3(:,:,:)
+  real(knd),allocatable :: Ap(:,:,:)
+
   abstract interface
     subroutine boundary_interface(array)
       use Parameters
@@ -57,18 +69,29 @@ implicit none
 contains
 
 
-  subroutine ScalarRK3(U,V,W,Temperature,Moisture,Scalar,RK_stage,fluxprofile)
+  subroutine Scalars_Deallocate
+    if (allocated(Temperature_adv)) deallocate(Temperature_adv)
+    if (allocated(Moisture_adv)) deallocate(Moisture_adv)
+    if (allocated(Scalar_adv)) deallocate(Scalar_adv)
+    if (allocated(Temperature_2)) deallocate(Temperature_2)
+    if (allocated(Moisture_2)) deallocate(Moisture_2)
+    if (allocated(Scalar_2)) deallocate(Scalar_2)
+    if (allocated(Slope)) deallocate(Slope)
+    if (allocated(Scal3)) deallocate(Scal3)
+    if (allocated(Ap)) deallocate(Ap)
+  end subroutine
+
+  subroutine ScalarRK3(U,V,W,Temperature,Moisture,Scalar,RK_stage, &
+                temperature_flux_profile, moisture_flux_profile)
     use RK3
     use VolumeSources, only: ScalarVolumeSources
     real(knd),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd),intent(inout) :: Temperature(-1:,-1:,-1:),Moisture(-1:,-1:,-1:)
     real(knd),intent(inout) :: Scalar(-1:,-1:,-1:,1:)
-    real(knd),intent(out)   :: fluxprofile(:)
+    real(knd),intent(out)   :: temperature_flux_profile(:)
+    real(knd),intent(out)   :: moisture_flux_profile(:)
     integer,  intent(in)    :: RK_stage
 
-    real(knd),dimension(:,:,:),  allocatable,save :: Temperature_adv, Temperature2
-    real(knd),dimension(:,:,:),  allocatable,save :: Moisture_adv,    Moisture2
-    real(knd),dimension(:,:,:,:),allocatable,save :: Scalar_adv,      Scalar_2
 
     integer :: i
     integer,save :: called = 0
@@ -91,14 +114,14 @@ contains
       allocate(Temperature_adv(lbound(Temperature,1):ubound(Temperature,1), &
                                lbound(Temperature,2):ubound(Temperature,2), &
                                lbound(Temperature,3):ubound(Temperature,3)))
-      allocate(Temperature2(lbound(Temperature,1):ubound(Temperature,1), &
+      allocate(Temperature_2(lbound(Temperature,1):ubound(Temperature,1), &
                             lbound(Temperature,2):ubound(Temperature,2), &
                             lbound(Temperature,3):ubound(Temperature,3)))
 
       allocate(Moisture_adv(lbound(Moisture,1):ubound(Moisture,1), &
                                lbound(Moisture,2):ubound(Moisture,2), &
                                lbound(Moisture,3):ubound(Moisture,3)))
-      allocate(Moisture2(lbound(Moisture,1):ubound(Moisture,1), &
+      allocate(Moisture_2(lbound(Moisture,1):ubound(Moisture,1), &
                             lbound(Moisture,2):ubound(Moisture,2), &
                             lbound(Moisture,3):ubound(Moisture,3)))
     end if
@@ -129,27 +152,28 @@ contains
 
       call ScalarVolumeSources(Scalar_adv)
 
-      !$omp parallel workshare
-      Scalar_2 = Scalar_2+Scalar_adv*RK_beta(RK_stage)
-      !$omp end parallel workshare
-
       if (scalsourcetype==pointsource) then
 
         do i=1,num_of_scalars
-          Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i) = &
-                     Scalar_2(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
-                     percdistrib(i)*(RK_rho(RK_stage) + &
-                     RK_beta(RK_stage))*dt*totalscalsource / &
+          Scalar_adv(scalsrci(i),scalsrcj(i),scalsrck(i),i) = &
+                     Scalar_adv(scalsrci(i),scalsrcj(i),scalsrck(i),i)+&
+                     percdistrib(i)*dt*totalscalsource / &
                          (dxPr(scalsrci(i))*dyPr(scalsrcj(i))*dzPr(scalsrck(i)))
         end do
 
       else if (scalsourcetype==volumesource) then
 
         do i=1,num_of_scalars
-          call VolScalSource(Scalar_2,RK_rho(RK_stage)+RK_beta(RK_stage))
+          call VolScalSource(Scalar_adv,1._knd)
         end do
 
       end if
+
+
+      !$omp parallel workshare
+      Scalar_2 = Scalar_2+Scalar_adv*RK_beta(RK_stage)
+      !$omp end parallel workshare
+
 
       !$omp parallel
       !$omp workshare
@@ -180,22 +204,23 @@ contains
       call HMPP_RK_stage_Temperature(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                             dxmin,dymin,dzmin,maxCNiter,epsCN,Re,limparam,&
                             TempBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr,&
-                            TDiff,Temperature2,Temperature,Temperature_adv,U,V,W,&
-                            SubsidenceProfile,fluxProfile,dt,RK_stage,RK_alpha,RK_beta,RK_rho)
+                            TDiff,Temperature_2,Temperature,Temperature_adv,U,V,W,&
+                            SubsidenceProfile,temperature_flux_profile,dt,RK_stage,RK_alpha,RK_beta,RK_rho)
 
     end if
 #else
     if (enable_buoyancy>0) then
 
-      call stage(Temperature,Temperature2,Temperature_adv, &
-                 ScalarTypeTemperature,BoundTemperature,TemperatureExtra,fluxProfile)
-        where (Prtype>0) Temperature(0:Prnx+1,0:Prny+1,0:Prnz+1) = temperature_ref
+      call stage(Temperature,Temperature_2,Temperature_adv, &
+                 ScalarTypeTemperature,BoundTemperature,TemperatureExtra,temperature_flux_profile)
+      where (Prtype>0) Temperature(0:Prnx+1,0:Prny+1,0:Prnz+1) = temperature_ref
     end if
 
     if (enable_moisture>0) then
 
-      call stage(Moisture,Moisture2,Moisture_adv, &
-                 ScalarTypeMoisture,BoundMoisture,MoistureExtra)
+      call stage(Moisture,Moisture_2,Moisture_adv, &
+                 ScalarTypeMoisture,BoundMoisture,MoistureExtra,moisture_flux_profile)
+      where (Prtype>0) Moisture(0:Prnx+1,0:Prny+1,0:Prnz+1) = moisture_ref
     end if
 #endif
 
@@ -257,12 +282,42 @@ contains
 
       subroutine TemperatureExtra
         use VolumeSources, only: TemperatureVolumeSources
+        integer :: first,last
+
         call TemperatureVolumeSources(Temperature_adv)
+
+        if (TempBtype(To)==AUTOMATICFLUX) then
+          first = min(Prnz*5/6,Prnz-5)
+          last = Prnz-5
+          sideTemp(To) = sum(temperature_flux_profile(first:last))/(last-first+1)
+        end if
+
+        do i=1,size(WMPoints)
+          associate (p => WMPoints(i))
+            Temperature_adv(p%xi,p%yj,p%zk) = Temperature_adv(p%xi,p%yj,p%zk) + &
+                                          p%temperature_flux * dt * p%area_factor
+          end associate
+        end do
       end subroutine
 
       subroutine MoistureExtra
         use VolumeSources, only: MoistureVolumeSources
+        integer :: first,last
+
         call MoistureVolumeSources(Moisture_adv)
+
+        if (MoistBtype(To)==AUTOMATICFLUX) then
+          first = min(Prnz*5/6,Prnz-5)
+          last = Prnz-5
+          sideMoist(To) = sum(moisture_flux_profile(first:last))/(last-first+1)
+        end if
+
+        do i=1,size(WMPoints)
+          associate (p => WMPoints(i))
+            Moisture_adv(p%xi,p%yj,p%zk) = Moisture_adv(p%xi,p%yj,p%zk) + &
+                                          p%moisture_flux * dt * p%area_factor
+          end associate
+        end do
       end subroutine
 
       subroutine ScalarExtra
@@ -276,19 +331,17 @@ contains
 
 
 
-  subroutine ADVSCALAR(SCAL2,SCAL,U,V,W,coef,SubsidenceProfile,fluxProfile)
+  subroutine ADVSCALAR(SCAL2,SCAL,U,V,W,coef,SubsidenceProfile,temperature_flux_profile)
   real(knd),intent(out)      :: Scal2(-1:,-1:,-1:)
   real(knd),intent(in)       :: Scal(-1:,-1:,-1:)
   real(knd),intent(in)       :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   real(knd),intent(in)       :: SubsidenceProfile(0:)
-  real(knd),intent(out),optional :: fluxProfile(0:)
-  real(knd),allocatable,save :: SubsidenceProfileLoc(:),fluxProfileLoc(:)
-  integer,save :: called=0
+  real(knd),intent(out),optional :: temperature_flux_profile(0:)
+  real(knd),allocatable,save :: SubsidenceProfileLoc(:),temperature_flux_profileLoc(:)
 
-    if (called==0) then
+    if (.not.allocated(SubsidenceProfileLoc)) then
       allocate(SubsidenceProfileLoc(0:Prnz))
-      allocate(fluxProfileLoc(0:Prnz))
-      called = 1
+      allocate(temperature_flux_profileLoc(0:Prnz))
     end if
 
     if (size(SubsidenceProfile)==size(SubsidenceProfileLoc)) then
@@ -298,14 +351,14 @@ contains
     end if
 
     if (gridtype==uniformgrid) then
-      call KAPPASCALARUG(SCAL2,SCAL,U,V,W,coef,SubsidenceProfileLoc,fluxProfileLoc)
+      call KAPPASCALARUG(SCAL2,SCAL,U,V,W,coef,SubsidenceProfileLoc,temperature_flux_profileLoc)
     else
-      call KAPPASCALARGG(SCAL2,SCAL,U,V,W,coef,SubsidenceProfileLoc,fluxProfileLoc)
+      call KAPPASCALARGG(SCAL2,SCAL,U,V,W,coef,SubsidenceProfileLoc,temperature_flux_profileLoc)
     end if
 
-    if (present(fluxProfile)) then
-      if (size(fluxProfile)==size(fluxProfileLoc)) &
-        fluxProfile(0:Prnz) = fluxProfileLoc
+    if (present(temperature_flux_profile)) then
+      if (size(temperature_flux_profile)==size(temperature_flux_profileLoc)) &
+        temperature_flux_profile(0:Prnz) = temperature_flux_profileLoc
     end if
 
   endsubroutine ADVSCALAR
@@ -344,25 +397,19 @@ contains
 
 
 
-  subroutine KAPPASCALARUG(SCAL2,SCAL,U,V,W,coef,SubsidenceProfile,fluxProfile) !Kappa scheme with flux limiter
+  subroutine KAPPASCALARUG(SCAL2,SCAL,U,V,W,coef,SubsidenceProfile,temperature_flux_profile) !Kappa scheme with flux limiter
   real(knd),intent(out) :: Scal2(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
   real(knd),intent(in)  :: Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
   real(knd),intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   real(knd),intent(in)  :: SubsidenceProfile(0:)
-  real(knd),intent(out) :: fluxProfile(0:)
+  real(knd),intent(out) :: temperature_flux_profile(0:)
   integer i,j,k,l
   real(knd) A,Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
   real(knd) vel,SL,SR,FLUX
-  real(knd),allocatable,save :: SLOPE(:,:,:)
   real(knd),parameter ::eps = 1e-8
-  real(knd) :: FluxLimiter,r
-  integer, save :: called = 0
 
-  FluxLimiter(r)=max(0._knd,min(2._knd*r,min(limparam,(1+2._knd*r)/3._knd)))
-
-  if (called==0) then
+  if (.not.allocated(SLOPE)) then
     allocate(SLOPE(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-    called = 1
   end if
 
   A = coef*dt
@@ -374,7 +421,7 @@ contains
   call set(SCAL2,0._knd)
   call set(SLOPE,0._knd)
 
-  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,fluxProfile)
+  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
   !$omp do
   do k = 1,Prnz
    do j = 1,Prny
@@ -412,7 +459,7 @@ contains
 
   call set(SLOPE,0._knd)
 
-  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,fluxProfile)
+  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
   !$omp do
   do k = 1,Prnz
    do j = 0,Prny
@@ -452,7 +499,7 @@ contains
 
   call set(SLOPE ,0._knd)
 
-  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,fluxProfile)
+  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
   !$omp do
   do k = 0,Prnz
    do j = 1,Prny
@@ -471,11 +518,11 @@ contains
   !$omp end do nowait
   !$omp end parallel
 
-  call set(fluxprofile,0._knd)
+  call set(temperature_flux_profile,0._knd)
 
-  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,fluxProfile)
+  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
   do l=0,1  !odd-even separation to avoid a race condition
-    !$omp do reduction(+:fluxprofile)
+    !$omp do reduction(+:temperature_flux_profile)
     do k = 0+l,Prnz,2
      do j = 1,Prny
       do i = 1,Prnx
@@ -488,7 +535,7 @@ contains
         FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._knd)
        end if
 
-       if (abs(vel)>=1e-6) fluxprofile(k) = fluxprofile(k) + FLUX/vel*W(i,j,k)
+       if (abs(vel)>=1e-6) temperature_flux_profile(k) = temperature_flux_profile(k) + FLUX/vel*W(i,j,k)
 
        SCAL2(i,j,k) = SCAL2(i,j,k) - Az*FLUX
        SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + Az*FLUX
@@ -499,34 +546,35 @@ contains
   end do
 
   !$omp workshare
-  fluxprofile = fluxprofile / (Prnx*Prny)
+  temperature_flux_profile = temperature_flux_profile / (Prnx*Prny)
   !$omp end workshare
 
   !$omp end parallel
+
+  contains
+
+    real(knd) pure function  FluxLimiter(r)
+      real(knd),intent(in) :: r
+      FluxLimiter=max(0._knd,min(2._knd*r,min(limparam,(1+2._knd*r)/3._knd)))
+    end function
 
   endsubroutine KAPPASCALARUG
 
 
 
-  subroutine KAPPASCALARGG(SCAL2,SCAL,U,V,W,coef,SubsidenceProfile,fluxProfile) !Kappa scheme with flux limiter
+  subroutine KAPPASCALARGG(SCAL2,SCAL,U,V,W,coef,SubsidenceProfile,temperature_flux_profile) !Kappa scheme with flux limiter
   real(knd),intent(out) :: Scal2(-1:,-1:,-1:)                                   !Hunsdorfer et al. 1995, JCP
   real(knd),intent(in)  :: Scal(-1:,-1:,-1:)
   real(knd),intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),coef
   real(knd),intent(in)  :: SubsidenceProfile(0:)
-  real(knd),intent(out) :: fluxProfile(0:)
+  real(knd),intent(out) :: temperature_flux_profile(0:)
   integer i,j,k,l
   real(knd) A                       !Auxiliary variables to store muliplication constants for efficiency
   real(knd) vel,SL,SR,FLUX
-  real(knd),allocatable,save :: SLOPE(:,:,:)
   real(knd),parameter::eps = 1e-8
-  real(knd) :: FluxLimiter,r
-  integer,save :: called = 0
 
-  FluxLimiter(r)=max(0._knd,min(2._knd*r,min(limparam,(1+2._knd*r)/3._knd)))
-
-  if (called==0) then
+  if (.not.allocated(SLOPE)) then
     allocate(SLOPE(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-    called = 1
   end if
 
   A = coef*dt
@@ -632,11 +680,11 @@ contains
   !$omp end do nowait
 
   !$omp workshare
-  fluxprofile = 0
+  temperature_flux_profile = 0
   !$omp end workshare
 
   do l=0,1  !odd-even separation to avoid a race condition
-    !$omp do reduction(+:fluxprofile)
+    !$omp do reduction(+:temperature_flux_profile)
     do j = 1,Prny  !loop order due to avoid race condition
      do k = 0,Prnz
       do i = 1,Prnx
@@ -649,7 +697,7 @@ contains
         FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._knd)
        end if
 
-       if (abs(vel)>=1e-6) fluxprofile(k) = fluxprofile(k+1) + FLUX/vel*W(i,j,k)
+       if (abs(vel)>=1e-6) temperature_flux_profile(k) = temperature_flux_profile(k+1) + FLUX/vel*W(i,j,k)
 
        SCAL2(i,j,k) = SCAL2(i,j,k) - A*FLUX/dzPr(k)
        SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + A*FLUX/dzPr(k+1)
@@ -660,10 +708,17 @@ contains
   end do
 
   !$omp workshare
-  fluxProfile = fluxProfile/(Prnx * Prny)
+  temperature_flux_profile = temperature_flux_profile/(Prnx * Prny)
   !$omp end workshare
 
   !$omp end parallel
+
+  contains
+
+    real(knd) pure function  FluxLimiter(r)
+      real(knd),intent(in) :: r
+      FluxLimiter=max(0._knd,min(2._knd*r,min(limparam,(1+2._knd*r)/3._knd)))
+    end function
 
   endsubroutine KAPPASCALARGG
 
@@ -676,18 +731,14 @@ contains
   real(knd),intent(in) :: coef
   integer,intent(in) :: sctype
   procedure(boundary_interface) :: boundary_procedure
-  real(knd),allocatable,save :: Scal3(:,:,:)
-  real(knd),allocatable,save :: Ap(:,:,:)
   integer nx,ny,nz,i,j,k,bi,bj,bk,l,xi,yj,zk
   real(knd) p,S
   real(knd) A,Ax,Ay,Az
   integer,parameter :: narr = 3, narr2 = 5
-  integer,save :: called = 0
 
-  if (called==0) then
+  if (.not.allocated(Scal3)) then
     allocate(Scal3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
     allocate(Ap(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-    called = 1
   end if
 
   nx = Prnx
@@ -971,6 +1022,188 @@ contains
 
 
 
+  subroutine AddScalarAdvVector(ScU,ScV,ScW,SCAL,U,V,W,weight) !Kappa scheme with flux limiter
+    real(knd),intent(inout) :: ScU(:,:,:) !Hunsdorfer et al. 1995, JCP
+    real(knd),intent(inout) :: ScV(:,:,:)
+    real(knd),intent(inout) :: ScW(:,:,:)
+    real(knd),intent(in)  :: Scal(-1:,-1:,-1:)
+    real(knd),intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),intent(in) :: weight
+    integer i,j,k
+    real(knd) vel,SL,SR,FLUX
+    real(knd),parameter ::eps = 1e-8
+
+    if (.not.allocated(SLOPE)) then
+      allocate(SLOPE(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+    end if
+
+
+    call set(SLOPE,0._knd)
+
+    !$omp parallel private(i,j,k,SL,SR) shared(SLOPE,SCAL,ScU)
+    !$omp do
+    do k = 1,Unz
+     do j = 1,Uny
+      do i = 1,Unx
+       if (U(i,j,k)>0) then
+        SR = (SCAL(i+1,j,k)-SCAL(i,j,k))
+        SL = (SCAL(i,j,k)-SCAL(i-1,j,k))
+       else
+        SR = (SCAL(i,j,k)-SCAL(i+1,j,k))
+        SL = (SCAL(i+1,j,k)-SCAL(i+2,j,k))
+       end if
+       SLOPE(i,j,k) = FLUXLIMITER((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
+      end do
+     end do
+    end do
+    !$omp end do
+
+    !$omp do
+    do k = 1,Unz
+     do j = 1,Uny
+      do i = 1,Unx
+       if (U(i,j,k)>0) then
+        ScU(i,j,k) = ScU(i,j,k) + &
+                   weight * U(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i-1,j,k))*SLOPE(i,j,k)/2._knd)
+       else
+        ScU(i,j,k) = ScU(i,j,k) + &
+                   weight * U(i,j,k)*(SCAL(i+1,j,k)+(SCAL(i+1,j,k)-SCAL(i+2,j,k))*SLOPE(i,j,k)/2._knd)
+       end if
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp end parallel
+
+    call set(SLOPE,0._knd)
+
+    !$omp parallel private(i,j,k,SL,SR) shared(SLOPE,SCAL,ScV)
+    !$omp do
+    do k = 1,Vnz
+     do j = 1,Vny
+      do i = 1,Vnx
+       if (V(i,j,k)>0) then
+        SR = (SCAL(i,j+1,k)-SCAL(i,j,k))
+        SL = (SCAL(i,j,k)-SCAL(i,j-1,k))
+       else
+        SR = (SCAL(i,j,k)-SCAL(i,j+1,k))
+        SL = (SCAL(i,j+1,k)-SCAL(i,j+2,k))
+       end if
+       SLOPE(i,j,k) = FLUXLIMITER((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
+      end do
+     end do
+    end do
+    !$omp end do
+
+
+    !$omp do
+    do k = 1,Vnz
+     do j = 1,Vny
+      do i = 1,Vnx
+       if (V(i,j,k)>0) then
+        ScV(i,j,k) = ScV(i,j,k) + &
+                   weight * V(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j-1,k))*SLOPE(i,j,k)/2._knd)
+       else
+        ScV(i,j,k) = ScV(i,j,k) + &
+                   weight * V(i,j,k)*(SCAL(i,j+1,k)+(SCAL(i,j+1,k)-SCAL(i,j+2,k))*SLOPE(i,j,k)/2._knd)
+       end if
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp end parallel
+
+
+    call set(SLOPE ,0._knd)
+
+    !$omp parallel private(i,j,k,SL,SR) shared(SLOPE,SCAL,ScW)
+    !$omp do
+    do k = 1,Wnz
+     do j = 1,Wny
+      do i = 1,Wnx
+       if (W(i,j,k)>0) then
+        SR = (SCAL(i,j,k+1)-SCAL(i,j,k))
+        SL = (SCAL(i,j,k)-SCAL(i,j,k-1))
+       else
+        SR = (SCAL(i,j,k)-SCAL(i,j,k+1))
+        SL = (SCAL(i,j,k+1)-SCAL(i,j,k+2))
+       end if
+       SLOPE(i,j,k) = FLUXLIMITER((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
+      end do
+     end do
+    end do
+    !$omp end do
+
+    !$omp do
+      do k = 1,Wnz
+       do j = 1,Wny
+        do i = 1,Wnx
+         if (W(i,j,k)>0) then
+          ScW(i,j,k) = ScW(i,j,k) + &
+                     weight * W(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._knd)
+         else
+          ScW(i,j,k) = ScW(i,j,k) + &
+                     weight * W(i,j,k)*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._knd)
+         end if
+        end do
+       end do
+      end do
+      !$omp end do
+    !$omp end parallel
+
+  contains
+
+    real(knd) pure function  FluxLimiter(r)
+      real(knd),intent(in) :: r
+      FluxLimiter=max(0._knd,min(2._knd*r,min(limparam,(1+2._knd*r)/3._knd)))
+    end function
+
+  endsubroutine AddScalarAdvVector
+  
+  subroutine AddScalarDiffVector(ScU,ScV,ScW,SCAL,weight)
+    real(knd),intent(inout) :: ScU(:,:,:)
+    real(knd),intent(inout) :: ScV(:,:,:)
+    real(knd),intent(inout) :: ScW(:,:,:)
+    real(knd),intent(in)  :: Scal(-1:,-1:,-1:)
+    real(knd),intent(in) :: weight
+    integer i,j,k
+
+    !$omp parallel private (i,j,k)
+    !$omp do
+    do k = 1,Unz
+     do j = 1,Uny
+      do i = 1,Unx
+        ScU(i,j,k) = ScU(i,j,k) + &
+                   weight * (TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))/dxmin
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp do
+    do k = 1,Vnz
+     do j = 1,Vny
+      do i = 1,Vnx
+        ScV(i,j,k) = ScV(i,j,k) + &
+                   weight * (TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))/dymin
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp do
+    do k = 1,Wnz
+     do j = 1,Wny
+      do i = 1,Wnx
+        ScW(i,j,k) = ScW(i,j,k) + &
+                   weight * (TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))/dzmin
+      end do
+     end do
+    end do
+    !$omp end do
+    !$omp end parallel
+  endsubroutine AddScalarDiffVector
+
+
+
 
   pure real(knd) function AirDensity(press,temp)
   real(knd),intent(in) :: press,temp
@@ -1239,7 +1472,7 @@ contains
     do k=1,Prnz
       do j=1,Prny
         do i=1,Prnx
-          TDiff(i,j,k) = (Visc(i,j,k)-1._knd/Re)/Prt + (1._knd/(Re*Prandtl))
+          TDiff(i,j,k) = (Viscosity(i,j,k)-1._knd/Re)/Prt + (1._knd/(Re*Prandtl))
         end do
       end do
     end do
@@ -1249,7 +1482,7 @@ contains
     do k=1,Prnz
       do j=1,Prny
         do i=1,Prnx
-          TDiff(i,j,k) = Visc(i,j,k)/Prt
+          TDiff(i,j,k) = Viscosity(i,j,k)/Prt
         end do
       end do
     end do
@@ -1273,7 +1506,7 @@ contains
     if (nSections > 0) then
 
        if (size(ScalarProfile%Sections)>0) then
-         if (ScalarProfile%Sections(1)%jump<=0) ScalarProfile%Sections(1)%jump = temperature_ref
+         if (ScalarProfile%Sections(1)%jump<=0) ScalarProfile%Sections(1)%jump = default_value
        end if
 
       ScalarProfile%Sections(1)%height = ScalarProfile%Sections(1)%top
@@ -1509,7 +1742,7 @@ contains
     dyp=(yf-ys)/nproby
     dzp=(zf-zs)/nprobz
     if (num_of_scalars>=4) then
-     if (time>(endtime-starttime)/3._knd) then
+     if (time>(end_time-start_time)/3._knd) then
       Scalar = 0
       p = 0
       do k=0,nprobz

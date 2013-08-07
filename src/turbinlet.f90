@@ -178,7 +178,9 @@ contains
    call multiply(Psiw(:,:,1),exp(-pi*dt/(2._knd*TLag)))
    call add_multiplied(Psiw(:,:,1), Psiw(:,:,2), sqrt(1-exp(-pi*dt/(TLag))))
    
-
+   call set(Uin,0._knd)
+   call set(Vin,0._knd)
+   call set(Win,0._knd)
    !$omp parallel private(i,j,k,Ui,Vi,Wi)
    !$omp do
    do k = 1,Prnz
@@ -212,9 +214,9 @@ contains
 
    call BoundUin(1,Uin)
 
-   call BoundUin(1,Vin)
+   call BoundUin(2,Vin)
 
-   call BoundUin(1,Win)
+   call BoundUin(3,Win)
 
 
    do k=-bigNz+1,Prnz+bigNz
@@ -224,7 +226,6 @@ contains
       call RandomGauss(Rw(j,k,2))
     end do
    end do
-
 
    if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
      !$omp parallel workshare

@@ -15,20 +15,24 @@ module Subgrid
   contains
 
     subroutine SGS_Smag(U,V,W,filter_ratio)  !Standard Smagorinsky model with implicit filtering
+     use ArrayUtilities,only: add
      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
      real(knd),intent(in) :: filter_ratio
      integer i,j,k
 
+      !$omp parallel do private(i,j,k)
       do k = 1,Prnz
        do j = 1,Prny
         do i = 1,Prnx
-          Visc(i,j,k) = NuSmag(i,j,k,U,V,W,filter_ratio)
+          Viscosity(i,j,k) = NuSmag(i,j,k,U,V,W,filter_ratio)
         end do
        end do
       end do
+      !$omp end parallel do
       if (Re>0) then
-        Visc = Visc+1._knd/Re
+        call add(Viscosity,1._knd/Re)
       end if
+
     endsubroutine SGS_Smag
 
 
@@ -75,13 +79,13 @@ module Subgrid
           l0 = CS*width
           l = WallDamp(l0,z0B,zPr(k))
 
-          Visc(i,j,k)  = Sbar*Fm(Ri)*l
+          Viscosity(i,j,k)  = Sbar*Fm(Ri)*l
           TDiff(i,j,k) = Sbar*Fh(Ri)*l
         end do
        end do
       end do
       if (Re>0) then
-        Visc  = Visc  + 1._knd/Re
+        Viscosity  = Viscosity  + 1._knd/Re
         TDiff = TDiff + 1._knd/(Re*Prandtl)
       end if
     endsubroutine SGS_StabSmag
@@ -261,12 +265,12 @@ module Subgrid
 
 
              if (abs(aa)>1e-5.and.bb>0)  then
-               Visc(i,j,k) = c2 * sqrt(bb/aa)
+               Viscosity(i,j,k) = c2 * sqrt(bb/aa)
              else
-               Visc(i,j,k) = 0
+               Viscosity(i,j,k) = 0
              end if
 
-             if (Re>0)  Visc(i,j,k) = Visc(i,j,k)+1._knd/Re
+             if (Re>0)  Viscosity(i,j,k) = Viscosity(i,j,k)+1._knd/Re
 
             end do
            end do
@@ -306,14 +310,14 @@ module Subgrid
              bb = bb+b(1,1)*b(3,3)-b(1,3)**2
              bb = bb+b(2,2)*b(3,3)-b(2,3)**2
 
-             Visc(i,j,k) = 0._knd
+             Viscosity(i,j,k) = 0._knd
 
 
              aa = sum(a(:,:)**2)
 
-             if (abs(aa)>1e-5.and.bb>0) Visc(i,j,k) = c2 * sqrt(bb/aa)
+             if (abs(aa)>1e-5.and.bb>0) Viscosity(i,j,k) = c2 * sqrt(bb/aa)
 
-             if (Re>0)  Visc(i,j,k) = Visc(i,j,k)+1._knd/Re
+             if (Re>0)  Viscosity(i,j,k) = Viscosity(i,j,k)+1._knd/Re
 
             end do
            end do
@@ -333,12 +337,13 @@ module Subgrid
     subroutine SGS_Sigma(U,V,W,filter_ratio)
       !from Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
       use Tiling, only: tilenx, tileny, tilenz
-      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
       real(knd),intent(in) :: filter_ratio
       real(knd),parameter :: Csig = 1.35_knd
       integer,parameter   :: narr = 4
       integer   :: i,j,k,bi,bj,bk
       real(knd) :: width, C, D, g(3,3), s1, s2, s3
+      integer,parameter :: sigma_knd = knd
 
       width = filter_ratio * (dxmin*dymin*dzmin)**(1._knd/3._knd)
       C = (Csig*width)**2
@@ -351,7 +356,7 @@ module Subgrid
           do j = bj,min(bj+tileny(narr)-1,Prny)
            do i = bi,min(bi+tilenx(narr)-1,Prnx)
 
-            call GradientTensorUG(g,i,j,k,U,V,W)
+            call GradientTensorUG(g,i,j,k)
 
             call Sigmas(s1,s2,s3,g)
 
@@ -361,9 +366,9 @@ module Subgrid
               D = 0
             end if
 
-            Visc(i,j,k) = C * D
+            Viscosity(i,j,k) = C * D
 
-            if (Re>0)  Visc(i,j,k) = Visc(i,j,k)+1._knd/Re
+            if (Re>0)  Viscosity(i,j,k) = Viscosity(i,j,k)+1._knd/Re
 
            end do
           end do
@@ -373,83 +378,82 @@ module Subgrid
       end do
       !$omp end parallel do
 
+    contains
+
+      pure subroutine GradientTensorUG(g,i,j,k)
+        real(knd),intent(out) :: g(3,3)
+        integer,intent(in) :: i,j,k
+
+        g(1,1) = (U(i,j,k)-U(i-1,j,k))/dxmin
+        g(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._knd*dymin)
+        g(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._knd*dzmin)
+
+        g(2,2) = (V(i,j,k)-V(i,j-1,k))/dymin
+        g(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(4._knd*dxmin)
+        g(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(4._knd*dzmin)
+
+        g(3,3) = (W(i,j,k)-W(i,j,k-1))/dzmin
+        g(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4._knd*dxmin)
+        g(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4._knd*dymin)
+      end subroutine GradientTensorUG
+
+
+      pure subroutine Sigmas(s1,s2,s3,grads)
+        !from Hasan, Basser, Parker, Alexander, http://dx.doi.org/10.1006/jmre.2001.2400
+        !via Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
+        real(knd),intent(out) :: s1,s2,s3
+        real(knd),intent(in)  :: grads(3,3)
+
+        real(sigma_knd) :: trG2, i1, i2, i3, a1, a2, a3, c, G(3,3)
+
+        G = real( matmul(transpose(grads),grads) ,sigma_knd)
+
+        trG2 = dot_product(G(:,1),G(:,1)) +&
+               dot_product(G(:,2),G(:,2)) +&
+               dot_product(G(:,3),G(:,3))
+
+        i1 = G(1,1) + G(2,2) + G(3,3)
+
+        i2 = (i1**2 - trG2)
+        i2 = i2 / 2
+
+        i3 = det3x3(G)
+
+        a1 = max((i1**2)/9 - i2/3,0._sigma_knd)
+
+        a2 = (i1**3)/27 - i1*i2/6 +i3/2
+
+        if (a1>10*epsilon(1._sigma_knd)) then
+           c =  a2 / sqrt(a1**3)
+        else
+           c = 0
+        end if
+        c = max(-1._sigma_knd,min(1._sigma_knd,c))
+        a3 = acos(c) / 3
+
+        c = 2*sqrt(a1)
+
+        s1 = real( sqrt( i1/3 + c*cos(a3) ) , knd )
+
+        s2 = real( sqrt( max( i1/3 - c*cos(pi/3 + a3) , 0._sigma_knd ) ) , knd)
+
+        s3 = real( sqrt( max( i1/3 - c*cos(pi/3 - a3) , 0._sigma_knd ) ) , knd)
+
+      end subroutine Sigmas
+
+
+      pure function det3x3(A) result (res)
+        real(sigma_knd),intent(in) :: A(3,3)
+        real(sigma_knd) :: res
+
+        res =   A(1,1)*A(2,2)*A(3,3)  &
+              - A(1,1)*A(2,3)*A(3,2)  &
+              - A(1,2)*A(2,1)*A(3,3)  &
+              + A(1,2)*A(2,3)*A(3,1)  &
+              + A(1,3)*A(2,1)*A(3,2)  &
+              - A(1,3)*A(2,2)*A(3,1)
+      end function det3x3
+
     end subroutine SGS_Sigma
-
-
-    pure subroutine GradientTensorUG(g,i,j,k,U,V,W)
-      real(knd),intent(out) :: g(3,3)
-      integer,intent(in) :: i,j,k
-      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-
-      g(1,1) = (U(i,j,k)-U(i-1,j,k))/dxmin
-      g(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._knd*dymin)
-      g(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._knd*dzmin)
-
-      g(2,2) = (V(i,j,k)-V(i,j-1,k))/dymin
-      g(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(4._knd*dxmin)
-      g(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(4._knd*dzmin)
-
-      g(3,3) = (W(i,j,k)-W(i,j,k-1))/dzmin
-      g(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4._knd*dxmin)
-      g(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4._knd*dymin)
-    end subroutine GradientTensorUG
-
-
-    pure subroutine Sigmas(s1,s2,s3,grads)
-      !from Hasan, Basser, Parker, Alexander, http://dx.doi.org/10.1006/jmre.2001.2400
-      !via Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
-      real(knd),intent(out) :: s1,s2,s3
-      real(knd),intent(in)  :: grads(3,3)
-
-      real(DBL) :: trG2, i1, i2, i3, a1, a2, a3, c, G(3,3)
-
-      G = matmul(transpose(grads),grads)
-
-      trG2 = dot_product(G(:,1),G(:,1)) +&
-             dot_product(G(:,2),G(:,2)) +&
-             dot_product(G(:,3),G(:,3))
-
-      i1 = G(1,1) + G(2,2) + G(3,3)
-
-      i2 = (i1**2 - trG2)
-      i2 = i2 / 2
-
-      i3 = det3x3(G)
-
-      a1 = max((i1**2)/9 - i2/3,0._DBL)
-
-      a2 = (i1**3)/27 - i1*i2/6 +i3/2
-
-      if (a1>10*epsilon(1._DBL)) then
-         c =  a2 / sqrt(a1**3)
-      else
-         c = 0
-      end if
-      c = max(-1._DBL,min(1._DBL,c))
-      a3 = acos(c) / 3
-
-      c = 2*sqrt(a1)
-
-      s1 = real( sqrt( i1/3 + c*cos(a3) ) , knd )
-
-      s2 = real( sqrt( max( i1/3 - c*cos(pi/3 + a3) , 0._DBL ) ) , knd)
-
-      s3 = real( sqrt( max( i1/3 - c*cos(pi/3 - a3) , 0._DBL ) ) , knd)
-
-    end subroutine Sigmas
-
-
-    pure function det3x3(A) result (res)
-      real(DBL),intent(in) :: A(3,3)
-      real(DBL) :: res
-
-      res =   A(1,1)*A(2,2)*A(3,3)  &
-            - A(1,1)*A(2,3)*A(3,2)  &
-            - A(1,2)*A(2,1)*A(3,3)  &
-            + A(1,2)*A(2,3)*A(3,1)  &
-            + A(1,3)*A(2,1)*A(3,2)  &
-            - A(1,3)*A(2,2)*A(3,1)
-    end function det3x3
-
 
 end module Subgrid

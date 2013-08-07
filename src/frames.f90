@@ -50,10 +50,11 @@ module StaggeredFrames
   end type
 
   type TSaveFlags
+    logical :: Pr = .false.
     logical :: U = .false.
     logical :: V = .false.
     logical :: W = .false.
-    logical :: Pr = .false.
+    logical :: Viscosity = .false.
     logical :: Temperature = .false.
     logical :: Moisture = .false.
     logical :: Scalar = .false.
@@ -78,11 +79,11 @@ module StaggeredFrames
     real(knd), allocatable :: times(:)
 
     type(rrange) :: range
+    integer   :: minPri, maxPri, minPrj, maxPrj, minPrk, maxPrk
     integer   :: minUi, maxUi, minUj, maxUj, minUk, maxUk
     integer   :: minVi, maxVi, minVj, maxVj, minVk, maxVk
     integer   :: minWi, maxWi, minWj, maxWj, minWk, maxWk
-    integer   :: minPri, maxPri, minPrj, maxPrj, minPrk, maxPrk
-    integer   :: sizeU, sizeV, sizeW, sizePr
+    integer   :: sizePr, sizeU, sizeV, sizeW
     real(knd),allocatable,dimension(:) :: xPr,yPr,zPr,xU,yV,zW
       !temperature and scalars use Prsize and min/maxPr_
     logical :: ranges_set = .false.
@@ -131,6 +132,9 @@ module StaggeredFrames
   interface SaveHeader
     module procedure TStaggeredFrameDomain_SaveHeader
   end interface
+  interface SaveMask
+    module procedure TStaggeredFrameDomain_SaveMask
+  end interface
   interface Finalize
     module procedure TStaggeredFrameDomain_Finalize
   end interface
@@ -163,8 +167,11 @@ module StaggeredFrames
       end if
       if (idx > ubound(array,1)) then
         allocate( tmp(lbound(array,1):lbound(array,1)+(idx-lbound(array,1))*2) )
+        tmp(lbound(array,1):ubound(array,1)) = array
+        deallocate(array)
+        call move_alloc(tmp, array)
       end if
-
+      
       array(idx) = val
 
     end subroutine TimeSeries_Add
@@ -221,7 +228,7 @@ module StaggeredFrames
     subroutine TStaggeredFrameDomain_SetRest(D, num_scalars)
 
       use Boundaries, only: GridCoords
-      use Parameters, only: xU, yV, zW, xPr, yPr, zPr
+      use Parameters, only: xU, yV, zW, xPr, yPr, zPr, Prtype, Utype, Vtype, Wtype
 
       type(TStaggeredFrameDomain),intent(inout) :: D
       integer,intent(in) :: num_scalars
@@ -229,6 +236,15 @@ module StaggeredFrames
       call GridCoords(D%minPri, D%minPrj, D%minPrk, D%range%min%x, D%range%min%y, D%range%min%z)
 
       call GridCoords(D%maxPri, D%maxPrj, D%maxPrk, D%range%max%x, D%range%max%y, D%range%max%z)
+      
+      
+      !FIXME?: this assumes the user wants the domain specified by D%range + side buffers for flux evaluations. Make this behaviour optional?
+      D%minPri = D%minPri - 1
+      D%minPrj = D%minPrj - 1
+      D%minPrk = D%minPrk - 1
+      D%maxPri = D%maxPri + 1
+      D%maxPrj = D%maxPrj + 1
+      D%maxPrk = D%maxPrk + 1
 
       D%minUi = D%minPri - 1
       D%minUj = D%minPrj
@@ -272,12 +288,13 @@ module StaggeredFrames
       allocate(D%zPr(D%maxPrk-D%minPrk+1))
       D%zPr(:) = zPr(D%minPrk:D%maxPrk)
 
-      D%buffer_size = 0
+      D%buffer_size = 1 !first position is a time-stamp
 
       if (D%save_flags%U) D%buffer_size = D%buffer_size + D%sizeU
       if (D%save_flags%V) D%buffer_size = D%buffer_size + D%sizeV
       if (D%save_flags%W) D%buffer_size = D%buffer_size + D%sizeW
       if (D%save_flags%Pr) D%buffer_size = D%buffer_size + D%sizePr
+      if (D%save_flags%Viscosity) D%buffer_size = D%buffer_size + D%sizePr
       if (D%save_flags%Temperature) D%buffer_size = D%buffer_size + D%sizePr
       if (D%save_flags%Moisture) D%buffer_size = D%buffer_size + D%sizePr
       if (D%save_flags%Scalar) D%buffer_size = D%buffer_size + D%sizePr * num_scalars
@@ -290,6 +307,8 @@ module StaggeredFrames
 
       call SaveHeader(D)
 
+      call SaveMask(D, Utype, Vtype, Wtype, Prtype)
+
       allocate(D%buffer(0:D%buffer_size-1))
 
       D%ranges_set = .true.
@@ -298,19 +317,22 @@ module StaggeredFrames
 
 
 
-    subroutine TStaggeredFrameDomain_Fill(D, U, V, W, Pr, Temperature, Scalar)
+    subroutine TStaggeredFrameDomain_Fill(D, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
       !Fill the output buffer for asynchronous output
       type(TStaggeredFrameDomain),intent(inout) :: D
       real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-      real(knd),intent(in) :: Pr(1:,1:,1:), Temperature(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,-1:)
+      real(knd),intent(in) :: Pr(1:,1:,1:), Viscosity(-1:,-1:,-1:), Temperature(-1:,-1:,-1:), &
+                              Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,-1:)
       integer :: offset
       integer :: i
 
       if (.not.D%ranges_set) call SetRest(D, num_scalars = size(Scalar,4))
 
       !assume allocated by SetRest, otherwise error by the runtime library
-
-      offset = 0
+      
+      !offset = 0
+      D%buffer(0) = D%times(D%frame_number)
+      offset = 1
 
       if (D%save_flags%U) then
         D%buffer(offset:offset+D%sizeU-1) = &
@@ -334,8 +356,16 @@ module StaggeredFrames
       end if
 
       if (D%save_flags%Pr) then
+        !FIXME: problem near boundaries becaus of boundary buffer
         D%buffer(offset:offset+D%sizePr-1) = &
             Pr(D%minPri:D%maxPri, D%minPrj:D%maxPrj, D%minPrk:D%maxPrk)
+
+        offset = offset + D%sizePr
+      end if
+
+      if (D%save_flags%Viscosity) then
+        D%buffer(offset:offset+D%sizePr-1) = &
+            Viscosity(D%minPri:D%maxPri, D%minPrj:D%maxPrj, D%minPrk:D%maxPrk)
 
         offset = offset + D%sizePr
       end if
@@ -343,6 +373,13 @@ module StaggeredFrames
       if (D%save_flags%Temperature) then
         D%buffer(offset:offset+D%sizePr-1) = &
             Temperature(D%minPri:D%maxPri, D%minPrj:D%maxPrj, D%minPrk:D%maxPrk)
+
+        offset = offset + D%sizePr
+      end if
+
+      if (D%save_flags%Moisture) then
+        D%buffer(offset:offset+D%sizePr-1) = &
+            Moisture(D%minPri:D%maxPri, D%minPrj:D%maxPrj, D%minPrk:D%maxPrk)
 
         offset = offset + D%sizePr
       end if
@@ -388,8 +425,6 @@ module StaggeredFrames
 
       open(unit=D%unit, file=file_name, access='stream', form='unformatted', action='write', status='replace')
 
-      write(D%unit) D%times(D%frame_number)          !current time
-
       write(D%unit) D%buffer
 
       close(D%unit)
@@ -398,11 +433,13 @@ module StaggeredFrames
 
 
 
-    subroutine TStaggeredFrameDomain_Save(D, time, U, V, W, Pr, Temperature, Scalar)
+    subroutine TStaggeredFrameDomain_Save(D, time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
       type(TStaggeredFrameDomain),target,asynchronous,intent(inout) :: D
       real(knd),intent(in) :: time
       real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-      real(knd),intent(in) :: Pr(1:,1:,1:), Temperature(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,-1:)
+      real(knd),intent(in) :: Pr(1:,1:,1:), &
+                              Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
+                              Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,-1:)
       integer err
 
       associate(start   => D%frame_times%start,&
@@ -414,13 +451,13 @@ module StaggeredFrames
 
           D%frame_number = D%frame_number + 1
 
-          if (.not.allocated(D%times)) allocate(D%times(D%frame_number:D%frame_number+1000))
+          if (.not.allocated(D%times)) allocate(D%times(D%frame_number:D%frame_number+100))
 
           call Add(D%times,D%frame_number,time)
 
           if (D%in_progress) call Wait(D)
 
-          call Fill(D, U, V, W, Pr, Temperature, Scalar)
+          call Fill(D, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
 
           call pthread_create_opaque(D%threadptr, c_funloc(SaveBuffer), c_loc(D), err)
 
@@ -439,7 +476,7 @@ module StaggeredFrames
 
 
     subroutine TStaggeredFrameDomain_SaveTimes(D)
-      type(TStaggeredFrameDomain),target,intent(in) :: D
+      type(TStaggeredFrameDomain),intent(in) :: D
       character(40) :: file_name
       integer i
 
@@ -457,7 +494,7 @@ module StaggeredFrames
 
 
     subroutine TStaggeredFrameDomain_SaveHeader(D)
-      type(TStaggeredFrameDomain),target,intent(in) :: D
+      type(TStaggeredFrameDomain),intent(in) :: D
       character(40) :: file_name
 
       file_name = trim(D%base_name)//"-header"//trim(D%suffix)
@@ -466,20 +503,44 @@ module StaggeredFrames
 
       write(D%unit) 1_int32 !endianess can be infered from this
       write(D%unit) int(storage_size(1._knd),int32)  !save number of bits of the used real kind
+      write(D%unit) int(storage_size(1),int32)  !save number of bits of the used (default) integer kind
+      write(D%unit) int(storage_size(.true.),int32)  !save number of bits of the used (default) logical kind
 
-      write(D%unit) D%save_flags%U, D%save_flags%V, D%save_flags%W, D%save_flags%Pr
-      write(D%unit) D%save_flags%Temperature, D%save_flags%Scalar, D%save_flags%num_scalars
+      write(D%unit) D%save_flags%U, D%save_flags%V, D%save_flags%W
+      write(D%unit) D%save_flags%Pr, D%save_flags%Viscosity
+      write(D%unit) D%save_flags%Temperature, D%save_flags%Moisture, &
+                    D%save_flags%Scalar, D%save_flags%num_scalars
 
       write(D%unit) D%minUi, D%maxUi, D%minUj, D%maxUj, D%minUk, D%maxUk
       write(D%unit) D%minVi, D%maxVi, D%minVj, D%maxVj, D%minVk, D%maxVk
       write(D%unit) D%minWi, D%maxWi, D%minWj, D%maxWj, D%minWk, D%maxWk
       write(D%unit) D%minPri, D%maxPri, D%minPrj, D%maxPrj, D%minPrk, D%maxPrk
 
-      write(D%unit) D%xPr,D%yPr,D%zPr,D%xU,D%yV,D%zW
+      write(D%unit) D%xU,D%yV,D%zW,D%xPr,D%yPr,D%zPr
 
       close(D%unit)
 
     end subroutine TStaggeredFrameDomain_SaveHeader
+
+
+    subroutine TStaggeredFrameDomain_SaveMask(D, Utype,Vtype, Wtype, Prtype)
+      type(TStaggeredFrameDomain),intent(in) :: D
+      integer,intent(in) :: Prtype(0:,0:,0:)
+      integer,dimension(-2:,-2:,-2:),intent(in) :: Utype, Vtype, Wtype
+      character(40) :: file_name
+
+      file_name = trim(D%base_name)//"-mask"//trim(D%suffix)
+
+      open(unit=D%unit, file=file_name, access='stream', form='unformatted', action='write', status='replace')
+
+      write(D%unit) Utype(D%minUi:D%maxUi, D%minUj:D%maxUj, D%minUk:D%maxUk)
+      write(D%unit) Vtype(D%minVi:D%maxVi, D%minVj:D%maxVj, D%minVk:D%maxVk)
+      write(D%unit) Wtype(D%minWi:D%maxWi, D%minWj: D%maxWj, D%minWk:D%maxWk)
+      write(D%unit) Prtype(D%minPri:D%maxPri, D%minPrj:D%maxPrj, D%minPrk:D%maxPrk)
+
+      close(D%unit)
+
+    end subroutine TStaggeredFrameDomain_SaveMask
 
 
 

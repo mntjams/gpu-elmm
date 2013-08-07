@@ -10,45 +10,54 @@ module Outputs
   use StaggeredFrames
 
   implicit none
-
+ 
 
   private
-  public store, display, probes, scalar_probes, number_of_probes, number_of_scalar_probes, &
-         OutTStep, Output, AllocateOutputs, SetFrameDomain, ReadProbes, proftempfl,&
-         StaggeredFrameDomains
+  public store, display, probes, scalar_probes, frame_flags, &
+         OutTStep, Output, AllocateOutputs, AddFrameDomain, SetFrameDomains, ReadProbes, StaggeredFrameDomains, &
+          proftempfl, profmoistfl, profuw, profvw, profuwsgs, profvwsgs
 
-  real(knd),dimension(:),allocatable :: profuavg,profuavg2,profvavg,profvavg2,profuuavg,profvvavg,profwwavg,&
-                                         profU,profV,profuu,profvv,profww,proftauavg,proftau,proftausgs,proftausgsavg,&
-                                         proftemp,proftempfl,proftempavg,proftempavg2,proftempflavg,&
-                                         proftempflsgs,proftempflsgsavg,proftt,profttavg,&
-                                         profmoist,profmoistfl,profmoistavg,profmoistavg2,profmoistflavg,&
-                                         profmoistflsgs,profmoistflsgsavg,profmm,profmmavg,&
-                                         profuw,profuwavg,profuwsgs,profuwsgsavg,&
+  real(knd),dimension(:),allocatable :: profuavg,profuavg2,profvavg,profvavg2,profuuavg,profvvavg,profwwavg, &
+                                         profU,profV,profuu,profvv,profww,proftauavg,proftau,proftausgs,proftausgsavg, &
+                                         proftemp,proftempfl,proftempavg,proftempavg2,proftempflavg, &
+                                         proftempflsgs,proftempflsgsavg,proftt,profttavg, &
+                                         profmoist,profmoistfl,profmoistavg,profmoistavg2,profmoistflavg, &
+                                         profmoistflsgs,profmoistflsgsavg,profmm,profmmavg, &
+                                         profuw,profuwavg,profuwsgs,profuwsgsavg, &
                                          profvw,profvwavg,profvwsgs,profvwsgsavg
 
-  real(knd),dimension(:,:),allocatable ::profscal,profscalfl,profscalavg,profscalavg2,profscalflavg,&  !which scalar, height
+  real(knd),dimension(:,:),allocatable ::profscal,profscalfl,profscalavg,profscalavg2,profscalflavg, &  !which scalar, height
                                          profscalflsgs,profscalflsgsavg,profss,profssavg
 
-  real(knd),allocatable :: U_avg(:,:,:),V_avg(:,:,:),W_avg(:,:,:)
-  real(knd),allocatable :: Pr_avg(:,:,:)
-  real(knd),allocatable :: Temperature_avg(:,:,:)
-  real(knd),allocatable :: Moisture_avg(:,:,:)
-  real(knd),allocatable :: Scalar_avg(:,:,:,:)
+  real(knd),allocatable :: U_avg(:,:,:),V_avg(:,:,:),W_avg(:,:,:) !<u>
+  real(knd),allocatable :: U_rms(:,:,:),V_rms(:,:,:),W_rms(:,:,:) !<uu>, <u'u'> must be computed before saving
+  real(knd),allocatable :: Pr_avg(:,:,:) !<p>
+  real(knd),allocatable :: Temperature_avg(:,:,:) !<theta>
+  real(knd),allocatable :: Moisture_avg(:,:,:) !<q>
+  real(knd),allocatable :: Scalar_avg(:,:,:,:) !<c>
+
+  real(knd),allocatable :: Scalar_max(:,:,:,:)
+
+  real(knd),allocatable :: Scalar_intermitency(:,:,:,:)
+
+  real(knd),allocatable :: Scalar_fl_U_avg(:,:,:,:) !<cu>, <c'u'> must be computed before saving
+  real(knd),allocatable :: Scalar_fl_V_avg(:,:,:,:)
+  real(knd),allocatable :: Scalar_fl_W_avg(:,:,:,:)
 
   real(TIM),allocatable,dimension(:) :: times                                !times of the timesteps
 
-  real(knd),allocatable,dimension(:) :: CDtime,CLtime,deltime,tke,dissip
+  real(knd),allocatable,dimension(:) :: delta_time,tke,dissip
 
   real(knd),allocatable,dimension(:,:) :: ustar,tstar                        !first index differentiates flux from friction number
                                                                              !second index is time
 
-  real(knd),allocatable,dimension(:,:) :: Utime,Vtime,Wtime,Prtime,temptime,moisttime  !position, time
+  real(knd),allocatable,dimension(:,:) :: U_time,V_time,W_time,Pr_time,temp_time,moist_time  !position, time
 
-  real(knd),allocatable,dimension(:,:,:) :: scalptime                        !which scalar, position, time
-  real(knd),allocatable,dimension(:,:) :: scalsumtime                        !which scalar, time
+  real(knd),allocatable,dimension(:,:,:) :: scalp_time                        !which scalar, position, time
+  real(knd),allocatable,dimension(:,:) :: scalsum_time                        !which scalar, time
 
-  !number of probes in space to collect timed data
-  integer :: number_of_probes = 0, number_of_scalar_probes = 0
+  real(knd),allocatable,dimension(:,:,:) :: momentum_fluxes_time, momentum_fluxes_sgs_time   !component, position, time
+                                                       !components: 1,1; 1,2; 1,3; 2,2; 2,3; 3,3 for 1..6
 
   type TProbe
     integer :: Ui,Uj,Uk,Vi,Vj,Vk,Wi,Wj,Wk    !grid coordinates of probes in the U,V,W grids
@@ -59,13 +68,31 @@ module Outputs
   !for flow variables including scalar ones (temperature, moisture)
   type(TProbe),allocatable,dimension(:),save :: probes
 
+  !for fluxes
+  type(TProbe),allocatable,dimension(:),save :: flux_probes
+
   !for passive scalars
   type(TProbe),allocatable,dimension(:),save :: scalar_probes
+
+  type TFrameFlags
+    integer :: U = 1
+    integer :: vort = 0
+    integer :: Pr = 0
+    integer :: lambda2 = 0
+    integer :: scalars = 0
+    integer :: sumscalars = 1
+    integer :: temperature = 1
+    integer :: moisture = 1
+    integer :: temperature_flux = 0
+    integer :: scalfl = 0
+  end type
+
+  type(TFrameFlags) :: frame_flags
 
   type TFrameDomain
     integer   :: dimension,direction
     real(knd) :: position
-    integer   :: mini, maxi, minj, maxj, mink, maxk
+    integer   :: mini=0, maxi=0, minj=0, maxj=-1, mink=-1, maxk=-1
   end type TFrameDomain
 
 
@@ -78,69 +105,67 @@ module Outputs
     integer :: W_interp = 0
 
     integer :: out = 1
-    integer :: avg = 1 !1..one avg.vtk, 2.. velocity only in separate Xavg.vtk, 3.. both
+    integer :: avg = 1
 
     integer :: scalars = 1
-    integer :: scalarsavg = 1
+    integer :: scalars_avg = 1
+    integer :: scalars_max = 0
+    integer :: scalars_intermitency = 0
+    
+    real(knd) :: scalars_intermitency_threshold = epsilon(1._knd)
 
-    integer :: deposition = 1
+    integer :: deposition = 0
 
 
     integer :: out_U = 1
-    integer :: out_vort = 1
+    integer :: out_vorticity = 1
     integer :: out_Pr = 1
-    integer :: out_Prtype = 1
-    integer :: out_lambda2 = 1
+    integer :: out_Prtype = 0
+    integer :: out_lambda2 = 0
     integer :: out_temperature = 1
     integer :: out_moisture = 1
-    integer :: out_div = 0
-    integer :: out_visc = 0
+    integer :: out_divergence = 0
+    integer :: out_viscosity = 0
 
-    integer :: avg_U = 1
-    integer :: avg_vort = 0
+    integer :: avg_U = 1  !1..only in avg.vtk, 2..only in separate Xavg.vtk, 3..both
+    integer :: avg_vorticity = 0
     integer :: avg_Pr = 1
-    integer :: avg_Prtype = 0
+    integer :: avg_Prtype = 1
     integer :: avg_temperature = 1
     integer :: avg_moisture = 1
 
-    integer :: frame_U = 1
-    integer :: frame_vort = 0
-    integer :: frame_Pr = 0
-    integer :: frame_lambda2 = 0
-    integer :: frame_scalars = 0
-    integer :: frame_sumscalars = 1
-    integer :: frame_temperature = 1
-    integer :: frame_moisture = 1
-    integer :: frame_temperature_flux = 0
-    integer :: frame_scalfl = 0
-    type(TFrameDomain),dimension(:),allocatable :: frame_domains
+    integer :: avg_U_rms = 0 !1..only in  avg.vtk, 2..only in separate Xavg.vtk, 3..both
+    integer :: avg_flux_scalar = 0 !FIXME!!!!
 
-    integer :: deltime = 0
+    integer :: delta_time = 0
     integer :: tke = 0
     integer :: dissip = 0
-    integer :: scalsumtime = 0
-    integer :: scaltotsumtime = 0
+    integer :: scalsum_time = 1
+    integer :: scaltotsum_time = 0
     integer :: ustar = 1
     integer :: tstar = 1
 
     integer :: blprofiles = 0
+    
+    integer :: probes_fluxes = 0
   end type TOutputSwitches
 
   type(TOutputSwitches),save :: store
 
   type TDisplaySwitches
-    integer :: delta = 1
-    integer :: ustar = 0
-    integer :: tstar = 0
+    integer :: delta = 0
+    integer :: ustar = 1
+    integer :: tstar = 1
   end type
 
   type(TDisplaySwitches),save :: display
+
+  type(TFrameDomain),allocatable :: FrameDomains(:)
 
   type(TStaggeredFrameDomain),allocatable :: StaggeredFrameDomains(:)
 
   !line feed
   character,parameter :: lf = achar(10)
-
 
 contains
 
@@ -177,26 +202,25 @@ contains
   subroutine AllocateOutputs
     integer :: k
 
-    if (num_of_scalars>0) then
-     if (averaging==1.and.store%scalarsavg==1) then
-      allocate(Scalar_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
-      Scalar_avg = 0
-     end if
-    else
-     if (averaging==1) then
-      allocate(Scalar_avg(0,0,0,0))
-     end if
-    end if
-
+   if (store%avg_U==0.and.store%avg_U_rms>1) store%avg_U = 1
 
    if (averaging==1) then
-    if (store%avg_U==1) then
+    if (store%avg_U>1) then
       allocate(U_avg(-2:Unx+3,-2:Uny+3,-2:Unz+3))
       allocate(V_avg(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
       allocate(W_avg(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
       U_avg = 0
       V_avg = 0
       W_avg = 0
+    end if
+
+    if (store%avg_U_rms>1) then
+      allocate(U_rms(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+      allocate(V_rms(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+      allocate(W_rms(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+      U_rms = 0
+      V_rms = 0
+      W_rms = 0
     end if
 
     if (store%avg_Pr==1) then
@@ -215,68 +239,110 @@ contains
     end if
    end if
 
-   allocate(times(0:nt))
+   if (num_of_scalars>0.and.store%scalars_avg==1) then
+     allocate(Scalar_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+     Scalar_avg = 0
+   else
+     allocate(Scalar_avg(0,0,0,0))
+   end if
+   
+   if (num_of_scalars>0.and.store%scalars_max==1) then
+     allocate(Scalar_max(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+     Scalar_max = 0
+   else
+     allocate(Scalar_max(0,0,0,0))
+   end if
 
-   if (number_of_probes>0) then
-     allocate(Utime(number_of_probes,0:nt),Vtime(number_of_probes,0:nt),Wtime(number_of_probes,0:nt),Prtime(number_of_probes,0:nt))
+   if (num_of_scalars>0.and.store%scalars_intermitency==1) then
+     allocate(Scalar_intermitency(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+     Scalar_intermitency = 0
+   else
+     allocate(Scalar_intermitency(0,0,0,0))
+   end if
+
+   if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
+     allocate(Scalar_fl_U_avg(Unx,Uny,Unz,num_of_scalars))
+     allocate(Scalar_fl_V_avg(Vnx,Vny,Vnz,num_of_scalars))
+     allocate(Scalar_fl_W_avg(Wnx,Wny,Wnz,num_of_scalars))
+     Scalar_fl_U_avg = 0
+     Scalar_fl_V_avg = 0
+     Scalar_fl_W_avg = 0
+   end if
+
+
+   allocate(times(0:max_number_of_time_steps))
+
+   if (size(probes)>0) then
+
+     allocate(U_time(size(probes),0:max_number_of_time_steps), &
+              V_time(size(probes),0:max_number_of_time_steps), &
+              W_time(size(probes),0:max_number_of_time_steps), &
+              Pr_time(size(probes),0:max_number_of_time_steps))
      times = huge(1.0_knd)
-     Utime = huge(1.0_knd)
-     Vtime = huge(1.0_knd)
-     Wtime = huge(1.0_knd)
-     Prtime = huge(1.0_knd)
+     U_time = huge(1.0_knd)
+     V_time = huge(1.0_knd)
+     W_time = huge(1.0_knd)
+     Pr_time = huge(1.0_knd)
 
-     if (enable_buoyancy==1) then
-       allocate(temptime(number_of_probes,0:nt))
-       temptime = huge(1.0_knd)
+     if (store%probes_fluxes==1) then
+       allocate(momentum_fluxes_time(6,size(probes),0:max_number_of_time_steps))
+       momentum_fluxes_time = huge(1.0)
+       allocate(momentum_fluxes_sgs_time(6,size(probes),0:max_number_of_time_steps))
+       momentum_fluxes_sgs_time = huge(1.0)
      end if
 
-      if (enable_moisture==1) then
-       allocate(moisttime(number_of_probes,0:nt))
-       moisttime = huge(1.0_knd)
+     if (enable_buoyancy==1) then
+       allocate(temp_time(size(probes),0:max_number_of_time_steps))
+       temp_time = huge(1.0_knd)
+     end if
+
+     if (enable_moisture==1) then
+       allocate(moist_time(size(probes),0:max_number_of_time_steps))
+       moist_time = huge(1.0_knd)
      end if
 
    end if
 
 
-   if (store%deltime==1) then
-     allocate(deltime(0:nt))
-     deltime = huge(1.0_knd)
+   if (store%delta_time==1) then
+     allocate(delta_time(0:max_number_of_time_steps))
+     delta_time = huge(1.0_knd)
    end if
 
    if (store%tke==1) then
-     allocate(tke(0:nt))
+     allocate(tke(0:max_number_of_time_steps))
      tke = huge(1.0_knd)
    end if
 
-   if (store%deltime==1) then
-     allocate(dissip(0:nt))
+   if (store%delta_time==1) then
+     allocate(dissip(0:max_number_of_time_steps))
      dissip = huge(1.0_knd)
      dissip(0)=0
    end if
 
    if (wallmodeltype>0.and.(display%ustar==1.or.store%ustar==1)) then
-     allocate(ustar(2,0:nt))
+     allocate(ustar(2,0:max_number_of_time_steps))
      ustar = huge(1.0)
    end if
 
    if (wallmodeltype>0.and.enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
-     allocate(tstar(2,0:nt))
+     allocate(tstar(2,0:max_number_of_time_steps))
      tstar = huge(1.0)
    end if
 
    if (num_of_scalars>0) then
-     if (store%scalsumtime==1) then
-       allocate(scalsumtime(1:num_of_scalars,0:nt))
-       scalsumtime = huge(1.0_knd)
+     if (store%scalsum_time==1.or.store%scaltotsum_time==1) then
+       allocate(scalsum_time(1:num_of_scalars,0:max_number_of_time_steps))
+       scalsum_time = huge(1.0_knd)
      end if
 
-     if (number_of_scalar_probes>0) then
-       allocate(scalptime(1:num_of_scalars,1:number_of_scalar_probes,0:nt))
-       scalptime = huge(1.0_knd)
+     if (size(scalar_probes)>0) then
+       allocate(scalp_time(1:num_of_scalars,1:size(scalar_probes),0:max_number_of_time_steps))
+       scalp_time = huge(1.0_knd)
     end if
    end if
-
-   do k = 1,number_of_probes
+   
+   do k = 1,size(probes)
      associate(p => probes(k))
        call GridCoords(p%i,p%j,p%k,p%x,p%y,p%z)
 
@@ -287,13 +353,13 @@ contains
        p%j = min(p%j,Prny)
        p%k = min(p%k,Prnz)
 
-       call GridCoordsU(p%Ui,p%Uj,p%Uk,p%x,p%y,p%z)
-       call GridCoordsV(p%Vi,p%Vj,p%Vk,p%x,p%y,p%z)
-       call GridCoordsW(p%Wi,p%Wj,p%Wk,p%x,p%y,p%z)
+       call GridCoords_U(p%Ui,p%Uj,p%Uk,p%x,p%y,p%z)
+       call GridCoords_V(p%Vi,p%Vj,p%Vk,p%x,p%y,p%z)
+       call GridCoords_W(p%Wi,p%Wj,p%Wk,p%x,p%y,p%z)
      end associate
    end do
 
-   do k = 1,number_of_scalar_probes
+   do k = 1,size(scalar_probes)
      associate(p => scalar_probes(k))
        call GridCoords(p%i,p%j,p%k,p%x,p%y,p%z)
 
@@ -375,11 +441,27 @@ contains
        profss = 0
        profssavg = 0
      end if
+     
    else
-     !to avoid the necessity of an allocatable dummy argument
-     allocate(proftempfl(0))
+   
+     if (Btype(To)==AUTOMATICFLUX) then
+       allocate(profuw(0:Prnz),profuwsgs(0:Prnz))
+       allocate(profvw(0:Prnz),profvwsgs(0:Prnz))
+     end if
+     
+     if (TempBtype(To)==AUTOMATICFLUX) then
+       allocate(proftempfl(0:Prnz),proftempflsgs(0:Prnz))
+     else
+       !to avoid the necessity of an allocatable dummy argument
+       allocate(proftempfl(0))
+     end if
 
-     allocate(profmoistfl(0))
+     if (MoistBtype(To)==AUTOMATICFLUX) then
+       allocate(profmoistfl(0:Prnz),profmoistflsgs(0:Prnz))
+     else
+       !to avoid the necessity of an allocatable dummy argument
+       allocate(profmoistfl(0))
+     end if
 
    end if
 
@@ -423,11 +505,12 @@ contains
     integer :: l,i,j,k
     real(knd) :: S,S2
     real(knd) :: time_weight
+    real(knd) :: fl_L, fl_R
     integer, save :: fnum = 0
 
     times(step)=time
 
-    if (store%scalsumtime==1) then
+    if (store%scalsum_time==1.or.store%scaltotsum_time==1) then
       do l = 1,num_of_scalars
          S = 0
          do k = 1,Prnz
@@ -437,93 +520,138 @@ contains
            end do
           end do
          end do
-         scalsumtime(l,step) = S
+         scalsum_time(l,step) = S
       end do
     end if
 
 
 
-    do k = 1,number_of_probes
+    do k = 1,size(probes)
       associate (p=> probes(k))
-        Utime(k,step)=Trilinint((p%x-xU(p%Ui))/(xU(p%Ui+1)-xU(p%Ui)),&
-                             (p%y-yPr(p%Uj))/(yPr(p%Uj+1)-yPr(p%Uj)),&
-                             (p%z-zPr(p%Uk))/(zPr(p%Uk+1)-zPr(p%Uk)),&
-                             U(p%Ui,p%Uj,p%Uk),U(p%Ui+1,p%Uj,p%Uk),&
-                             U(p%Ui,p%Uj+1,p%Uk),U(p%Ui,p%Uj,p%Uk+1),&
-                             U(p%Ui+1,p%Uj+1,p%Uk),U(p%Ui+1,p%Uj,p%Uk+1),&
+        U_time(k,step)=Trilinint((p%x-xU(p%Ui))/(xU(p%Ui+1)-xU(p%Ui)), &
+                             (p%y-yPr(p%Uj))/(yPr(p%Uj+1)-yPr(p%Uj)), &
+                             (p%z-zPr(p%Uk))/(zPr(p%Uk+1)-zPr(p%Uk)), &
+                             U(p%Ui,p%Uj,p%Uk),U(p%Ui+1,p%Uj,p%Uk), &
+                             U(p%Ui,p%Uj+1,p%Uk),U(p%Ui,p%Uj,p%Uk+1), &
+                             U(p%Ui+1,p%Uj+1,p%Uk),U(p%Ui+1,p%Uj,p%Uk+1), &
                              U(p%Ui,p%Uj+1,p%Uk+1),U(p%Ui+1,p%Uj+1,p%Uk+1))
 
-        Vtime(k,step)=Trilinint((p%x-xPr(p%Vi))/(xPr(p%Vi+1)-xPr(p%Vi)),&
-                             (p%y-yV(p%Vj))/(yV(p%Vj+1)-yV(p%Vj)),&
-                             (p%z-zPr(p%Vk))/(zPr(p%Vk+1)-zPr(p%Vk)),&
-                             V(p%Vi,p%Vj,p%Vk),V(p%Vi+1,p%Vj,p%Vk),&
-                             V(p%Vi,p%Vj+1,p%Vk),V(p%Vi,p%Vj,p%Vk+1),&
-                             V(p%Vi+1,p%Vj+1,p%Vk),V(p%Vi+1,p%Vj,p%Vk+1),&
+        V_time(k,step)=Trilinint((p%x-xPr(p%Vi))/(xPr(p%Vi+1)-xPr(p%Vi)), &
+                             (p%y-yV(p%Vj))/(yV(p%Vj+1)-yV(p%Vj)), &
+                             (p%z-zPr(p%Vk))/(zPr(p%Vk+1)-zPr(p%Vk)), &
+                             V(p%Vi,p%Vj,p%Vk),V(p%Vi+1,p%Vj,p%Vk), &
+                             V(p%Vi,p%Vj+1,p%Vk),V(p%Vi,p%Vj,p%Vk+1), &
+                             V(p%Vi+1,p%Vj+1,p%Vk),V(p%Vi+1,p%Vj,p%Vk+1), &
                              V(p%Vi,p%Vj+1,p%Vk+1),V(p%Vi+1,p%Vj+1,p%Vk+1))
 
-        Wtime(k,step)=Trilinint((p%x-xPr(p%Wi))/(xPr(p%Wi+1)-xPr(p%Wi)),&
-                             (p%y-yPr(p%Wj))/(yPr(p%Wj+1)-yPr(p%Wj)),&
-                             (p%z-zW(p%Wk))/(zW(p%Wk+1)-zW(p%Wk)),&
-                             W(p%Wi,p%Wj,p%Wk),W(p%Wi+1,p%Wj,p%Wk),&
-                             W(p%Wi,p%Wj+1,p%Wk),W(p%Wi,p%Wj,p%Wk+1),&
-                             W(p%Wi+1,p%Wj+1,p%Wk),W(p%Wi+1,p%Wj,p%Wk+1),&
+        W_time(k,step)=Trilinint((p%x-xPr(p%Wi))/(xPr(p%Wi+1)-xPr(p%Wi)), &
+                             (p%y-yPr(p%Wj))/(yPr(p%Wj+1)-yPr(p%Wj)), &
+                             (p%z-zW(p%Wk))/(zW(p%Wk+1)-zW(p%Wk)), &
+                             W(p%Wi,p%Wj,p%Wk),W(p%Wi+1,p%Wj,p%Wk), &
+                             W(p%Wi,p%Wj+1,p%Wk),W(p%Wi,p%Wj,p%Wk+1), &
+                             W(p%Wi+1,p%Wj+1,p%Wk),W(p%Wi+1,p%Wj,p%Wk+1), &
                              W(p%Wi,p%Wj+1,p%Wk+1),W(p%Wi+1,p%Wj+1,p%Wk+1))
 
-        Prtime(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)),&
-                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)),&
-                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)),&
-                              Pr(p%i,p%j,p%k),&
-                              Pr(min(p%i+1,Unx+1),p%j,p%k),&
-                              Pr(p%i,min(p%j+1,Vny+1),p%k),&
-                              Pr(p%i,p%j,min(p%k+1,Wnz+1)),&
-                              Pr(min(p%i+1,Unx+1),min(p%j+1,Vny+1),p%k),&
-                              Pr(min(p%i+1,Unx+1),p%j,min(p%k+1,Wnz+1)),&
-                              Pr(p%i,min(p%j+1,Vny+1),min(p%k+1,Wnz+1)),&
+        Pr_time(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)), &
+                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)), &
+                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)), &
+                              Pr(p%i,p%j,p%k), &
+                              Pr(min(p%i+1,Unx+1),p%j,p%k), &
+                              Pr(p%i,min(p%j+1,Vny+1),p%k), &
+                              Pr(p%i,p%j,min(p%k+1,Wnz+1)), &
+                              Pr(min(p%i+1,Unx+1),min(p%j+1,Vny+1),p%k), &
+                              Pr(min(p%i+1,Unx+1),p%j,min(p%k+1,Wnz+1)), &
+                              Pr(p%i,min(p%j+1,Vny+1),min(p%k+1,Wnz+1)), &
                               Pr(min(p%i+1,Unx+1),min(p%j+1,Vny+1),min(p%k+1,Wnz+1)))
 
         if (enable_buoyancy==1) then
-          temptime(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)),&
-                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)),&
-                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)),&
-                             Temperature(p%i,p%j,p%k),&
-                             Temperature(p%i+1,p%j,p%k),&
-                             Temperature(p%i,p%j+1,p%k),&
-                             Temperature(p%i,p%j,p%k+1),&
-                             Temperature(p%i+1,p%j+1,p%k),&
-                             Temperature(p%i+1,p%j,p%k+1),&
-                             Temperature(p%i,p%j+1,p%k+1),&
+          temp_time(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)), &
+                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)), &
+                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)), &
+                             Temperature(p%i,p%j,p%k), &
+                             Temperature(p%i+1,p%j,p%k), &
+                             Temperature(p%i,p%j+1,p%k), &
+                             Temperature(p%i,p%j,p%k+1), &
+                             Temperature(p%i+1,p%j+1,p%k), &
+                             Temperature(p%i+1,p%j,p%k+1), &
+                             Temperature(p%i,p%j+1,p%k+1), &
                              Temperature(p%i+1,p%j+1,p%k+1))
         end if
 
         if (enable_moisture==1) then
-          moisttime(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)),&
-                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)),&
-                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)),&
-                             Moisture(p%i,p%j,p%k),&
-                             Moisture(p%i+1,p%j,p%k),&
-                             Moisture(p%i,p%j+1,p%k),&
-                             Moisture(p%i,p%j,p%k+1),&
-                             Moisture(p%i+1,p%j+1,p%k),&
-                             Moisture(p%i+1,p%j,p%k+1),&
-                             Moisture(p%i,p%j+1,p%k+1),&
+          moist_time(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)), &
+                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)), &
+                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)), &
+                             Moisture(p%i,p%j,p%k), &
+                             Moisture(p%i+1,p%j,p%k), &
+                             Moisture(p%i,p%j+1,p%k), &
+                             Moisture(p%i,p%j,p%k+1), &
+                             Moisture(p%i+1,p%j+1,p%k), &
+                             Moisture(p%i+1,p%j,p%k+1), &
+                             Moisture(p%i,p%j+1,p%k+1), &
                              Moisture(p%i+1,p%j+1,p%k+1))
+        end if
+        
+        if (store%probes_fluxes==1) then 
+          !NOTE: valid only for central schemes
+          momentum_fluxes_time(1,k,step) = (U_time(k,step))**2
+          momentum_fluxes_time(2,k,step) = U_time(k,step) * V_time(k,step)
+          momentum_fluxes_time(3,k,step) = U_time(k,step) * W_time(k,step)
+          momentum_fluxes_time(4,k,step) = (V_time(k,step))**2
+          momentum_fluxes_time(5,k,step) = V_time(k,step) * W_time(k,step)
+          momentum_fluxes_time(6,k,step) = (W_time(k,step))**2
+          
+          !NOTE: subgrid part evaluated in the center of the cell
+          momentum_fluxes_sgs_time(1,k,step) = (U(p%i, p%j, p%k) - U(p%i-1, p%j, p%k)) / &
+                                             dxPr(p%i)
+          momentum_fluxes_sgs_time(4,k,step) = (V(p%i, p%j, p%k) - V(p%i, p%j-1, p%k)) / &
+                                             dyPr(p%j)
+          momentum_fluxes_sgs_time(6,k,step) = (W(p%i, p%j, p%k) - W(p%i, p%j, p%k-1)) / &
+                                             dzPr(p%k)
+
+          fl_L = ( V(p%i+1, p%j, p%k)+V(p%i+1, p%j-1, p%k) - &
+                   V(p%i-1, p%j, p%k)+V(p%i-1, p%j-1, p%k) ) / &
+                 (2*(xPr(i+1)-xPr(i-1)))
+          fl_R = ( U(p%i, p%j+1, p%k)+U(p%i-1, p%j+1, p%k) - &
+                   U(p%i, p%j-1, p%k)+U(p%i-1, p%j-1, p%k) ) / &
+                 (2*(yPr(j+1)-yPr(j-1)))
+          momentum_fluxes_sgs_time(2,k,step) = (fl_L + fl_R) / 2
+                 
+          fl_L = ( W(p%i+1, p%j, p%k)+W(p%i+1, p%j, p%k-1) - &
+                   W(p%i-1, p%j, p%k)+W(p%i-1, p%j, p%k-1) ) / &
+                 (2*(xPr(i+1)-xPr(i-1)))
+          fl_R = ( U(p%i, p%j, p%k+1)+U(p%i-1, p%j, p%k+1) - &
+                   U(p%i, p%j, p%k-1)+U(p%i-1, p%j, p%k-1) ) / &
+                 (2*(zPr(k+1)-zPr(k-1)))
+          momentum_fluxes_sgs_time(3,k,step) = (fl_L + fl_R) / 2
+                                  
+          fl_L = ( W(p%i, p%j+1, p%k)+W(p%i, p%j+1, p%k-1) - &
+                   W(p%i, p%j-1, p%k)+W(p%i, p%j-1, p%k-1) ) / &
+                 (2*(yPr(j+1)-yPr(j-1)))
+          fl_R = ( V(p%i, p%j, p%k+1)+V(p%i, p%j-1, p%k+1) - &
+                   V(p%i, p%j, p%k-1)+V(p%i, p%j-1, p%k-1) ) / &
+                 (2*(zPr(k+1)-zPr(k-1)))
+          momentum_fluxes_sgs_time(5,k,step) = (fl_L + fl_R) / 2
+                 
+          momentum_fluxes_sgs_time(:,k,step) = Viscosity(p%i, p%j, p%k) * &
+                                             momentum_fluxes_sgs_time(:,k,step)
         end if
       end associate
     end do
 
-    do k = 1,number_of_scalar_probes    
+    do k = 1,size(scalar_probes)    
       associate (p=> scalar_probes(k))
         do l = 1,num_of_scalars
-          scalptime(l,k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)),&
-                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)),&
-                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)),&
-                             Scalar(p%i,p%j,p%k,l),&
-                             Scalar(p%i+1,p%j,p%k,l),&
-                             Scalar(p%i,p%j+1,p%k,l),&
-                             Scalar(p%i,p%j,p%k+1,l),&
-                             Scalar(p%i+1,p%j+1,p%k,l),&
-                             Scalar(p%i+1,p%j,p%k+1,l),&
-                             Scalar(p%i,p%j+1,p%k+1,l),&
+          scalp_time(l,k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)), &
+                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)), &
+                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)), &
+                             Scalar(p%i,p%j,p%k,l), &
+                             Scalar(p%i+1,p%j,p%k,l), &
+                             Scalar(p%i,p%j+1,p%k,l), &
+                             Scalar(p%i,p%j,p%k+1,l), &
+                             Scalar(p%i+1,p%j+1,p%k,l), &
+                             Scalar(p%i+1,p%j,p%k+1,l), &
+                             Scalar(p%i,p%j+1,p%k+1,l), &
                              Scalar(p%i+1,p%j+1,p%k+1,l))
         end do
       end associate
@@ -537,8 +665,8 @@ contains
       dissip(step)=(tke(step-1)-tke(step))/(times(step)-times(step-1))
     end if
 
-    if (store%deltime==1) then
-      deltime(step)=delta/dt
+    if (store%delta_time==1) then
+      delta_time(step)=delta/dt
     end if
 
     endstep = step
@@ -549,21 +677,29 @@ contains
 
 
     if (display%delta==1) then
-      write (*,*) "delta: ",delta
+      write(*,*) "delta: ",delta
     end if
 
 
 
 
 
-    time_weight = dt/(timeavg2-timeavg1)
+    if ((averaging==1).and.((time>=timeavg1).and.(time-dt<timeavg2))) then
 
-    if ((averaging==1).and.((time>=timeavg1).and.(time<=timeavg2))) then
+      time_weight = min(dt, time-timeavg1, timeavg2-(time-dt), timeavg2-timeavg1) / &
+                    (timeavg2-timeavg1)
 
-      if (store%avg_U==1) then
-        U_avg = U_avg + U * time_weight
-        V_avg = V_avg + V * time_weight
-        W_avg = W_avg + W * time_weight
+      if (store%avg_U>1) then
+         U_avg = U_avg + U * time_weight
+         V_avg = V_avg + V * time_weight
+         W_avg = W_avg + W * time_weight
+      end if
+
+      if (store%avg_U_rms>1) then
+        U_rms = U_rms + U**2 * time_weight
+        V_rms = V_rms + V**2 * time_weight
+        W_rms = W_rms + W**2 * time_weight
+        call AddSubgridRMS(U_rms,V_rms,W_rms,U,V,W,time_weight)
       end if
 
       if (store%avg_Pr==1) then
@@ -578,10 +714,32 @@ contains
         Moisture_avg = Moisture_avg + moisture * time_weight
       end if
 
-      if (num_of_scalars>0.and.store%scalarsavg==1) then
+      if (num_of_scalars>0.and.store%scalars_avg==1) then
         Scalar_avg = Scalar_avg + Scalar * time_weight
       end if
 
+      if (num_of_scalars>0.and.store%scalars_max==1) then
+        Scalar_max = max(Scalar_max, Scalar)
+      end if
+
+      if (num_of_scalars>0.and.store%scalars_intermitency==1) then
+        where (Scalar>=store%scalars_intermitency_threshold)  &
+          Scalar_intermitency = Scalar_intermitency + time_weight
+      end if
+
+      if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
+        do i=1,num_of_scalars
+          call AddScalarAdvVector(Scalar_fl_U_avg(:,:,:,i), &
+                               Scalar_fl_V_avg(:,:,:,i), &
+                               Scalar_fl_W_avg(:,:,:,i), &
+                               Scalar(:,:,:,i), &
+                               U,V,W,time_weight)
+          call AddScalarDiffVector(Scalar_fl_U_avg(:,:,:,i), &
+                                Scalar_fl_V_avg(:,:,:,i), &
+                                Scalar_fl_W_avg(:,:,:,i), &
+                                Scalar(:,:,:,i),time_weight)
+        end do
+      end if
    end if
 
 
@@ -617,6 +775,23 @@ contains
      end if
     end if
 
+    if ((store%BLprofiles==1 .and. &
+         (averaging==1 .and. &
+         ( time>=timeavg1 .and. &
+         time<=timeavg2))) .or. &
+       Btype(To)==AUTOMATICFLUX) then
+      call StressProfiles(U,V,W)
+    end if
+
+    if ((store%BLprofiles==1 .and. &
+         (averaging==1 .and. &
+         ( time>=timeavg1 .and. &
+         time<=timeavg2))) .or. &
+       (TempBtype(To)==AUTOMATICFLUX .or. &
+        MoistBtype(To)==AUTOMATICFLUX .or. &
+        ScalBType(To)==AUTOMATICFLUX)) then
+      call ScalarFluxSGSProfiles(W,Temperature,Moisture,Scalar)
+    end if
 
     if (store%BLprofiles==1) then
       if ((averaging==1).and.((time>=timeavg1).and.(time<=timeavg2))) then
@@ -657,7 +832,6 @@ contains
   end if
 
 
-
     if (frames>0)then
        if ((time>=timefram1).and.(time<=timefram2+(timefram2-timefram1)/(frames-1))&
          .and.(time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
@@ -668,90 +842,148 @@ contains
 
     if (allocated(StaggeredFrameDomains)) then
       do i=1,size(StaggeredFrameDomains)
-        call Save(StaggeredFrameDomains(i), time, U, V, W, Pr, Temperature, Scalar)
+        call Save(StaggeredFrameDomains(i), time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
       end do
     end if
-
-
-
 
   end subroutine OutTstep
 
 
+  subroutine AddSubgridRMS(U_r,V_r,W_r,U,V,W,weight)
+    real(knd),dimension(-2:,-2:,-2:),intent(inout)   :: U_r,V_r,W_r
+    real(knd),dimension(-2:,-2:,-2:),intent(in)   :: U,V,W
+    real(knd),intent(in) :: weight
+    real(knd) :: Ax,Ay,Az
+    integer :: i,j,k
+    
+    Ax = weight/(2*dxmin)
+    Ay = weight/(2*dymin)
+    Az = weight/(2*dzmin)
+
+    !NOTE:neglecting part caused by molecular viscosity
+    !$omp parallel private(i,j,k)
+    !$omp do
+    do k=1,Unz
+      do j=1,Uny
+        do i=1,Unx
+          U_r(i,j,k) =  U_r(i,j,k) + &
+                        Ax * (Viscosity(i+1,j,k)*(U(i+1,j,k)-U(i,j,k)) + &
+                              Viscosity(i,j,k)*(U(i,j,k)-U(i-1,j,k)))
+        end do
+      end do
+    end do
+    !$omp end do nowait
+    !$omp do
+    do k=1,Vnz
+      do j=1,Vny
+        do i=1,Vnx
+          V_r(i,j,k) = V_r(i,j,k) + &
+                       Ay * (Viscosity(i,j+1,k)*(V(i,j+1,k)-V(i,j,k)) + &
+                             Viscosity(i,j,k)*(V(i,j,k)-V(i,j-1,k)))
+        end do
+      end do
+    end do
+    !$omp end do nowait
+    !$omp do
+    do k=1,Wnz
+      do j=1,Wny
+        do i=1,Wnx
+          W_r(i,j,k) = W_r(i,j,k) + &
+                       Az * (Viscosity(i,j,k+1)*(W(i,j,k+1)-W(i,j,k)) + &
+                             Viscosity(i,j,k)*(W(i,j,k)-W(i,j,k-1)))
+        end do
+      end do
+    end do
+    !$omp end do nowait
+    !$omp end parallel
+  end subroutine AddSubgridRMS
 
 
 
   subroutine OutputProfiles
-    character(2) :: prob
+    character(5) :: prob
     real(knd) :: S,S2,nom,denom
     integer :: i,j,k,unit
 
     call newunit(unit)
 
-    do k = 1,number_of_probes
+    do k = 1,size(probes)
 
-      write(prob,"(i2.2)") k
+      write(prob,"(i0)") k
 
-      open(unit,file="output/Prtimep"//prob//".txt")
+      open(unit,file="output/Prtimep"//trim(prob)//".txt")
       do j = 0,endstep
-       write (unit,*) times(j),Prtime(k,j)
+       write(unit,*) times(j),Pr_time(k,j)
       end do
       close(unit)
 
-      open(unit,file="output/Utimep"//prob//".txt")
+      open(unit,file="output/Utimep"//trim(prob)//".txt")
       do j = 0,endstep
-       write (unit,*) times(j),Utime(k,j)
+       write(unit,*) times(j),U_time(k,j)
       end do
       close(unit)
 
-      open(unit,file="output/Vtimep"//prob//".txt")
+      open(unit,file="output/Vtimep"//trim(prob)//".txt")
       do j = 0,endstep
-       write (unit,*) times(j),Vtime(k,j)
+       write(unit,*) times(j),V_time(k,j)
       end do
       close(unit)
 
-      open(unit,file="output/Wtimep"//prob//".txt")
+      open(unit,file="output/Wtimep"//trim(prob)//".txt")
       do j = 0,endstep
-       write (unit,*) times(j),Wtime(k,j)
+       write(unit,*) times(j),W_time(k,j)
       end do
       close(unit)
+      
+      if (store%probes_fluxes==1) then
+        open(unit,file="output/stresstimep"//trim(prob)//".txt")
+        do j = 0,endstep
+         write(unit,'(7(2x,g12.6))') times(j),momentum_fluxes_time(:,k,j)
+        end do
+        close(unit)
+        open(unit,file="output/sgstresstimep"//trim(prob)//".txt")
+        do j = 0,endstep
+         write(unit,'(7(2x,g12.6))') times(j),momentum_fluxes_time(:,k,j)
+        end do
+        close(unit)
+      end if
 
       if (enable_buoyancy==1) then
-        open(unit,file="output/temptimep"//prob//".txt")
+        open(unit,file="output/temptimep"//trim(prob)//".txt")
         do j = 0,endstep
-         write (unit,*) times(j),temptime(k,j)
+         write(unit,*) times(j),temp_time(k,j)
         end do
         close(unit)
       end if
 
       if (enable_moisture==1) then
-        open(unit,file="output/moisttimep"//prob//".txt")
+        open(unit,file="output/moisttimep"//trim(prob)//".txt")
         do j = 0,endstep
-         write (unit,*) times(j),moisttime(k,j)
+         write(unit,*) times(j),moist_time(k,j)
         end do
         close(unit)
       end if
 
     end do
 
-    do k = 1,number_of_scalar_probes
+    do k = 1,size(scalar_probes)
 
-      write(prob,"(i2.2)") k
+      write(prob,"(i0)") k
 
       if (num_of_scalars>0) then
-        open(unit,file="output/scaltimep"//prob//".txt")
+        open(unit,file="output/scaltimep"//trim(prob)//".txt")
         do j = 1,endstep
-         write (unit,'(99(g0,tr3))') times(j),scalptime(:,k,j)
+         write(unit,'(99(g0,tr3))') times(j),scalp_time(:,k,j)
         end do
         close(unit)
       end if
 
     end do
 
-    if (store%deltime==1) then
-      open(unit,file="output/deltime.txt")
+    if (store%delta_time==1) then
+      open(unit,file="output/delta_time.txt")
       do j = 1,endstep
-       write (unit,*) times(j),deltime(j)
+       write(unit,*) times(j),delta_time(j)
       end do
       close(unit)
     end if
@@ -759,7 +991,7 @@ contains
     if (store%tke==1) then
       open(unit,file="output/tke.txt")
       do j = 0,endstep
-       write (unit,*) times(j),tke(j)
+       write(unit,*) times(j),tke(j)
       end do
       close(unit)
     end if
@@ -767,7 +999,7 @@ contains
     if (store%tke==1.and.store%dissip==1) then
      open(unit,file="output/dissip.txt")
       do j = 1,endstep
-       write (unit,*) times(j),dissip(j)
+       write(unit,*) times(j),dissip(j)
       end do
       close(unit)
     end if
@@ -775,7 +1007,7 @@ contains
     if (wallmodeltype>0.and.display%ustar==1) then
       open(unit,file="output/Retau.txt")
       do j = 0,endstep
-       write (unit,*) times(j),ustar(:,j)
+       write(unit,*) times(j),ustar(:,j)
       end do
       close(unit)
     end if
@@ -783,24 +1015,24 @@ contains
     if (wallmodeltype>0.and.enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET.and.store%tstar==1) then
       open(unit,file="output/tflux.txt")
       do j = 0,endstep
-       write (unit,*) times(j),tstar(:,j)
+       write(unit,*) times(j),tstar(:,j)
       end do
       close(unit)
     end if
 
 
-    if (num_of_scalars>0.and.store%scalsumtime==1) then
+    if (num_of_scalars>0.and.store%scalsum_time==1) then
       open(unit,file="output/scalsumtime.txt")
       do j = 1,endstep
-       write (unit,*) times(j),scalsumtime(:,j)
+       write(unit,*) times(j),scalsum_time(:,j)
       end do
       close(unit)
     end if
 
-    if (num_of_scalars>0.and.store%scaltotsumtime==1) then
+    if (num_of_scalars>0.and.store%scaltotsum_time==1) then
       open(unit,file="output/scaltotsumtime.txt")
       do j = 1,endstep
-       write (unit,*) times(j),sum(scalsumtime(:,j))
+       write(unit,*) times(j),sum(scalsum_time(:,j))
       end do
       close(unit)
     end if
@@ -810,43 +1042,43 @@ contains
 
        open(unit,file="output/profu.txt")
        do k = 1,Unz
-        write (unit,*) zPr(k),profuavg(k)
+        write(unit,*) zPr(k),profuavg(k)
        end do
        close(unit)
 
        open(unit,file="output/profv.txt")
        do k = 1,Vnz
-        write (unit,*) zPr(k),profvavg(k)
+        write(unit,*) zPr(k),profvavg(k)
        end do
        close(unit)
 
        open(unit,file="output/profuu.txt")
        do k = 1,Unz
-        write (unit,*) zPr(k),profuuavg(k)
+        write(unit,*) zPr(k),profuuavg(k)
        end do
        close(unit)
 
        open(unit,file="output/profvv.txt")
        do k = 1,Vnz
-        write (unit,*) zPr(k),profvvavg(k)
+        write(unit,*) zPr(k),profvvavg(k)
        end do
        close(unit)
 
        open(unit,file="output/profww.txt")
        do k = 1,Wnz
-        write (unit,*) zW(k),profwwavg(k)
+        write(unit,*) zW(k),profwwavg(k)
        end do
        close(unit)
 
        open(unit,file="output/profuw.txt")
        do k = 0,Prnz
-        write (unit,*) zW(k),profuwavg(k),profuwsgsavg(k)
+        write(unit,*) zW(k),profuwavg(k),profuwsgsavg(k)
        end do
        close(unit)
 
        open(unit,file="output/profvw.txt")
        do k = 0,Prnz
-        write (unit,*) zW(k),profvwavg(k),profvwsgsavg(k)
+        write(unit,*) zW(k),profvwavg(k),profvwsgsavg(k)
        end do
        close(unit)
 
@@ -854,19 +1086,19 @@ contains
 
           open(unit,file="output/proftemp.txt")
           do k = 1,Prnz
-           write (unit,*) zPr(k),proftempavg(k)
+           write(unit,*) zPr(k),proftempavg(k)
           end do
           close(unit)
 
           open(unit,file="output/proftempfl.txt")
           do k = 0,Prnz
-           write (unit,*) zW(k),proftempflavg(k),proftempflsgsavg(k)
+           write(unit,*) zW(k),proftempflavg(k),proftempflsgsavg(k)
           end do
           close(unit)
 
           open(unit,file="output/proftt.txt")
           do k = 1,Prnz
-           write (unit,*) zPr(k),profttavg(k)
+           write(unit,*) zPr(k),profttavg(k)
           end do
           close(unit)
 
@@ -880,7 +1112,7 @@ contains
               end do
              end do
              S = S / (Prnx*Prny)
-             write (unit,*) zPr(k),S
+             write(unit,*) zPr(k),S
             end do
             close(unit)
 
@@ -906,7 +1138,7 @@ contains
                S = 100000._knd*sign(1.0_knd,nom)*sign(1.0_knd,denom)
              end if
 
-             write (unit,*) zPr(k),S
+             write(unit,*) zPr(k),S
             end do
             close(unit)
           end if !allocated avgs
@@ -918,19 +1150,19 @@ contains
 
           open(unit,file="output/profmoist.txt")
           do k = 1,Prnz
-           write (unit,*) zPr(k),profmoistavg(k)
+           write(unit,*) zPr(k),profmoistavg(k)
           end do
           close(unit)
 
           open(unit,file="output/profmoistfl.txt")
           do k = 0,Prnz
-           write (unit,*) zW(k),profmoistflavg(k),profmoistflsgsavg(k)
+           write(unit,*) zW(k),profmoistflavg(k),profmoistflsgsavg(k)
           end do
           close(unit)
 
           open(unit,file="output/profmm.txt")
           do k = 1,Prnz
-           write (unit,*) zPr(k),profmmavg(k)
+           write(unit,*) zPr(k),profmmavg(k)
           end do
           close(unit)
 
@@ -941,19 +1173,19 @@ contains
 
           open(unit,file="output/profscal.txt")
           do k = 1,Prnz
-           write (unit,*) zPr(k),(profscalavg(i,k), i = 1,num_of_scalars)
+           write(unit,*) zPr(k),(profscalavg(i,k), i = 1,num_of_scalars)
           end do
           close(unit)
 
           open(unit,file="output/profscalfl.txt")
           do k = 0,Prnz
-           write (unit,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i = 1,num_of_scalars)
+           write(unit,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i = 1,num_of_scalars)
           end do
           close(unit)
 
           open(unit,file="output/profss.txt")
           do k = 1,Prnz
-           write (unit,*) zPr(k),(profssavg(i,k), i = 1,num_of_scalars)
+           write(unit,*) zPr(k),(profssavg(i,k), i = 1,num_of_scalars)
           end do
           close(unit)
 
@@ -985,71 +1217,71 @@ contains
        open(unit,file="output/out.vtk", &
          access='stream',status='replace',form="unformatted",action="write")
 
-       write (unit) "# vtk DataFile Version 2.0",lf
-       write (unit) "CLMM output file",lf
-       write (unit) "BINARY",lf
-       write (unit) "DATASET RECTILINEAR_GRID",lf
+       write(unit) "# vtk DataFile Version 2.0",lf
+       write(unit) "CLMM output file",lf
+       write(unit) "BINARY",lf
+       write(unit) "DATASET RECTILINEAR_GRID",lf
        str="DIMENSIONS"
-       write (str(12:),*) Prnx,Prny,Prnz
-       write (unit) str,lf
+       write(str(12:),*) Prnx,Prny,Prnz
+       write(unit) str,lf
        str="X_COORDINATES"
-       write (str(15:),'(i5,2x,a)') Prnx,"float"
-       write (unit) str,lf
-       write (unit) BigEnd(real(xPr(1:Prnx), real32)),lf
+       write(str(15:),'(i5,2x,a)') Prnx,"float"
+       write(unit) str,lf
+       write(unit) BigEnd(real(xPr(1:Prnx), real32)),lf
        str="Y_COORDINATES"
-       write (str(15:),'(i5,2x,a)') Prny,"float"
-       write (unit) str,lf
-       write (unit) BigEnd(real(yPr(1:Prny), real32)),lf
+       write(str(15:),'(i5,2x,a)') Prny,"float"
+       write(unit) str,lf
+       write(unit) BigEnd(real(yPr(1:Prny), real32)),lf
        str="Z_COORDINATES"
-       write (str(15:),'(i5,2x,a)') Prnz,"float"
-       write (unit) str,lf
-       write (unit) BigEnd(real(zPr(1:Prnz), real32)),lf
+       write(str(15:),'(i5,2x,a)') Prnz,"float"
+       write(unit) str,lf
+       write(unit) BigEnd(real(zPr(1:Prnz), real32)),lf
        str="POINT_DATA"
-       write (str(12:),*) Prnx*Prny*Prnz
-       write (unit) str,lf
+       write(str(12:),*) Prnx*Prny*Prnz
+       write(unit) str,lf
 
        if (store%out_Pr==1) then
-         write (unit) "SCALARS p float",lf
-         write (unit) "LOOKUP_TABLE default",lf
+         write(unit) "SCALARS p float",lf
+         write(unit) "LOOKUP_TABLE default",lf
 
-         write (unit) BigEnd(real(Pr(1:Prnx,1:Prny,1:Prnz), real32))
+         write(unit) BigEnd(real(Pr(1:Prnx,1:Prny,1:Prnz), real32))
 
-         write (unit) lf
+         write(unit) lf
        end if
 
        if (enable_buoyancy>0.and.store%out_temperature==1) then
-         write (unit) "SCALARS temperature float",lf
-         write (unit) "LOOKUP_TABLE default",lf
+         write(unit) "SCALARS temperature float",lf
+         write(unit) "LOOKUP_TABLE default",lf
 
-         write (unit) BigEnd(real(Temperature(1:Prnx,1:Prny,1:Prnz), real32))
+         write(unit) BigEnd(real(Temperature(1:Prnx,1:Prny,1:Prnz), real32))
 
-         write (unit) lf
+         write(unit) lf
        end if
 
        if (enable_moisture>0.and.store%out_moisture==1) then
-         write (unit) "SCALARS moisture float",lf
-         write (unit) "LOOKUP_TABLE default",lf
+         write(unit) "SCALARS moisture float",lf
+         write(unit) "LOOKUP_TABLE default",lf
 
-         write (unit) BigEnd(real(Moisture(1:Prnx,1:Prny,1:Prnz), real32))
+         write(unit) BigEnd(real(Moisture(1:Prnx,1:Prny,1:Prnz), real32))
 
-         write (unit) lf
+         write(unit) lf
        end if
 
        if (store%out_Prtype==1) then
-         write (unit) "SCALARS ptype float",lf
-         write (unit) "LOOKUP_TABLE default",lf
+         write(unit) "SCALARS ptype float",lf
+         write(unit) "LOOKUP_TABLE default",lf
 
-         write (unit) BigEnd(real(Prtype(1:Prnx,1:Prny,1:Prnz), real32))
+         write(unit) BigEnd(real(Prtype(1:Prnx,1:Prny,1:Prnz), real32))
 
-         write (unit) lf
+         write(unit) lf
        end if
 
-       if (store%out_div==1) then
-         write (unit) "SCALARS div float",lf
-         write (unit) "LOOKUP_TABLE default",lf
+       if (store%out_divergence==1) then
+         write(unit) "SCALARS div float",lf
+         write(unit) "LOOKUP_TABLE default",lf
 
          if (gridtype==uniformgrid) then
-           write (unit) BigEnd(real((U(1:Prnx,1:Prny,1:Prnz) - &
+           write(unit) BigEnd(real((U(1:Prnx,1:Prny,1:Prnz) - &
                                        U(0:Prnx-1,1:Prny,1:Prnz))/dxmin + &
                                     (V(1:Prnx,1:Prny,1:Prnz) - &
                                        V(1:Vnx,0:Vny-1,1:Vnz))/dymin + &
@@ -1060,7 +1292,7 @@ contains
            do k = 1,Prnz
             do j = 1,Prny
              do i = 1,Prnx
-               write (unit) BigEnd(real((U(i,j,k)-U(i-1,j,k))/(dxPr(i)) + &
+               write(unit) BigEnd(real((U(i,j,k)-U(i-1,j,k))/(dxPr(i)) + &
                                         (V(i,j,k)-V(i,j-1,k))/(dyPr(j)) + &
                                         (W(i,j,k)-W(i,j,k-1))/(dzPr(k)), real32))
              end do
@@ -1068,14 +1300,14 @@ contains
            end do
          end if
 
-         write (unit) lf
+         write(unit) lf
        end if
 
        if (store%out_lambda2==1) then
          allocate(tmp(1:Prnx,1:Prny,1:Prnz,1))
 
-         write (unit) "SCALARS lambda2 float",lf
-         write (unit) "LOOKUP_TABLE default",lf
+         write(unit) "SCALARS lambda2 float",lf
+         write(unit) "LOOKUP_TABLE default",lf
 
          do k = 1,Prnz
           do j = 1,Prny
@@ -1085,25 +1317,25 @@ contains
           end do
          end do
 
-         write (unit) tmp
+         write(unit) tmp
 
-         write (unit) lf
+         write(unit) lf
          deallocate(tmp)
        end if
 
-       if (store%out_visc==1) then
-         write (unit) "SCALARS visc float",lf
-         write (unit) "LOOKUP_TABLE default",lf
+       if (store%out_viscosity==1) then
+         write(unit) "SCALARS visc float",lf
+         write(unit) "LOOKUP_TABLE default",lf
 
-         write (unit) BigEnd(real(Visc(1:Prnx,1:Prny,1:Prnz), real32))
+         write(unit) BigEnd(real(Viscosity(1:Prnx,1:Prny,1:Prnz), real32))
 
-         write (unit) lf
+         write(unit) lf
        end if
 
-       if (store%out_U==1.or.store%out_vort==1) allocate(tmp(1:3,1:Prnx,1:Prny,1:Prnz))
+       if (store%out_U==1.or.store%out_vorticity==1) allocate(tmp(1:3,1:Prnx,1:Prny,1:Prnz))
 
        if (store%out_U==1) then
-         write (unit) "VECTORS u float",lf
+         write(unit) "VECTORS u float",lf
 
          do k = 1,Prnz
           do j = 1,Prny
@@ -1115,13 +1347,13 @@ contains
           end do
          end do
 
-         write (unit) tmp
+         write(unit) tmp
 
-         write (unit) lf
+         write(unit) lf
        end if
 
-       if (store%out_vort==1) then
-         write (unit) "VECTORS vort float",lf
+       if (store%out_vorticity==1) then
+         write(unit) "VECTORS vort float",lf
 
          do k = 1,Prnz
           do j = 1,Prny
@@ -1136,9 +1368,9 @@ contains
           end do
          end do
 
-         write (unit) tmp
+         write(unit) tmp
 
-         write (unit) lf
+         write(unit) lf
        end if
        close(unit)
     end if  !store%out
@@ -1155,48 +1387,50 @@ contains
     real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
     character(70) :: str
     real(knd),dimension(:,:,:),allocatable :: depos
-    character(8) ::  scalname="scalar00"
+    character(8) ::  scalname
     integer :: l,unit
+
+    scalname = "scalar"
 
     if (num_of_scalars>0) then
       if (store%scalars==1) then
 
           call newunit(unit)
 
-          open(unit,file="output/scalars.vtk",&
+          open(unit,file="output/scalars.vtk", &
             access='stream',status='replace',form="unformatted",action="write")
 
-          write (unit) "# vtk DataFile Version 2.0",lf
-          write (unit) "CLMM output file",lf
-          write (unit) "BINARY",lf
-          write (unit) "DATASET RECTILINEAR_GRID",lf
+          write(unit) "# vtk DataFile Version 2.0",lf
+          write(unit) "CLMM output file",lf
+          write(unit) "BINARY",lf
+          write(unit) "DATASET RECTILINEAR_GRID",lf
           str="DIMENSIONS"
-          write (str(12:),*) Prnx,Prny,Prnz
-          write (unit) str,lf
+          write(str(12:),*) Prnx,Prny,Prnz
+          write(unit) str,lf
           str="X_COORDINATES"
-          write (str(15:),'(i5,2x,a)') Prnx,"float"
-          write (unit) str,lf
-          write (unit) BigEnd(real(xPr(1:Prnx), real32)),lf
+          write(str(15:),'(i5,2x,a)') Prnx,"float"
+          write(unit) str,lf
+          write(unit) BigEnd(real(xPr(1:Prnx), real32)),lf
           str="Y_COORDINATES"
-          write (str(15:),'(i5,2x,a)') Prny,"float"
-          write (unit) str,lf
-          write (unit) BigEnd(real(yPr(1:Prny), real32)),lf
+          write(str(15:),'(i5,2x,a)') Prny,"float"
+          write(unit) str,lf
+          write(unit) BigEnd(real(yPr(1:Prny), real32)),lf
           str="Z_COORDINATES"
-          write (str(15:),'(i5,2x,a)') Prnz,"float"
-          write (unit) str,lf
-          write (unit) BigEnd(real(zPr(1:Prnz), real32)),lf
+          write(str(15:),'(i5,2x,a)') Prnz,"float"
+          write(unit) str,lf
+          write(unit) BigEnd(real(zPr(1:Prnz), real32)),lf
           str="POINT_DATA"
-          write (str(12:),*) Prnx*Prny*Prnz
-          write (unit) str,lf
+          write(str(12:),*) Prnx*Prny*Prnz
+          write(unit) str,lf
 
           do l = 1,num_of_scalars
             write(scalname(7:8),"(I2.2)") l
-            write (unit) "SCALARS ", scalname , " float",lf
-            write (unit) "LOOKUP_TABLE default",lf
+            write(unit) "SCALARS ", scalname , " float",lf
+            write(unit) "LOOKUP_TABLE default",lf
 
-            write (unit) BigEnd(real(Scalar(1:Prnx,1:Prny,1:Prnz,l), real32))
+            write(unit) BigEnd(real(Scalar(1:Prnx,1:Prny,1:Prnz,l), real32))
 
-            write (unit) lf
+            write(unit) lf
           end do
           close(unit)
       end if !store%scalars
@@ -1208,39 +1442,39 @@ contains
 
           call newunit(unit)
 
-          open(unit,file="output/deposition.vtk",&
+          open(unit,file="output/deposition.vtk", &
             access='stream',status='replace',form="unformatted",action="write")
 
-          write (unit) "CLMM output file",lf
-          write (unit) "BINARY",lf
-          write (unit) "DATASET RECTILINEAR_GRID",lf
+          write(unit) "CLMM output file",lf
+          write(unit) "BINARY",lf
+          write(unit) "DATASET RECTILINEAR_GRID",lf
           str="DIMENSIONS"
-          write (str(12:),*) Prnx,Prny,1
-          write (unit) str,lf
+          write(str(12:),*) Prnx,Prny,1
+          write(unit) str,lf
           str="X_COORDINATES"
-          write (str(15:),'(i5,2x,a)') Prnx,"float"
-          write (unit) str,lf
-          write (unit) BigEnd(real(xPr(1:Prnx), real32)),lf
+          write(str(15:),'(i5,2x,a)') Prnx,"float"
+          write(unit) str,lf
+          write(unit) BigEnd(real(xPr(1:Prnx), real32)),lf
           str="Y_COORDINATES"
-          write (str(15:),'(i5,2x,a)') Prny,"float"
-          write (unit) str,lf
-          write (unit) BigEnd(real(yPr(1:Prny), real32))
+          write(str(15:),'(i5,2x,a)') Prny,"float"
+          write(unit) str,lf
+          write(unit) BigEnd(real(yPr(1:Prny), real32))
           str="Z_COORDINATES"
-          write (str(15:),'(i5,2x,a)') 1,"float"
-          write (unit) str,lf
-          write (unit) BigEnd(real(zW(0), real32)),lf
+          write(str(15:),'(i5,2x,a)') 1,"float"
+          write(unit) str,lf
+          write(unit) BigEnd(real(zW(0), real32)),lf
           str="POINT_DATA"
-          write (str(12:),*) Prnx*Prny
-          write (unit) str,lf
+          write(str(12:),*) Prnx*Prny
+          write(unit) str,lf
 
           do l = 1,num_of_scalars
             write(scalname(7:8),"(I2.2)") l
-            write (unit) "SCALARS ", scalname , " float",lf
-            write (unit) "LOOKUP_TABLE default",lf
+            write(unit) "SCALARS ", scalname , " float",lf
+            write(unit) "LOOKUP_TABLE default",lf
 
-            write (unit) BigEnd(real(depos(1:Prnx,1:Prny,l), real32))
+            write(unit) BigEnd(real(depos(1:Prnx,1:Prny,l), real32))
 
-            write (unit) lf
+            write(unit) lf
           end do
 
           close(unit)
@@ -1260,86 +1494,93 @@ contains
 
 
 
-  subroutine OutputAvg(U,V,W,Pr,Temperature,Moisture,Scalar)
-    real(knd),dimension(-2:,-2:,-2:),intent(in)   :: U,V,W
-    real(knd),dimension(1:,1:,1:),intent(in)      :: Pr
-    real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
-    real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Moisture
-    real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
+  subroutine OutputAvg(U,V,W,U_r,V_r,W_r,Pr,Temperature,Moisture)
+    real(knd),allocatable,dimension(:,:,:),intent(in)    :: U,V,W
+    real(knd),allocatable,dimension(:,:,:),intent(inout) :: U_r,V_r,W_r
+    real(knd),allocatable,dimension(:,:,:),intent(in)    :: Pr
+    real(knd),allocatable,dimension(:,:,:),intent(in)    :: Temperature
+    real(knd),allocatable,dimension(:,:,:),intent(in)    :: Moisture
     character(70) :: str
     character(8) ::  scalname="scalar00"
     integer i,j,k,l,unit
     real(real32),allocatable :: tmp(:,:,:,:)
 
-    if (averaging==1.and.btest(store%avg,0)) then
+    if (averaging==1) then
+      if (store%avg_U_rms>0) then
+        U_r = U_r - U**2
+        V_r = V_r - V**2
+        W_r = W_r - W**2
+      end if
+
+      if (store%avg==1) then
         allocate(tmp(1:3,1:Prnx,1:Prny,1:Prnz))
 
         call newunit(unit)
 
-        open(unit,file="output/avg.vtk",&
+        open(unit,file="output/avg.vtk", &
           access='stream',status='replace',form="unformatted",action="write")
 
-        write (unit) "# vtk DataFile Version 2.0",lf
-        write (unit) "CLMM output file",lf
-        write (unit) "BINARY",lf
-        write (unit) "DATASET RECTILINEAR_GRID",lf
+        write(unit) "# vtk DataFile Version 2.0",lf
+        write(unit) "CLMM output file",lf
+        write(unit) "BINARY",lf
+        write(unit) "DATASET RECTILINEAR_GRID",lf
         str="DIMENSIONS"
-        write (str(12:),*) Prnx,Prny,Prnz
-        write (unit) str,lf
+        write(str(12:),*) Prnx,Prny,Prnz
+        write(unit) str,lf
         str="X_COORDINATES"
-        write (str(15:),'(i5,2x,a)') Prnx,"float"
-        write (unit) str,lf
-        write (unit) BigEnd(real(xPr(1:Prnx), real32)),lf
+        write(str(15:),'(i5,2x,a)') Prnx,"float"
+        write(unit) str,lf
+        write(unit) BigEnd(real(xPr(1:Prnx), real32)),lf
         str="Y_COORDINATES"
-        write (str(15:),'(i5,2x,a)') Prny,"float"
-        write (unit) str,lf
-        write (unit) BigEnd(real(yPr(1:Prny), real32)),lf
+        write(str(15:),'(i5,2x,a)') Prny,"float"
+        write(unit) str,lf
+        write(unit) BigEnd(real(yPr(1:Prny), real32)),lf
         str="Z_COORDINATES"
-        write (str(15:),'(i5,2x,a)') Prnz,"float"
-        write (unit) str,lf
-        write (unit) BigEnd(real(zPr(1:Prnz), real32)),lf
+        write(str(15:),'(i5,2x,a)') Prnz,"float"
+        write(unit) str,lf
+        write(unit) BigEnd(real(zPr(1:Prnz), real32)),lf
         str="POINT_DATA"
-        write (str(12:),*) Prnx*Prny*Prnz
-        write (unit) str,lf
+        write(str(12:),*) Prnx*Prny*Prnz
+        write(unit) str,lf
 
         if (store%avg_Pr==1) then
-          write (unit) "SCALARS p float",lf
-          write (unit) "LOOKUP_TABLE default",lf
+          write(unit) "SCALARS p float",lf
+          write(unit) "LOOKUP_TABLE default",lf
 
-          write (unit) BigEnd(real(Pr(1:Prnx,1:Prny,1:Prnz), real32))
+          write(unit) BigEnd(real(Pr(1:Prnx,1:Prny,1:Prnz), real32))
 
-          write (unit) lf
+          write(unit) lf
         end if
 
         if (store%avg_Prtype==1) then
-          write (unit) "SCALARS ptype float",lf
-          write (unit) "LOOKUP_TABLE default",lf
+          write(unit) "SCALARS ptype float",lf
+          write(unit) "LOOKUP_TABLE default",lf
 
-          write (unit) BigEnd(real(Prtype(1:Prnx,1:Prny,1:Prnz), real32))
+          write(unit) BigEnd(real(Prtype(1:Prnx,1:Prny,1:Prnz), real32))
 
-          write (unit) lf
+          write(unit) lf
         end if
 
         if (enable_buoyancy==1.and.store%avg_temperature==1) then
-          write (unit) "SCALARS temperature float",lf
-          write (unit) "LOOKUP_TABLE default",lf
+          write(unit) "SCALARS temperature float",lf
+          write(unit) "LOOKUP_TABLE default",lf
 
-          write (unit) BigEnd(real(Temperature(1:Prnx,1:Prny,1:Prnz), real32))
+          write(unit) BigEnd(real(Temperature(1:Prnx,1:Prny,1:Prnz), real32))
 
-          write (unit) lf
+          write(unit) lf
         end if
 
         if (enable_moisture==1.and.store%avg_moisture==1) then
-          write (unit) "SCALARS moisture float",lf
-          write (unit) "LOOKUP_TABLE default",lf
+          write(unit) "SCALARS moisture float",lf
+          write(unit) "LOOKUP_TABLE default",lf
 
-          write (unit) BigEnd(real(Moisture(1:Prnx,1:Prny,1:Prnz), real32))
+          write(unit) BigEnd(real(Moisture(1:Prnx,1:Prny,1:Prnz), real32))
 
-          write (unit) lf
+          write(unit) lf
         end if
 
-        if (store%avg_U==1) then
-          write (unit) "VECTORS u float",lf
+        if (btest(store%avg_U,0)) then
+          write(unit) "VECTORS u float",lf
 
           do k = 1,Prnz
            do j = 1,Prny
@@ -1351,13 +1592,31 @@ contains
            end do
           end do
 
-          write (unit) tmp
+          write(unit) tmp
 
-          write (unit) lf
+          write(unit) lf
         end if
 
-        if (store%avg_vort==1) then
-          write (unit) "VECTORS vort float",lf
+        if (btest(store%avg_U_rms,0)) then
+          write(unit) "VECTORS u_rms float",lf
+
+          do k = 1,Prnz
+           do j = 1,Prny
+            do i = 1,Prnx
+              tmp(:,i,j,k) = [ BigEnd(real((U_r(i,j,k)+U_r(i-1,j,k))/2._knd, real32)), &
+                               BigEnd(real((V_r(i,j,k)+V_r(i,j-1,k))/2._knd, real32)), &
+                               BigEnd(real((W_r(i,j,k)+W_r(i,j,k-1))/2._knd, real32)) ]
+            end do
+           end do
+          end do
+
+          write(unit) tmp
+
+          write(unit) lf
+        end if
+
+        if (store%avg_vorticity==1) then
+          write(unit) "VECTORS vort float",lf
 
           do k = 1,Prnz
            do j = 1,Prny
@@ -1372,58 +1631,97 @@ contains
            end do
           end do
 
-          write (unit) tmp
+          write(unit) tmp
 
-          write (unit) lf
+          write(unit) lf
         end if
 
         close(unit)
-    end if !averaging
 
-    if (averaging==1.and.btest(store%avg,1)) call OutputUVW(U,V,W,"output/Uavg.vtk","output/Vavg.vtk","output/Wavg.vtk",.true.)
+      end if !store%avg
 
-    if (averaging==1.and.store%scalarsavg==1) then
-        if (num_of_scalars>0) then
-            open(unit,file="output/scalarsavg.vtk",&
-              access='stream',status='replace',form="unformatted",action="write")
+      if (btest(store%avg_U,1)) &
+        call OutputUVW(U,V,W,"output/Uavg.vtk","output/Vavg.vtk","output/Wavg.vtk",.true.)
 
-            write (unit) "# vtk DataFile Version 2.0",lf
-            write (unit) "CLMM output file",lf
-            write (unit) "BINARY",lf
-            write (unit) "DATASET RECTILINEAR_GRID",lf
-            str="DIMENSIONS"
-            write (str(12:),*) Prnx,Prny,Prnz
-            write (unit) str,lf
-            str="X_COORDINATES"
-            write (str(15:),'(i5,2x,a)') Prnx,"float"
-            write (unit) str,lf
-            write (unit) BigEnd(real(xPr(1:Prnx), real32)),lf
-            str="Y_COORDINATES"
-            write (str(15:),'(i5,2x,a)') Prny,"float"
-            write (unit) str,lf
-            write (unit) BigEnd(real(yPr(1:Prny), real32)),lf
-            str="Z_COORDINATES"
-            write (str(15:),'(i5,2x,a)') Prnz,"float"
-            write (unit) str,lf
-            write (unit) BigEnd(real(zPr(1:Prnz), real32)),lf
-            str="POINT_DATA"
-            write (str(12:),*) Prnx*Prny*Prnz
-            write (unit) str,lf
-
-            do l = 1,num_of_scalars
-              write(scalname(7:8),"(I2.2)") l
-              write (unit) "SCALARS ", scalname , " float",lf
-              write (unit) "LOOKUP_TABLE default",lf
-
-              write (unit) BigEnd(real(Scalar(1:Prnx,1:Prny,1:Prnz,l), real32))
-
-              write (unit) lf
-            end do
-            close(unit)
-        end if  !num_of_scalars
+      if (btest(store%avg_U_rms,1)) &
+        call OutputUVW(U_r,V_r,W_r,"output/Urms.vtk","output/Vrms.vtk","output/Wrms.vtk",.true.)
 
     end if !averaging
+
   end subroutine OutputAvg
+
+  subroutine OutputScalarStats(S_avg,S_max,S_int)
+    real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: S_avg,S_max,S_int
+    character(70) :: str
+    integer unit
+    
+    if (averaging==1.and. &
+         (store%scalars_avg==1.or. &
+          store%scalars_max==1.or. &
+          store%scalars_intermitency==1) &
+        .and. num_of_scalars>0) then
+       
+      open(newunit=unit,file="output/scalars_avg.vtk", &
+        access='stream',status='replace',form="unformatted",action="write")
+
+      write(unit) "# vtk DataFile Version 2.0",lf
+      write(unit) "CLMM output file",lf
+      write(unit) "BINARY",lf
+      write(unit) "DATASET RECTILINEAR_GRID",lf
+      str="DIMENSIONS"
+      write(str(12:),*) Prnx,Prny,Prnz
+      write(unit) str,lf
+      str="X_COORDINATES"
+      write(str(15:),'(i5,2x,a)') Prnx,"float"
+      write(unit) str,lf
+      write(unit) BigEnd(real(xPr(1:Prnx), real32)),lf
+      str="Y_COORDINATES"
+      write(str(15:),'(i5,2x,a)') Prny,"float"
+      write(unit) str,lf
+      write(unit) BigEnd(real(yPr(1:Prny), real32)),lf
+      str="Z_COORDINATES"
+      write(str(15:),'(i5,2x,a)') Prnz,"float"
+      write(unit) str,lf
+      write(unit) BigEnd(real(zPr(1:Prnz), real32)),lf
+      str="POINT_DATA"
+      write(str(12:),*) Prnx*Prny*Prnz
+      write(unit) str,lf
+
+      if (store%scalars_avg==1) then
+        call aux(S_avg,'_avg')
+      end if
+      
+      if (store%scalars_max==1) then
+        call aux(S_max,'_max')
+      end if
+      
+      if (store%scalars_intermitency==1) then
+        call aux(S_int,'_intermitency')
+      end if
+      
+      close(unit)
+
+    end if
+    
+  contains
+  
+    subroutine aux(S,suff)
+      real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: S
+      character(*),intent(in) :: suff
+      integer :: l
+      character(8) ::  scalname="scalar00"
+
+      do l = 1,num_of_scalars
+        write(scalname(7:8),"(I2.2)") l
+        write(unit) "SCALARS ", scalname//suff, " float",lf
+        write(unit) "LOOKUP_TABLE default",lf
+
+        write(unit) BigEnd(real(S(1:Prnx,1:Prny,1:Prnz,l), real32))
+
+        write(unit) lf
+      end do
+    end subroutine
+  end subroutine OutputScalarStats
 
 
 
@@ -1446,47 +1744,47 @@ contains
 
         call newunit(unit)
 
-        open(unit,file=fnameU,&
+        open(unit,file=fnameU, &
           access='stream',status='replace',form="unformatted",action="write")
 
-        write (unit) "# vtk DataFile Version 2.0",lf
-        write (unit) "CLMM output file",lf
-        write (unit) "BINARY",lf
-        write (unit) "DATASET RECTILINEAR_GRID",lf
+        write(unit) "# vtk DataFile Version 2.0",lf
+        write(unit) "CLMM output file",lf
+        write(unit) "BINARY",lf
+        write(unit) "DATASET RECTILINEAR_GRID",lf
         str="DIMENSIONS"
-        write (str(12:),*) Unx,Uny,Unz
-        write (unit) str,lf
+        write(str(12:),*) Unx,Uny,Unz
+        write(unit) str,lf
         str="X_COORDINATES"
-        write (str(15:),'(i5,2x,a)') Unx,"float"
-        write (unit) str,lf
-        write (unit) BigEnd(real(xU(1:Unx), real32)),lf
+        write(str(15:),'(i5,2x,a)') Unx,"float"
+        write(unit) str,lf
+        write(unit) BigEnd(real(xU(1:Unx), real32)),lf
         str="Y_COORDINATES"
-        write (str(15:),'(i5,2x,a)') Uny,"float"
-        write (unit) str,lf
-        write (unit) BigEnd(real(yPr(1:Uny), real32)),lf
+        write(str(15:),'(i5,2x,a)') Uny,"float"
+        write(unit) str,lf
+        write(unit) BigEnd(real(yPr(1:Uny), real32)),lf
         str="Z_COORDINATES"
-        write (str(15:),'(i5,2x,a)') Unz,"float"
-        write (unit) str,lf
-        write (unit) BigEnd(real(zPr(1:Unz), real32)),lf
+        write(str(15:),'(i5,2x,a)') Unz,"float"
+        write(unit) str,lf
+        write(unit) BigEnd(real(zPr(1:Unz), real32)),lf
         str="POINT_DATA"
-        write (str(12:),*) Unx*Uny*Unz
-        write (unit) str,lf
+        write(str(12:),*) Unx*Uny*Unz
+        write(unit) str,lf
 
 
-        write (unit) "SCALARS U float",lf
-        write (unit) "LOOKUP_TABLE default",lf
+        write(unit) "SCALARS U float",lf
+        write(unit) "LOOKUP_TABLE default",lf
 
-        write (unit) BigEnd(real(U(1:Unx,1:Uny,1:Unz), real32))
+        write(unit) BigEnd(real(U(1:Unx,1:Uny,1:Unz), real32))
 
-        write (unit) lf
+        write(unit) lf
 
         if (store%U_interp==1) then
-          write (unit) "SCALARS Utype float",lf
-          write (unit) "LOOKUP_TABLE default",lf
+          write(unit) "SCALARS Utype float",lf
+          write(unit) "LOOKUP_TABLE default",lf
 
-          write (unit) BigEnd(real(Utype(1:Unx,1:Uny,1:Unz), real32))
+          write(unit) BigEnd(real(Utype(1:Unx,1:Uny,1:Unz), real32))
 
-          write (unit) lf
+          write(unit) lf
         end if
 
         close(unit)
@@ -1496,47 +1794,47 @@ contains
 
         call newunit(unit)
 
-        open(unit,file=fnameV,&
+        open(unit,file=fnameV, &
           access='stream',status='replace',form="unformatted",action="write")
 
-        write (unit) "# vtk DataFile Version 2.0",lf
-        write (unit) "CLMM output file",lf
-        write (unit) "BINARY",lf
-        write (unit) "DATASET RECTILINEAR_GRID",lf
+        write(unit) "# vtk DataFile Version 2.0",lf
+        write(unit) "CLMM output file",lf
+        write(unit) "BINARY",lf
+        write(unit) "DATASET RECTILINEAR_GRID",lf
         str="DIMENSIONS"
-        write (str(12:),*) Vnx,Vny,Vnz
-        write (unit) str,lf
+        write(str(12:),*) Vnx,Vny,Vnz
+        write(unit) str,lf
         str="X_COORDINATES"
-        write (str(15:),'(i5,2x,a)') Vnx,"float"
-        write (unit) str,lf
-        write (unit) BigEnd(real(xPr(1:Vnx), real32)),lf
+        write(str(15:),'(i5,2x,a)') Vnx,"float"
+        write(unit) str,lf
+        write(unit) BigEnd(real(xPr(1:Vnx), real32)),lf
         str="Y_COORDINATES"
-        write (str(15:),'(i5,2x,a)') Vny,"float"
-        write (unit) str,lf
-        write (unit) BigEnd(real(yV(1:Vny), real32)),lf
+        write(str(15:),'(i5,2x,a)') Vny,"float"
+        write(unit) str,lf
+        write(unit) BigEnd(real(yV(1:Vny), real32)),lf
         str="Z_COORDINATES"
-        write (str(15:),'(i5,2x,a)') Vnz,"float"
-        write (unit) str,lf
-        write (unit) BigEnd(real(zPr(1:Vnz), real32)),lf
+        write(str(15:),'(i5,2x,a)') Vnz,"float"
+        write(unit) str,lf
+        write(unit) BigEnd(real(zPr(1:Vnz), real32)),lf
         str="POINT_DATA"
-        write (str(12:),*) Vnx*Vny*Vnz
-        write (unit) str,lf
+        write(str(12:),*) Vnx*Vny*Vnz
+        write(unit) str,lf
 
 
-        write (unit) "SCALARS V float",lf
-        write (unit) "LOOKUP_TABLE default",lf
+        write(unit) "SCALARS V float",lf
+        write(unit) "LOOKUP_TABLE default",lf
 
-        write (unit) BigEnd(real(V(1:Vnx,1:Vny,1:Vnz), real32))
+        write(unit) BigEnd(real(V(1:Vnx,1:Vny,1:Vnz), real32))
 
-        write (unit) lf
+        write(unit) lf
 
         if (store%V_interp==1) then
-          write (unit) "SCALARS Vtype float",lf
-          write (unit) "LOOKUP_TABLE default",lf
+          write(unit) "SCALARS Vtype float",lf
+          write(unit) "LOOKUP_TABLE default",lf
 
-          write (unit) BigEnd(real(Vtype(1:Vnx,1:Vny,1:Vnz), real32))
+          write(unit) BigEnd(real(Vtype(1:Vnx,1:Vny,1:Vnz), real32))
 
-          write (unit) lf
+          write(unit) lf
         end if
 
         close(unit)
@@ -1546,47 +1844,47 @@ contains
 
         call newunit(unit)
 
-        open(unit,file=fnameW,&
+        open(unit,file=fnameW, &
           access='stream',status='replace',form="unformatted",action="write")
 
-        write (unit) "# vtk DataFile Version 2.0",lf
-        write (unit) "CLMM output file",lf
-        write (unit) "BINARY",lf
-        write (unit) "DATASET RECTILINEAR_GRID",lf
+        write(unit) "# vtk DataFile Version 2.0",lf
+        write(unit) "CLMM output file",lf
+        write(unit) "BINARY",lf
+        write(unit) "DATASET RECTILINEAR_GRID",lf
         str="DIMENSIONS"
-        write (str(12:),*) Wnx,Wny,Wnz
-        write (unit) str,lf
+        write(str(12:),*) Wnx,Wny,Wnz
+        write(unit) str,lf
         str="X_COORDINATES"
-        write (str(15:),'(i5,2x,a)') Wnx,"float"
-        write (unit) str,lf
-        write (unit) BigEnd(real(xPr(1:Wnx), real32)),lf
+        write(str(15:),'(i5,2x,a)') Wnx,"float"
+        write(unit) str,lf
+        write(unit) BigEnd(real(xPr(1:Wnx), real32)),lf
         str="Y_COORDINATES"
-        write (str(15:),'(i5,2x,a)') Wny,"float"
-        write (unit) str,lf
-        write (unit) BigEnd(real(yPr(1:Wny), real32)),lf
+        write(str(15:),'(i5,2x,a)') Wny,"float"
+        write(unit) str,lf
+        write(unit) BigEnd(real(yPr(1:Wny), real32)),lf
         str="Z_COORDINATES"
-        write (str(15:),'(i5,2x,a)') Wnz,"float"
-        write (unit) str,lf
-        write (unit) BigEnd(real(zW(1:Wnz), real32)),lf
+        write(str(15:),'(i5,2x,a)') Wnz,"float"
+        write(unit) str,lf
+        write(unit) BigEnd(real(zW(1:Wnz), real32)),lf
         str="POINT_DATA"
-        write (str(12:),*) Wnx*Wny*Wnz
-        write (unit) str,lf
+        write(str(12:),*) Wnx*Wny*Wnz
+        write(unit) str,lf
 
 
-        write (unit) "SCALARS W float",lf
-        write (unit) "LOOKUP_TABLE default",lf
+        write(unit) "SCALARS W float",lf
+        write(unit) "LOOKUP_TABLE default",lf
 
-        write (unit) BigEnd(real(W(1:Wnx,1:Wny,1:Wnz), real32))
+        write(unit) BigEnd(real(W(1:Wnx,1:Wny,1:Wnz), real32))
 
-        write (unit) lf
+        write(unit) lf
 
         if (store%W_interp==1) then
-          write (unit) "SCALARS Wtype float",lf
-          write (unit) "LOOKUP_TABLE default",lf
+          write(unit) "SCALARS Wtype float",lf
+          write(unit) "LOOKUP_TABLE default",lf
 
-          write (unit) BigEnd(real(Wtype(1:Wnx,1:Wny,1:Wnz), real32))
+          write(unit) BigEnd(real(Wtype(1:Wnx,1:Wny,1:Wnz), real32))
 
-          write (unit) lf
+          write(unit) lf
         end if
 
         close(unit)
@@ -1659,9 +1957,135 @@ contains
   end subroutine OutputUVW
 
 
+  subroutine OutputAvgFluxes
+    real(knd),allocatable :: Scalar_fl_U_adv(:,:,:,:)
+    real(knd),allocatable :: Scalar_fl_V_adv(:,:,:,:)
+    real(knd),allocatable :: Scalar_fl_W_adv(:,:,:,:)
+    real(knd),allocatable :: Scalar_fl_U_turb(:,:,:,:)
+    real(knd),allocatable :: Scalar_fl_V_turb(:,:,:,:)
+    real(knd),allocatable :: Scalar_fl_W_turb(:,:,:,:)
+    integer :: i
+   
+    if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
 
+      !NOTE: just to allocate, mold= does not work correctly as of gcc 4.8
+!       allocate(Scalar_fl_U_adv,mold=Scalar_fl_U_avg)
+      Scalar_fl_U_adv = Scalar_fl_U_avg
+      Scalar_fl_V_adv = Scalar_fl_V_avg
+      Scalar_fl_W_adv = Scalar_fl_W_avg
+      Scalar_fl_U_avg = 0
+      Scalar_fl_V_adv = 0
+      Scalar_fl_W_adv = 0
 
+      do i=1,num_of_scalars
+        call AddScalarAdvVector(Scalar_fl_U_adv(:,:,:,i), &
+                             Scalar_fl_V_adv(:,:,:,i), &
+                             Scalar_fl_W_adv(:,:,:,i), &
+                             Scalar_avg(:,:,:,i), &
+                             U_avg,V_avg,W_avg, &
+                             1._knd)
+      end do
 
+      Scalar_fl_U_turb = Scalar_fl_U_avg - Scalar_fl_U_adv
+      Scalar_fl_V_turb = Scalar_fl_V_avg - Scalar_fl_V_adv
+      Scalar_fl_W_turb = Scalar_fl_W_avg - Scalar_fl_W_adv
+      
+
+      call SaveScalarVTKFluxes(Scalar_fl_U_avg, &
+                               Scalar_fl_U_adv, &
+                               Scalar_fl_U_turb, &
+                               "output/scalflu.vtk",xU,yPr,zPr)
+      call SaveScalarVTKFluxes(Scalar_fl_V_avg, &
+                               Scalar_fl_V_adv, &
+                               Scalar_fl_V_turb, &
+                               "output/scalflv.vtk",xPr,yV,zPr)
+      call SaveScalarVTKFluxes(Scalar_fl_W_avg, &
+                               Scalar_fl_W_adv, &
+                               Scalar_fl_W_turb, &
+                               "output/scalflw.vtk",xPr,yPr,zW)
+
+    end if
+
+  end subroutine
+
+  subroutine SaveScalarVTKFluxes(Avg,Adv,Turb,file_name,x,y,z)
+    real(knd),dimension(:,:,:,:),intent(in) :: Avg,Adv,Turb
+    character(*),intent(in) :: file_name
+    real(knd),allocatable,intent(in) :: x(:),y(:),z(:)
+    integer :: nx,ny,nz
+    character(70) :: str
+    character(13) ::  scalname
+    integer :: l,unit
+
+    nx = size(Avg,1)
+    ny = size(Avg,2)
+    nz = size(Avg,3)
+
+    call newunit(unit)
+
+    open(unit,file=trim(file_name), &
+      access='stream',status='replace',form="unformatted",action="write")
+
+    write(unit) "# vtk DataFile Version 2.0",lf
+    write(unit) "CLMM output file",lf
+    write(unit) "BINARY",lf
+    write(unit) "DATASET RECTILINEAR_GRID",lf
+    str="DIMENSIONS"
+    write(str(12:),*) nx,ny,nz
+    write(unit) str,lf
+    str="X_COORDINATES"
+    write(str(15:),'(i5,2x,a)') nx,"float"
+    write(unit) str,lf
+    write(unit) BigEnd(real(x(1:nx), real32)),lf
+    str="Y_COORDINATES"
+    write(str(15:),'(i5,2x,a)') ny,"float"
+    write(unit) str,lf
+    write(unit) BigEnd(real(y(1:ny), real32)),lf
+    str="Z_COORDINATES"
+    write(str(15:),'(i5,2x,a)') nz,"float"
+    write(unit) str,lf
+    write(unit) BigEnd(real(z(1:nz), real32)),lf
+    str="POINT_DATA"
+    write(str(12:),*) nx*ny*nz
+    write(unit) str,lf
+
+    scalname = "scalfl-avg-"
+
+    do l = 1,num_of_scalars
+      write(scalname(12:13),"(I2.2)") l
+      write(unit) "SCALARS ", scalname , " float",lf
+      write(unit) "LOOKUP_TABLE default",lf
+
+      write(unit) BigEnd(real(Avg(:,:,:,l), real32))
+
+      write(unit) lf
+    end do
+
+    scalname = "scalfl-adv-"
+
+    do l = 1,num_of_scalars
+      write(scalname(12:13),"(I2.2)") l
+      write(unit) "SCALARS ", scalname , " float",lf
+      write(unit) "LOOKUP_TABLE default",lf
+
+      write(unit) BigEnd(real(Adv(:,:,:,l), real32))
+
+      write(unit) lf
+    end do
+
+    scalname = "scalfl-trb-"
+
+    do l = 1,num_of_scalars
+      write(scalname(12:13),"(I2.2)") l
+      write(unit) "SCALARS ", scalname , " float",lf
+      write(unit) "LOOKUP_TABLE default",lf
+
+      write(unit) BigEnd(real(Turb(:,:,:,l), real32))
+
+      write(unit) lf
+    end do
+    close(unit)
+  end subroutine SaveScalarVTKFluxes
 
   subroutine Output(U,V,W,Pr,Temperature,Moisture,Scalar)
     real(knd),dimension(-2:,-2:,-2:),intent(inout) :: U,V,W
@@ -1671,19 +2095,26 @@ contains
     real(knd),intent(in) :: Scalar(-1:,-1:,-1:,:)
     integer i
 
-    call BoundU(1,U)
-    call BoundU(2,V)
-    call BoundU(3,W)
+    call BoundU(1,U,Uin)
+    call BoundU(2,V,Vin)
+    call BoundU(3,W,Win)
 
     call OutputOut(U,V,W,Pr,Temperature,Moisture)
 
     call OutputScalars(Scalar)
 
-    if (time>=timeavg1) call OutputAvg(U_avg,V_avg,W_avg,Pr_avg,Temperature_avg,Moisture_avg,Scalar_avg)
-
     call OutputUVW(U,V,W,"U.vtk","V.vtk","W.vtk")
 
-    if (time>=timeavg1) call OutputProfiles
+    if (averaging==1.and.time>=timeavg1) then
+      call OutputAvg(U_avg,V_avg,W_avg,U_rms,V_rms,W_rms,Pr_avg,Temperature_avg,Moisture_avg)
+      
+      call OutputScalarStats(Scalar_avg,Scalar_max,Scalar_intermitency)
+
+      call OutputProfiles
+
+      call OutputAvgFluxes
+
+    end if
 
     if (allocated(StaggeredFrameDomains)) then
       do i=1,size(StaggeredFrameDomains)
@@ -1691,7 +2122,7 @@ contains
       end do
     end if
 
-    write (*,*) "saved"
+    write(*,*) "saved"
   end subroutine Output
 
 
@@ -1709,13 +2140,28 @@ contains
     real(knd),dimension(-2:,-2:,-2:), intent(in) :: U,V,W
 
     Vorticity = (/         (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
-                              -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin),&
+                              -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin), &
                            (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
-                             -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin),&
+                             -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin), &
                            (V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
                              -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin) /)
   end function Vorticity
 
+
+  subroutine AddFrameDomain(dim,dir,pos)
+    integer,intent(in) :: dim, dir
+    real(knd) :: pos
+
+    if (.not.allocated(FrameDomains)) then
+      FrameDomains = [TFrameDomain(dim,dir,pos)]
+    else
+      FrameDomains = [FrameDomains, TFrameDomain(dim,dir,pos)]
+    end if
+  end subroutine
+
+  subroutine SetFrameDomains
+    call SetFrameDomain(FrameDomains)
+  end subroutine
 
   elemental subroutine SetFrameDomain(domain)
     type(TFrameDomain),intent(inout) :: domain
@@ -1734,7 +2180,7 @@ contains
 
           if (domain%direction==1) then
 
-            call Gridcoords(domain%mini, domain%minj, domain%mink, domain%position, &
+            call GridCoords(domain%mini, domain%minj, domain%mink, domain%position, &
                             (yV(Prny+1)+yV(0))/2._knd, (zW(Prnz+1)+zW(0))/2._knd )
 
             domain%maxi = domain%mini
@@ -1745,7 +2191,7 @@ contains
 
           elseif (domain%direction==2) then
 
-            call Gridcoords(domain%mini, domain%minj, domain%mink, (xU(Prnx+1)+xU(0))/2._knd, &
+            call GridCoords(domain%mini, domain%minj, domain%mink, (xU(Prnx+1)+xU(0))/2._knd, &
                             domain%position, (zW(Prnz+1)+zW(0))/2._knd )
 
             domain%maxj = domain%minj
@@ -1756,7 +2202,7 @@ contains
 
           else
 
-            call Gridcoords(domain%mini, domain%minj, domain%mink, (xU(Prnx+1)+xU(0))/2._knd, &
+            call GridCoords(domain%mini, domain%minj, domain%mink, (xU(Prnx+1)+xU(0))/2._knd, &
                             (yV(Prny+1)+yV(0))/2._knd, domain%position )
 
             domain%maxk = domain%mink
@@ -1790,72 +2236,73 @@ contains
 
     fsuffix=".vtk"
 
-
-    !$omp parallel do default(private) shared(n,store,time,fsuffix,xPr,yPr,zPr,Prtype,Pr,U,V,W,&
-    !$omp    scalar,Temperature,Moisture,enable_moisture,enable_buoyancy,num_of_scalars,&
-    !$omp    dxmin,dymin,dzmin,temperature_ref)
-    do m = 1,size(store%frame_domains)
+    !$omp parallel do default(none) &
+    !$omp  shared(n,FrameDomains,frame_flags,time,fsuffix,xPr,yPr,zPr,Prtype,Pr,U,V,W, &
+    !$omp    scalar,Temperature,Moisture,enable_moisture,enable_buoyancy,num_of_scalars, &
+    !$omp    dxmin,dymin,dzmin,temperature_ref,moisture_ref) &
+    !$omp  private(fname,fnumber,mini,maxi,minj,maxj,mink,maxk,unit,buffer,vbuffer,str,scalname)
+    do m = 1,size(FrameDomains)
 
       fname="output/frame-"//achar(iachar('a')+m-1)//"-"
       write(fnumber,"(I4.4)") n
       write(*,*) "Saving frame:",fnumber,"   time:",time
 
 
-      mini = store%frame_domains(m)%mini
-      minj = store%frame_domains(m)%minj
-      mink = store%frame_domains(m)%mink
-      maxi = store%frame_domains(m)%maxi
-      maxj = store%frame_domains(m)%maxj
-      maxk = store%frame_domains(m)%maxk
+      mini = FrameDomains(m)%mini
+      minj = FrameDomains(m)%minj
+      mink = FrameDomains(m)%mink
+      maxi = FrameDomains(m)%maxi
+      maxj = FrameDomains(m)%maxj
+      maxk = FrameDomains(m)%maxk
 
       allocate(buffer(mini:maxi,minj:maxj,mink:maxk))
 
-      if (store%frame_U==1 .or. store%frame_vort==1) then
+      if (frame_flags%U==1 .or. frame_flags%vort==1) then
         allocate(vbuffer(3,mini:maxi,minj:maxj,mink:maxk))
       end if
 
 
       !$omp critical
       call newunit(unit)
-      open(unit,file = trim(fname)//trim(fnumber)//trim(fsuffix),&
+      open(unit,file = trim(fname)//trim(fnumber)//trim(fsuffix), &
         access='stream',status='replace',form="unformatted",action="write")
       !$omp end critical
 
-      write (unit) "# vtk DataFile Version 2.0",lf
-      write (unit) "CLMM output file",lf
-      write (unit) "BINARY",lf
-      write (unit) "DATASET RECTILINEAR_GRID",lf
+      write(unit) "# vtk DataFile Version 2.0",lf
+      write(unit) "CLMM output file",lf
+      write(unit) "BINARY",lf
+      write(unit) "DATASET RECTILINEAR_GRID",lf
       str="DIMENSIONS"
-      write (str(12:),*) maxi-mini+1,maxj-minj+1,maxk-mink+1
-      write (unit) str,lf
+      write(str(12:),*) maxi-mini+1,maxj-minj+1,maxk-mink+1
+      write(unit) str,lf
       str="X_COORDINATES"
-      write (str(15:),'(i5,2x,a)') maxi-mini+1,"float"
-      write (unit) str,lf
-      write (unit) (BigEnd(real(xPr(i), real32)), i = mini,maxi),lf
+      write(str(15:),'(i5,2x,a)') maxi-mini+1,"float"
+      write(unit) str,lf
+      write(unit) (BigEnd(real(xPr(i), real32)), i = mini,maxi),lf
       str="Y_COORDINATES"
-      write (str(15:),'(i5,2x,a)') maxj-minj+1,"float"
-      write (unit) str,lf
-      write (unit) (BigEnd(real(yPr(j), real32)), j = minj,maxj),lf
+      write(str(15:),'(i5,2x,a)') maxj-minj+1,"float"
+      write(unit) str,lf
+      write(unit) (BigEnd(real(yPr(j), real32)), j = minj,maxj),lf
       str="Z_COORDINATES"
-      write (str(15:),'(i5,2x,a)') maxk-mink+1,"float"
-      write (unit) str,lf
-      write (unit) (BigEnd(real(zPr(k), real32)), k = mink,maxk),lf
+      write(str(15:),'(i5,2x,a)') maxk-mink+1,"float"
+      write(unit) str,lf
+      write(unit) (BigEnd(real(zPr(k), real32)), k = mink,maxk),lf
       str="POINT_DATA"
-      write (str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
-      write (unit) str,lf
+      write(str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
+      write(unit) str,lf
 
-      if (store%frame_Pr==1) then
-        write (unit) "SCALARS p float",lf
-        write (unit) "LOOKUP_TABLE default",lf
+      if (frame_flags%Pr==1) then
+        write(unit) "SCALARS p float",lf
+        write(unit) "LOOKUP_TABLE default",lf
         
-        write (unit) BigEnd(real(Pr(mini:maxi,minj:maxj,mink:maxk), real32))
+        write(unit) BigEnd(real(Pr(mini:maxi,minj:maxj,mink:maxk), real32))
 
-        write (unit) lf
+        write(unit) lf
       end if
 
-      if (store%frame_lambda2==1) then
-        write (unit) "SCALARS lambda2 float",lf
-        write (unit) "LOOKUP_TABLE default",lf
+      if (frame_flags%lambda2==1) then
+        write(unit) "SCALARS lambda2 float",lf
+        write(unit) "LOOKUP_TABLE default",lf
         do k = mink,maxk
          do j = minj,maxj
           do i = mini,maxi
@@ -1868,17 +2315,17 @@ contains
          end do
         end do
 
-        write (unit) BigEnd(buffer)
+        write(unit) BigEnd(buffer)
 
-        write (unit) lf
+        write(unit) lf
       end if
 
-      if (store%frame_scalars==1) then
+      if (frame_flags%scalars==1) then
         scalname(1:6)="scalar"
         do l = 1,num_of_scalars
          write(scalname(7:8),"(I2.2)") l
-         write (unit) "SCALARS ", scalname , " float",lf
-         write (unit) "LOOKUP_TABLE default",lf
+         write(unit) "SCALARS ", scalname , " float",lf
+         write(unit) "LOOKUP_TABLE default",lf
 
          do k = mink,maxk
           do j = minj,maxj
@@ -1892,13 +2339,13 @@ contains
           end do
          end do
 
-         write (unit) BigEnd(buffer)
+         write(unit) BigEnd(buffer)
 
-         write (unit) lf
+         write(unit) lf
         end do
-      elseif (store%frame_sumscalars==1.and.num_of_scalars==1) then
-        write (unit) "SCALARS ", "scalar" , " float",lf
-        write (unit) "LOOKUP_TABLE default",lf
+      elseif (frame_flags%sumscalars==1.and.num_of_scalars==1) then
+        write(unit) "SCALARS ", "scalar" , " float",lf
+        write(unit) "LOOKUP_TABLE default",lf
         do k = mink,maxk
          do j = minj,maxj
           do i = mini,maxi
@@ -1911,14 +2358,14 @@ contains
          end do
         end do
 
-        write (unit) BigEnd(buffer)
+        write(unit) BigEnd(buffer)
 
-        write (unit) lf
+        write(unit) lf
       end if
 
-      if (enable_buoyancy==1.and.store%frame_temperature==1) then
-        write (unit) "SCALARS temperature float",lf
-        write (unit) "LOOKUP_TABLE default",lf
+      if (enable_buoyancy==1.and.frame_flags%temperature==1) then
+        write(unit) "SCALARS temperature float",lf
+        write(unit) "LOOKUP_TABLE default",lf
         do k = mink,maxk
          do j = minj,maxj
           do i = mini,maxi
@@ -1931,34 +2378,34 @@ contains
          end do
         end do
 
-        write (unit) BigEnd(buffer)
+        write(unit) BigEnd(buffer)
 
-        write (unit) lf
+        write(unit) lf
       end if
 
-      if (enable_moisture==1.and.store%frame_moisture==1) then
-        write (unit) "SCALARS moisture float",lf
-        write (unit) "LOOKUP_TABLE default",lf
+      if (enable_moisture==1.and.frame_flags%moisture==1) then
+        write(unit) "SCALARS moisture float",lf
+        write(unit) "LOOKUP_TABLE default",lf
         do k = mink,maxk
          do j = minj,maxj
           do i = mini,maxi
             if (Prtype(i,j,k)<=0) then
               buffer(i,j,k) = real(Moisture(i,j,k), real32)
             else
-              buffer(i,j,k) = 0._real32
+              buffer(i,j,k) = real(moisture_ref, real32)
             end if
           end do
          end do
         end do
 
-        write (unit) BigEnd(buffer)
+        write(unit) BigEnd(buffer)
 
-        write (unit) lf
+        write(unit) lf
       end if
 
-      if (enable_buoyancy==1.and.store%frame_temperature_flux==1) then
-        write (unit) "SCALARS temperature_flux float", lf
-        write (unit) "LOOKUP_TABLE default", lf
+      if (enable_buoyancy==1.and.frame_flags%temperature_flux==1) then
+        write(unit) "SCALARS temperature_flux float", lf
+        write(unit) "LOOKUP_TABLE default", lf
 
         do k = mink,maxk
          do j = minj,maxj
@@ -1972,18 +2419,18 @@ contains
          end do
         end do
 
-        write (unit) BigEnd(buffer)
+        write(unit) BigEnd(buffer)
 
-        write (unit) lf
+        write(unit) lf
       end if
 
-      if (store%frame_scalfl==1) then
-        if (store%frame_scalars==1) then
+      if (frame_flags%scalfl==1) then
+        if (frame_flags%scalars==1) then
           scalname(1:6)="scalfl"
           do l = 1,num_of_scalars
             write(scalname(7:8),"(I2.2)") l
-            write (unit) "SCALARS ", scalname , " float", lf
-            write (unit) "LOOKUP_TABLE default", lf
+            write(unit) "SCALARS ", scalname , " float", lf
+            write(unit) "LOOKUP_TABLE default", lf
             do k = mink,maxk
              do j = minj,maxj
               do i = mini,maxi
@@ -1996,13 +2443,13 @@ contains
              end do
             end do
 
-            write (unit) BigEnd(buffer)
+            write(unit) BigEnd(buffer)
 
-            write (unit) lf
+            write(unit) lf
           end do
-        elseif (store%frame_sumscalars==1.and.num_of_scalars>0) then
-          write (unit) "SCALARS scalfl float", lf
-          write (unit) "LOOKUP_TABLE default", lf
+        elseif (frame_flags%sumscalars==1.and.num_of_scalars>0) then
+          write(unit) "SCALARS scalfl float", lf
+          write(unit) "LOOKUP_TABLE default", lf
           do k = mink,maxk
            do j = minj,maxj
             do i = mini,maxi
@@ -2015,14 +2462,14 @@ contains
            end do
           end do
 
-          write (unit) BigEnd(buffer)
+          write(unit) BigEnd(buffer)
 
-          write (unit) lf
+          write(unit) lf
         end if
       end if
 
-      if (store%frame_U==1) then
-        write (unit) "VECTORS u float",lf
+      if (frame_flags%U==1) then
+        write(unit) "VECTORS u float",lf
         do k = mink,maxk
          do j = minj,maxj
           do i = mini,maxi
@@ -2037,13 +2484,13 @@ contains
          end do
         end do
 
-        write (unit) BigEnd(vbuffer)
+        write(unit) BigEnd(vbuffer)
 
-        write (unit) lf
+        write(unit) lf
       end if
 
-      if (store%frame_vort==1) then
-        write (unit) "VECTORS vort float",lf
+      if (frame_flags%vort==1) then
+        write(unit) "VECTORS vort float",lf
         do k = mink,maxk
          do j = minj,maxj
           do i = mini,maxi
@@ -2061,7 +2508,7 @@ contains
          end do
         end do
 
-        write (unit) BigEnd(vbuffer)
+        write(unit) BigEnd(vbuffer)
 
       end if
       close(unit)
@@ -2072,6 +2519,180 @@ contains
   end subroutine Frame
 
 
+  subroutine StressProfiles(U,V,W)
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd) :: S
+    real(knd),allocatable,save ::fp(:),ht(:),gp(:)
+    integer   :: i,j,k,l,n
+    integer,save :: called = 0
+
+    if (called==0) then
+      allocate(fp(0:Prnx+1),ht(0:Prnz+1),gp(0:Prny+1))
+      !$omp parallel workshare
+      forall (i = 0:Prnx+1)      fp(i)=(xU(i)-xPr(i))/(xPr(i+1)-xPr(i))
+      forall (k = 0:Prnz+1)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
+      forall (j = 0:Prny+1)      gp(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
+      !$omp end parallel workshare
+      called = 1
+    end if
+
+    !$omp parallel private(i,j,k,n,S)
+    !$omp do
+    do k = 0,Prnz
+      S = 0
+      n = 0
+      do j = 1,Uny
+       do i = 1,Unx
+         if ((Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0).and.(Wtype(i+1,j,k)<=0.or.Wtype(i,j,k)<=0)) then
+           S = S + ((ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))-((1-ht(k))*profU(k)+ht(k)*profU(k+1))) * &
+                   (fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))
+           n = n + 1
+         end if
+       end do
+      end do
+      profuw(k) = S / max(n,1)
+    end do
+    !$omp end do nowait
+
+    !$omp do
+    do k = 0,Prnz
+      S = 0
+      n = 0
+      do j = 1,Vny
+       do i = 1,Vnx
+         if ((Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0).and.(Wtype(i,j+1,k)<=0.or.Wtype(i,j,k)<=0)) then
+           S = S + (ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)-(ht(k)*profV(k+1)+(1-ht(k))*profV(k))) * &
+                   (gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))
+           n = n + 1
+         end if
+       end do
+      end do
+      profvw(k) = S / max(n,1)
+    end do
+    !$omp end do nowait
+
+    !$omp do
+    do k = 0,Prnz
+      S = 0
+      n = 0
+      do j = 1,Uny
+       do i = 1,Unx
+         if (Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0) then
+           S = S-0.25_knd*(Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)
+           n = n + 1
+         end if
+       end do
+      end do
+      profuwsgs(k) = S / max(n,1)
+    end do
+    !$omp end do nowait
+
+    !$omp do
+    do k = 0,Prnz
+      S = 0
+      n = 0
+      do j = 1,Vny
+       do i = 1,Vnx
+         if (Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0) then
+           S = S-0.25_knd*(Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)
+           n = n + 1
+         end if
+       end do
+      end do
+      profvwsgs(k) = S / max(n,1)
+    end do
+    !$omp end do nowait
+    !$omp end parallel
+    
+  end subroutine StressProfiles
+  
+  
+  subroutine ScalarFluxSGSProfiles(W,Temperature,Moisture,Scalar)
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: W
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Moisture
+    real(knd),dimension(-1:,-1:,-1:,1:),intent(in) :: Scalar
+    real(knd) :: S
+    integer   :: i,j,k,l,n
+
+    if (enable_buoyancy==1) then
+      !proftempfl is computed directly during advection step
+
+      !$omp parallel do private(i,j,k,n,S)
+      do k = 0,Prnz
+        S = 0
+        n = 0
+        do j = 1,Prny
+         do i = 1,Prnx
+           if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
+             S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Temperature(i,j,k+1)-Temperature(i,j,k)))/dzW(k)
+             n = n + 1
+           end if
+         end do
+        end do
+        proftempflsgs(k) = S / max(n,1)
+      end do
+      !$omp end parallel do
+    end if
+
+    if (enable_moisture==1) then
+      !profmoistfl is computed directly during advection step
+
+      !$omp parallel do private(i,j,k,n,S)
+      do k = 0,Prnz
+        S = 0
+        n = 0
+        do j = 1,Prny
+         do i = 1,Prnx
+           if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
+             S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Moisture(i,j,k+1)-Moisture(i,j,k)))/dzW(k)
+             n = n + 1
+           end if
+         end do
+        end do
+        profmoistflsgs(k) = S / max(n,1)
+      end do
+      !$omp end parallel do
+    end if
+      
+    do l = 1,num_of_scalars
+      !$omp parallel private(i,j,k,n,S)
+      !$omp do
+      do k = 0,Prnz
+        S = 0
+        n = 0
+        do j = 1,Prny
+         do i = 1,Prnx
+           if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
+            S = S + 0.5_knd*(Scalar(i,j,k+1,l)+Scalar(i,j,k,l))*(W(i,j,k))
+            n = n + 1
+           end if
+         end do
+        end do
+        profscalfl(l,k) = S / max(n,1)
+      end do
+      !$omp end do nowait
+      !$omp do
+      do k = 0,Prnz
+        S = 0
+        n = 0
+        do j = 1,Prny
+         do i = 1,Prnx
+           if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
+             S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Scalar(i,j,k+1,l)-Scalar(i,j,k,l)))/dzW(k)
+             n = n + 1
+           end if
+         end do
+        end do
+        profscalflsgs(l,k) = S / max(n,1)
+      end do
+      !$omp end do
+      !$omp end parallel
+    end do
+
+
+  end subroutine ScalarFluxSGSProfiles
+
 
   subroutine BLProfiles(U,V,W,Temperature,Moisture,Scalar)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
@@ -2079,9 +2700,7 @@ contains
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Moisture
     real(knd),dimension(-1:,-1:,-1:,1:),intent(in) :: Scalar
     real(knd) :: S
-    real(knd),allocatable,save ::fp(:),ht(:),gp(:)
     integer   :: i,j,k,l,n
-    integer,save :: called = 0
 
     !$omp parallel private(i,j,k,n,S)
     !$omp do
@@ -2173,82 +2792,7 @@ contains
       end do
     end if
 
-    if (called==0) then
-      allocate(fp(0:Prnx+1),ht(0:Prnz+1),gp(0:Prny+1))
-      !$omp parallel workshare
-      forall (i = 0:Prnx+1)      fp(i)=(xU(i)-xPr(i))/(xPr(i+1)-xPr(i))
-      forall (k = 0:Prnz+1)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
-      forall (j = 0:Prny+1)      gp(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
-      !$omp end parallel workshare
-    end if
-
     !$omp parallel private(i,j,k,n,S)
-    !$omp do
-    do k = 0,Prnz
-      S = 0
-      n = 0
-      do j = 1,Uny
-       do i = 1,Unx
-         if ((Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0).and.(Wtype(i+1,j,k)<=0.or.Wtype(i,j,k)<=0)) then
-           S = S + ((ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))-((1-ht(k))*profU(k)+ht(k)*profU(k+1))) * &
-                   (fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))
-           n = n + 1
-         end if
-       end do
-      end do
-      profuw(k) = S / max(n,1)
-    end do
-    !$omp end do nowait
-
-    !$omp do
-    do k = 0,Prnz
-      S = 0
-      n = 0
-      do j = 1,Vny
-       do i = 1,Vnx
-         if ((Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0).and.(Wtype(i,j+1,k)<=0.or.Wtype(i,j,k)<=0)) then
-           S = S + (ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)-(ht(k)*profV(k+1)+(1-ht(k))*profV(k))) * &
-                   (gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))
-           n = n + 1
-         end if
-       end do
-      end do
-      profvw(k) = S / max(n,1)
-    end do
-    !$omp end do nowait
-
-    !$omp do
-    do k = 0,Prnz
-      S = 0
-      n = 0
-      do j = 1,Uny
-       do i = 1,Unx
-         if (Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0) then
-           S = S-0.25_knd*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)
-           n = n + 1
-         end if
-       end do
-      end do
-      profuwsgs(k) = S / max(n,1)
-    end do
-    !$omp end do nowait
-
-    !$omp do
-    do k = 0,Prnz
-      S = 0
-      n = 0
-      do j = 1,Vny
-       do i = 1,Vnx
-         if (Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0) then
-           S = S-0.25_knd*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)
-           n = n + 1
-         end if
-       end do
-      end do
-      profvwsgs(k) = S / max(n,1)
-    end do
-    !$omp end do nowait
-
     !$omp do
     do k = 1,Unz
       S = 0
@@ -2298,11 +2842,8 @@ contains
     !$omp end do
     !$omp end parallel
 
-    if (size(Temperature)>0) then
-      !proftempfl is computed directly during advection step
-
-      !$omp parallel private(i,j,k,n,S)
-      !$omp do
+    if (enable_buoyancy==1) then
+      !$omp parallel do private(i,j,k,n,S)
       do k = 1,Prnz
         S = 0
         n = 0
@@ -2316,30 +2857,11 @@ contains
         end do
         proftt(k) = S / max(n,1)
       end do
-      !$omp end do nowait
-
-      !$omp do
-      do k = 0,Prnz
-        S = 0
-        n = 0
-        do j = 1,Prny
-         do i = 1,Prnx
-           if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-             S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Temperature(i,j,k+1)-Temperature(i,j,k)))/dzW(k)
-             n = n + 1
-           end if
-         end do
-        end do
-        proftempflsgs(k) = S / max(n,1)
-      end do
-      !$omp end do
-      !$omp end parallel
+      !$omp end parallel do
     end if ! size(Temperature)
 
 
-    if (size(Moisture)>0) then
-      !proftempfl is computed directly during advection step
-
+    if (enable_moisture==1) then
       !$omp parallel private(i,j,k,n,S)
       !$omp do
       do k = 1,Prnz
@@ -2376,61 +2898,25 @@ contains
     end if ! size(Moisture)
 
 
-    if (size(Scalar)>0) then
-      do l = 1,num_of_scalars
-        !$omp parallel private(i,j,k,n,S)
-        !$omp do
-        do k = 0,Prnz
-          S = 0
-          n = 0
-          do j = 1,Prny
-           do i = 1,Prnx
-             if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-              S = S + 0.5_knd*(Scalar(i,j,k+1,l)+Scalar(i,j,k,l))*(W(i,j,k))
-              n = n + 1
-             end if
-           end do
-          end do
-          profscalfl(l,k) = S / max(n,1)
-        end do
-        !$omp end do nowait
 
-        !$omp do
-        do k = 1,Prnz
-          S = 0
-          n = 0
-          do j = 1,Prny
-           do i = 1,Prnx
-             if (Prtype(i,j,k)<=0) then
-              S = S + (Scalar(i,j,k,l)-profscal(l,k))**2
-              n = n + 1
-             end if
-           end do
-          end do
-          profss(l,k) = S / max(n,1)
+    do l = 1,num_of_scalars
+      !$omp parallel do private(i,j,k,n,S)
+      do k = 1,Prnz
+        S = 0
+        n = 0
+        do j = 1,Prny
+         do i = 1,Prnx
+           if (Prtype(i,j,k)<=0) then
+            S = S + (Scalar(i,j,k,l)-profscal(l,k))**2
+            n = n + 1
+           end if
+         end do
         end do
-        !$omp end do nowait
-
-        !$omp do
-        do k = 0,Prnz
-          S = 0
-          n = 0
-          do j = 1,Prny
-           do i = 1,Prnx
-             if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-               S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Scalar(i,j,k+1,l)-Scalar(i,j,k,l)))/dzW(k)
-               n = n + 1
-             end if
-           end do
-          end do
-          profscalflsgs(l,k) = S / max(n,1)
-        end do
-        !$omp end do
-        !$omp end parallel
+        profss(l,k) = S / max(n,1)
       end do
-    end if ! size(Scalar)
+      !$omp end parallel do
+    end do
 
-    called = 1
   end subroutine BLProfiles
 
 
@@ -2499,104 +2985,104 @@ contains
     call newunit(unit)
 
     open(unit,file="output/U2.vtk")
-    write (unit) "# vtk DataFile Version 2.0",lf
-    write (unit) "CLMM output file",lf
-    write (unit) "BINARY",lf
-    write (unit) "DATASET RECTILINEAR_GRID",lf
+    write(unit) "# vtk DataFile Version 2.0",lf
+    write(unit) "CLMM output file",lf
+    write(unit) "BINARY",lf
+    write(unit) "DATASET RECTILINEAR_GRID",lf
     str="DIMENSIONS"
-    write (str(12:),*) Unx,Uny,Unz
-    write (unit) str,lf
+    write(str(12:),*) Unx,Uny,Unz
+    write(unit) str,lf
     str="X_COORDINATES"
-    write (str(15:),'(i5,2x,a)') Unx,"float"
-    write (unit) str,lf
-    write (unit) BigEnd(real(xU(1:Unx), real32)),lf
+    write(str(15:),'(i5,2x,a)') Unx,"float"
+    write(unit) str,lf
+    write(unit) BigEnd(real(xU(1:Unx), real32)),lf
     str="Y_COORDINATES"
-    write (str(15:),'(i5,2x,a)') Uny,"float"
-    write (unit) str,lf
-    write (unit) BigEnd(real(yPr(1:Uny), real32)),lf
+    write(str(15:),'(i5,2x,a)') Uny,"float"
+    write(unit) str,lf
+    write(unit) BigEnd(real(yPr(1:Uny), real32)),lf
     str="Z_COORDINATES"
-    write (str(15:),'(i5,2x,a)') Unz,"float"
-    write (unit) str,lf
-    write (unit) BigEnd(real(zPr(1:Unz), real32)),lf
+    write(str(15:),'(i5,2x,a)') Unz,"float"
+    write(unit) str,lf
+    write(unit) BigEnd(real(zPr(1:Unz), real32)),lf
     str="POINT_DATA"
-    write (str(12:),*) Unx*Uny*Unz
-    write (unit) str,lf
+    write(str(12:),*) Unx*Uny*Unz
+    write(unit) str,lf
 
 
-    write (unit) "SCALARS U float",lf
-    write (unit) "LOOKUP_TABLE default",lf
+    write(unit) "SCALARS U float",lf
+    write(unit) "LOOKUP_TABLE default",lf
 
-    write (unit) BigEnd(real(U(1:Unx,1:Uny,1:Unz), real32)),lf
+    write(unit) BigEnd(real(U(1:Unx,1:Uny,1:Unz), real32)),lf
 
-    write (unit) lf
+    write(unit) lf
     close(unit)
 
 
     open(unit,file="output/V2.vtk")
-    write (unit) "# vtk DataFile Version 2.0",lf
-    write (unit) "CLMM output file",lf
-    write (unit) "BINARY",lf
-    write (unit) "DATASET RECTILINEAR_GRID",lf
+    write(unit) "# vtk DataFile Version 2.0",lf
+    write(unit) "CLMM output file",lf
+    write(unit) "BINARY",lf
+    write(unit) "DATASET RECTILINEAR_GRID",lf
     str="DIMENSIONS"
-    write (str(12:),*) Vnx,Vny,Vnz
-    write (unit) str,lf
+    write(str(12:),*) Vnx,Vny,Vnz
+    write(unit) str,lf
     str="X_COORDINATES"
-    write (str(15:),'(i5,2x,a)') Vnx,"float"
-    write (unit) str,lf
-    write (unit) BigEnd(real(xPr(1:Vnx), real32)),lf
+    write(str(15:),'(i5,2x,a)') Vnx,"float"
+    write(unit) str,lf
+    write(unit) BigEnd(real(xPr(1:Vnx), real32)),lf
     str="Y_COORDINATES"
-    write (str(15:),'(i5,2x,a)') Vny,"float"
-    write (unit) str,lf
-    write (unit) BigEnd(real(yV(1:Vny), real32)),lf
+    write(str(15:),'(i5,2x,a)') Vny,"float"
+    write(unit) str,lf
+    write(unit) BigEnd(real(yV(1:Vny), real32)),lf
     str="Z_COORDINATES"
-    write (str(15:),'(i5,2x,a)') Vnz,"float"
-    write (unit) str,lf
-    write (unit) BigEnd(real(zPr(1:Vnz), real32)),lf
+    write(str(15:),'(i5,2x,a)') Vnz,"float"
+    write(unit) str,lf
+    write(unit) BigEnd(real(zPr(1:Vnz), real32)),lf
     str="POINT_DATA"
-    write (str(12:),*) Vnx*Vny*Vnz
-    write (unit) str,lf
+    write(str(12:),*) Vnx*Vny*Vnz
+    write(unit) str,lf
 
 
-    write (unit) "SCALARS V float",lf
-    write (unit) "LOOKUP_TABLE default",lf
+    write(unit) "SCALARS V float",lf
+    write(unit) "LOOKUP_TABLE default",lf
 
-    write (unit) BigEnd(real(V(1:Vnx,1:Vny,1:Vnz), real32)),lf
+    write(unit) BigEnd(real(V(1:Vnx,1:Vny,1:Vnz), real32)),lf
 
-    write (unit) lf
+    write(unit) lf
     close(unit)
 
 
     open(unit,file="output/W2.vtk")
-    write (unit) "# vtk DataFile Version 2.0",lf
-    write (unit) "CLMM output file",lf
-    write (unit) "BINARY",lf
-    write (unit) "DATASET RECTILINEAR_GRID",lf
+    write(unit) "# vtk DataFile Version 2.0",lf
+    write(unit) "CLMM output file",lf
+    write(unit) "BINARY",lf
+    write(unit) "DATASET RECTILINEAR_GRID",lf
     str="DIMENSIONS"
-    write (str(12:),*) Wnx,Wny,Wnz
-    write (unit) str,lf
+    write(str(12:),*) Wnx,Wny,Wnz
+    write(unit) str,lf
     str="X_COORDINATES"
-    write (str(15:),'(i5,2x,a)') Wnx,"float"
-    write (unit) str,lf
-    write (unit) BigEnd(real(xPr(1:Wnx), real32)),lf
+    write(str(15:),'(i5,2x,a)') Wnx,"float"
+    write(unit) str,lf
+    write(unit) BigEnd(real(xPr(1:Wnx), real32)),lf
     str="Y_COORDINATES"
-    write (str(15:),'(i5,2x,a)') Wny,"float"
-    write (unit) str,lf
-    write (unit) BigEnd(real(yPr(1:Wny), real32)),lf
+    write(str(15:),'(i5,2x,a)') Wny,"float"
+    write(unit) str,lf
+    write(unit) BigEnd(real(yPr(1:Wny), real32)),lf
     str="Z_COORDINATES"
-    write (str(15:),'(i5,2x,a)') Wnz,"float"
-    write (unit) str,lf
-    write (unit) BigEnd(real(zW(1:Wnz), real32)),lf
+    write(str(15:),'(i5,2x,a)') Wnz,"float"
+    write(unit) str,lf
+    write(unit) BigEnd(real(zW(1:Wnz), real32)),lf
     str="POINT_DATA"
-    write (str(12:),*) Wnx*Wny*Wnz
-    write (unit) str,lf
+    write(str(12:),*) Wnx*Wny*Wnz
+    write(unit) str,lf
 
 
-    write (unit) "SCALARS W float",lf
-    write (unit) "LOOKUP_TABLE default",lf
+    write(unit) "SCALARS W float",lf
+    write(unit) "LOOKUP_TABLE default",lf
 
-    write (unit) BigEnd(real(W(1:Wnx,1:Wny,1:Wnz), real32)),lf
+    write(unit) BigEnd(real(W(1:Wnx,1:Wny,1:Wnz), real32)),lf
 
-    write (unit) lf
+    write(unit) lf
     close(unit)
   end subroutine OutputU2
 
@@ -2637,7 +3123,7 @@ contains
     character(12) :: fname
     integer mini,maxi,minj,maxj,mink,maxk,unit
 
-    call Gridcoords(mini,minj,mink,store%frame_domains(1)%position,(yV(Prny+1)+yV(0))/2._knd,(zW(Prnz+1)+zW(0))/2._knd)
+    call GridCoords(mini,minj,mink,FrameDomains(1)%position,(yV(Prny+1)+yV(0))/2._knd,(zW(Prnz+1)+zW(0))/2._knd)
     maxi = mini
     minj = 1
     maxj = Prny

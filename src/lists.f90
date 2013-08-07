@@ -2,38 +2,38 @@ module Lists
 
   implicit none
 
-  type,abstract :: TListable  !A placeholder, unlimited polymorphism still problematic in compilers as of January 2013.
+  type,abstract :: Listable  !A placeholder, unlimited polymorphism still problematic in compilers as of January 2013.
   end type
 
-  type TListNode
-    class(TListable),allocatable :: item
-    type(TListNode),pointer :: next =>null()
-  end type TListNode
+  type ListNode
+    class(Listable),allocatable :: item
+    type(ListNode),pointer :: next =>null()
+  end type ListNode
 
-  type TList
-    type(TListNode),pointer,private :: first => null()
-    type(TListNode),pointer,private :: last => null()
-    type(TListNode),pointer,private :: iter => null()
+  type List
+    type(ListNode),pointer,private :: first => null()
+    type(ListNode),pointer,private :: last => null()
+    type(ListNode),pointer,private :: iter => null()
     integer                ,private :: length = 0
     contains
-      procedure :: Deallocate => TList_Deallocate
-      procedure :: Add => TList_Add
-      procedure :: IterNext => TList_IterNext
-      procedure :: IterRestart => TList__IterRestart
-      procedure :: ForEach => TList_ForEach
-      procedure :: All => TList_All
-      procedure :: Any => TList_Any
-      procedure :: Len => TList_Len
-  end type TList
+      procedure :: Deallocate => List_Deallocate
+      procedure :: Add => List_Add
+      procedure :: IterNext => List_IterNext
+      procedure :: IterRestart => List__IterRestart
+      procedure :: ForEach => List_ForEach
+      procedure :: All => List_All
+      procedure :: Any => List_Any
+      procedure :: Len => List_Len
+  end type List
 
   abstract interface
     subroutine foreach_sub(item)
       import
-      class(TListable) :: item
+      class(Listable) :: item
     end subroutine
     logical function elem_logical_fun(item)
       import
-      class(TListable) :: item
+      class(Listable) :: item
     end function
   end interface
 
@@ -41,9 +41,9 @@ module Lists
   contains
 
 
-    subroutine TList_Deallocate(self)
-      class(Tlist),intent(inout) :: self
-      type(TListNode),pointer :: node,tmp
+    subroutine List_Deallocate(self)
+      class(List),intent(inout) :: self
+      type(ListNode),pointer :: node,tmp
 
       node => self%first
 
@@ -60,14 +60,14 @@ module Lists
       self%length = 0
       
 
-    end subroutine TList_Deallocate
+    end subroutine List_Deallocate
 
 
 
-    subroutine TList_Add(self,item)
+    subroutine List_Add(self,item)
       use iso_c_binding
-      class(TList),intent(inout) :: self
-      class(TListable),intent(in) :: item
+      class(List),intent(inout) :: self
+      class(Listable),intent(in) :: item
 
       if (.not.associated(self%last)) then
         allocate(self%first)
@@ -81,20 +81,20 @@ module Lists
 
       self%length = self%length + 1
 
-    end subroutine TList_Add
+    end subroutine List_Add
 
 
-    subroutine TList__IterRestart(self)
-      class(TList),intent(inout) :: self
+    subroutine List__IterRestart(self)
+      class(List),intent(inout) :: self
 
       self%iter => self%first
 
-    end subroutine TList__IterRestart
+    end subroutine List__IterRestart
 
 
-    subroutine TList_IterNext(self,res)
-      class(TList),intent(inout) :: self
-      class(TListable),pointer,intent(out) :: res
+    subroutine List_IterNext(self,res)
+      class(List),intent(inout) :: self
+      class(Listable),pointer,intent(out) :: res
 
       if (associated(self%iter)) then
         res => self%iter%item
@@ -102,12 +102,12 @@ module Lists
       else
         res => null()
       end if
-    end subroutine TList_IterNext
+    end subroutine List_IterNext
 
-    subroutine TList_ForEach(self,proc)
-      class(TList),intent(inout) :: self
+    subroutine List_ForEach(self,proc)
+      class(List),intent(inout) :: self
       procedure(foreach_sub) :: proc
-      type(TListNode),pointer :: node
+      type(ListNode),pointer :: node
 
       node => self%first
 
@@ -118,10 +118,10 @@ module Lists
 
     end subroutine
 
-    logical function TList_All(self,proc) result(res)
-      class(TList),intent(inout) :: self
+    logical function List_All(self,proc) result(res)
+      class(List),intent(inout) :: self
       procedure(elem_logical_fun) :: proc
-      type(TListNode),pointer :: node
+      type(ListNode),pointer :: node
 
       res = .true.
       
@@ -137,10 +137,10 @@ module Lists
 
     end function
 
-    logical function TList_Any(self,proc) result(res)
-      class(TList),intent(inout) :: self
+    logical function List_Any(self,proc) result(res)
+      class(List),intent(inout) :: self
       procedure(elem_logical_fun) :: proc
-      type(TListNode),pointer :: node
+      type(ListNode),pointer :: node
 
       res = .false.
       
@@ -156,10 +156,10 @@ module Lists
 
     end function
 
-    pure integer function TList_Len(self)
-      class(TList),intent(in) :: self
+    pure integer function List_Len(self)
+      class(List),intent(in) :: self
 
-      TList_Len = self%length
+      List_Len = self%length
     end function
     
 end module Lists

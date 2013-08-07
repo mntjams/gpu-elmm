@@ -8,7 +8,7 @@ module TSTEPS
   use BOUNDARIES, only: BoundU,Bound_Q
   use ScalarBoundaries, only: BoundTemperature, BoundViscosity
   use POISSON !it exports Pr_Correct and GetPrFromGPU
-  use OUTPUTS, only: store,display,proftempfl
+  use OUTPUTS, only: store,display,proftempfl,profmoistfl
   use SCALARS, only: ScalarRK3, ComputeTDiff
   use Subgrid, only: sgstype, SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma
   use TURBINLET, only: GetTurbulentInlet, GetInletFromFile
@@ -22,13 +22,23 @@ module TSTEPS
 
 
   private
-  public TMarchRK3
+  public TMarchRK3, TSteps_Deallocate
 
 #ifdef __HMPP
   public GetDataFromGPU
-  type(hmppWMPoint),allocatable,save :: hmppWMPoints(:)
-  integer,save :: nWMPoints = 0
+  type(hmppWMPoint),allocatable :: hmppWMPoints(:)
+  integer :: nWMPoints = 0
 #endif
+
+  !module variables to allow their deallocation before programend
+  real(knd),dimension(:,:,:),allocatable:: U3,V3,W3
+
+  real(knd),dimension(:,:,:),allocatable :: Q
+  real(knd),dimension(:,:,:),allocatable :: U2,Ustar
+  real(knd),dimension(:,:,:),allocatable :: V2,Vstar
+  real(knd),dimension(:,:,:),allocatable :: W2,Wstar
+
+  real(knd),allocatable:: Apu(:,:,:),ApV(:,:,:),ApW(:,:,:)
 
 contains
 
@@ -36,17 +46,28 @@ contains
 #include "tsteps-shared.f90"
 #endif
 
+ subroutine TSteps_Deallocate
+   if (allocated(U3)) deallocate(U3)
+   if (allocated(V3)) deallocate(V3)
+   if (allocated(W3)) deallocate(W3)
+   if (allocated(Q)) deallocate(Q)
+   if (allocated(U2)) deallocate(U2)
+   if (allocated(V2)) deallocate(V2)
+   if (allocated(W2)) deallocate(W2)
+   if (allocated(Ustar)) deallocate(Ustar)
+   if (allocated(Vstar)) deallocate(Vstar)
+   if (allocated(Wstar)) deallocate(Wstar)
+   if (allocated(ApU)) deallocate(ApU)
+   if (allocated(ApV)) deallocate(ApV)
+   if (allocated(ApW)) deallocate(ApW)
+ end subroutine
+
 
  subroutine TMarchRK3(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
   use RK3
   real(knd),allocatable,intent(inout) :: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)  !allocatable to anable move_alloc
   real(knd),allocatable,intent(inout) :: Temperature(:,:,:),Moisture(:,:,:),Scalar(:,:,:,:)
   real(knd),intent(out) :: delta
-
-  real(knd),dimension(:,:,:),allocatable,save :: Q
-  real(knd),dimension(:,:,:),allocatable,save :: U2,Ustar
-  real(knd),dimension(:,:,:),allocatable,save :: V2,Vstar
-  real(knd),dimension(:,:,:),allocatable,save :: W2,Wstar
 
   integer RK_stage
   integer,save:: called = 0
@@ -69,11 +90,11 @@ contains
    !$omp parallel
    !$omp sections
    !$omp section
-   call BoundU(1,U)
+   call BoundU(1,U,Uin)
    !$omp section
-   call BoundU(2,V)
+   call BoundU(2,V,Vin)
    !$omp section
-   call BoundU(3,W)
+   call BoundU(3,W,Win)
    !$omp section
    if (enable_buoyancy==1) call BoundTemperature(temperature)
    !$omp end sections
@@ -98,8 +119,8 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
 
     !$hmpp <tsteps> allocate
     !$hmpp <tsteps> advancedload, args[Vreman::Prnx,BoundU::Prny,BoundU::Prnz]
-    !$hmpp <tsteps> advancedload, args[BoundU::nx,BoundU::ny,BoundU::nz,&
-    !$hmpp &     BoundV::nx,BoundV::ny,BoundV::nz,BoundW::nx,BoundW::ny,BoundW::nz]
+    !$hmpp <tsteps> advancedload, args[BoundU::nx,BoundU::ny,BoundU::nz, &
+    !$hmpp  &     BoundV::nx,BoundV::ny,BoundV::nz,BoundW::nx,BoundW::ny,BoundW::nz]
 
     !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
 
@@ -151,8 +172,8 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
 
   !$hmpp <tsteps> advancedload, args[TimeStepEul::time]
   !$hmpp <tsteps> TimeStepEul callsite, args[*].noupdate = true
-  call TimeStepEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-               dxmin,dxU,dyV,dzW,CFL,Uref,steady,time,endtime,&
+  call TimeStepEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
+               dxmin,dxU,dyV,dzW,CFL,Uref,steady,time,end_time, &
                U,V,W,dt)
   !$hmpp <tsteps> delegatedstore, args[TimeStepEul::dt]
 
@@ -184,28 +205,28 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
     !download U2 V2 and W2 to main memory Attenuates below are to slow on GPU, waiting for HMPP update
 !     !$hmpp <tsteps> delegatedstore, args[UnifRedblack::U2,UnifRedblack::V2,UnifRedblack::W2]
 
-!     !this will havr no effect when doing HMPP
-!     if ((Btype(To) ==FreeSlipBuff) .and. (Prnz>15))  then
-!         !$hmpp <tsteps> AttenuateTop callsite, args[*].noupdate = true
-!         call AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,&
-!                           zPr,zW,U2,V2,W2,temperature,enable_buoyancy)
-!     end if
-!
-!     if ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) then
-!         !$hmpp <tsteps> AttenuateOut callsite, args[*].noupdate = true
-!         call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-!                           xPr,xU,U2,V2,W2,temperature,enable_buoyancy)
-!     end if
+    !this will havr no effect when doing HMPP
+    if ((Btype(To) ==FreeSlipBuff) .and. (Prnz>15))  then
+        !$hmpp <tsteps> AttenuateTop callsite, args[*].noupdate = true
+        call AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype, &
+                          zPr,zW,U2,V2,W2,temperature,enable_buoyancy)
+    end if
+
+    if ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) then
+        !$hmpp <tsteps> AttenuateOut callsite, args[*].noupdate = true
+        call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
+                          xPr,xU,U2,V2,W2,temperature,enable_buoyancy)
+    end if
 
 
-!     if ( ((Btype(To) ==FreeSlipBuff) .and.&
-!          (Prnz>15)) .or. ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) ) then
-!
-!              call BoundU(1,U2)
-!              call BoundU(2,V2)
-!              call BoundU(3,W2)
-!              !Not for temperature, it will be taken care of in ScalarRK3
-!     end if
+    if ( ((Btype(To) ==FreeSlipBuff) .and. &
+         (Prnz>15)) .or. ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) ) then
+
+             call BoundU(1,U2,Uin)
+             call BoundU(2,V2,Vin)
+             call BoundU(3,W2,Win)
+             !Not for temperature, it will be taken care of in ScalarRK3
+    end if
 
     if (masssourc==1) then
         call IBMassSources(Q,U2,V2,W2)
@@ -224,11 +245,11 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
     if (RK_stage==1) delta = 0
 #ifdef DEBUG
     if (debuglevel>0.or.steady==1) then
-      if (Unx*Uny*Unz>0) then &
+      if (Unx*Uny*Unz>0) then  &
         delta = delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-      if (Vnx*Vny*Vnz>0) then &
+      if (Vnx*Vny*Vnz>0) then  &
         delta = delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
-      if (Wnx*Wny*Wnz>0) then &
+      if (Wnx*Wny*Wnz>0) then  &
         delta = delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
     end if
 #endif
@@ -242,14 +263,14 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
     !Upload the new values from Pr_Correct to GPU
 
 
-    call ScalarRK3(U,V,W,Temperature,Moisture,Scalar,RK_stage,proftempfl)
+    call ScalarRK3(U,V,W,Temperature,Moisture,Scalar,RK_stage,proftempfl,profmoistfl)
 
 
 
 
     if ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) then
      !$hmpp <tsteps> AttenuateOut2 callsite, args[*].noupdate = true
-      call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+      call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
                         xPr,xU,U,V,W,temperature,enable_buoyancy)
 !       if (enable_buoyancy==1) then
 ! #ifdef __HMPP
@@ -263,34 +284,34 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
 
 
      !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
-     call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+     call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
                            nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
 
 
 #ifdef __HMPP
     !$hmpp <tsteps> BoundU callsite, args[*].noupdate = true
-    call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz,&
-                         Btype,sideU,&
+    call BoundU_GPU(1,Unx,Uny,Unz,Prny,Prnz, &
+                         Btype,sideU, &
                          Uin,U,0)
 
     !$hmpp <tsteps> BoundV callsite, args[*].noupdate = true
-    call BoundU_GPU(2,Vnx,Vny,Vnz,Prny,Prnz,&
-                         Btype,sideU,&
+    call BoundU_GPU(2,Vnx,Vny,Vnz,Prny,Prnz, &
+                         Btype,sideU, &
                          Vin,V,0)
 
     !$hmpp <tsteps> BoundW callsite, args[*].noupdate = true
-    call BoundU_GPU(3,Wnx,Wny,Wnz,Prny,Prnz,&
-                         Btype,sideU,&
+    call BoundU_GPU(3,Wnx,Wny,Wnz,Prny,Prnz, &
+                         Btype,sideU, &
                          Win,W,0)
 #else
 !$omp parallel
 !$omp sections
 !$omp section
-        call BoundU(1,U)
+        call BoundU(1,U,Uin)
 !$omp section
-        call BoundU(2,V)
+        call BoundU(2,V,Vin)
 !$omp section
-        call BoundU(3,W)
+        call BoundU(3,W,Win)
 !$omp end sections
 !$omp end parallel
 #endif
@@ -325,7 +346,6 @@ end subroutine TMarchRK3
    real(knd),allocatable,intent(inout):: U2(:,:,:),V2(:,:,:),W2(:,:,:)
    real(knd),intent(in):: coef
 
-   real(knd),dimension(:,:,:),allocatable,save:: U3,V3,W3
    real(knd) S
 
    integer i,j,k
@@ -344,11 +364,11 @@ end subroutine TMarchRK3
 
    !Pressure gradient terms
    !$hmpp <tsteps> PressureGrad callsite, args[*].noupdate = true
-   call PressureGrad(Prnx,Prny,Prnz,&
-                     Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-                     dxU,dyV,dzW,&
-                     Btype,prgradientx,prgradienty,&
-                     Pr,U2,V2,W2,&
+   call PressureGrad(Prnx,Prny,Prnz, &
+                     Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
+                     dxU,dyV,dzW, &
+                     Btype,prgradientx,prgradienty, &
+                     Pr,U2,V2,W2, &
                      dt,coef)
 
 
@@ -362,9 +382,9 @@ end subroutine TMarchRK3
 !      !$hmpp <tsteps> advancedload, args[ForwEul::Visc]
 
      !$hmpp <tsteps> ForwEul callsite, args[*].noupdate = true
-     call ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-                  dxPr,dyPr,dzPr,dxU,dyV,dzW,&
-                  U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
+     call ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
+                  dxPr,dyPr,dzPr,dxU,dyV,dzW, &
+                  U,V,W,U2,V2,W2,U3,V3,W3,Viscosity, &
                   dt,coef)
 
 
@@ -375,11 +395,11 @@ end subroutine TMarchRK3
 !       !$hmpp <tsteps>  advancedload, args[UnifRedBlack::maxCNiter,UnifRedBlack::epsCN]
 
       !$hmpp <tsteps> UNIFREDBLACK callsite, args[*].noupdate=true
-      call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,&
-                            Btype,sideU,&
-                            dt,dxmin,dymin,dzmin,&
-                            Uin,Vin,Win,&
-                            U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
+      call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz, &
+                            Btype,sideU, &
+                            dt,dxmin,dymin,dzmin, &
+                            Uin,Vin,Win, &
+                            U,V,W,U2,V2,W2,U3,V3,W3,Visc, &
                             coef,maxCNiter,epsCN,it,S)
 
      !$hmpp <tsteps> delegatedstore, args[UnifRedBlack::iters,UnifRedBlack::residuum]
@@ -410,12 +430,16 @@ end subroutine TMarchRK3
     do k=1,Unz
      do j=1,Uny
       do i=1,Unx
-       S = S-((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
-       Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
-         (0.25_knd*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
-         0.25_knd*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-          (0.25_knd*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
-         0.25_knd*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))
+       S = S-((Viscosity(i+1,j,k) * (U(i+1,j,k)-U(i,j,k))/dxPr(i+1) - &
+       Viscosity(i,j,k) * (U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i) + &
+         (0.25_knd * (Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))* &
+               (U(i,j+1,k)-U(i,j,k))/dyV(j) - &
+         0.25_knd * (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k))* &
+               (U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j) + &
+          (0.25_knd * (Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))* &
+               (U(i,j,k+1)-U(i,j,k))/dzW(k) - &
+         0.25_knd * (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))* &
+               (U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))
       end do
      end do
     end do
@@ -431,6 +455,7 @@ end subroutine TMarchRK3
 
 
   subroutine UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
+   use Parameters, nu => Viscosity
    real(knd),dimension(-2:,-2:,-2:),intent(in):: U,V,W
    real(knd),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
    real(knd),intent(in):: coef
@@ -438,7 +463,6 @@ end subroutine TMarchRK3
    real(knd) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
    integer i,j,k,bi,bj,bk,l
    integer,parameter :: narr = 3, narr2 = 5 !number of arrays in the loop
-   real(knd),allocatable,save:: Apu(:,:,:),ApV(:,:,:),ApW(:,:,:)
    integer,save :: called = 0
 
        if (called==0) then
@@ -467,13 +491,13 @@ end subroutine TMarchRK3
           do k = bk,min(bk+tilenz(narr)-1,Unz)
            do j = bj,min(bj+tileny(narr)-1,Uny)
             do i = bi,min(bi+tilenx(narr)-1,Unx)
-              U2(i,j,k) = U2(i,j,k)+Ap*(&
-              ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
-              Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*recdxmin2+0.25_knd*(&
-               ((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
-               (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))*recdymin2+&
-               ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
-               (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))*recdzmin2)))
+              U2(i,j,k) = U2(i,j,k)+Ap*( &
+              ((nu(i+1,j,k) * (U(i+1,j,k)-U(i,j,k)) - &
+              nu(i,j,k) * (U(i,j,k)-U(i-1,j,k)))*recdxmin2+0.25_knd * ( &
+               ((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (U(i,j+1,k)-U(i,j,k)) - &
+               (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (U(i,j,k)-U(i,j-1,k)))*recdymin2 + &
+               ((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (U(i,j,k+1)-U(i,j,k)) - &
+               (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (U(i,j,k)-U(i,j,k-1)))*recdzmin2)))
             end do
            end do
           end do
@@ -488,13 +512,13 @@ end subroutine TMarchRK3
           do k = bk,min(bk+tilenz(narr)-1,Vnz)
            do j = bj,min(bj+tileny(narr)-1,Vny)
             do i = bi,min(bi+tilenx(narr)-1,Vnx)
-              V2(i,j,k) = V2(i,j,k)+Ap*(&
-            (0.25_knd*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
-            (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))*recdxmin2+&
-             (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
-             Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*recdymin2+&
-             0.25_knd*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
-             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))*recdzmin2))
+              V2(i,j,k) = V2(i,j,k)+Ap*( &
+            (0.25_knd * ((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (V(i+1,j,k)-V(i,j,k)) - &
+            (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (V(i,j,k)-V(i-1,j,k)))*recdxmin2 + &
+             (nu(i,j+1,k) * (V(i,j+1,k)-V(i,j,k)) - &
+             nu(i,j,k) * (V(i,j,k)-V(i,j-1,k)))*recdymin2 + &
+             0.25_knd * ((nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * (V(i,j,k+1)-V(i,j,k)) - &
+             (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (V(i,j,k)-V(i,j,k-1)))*recdzmin2))
             end do
            end do
           end do
@@ -509,13 +533,13 @@ end subroutine TMarchRK3
           do k = bk,min(bk+tilenz(narr)-1,Wnz)
            do j = bj,min(bj+tileny(narr)-1,Wny)
             do i = bi,min(bi+tilenx(narr)-1,Wnx)
-              W2(i,j,k) = W2(i,j,k)+Ap*(&
-            (0.25_knd*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
-            (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))*recdxmin2+&
-             ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
-             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))*recdymin2)+&
-             (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
-             Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*recdzmin2))
+              W2(i,j,k) = W2(i,j,k)+Ap*( &
+            (0.25_knd * (((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (W(i+1,j,k)-W(i,j,k)) - &
+            (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (W(i,j,k)-W(i-1,j,k)))*recdxmin2 + &
+             ((nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * (W(i,j+1,k)-W(i,j,k)) - &
+             (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (W(i,j,k)-W(i,j-1,k)))*recdymin2) + &
+             (nu(i,j,k+1) * (W(i,j,k+1)-W(i,j,k)) - &
+             nu(i,j,k) * (W(i,j,k)-W(i,j,k-1)))*recdzmin2))
             end do
            end do
           end do
@@ -532,12 +556,12 @@ end subroutine TMarchRK3
           do k = bk,min(bk+tilenz(narr)-1,Unz)
            do j = bj,min(bj+tileny(narr)-1,Uny)
             do i = bi,min(bi+tilenx(narr)-1,Unx)
-              ApU(i,j,k) = ((Visc(i+1,j,k)+&
-                          Visc(i,j,k))*recdxmin2+&
-                          0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
-                          (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2+&
-                          ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
-                          (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))*recdzmin2))
+              ApU(i,j,k) = ((nu(i+1,j,k) + &
+                          nu(i,j,k))*recdxmin2 + &
+                          0.25_knd * (((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) + &
+                          (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)))*recdymin2 + &
+                          ((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) + &
+                          (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)))*recdzmin2))
             end do
            end do
           end do
@@ -559,12 +583,12 @@ end subroutine TMarchRK3
           do k = bk,min(bk+tilenz(narr)-1,Vnz)
            do j = bj,min(bj+tileny(narr)-1,Vny)
             do i = bi,min(bi+tilenx(narr)-1,Vnx)
-              ApV(i,j,k) = ((Visc(i,j+1,k)+&
-                         Visc(i,j,k))*recdymin2+&
-                         0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
-                          (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k)))*recdxmin2+&
-                         ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
-                         (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))*recdzmin2))
+              ApV(i,j,k) = ((nu(i,j+1,k) + &
+                         nu(i,j,k))*recdymin2 + &
+                         0.25_knd * (((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) + &
+                          (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)))*recdxmin2 + &
+                         ((nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) + &
+                         (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)))*recdzmin2))
             end do
            end do
           end do
@@ -586,12 +610,12 @@ end subroutine TMarchRK3
           do k = bk,min(bk+tilenz(narr)-1,Wnz)
            do j = bj,min(bj+tileny(narr)-1,Wny)
             do i = bi,min(bi+tilenx(narr)-1,Wnx)
-              ApW(i,j,k) = (0.25_knd*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
-                          (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k)))*recdxmin2+&
-                         ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))+&
-                         (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2)+&
-                         (Visc(i,j,k+1)+&
-                         Visc(i,j,k))*recdzmin2)
+              ApW(i,j,k) = (0.25_knd * (((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) + &
+                          (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)))*recdxmin2 + &
+                         ((nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) + &
+                         (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)))*recdymin2) + &
+                         (nu(i,j,k+1) + &
+                         nu(i,j,k))*recdzmin2)
             end do
            end do
           end do
@@ -624,9 +648,9 @@ end subroutine TMarchRK3
 
 
        do l=1,maxCNiter               !Gauss-Seidel iteration for Crank-Nicolson result
-        call BoundU(1,U3)
-        call BoundU(2,V3)
-        call BoundU(3,W3)
+        call BoundU(1,U3,Uin)
+        call BoundU(2,V3,Vin)
+        call BoundU(3,W3,Win)
 
         S = 0
         Su = 0
@@ -640,12 +664,12 @@ end subroutine TMarchRK3
            do k = bk,min(bk+tilenz(narr2)-1,Unz)
             do j = bj,min(bj+tileny(narr2)-1,Uny)
              do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Unx),2
-               p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
-                Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
-                0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
-                (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
-                ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
-                (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
+               p=((nu(i+1,j,k) * (U3(i+1,j,k)) - &
+                nu(i,j,k) * (-U3(i-1,j,k)))*recdxmin2 + &
+                0.25_knd * (((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (U3(i,j+1,k)) - &
+                (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (-U3(i,j-1,k)))*recdymin2 + &
+                ((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (U3(i,j,k+1)) - &
+                (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (-U3(i,j,k-1)))*recdzmin2))
                p = Ap*p+U2(i,j,k)+U(i,j,k)
                p = p*ApU(i,j,k)
                Su = max(Su,abs(p-U3(i,j,k)))
@@ -664,12 +688,12 @@ end subroutine TMarchRK3
            do k = bk,min(bk+tilenz(narr2)-1,Vnz)
             do j = bj,min(bj+tileny(narr2)-1,Vny)
              do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Vnx),2
-               p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
-                Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
-                0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
-                (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
-                ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
-                (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
+               p=((nu(i,j+1,k) * (V3(i,j+1,k)) - &
+                nu(i,j,k) * (-V3(i,j-1,k)))*recdymin2 + &
+                0.25_knd * (((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (V3(i+1,j,k)) - &
+                (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (-V3(i-1,j,k)))*recdxmin2 + &
+                ((nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * (V3(i,j,k+1)) - &
+                (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (-V3(i,j,k-1)))*recdzmin2))
                p = Ap*p+V2(i,j,k)+V(i,j,k)
                p = p*ApV(i,j,k)
                Sv = max(Sv,abs(p-V3(i,j,k)))
@@ -688,12 +712,12 @@ end subroutine TMarchRK3
            do k = bk,min(bk+tilenz(narr2)-1,Wnz)
             do j = bj,min(bj+tileny(narr2)-1,Wny)
              do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Wnx),2
-               p=(0.25_knd*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
-                (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
-                ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
-                (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
-                (Visc(i,j,k+1)*(W3(i,j,k+1))-&
-                Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
+               p=(0.25_knd * (((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (W3(i+1,j,k)) - &
+                (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (-W3(i-1,j,k)))*recdxmin2 + &
+                ((nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * (W3(i,j+1,k)) - &
+                (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (-W3(i,j-1,k)))*recdymin2) + &
+                (nu(i,j,k+1) * (W3(i,j,k+1)) - &
+                nu(i,j,k) * (-W3(i,j,k-1)))*recdzmin2)
                p = Ap*p+W2(i,j,k)+W(i,j,k)
                p = p*ApW(i,j,k)
                Sw = max(Sw,abs(p-W3(i,j,k)))
@@ -713,12 +737,12 @@ end subroutine TMarchRK3
            do k = bk,min(bk+tilenz(narr2)-1,Unz)
             do j = bj,min(bj+tileny(narr2)-1,Uny)
              do i = bi+mod(bi+j+k,2),min(bi+tilenx(narr2)-1,Unx),2
-               p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
-                 Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
-                 0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
-                 (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
-                 ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
-                 (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
+               p=((nu(i+1,j,k) * (U3(i+1,j,k)) - &
+                 nu(i,j,k) * (-U3(i-1,j,k)))*recdxmin2 + &
+                 0.25_knd * (((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (U3(i,j+1,k)) - &
+                 (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (-U3(i,j-1,k)))*recdymin2 + &
+                 ((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (U3(i,j,k+1)) - &
+                 (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (-U3(i,j,k-1)))*recdzmin2))
                 p = Ap*p+U2(i,j,k)+U(i,j,k)
                 p = p*ApU(i,j,k)
 
@@ -739,12 +763,12 @@ end subroutine TMarchRK3
            do k = bk,min(bk+tilenz(narr2)-1,Vnz)
             do j = bj,min(bj+tileny(narr2)-1,Vny)
              do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Vnx),2
-               p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
-                Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
-                0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
-                (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
-                ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
-                (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
+               p=((nu(i,j+1,k) * (V3(i,j+1,k)) - &
+                nu(i,j,k) * (-V3(i,j-1,k)))*recdymin2 + &
+                0.25_knd * (((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (V3(i+1,j,k)) - &
+                (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (-V3(i-1,j,k)))*recdxmin2 + &
+                ((nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * (V3(i,j,k+1)) - &
+                (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (-V3(i,j,k-1)))*recdzmin2))
                p = Ap*p+V2(i,j,k)+V(i,j,k)
                p = p*ApV(i,j,k)
                Sv = max(Sv,abs(p-V3(i,j,k)))
@@ -763,12 +787,12 @@ end subroutine TMarchRK3
            do k = bk,min(bk+tilenz(narr2)-1,Wnz)
             do j = bj,min(bj+tileny(narr2)-1,Wny)
              do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Wnx),2
-               p=(0.25_knd*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
-                (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
-                ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
-                (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
-                (Visc(i,j,k+1)*(W3(i,j,k+1))-&
-                Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
+               p=(0.25_knd * (((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (W3(i+1,j,k)) - &
+                (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (-W3(i-1,j,k)))*recdxmin2 + &
+                ((nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * (W3(i,j+1,k)) - &
+                (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (-W3(i,j-1,k)))*recdymin2) + &
+                (nu(i,j,k+1) * (W3(i,j,k+1)) - &
+                nu(i,j,k) * (-W3(i,j,k-1)))*recdzmin2)
                p = Ap*p+W2(i,j,k)+W(i,j,k)
                p = p*ApW(i,j,k)
                Sw = max(Sw,abs(p-W3(i,j,k)))
@@ -792,12 +816,12 @@ end subroutine TMarchRK3
 
 
   subroutine GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
+   use Parameters, nu => Viscosity
    real(knd),dimension(-2:,-2:,-2:),intent(in):: U,V,W
    real(knd),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
    real(knd),intent(in):: coef
    real(knd) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
    integer i,j,k,l
-   real(knd),allocatable,save:: Apu(:,:,:),ApV(:,:,:),ApW(:,:,:)
    integer,save :: called = 0
 
        if (called==0) then
@@ -817,39 +841,51 @@ end subroutine TMarchRK3
        do k=1,Unz    !The explicit part, which doesn't have to be changed inside the loop
         do j=1,Uny
          do i=1,Unx
-          U2(i,j,k) = U2(i,j,k)+Ap*(&
-          ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
-          Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
-           (0.25_knd*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
-           0.25_knd*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-           (0.25_knd*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
-           0.25_knd*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k)))
+          U2(i,j,k) = U2(i,j,k)+Ap*( &
+          ((nu(i+1,j,k) * (U(i+1,j,k)-U(i,j,k))/dxPr(i+1) - &
+          nu(i,j,k) * (U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i) + &
+           (0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k))* &
+                     (U(i,j+1,k)-U(i,j,k))/dyV(j) - &
+           0.25_knd * (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k))* &
+                    (U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j) + &
+           (0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k))* &
+                     (U(i,j,k+1)-U(i,j,k))/dzW(k) - &
+           0.25_knd * (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1))* &
+                    (U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k)))
          end do
         end do
        end do
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
-          V2(i,j,k) = V2(i,j,k)+Ap*(&
-          ((0.25_knd*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
-          0.25_knd*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-           (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
-           Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
-           (0.25_knd*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
-           0.25_knd*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k)))
+          V2(i,j,k) = V2(i,j,k)+Ap*( &
+          ((0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k))* &
+                     (V(i+1,j,k)-V(i,j,k))/dxU(i) - &
+          0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k))* &
+                   (V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i) + &
+           (nu(i,j+1,k) * (V(i,j+1,k)-V(i,j,k))/dyPr(j+1) - &
+           nu(i,j,k) * (V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j) + &
+           (0.25_knd * (nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k))* &
+                     (V(i,j,k+1)-V(i,j,k))/dzW(k) - &
+           0.25_knd * (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1))* &
+                    (V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k)))
          end do
         end do
        end do
        do k=1,Wnz
        do j=1,Wny
         do i=1,Wnx
-         W2(i,j,k) = W2(i,j,k)+Ap*(&
-         ((0.25_knd*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
-         0.25_knd*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-          (0.25_knd*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
-          0.25_knd*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-          (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))/dzPr(k+1)-&
-          Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k)))
+         W2(i,j,k) = W2(i,j,k)+Ap*( &
+         ((0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k))* &
+                    (W(i+1,j,k)-W(i,j,k))/dxU(i) - &
+         0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k))* &
+                  (W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i) + &
+          (0.25_knd * (nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k))* &
+                    (W(i,j+1,k)-W(i,j,k))/dyV(j) - &
+          0.25_knd * (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k))* &
+                   (W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j) + &
+          (nu(i,j,k+1) * (W(i,j,k+1)-W(i,j,k))/dzPr(k+1) - &
+          nu(i,j,k) * (W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k)))
         end do
        end do
       end do
@@ -857,12 +893,16 @@ end subroutine TMarchRK3
        do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
         do j=1,Uny
          do i=1,Unx
-          ApU(i,j,k) = ((Visc(i+1,j,k)/dxPr(i+1)+&
-                      Visc(i,j,k)/dxPr(i))/dxU(i)+&
-                      (0.25_knd*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))/dyV(j)+&
-                      0.25_knd*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-                      (0.25_knd*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))/dzW(k)+&
-                      0.25_knd*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))/dzW(k-1))/dzPr(k))
+          ApU(i,j,k) = ((nu(i+1,j,k)/dxPr(i+1) + &
+                      nu(i,j,k)/dxPr(i))/dxU(i) + &
+                      (0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) &
+                        /dyV(j) + &
+                      0.25_knd * (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) &
+                        /dyV(j-1))/dyPr(j) + &
+                      (0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) &
+                        /dzW(k) + &
+                      0.25_knd * (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1))/ &
+                        dzW(k-1))/dzPr(k))
          end do
         end do
        end do
@@ -873,12 +913,16 @@ end subroutine TMarchRK3
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
-          ApV(i,j,k) =  ((0.25_knd*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))/dxU(i)+&
-                      0.25_knd*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-                     (Visc(i,j+1,k)/dyPr(j+1)+&
-                     Visc(i,j,k)/dyPr(j))/dyV(j)+&
-                     (0.25_knd*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))/dzW(k)+&
-                     0.25_knd*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))/dzW(k-1))/dzPr(k))
+          ApV(i,j,k) =  ((0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) &
+                            /dxU(i) + &
+                      0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) &
+                        /dxU(i-1))/dxPr(i) + &
+                     (nu(i,j+1,k)/dyPr(j+1) + &
+                     nu(i,j,k)/dyPr(j))/dyV(j) + &
+                     (0.25_knd * (nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) &
+                        /dzW(k) + &
+                     0.25_knd * (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) &
+                       /dzW(k-1))/dzPr(k))
          end do
         end do
        end do
@@ -889,12 +933,16 @@ end subroutine TMarchRK3
        do k=1,Wnz
         do j=1,Wny
          do i=1,Wnx
-          ApW(i,j,k) =  ((0.25_knd*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))/dxU(i)+&
-                      0.25_knd*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-                     (0.25_knd*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))/dyV(j)+&
-                     0.25_knd*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-                     (Visc(i,j,k+1)/dzPr(k+1)+&
-                     Visc(i,j,k)/dzPr(k))/dzW(k))
+          ApW(i,j,k) =  ((0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) &
+                            /dxU(i) + &
+                      0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) &
+                            /dxU(i-1))/dxPr(i) + &
+                     (0.25_knd * (nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) &
+                            /dyV(j) + &
+                     0.25_knd * (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) &
+                            /dyV(j-1))/dyPr(j) + &
+                     (nu(i,j,k+1)/dzPr(k+1) + &
+                     nu(i,j,k)/dzPr(k))/dzW(k))
          end do
         end do
        end do
@@ -911,9 +959,9 @@ end subroutine TMarchRK3
 
 
        do l=1,maxCNiter               !Gauss-Seidel iteration for Crank-Nicolson result
-        call BoundU(1,U3)
-        call BoundU(2,V3)
-        call BoundU(3,W3)
+        call BoundU(1,U3,Uin)
+        call BoundU(2,V3,Vin)
+        call BoundU(3,W3,Win)
         S = 0
         Su = 0
         Sv = 0
@@ -923,12 +971,16 @@ end subroutine TMarchRK3
         do k=1,Unz
          do j=1,Uny
           do i=1+mod(j+k,2),Unx,2
-            p=((Visc(i+1,j,k)*(U3(i+1,j,k))/dxPr(i+1)-&
-             Visc(i,j,k)*(-U3(i-1,j,k))/dxPr(i))/dxU(i)+&
-             (0.25_knd*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))/dyV(j)-&
-             0.25_knd*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-             (0.25_knd*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))/dzW(k)-&
-             0.25_knd*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
+            p=((nu(i+1,j,k) * (U3(i+1,j,k))/dxPr(i+1) - &
+             nu(i,j,k) * (-U3(i-1,j,k))/dxPr(i))/dxU(i) + &
+             (0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k))* &
+                       (U3(i,j+1,k))/dyV(j) - &
+             0.25_knd * (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k))* &
+                      (-U3(i,j-1,k))/dyV(j-1))/dyPr(j) + &
+             (0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k))* &
+                      (U3(i,j,k+1))/dzW(k) - &
+             0.25_knd * (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1))* &
+                      (-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
             p = Ap*p+U2(i,j,k)+U(i,j,k)
             p = p*ApU(i,j,k)
 
@@ -943,12 +995,16 @@ end subroutine TMarchRK3
         do k=1,Vnz
          do j=1,Vny
           do i=1+mod(j+k,2),Vnx,2
-            p=((0.25_knd*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))/dxU(i)-&
-             0.25_knd*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-             (Visc(i,j+1,k)*(V3(i,j+1,k))/dyPr(j+1)-&
-             Visc(i,j,k)*(-V3(i,j-1,k))/dyPr(j))/dyV(j)+&
-             (0.25_knd*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))/dzW(k)-&
-             0.25_knd*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
+            p=((0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k))* &
+                         (V3(i+1,j,k))/dxU(i) - &
+             0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k))* &
+                      (-V3(i-1,j,k))/dxU(i-1))/dxPr(i) + &
+             (nu(i,j+1,k) * (V3(i,j+1,k))/dyPr(j+1) - &
+             nu(i,j,k) * (-V3(i,j-1,k))/dyPr(j))/dyV(j) + &
+             (0.25_knd * (nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k))* &
+                       (V3(i,j,k+1))/dzW(k) - &
+             0.25_knd * (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1))* &
+                      (-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
             p = Ap*p+V2(i,j,k)+V(i,j,k)
             p = p*ApV(i,j,k)
             Sv = max(Sv,abs(p-V3(i,j,k)))
@@ -961,12 +1017,16 @@ end subroutine TMarchRK3
         do k=1,Wnz
          do j=1,Wny
           do i=1+mod(j+k,2),Wnx,2
-            p=((0.25_knd*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))/dxU(i)-&
-             0.25_knd*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-             (0.25_knd*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))/dyV(j)-&
-             0.25_knd*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-             (Visc(i,j,k+1)*(W3(i,j,k+1))/dzPr(k+1)-&
-             Visc(i,j,k)*(-W3(i,j,k-1))/dzPr(k))/dzW(k))
+            p=((0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k))* &
+                         (W3(i+1,j,k))/dxU(i) - &
+             0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k))* &
+                      (-W3(i-1,j,k))/dxU(i-1))/dxPr(i) + &
+             (0.25_knd * (nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k))* &
+                       (W3(i,j+1,k))/dyV(j) - &
+             0.25_knd * (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k))* &
+                      (-W3(i,j-1,k))/dyV(j-1))/dyPr(j) + &
+             (nu(i,j,k+1) * (W3(i,j,k+1))/dzPr(k+1) - &
+             nu(i,j,k) * (-W3(i,j,k-1))/dzPr(k))/dzW(k))
             p = Ap*p+W2(i,j,k)+W(i,j,k)
             p = p*ApW(i,j,k)
             Sw = max(Sw,abs(p-W3(i,j,k)))
@@ -980,12 +1040,16 @@ end subroutine TMarchRK3
         do k=1,Unz
          do j=1,Uny
           do i=1+mod(j+k+1,2),Unx,2
-            p=((Visc(i+1,j,k)*(U3(i+1,j,k))/dxPr(i+1)-&
-             Visc(i,j,k)*(-U3(i-1,j,k))/dxPr(i))/dxU(i)+&
-             (0.25_knd*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))/dyV(j)-&
-             0.25_knd*(Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-             (0.25_knd*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))/dzW(k)-&
-             0.25_knd*(Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
+            p=((nu(i+1,j,k) * (U3(i+1,j,k))/dxPr(i+1) - &
+             nu(i,j,k) * (-U3(i-1,j,k))/dxPr(i))/dxU(i) + &
+             (0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k))* &
+                       (U3(i,j+1,k))/dyV(j) - &
+             0.25_knd * (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k))* &
+                      (-U3(i,j-1,k))/dyV(j-1))/dyPr(j) + &
+             (0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k))* &
+                       (U3(i,j,k+1))/dzW(k) - &
+             0.25_knd * (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1))* &
+                      (-U3(i,j,k-1))/dzW(k-1))/dzPr(k))
             p = Ap*p+U2(i,j,k)+U(i,j,k)
             p = p*ApU(i,j,k)
 
@@ -1000,12 +1064,16 @@ end subroutine TMarchRK3
         do k=1,Vnz
          do j=1,Vny
           do i=1+mod(j+k+1,2),Vnx,2
-            p=((0.25_knd*(Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))/dxU(i)-&
-             0.25_knd*(Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-             (Visc(i,j+1,k)*(V3(i,j+1,k))/dyPr(j+1)-&
-             Visc(i,j,k)*(-V3(i,j-1,k))/dyPr(j))/dyV(j)+&
-             (0.25_knd*(Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))/dzW(k)-&
-             0.25_knd*(Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
+            p=((0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k))* &
+                         (V3(i+1,j,k))/dxU(i) - &
+             0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k))* &
+                      (-V3(i-1,j,k))/dxU(i-1))/dxPr(i) + &
+             (nu(i,j+1,k) * (V3(i,j+1,k))/dyPr(j+1) - &
+             nu(i,j,k) * (-V3(i,j-1,k))/dyPr(j))/dyV(j) + &
+             (0.25_knd * (nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k))* &
+                       (V3(i,j,k+1))/dzW(k) - &
+             0.25_knd * (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1))* &
+                      (-V3(i,j,k-1))/dzW(k-1))/dzPr(k))
             p = Ap*p+V2(i,j,k)+V(i,j,k)
             p = p*ApV(i,j,k)
             Sv = max(Sv,abs(p-V3(i,j,k)))
@@ -1018,12 +1086,16 @@ end subroutine TMarchRK3
         do k=1,Wnz
          do j=1,Wny
           do i=1+mod(j+k+1,2),Wnx,2
-            p=((0.25_knd*(Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))/dxU(i)-&
-             0.25_knd*(Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-             (0.25_knd*(Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))/dyV(j)-&
-             0.25_knd*(Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-             (Visc(i,j,k+1)*(W3(i,j,k+1))/dzPr(k+1)-&
-             Visc(i,j,k)*(-W3(i,j,k-1))/dzPr(k))/dzW(k))
+            p=((0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k))* &
+                         (W3(i+1,j,k))/dxU(i) - &
+             0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k))* &
+                      (-W3(i-1,j,k))/dxU(i-1))/dxPr(i) + &
+             (0.25_knd * (nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k))* &
+                       (W3(i,j+1,k))/dyV(j) - &
+             0.25_knd * (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k))* &
+                      (-W3(i,j-1,k))/dyV(j-1))/dyPr(j) + &
+             (nu(i,j,k+1) * (W3(i,j,k+1))/dzPr(k+1) - &
+             nu(i,j,k) * (-W3(i,j,k-1))/dzPr(k))/dzW(k))
             p = Ap*p+W2(i,j,k)+W(i,j,k)
             p = p*ApW(i,j,k)
             Sw = max(Sw,abs(p-W3(i,j,k)))
@@ -1056,20 +1128,20 @@ end subroutine TMarchRK3
 #ifdef __HMPP
 
      !$hmpp <tsteps> Vreman callsite, args[*].noupdate = true
-     call Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Re,U,V,W,Visc)
+     call Vreman_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Re,U,V,W,Viscosity)
 !      !$hmpp <tsteps> delegatedstore, args[Vreman::Visc]
 
 2._knd
      if (wallmodeltype>0) then
 
-!        !$hmpp <tsteps> delegatedstore, args[AttenuateTop::Temperature],&
-!        !$hmpp & args[AttenuateTop::Temperature].section={-1:Prnx+2,-1:Prny+2,1:1} of {-1:Prnx+2,-1:Prny+2,-1:Prnz+2}
+!        !$hmpp <tsteps> delegatedstore, args[AttenuateTop::Temperature], &
+!        !$hmpp  & args[AttenuateTop::Temperature].section={-1:Prnx+2,-1:Prny+2,1:1} of {-1:Prnx+2,-1:Prny+2,-1:Prnz+2}
 
        !$hmpp <tsteps> ComputeViscWM callsite, args[*].noupdate = true
-       call ComputeViscsWM_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-                                nWMPoints,hmppWMPoints,&
-                                TempBtype,Re,temperature_ref,grav_acc,&
-                                U,V,W,Visc)
+       call ComputeViscsWM_GPU(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
+                                nWMPoints,hmppWMPoints, &
+                                TempBtype,Re,temperature_ref,grav_acc, &
+                                U,V,W,Viscosity)
      end if
 
 
@@ -1093,17 +1165,17 @@ end subroutine TMarchRK3
                        call SGS_StabSmag(U,V,W,Temperature,filter_ratios(filtertype))
      else
          if (Re>0) then
-           Visc=1._knd/Re
+           Viscosity = 1._knd/Re
          else
-           Visc=0
+           Viscosity = 0
          end if
      end if
 
 
      if (debuglevel>0) then
-      write(*,*) "NUt", sum(Visc(1:Prnx,1:Prny,1:Prnz))/(Prnx*Prny*Prnz)
-      write(*,*) "maxNUt", MAXVAL(Visc(1:Prnx,1:Prny,1:Prnz))
-      write(*,*) "minNUt", MINVAL(Visc(1:Prnx,1:Prny,1:Prnz))
+      write(*,*) "NUt", sum(Viscosity(1:Prnx,1:Prny,1:Prnz))/(Prnx*Prny*Prnz)
+      write(*,*) "maxNUt", MAXVAL(Viscosity(1:Prnx,1:Prny,1:Prnz))
+      write(*,*) "minNUt", MINVAL(Viscosity(1:Prnx,1:Prny,1:Prnz))
      end if
 
      if (wallmodeltype>0) then
@@ -1111,11 +1183,11 @@ end subroutine TMarchRK3
      end if
 
      do i=1,size(ScalFlIBPoints)
-       Visc(ScalFlIBPoints(i)%xi,ScalFlIBPoints(i)%yj,ScalFlIBPoints(i)%zk) = &
-                                               TIBPoint_Viscosity(ScalFlIBPoints(i),Visc)
+       Viscosity(ScalFlIBPoints(i)%xi,ScalFlIBPoints(i)%yj,ScalFlIBPoints(i)%zk) =  &
+                                               TIBPoint_Viscosity(ScalFlIBPoints(i),Viscosity)
      end do
 
-     call BoundViscosity(Visc)
+     call BoundViscosity(Viscosity)
 
      if (sgstype/=StabSubgridModel.and.enable_buoyancy==1)  call ComputeTDiff(U,V,W)
 
@@ -1157,9 +1229,9 @@ end subroutine TMarchRK3
 
     if (size(UIBPoints)+size(UIBPoints)+size(UIBPoints)>0) then
       !$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
-      call BoundU(1,U3)
-      call BoundU(2,V3)
-      call BoundU(3,W3)
+      call BoundU(1,U3,Uin)
+      call BoundU(2,V3,Vin)
+      call BoundU(3,W3,Win)
 
      !$omp parallel
       !$omp do private(xi,yj,zk,src)
@@ -1277,7 +1349,7 @@ end subroutine TMarchRK3
 
     if (getTemperature) call GetTemperatureFromGPU(Temperature)
 
-    if (getVisc) call GetViscFromGPU
+    if (getViscosity) call GetViscFromGPU
 
     if (getTDiff) call GetTDiffFromGPU
 

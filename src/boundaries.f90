@@ -6,16 +6,42 @@ implicit none
 
 
   private
-  public GridCoords, GridCoordsU, GridCoordsV, GridCoordsW,&
+  public volumePr, GridCoords, GridCoords_U, GridCoords_V, GridCoords_W, InDomain,&
          BoundU, Bound_Phi, Bound_Pr, Bound_Q,&
          ShearInlet, ParInlet, ConstInlet
 
+  interface GridCoords
+    module procedure GridCoords_scalar
+    module procedure GridCoords_vector
+  end interface
+
+  interface InDomain
+    module procedure InDomain_3r
+    module procedure InDomain_vec
+  end interface
+
+  interface volumePr
+    module procedure volumePr_arr
+    module procedure volumePr_int
+  end interface
 
  contains
 
+  pure function volumePr_arr(indexes) result(res)
+    real(knd) :: res
+    integer,intent(in) :: indexes(3)
+    res = dxPr(indexes(1))*dyPr(indexes(2))*dzPr(indexes(3))
+  end function
+
+  elemental function volumePr_int(i,j,k) result(res)
+    real(knd) :: res
+    integer,intent(in) :: i,j,k
+    res = dxPr(i)*dyPr(j)*dzPr(k)
+  end function
+
   !TODO: one common base subroutine just called with different arguments
   !consider binary search for general case (branch mispredictions vs. more iterations)
-  elemental subroutine GridCoords(xi,yj,zk,x,y,z)
+  elemental subroutine GridCoords_scalar(xi,yj,zk,x,y,z)
     integer,intent(out):: xi,yj,zk
     real(knd),intent(in):: x,y,z
     integer i
@@ -53,9 +79,16 @@ implicit none
       end do
 
     end if
-  endsubroutine GridCoords
+  endsubroutine GridCoords_scalar
 
-  elemental subroutine GridCoordsU(xi,yj,zk,x,y,z)
+  subroutine GridCoords_vector(ri,r)
+    integer,intent(out):: ri(3)
+    real(knd),intent(in):: r(3)
+    
+    call GridCoords_scalar(ri(1),ri(2),ri(3),r(1),r(2),r(3))
+  end subroutine
+
+  elemental subroutine GridCoords_U(xi,yj,zk,x,y,z)
     integer,intent(out) :: xi,yj,zk
     real(knd),intent(in) :: x,y,z
     integer i
@@ -92,10 +125,10 @@ implicit none
       end do
 
     end if
-  end subroutine GridCoordsU
+  end subroutine GridCoords_U
 
 
-  elemental subroutine GridCoordsV(xi,yj,zk,x,y,z)
+  elemental subroutine GridCoords_V(xi,yj,zk,x,y,z)
     integer,intent(out) :: xi,yj,zk
     real(knd),intent(in) :: x,y,z
     integer i
@@ -132,10 +165,10 @@ implicit none
       end do
 
     end if
-  end subroutine GridCoordsV
+  end subroutine GridCoords_V
 
 
-  elemental subroutine GridCoordsW(xi,yj,zk,x,y,z)
+  elemental subroutine GridCoords_W(xi,yj,zk,x,y,z)
     integer,intent(out) :: xi,yj,zk
     real(knd),intent(in) :: x,y,z
     integer i
@@ -173,13 +206,26 @@ implicit none
       end do
 
     end if
-  end subroutine GridCoordsW
+  end subroutine GridCoords_W
 
 
+  logical function InDomain_3r(x,y,z) result(res)
+    real(knd),intent(in) :: x,y,z
+    res = (x>=xU(0).and.x<=xU(Prnx)) .and. &
+          (y>=yV(0).and.y<=yV(Prny)) .and. &
+          (z>=zW(0).and.z<=zW(Prnz))
+  end function
 
-  recursive subroutine BoundU(component,U,reg)
-    integer,intent(in)           :: component
-    real(knd),intent(inout)      :: U(-2:,-2:,-2:)
+  logical function InDomain_vec(r)
+    real(knd),intent(in) :: r(3)
+    InDomain_vec = InDomain_3r(r(1),r(2),r(3))
+  end function
+
+
+  recursive subroutine BoundU(component,U,Uin,reg)
+    integer,intent(in)          :: component
+    real(knd),intent(inout)     :: U(-2:,-2:,-2:)
+    real(knd),intent(in)        :: Uin(-2:,-2:)
     integer,optional,intent(in) :: reg
     integer regime,i,j,k,nx,ny,nz
     integer,parameter :: interm = 2
@@ -465,7 +511,10 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(To)==NOSLIP .or. (component==3.and.(Btype(To)==FREESLIP.or.Btype(To)==FREESLIPBUFF)) .or. &
+    else if (Btype(To)==NOSLIP .or. &
+             (component==3.and.(Btype(To)==FREESLIP .or. &
+                                Btype(To)==FREESLIPBUFF .or. &
+                                Btype(To)==AUTOMATICFLUX)) .or. &
              (Btype(To)==DIRICHLET.and.regime==interm) ) then
       if (component==3) then
         do j=1,ny
@@ -484,7 +533,10 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(To)==NEUMANN.or.(component/=3.and.(Btype(To)==FREESLIP.or.Btype(To)==FREESLIPBUFF))) then
+    else if (Btype(To)==NEUMANN .or. &
+             (component/=3.and.(Btype(To)==FREESLIP .or. &
+                                Btype(To)==FREESLIPBUFF.or. &
+                                Btype(To)==AUTOMATICFLUX))) then
       do j=1,ny
        do i=1,nx                       !Neumann inlet
         U(i,j,nz+1)=U(i,j,nz)
@@ -686,16 +738,16 @@ implicit none
     else if (Btype(We)==TURBULENTINLET.or.Btype(We)==INLETFROMFILE) then
       if (regime/=interm) then
         if (component==1) then
-          do k=-2,nz+3
-           do j=-2,ny+3
+          do k=-1,nz+2
+           do j=-1,ny+2
             U(0,j,k)=Uin(j,k)
             U(-1,j,k)=Uin(j,k)+(Uin(j,k)-U(1,j,k))
             U(-2,j,k)=Uin(j,k)+(Uin(j,k)-U(2,j,k))
            end do
           end do
         else
-          do k=-2,nz+3
-           do j=-2,ny+3
+          do k=-1,nz+2
+           do j=-1,ny+2
             U(0,j,k)=Uin(j,k)+(Uin(j,k)-U(1,j,k))
             U(-1,j,k)=Uin(j,k)+(Uin(j,k)-U(2,j,k))
             U(-2,j,k)=Uin(j,k)+(Uin(j,k)-U(3,j,k))
@@ -704,16 +756,16 @@ implicit none
         end if
       else
         if (component==1) then
-           do k=-2,nz+3
-            do j=-2,ny+3
+           do k=-1,nz+2
+            do j=-1,ny+2
              U(0,j,k)=0
              U(-1,j,k)=-U(1,j,k)
              U(-2,j,k)=-U(2,j,k)
             end do
            end do
         else
-           do k=-2,nz+3
-            do j=-2,ny+3
+           do k=-1,nz+2
+            do j=-1,ny+2
              U(0,j,k)=-U(1,j,k)
              U(-1,j,k)=-U(2,j,k)
              U(-2,j,k)=-U(3,j,k)
@@ -821,6 +873,7 @@ implicit none
     !$omp end parallel
 
   end subroutine BoundU
+
 
 
 

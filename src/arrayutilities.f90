@@ -100,7 +100,7 @@ module ArrayUtilities
   public exchange_alloc, assign, add, &
          set, multiply, add_multiplied, &
          multiply_and_add_scalar, reciprocal, &
-         add_element
+         add_element, avg, dist
 
   interface exchange_alloc
     module procedure exchange_alloc_1D
@@ -118,6 +118,9 @@ module ArrayUtilities
     module procedure add_1D
     module procedure add_2D
     module procedure add_3D
+    module procedure add_scalar_1D
+    module procedure add_scalar_2D
+    module procedure add_scalar_3D
   end interface
 
   interface set
@@ -152,6 +155,15 @@ module ArrayUtilities
   
   interface add_element
     module procedure add_element_int
+  end interface
+  
+  interface avg
+    module procedure avg_real_1D
+    module procedure avg_real_2D
+    module procedure avg_real_3D
+    module procedure avg_int_1D
+    module procedure avg_int_2D
+    module procedure avg_int_3D
   end interface
 
   contains
@@ -256,6 +268,43 @@ module ArrayUtilities
       end do
       !$omp end parallel do
 !       call axpy(1._knd,from,to)
+    end subroutine
+
+
+    subroutine add_scalar_1D(to,from)
+      real(knd),intent(inout) :: to(:)
+      real(knd),intent(in)  :: from
+      integer i
+
+      !$omp parallel do
+      do i=1,size(to)
+        to(i) = to(i) + from
+      end do
+      !$omp end parallel do
+    end subroutine
+
+    subroutine add_scalar_2D(to,from)
+      real(knd),intent(inout) :: to(:,:)
+      real(knd),intent(in)  :: from
+      integer j
+
+      !$omp parallel do
+      do j=1,size(to,2)
+        to(:,j) = to(:,j) + from
+      end do
+      !$omp end parallel do
+    end subroutine
+
+    subroutine add_scalar_3D(to,from)
+      real(knd),intent(inout) :: to(:,:,:)
+      real(knd),intent(in)  :: from
+      integer k
+
+      !$omp parallel do
+      do k=1,size(to,3)
+        to(:,:,k) = to(:,:,k) + from
+      end do
+      !$omp end parallel do
     end subroutine
 
 
@@ -462,18 +511,66 @@ module ArrayUtilities
       integer,intent(in) :: e
       integer,allocatable :: tmp(:)
 
-      !usses automatic lhs reallocation
       if (.not.allocated(a)) then
-        allocate(a(1))
-        a(1) = e
+        a = [e]
       else
-        allocate(tmp(size(a)))
-        tmp(:) = a
-        deallocate(a)
+        call move_alloc(a,tmp)
         allocate(a(size(tmp)+1))
         a(1:size(tmp)) = tmp
         a(size(tmp)+1) = e
       end if
     end subroutine
+    
+    pure function avg_real_1D(a) result(res)
+      real(knd) :: res
+      real(knd),intent(in) :: a(:)
+      
+      res = sum(a)/size(a)
+    end function
+    
+    pure function avg_real_2D(a) result(res)
+      real(knd) :: res
+      real(knd),intent(in) :: a(:,:)
+      
+      res = sum(a)/size(a)
+    end function
+    
+    pure function avg_real_3D(a) result(res)
+      real(knd) :: res
+      real(knd),intent(in) :: a(:,:,:)
+      
+      res = sum(a)/size(a)
+    end function
+    
+    pure function avg_int_1D(a) result(res)
+      integer :: res
+      integer,intent(in) :: a(:)
+      
+      res = sum(a)/size(a)
+    end function
+    
+    pure function avg_int_2D(a) result(res)
+      integer :: res
+      integer,intent(in) :: a(:,:)
+      
+      res = sum(a)/size(a)
+    end function
+    
+    pure function avg_int_3D(a) result(res)
+      integer :: res
+      integer,intent(in) :: a(:,:,:)
+      
+      res = sum(a)/size(a)
+    end function
+    
+    pure function dist(a,b) result(res)   
+      real(knd) :: res
+      real(knd),intent(in) :: a(3),b(3)
+      real(knd) :: c(3)
+      
+      c = b - a
+      res = hypot(c(1),hypot(c(2),c(3)))
+    end function
+      
     
 end module ArrayUtilities

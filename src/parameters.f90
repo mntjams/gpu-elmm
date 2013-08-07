@@ -1,12 +1,15 @@
 module Kinds
-!   use iso_fortran_env
+
+  use iso_fortran_env
+
   implicit none
 
-  integer,parameter :: int8   = selected_int_kind(1)
-  integer,parameter :: int32  = selected_int_kind(9)
-  integer,parameter :: int64  = selected_int_kind(10)
-  integer,parameter :: real32 = selected_real_kind(p=6,r=37)
-  integer,parameter :: real64 = selected_real_kind(p=15,r=200)
+!for reference when iso_fortran_env is not available:
+!   integer,parameter :: int8   = selected_int_kind(1)
+!   integer,parameter :: int32  = selected_int_kind(9)
+!   integer,parameter :: int64  = selected_int_kind(10)
+!   integer,parameter :: real32 = selected_real_kind(p=6,r=37)
+!   integer,parameter :: real64 = selected_real_kind(p=15,r=200)
 
   integer,parameter :: DBL = real64, SNG = real32
 
@@ -46,9 +49,9 @@ module Parameters
   integer :: Prnx,Prny,Prnz  !dimensions of grid for pressure
 
 
-  integer   :: nt              !maximum number of time steps
+  integer   :: max_number_of_time_steps    !maximum number of time steps
 
-  real(TIM) :: dt,starttime,endtime        !active time step
+  real(TIM) :: dt,start_time,end_time
 
   real(knd) :: dxmin,dymin,dzmin,CFL,Uref  !minimum grid spacing, dimensions of the domain
 
@@ -56,7 +59,8 @@ module Parameters
   real(knd) :: Re = 70000, Prandtl = 0.7!1/molecular viscosity, viscosity/thermal diffusivity
 
 
-  real(knd) :: prgradientx = 0, prgradienty = 0, temperature_ref = 295, grav_acc = 0, coriolisparam = 0
+  real(knd) :: prgradientx = 0, prgradienty = 0
+  real(knd) :: grav_acc = 0, coriolisparam = 0
 
   real(knd) :: top_pressure !mean pressure at the top boundary - calculated
   real(knd) :: bottom_pressure = 0
@@ -91,7 +95,7 @@ module Parameters
   integer :: enable_radiation = 0
 
   integer :: partdistrib,computedeposition,computegravsettling
-  integer :: maxCNiter,maxPOISSONiter,maxiter,endstep
+  integer :: maxCNiter,maxPOISSONiter,endstep
   integer :: projectiontype,correctcompatibility = 0
 
   integer :: inlettype,gridtype,profiletype
@@ -106,7 +110,7 @@ module Parameters
 
   real(knd) :: x_axis_azimuth = 90!true geographic heading of the x axis in degrees
 
-  real(knd),allocatable :: Visc(:,:,:),TDiff(:,:,:)  !(turbulent) viscosity, (turbulent) thermal diffusivity
+  real(knd),allocatable :: Viscosity(:,:,:),TDiff(:,:,:)  !(turbulent) viscosity, (turbulent) thermal diffusivity
 
   integer(sint),allocatable,dimension(:,:,:) :: Utype,Vtype,Wtype,Prtype !number of solid body inside which the point is or 0
   integer,allocatable,dimension(:,:) :: Unull,Vnull,Wnull                !indexes of points to be nulled every timestep
@@ -119,6 +123,9 @@ module Parameters
   integer   :: initcondsfromfile
 
   integer,parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+
+  real(knd) :: temperature_ref = 295
+  real(knd) :: moisture_ref = 0.001 !TODO: compute from specific humidity
 
   integer,dimension(6) :: Btype      !boundary condition types for velocity, see below for values
   integer,dimension(6) :: TempBtype  !boundary condition types for temperature
@@ -140,7 +147,7 @@ module Parameters
                        ScalarTypePassive = 3
 
   integer,parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
-                        TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10, RADIATION=7
+                        TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10, RADIATION=7, AUTOMATICFLUX=11
   !inlet types
   integer,parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
                        ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5

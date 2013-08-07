@@ -177,7 +177,7 @@
    real(knd),intent(in)            :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
    real(knd),intent(in)            :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
    real(knd),intent(in)            :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-   real(knd),intent(inout)         :: Visc(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
+   real(knd),intent(inout)         :: Viscosity(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
    integer i,xi,yj,zk
    real(knd) up,vp,wp
 
@@ -196,7 +196,7 @@
 
         if (TempBtype(Bo)==CONSTFLUX) then
 
-           call WM_MO_FLUX_GPU(Visc(xi,yj,zk) ,&
+           call WM_MO_FLUX_GPU(Viscosity(xi,yj,zk) ,&
                              xi, yj, zk,&
                              WMPoints(i)%distx, WMPoints(i)%disty, WMPoints(i)%distz,&
                              WMPoints(i)%z0, WMPoints(i)%temperature_flux, WMPoints(i)%ustar,&

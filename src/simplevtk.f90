@@ -31,7 +31,7 @@ module vtkarray
 
       call newunit(unit)
 
-      open(unit,file=fname)
+      open(unit,file=fname,status="replace",action="write")
       write (unit,"(A)") "# vtk DataFile Version 2.0"
       write (unit,"(A)") "CLMM output file"
       write (unit,"(A)") "ASCII"
@@ -80,7 +80,7 @@ module vtkarray
 
       call newunit(unit)
 
-      open(unit,file=fname)
+      open(unit,file=fname,status="replace",action="write")
       write (unit,"(A)") "# vtk DataFile Version 2.0"
       write (unit,"(A)") "CLMM output file"
       write (unit,"(A)") "ASCII"

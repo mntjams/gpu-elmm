@@ -4,7 +4,7 @@ prec = ARGUMENTS.get('prec','')
 omp = ARGUMENTS.get('omp','')
 fast = ARGUMENTS.get('fast','')
 lto = ARGUMENTS.get('lto','')
-dtrace = ARGUMENTS.get('dtrace','')
+prof = ARGUMENTS.get('prof','')
 diag = ARGUMENTS.get('diag','')
 dir = ARGUMENTS.get('dir','')
 customSB = ARGUMENTS.get('customSB','')
@@ -45,9 +45,9 @@ if str(comp)=='intel':
   else:
     lto_flag = ''
 
-  env.Append(F90FLAGS='-cpp -g -debug')
+  env.Append(F90FLAGS='-cpp -g -debug -standard-semantics -assume nostd_mod_proc_name -heap-arrays 200')
 
-  env.Append(LIBPATH = ['/usr/local/poisfft_intel/'])
+  env.Append(LIBPATH = ['/usr/local/poisfft_intel/','/usr/local/openblas-intel/lib/'])
 
   env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_intel/'])
 
@@ -66,7 +66,7 @@ else:
   if str(fast)=='yes':
     fast_flag = ' -Ofast'# -Warray-temporaries'
   else:
-   fast_flag = ' -fcheck=all -Wall -Wno-unused-dummy-argument -Wno-unused -Werror'
+   fast_flag = ' -fcheck=all -Wall -Wsurprising -Waliasing -Wimplicit-interface -Wno-unused-dummy-argument -Wno-unused -Werror'
   
   if str(lto)=='yes':
     lto_flag = ' -flto'
@@ -75,7 +75,7 @@ else:
 
   env.Replace(F90='gfortran')
   
-  env.Append(F90FLAGS='-cpp -fbacktrace -g -ffpe-trap=zero,overflow,invalid -fstack-arrays -static-libgcc -static-libstdc++ -static-libgfortran')
+  env.Append(F90FLAGS='-cpp -fbacktrace -g -ffpe-trap=zero,overflow,invalid -fstack-arrays')
 
   env.Append(LIBPATH = ['/usr/local/poisfft_gcc/'])
 
@@ -99,14 +99,20 @@ except:
   pass
 
 env.Replace(LINK = env.Dump('F90'))
+
+if prof=="yes":
+  prof_flag=' -pg'
+else:
+  prof_flag=''
   
-env.Append(F90FLAGS= fast_flag + omp_flag + lto_flag + extra_flag + prec_flag)
+env.Append(F90FLAGS= fast_flag + omp_flag + prof_flag + lto_flag + extra_flag + prec_flag + ' -gdwarf-3')
   
-env.Append(LINKFLAGS= fast_flag + omp_flag + lto_flag + extra_flag)
+env.Append(LINKFLAGS= fast_flag + omp_flag + prof_flag + lto_flag + extra_flag) # + '-Bdynamic -lpoisfft -lfftw3 -lfftw3f -lfftw3_omp -lfftw3f_omp -Bstatic -lgfortran -lquadmath -lstdc++ -llapack -L/usr/lib/x86_64-linux-uclibc/usr/lib/ -lc -lm -lpthread'  -Wl,--verbose
     
 env.Append(FORTRANMODDIR = '${TARGET.dir}')
 
-env.Append(LIBS = ['poisfft','lapack','fftw3','fftw3f','fftw3_omp','fftw3f_omp','pthread','stdc++'])
+#instead of openblas, any blas and lapack can be used.
+env.Append(LIBS = ['openblas','poisfft','fftw3','fftw3f','fftw3_omp','fftw3f_omp','pthread','stdc++'])
 
 env.Append(LIBS = ['CGAL'])
 
@@ -130,11 +136,19 @@ else:
   PBfile=[]
 
 
+#May be used to compile PoisFFT directly, adjust the correct path.
+#objs = env.Object(target=target_dir+'P/precisions', source='../../PoisFFT/src/precisions.f90')
+#objs += env.Object(target=target_dir+'P/parameters', source='../../PoisFFT/src/parameters.f90')
+#objs += env.Object(target=target_dir+'P/fft', source='../../PoisFFT/src/fft.f90')
+#objs += env.Object(target=target_dir+'P/poisfft', source='../../PoisFFT/src/poisfft.f90')
+#objs += env.Object(target=target_dir+'P/main', source='../../PoisFFT/src/main.f90')
+
+
 objs =  env.Object(target=target_dir+'parameters',     source='parameters.f90')
 objs += env.Object(target=target_dir+'lapack',         source='lapack.f')
 objs += env.Object(target=target_dir+'strings',        source='strings.f90')
 objs += env.Object(target=target_dir+'lists',          source='lists.f90')
-objs += env.Object(target=target_dir+'endianness',     source='endianness.f90', F90FLAGS=" -Wno-error")
+objs += env.Object(target=target_dir+'endianness',     source='endianness.f90')
 objs += env.Object(target=target_dir+'freeunit',       source='freeunit.f90')
 objs += env.Object(target=target_dir+'arrayutilities', source='arrayutilities.f90')
 objs += env.Object(target=target_dir+'tiling',         source='tiling.f90')
@@ -145,15 +159,22 @@ objs += env.Object(target=target_dir+'multigrid2d',    source='multigrid2d.f90')
 objs += env.Object(target=target_dir+'solarradiation', source='solarradiation.f90')
 objs += env.Object(target=target_dir+'wallmodels',     source='wallmodels.f90')
 objs += env.Object(target=target_dir+'volumesources',  source='volumesources.f90')
+objs += env.Object(target=target_dir+'linesources',    source='linesources.f90')
+
+#Support for CGAL for geometry files reading.
 objs += env.Object(target=target_dir+'cgal_polyhedra_cc',  source='cgal_polyhedra.cc', CPPFLAGS=" -Ofast -frounding-math -std=c++11")
 objs += env.Object(target=target_dir+'cgal_polyhedra',  source='cgal_polyhedra.f90')
-#objs += env.Object(target=target_dir+'dummy_cgal_polyh4edra',  source='dummy_cgal_polyhedra.f90')
-objs += env.Object(target=target_dir+'geometricshapes',  source='geometricshapes.f90')
+
+#Disable support for CGAL. Useful for enabling valgrind.
+#objs += env.Object(target=target_dir+'dummy_cgal_polyhedra',  source='dummy_cgal_polyhedra.f90')
+
+
+objs += env.Object(target=target_dir+'geometricshapes',source='geometricshapes.f90')
 objs += env.Object(target=target_dir+'solidbodies',    source='solidbodies.f90')
-objs += env.Object(target=target_dir+'immersedboundary', source='immersedboundary.f90')
+objs += env.Object(target=target_dir+'immersedboundary',source='immersedboundary.f90')
 objs += env.Object(target=target_dir+'turbinlet',      source='turbinlet.f90')
 objs += env.Object(target=target_dir+'boundaries',     source='boundaries.f90')
-objs += env.Object(target=target_dir+'scalarboundaries', source='scalarboundaries.f90')
+objs += env.Object(target=target_dir+'scalarboundaries',source='scalarboundaries.f90')
 objs += env.Object(target=target_dir+'scalars',        source='scalars.f90')
 objs += env.Object(target=target_dir+'filters',        source='filters.f90')
 objs += env.Object(target=target_dir+'subgrid',        source='subgrid.f90')

@@ -170,11 +170,11 @@ contains
     !$omp parallel
     !$omp sections
     !$omp section
-    call BoundU(1,U)
+    call BoundU(1,U,Uin)
     !$omp section
-    call BoundU(2,V)
+    call BoundU(2,V,Vin)
     !$omp section
-    call BoundU(3,W)
+    call BoundU(3,W,Win)
     !$omp end sections
     !$omp end parallel
 
@@ -311,11 +311,11 @@ contains
 
     !$omp sections
     !$omp section
-    call BoundU(1,U)
+    call BoundU(1,U,Uin)
     !$omp section
-    call BoundU(2,V)
+    call BoundU(2,V,Vin)
     !$omp section
-    call BoundU(3,W)
+    call BoundU(3,W,Win)
     !$omp section
     call Bound_Pr(Pr)
     !$omp end sections

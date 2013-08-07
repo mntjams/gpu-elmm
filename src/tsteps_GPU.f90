@@ -54,12 +54,12 @@
         do j=1,Uny
          do i=1,Unx
           U2(i,j,k)=U2(i,j,k)+Ap*(&
-          ((Visc(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
-          Visc(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*recdxmin2+0.25_knd*(&
-           ((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
-           (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))*recdymin2+&
-           ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
-           (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))*recdzmin2)))
+          ((Viscosity(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
+          Viscosity(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*recdxmin2+0.25_knd*(&
+           ((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
+           (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))*recdymin2+&
+           ((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
+           (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))*recdzmin2)))
          enddo
         enddo
        enddo
@@ -70,12 +70,12 @@
         do j=1,Vny
          do i=1,Vnx
           V2(i,j,k)=V2(i,j,k)+Ap*(&
-          (0.25_knd*((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
-          (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))*recdxmin2+&
-           (Visc(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
-           Visc(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*recdymin2+&
-           0.25_knd*((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
-           (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))*recdzmin2))
+          (0.25_knd*((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
+          (Viscosity(i,j+1,k)+Viscosity(i,j,k)+Viscosity(i-1,j+1,k)+Viscosity(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))*recdxmin2+&
+           (Viscosity(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
+           Viscosity(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*recdymin2+&
+           0.25_knd*((Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
+           (Viscosity(i,j+1,k)+Viscosity(i,j+1,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))*recdzmin2))
          enddo
         enddo
        enddo
@@ -86,12 +86,12 @@
        do j=1,Wny
         do i=1,Wnx
          W2(i,j,k)=W2(i,j,k)+Ap*(&
-         (0.25_knd*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
-         (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))*recdxmin2+&
-          ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
-          (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))*recdymin2)+&
-          (Visc(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
-          Visc(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*recdzmin2))
+         (0.25_knd*(((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
+         (Viscosity(i,j,k+1)+Viscosity(i,j,k)+Viscosity(i-1,j,k+1)+Viscosity(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))*recdxmin2+&
+          ((Viscosity(i,j+1,k+1)+Viscosity(i,j,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
+          (Viscosity(i,j,k+1)+Viscosity(i,j-1,k+1)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))*recdymin2)+&
+          (Viscosity(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
+          Viscosity(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*recdzmin2))
         enddo
        enddo
       enddo
@@ -102,12 +102,12 @@
        do k=1,Unz         !Auxiliary coefficients to better efficiency in loops
         do j=1,Uny
          do i=1,Unx
-          ApU(i,j,k)=((Visc(i+1,j,k)+&
-                      Visc(i,j,k))*recdxmin2+&
-                      0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
-                      (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2+&
-                      ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
-                      (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))*recdzmin2))
+          ApU(i,j,k)=((Viscosity(i+1,j,k)+&
+                      Viscosity(i,j,k))*recdxmin2+&
+                      0.25_knd*(((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))+&
+                      (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k)))*recdymin2+&
+                      ((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))+&
+                      (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1)))*recdzmin2))
           ApU(i,j,k)=1._knd/(1._knd+Ap*ApU(i,j,k))
          enddo
         enddo
@@ -120,12 +120,12 @@
        do k=1,Vnz
         do j=1,Vny
          do i=1,Vnx
-          ApV(i,j,k)=((Visc(i,j+1,k)+&
-                     Visc(i,j,k))*recdymin2+&
-                     0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))+&
-                      (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k)))*recdxmin2+&
-                     ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
-                     (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1)))*recdzmin2))
+          ApV(i,j,k)=((Viscosity(i,j+1,k)+&
+                     Viscosity(i,j,k))*recdymin2+&
+                     0.25_knd*(((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))+&
+                      (Viscosity(i,j+1,k)+Viscosity(i,j,k)+Viscosity(i-1,j+1,k)+Viscosity(i-1,j,k)))*recdxmin2+&
+                     ((Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))+&
+                     (Viscosity(i,j+1,k)+Viscosity(i,j+1,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1)))*recdzmin2))
           ApV(i,j,k)=1._knd/(1._knd+Ap*ApV(i,j,k))
          enddo
         enddo
@@ -138,12 +138,12 @@
        do k=1,Wnz
         do j=1,Wny
          do i=1,Wnx
-          ApW(i,j,k)=(0.25_knd*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))+&
-                      (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k)))*recdxmin2+&
-                     ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))+&
-                     (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k)))*recdymin2)+&
-                     (Visc(i,j,k+1)+&
-                     Visc(i,j,k))*recdzmin2)
+          ApW(i,j,k)=(0.25_knd*(((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))+&
+                      (Viscosity(i,j,k+1)+Viscosity(i,j,k)+Viscosity(i-1,j,k+1)+Viscosity(i-1,j,k)))*recdxmin2+&
+                     ((Viscosity(i,j+1,k+1)+Viscosity(i,j,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k))+&
+                     (Viscosity(i,j,k+1)+Viscosity(i,j-1,k+1)+Viscosity(i,j,k)+Viscosity(i,j-1,k)))*recdymin2)+&
+                     (Viscosity(i,j,k+1)+&
+                     Viscosity(i,j,k))*recdzmin2)
           ApW(i,j,k)=1._knd/(1._knd+Ap*ApW(i,j,k))
          enddo
         enddo
@@ -208,12 +208,12 @@
         do k=1,Unz
          do i=1,Unx
           do j=1+mod(i+k,2),Uny,2
-            p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
-             Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
-             0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
-             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
-             ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
-             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
+            p=((Viscosity(i+1,j,k)*(U3(i+1,j,k))-&
+             Viscosity(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
+             0.25_knd*(((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(U3(i,j+1,k))-&
+             (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
+             ((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(U3(i,j,k+1))-&
+             (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
             p=Ap*p+U2(i,j,k)+U(i,j,k)
             p=p*ApU(i,j,k)
 !             Su=max(Su,abs(p-U3(i,j,k)))
@@ -227,12 +227,12 @@
         do k=1,Vnz
          do i=1,Vnx
           do j=1+mod(i+k,2),Vny,2
-            p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
-             Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
-             0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
-             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
-             ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
-             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
+            p=((Viscosity(i,j+1,k)*(V3(i,j+1,k))-&
+             Viscosity(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
+             0.25_knd*(((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(V3(i+1,j,k))-&
+             (Viscosity(i,j+1,k)+Viscosity(i,j,k)+Viscosity(i-1,j+1,k)+Viscosity(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
+             ((Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(V3(i,j,k+1))-&
+             (Viscosity(i,j+1,k)+Viscosity(i,j+1,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
             p=Ap*p+V2(i,j,k)+V(i,j,k)
             p=p*ApV(i,j,k)
 !             Sv=max(Sv,abs(p-V3(i,j,k)))
@@ -246,12 +246,12 @@
         do k=1,Wnz
          do i=1,Wnx
           do j=1+mod(i+k,2),Wny,2
-            p=(0.25_knd*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
-             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
-             ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
-             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
-             (Visc(i,j,k+1)*(W3(i,j,k+1))-&
-             Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
+            p=(0.25_knd*(((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(W3(i+1,j,k))-&
+             (Viscosity(i,j,k+1)+Viscosity(i,j,k)+Viscosity(i-1,j,k+1)+Viscosity(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
+             ((Viscosity(i,j+1,k+1)+Viscosity(i,j,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(W3(i,j+1,k))-&
+             (Viscosity(i,j,k+1)+Viscosity(i,j-1,k+1)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
+             (Viscosity(i,j,k+1)*(W3(i,j,k+1))-&
+             Viscosity(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
             p=Ap*p+W2(i,j,k)+W(i,j,k)
             p=p*ApW(i,j,k)
 !             Sw=max(Sw,abs(p-W3(i,j,k)))
@@ -267,12 +267,12 @@
         do k=1,Unz
          do i=1,Unx
           do j=1+mod(i+k+1,2),Uny,2
-            p=((Visc(i+1,j,k)*(U3(i+1,j,k))-&
-             Visc(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
-             0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(U3(i,j+1,k))-&
-             (Visc(i+1,j,k)+Visc(i+1,j-1,k)+Visc(i,j,k)+Visc(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
-             ((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(U3(i,j,k+1))-&
-             (Visc(i+1,j,k)+Visc(i+1,j,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
+            p=((Viscosity(i+1,j,k)*(U3(i+1,j,k))-&
+             Viscosity(i,j,k)*(-U3(i-1,j,k)))*recdxmin2+&
+             0.25_knd*(((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(U3(i,j+1,k))-&
+             (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(-U3(i,j-1,k)))*recdymin2+&
+             ((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(U3(i,j,k+1))-&
+             (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(-U3(i,j,k-1)))*recdzmin2))
             p=Ap*p+U2(i,j,k)+U(i,j,k)
             p=p*ApU(i,j,k)
 
@@ -288,12 +288,12 @@
         do k=1,Vnz
          do i=1,Vnx
           do j=1+mod(i+k+1,2),Vny,2
-            p=((Visc(i,j+1,k)*(V3(i,j+1,k))-&
-             Visc(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
-             0.25_knd*(((Visc(i+1,j+1,k)+Visc(i+1,j,k)+Visc(i,j+1,k)+Visc(i,j,k))*(V3(i+1,j,k))-&
-             (Visc(i,j+1,k)+Visc(i,j,k)+Visc(i-1,j+1,k)+Visc(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
-             ((Visc(i,j+1,k+1)+Visc(i,j+1,k)+Visc(i,j,k+1)+Visc(i,j,k))*(V3(i,j,k+1))-&
-             (Visc(i,j+1,k)+Visc(i,j+1,k-1)+Visc(i,j,k)+Visc(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
+            p=((Viscosity(i,j+1,k)*(V3(i,j+1,k))-&
+             Viscosity(i,j,k)*(-V3(i,j-1,k)))*recdymin2+&
+             0.25_knd*(((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(V3(i+1,j,k))-&
+             (Viscosity(i,j+1,k)+Viscosity(i,j,k)+Viscosity(i-1,j+1,k)+Viscosity(i-1,j,k))*(-V3(i-1,j,k)))*recdxmin2+&
+             ((Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(V3(i,j,k+1))-&
+             (Viscosity(i,j+1,k)+Viscosity(i,j+1,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(-V3(i,j,k-1)))*recdzmin2))
             p=Ap*p+V2(i,j,k)+V(i,j,k)
             p=p*ApV(i,j,k)
 !             Sv=max(Sv,abs(p-V3(i,j,k)))
@@ -307,12 +307,12 @@
         do k=1,Wnz
          do i=1,Wnx
           do j=1+mod(i+k+1,2),Wny,2
-            p=(0.25_knd*(((Visc(i+1,j,k+1)+Visc(i+1,j,k)+Visc(i,j,k+1)+Visc(i,j,k))*(W3(i+1,j,k))-&
-             (Visc(i,j,k+1)+Visc(i,j,k)+Visc(i-1,j,k+1)+Visc(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
-             ((Visc(i,j+1,k+1)+Visc(i,j,k+1)+Visc(i,j+1,k)+Visc(i,j,k))*(W3(i,j+1,k))-&
-             (Visc(i,j,k+1)+Visc(i,j-1,k+1)+Visc(i,j,k)+Visc(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
-             (Visc(i,j,k+1)*(W3(i,j,k+1))-&
-             Visc(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
+            p=(0.25_knd*(((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(W3(i+1,j,k))-&
+             (Viscosity(i,j,k+1)+Viscosity(i,j,k)+Viscosity(i-1,j,k+1)+Viscosity(i-1,j,k))*(-W3(i-1,j,k)))*recdxmin2+&
+             ((Viscosity(i,j+1,k+1)+Viscosity(i,j,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(W3(i,j+1,k))-&
+             (Viscosity(i,j,k+1)+Viscosity(i,j-1,k+1)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(-W3(i,j-1,k)))*recdymin2)+&
+             (Viscosity(i,j,k+1)*(W3(i,j,k+1))-&
+             Viscosity(i,j,k)*(-W3(i,j,k-1)))*recdzmin2)
             p=Ap*p+W2(i,j,k)+W(i,j,k)
             p=p*ApW(i,j,k)
 !             Sw=max(Sw,abs(p-W3(i,j,k)))
