@@ -1700,7 +1700,7 @@ contains
     res%inv_matrix = 0
 
     forall(i=1:3)  res%matrix(i,i) = factor(i)
-    forall(i=1:3)  res%matrix(i,i) = 1._knd/factor(i)
+    forall(i=1:3)  res%inv_matrix(i,i) = 1._knd/factor(i)
   end function
   
   elemental function LinearTransform_Init_scale_r3(original,factor) result(res)
@@ -1718,7 +1718,7 @@ contains
     res%inv_matrix = 0
 
     forall(i=1:3)  res%matrix(i,i) = v(i)
-    forall(i=1:3)  res%matrix(i,i) = 1._knd/v(i)
+    forall(i=1:3)  res%inv_matrix(i,i) = 1._knd/v(i)
   end function
   
   pure function rotation_matrix_x(phi) result(res)
