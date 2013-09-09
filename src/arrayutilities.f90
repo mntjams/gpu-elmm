@@ -112,12 +112,14 @@ module ArrayUtilities
     module procedure assign_1D
     module procedure assign_2D
     module procedure assign_3D
+    module procedure assign_4D
   end interface
 
   interface add
     module procedure add_1D
     module procedure add_2D
     module procedure add_3D
+    module procedure add_4D
     module procedure add_scalar_1D
     module procedure add_scalar_2D
     module procedure add_scalar_3D
@@ -127,6 +129,11 @@ module ArrayUtilities
     module procedure set_1D
     module procedure set_2D
     module procedure set_3D
+    module procedure set_4D
+    module procedure set_int_1D
+    module procedure set_int_2D
+    module procedure set_int_3D
+    module procedure set_int_4D
   end interface
 
   interface multiply
@@ -139,6 +146,7 @@ module ArrayUtilities
     module procedure add_multiplied_1D
     module procedure add_multiplied_2D
     module procedure add_multiplied_3D
+    module procedure add_multiplied_4D
   end interface
 
   interface multiply_and_add_scalar
@@ -232,6 +240,16 @@ module ArrayUtilities
       !$omp end parallel do
     end subroutine
 
+    subroutine assign_4D(to,from)
+      real(knd),intent(out) :: to(:,:,:,:)
+      real(knd),intent(in)  :: from(:,:,:,:)
+      integer k
+
+      do k=1,size(to,4)
+        call assign(to(:,:,:,k),from(:,:,:,k))
+      end do
+    end subroutine
+
 
     subroutine add_1D(to,from)
       real(knd),intent(inout) :: to(:)
@@ -268,6 +286,16 @@ module ArrayUtilities
       end do
       !$omp end parallel do
 !       call axpy(1._knd,from,to)
+    end subroutine
+
+    subroutine add_4D(to,from)
+      real(knd),intent(inout) :: to(:,:,:,:)
+      real(knd),intent(in)  :: from(:,:,:,:)
+      integer k
+
+      do k=1,size(to,4)
+        call add(to(:,:,:,k),from(:,:,:,k))
+      end do
     end subroutine
 
 
@@ -342,6 +370,63 @@ module ArrayUtilities
         to(:,:,k) = from
       end do
       !$omp end parallel do
+    end subroutine
+    
+    subroutine set_4D(to,from)
+      real(knd),intent(out) :: to(:,:,:,:)
+      real(knd),intent(in)  :: from
+      integer k
+
+      do k=1,size(to,4)
+        call set(to(:,:,:,k), from)
+      end do
+    end subroutine
+    
+
+    subroutine set_int_1D(to,from)
+      real(knd),intent(out) :: to(:)
+      integer,intent(in)  :: from
+      integer i
+
+      !$omp parallel do
+      do i=1,size(to)
+        to(i) = from
+      end do
+      !$omp end parallel do
+    end subroutine
+
+    subroutine set_int_2D(to,from)
+      real(knd),intent(out) :: to(:,:)
+      integer,intent(in)  :: from
+      integer j
+
+      !$omp parallel do
+      do j=1,size(to,2)
+        to(:,j) = from
+      end do
+      !$omp end parallel do
+    end subroutine
+
+    subroutine set_int_3D(to,from)
+      real(knd),contiguous,intent(out) :: to(:,:,:)
+      integer,intent(in)  :: from
+      integer k
+
+      !$omp parallel do
+      do k=1,size(to,3)
+        to(:,:,k) = from
+      end do
+      !$omp end parallel do
+    end subroutine
+    
+    subroutine set_int_4D(to,from)
+      real(knd),intent(out) :: to(:,:,:,:)
+      integer,intent(in)  :: from
+      integer k
+
+      do k=1,size(to,4)
+        call set(to(:,:,:,k),from)
+      end do
     end subroutine
     
 
@@ -421,6 +506,17 @@ module ArrayUtilities
       end do
       !$omp end parallel do
 !        call axpy(a,from,to)
+    end subroutine
+
+    subroutine add_multiplied_4D(to,from,a)
+      real(knd),intent(inout) :: to(:,:,:,:)
+      real(knd),intent(in)  :: from(:,:,:,:)
+      real(knd),intent(in)  :: a
+      integer k
+
+      do k=1,size(to,4)
+        call add_multiplied(to(:,:,:,k),from(:,:,:,k),a)
+      end do
     end subroutine
 
 

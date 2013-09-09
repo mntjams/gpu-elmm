@@ -1071,7 +1071,7 @@ contains
      class(Ellipsoid),intent(in) :: self
      class(Ray),intent(in) :: r
      type(Ray) :: r2
-     !FIXME constructors contains irelevant properties and no keywords due to problem in ifort 13.1
+     !FIXME: constructors contain irrelevant properties and no keywords due to problem in ifort as of version 14
      type(Sphere),parameter :: unit_sphere = Sphere( Bbox(0,0,0,0,0,0), 0._knd,  0._knd,&
                                                       0._knd,  1._knd,  .false.,  0)
      r2 = Ray((r%xc - self%xc)/self%a, (r%yc - self%yc)/self%b, (r%zc - self%zc)/self%c, &

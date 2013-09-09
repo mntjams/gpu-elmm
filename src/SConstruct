@@ -36,9 +36,9 @@ if str(comp)=='intel':
     omp_flag = ''
 
   if str(fast)=='yes':
-    fast_flag = ' -O3' # -shared-intel
+   fast_flag = ' -O3 -shared-intel'
   else:
-    fast_flag = '-O0 -check all -traceback -warn nounused -fstack-protector -ftrapuv'
+   fast_flag = '-O0 -shared-intel -check all -traceback -warn nounused -fstack-protector -ftrapuv'
 
   if str(lto)=='yes':
     lto_flag = ' -ipo'
@@ -114,8 +114,6 @@ env.Append(FORTRANMODDIR = '${TARGET.dir}')
 #instead of openblas, any blas and lapack can be used.
 env.Append(LIBS = ['openblas','poisfft','fftw3','fftw3f','fftw3_omp','fftw3f_omp','pthread','stdc++'])
 
-env.Append(LIBS = ['CGAL'])
-
 if customSB=='yes':
  env.Append(F90FLAGS='-DCUSTOMSB')
  if str(SB)=='':
@@ -160,10 +158,13 @@ objs += env.Object(target=target_dir+'solarradiation', source='solarradiation.f9
 objs += env.Object(target=target_dir+'wallmodels',     source='wallmodels.f90')
 objs += env.Object(target=target_dir+'volumesources',  source='volumesources.f90')
 objs += env.Object(target=target_dir+'linesources',    source='linesources.f90')
+objs += env.Object(target=target_dir+'puffs',          source='puffs.f90')
 
 #Support for CGAL for geometry files reading.
 objs += env.Object(target=target_dir+'cgal_polyhedra_cc',  source='cgal_polyhedra.cc', CPPFLAGS=" -Ofast -frounding-math -std=c++11")
 objs += env.Object(target=target_dir+'cgal_polyhedra',  source='cgal_polyhedra.f90')
+env.Append(LIBS = ['CGAL'])
+
 
 #Disable support for CGAL. Useful for enabling valgrind.
 #objs += env.Object(target=target_dir+'dummy_cgal_polyhedra',  source='dummy_cgal_polyhedra.f90')

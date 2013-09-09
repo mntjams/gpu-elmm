@@ -18,11 +18,12 @@ module Initial
   use SolarRadiation, only: InitSolarRadiation
   use SolidBodies, only: obstacles_file, InitSolidBodies
   use ImmersedBoundary, only: GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
-  use VolumeSources, only: InitVolumeSources, InitVolumeSourceBodies
+  use VolumeSources!, only: InitVolumeSources, InitVolumeSourceBodies, ScalarFlVolume, ScalarFlVolumesContainer
   use LineSources, only: InitLineSources
   use WALLMODELS
   use TILING, only: tilesize,InitTiles
   use FreeUnit, only: newunit
+  use Puffs, only: InitPuffSources
 
   implicit none
 
@@ -404,36 +405,37 @@ contains
      call get(sideScal(Bo))
      call get(sideScal(To))
 
-     if (partdistrib>0) then
+     if (scalsourcetype==1) then
+       if (partdistrib>0) then
 
-        allocate(partdiam(partdistrib),partrho(partdistrib),percdistrib(partdistrib))
-        allocate(scalsrcx(partdistrib),scalsrcy(partdistrib),scalsrcz(partdistrib))
-        allocate(scalsrci(partdistrib),scalsrcj(partdistrib),scalsrck(partdistrib))
+          allocate(partdiam(partdistrib),partrho(partdistrib),percdistrib(partdistrib))
+          allocate(scalsrcx(partdistrib),scalsrcy(partdistrib),scalsrcz(partdistrib))
+          allocate(scalsrci(partdistrib),scalsrcj(partdistrib),scalsrck(partdistrib))
 
-        do i = 1,partdistrib
-          call get(partdiam(i))
-          call get(partrho(i))
-          call get(percdistrib(i))
-          call get(scalsrcx(i))
-          call get(scalsrcy(i))
-          call get(scalsrcz(i))
-        end do
+          do i = 1,partdistrib
+            call get(partdiam(i))
+            call get(partrho(i))
+            call get(percdistrib(i))
+            call get(scalsrcx(i))
+            call get(scalsrcy(i))
+            call get(scalsrcz(i))
+          end do
 
-     else
+       else
 
-        allocate(partdiam(num_of_scalars),partrho(num_of_scalars),percdistrib(num_of_scalars))
-        allocate(scalsrcx(num_of_scalars),scalsrcy(num_of_scalars),scalsrcz(num_of_scalars))
-        allocate(scalsrci(num_of_scalars),scalsrcj(num_of_scalars),scalsrck(num_of_scalars))
+          allocate(partdiam(num_of_scalars),partrho(num_of_scalars),percdistrib(num_of_scalars))
+          allocate(scalsrcx(num_of_scalars),scalsrcy(num_of_scalars),scalsrcz(num_of_scalars))
+          allocate(scalsrci(num_of_scalars),scalsrcj(num_of_scalars),scalsrck(num_of_scalars))
 
-        do i = 1,num_of_scalars
-          call get(partdiam(i))
-          call get(partrho(i))
-          call get(percdistrib(i))
-          call get(scalsrcx(i))
-          call get(scalsrcy(i))
-          call get(scalsrcz(i))
-        end do
-
+          do i = 1,num_of_scalars
+            call get(partdiam(i))
+            call get(partrho(i))
+            call get(percdistrib(i))
+            call get(scalsrcx(i))
+            call get(scalsrcy(i))
+            call get(scalsrcz(i))
+          end do
+       end if
      end if
      close(unit)
    else
@@ -600,6 +602,9 @@ contains
        end do
 
        scalar_probes = probes
+     else
+       allocate(probes(0))
+       allocate(scalar_probes(0))
      end if
 
    else
@@ -1914,6 +1919,9 @@ contains
 
    !add arrays of the line source points
    call InitLineSources
+
+   !add puff sources, each containing one or more points
+   call InitPuffSources
 
    call SetFrameDomains
 

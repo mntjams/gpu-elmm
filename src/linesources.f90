@@ -30,7 +30,7 @@ module LineSources
       real(knd) :: rpos(3), flux_per_point
       integer :: ipos(3),last_ipos(3)
       integer i
-
+      
       res%scalar_number = self%scalar_number
       
       allocate(res%volumes(0))

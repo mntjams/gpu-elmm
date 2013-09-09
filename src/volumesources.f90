@@ -43,6 +43,7 @@ module VolumeSources
   end type ScalarFlVolume
 
   interface ScalarFlVolume
+    module procedure ScalarFlVolume_3i
     module procedure ScalarFlVolume_v3
   end interface
 
@@ -139,6 +140,14 @@ module VolumeSources
       integer,intent(in) :: pos(3)
       real(knd),intent(in) :: flux
       res%FluxVolume = FluxVolume(pos,flux)
+    end function
+
+    
+    function ScalarFlVolume_3i(x,y,z,flux) result(res)
+      type(ScalarFlVolume) :: res
+      integer,intent(in) :: x,y,z
+      real(knd),intent(in) :: flux
+      res%FluxVolume = FluxVolume([x,y,z],flux)
     end function
 
     
@@ -701,7 +710,7 @@ module VolumeSources
       integer i
       associate (sn => r%scalar_number)
         if (size(r%volumes)>0) then
-          !NOTE: the shorter version problematic in gfortran4.8 and ifort 13
+          !NOTE: the shorter version problematic in gfortran4.8 and ifort 14
           !l(sn)%volumes = [l(sn)%volumes, r%volumes]
           allocate(tmp( size(l(sn)%volumes) + size(r%volumes) ))
           

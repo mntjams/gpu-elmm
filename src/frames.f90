@@ -322,7 +322,7 @@ module StaggeredFrames
       type(TStaggeredFrameDomain),intent(inout) :: D
       real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
       real(knd),intent(in) :: Pr(1:,1:,1:), Viscosity(-1:,-1:,-1:), Temperature(-1:,-1:,-1:), &
-                              Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,-1:)
+                              Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
       integer :: offset
       integer :: i
 
@@ -356,7 +356,7 @@ module StaggeredFrames
       end if
 
       if (D%save_flags%Pr) then
-        !FIXME: problem near boundaries becaus of boundary buffer
+        !FIXME: problem near boundaries because of the boundary buffer
         D%buffer(offset:offset+D%sizePr-1) = &
             Pr(D%minPri:D%maxPri, D%minPrj:D%maxPrj, D%minPrk:D%maxPrk)
 
@@ -439,7 +439,7 @@ module StaggeredFrames
       real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
       real(knd),intent(in) :: Pr(1:,1:,1:), &
                               Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
-                              Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,-1:)
+                              Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
       integer err
 
       associate(start   => D%frame_times%start,&

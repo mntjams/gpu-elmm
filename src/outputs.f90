@@ -135,7 +135,7 @@ module Outputs
     integer :: avg_moisture = 1
 
     integer :: avg_U_rms = 0 !1..only in  avg.vtk, 2..only in separate Xavg.vtk, 3..both
-    integer :: avg_flux_scalar = 0 !FIXME!!!!
+    integer :: avg_flux_scalar = 0
 
     integer :: delta_time = 0
     integer :: tke = 0
@@ -205,7 +205,7 @@ contains
    if (store%avg_U==0.and.store%avg_U_rms>1) store%avg_U = 1
 
    if (averaging==1) then
-    if (store%avg_U>1) then
+    if (store%avg_U>0) then
       allocate(U_avg(-2:Unx+3,-2:Uny+3,-2:Unz+3))
       allocate(V_avg(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
       allocate(W_avg(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
@@ -214,7 +214,7 @@ contains
       W_avg = 0
     end if
 
-    if (store%avg_U_rms>1) then
+    if (store%avg_U_rms>0) then
       allocate(U_rms(-2:Unx+3,-2:Uny+3,-2:Unz+3))
       allocate(V_rms(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
       allocate(W_rms(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
@@ -341,7 +341,7 @@ contains
        scalp_time = huge(1.0_knd)
     end if
    end if
-   
+
    do k = 1,size(probes)
      associate(p => probes(k))
        call GridCoords(p%i,p%j,p%k,p%x,p%y,p%z)
@@ -689,13 +689,13 @@ contains
       time_weight = min(dt, time-timeavg1, timeavg2-(time-dt), timeavg2-timeavg1) / &
                     (timeavg2-timeavg1)
 
-      if (store%avg_U>1) then
+      if (store%avg_U>0) then
          U_avg = U_avg + U * time_weight
          V_avg = V_avg + V * time_weight
          W_avg = W_avg + W * time_weight
       end if
 
-      if (store%avg_U_rms>1) then
+      if (store%avg_U_rms>0) then
         U_rms = U_rms + U**2 * time_weight
         V_rms = V_rms + V**2 * time_weight
         W_rms = W_rms + W**2 * time_weight
@@ -938,12 +938,12 @@ contains
       if (store%probes_fluxes==1) then
         open(unit,file="output/stresstimep"//trim(prob)//".txt")
         do j = 0,endstep
-         write(unit,'(7(2x,g12.6))') times(j),momentum_fluxes_time(:,k,j)
+         write(unit,'(7(2x,g13.6))') times(j),momentum_fluxes_time(:,k,j)
         end do
         close(unit)
         open(unit,file="output/sgstresstimep"//trim(prob)//".txt")
         do j = 0,endstep
-         write(unit,'(7(2x,g12.6))') times(j),momentum_fluxes_time(:,k,j)
+         write(unit,'(7(2x,g13.6))') times(j),momentum_fluxes_time(:,k,j)
         end do
         close(unit)
       end if
@@ -1968,12 +1968,12 @@ contains
    
     if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
 
-      !NOTE: just to allocate, mold= does not work correctly as of gcc 4.8
+      !FIXME: just to allocate, mold= does not work correctly as of gcc 4.8
 !       allocate(Scalar_fl_U_adv,mold=Scalar_fl_U_avg)
       Scalar_fl_U_adv = Scalar_fl_U_avg
       Scalar_fl_V_adv = Scalar_fl_V_avg
       Scalar_fl_W_adv = Scalar_fl_W_avg
-      Scalar_fl_U_avg = 0
+      Scalar_fl_U_adv = 0
       Scalar_fl_V_adv = 0
       Scalar_fl_W_adv = 0
 
@@ -2005,6 +2005,8 @@ contains
                                "output/scalflw.vtk",xPr,yPr,zW)
 
     end if
+
+    deallocate(Scalar_fl_U_avg, Scalar_fl_V_avg, Scalar_fl_W_avg)
 
   end subroutine
 
@@ -2106,6 +2108,7 @@ contains
     call OutputUVW(U,V,W,"U.vtk","V.vtk","W.vtk")
 
     if (averaging==1.and.time>=timeavg1) then
+
       call OutputAvg(U_avg,V_avg,W_avg,U_rms,V_rms,W_rms,Pr_avg,Temperature_avg,Moisture_avg)
       
       call OutputScalarStats(Scalar_avg,Scalar_max,Scalar_intermitency)

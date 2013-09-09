@@ -85,6 +85,7 @@ contains
                 temperature_flux_profile, moisture_flux_profile)
     use RK3
     use VolumeSources, only: ScalarVolumeSources
+    use Puffs, only: DoPuffs, enable_puffs
     real(knd),intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd),intent(inout) :: Temperature(-1:,-1:,-1:),Moisture(-1:,-1:,-1:)
     real(knd),intent(inout) :: Scalar(-1:,-1:,-1:,1:)
@@ -132,14 +133,12 @@ contains
 
     if (num_of_scalars>0) then
 
-      !$omp parallel workshare
-      Scalar_2=0
-      !$omp end parallel workshare
+      call set(Scalar_2, 0)
 
       if (RK_stage>1) then
-        !$omp parallel workshare
-        Scalar_2 = Scalar_2+Scalar_adv*RK_rho(RK_stage)
-        !$omp end parallel workshare
+
+        call add_multiplied(Scalar_2, Scalar_adv, RK_rho(RK_stage))
+
       end if
 
       do i=1,num_of_scalars
@@ -169,17 +168,16 @@ contains
 
       end if
 
+      if (enable_puffs==1) then
+        call DoPuffs(Scalar,Scalar_adv,RK_stage,RK_stages)
+      end if
 
-      !$omp parallel workshare
-      Scalar_2 = Scalar_2+Scalar_adv*RK_beta(RK_stage)
-      !$omp end parallel workshare
+      
+      call add_multiplied(Scalar_2, Scalar_adv, RK_beta(RK_stage))
+      
 
 
-      !$omp parallel
-      !$omp workshare
-      Scalar = Scalar+Scalar_2
-      !$omp end workshare
-      !$omp end parallel
+      call add(Scalar, Scalar_2)
 
       do i=1,num_of_scalars
          call DiffScalar(Scalar_2(:,:,:,i),Scalar(:,:,:,i), &
@@ -190,11 +188,7 @@ contains
 
       if (computegravsettling>0) call GravSettling(Scalar_2,2._knd*RK_alpha(RK_stage))
 
-      !$omp parallel
-      !$omp workshare
-      Scalar = Scalar_2
-      !$omp end workshare
-      !$omp end parallel
+      call assign(Scalar, Scalar_2)
 
     end if
 
