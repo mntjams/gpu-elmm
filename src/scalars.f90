@@ -1696,7 +1696,7 @@ contains
 
     if (SubsidenceGradient/=0) then
       allocate(SubsidenceProfile(0:Prnz))
-      SubsidenceProfile = (/ (zW(k)*SubsidenceGradient, k=0,Prnz) /)
+      SubsidenceProfile = [ (zW(k)*SubsidenceGradient, k=0,Prnz) ]
     else
       allocate(SubsidenceProfile(0))
     end if

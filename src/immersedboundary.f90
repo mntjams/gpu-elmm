@@ -41,7 +41,7 @@ contains
            m=neighbours(1,p)
            n=neighbours(2,p)
            o=neighbours(3,p)
-           if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs((/m,n,o/)))==1)) then
+           if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs([m,n,o]))==1)) then
              call SetCurrentSB(CurrentSB,Prtype(i+m,j+n,k+o))
              call CurrentSB%Closest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
              if (SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
@@ -780,13 +780,13 @@ contains
 
         if (IBP%interpdir==1) then
           xr = xU(xi) + IBP%distx
-          x  = (/ xU(xi), xU(xi+dirx), xU(xi+2*dirx), xU(xi+3*dirx)  /)
+          x  = [ xU(xi), xU(xi+dirx), xU(xi+2*dirx), xU(xi+3*dirx)  ]
         elseif (IBP%interpdir==2) then
           xr = yU(yj) + IBP%disty
-          x  = (/ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  /)
+          x  = [ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  ]
         else
           xr = zU(zk) + IBP%distz
-          x  = (/ zU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  /)
+          x  = [ zU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  ]
         endif
 
         call IBLeastSquare2InterpolationCoefs(IBP%IntPoints%coef,xr,x)
@@ -822,10 +822,10 @@ contains
           IBP%IntPoints(6)%zk = zk + 3*dirz
 
           xr = yU(yj) + IBP%disty
-          x  = (/ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  /)
+          x  = [ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  ]
 
           yr = zU(zk) + IBP%distz
-          y  = (/ zU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  /)
+          y  = [ zU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  ]
 
 
         elseif (IBP%interpdir==2) then
@@ -855,10 +855,10 @@ contains
           IBP%IntPoints(6)%zk = zk
 
           xr = zU(zk) + IBP%distz
-          x  = (/ zU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  /)
+          x  = [ zU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  ]
 
           yr = xU(xi) + IBP%distx
-          y  = (/ xU(xi), xU(xi+dirx), xU(xi+2*dirx), xU(xi+3*dirx)  /)
+          y  = [ xU(xi), xU(xi+dirx), xU(xi+2*dirx), xU(xi+3*dirx)  ]
 
         else
 
@@ -887,10 +887,10 @@ contains
           IBP%IntPoints(6)%zk = zk
 
           xr = xU(xi) + IBP%distx
-          x  = (/ xU(xi), xU(xi+dirx), xU(xi+2*dirx), xU(xi+3*dirx)  /)
+          x  = [ xU(xi), xU(xi+dirx), xU(xi+2*dirx), xU(xi+3*dirx)  ]
 
           yr = yU(yj) + IBP%disty
-          y  = (/ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  /)
+          y  = [ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  ]
 
         endif
 
@@ -947,13 +947,13 @@ contains
         IBP%IntPoints(9)%zk = zk + 3*dirz
 
         xr = xU(xi) + IBP%distx
-        x  = (/ xU(xi), xU(xi+dirx), xU(xi+2*dirx), xU(xi+3*dirx)  /)
+        x  = [ xU(xi), xU(xi+dirx), xU(xi+2*dirx), xU(xi+3*dirx)  ]
 
         yr = yU(yj) + IBP%disty
-        y  = (/ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  /)
+        y  = [ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  ]
 
         zr = zU(zk) + IBP%distz
-        z  = (/ yU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  /)
+        z  = [ yU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  ]
 
         call IBLeastSquare2InterpolationCoefs(IBP%IntPoints(1:3)%coef,xr,x)
 

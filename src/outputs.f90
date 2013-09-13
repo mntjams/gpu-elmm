@@ -757,7 +757,7 @@ contains
        end if
      end if
      if (store%ustar==1) then
-       ustar(:,step)=(/ S2 , S /)
+       ustar(:,step)=[ S2 , S ]
      end if
    end if
 
@@ -771,7 +771,7 @@ contains
      end if
 
      if (store%tstar==1) then
-       tstar(:,step) = (/ S2,S /)
+       tstar(:,step) = [ S2,S ]
      end if
     end if
 
@@ -2142,12 +2142,12 @@ contains
     integer, intent(in)     :: i,j,k
     real(knd),dimension(-2:,-2:,-2:), intent(in) :: U,V,W
 
-    Vorticity = (/         (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
+    Vorticity = [         (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                               -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin), &
                            (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
                              -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin), &
                            (V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
-                             -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin) /)
+                             -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin) ]
   end function Vorticity
 
 

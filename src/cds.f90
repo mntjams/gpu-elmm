@@ -375,9 +375,9 @@ module CDS
     subroutine CDS4U(U2,U,V,W)
       real(knd),dimension(-2:,-2:,-2:),intent(out) :: U2
       real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
-      integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
+      integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
-      integer,parameter :: mask2(2) = (/ 8, 8 /)
+      integer,parameter :: mask2(2) = [ 8, 8 ]
       integer   :: i,j,k,l
       real(knd) :: flux
 
@@ -465,9 +465,9 @@ module CDS
     subroutine CDS4V(V2,U,V,W)
       real(knd),dimension(-2:,-2:,-2:),intent(out) :: V2
       real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
-      integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
+      integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
-      integer,parameter :: mask2(2) = (/ 8, 8 /)
+      integer,parameter :: mask2(2) = [ 8, 8 ]
       integer   :: i,j,k,l
       real(knd) :: flux
 
@@ -556,9 +556,9 @@ module CDS
     subroutine CDS4W(W2,U,V,W)
       real(knd),dimension(-2:,-2:,-2:),intent(out) :: W2
       real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
-      integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
+      integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
-      integer,parameter :: mask2(2) = (/  8, 8 /)
+      integer,parameter :: mask2(2) = [  8, 8 ]
       integer   :: i,j,k,l
       real(knd) :: flux
 
@@ -661,9 +661,9 @@ module CDS
     subroutine CDS4_2U(U2,U,V,W)
       real(knd),dimension(-2:,-2:,-2:),intent(out) :: U2
       real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
-      integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
+      integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
-      integer,parameter :: mask2(2) = (/ 8, 8 /)
+      integer,parameter :: mask2(2) = [ 8, 8 ]
       integer   :: i,j,k,l
       real(knd) :: flux
 
@@ -751,9 +751,9 @@ module CDS
     subroutine CDS4_2V(V2,U,V,W)
       real(knd),dimension(-2:,-2:,-2:),intent(out) :: V2
       real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
-      integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
+      integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
-      integer,parameter :: mask2(2) = (/ 8, 8 /)
+      integer,parameter :: mask2(2) = [ 8, 8 ]
       integer   :: i,j,k,l
       real(knd) :: flux
 
@@ -842,9 +842,9 @@ module CDS
     subroutine CDS4_2W(W2,U,V,W)
       real(knd),dimension(-2:,-2:,-2:),intent(out) :: W2
       real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
-      integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
+      integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
-      integer,parameter :: mask2(2) = (/  8, 8 /)
+      integer,parameter :: mask2(2) = [  8, 8 ]
       integer   :: i,j,k,l
       real(knd) :: flux
 
@@ -1448,10 +1448,10 @@ module CDS
 !     subroutine JST4U(U2,U,V,W)
 !       real(knd),dimension(-2:,-2:,-2:),intent(out) :: U2
 !       real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
-!       integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
+!       integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
 !       integer,parameter :: divcoef = 16
-!       integer,parameter :: mask2(4) = (/ 0, 8, 8, 0 /)
-!       integer,parameter :: diffmask(4) = (/ -1, +3, -3, +1 /)
+!       integer,parameter :: mask2(4) = [ 0, 8, 8, 0 ]
+!       integer,parameter :: diffmask(4) = [ -1, +3, -3, +1 ]
 !       real(knd),parameter :: k4 = 0.01_knd
 !       integer   :: i,j,k,l,mask(4)
 !       real(knd) :: flux,nubar,eps4,Uadv,Vadv,Wadv,d
@@ -1607,10 +1607,10 @@ module CDS
 !     subroutine JST4V(V2,U,V,W)
 !       real(knd),dimension(-2:,-2:,-2:),intent(out) :: V2
 !       real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
-!       integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
+!       integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
 !       integer,parameter :: divcoef = 16
-!       integer,parameter :: mask2(4) = (/ 0, 8, 8, 0 /)
-!       integer,parameter :: diffmask(4) = (/ -1, +3, -3, +1 /)
+!       integer,parameter :: mask2(4) = [ 0, 8, 8, 0 ]
+!       integer,parameter :: diffmask(4) = [ -1, +3, -3, +1 ]
 !       real(knd),parameter :: k4 = 0.01_knd
 !       integer   :: i,j,k,l,mask(4)
 !       real(knd) :: flux,nubar,eps4,Uadv,Vadv,Wadv,d
@@ -1767,10 +1767,10 @@ module CDS
 !     subroutine JST4W(W2,U,V,W)
 !       real(knd),dimension(-2:,-2:,-2:),intent(out) :: W2
 !       real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
-!       integer,parameter :: mask4(4) = (/ -1, 9, 9, -1 /)
+!       integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
 !       integer,parameter :: divcoef = 16
-!       integer,parameter :: mask2(4) = (/ 0, 8, 8, 0 /)
-!       integer,parameter :: diffmask(4) = (/ -1, +3, -3, +1 /)
+!       integer,parameter :: mask2(4) = [ 0, 8, 8, 0 ]
+!       integer,parameter :: diffmask(4) = [ -1, +3, -3, +1 ]
 !       real(knd),parameter :: k4 = 0.01_knd
 !       integer   :: i,j,k,l,mask(4)
 !       real(knd) :: flux,nubar,eps4,Uadv,Vadv,Wadv,d

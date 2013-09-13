@@ -1958,7 +1958,7 @@ contains
            .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  then
             !$omp atomic
             n = n+1
-            Unull(:,n) = (/ i,j,k /)
+            Unull(:,n) = [ i,j,k ]
 
        end if
       end do
@@ -1991,7 +1991,7 @@ contains
            .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  then
 
             n = n+1
-            Vnull(:,n) = (/ i,j,k /)
+            Vnull(:,n) = [ i,j,k ]
 
        end if
       end do
@@ -2025,7 +2025,7 @@ contains
            .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  then
 
             n = n+1
-            Wnull(:,n) = (/ i,j,k /)
+            Wnull(:,n) = [ i,j,k ]
 
        end if
       end do
@@ -2046,7 +2046,7 @@ contains
 
     call SYSTEM_CLOCK(COUNT = clock)
 
-    seed = 0!clock+37*(/(i-1,i = 1,n)/)
+    seed = 0!clock+37*[(i-1,i = 1,n)]
     call RANDOM_SEED(PUT = seed)
 
     deallocate(seed)

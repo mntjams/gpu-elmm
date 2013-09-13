@@ -1288,25 +1288,25 @@ contains
 
 
 
-     nxa=(/ CoefMG(0)%nx, CoefMG(1)%nx, CoefMG(2)%nx, CoefMG(3)%nx, CoefMG(4)%nx,&
-            CoefMG(5)%nx, CoefMG(6)%nx, CoefMG(7)%nx, CoefMG(8)%nx /)
-     nya=(/ CoefMG(0)%ny, CoefMG(1)%ny, CoefMG(2)%ny, CoefMG(3)%ny, CoefMG(4)%ny,&
-            CoefMG(5)%ny, CoefMG(6)%ny, CoefMG(7)%ny, CoefMG(8)%ny /)
-     nza=(/ CoefMG(0)%nz, CoefMG(1)%nz, CoefMG(2)%nz, CoefMG(3)%nz, CoefMG(4)%nz,&
-            CoefMG(5)%nz, CoefMG(6)%nz, CoefMG(7)%nz, CoefMG(8)%nz /)
+     nxa=[ CoefMG(0)%nx, CoefMG(1)%nx, CoefMG(2)%nx, CoefMG(3)%nx, CoefMG(4)%nx,&
+            CoefMG(5)%nx, CoefMG(6)%nx, CoefMG(7)%nx, CoefMG(8)%nx ]
+     nya=[ CoefMG(0)%ny, CoefMG(1)%ny, CoefMG(2)%ny, CoefMG(3)%ny, CoefMG(4)%ny,&
+            CoefMG(5)%ny, CoefMG(6)%ny, CoefMG(7)%ny, CoefMG(8)%ny ]
+     nza=[ CoefMG(0)%nz, CoefMG(1)%nz, CoefMG(2)%nz, CoefMG(3)%nz, CoefMG(4)%nz,&
+            CoefMG(5)%nz, CoefMG(6)%nz, CoefMG(7)%nz, CoefMG(8)%nz ]
 
-     Aw=(/ CoefMG(0)%Aw, CoefMG(1)%Aw, CoefMG(2)%Aw, CoefMG(3)%Aw, CoefMG(4)%Aw,&
-            CoefMG(5)%Aw, CoefMG(6)%Aw, CoefMG(7)%Aw, CoefMG(8)%Aw /)
-     Ae=(/ CoefMG(0)%Ae, CoefMG(1)%Ae, CoefMG(2)%Ae, CoefMG(3)%Ae, CoefMG(4)%Ae,&
-            CoefMG(5)%Ae, CoefMG(6)%Ae, CoefMG(7)%Ae, CoefMG(8)%Ae /)
-     As=(/ CoefMG(0)%As, CoefMG(1)%As, CoefMG(2)%As, CoefMG(3)%As, CoefMG(4)%As,&
-            CoefMG(5)%As, CoefMG(6)%As, CoefMG(7)%As, CoefMG(8)%As /)
-     An=(/ CoefMG(0)%An, CoefMG(1)%An, CoefMG(2)%An, CoefMG(3)%An, CoefMG(4)%An,&
-            CoefMG(5)%An, CoefMG(6)%An, CoefMG(7)%An, CoefMG(8)%An /)
-     Ab=(/ CoefMG(0)%Ab, CoefMG(1)%Ab, CoefMG(2)%Ab, CoefMG(3)%Ab, CoefMG(4)%Ab,&
-            CoefMG(5)%Ab, CoefMG(6)%Ab, CoefMG(7)%Ab, CoefMG(8)%Ab /)
-     At=(/ CoefMG(0)%At, CoefMG(1)%At, CoefMG(2)%At, CoefMG(3)%At, CoefMG(4)%At,&
-            CoefMG(5)%At, CoefMG(6)%At, CoefMG(7)%At, CoefMG(8)%At /)
+     Aw=[ CoefMG(0)%Aw, CoefMG(1)%Aw, CoefMG(2)%Aw, CoefMG(3)%Aw, CoefMG(4)%Aw,&
+            CoefMG(5)%Aw, CoefMG(6)%Aw, CoefMG(7)%Aw, CoefMG(8)%Aw ]
+     Ae=[ CoefMG(0)%Ae, CoefMG(1)%Ae, CoefMG(2)%Ae, CoefMG(3)%Ae, CoefMG(4)%Ae,&
+            CoefMG(5)%Ae, CoefMG(6)%Ae, CoefMG(7)%Ae, CoefMG(8)%Ae ]
+     As=[ CoefMG(0)%As, CoefMG(1)%As, CoefMG(2)%As, CoefMG(3)%As, CoefMG(4)%As,&
+            CoefMG(5)%As, CoefMG(6)%As, CoefMG(7)%As, CoefMG(8)%As ]
+     An=[ CoefMG(0)%An, CoefMG(1)%An, CoefMG(2)%An, CoefMG(3)%An, CoefMG(4)%An,&
+            CoefMG(5)%An, CoefMG(6)%An, CoefMG(7)%An, CoefMG(8)%An ]
+     Ab=[ CoefMG(0)%Ab, CoefMG(1)%Ab, CoefMG(2)%Ab, CoefMG(3)%Ab, CoefMG(4)%Ab,&
+            CoefMG(5)%Ab, CoefMG(6)%Ab, CoefMG(7)%Ab, CoefMG(8)%Ab ]
+     At=[ CoefMG(0)%At, CoefMG(1)%At, CoefMG(2)%At, CoefMG(3)%At, CoefMG(4)%At,&
+            CoefMG(5)%At, CoefMG(6)%At, CoefMG(7)%At, CoefMG(8)%At ]
 
      !$hmpp <GSKernels> allocate
      !$hmpp <GSkernels> advancedload, args[GS::nx,GS::ny,GS::nz,GS::Aw,GS::Ae,GS::As,GS::An,GS::Ab,GS::At,&

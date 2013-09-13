@@ -22,7 +22,7 @@ module Filters
       real(knd),dimension(-2:,-2:,-2:),intent(inout)  :: U
       integer,dimension(-2:,-2:,-2:),intent(inout)  :: Utype
       integer,intent(in) :: dir
-      real(knd),parameter :: w(-3:3) = (/ -1._knd/32, 0._knd, 9._knd/32, 1._knd/2, 9._knd/32, 0._knd, -1._knd/32 /)
+      real(knd),parameter :: w(-3:3) = [ -1._knd/32, 0._knd, 9._knd/32, 1._knd/2, 9._knd/32, 0._knd, -1._knd/32 ]
       real(knd) S,q
       integer i,j,k,ii,jj,kk
       integer mini,minj,mink
