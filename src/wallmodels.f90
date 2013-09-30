@@ -23,7 +23,7 @@ use PARAMETERS
 implicit none
 
  private
- public WMPoint, AddWMPoint, FirstWMPoint, ComputeViscsWM, MoveWMPointsToArray, GetOutsideBoundariesWM,&
+ public WMPoint, AddWMPoint, FirstWMPoint, ComputeViscsWM, MoveWMPointsToArray, GetOutsideBoundariesWM, &
         InitTempFl, GroundDeposition, GroundUstar, WMPoints, ListLength, wallmodeltype
 #ifdef __HMPP
  public hmppWMpoint,WMPtoHMPP
@@ -283,37 +283,39 @@ implicit none
   subroutine RemoveDuplicateWMPoints(WMPoints)
     use iso_c_binding
     use Sort
-    type(WMPoint),allocatable,dimension(:),target,intent(inout)  :: WMPoints !Requires f95TS
+    type(WMPoint),allocatable,dimension(:),target,intent(inout)  :: WMPoints
     type(WMPoint),allocatable,dimension(:) :: TMP
     integer i,n
 
     !Choose the one closer to a wall. If of the same distance, choose the later one.
     !For wider compatibility we do not use MOLD= or SOURCE= in allocate.
 
-    allocate(TMP(size(WMPoints)))
+    if (size(WMPoints)>1) then
 
-    call qsort(c_loc(WMPoints(1)),&
-               size(WMPoints,kind = c_size_t),&
-               int(storage_size(WMPoints)/storage_size('a'),c_size_t),& !c_sizeof not supported by Solaris Studio 12.3
-               c_funloc(CompareWMPoints))
+      allocate(TMP(size(WMPoints)))
 
-    TMP(1) = WMPoints(1)
-    n = 1
-    do i = 2,size(WMPoints)
-        if (WMPoints(i-1)%xi/=WMPoints(i)%xi .or.&
-            WMPoints(i-1)%yj/=WMPoints(i)%yj .or.&
-            WMPoints(i-1)%zk/=WMPoints(i)%zk) then !if the point is not duplicate of previous one
+      call qsort(c_loc(WMPoints(1)), &
+                 size(WMPoints,kind = c_size_t), &
+                 storage_size(WMPoints,c_size_t)/storage_size(c_char_'a',c_size_t), &
+  !                c_sizeof(WMPoints), &  F08+TS29113 seem to require C interoperable variable as argument.
+                 c_funloc(CompareWMPoints))
 
-              n = n+1
-              TMP(n) = WMPoints(i)
+      TMP(1) = WMPoints(1)
+      n = 1
+      do i = 2,size(WMPoints)
+          if (WMPoints(i-1)%xi/=WMPoints(i)%xi .or. &
+              WMPoints(i-1)%yj/=WMPoints(i)%yj .or. &
+              WMPoints(i-1)%zk/=WMPoints(i)%zk) then !if the point is not duplicate of previous one
 
-        end if
-    end do
+                n = n+1
+                TMP(n) = WMPoints(i)
 
-    deallocate(WMPoints) !would not be needed in Fortran 2003
-    allocate(WMPoints(n))!
+          end if
+      end do
 
-    WMPoints = TMP(1:n)
+      WMPoints = TMP(1:n)
+
+   end if
 
   end subroutine RemoveDuplicateWMPoints
 
@@ -1199,7 +1201,7 @@ implicit none
 
          if (enable_buoyancy==1 .and. TempBtype(Bo)==CONSTFLUX) then
 
-           call WM_MO_FLUX(Viscosity(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%temperature_flux,&
+           call WM_MO_FLUX(Viscosity(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%temperature_flux, &
                            WMPoints(i)%z0, dist, vel)
 
          else if (enable_buoyancy==1 .and. TempBtype(Bo)==DIRICHLET) then
@@ -1208,15 +1210,15 @@ implicit none
 
            tdif = WMPoints(i)%temp - Temperature(xi,yj,zk)
 
-           call WM_MO_DIRICHLET(Viscosity(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%temperature_flux,&
+           call WM_MO_DIRICHLET(Viscosity(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%temperature_flux, &
                                 WMPoints(i)%z0, tdif, dist, vel)
 
            if (zk==1) BsideTFLArr(xi,yj) = WMPoints(i)%temperature_flux
 
          else
 
-           call WMRoughVisc(Viscosity(xi, yj, zk),&
-                            WMPoints(i)%ustar, WMPoints(i)%z0,&
+           call WMRoughVisc(Viscosity(xi, yj, zk), &
+                            WMPoints(i)%ustar, WMPoints(i)%z0, &
                             dist, vel, wallvel)
          end if
 
@@ -1230,15 +1232,15 @@ implicit none
 
            call WallPrGradient(prgrad,xi,yj,zk,Pr,Prtype)
 
-           call WMFlatPrGradVisc(Viscosity(xi, yj, zk),&
-                           WMPoints(i)%ustar,&
+           call WMFlatPrGradVisc(Viscosity(xi, yj, zk), &
+                           WMPoints(i)%ustar, &
                            dist, vel, wallvel, prgrad)
 
          else
 
 
-           call WMFlatVisc(Viscosity(xi, yj, zk),&
-                           WMPoints(i)%ustar,&
+           call WMFlatVisc(Viscosity(xi, yj, zk), &
+                           WMPoints(i)%ustar, &
                            dist, vel, wallvel)
 
          end if
@@ -1292,7 +1294,8 @@ implicit none
       if (allocated(WMPoints(j)%depscalar)) then
 
         do i = 1, num_of_scalars
-          depos(WMPoints(j)%xi,WMPoints(j)%yj,i) = depos(WMPoints(j)%xi,WMPoints(j)%yj,i) + WMPoints(j)%depscalar(i)
+          depos(WMPoints(j)%xi,WMPoints(j)%yj,i) = depos(WMPoints(j)%xi,WMPoints(j)%yj,i) + &
+                                                   WMPoints(j)%depscalar(i)
         end do
 
       end if
