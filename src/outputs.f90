@@ -2006,8 +2006,6 @@ contains
 
     end if
 
-    deallocate(Scalar_fl_U_avg, Scalar_fl_V_avg, Scalar_fl_W_avg)
-
   end subroutine
 
   subroutine SaveScalarVTKFluxes(Avg,Adv,Turb,file_name,x,y,z)
