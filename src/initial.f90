@@ -46,7 +46,7 @@ contains
    character(80), save :: probes_file = ""
    character(80), save :: scalar_probes_file = ""
 
-   character(len = 1024) :: commandline,msg
+   character(len = 1024) :: command_line,msg
    integer :: exenamelength
    integer :: unit
 
@@ -68,11 +68,17 @@ contains
      procedure rgetv3
    end interface
 
-   call read_command_line
+   call newunit(unit)
+
+   !the command line arguments can also be specified in cmd.conf
+   call read_cmd_conf
 
    call parse_command_line
 
-   call newunit(unit)
+   !the actual command line has priority over cmd.conf
+   call read_command_line
+
+   call parse_command_line
 
    open(unit,file="main.conf",status="old",action="read")
    call get(CFL)
@@ -866,15 +872,24 @@ contains
        read(unit,*) v
      end subroutine
 
+     subroutine read_cmd_conf
+        command_line = ""
+        open(unit,file="cmd.conf",status="old",action="read",iostat = io)
+        if (io==0) then
+          read(unit,'(a)') command_line
+        end if
+        command_line = "&cmd "//adjustl(trim(command_line))//" /"
+     end subroutine
+
      subroutine read_command_line
-       commandline = ""
-       call get_command(command = commandline,status = io)
+       command_line = ""
+       call get_command(command = command_line,status = io)
        if (io==0) then
          call get_command_argument(0,length = exenamelength,status = io2)
          if (io2==0) then
-           commandline="&cmd "//adjustl(trim(commandline(exenamelength+1:)))//" /"
+           command_line = "&cmd "//adjustl(trim(command_line(exenamelength+1:)))//" /"
          else
-           commandline="&cmd "//adjustl(trim(commandline))//" /"
+           command_line = "&cmd "//adjustl(trim(command_line))//" /"
          end if
        else
          write(*,*) io,"Error getting command line."
@@ -886,13 +901,13 @@ contains
                        Prnx, Prny, Prnz,&
                        obstacles_file, probes_file, scalar_probes_file
 
-       if (len_trim(commandline)>0) then
+       if (len_trim(command_line)>0) then
          msg = ''
-         read(commandline,nml = cmd,iostat = io,iomsg = msg)
+         read(command_line,nml = cmd,iostat = io,iomsg = msg)
          if (io/=0) then
            write(*,*) io,"Error parsing command line."
            write(*,*) msg
-           write(*,*) commandline
+           write(*,*) command_line
          end if
        else
          write(*,*) io,"Error getting command line."
