@@ -44,8 +44,8 @@ contains
            if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs([m,n,o]))==1)) then
              call SetCurrentSB(CurrentSB,Prtype(i+m,j+n,k+o))
              call CurrentSB%Closest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
-             if (SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
-              dist = SQRT((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
+             if (sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
+              dist = sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
               nb = Prtype(i+m,j+n,k+o)
              endif
            endif
@@ -121,8 +121,8 @@ allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
             r = Ray([xr, yr, zr], &
                     vector_to_sun)
                      
-            if ((SolidBodiesList%Any(DoIntersect)) .or. &
-                (SourceBodiesList%Any(DoIntersectPlants))) then
+            if ((SolidBodiesList%any(DoIntersect)) .or. &
+                (SourceBodiesList%any(DoIntersectPlants))) then
               angle_to_sun = 0
             end if
           end if
@@ -169,8 +169,8 @@ allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
         do i=1,svf_nrays
           r = Ray([x,y,z],svf_vecs(:,i))
         
-          if (.not.((SolidBodiesList%Any(DoIntersect)) .or. &
-                    (SourceBodiesList%Any(DoIntersectPlants)))) then
+          if (.not.((SolidBodiesList%any(DoIntersect)) .or. &
+                    (SourceBodiesList%any(DoIntersectPlants)))) then
             nfree = nfree + 1
           end if
         end do
@@ -180,7 +180,7 @@ allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
       end function
   
       logical function DoIntersect(item) result(res)
-        class(Listable) :: item
+        class(*) :: item
         
         select type (item)
           class is (SolidBody)
@@ -191,7 +191,7 @@ allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
       end function
       
       logical function DoIntersectPlants(item) result(res)
-        class(Listable) :: item
+        class(*) :: item
         
         select type (item)
           class is (PlantBody)
@@ -254,7 +254,7 @@ module ImmersedBoundary
     real(knd) :: coef              !interpolation coefficients for the interpolation points
   endtype TInterpolationPoint
 
-  type,extends(Listable) :: TVelIBPoint
+  type :: TVelIBPoint
     integer   :: component      !1..U, 2..V, 3..W
     integer   :: xi             !coordinates of the grid point
     integer   :: yj
@@ -274,7 +274,7 @@ module ImmersedBoundary
 
 
 
-  type,extends(Listable) :: TScalFlIBPoint
+  type :: TScalFlIBPoint
     integer                :: xi                       !coordinates of the grid point
     integer                :: yj
     integer                :: zk
@@ -458,7 +458,7 @@ contains
 
 
 
-  subroutine TVelIBPoint_Create(IBP,xi,yj,zk,xU,yU,zU,Utype,component)
+  recursive subroutine TVelIBPoint_Create(IBP,xi,yj,zk,xU,yU,zU,Utype,component)
     type(TVelIBPoint),intent(out)               :: IBP
     integer,intent(in)                          :: xi,yj,zk
     real(knd),dimension(-2:),intent(in)         :: xU,yU,zU
@@ -469,12 +469,14 @@ contains
     integer dirx,diry,dirz,n1,n2,nx,ny,nz
     real(knd) x,y,z,xnear,ynear,znear,t
     logical free100,free010,free001
+    real(knd) x2,y2,z2
 
     x = xU(xi)                                !real coordinates of the IB forcing point
     y = yU(yj)
     z = zU(zk)
     call SetCurrentSB(SB,Utype(xi,yj,zk))
     call SB%ClosestOut(xnear,ynear,znear,x,y,z)
+
     IBP%component = component
     IBP%xi = xi                                !integer grid coordinates
     IBP%yj = yj
@@ -523,21 +525,20 @@ contains
     if (dirx==0) then                                               !If there is a cell free of solid bodies in the direction
       free100=.false.
     else
-      free100 = (Utype(xi+IBP%dirx,yj,zk)==0)
+      free100 = (Utype(xi+IBP%dirx,yj,zk)<=0)
     endif
 
     if (diry==0) then
       free010=.false.
     else
-      free010 = (Utype(xi,yj+IBP%diry,zk)==0)
+      free010 = (Utype(xi,yj+IBP%diry,zk)<=0)
     endif
 
     if (dirz==0) then
       free001=.false.
     else
-      free001 = (Utype(xi,yj,zk+IBP%dirz)==0)
+      free001 = (Utype(xi,yj,zk+IBP%dirz)<=0)
     endif
-
 
     nx = 0
     ny = 0
@@ -579,6 +580,15 @@ contains
     if (diry/=0) n2 = n2+1
     if (dirz/=0) n2 = n2+1
 
+if (abs(IBP%distx)>10000.or. abs(IBP%disty)>10000.or. abs(IBP%distz)>10000 ) then
+  print *,"line",__LINE__
+  print *,xi,yj,zk
+  print *,x,y,z
+  print *,xnear,ynear,znear
+  print *,IBP%distx,IBP%disty,IBP%distz
+  print *,Utype(xi,yj,zk)
+  stop
+end if
 
     if (n1>n2) then   ! If too many free directions, treat as directly on the boundary,
       IBP%interp = 0  ! because we are probably at some edge.
@@ -608,8 +618,15 @@ contains
       IBP%diry = 0
       IBP%dirz = 0
     endif
-
-
+if (abs(IBP%distx)>10000.or. abs(IBP%disty)>10000.or. abs(IBP%distz)>10000 ) then
+  print *,"line",__LINE__
+  print *,xi,yj,zk
+  print *,x,y,z
+  print *,xnear,ynear,znear
+  print *,IBP%distx,IBP%disty,IBP%distz
+  print *,Utype(xi,yj,zk)
+  stop
+end if
     if ((dirx==0.and.diry==0.and.dirz==0).or.((.not.free001).and.(.not.free010).and.(.not.free100))) then
                               !If no free direction, the boundary is here.
       IBP%interp = 0
@@ -629,18 +646,37 @@ contains
       IBP%interp = 9                                                                           !use trilinear interpolation.
       IBP%interpdir = 0
 
-    elseif ((.not.free100).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then !Two free directions y and z,
-                                                                                     !use bilinear interpolation normal to x.
+    elseif ((.not.free100).and.(free010.and.diry==1).and.(free001.and.dirz==1)) then
+      !Two free directions y and z use bilinear interpolation normal to x.
       IBP%interp = 6
       IBP%interpdir = 1
 
-      if (dirx==1) then                                       !If dirx /= 0 then forget the x component of dist vector
-        t = SB%ClosestOnLineOut(x,y,z,x,y+IBP%disty,z+IBP%distz) ! and find an intersection of the new vector with the boundary
-        dirx = 0
-        IBP%dirx = 0
-        IBP%distx = 0
-        IBP%disty = IBP%disty*t
-        IBP%distz = IBP%distz*t
+      if (dirx==1) then
+        !If dirx /= 0 then forget the x component of dist vector        
+        y2 = yU(yj+IBP%diry)
+        z2 = zU(zk+IBP%dirz)
+        ! and find an intersection of the new vector with the boundary
+        t = SB%ClosestOnLineOut(x,y,z,x,y2,z2)
+        
+        if (t>=2) then
+          IBP%interp = 0
+          IBP%interpdir = 0
+          IBP%distx = 0
+          IBP%disty = 0
+          IBP%distz = 0
+          dirx = 0
+          diry = 0
+          dirz = 0
+          IBP%dirx = 0
+          IBP%diry = 0
+          IBP%dirz = 0
+        else
+          dirx = 0
+          IBP%dirx = 0
+          IBP%distx = 0
+          IBP%disty = IBP%disty*t
+          IBP%distz = IBP%distz*t
+        end if
       endif
 
     elseif ((.not.free010).and.(free100.and.dirx==1).and.(free001.and.dirz==1)) then  !the same normal to y
@@ -649,12 +685,30 @@ contains
       IBP%interpdir = 2
 
       if (diry==1) then
-        t = SB%ClosestOnLineOut(x,y,z,x+IBP%distx,y,z+IBP%distz)
-        diry = 0
-        IBP%diry = 0
-        IBP%distx = IBP%distx*t
-        IBP%disty = 0
-        IBP%distz = IBP%distz*t
+        x2 = xU(xi+IBP%dirx)
+        z2 = zU(zk+IBP%dirz)
+        
+        t = SB%ClosestOnLineOut(x,y,z,x2,y,z2)
+        
+        if (t>=2) then
+          IBP%interp = 0
+          IBP%interpdir = 0
+          IBP%distx = 0
+          IBP%disty = 0
+          IBP%distz = 0
+          dirx = 0
+          diry = 0
+          dirz = 0
+          IBP%dirx = 0
+          IBP%diry = 0
+          IBP%dirz = 0
+        else
+          diry = 0
+          IBP%diry = 0
+          IBP%distx = IBP%distx*t
+          IBP%disty = 0
+          IBP%distz = IBP%distz*t
+        end if
       endif
 
     elseif ((.not.free001).and.(free100.and.dirx==1).and.(free010.and.diry==1)) then  !the same normal to z
@@ -663,12 +717,30 @@ contains
       IBP%interpdir = 3
 
       if (dirz==1) then
-        t = SB%ClosestOnLineOut(x,y,z,x+IBP%distx,y+IBP%disty,z)
-        dirz = 0
-        IBP%dirz = 0
-        IBP%distx = IBP%distx*t
-        IBP%disty = IBP%disty*t
-        IBP%distz = 0
+        x2 = xU(xi+IBP%dirx)
+        y2 = yU(yj+IBP%diry)
+        
+        t = SB%ClosestOnLineOut(x,y,z,x2,y2,z)
+        
+        if (t>=2) then
+          IBP%interp = 0
+          IBP%interpdir = 0
+          IBP%distx = 0
+          IBP%disty = 0
+          IBP%distz = 0
+          dirx = 0
+          diry = 0
+          dirz = 0
+          IBP%dirx = 0
+          IBP%diry = 0
+          IBP%dirz = 0
+        else
+          dirz = 0
+          IBP%dirz = 0
+          IBP%distx = IBP%distx*t
+          IBP%disty = IBP%disty*t
+          IBP%distz = 0
+        end if
       endif
 
     elseif (free100.and.dirx==1) then  !Only one free direction, use linear interpolation in direction x.
@@ -677,7 +749,8 @@ contains
       IBP%interpdir = 1
 
       if (diry==1.or.dirz==1) then                   !If other dir components nonzero, delete them and
-        t = SB%ClosestOnLineOut(x,y,z,x+IBP%distx,y,z)  !find an intersection of the new vector with the boundary
+        x2 = xU(xi+IBP%dirx)
+        t = SB%ClosestOnLineOut(x,y,z,x2,y,z)  !find an intersection of the new vector with the boundary
         diry = 0
         dirz = 0
         IBP%diry = 0
@@ -693,7 +766,8 @@ contains
       IBP%interpdir = 2
 
       if (dirx==1.or.dirz==1) then
-        t = SB%ClosestOnLineOut(x,y,z,x,y+IBP%disty,z)
+        y2 = yU(yj+IBP%diry)
+        t = SB%ClosestOnLineOut(x,y,z,x,y2,z)
         dirx = 0
         dirz = 0
         IBP%dirx = 0
@@ -709,7 +783,8 @@ contains
       IBP%interpdir = 3
 
       if (dirx==1.or.diry==1) then
-        t = SB%ClosestOnLineOut(x,y,z,x,y,z+IBP%distz)
+        z2 = zU(zk+IBP%dirz)
+        t = SB%ClosestOnLineOut(x,y,z,x,y,z2)
         dirx = 0
         diry = 0
         IBP%dirx = 0
@@ -739,6 +814,18 @@ contains
       write(*,*) "component",IBP%component
       stop
     endif
+    
+if (abs(IBP%distx)>20.or. abs(IBP%disty)>20.or. abs(IBP%distz)>20 ) then
+  print *,"line",__LINE__
+  print *,xi,yj,zk
+  print *,x,y,z
+  print *,xnear,ynear,znear
+  print *,IBP%distx,IBP%disty,IBP%distz
+  print *,Utype(xi,yj,zk)
+  print *,"dir",dirx,diry,dirz
+  print *,free001,free010,free100
+  stop
+end if
 
     allocate(IBP%IntPoints(IBP%interp))
 
@@ -748,7 +835,7 @@ contains
 
 
 
-  subroutine TVelIBPoint_InterpolationCoefs(IBP,xU,yU,zU)
+  recursive subroutine TVelIBPoint_InterpolationCoefs(IBP,xU,yU,zU)
     type(TVelIBpoint),intent(inout)     :: IBP
     real(knd),dimension(-2:),intent(in) :: xU,yU,zU
     real(knd) xr, yr, zr, x(0:3), y(0:3), z(0:3)
@@ -979,7 +1066,7 @@ contains
 
 
 
-  pure subroutine IBLeastSquare2InterpolationCoefs(Coefs,xr,x)
+  subroutine IBLeastSquare2InterpolationCoefs(Coefs,xr,x)!pure
     real(knd),intent(out) :: Coefs(:)
     real(knd),intent(in)  :: xr,x(0:)
     real(knd) :: A1, A2, A4
@@ -1363,18 +1450,18 @@ contains
     allocate(ScalFlIBPoints(ScalFlIBPointsList%Len()))
 
     i = 0
-    call UIBPointsList%ForEach(CopyIBPoint)
+    call UIBPointsList%for_each(CopyIBPoint)
     i = 0
-    call VIBPointsList%ForEach(CopyIBPoint)
+    call VIBPointsList%for_each(CopyIBPoint)
     i = 0
-    call WIBPointsList%ForEach(CopyIBPoint)
+    call WIBPointsList%for_each(CopyIBPoint)
     i = 0
-    call ScalFlIBPointsList%ForEach(CopyIBPoint)
+    call ScalFlIBPointsList%for_each(CopyIBPoint)
 
     contains
 
       subroutine CopyIBPoint(CurrentIBPoint)
-        class(Listable) :: CurrentIBPoint
+        class(*) :: CurrentIBPoint
 
         i = i + 1
 
@@ -1397,7 +1484,8 @@ contains
   end subroutine MoveIBPointsToArray
 
 
-  subroutine AuxNeighbours(Xtype,nx,ny,nz,s) !helper procedure to FindNeighbouringCells
+  subroutine AuxNeighbours(Xtype,nx,ny,nz,s)
+    !helper procedure to FindNeighbouringCells
     integer,intent(in)    :: nx,ny,nz,s
     integer,intent(inout) :: Xtype(s:,s:,s:)
     integer i,j,k
@@ -1407,18 +1495,18 @@ contains
     if (Btype(No)==DIRICHLET.or.Btype(No)==NOSLIP) Xtype(:,ny+1:,:) = -2
     if (Btype(Bo)==DIRICHLET.or.Btype(Bo)==NOSLIP) Xtype(:,:,:0) = -2
     if (Btype(To)==DIRICHLET.or.Btype(To)==NOSLIP) Xtype(:,:,nz+1:) = -2
-    !$omp parallel do private(i,j,k)
+
     do k = 1,nz
       do j = 1,ny
         do i = 1,nx
           if (Xtype(i,j,k)==0.and. &
-              any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)>0.or. &
-                  Xtype(i-1:i+1,j-1:j+1,k-1:k+1)<-1 )) &
+              (any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)>0).or. &
+               any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)<-1) ) ) &
                                                         Xtype(i,j,k) = -1
         end do
       end do
     end do
-    !$omp end parallel do
+
   end subroutine
 
   subroutine FindNeighbouringCells
@@ -1584,7 +1672,7 @@ contains
         if (Utype(i+1,j,k)<=0.or.Utype(i-1,j,k)<=0.or.Utype(i,j+1,k)<=0&
           .or.Utype(i,j-1,k)<=0.or.Utype(i,j,k+1)<=0.or.Utype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xU(-2:),yPr(-2:),zPr(-2:),Utype,1)
-            call  UIBPointsList%Add(IBP)
+            call  UIBPointsList%add(IBP)
         endif
        endif
       enddo
@@ -1598,7 +1686,7 @@ contains
         if (Vtype(i+1,j,k)<=0.or.Vtype(i-1,j,k)<=0.or.Vtype(i,j+1,k)<=0&
           .or.Vtype(i,j-1,k)<=0.or.Vtype(i,j,k+1)<=0.or.Vtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yV(-2:),zPr(-2:),Vtype,2)
-            call  VIBPointsList%Add(IBP)
+            call  VIBPointsList%add(IBP)
         endif
        endif
       enddo
@@ -1612,7 +1700,7 @@ contains
         if (Wtype(i+1,j,k)<=0.or.Wtype(i-1,j,k)<=0.or.Wtype(i,j+1,k)<=0&
           .or.Wtype(i,j-1,k)<=0.or.Wtype(i,j,k+1)<=0.or.Wtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yPr(-2:),zW(-2:),Wtype,3)
-            call  WIBPointsList%Add(IBP)
+            call  WIBPointsList%add(IBP)
         endif
        endif
       enddo
@@ -1626,7 +1714,7 @@ contains
         if (Prtype(i+1,j,k)<=0.or.Prtype(i-1,j,k)<=0.or.Prtype(i,j+1,k)<=0&
           .or.Prtype(i,j-1,k)<=0.or.Prtype(i,j,k+1)<=0.or.Prtype(i,j,k-1)<=0)  then
             call  Create(SIBP,i,j,k)
-            call  ScalFlIBPointsList%Add(SIBP)
+            call  ScalFlIBPointsList%add(SIBP)
         endif
        endif
       enddo
@@ -1635,10 +1723,10 @@ contains
 
     call MoveIBPointsToArray
 
-    call UIBPointsList%Deallocate
-    call VIBPointsList%Deallocate
-    call WIBPointsList%Deallocate
-    call ScalFlIBPointsList%Deallocate
+    call UIBPointsList%deallocate
+    call VIBPointsList%deallocate
+    call WIBPointsList%deallocate
+    call ScalFlIBPointsList%deallocate
 
   end subroutine InitImBoundaries
 
@@ -1652,7 +1740,7 @@ contains
     call InitImBoundaries
 
     call GetSolidBodiesWM
-    
+
   end subroutine GetSolidBodiesBC
 
 

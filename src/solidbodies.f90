@@ -30,6 +30,10 @@ module SolidBodies
     module procedure AddSolidBody_scalar
     module procedure AddSolidBody_array
   end interface
+  
+  interface SolidBody
+    module procedure SolidBody_Init
+  end interface
 
 contains
 
@@ -38,13 +42,13 @@ contains
   subroutine SetCurrentSB(SB,n)
     type(SolidBody),pointer,intent(out) :: SB
     integer,intent(in) :: n
-    class(Listable),pointer :: ptr
+    class(*),pointer :: ptr
     integer i
 
-    call SolidBodiesList%IterRestart
+    call SolidBodiesList%iter_restart
 
     do i = 1,n
-      call SolidBodiesList%IterNext(ptr)
+      call SolidBodiesList%iter_next(ptr)
     enddo
 
     if (associated(ptr)) then
@@ -73,15 +77,15 @@ contains
     !find if the gridpoints lie inside a solid body and write it's number
     !do not nullify the .type arrays, they could have been made nonzero by other unit
 
-    call SolidBodiesList%ForEach(SetPrtype)
-    call SolidBodiesList%ForEach(SetUtype)
-    call SolidBodiesList%ForEach(SetVtype)
-    call SolidBodiesList%ForEach(SetWtype)
+    call SolidBodiesList%for_each(SetPrtype)
+    call SolidBodiesList%for_each(SetUtype)
+    call SolidBodiesList%for_each(SetVtype)
+    call SolidBodiesList%for_each(SetWtype)
 
     contains
 
       subroutine SetPrtype(CurrentSB)
-        class(Listable) :: CurrentSB
+        class(*) :: CurrentSB
         integer i,j,k
 
         select type (CurrentSB)
@@ -103,7 +107,7 @@ contains
       end subroutine
 
       subroutine SetUtype(CurrentSB)
-        class(Listable) :: CurrentSB
+        class(*) :: CurrentSB
         integer i,j,k
 
         select type (CurrentSB)
@@ -125,7 +129,7 @@ contains
       end subroutine
 
       subroutine SetVtype(CurrentSB)
-        class(Listable) :: CurrentSB
+        class(*) :: CurrentSB
         integer i,j,k
 
         select type (CurrentSB)
@@ -147,7 +151,7 @@ contains
       end subroutine
 
       subroutine SetWtype(CurrentSB)
-        class(Listable) :: CurrentSB
+        class(*) :: CurrentSB
         integer i,j,k
 
          select type (CurrentSB)
@@ -245,26 +249,42 @@ contains
 
 
   subroutine AddSolidBody_scalar(SB)
-    class(Body),intent(inout) :: SB
+    type(SolidBody),intent(in) :: SB
     !NOTE: expecting numofbody value unspecified and not important in the calling code
+    type(SolidBody) :: tmp
 
-    SB%numofbody = SolidBodiesList%Len() + 1
+    tmp = SB
+    tmp%numofbody = SolidBodiesList%Len() + 1
 
-    call SolidBodiesList%Add(SB)
+    call SolidBodiesList%add(tmp)
 
   end subroutine
 
   subroutine AddSolidBody_array(SB)
-    class(Body),intent(inout) :: SB(:)
+    type(SolidBody),intent(in) :: SB(:)
     !NOTE: expecting numofbody value unspecified and not important in the calling code
     integer :: i
+    type(SolidBody) :: tmp
     
     do i = 1,size(SB)
-      SB(i)%numofbody = SolidBodiesList%Len() + 1
+      tmp = SB(i)
+      tmp%numofbody = SolidBodiesList%Len() + 1
 
-      call SolidBodiesList%Add(SB(i))
+      call SolidBodiesList%add(tmp)
     end do
 
   end subroutine
+  
+  function SolidBody_Init(gs, z0, temperature_flux, moisture_flux) result(res)
+    type(SolidBody) :: res
+    class(GeometricShape), intent(in) :: gs
+    real(knd), optional, intent(in) :: z0, temperature_flux, moisture_flux
+    
+    allocate(res%GeometricShape, source=gs)
+    if (present(z0)) res%z0 = z0
+    res%rough = res%z0 > 0
+    if (present(temperature_flux)) res%temperature_flux = temperature_flux
+    if (present(moisture_flux)) res%moisture_flux = moisture_flux
+  end function
 
 end module SolidBodies

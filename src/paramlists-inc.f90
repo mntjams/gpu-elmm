@@ -1,20 +1,11 @@
-!example of parametric list usage
-#define STRING32 32
-module str_lists
-#define TYPEPARAM character(STRING32)
-#include "paramlists-inc.f90"
-#undef TYPEPARAM
-end module
-
-module gen_lists
 
   implicit none
   
-  type nil
-  end type
+!   type nil
+!   end type
 
   type list_node
-    class(*),allocatable :: item
+    TYPEPARAM :: item
     type(list_node),pointer :: next =>null()
   end type list_node
 
@@ -34,7 +25,6 @@ module gen_lists
       procedure :: len => list_len
       procedure :: get_first => list_get_first
       procedure :: get_last => list_get_last
-!       procedure :: get_nth => list_get_nth
       procedure :: push => list_push
       procedure :: pop => list_pop
       procedure :: pop_first => list_pop_first
@@ -43,11 +33,11 @@ module gen_lists
   abstract interface
     subroutine for_each_sub(item)
       import
-      class(*),intent(inout) :: item
+      TYPEPARAM,intent(inout) :: item
     end subroutine
     logical function elem_logical_fun(item)
       import
-      class(*),intent(in) :: item
+      TYPEPARAM,intent(in) :: item
     end function
   end interface
 
@@ -65,13 +55,6 @@ module gen_lists
         tmp => node
         node => node%next
 
-        select type (it=>tmp%item)
-        !NOTE: finalization would be better, 
-        !  but not supported by gfortran 4.8
-          class is (list)
-            call it%deallocate()
-        end select
-        
         deallocate(tmp)
       end do
 
@@ -87,7 +70,7 @@ module gen_lists
 
     subroutine list_add(self,item)
       class(list),intent(inout) :: self
-      class(*),intent(in) :: item
+      TYPEPARAM,intent(in) :: item
 
       if (.not.associated(self%last)) then
         allocate(self%first)
@@ -97,7 +80,7 @@ module gen_lists
         self%last => self%last%next
       endif
 
-      allocate(self%last%item, source=item)
+      self%last%item = item
 
       self%length = self%length + 1
 
@@ -114,13 +97,13 @@ module gen_lists
 
     subroutine list_iter_next(self,res)
       class(list),intent(inout) :: self
-      class(*),pointer,intent(out) :: res
+      TYPEPARAM,intent(out) :: res
 
       if (associated(self%iter)) then
-        res => self%iter%item
+        res = self%iter%item
         self%iter => self%iter%next
       else
-        res => null()
+        res = ''
       end if
     end subroutine
 
@@ -132,7 +115,7 @@ module gen_lists
       node => self%first
 
       do while (associated(node))
-        if (allocated(node%item)) call proc(node%item)
+        call proc(node%item)
         node => node%next
       end do
 
@@ -148,10 +131,8 @@ module gen_lists
       node => self%first
 
       do while (associated(node))
-        if (allocated(node%item)) then
-          res =  proc(node%item)
-          if (.not.res) return
-        end if
+        res =  proc(node%item)
+        if (.not.res) return
         node => node%next
       end do
 
@@ -167,10 +148,8 @@ module gen_lists
       node => self%first
 
       do while (associated(node))
-        if (allocated(node%item)) then
-          res =  proc(node%item)
-          if (res) return
-        end if
+        res =  proc(node%item)
+        if (res) return
         node => node%next
       end do
 
@@ -183,54 +162,26 @@ module gen_lists
     end function
     
     function list_get_last(self) result(res)
-      class(*),pointer :: res
+      TYPEPARAM :: res
       class(list),intent(in) :: self
 
-      res => self%last%item
+      if (associated(self%last)) res = self%last%item
     end function
     
     function list_get_first(self) result(res)
-      class(*),pointer :: res
+      TYPEPARAM :: res
       class(list),intent(in) :: self
 
-      res => self%first%item
+      if (associated(self%first)) res = self%first%item
     end function
-!     
-!     function list_get_nth(self,n) result(res)
-!       class(*),pointer :: res
-!       class(list),intent(in) :: self
-!       integer, intent(in) :: n
-!       integer :: i
-!       type(list_node),pointer :: node
-! 
-!       if (associated(self%first).and.self%length>=n) then
-!         node => self%first
-!         i = 1
-!         do
-!           if (i==n) then
-!             res => node%item
-!             exit
-!           else if (i<n.and..not.associated(node%next)) then
-!             res => null()
-!             exit
-!           else
-!             i = i + 1
-!             node => node%next
-!           end if
-!         end do
-!       else
-!         res => null()
-!       end if
-!     end function
-    
     
     subroutine list_pop(self, item)
       class(list),intent(inout) :: self
-      class(*),allocatable,intent(out) :: item
+      TYPEPARAM,intent(out) :: item
       type(list_node),pointer :: node, previous
 
       if (associated(self%last)) then
-        allocate(item, source=self%last%item)
+        item=self%last%item
         
         previous => null()
         node => self%first
@@ -249,25 +200,24 @@ module gen_lists
         self%last => previous
         
         self%length = self%length - 1
-      else
-        allocate(item, source=nil())
+
       end if
     end subroutine
     
     subroutine list_push(self, item)
       class(list),intent(inout) :: self
-      class(*),intent(in) :: item
+      TYPEPARAM,intent(in) :: item
 
       call self%add(item)
     end subroutine
     
     subroutine list_pop_first(self, item)
       class(list),intent(inout) :: self
-      class(*),allocatable,intent(out) :: item
+      TYPEPARAM,intent(out) :: item
       type(list_node),pointer :: node
       
       if (associated(self%first)) then
-        allocate(item, source=self%first%item)
+        item=self%first%item
         
         node => self%first%next
         deallocate(self%first)
@@ -275,16 +225,6 @@ module gen_lists
         
         self%length = self%length - 1
         if (self%length==0) nullify(self%last)
-      else
-        allocate(item, source=nil())
+
       end if
     end subroutine
-end module
-
-module lists
-  use str_lists, only: str_list => list
-  use gen_lists, only: list, nil
-end module lists
-
-
-

@@ -1190,6 +1190,12 @@ implicit none
 
       dist(:) = [WMPoints(i)%distx, WMPoints(i)%disty, WMPoints(i)%distz]
 
+      if (all(dist==0))then
+        write(*,*) "ijk",xi,yj,zk
+        write(*,*) "dist",dist
+        stop "Error, WM point can not be exactly on the wall!"
+      end if
+
       vel(1) = (U(xi,yj,zk)+U(xi-1,yj,zk))/2._knd
       vel(2) = (V(xi,yj,zk)+V(xi,yj-1,zk))/2._knd
       vel(3) = (W(xi,yj,zk)+W(xi,yj,zk-1))/2._knd
@@ -1237,7 +1243,6 @@ implicit none
                            dist, vel, wallvel, prgrad)
 
          else
-
 
            call WMFlatVisc(Viscosity(xi, yj, zk), &
                            WMPoints(i)%ustar, &

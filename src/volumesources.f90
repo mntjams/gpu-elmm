@@ -10,7 +10,7 @@ module VolumeSources
 !   public UResistanceVolumes, VResistanceVolumes, WResistanceVolumes, &
 !          TemperatureFlVolumes, MoistureFlVolumes, ScalarFlVolumes, VolumeSourceBody
 
-  type,extends(Listable) :: GridVolume
+  type :: GridVolume
     integer   :: xi, yj, zk
   end type GridVolume
 
@@ -157,26 +157,26 @@ module VolumeSources
       
 !       !$omp parallel sections
 !       !$omp section
-      call SourceBodiesList%ForEach(GetUCells)
+      call SourceBodiesList%for_each(GetUCells)
 
 !       !$omp section
-      call SourceBodiesList%ForEach(GetVCells)
+      call SourceBodiesList%for_each(GetVCells)
 
 !       !$omp section
-      call SourceBodiesList%ForEach(GetWCells)
+      call SourceBodiesList%for_each(GetWCells)
 
 !       !$omp section
       allocate(ScalarFlVolumesLists(num_of_scalars))
 
       allocate(InsidePr(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
       
-      call SourceBodiesList%ForEach(GetOtherCells)
+      call SourceBodiesList%for_each(GetOtherCells)
 !       !$omp end parallel sections
 
       contains
 
         subroutine GetUCells(PB)
-          class(Listable) :: PB
+          class(*) :: PB
           type(TResistanceVolume) :: elem
           integer i,j,k
 
@@ -191,7 +191,7 @@ module VolumeSources
                        elem%yj = j
                        elem%zk = k
                        elem%flux = PB%get_resistance(xU(i),yPr(j),zPr(k))
-                       call UResistanceVolumesList%Add(elem)
+                       call UResistanceVolumesList%add(elem)
                      end if
                   enddo
                  enddo
@@ -203,7 +203,7 @@ module VolumeSources
         end subroutine
 
         subroutine GetVCells(PB)
-          class(Listable) :: PB
+          class(*) :: PB
           type(TResistanceVolume) :: elem
           integer i,j,k
 
@@ -218,7 +218,7 @@ module VolumeSources
                        elem%yj = j
                        elem%zk = k
                        elem%flux = PB%get_resistance(xPr(i),yV(j),zPr(k))
-                       call VResistanceVolumesList%Add(elem)
+                       call VResistanceVolumesList%add(elem)
                      end if
                   enddo
                  enddo
@@ -230,7 +230,7 @@ module VolumeSources
         end subroutine
 
         subroutine GetWCells(PB)
-          class(Listable) :: PB
+          class(*) :: PB
           type(TResistanceVolume) :: elem
           integer i,j,k
 
@@ -245,7 +245,7 @@ module VolumeSources
                        elem%yj = j
                        elem%zk = k
                        elem%flux = PB%get_resistance(xPr(i),yPr(j),zW(k))
-                       call WResistanceVolumesList%Add(elem)
+                       call WResistanceVolumesList%add(elem)
                      end if
                   enddo
                  enddo
@@ -258,7 +258,7 @@ module VolumeSources
 
         subroutine GetOtherCells(PB)
           use SolarRadiation, only: enable_radiation
-          class(Listable) :: PB
+          class(*) :: PB
           type(TemperatureFlVolume) :: Telem
           type(MoistureFlVolume) :: Melem
           type(ScalarFlVolume) :: Selem
@@ -323,9 +323,9 @@ module VolumeSources
                        
                      end if
 
-                     if (Telem%flux/=0) call TemperatureFlVolumesList%Add(Telem)
+                     if (Telem%flux/=0) call TemperatureFlVolumesList%add(Telem)
 
-                     if (Melem%flux/=0) call MoistureFlVolumesList%Add(Melem)
+                     if (Melem%flux/=0) call MoistureFlVolumesList%add(Melem)
                       
                      
                      if (associated(PB%get_scalar_flux)) then
@@ -334,7 +334,7 @@ module VolumeSources
                          Selem%yj = j
                          Selem%zk = k
                          Selem%flux = PB%get_scalar_flux(xPr(i),yPr(j),zPr(k),sc)
-                         if (Selem%flux/=0) call ScalarFlVolumesLists(sc)%list%Add(Selem)
+                         if (Selem%flux/=0) call ScalarFlVolumesLists(sc)%list%add(Selem)
                        end do
                      end if
                    end if
@@ -399,8 +399,8 @@ module VolumeSources
         r = Ray([xr, yr, zr], &
                 vector_to_sun)
 
-        if ((SolidBodiesList%Any(DoIntersect)) .or. &
-            (SourceBodiesList%Any(DoIntersectPlants))) then
+        if ((SolidBodiesList%any(DoIntersect)) .or. &
+            (SourceBodiesList%any(DoIntersectPlants))) then
           angle_to_sun = 0
         end if
       end if
@@ -443,8 +443,8 @@ module VolumeSources
           do i=1,svf_nrays
             r = Ray([x,y,z],svf_vecs(:,i))
           
-            if (.not.((SolidBodiesList%Any(DoIntersect)) .or. &
-                      (SourceBodiesList%Any(DoIntersectPlants)))) then
+            if (.not.((SolidBodiesList%any(DoIntersect)) .or. &
+                      (SourceBodiesList%any(DoIntersectPlants)))) then
               nfree = nfree + 1
             end if
           end do
@@ -454,7 +454,7 @@ module VolumeSources
         end function
   
         logical function DoIntersect(item) result(res)
-          class(Listable) :: item
+          class(*) :: item
           
           select type (item)
             class is (SolidBody)
@@ -465,7 +465,7 @@ module VolumeSources
         end function
         
         logical function DoIntersectPlants(item) result(res)
-          class(Listable) :: item
+          class(*) :: item
           
           select type (item)
             class is (PlantBody)
@@ -518,21 +518,21 @@ module VolumeSources
 
       i = 0
       component = 1
-      call UResistanceVolumesList%ForEach(CopyPoint)
+      call UResistanceVolumesList%for_each(CopyPoint)
       i = 0
       component = 2
-      call VResistanceVolumesList%ForEach(CopyPoint)
+      call VResistanceVolumesList%for_each(CopyPoint)
       i = 0
       component = 3
-      call WResistanceVolumesList%ForEach(CopyPoint)
+      call WResistanceVolumesList%for_each(CopyPoint)
       i = 0
-      call TemperatureFlVolumesList%ForEach(CopyPoint)
+      call TemperatureFlVolumesList%for_each(CopyPoint)
       i = 0
-      call MoistureFlVolumesList%ForEach(CopyPoint)
+      call MoistureFlVolumesList%for_each(CopyPoint)
 
       do j=1,num_of_scalars
         i = 0
-        call ScalarFlVolumesLists(j)%list%ForEach(CopyPoint)
+        call ScalarFlVolumesLists(j)%list%for_each(CopyPoint)
       end do
       
       if (enable_radiation==1) call SaveFluxes
@@ -540,7 +540,7 @@ module VolumeSources
       contains
 
         subroutine CopyPoint(elem)
-          class(Listable) :: elem
+          class(*) :: elem
 
           i = i + 1
 

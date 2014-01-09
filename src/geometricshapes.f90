@@ -106,9 +106,7 @@ module GeometricShapes
   type,extends(GeometricShape) :: Plane
     real(knd) a,b,c,d      !ax+by+cz+d/=0 for inner half-space
     logical gl             !T > in ineq. above F < in ineq. above
-    logical :: rough = .false.!T rough surface, F flat surface
-    real(knd) z0           !roughness parameter
-  contains
+   contains
     procedure :: InsideEps => Plane_Inside
     procedure :: Closest => Plane_Closest
   end type
@@ -138,8 +136,6 @@ module GeometricShapes
 
   type,extends(GeometricShape) :: Sphere
     real(knd) xc,yc,zc,r
-    logical :: rough = .false. !T rough surface, F flat surface
-    real(knd) :: z0 = 0           !roughness parameter
   contains
     procedure,private :: InsideEps => Sphere_Inside
     procedure :: Closest => Sphere_Closest
@@ -149,8 +145,6 @@ module GeometricShapes
 
   type,extends(GeometricShape) :: Ellipsoid
     real(knd) xc,yc,zc,a,b,c
-    logical :: rough = .false. !T rough surface, F flat surface
-    real(knd) z0            !roughness parameter
   contains
     procedure,private :: InsideEps => Ellipsoid_Inside
     procedure :: Closest => Ellipsoid_Closest
@@ -163,7 +157,6 @@ module GeometricShapes
     real(knd) a,b,c
     real(knd) r
     logical :: rough = .false. !T rough surface, F flat surface
-    real(knd) z0            !roughness parameter
   contains
     procedure :: InsideEps => CylJacket_Inside
     procedure :: Closest => CylJacket_Closest
@@ -188,7 +181,7 @@ module GeometricShapes
 
 
   type,extends(GeometricShape) :: Terrain
-    type(TerrainPoint),dimension(:,:),allocatable :: UPoints,VPoints,PrPoints !allocate with a buffer of width 1 (i.e. 0:Xnx)
+    type(TerrainPoint),dimension(:,:),allocatable :: UPoints,VPoints,PrPoints !allocate with a buffer of width 1 (i.e. 0:Xnx+1)
   contains
     procedure,private :: InsideEps => Terrain_Inside
     procedure,private,nopass,non_overridable :: GridCoords => Terrain_GridCoords
@@ -269,6 +262,11 @@ module GeometricShapes
   
   interface Ellipsoid
     module procedure Ellipsoid_Init
+  end interface
+  
+  interface Terrain
+    module procedure Terrain_Init_function
+    module procedure Terrain_Init_uniform_DEM
   end interface
   
   interface Translation
@@ -563,8 +561,8 @@ contains
     real(knd),intent(in) ::x,y,z
     real(knd) t
 
-    if (abs(self%a)>tiny(1._knd).and. &
-        abs(self%b)>tiny(1._knd).and. &
+    if (abs(self%a)>tiny(1._knd).or. &
+        abs(self%b)>tiny(1._knd).or. &
         abs(self%c)>tiny(1._knd)) then
       t = -(self%a*x+self%b*y+self%c*z+self%d)/(self%a**2+self%b**2+self%c**2)
     else
@@ -1013,11 +1011,10 @@ contains
   
   
 
-  function Ellipsoid_Init(xc,yc,zc,a,b,c,rough,z0) result(res)
+  function Ellipsoid_Init(xc,yc,zc,a,b,c,rough) result(res)
     type(Ellipsoid) :: res
     real(knd),intent(in) :: xc, yc, zc, a, b, c
     logical,intent(in),optional :: rough
-    real(knd),intent(in),optional :: z0
     
     res%xc = xc
     res%yc = yc
@@ -1025,8 +1022,6 @@ contains
     res%a  = a
     res%b  = b
     res%c  = c
-    if (present(rough)) res%rough = rough
-    if (present(z0)) res%z0 = z0
     
     res%bbox%xmin = xc - a
     res%bbox%xmax = xc + a
@@ -1073,7 +1068,7 @@ contains
      type(Ray) :: r2
      !FIXME: constructors contain irrelevant properties and no keywords due to problem in ifort as of version 14
      type(Sphere),parameter :: unit_sphere = Sphere( Bbox(0,0,0,0,0,0), 0._knd,  0._knd,&
-                                                      0._knd,  1._knd,  .false.,  0)
+                                                      0._knd,  1._knd)
      r2 = Ray((r%xc - self%xc)/self%a, (r%yc - self%yc)/self%b, (r%zc - self%zc)/self%c, &
                   r%a/self%a, r%b/self%b, r%c/self%c )
      
@@ -1296,9 +1291,9 @@ contains
 
     endif
 
-    distPr = (x-xPr(xPri))**2+(y-yPr(yPrj))**2
-    distU = (x-xU(xUi))**2+(y-yPr(yPrj))**2
-    distV = (x-xPr(xPri))**2+(y-yV(yVj))**2
+    distPr = hypot(x-xPr(xPri), y-yPr(yPrj))
+    distU = hypot(x-xU(xUi), y-yPr(yPrj))
+    distV = hypot(x-xPr(xPri), y-yV(yVj))
 
     if (distU<distPr.and.distU<distV) then
      xi = xUi
@@ -1358,7 +1353,7 @@ contains
      Pl%a = a
      Pl%b = b
      Pl%c = -1._knd
-     Pl%d = -a*x-b*y+zloc
+     Pl%d = - a*xU(xi) - b*yPr(yj) + zloc
 
      call Pl%Closest(xnear,ynear,znear,x,y,z)
 
@@ -1371,7 +1366,7 @@ contains
      Pl%a = a
      Pl%b = b
      Pl%c = -1._knd
-     Pl%d = -a*x-b*y+zloc
+     Pl%d = - a*xPr(xi) - b*yV(yj) + zloc
 
      call Pl%Closest(xnear,ynear,znear,x,y,z)
 
@@ -1384,12 +1379,143 @@ contains
      Pl%a = a
      Pl%b = b
      Pl%c = -1._knd
-     Pl%d = - a*x - b*y + zloc
+     Pl%d = - a*xPr(xi) - b*yPr(yj) + zloc
 
      call Pl%Closest(xnear,ynear,znear,x,y,z)
 
     endif
   end subroutine Terrain_Closest
+  
+  
+  
+  function Terrain_Init_function(fz, z0) result(res)
+    type(Terrain) :: res
+    interface
+      real(knd) function fz(x,y)
+        import
+        real(knd), intent(in) :: x,y
+      end function
+    end interface
+    real(knd), optional, intent(in) :: z0
+    real(knd) :: z0_l
+    logical :: rough
+     integer :: i,j
+   
+    if (present(z0)) then
+      z0_l = z0
+      rough = .true.
+    else
+      if (z0B > 0) then
+        rough = .true.
+        z0_l = z0B
+      else
+        rough = .false.
+        z0_l = 0
+      end if
+    end if
+    
+    allocate(res%PrPoints(0:Prnx+1,0:Prny+1))
+    allocate(res%UPoints(0:Unx+1,0:Uny+1))
+    allocate(res%VPoints(0:Vnx+1,0:Vny+1))
+    
+    do j = 0, Prny+1
+      do i = 0, Prnx+1
+        res%PrPoints(i,j)%elev = fz(xPr(i), yPr(j))
+        res%PrPoints(i,j)%rough = .true.
+        res%PrPoints(i,j)%z0 = z0_l
+      end do
+    end do
+    
+    do j = 0, Uny+1
+      do i = 0, Unx+1
+        res%UPoints(i,j)%elev = fz(xU(i), yPr(j))
+        res%UPoints(i,j)%rough = rough
+        res%UPoints(i,j)%z0 = z0_l
+      end do
+    end do
+    
+    do j = 0, Vny+1
+      do i = 0, Vnx+1
+        res%VPoints(i,j)%elev = fz(xPr(i), yV(j))
+        res%VPoints(i,j)%rough = rough
+        res%VPoints(i,j)%z0 = z0_l
+      end do
+    end do
+    
+    res%bbox%xmin = xPr(0)
+    res%bbox%xmax = xPr(Prnx+1)
+    res%bbox%ymin = yPr(0)
+    res%bbox%ymax = yPr(Prny+1)
+    res%bbox%zmin = -huge(1.)
+    res%bbox%zmax = max(maxval(res%PrPoints%elev), &
+                        maxval(res%UPoints%elev), &
+                        maxval(res%VPoints%elev))
+    
+  end function
+
+
+
+  
+  function Terrain_Init_uniform_DEM(xyz, z0) result(res)
+    use ElevationModels, only: uniform_DEM
+    type(Terrain) :: res
+    class(uniform_DEM), intent(in) :: xyz
+    real(knd), optional, intent(in) :: z0
+    real(knd) :: z0_l
+    logical :: rough
+    integer :: i,j
+    
+    if (present(z0)) then
+      z0_l = z0
+      rough = .true.
+    else
+      if (z0B > 0) then
+        rough = .true.
+        z0_l = z0B
+      else
+        rough = .false.
+        z0_l = 0
+      end if
+    end if
+    
+    allocate(res%PrPoints(0:Prnx+1,0:Prny+1))
+    allocate(res%UPoints(0:Unx+1,0:Uny+1))
+    allocate(res%VPoints(0:Vnx+1,0:Vny+1))
+    
+    do j = 0, Prny+1
+      do i = 0, Prnx+1
+        res%PrPoints(i,j)%elev = xyz%elevation(xPr(i), yPr(j))
+        res%PrPoints(i,j)%rough = .true.
+        res%PrPoints(i,j)%z0 = z0_l
+      end do
+    end do
+    
+    do j = 0, Uny+1
+      do i = 0, Unx+1
+        res%UPoints(i,j)%elev = xyz%elevation(xU(i), yPr(j))
+        res%UPoints(i,j)%rough = rough
+        res%UPoints(i,j)%z0 = z0_l
+      end do
+    end do
+    
+    do j = 0, Vny+1
+      do i = 0, Vnx+1
+        res%VPoints(i,j)%elev = xyz%elevation(xPr(i), yV(j))
+        res%VPoints(i,j)%rough = rough
+        res%VPoints(i,j)%z0 = z0_l
+      end do
+    end do
+    
+    res%bbox%xmin = xPr(0)
+    res%bbox%xmax = xPr(Prnx+1)
+    res%bbox%ymin = yPr(0)
+    res%bbox%ymax = yPr(Prny+1)
+    res%bbox%zmin = -huge(1.)
+    res%bbox%zmax = max(maxval(res%PrPoints%elev), &
+                        maxval(res%UPoints%elev), &
+                        maxval(res%VPoints%elev))
+                        
+  end function
 
 
 
@@ -1961,8 +2087,6 @@ contains
 
         if (count_multispaces(line) == 4) then
           read(line,*,iostat=io) Pl%a,Pl%b,Pl%c,Pl%d,Pl%gl
-        else if (count_multispaces(line) == 6) then
-          read(line,*,iostat=io) Pl%a,Pl%b,Pl%c,Pl%d,Pl%gl,Pl%rough, Pl%z0
         else
           io = 999
         end if
@@ -2019,8 +2143,6 @@ contains
             
             call add_element(items,poly)
 
-!               items = [items, poly]
-
            end if
         end if
 
@@ -2076,8 +2198,6 @@ contains
 
         if (count_multispaces(line) == 4) then
           read(line,*,iostat=io) Pl%a,Pl%b,Pl%c,Pl%d,Pl%gl
-        else if (count_multispaces(line) == 6) then
-          read(line,*,iostat=io) Pl%a,Pl%b,Pl%c,Pl%d,Pl%gl,Pl%rough, Pl%z0
         else
           io = 999
         end if
@@ -2113,7 +2233,6 @@ end module GeometricShapes
 
 module Body_class
   use Kinds, only: knd
-  use Lists, only: Listable
   use GeometricShapes, only: GeometricShape, Ray
   use Parameters
   
@@ -2124,7 +2243,7 @@ module Body_class
   public Body,Inside
 
 
-  type, extends(Listable),abstract :: Body
+  type,abstract :: Body
      integer numofbody
      class(GeometricShape),allocatable :: GeometricShape
   contains
@@ -2196,21 +2315,28 @@ contains
 
 
 
-  real(knd) function ClosestOnLineOut(self,x,y,z,x2,y2,z2) !Find t, such that x+(x2-x)*t lies on the boundary of the SB
+  real(knd) function ClosestOnLineOut(self,x,y,z,x2,y2,z2) result(t)
+  !Find t, such that x+(x2-x)*t lies on the boundary of the SB
     class(Body),intent(in) :: self
     real(knd),intent(in) :: x,y,z,x2,y2,z2
 
-    real(knd) t,t1,t2
+    real(knd) t1,t2
     integer i
 
     t1 = 0
     t2 = 1
+    !First, find a point lying outside. We should have the right direction.
     if (self%Inside(x2,y2,z2)) then
      do
-      t2 = t2*2._knd
+      t2 = t2*1.1_knd
       if (.not. self%Inside(x+(x2-x)*t2,y+(y2-y)*t2,z+(z2-z)*t2)) exit
+      if (t2>2) then
+        t = 10
+        return
+      end if
      enddo
     endif
+    
     t = (t1+t2)/2._knd
 
     do i = 1,20         !The bisection method with maximum 20 iterations (should be well enough)
@@ -2222,7 +2348,7 @@ contains
      t = (t1+t2)/2._knd
      if (abs(t1-t2)<MIN(dxmin/1000._knd,dymin/1000._knd,dzmin/1000._knd))   exit
     enddo
-    ClosestOnLineOut = t
+
   end function ClosestOnLineOut
 
   logical function IntersectsRay(self,r) result(intersects)

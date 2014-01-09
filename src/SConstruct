@@ -66,7 +66,7 @@ else:
   if str(fast)=='yes':
     fast_flag = ' -Ofast'# -Warray-temporaries'
   else:
-   fast_flag = ' -fcheck=all -Wall -Wsurprising -Waliasing -Wimplicit-interface -Wno-unused-dummy-argument -Wno-unused -Werror'
+   fast_flag = ' -fcheck=all -ffpe-trap=zero,overflow,invalid -Wall -Wsurprising -Waliasing -Wimplicit-interface -Wno-unused-dummy-argument -Wno-unused -Werror'
   
   if str(lto)=='yes':
     lto_flag = ' -flto'
@@ -75,7 +75,7 @@ else:
 
   env.Replace(F90='gfortran')
   
-  env.Append(F90FLAGS='-cpp -fbacktrace -g -ffpe-trap=zero,overflow,invalid -fstack-arrays')
+  env.Append(F90FLAGS='-cpp -fbacktrace -g -fstack-arrays -static')
 
   env.Append(LIBPATH = ['/usr/local/poisfft_gcc/'])
 
@@ -170,6 +170,7 @@ env.Append(LIBS = ['CGAL'])
 #objs += env.Object(target=target_dir+'dummy_cgal_polyhedra',  source='dummy_cgal_polyhedra.f90')
 
 
+objs += env.Object(target=target_dir+'elevationmodels',source='elevationmodels.f90')
 objs += env.Object(target=target_dir+'geometricshapes',source='geometricshapes.f90')
 objs += env.Object(target=target_dir+'solidbodies',    source='solidbodies.f90')
 objs += env.Object(target=target_dir+'immersedboundary',source='immersedboundary.f90')
