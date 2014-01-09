@@ -36,7 +36,7 @@ contains
     integer(DBL), save :: trate
     integer(DBL), save :: time1, time2, time3, time4
     integer(DBL), save :: timem1, timem2, timem3, timem4
-
+correctcompatibility = 2
     if (called==0) then
       allocate(Phi(0:Prnx+1,0:Prny+1,0:Prnz+1))
       allocate(RHS(0:Prnx+1,0:Prny+1,0:Prnz+1))
@@ -85,7 +85,7 @@ contains
 
     if (debugparam>1.and.called>1) call system_clock(count=time2)
 
-    if (correctcompatibility==1) write(*,*) "Uncompatibility:",uncompatibility
+    if (correctcompatibility>=1) write(*,*) "Uncompatibility:",uncompatibility
 
     write(*,*) "avgRHS:",divergence
 
@@ -178,7 +178,7 @@ contains
     !$omp end sections
     !$omp end parallel
 
-    if (correctcompatibility==1) then
+    if (correctcompatibility>=1) then
       S=0
       !$omp parallel do private(i,j,k) reduction(+:S)
       do k=1,Prnz
@@ -194,11 +194,12 @@ contains
       S=S*dxmin/(Prny*Prnz)
 
       uncompatibility = S
-
-      !$omp parallel workshare
-      U(Unx+1,:,:) = U(Unx+1,:,:)+S
-      !$omp end parallel workshare
-
+      
+      if (correctcompatibility==1) then
+        !$omp parallel workshare
+        U(Unx+1,:,:) = U(Unx+1,:,:)+S
+        !$omp end parallel workshare
+      end if
     end if
 
     S=0
