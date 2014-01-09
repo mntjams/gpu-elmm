@@ -59,7 +59,7 @@ module vtkarray
       write (unit,"(A)") "SCALARS array float"
       write (unit,"(A)") "LOOKUP_TABLE default"
 
-      write (unit,'(99999999(g0,/))') A(1:nx,1:ny,1:nz)
+      write (unit,'(*(g0,/))') A(1:nx,1:ny,1:nz)
 
       write (unit,*)
       close(unit)
@@ -108,7 +108,7 @@ module vtkarray
       write (unit,"(A)") "SCALARS array float"
       write (unit,"(A)") "LOOKUP_TABLE default"
 
-      write (unit,'(99999999(g0,/))') A(1:nx,1:ny,1:nz)
+      write (unit,'(*(g0,/))') A(1:nx,1:ny,1:nz)
 
       write (unit,*)
       close(unit)
