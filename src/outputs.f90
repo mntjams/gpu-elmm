@@ -118,8 +118,8 @@ module Outputs
 
 
     integer :: out_U = 1
-    integer :: out_vorticity = 1
-    integer :: out_Pr = 1
+    integer :: out_vorticity = 0
+    integer :: out_Pr = 0
     integer :: out_Prtype = 0
     integer :: out_lambda2 = 0
     integer :: out_temperature = 1
