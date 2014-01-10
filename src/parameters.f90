@@ -69,7 +69,7 @@ module Parameters
 
   real(knd) :: z0W,z0E,z0S,z0N,z0B,z0T
 
-  real(knd) :: windangle
+  real(knd) :: windangle = 0
 
   real(knd),dimension(:),allocatable :: scalsrcx,scalsrcy,scalsrcz
 
@@ -146,8 +146,9 @@ module Parameters
                        ScalarTypeMoisture = 2, &
                        ScalarTypePassive = 3
 
-  integer,parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6,&  !boundary condition types
-                        TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10, RADIATION=7, AUTOMATICFLUX=11
+  integer,parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6, &  !boundary condition types
+                        TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10, RADIATION=7, &
+                        NEUMANN_BUFF=8, AUTOMATICFLUX=11
   !inlet types
   integer,parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
                        ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5
