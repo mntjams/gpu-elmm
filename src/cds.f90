@@ -986,11 +986,12 @@ module CDS
               if (Utype(i,j,k)==0) then
                 dU =     9 * (UV1(li+1,lj,lk) - UV1(li  ,lj,lk))
                 dU = dU -    (UV3(li+2,lj,lk) - UV3(li-1,lj,lk))/3
+                U2(i,j,k) = U2(i,j,k) + dU / dxmin
               else if (Utype(i,j,k)<0) then  !near a boundary - 2nd order
                 dU = coef2ord * ((U(i+1,j,k)+U(i  ,j,k)) * (U(i+1,j,k)+U(i  ,j,k)) &
                                 -(U(i  ,j,k)+U(i-1,j,k)) * (U(i  ,j,k)+U(i-1,j,k)))
+                U2(i,j,k) = U2(i,j,k) + dU / dxmin
               end if
-              U2(i,j,k) = U2(i,j,k) + dU / dxmin
             end do
            end do
           end do
@@ -1029,11 +1030,12 @@ module CDS
               if (Utype(i,j,k)==0) then
                 dU =     9 * (UV1(li,lj  ,lk) - UV1(li,lj-1,lk))
                 dU = dU -    (UV3(li,lj+1,lk) - UV3(li,lj-2,lk))/3
+                U2(i,j,k) = U2(i,j,k) + dU / dymin
               else if (Utype(i,j,k)<0) then  !near a boundary - 2nd order
                 dU = coef2ord * ((U(i,j+1,k)+U(i,j  ,k)) * (V(i+1,j  ,k)+V(i,j  ,k)) &
                                 -(U(i,j  ,k)+U(i,j-1,k)) * (V(i+1,j-1,k)+V(i,j-1,k)))
+                U2(i,j,k) = U2(i,j,k) + dU / dymin
               end if
-              U2(i,j,k) = U2(i,j,k) + dU / dymin
             end do
            end do
           end do
@@ -1072,11 +1074,12 @@ module CDS
               if (Utype(i,j,k)==0) then
                 dU =     9 * (UV1(li,lj,lk  ) - UV1(li,lj,lk-1))
                 dU = dU -    (UV3(li,lj,lk+1) - UV3(li,lj,lk-2))/3
+                U2(i,j,k) = U2(i,j,k) + dU / dzmin
               else if (Utype(i,j,k)<0) then  !near a boundary - 2nd order
                 dU = coef2ord * ((U(i,j,k+1)+U(i,j,k  )) * (W(i+1,j,k  )+W(i,j,k  )) &
                                 -(U(i,j,k  )+U(i,j,k-1)) * (W(i+1,j,k-1)+W(i,j,k-1)))
+                U2(i,j,k) = U2(i,j,k) + dU / dzmin
               end if
-              U2(i,j,k) = U2(i,j,k) + dU / dzmin
             end do
            end do
           end do
@@ -1147,11 +1150,12 @@ module CDS
               if (Vtype(i,j,k)==0) then
                 dV =     9 * (UV1(li  ,lj,lk) - UV1(li-1,lj,lk))
                 dV = dV -    (UV3(li+1,lj,lk) - UV3(li-2,lj,lk))/3
+                V2(i,j,k) = V2(i,j,k) + dV / dxmin
               else if (Vtype(i,j,k)<0) then  !near a boundary - 2nd order
                 dV = coef2ord * ((V(i+1,j,k)+V(i  ,j,k)) * (U(i  ,j+1,k)+U(i  ,j,k)) &
                                 -(V(i  ,j,k)+V(i-1,j,k))  *(U(i-1,j+1,k)+U(i-1,j,k)))
+                V2(i,j,k) = V2(i,j,k) + dV / dxmin
               end if
-              V2(i,j,k) = V2(i,j,k) + dV / dxmin
             end do
            end do
           end do
@@ -1190,11 +1194,12 @@ module CDS
               if (Vtype(i,j,k)==0) then
                 dV =     9 * (UV1(li,lj+1,lk) - UV1(li,lj  ,lk))
                 dV = dV -    (UV3(li,lj+2,lk) - UV3(li,lj-1,lk))/3
+                V2(i,j,k) = V2(i,j,k) + dV / dymin
               else if (Vtype(i,j,k)<0) then  !near a boundary - 2nd order
                 dV = coef2ord * ((V(i,j+1,k)+V(i,j  ,k)) * (V(i,j+1,k)+V(i,j  ,k)) &
                                 -(V(i,j  ,k)+V(i,j-1,k)) * (V(i,j  ,k)+V(i,j-1,k)))
+                V2(i,j,k) = V2(i,j,k) + dV / dymin
               end if
-              V2(i,j,k) = V2(i,j,k) + dV / dymin
             end do
            end do
           end do
@@ -1233,11 +1238,12 @@ module CDS
               if (Vtype(i,j,k)==0) then
                 dV =     9 * (UV1(li,lj,lk  ) - UV1(li,lj,lk-1))
                 dV = dV -    (UV3(li,lj,lk+1) - UV3(li,lj,lk-2))/3
+                V2(i,j,k) = V2(i,j,k) + dV / dzmin
               else if (Vtype(i,j,k)<0) then  !near a boundary - 2nd order
                 dV = coef2ord * ((V(i,j,k+1)+V(i,j,k  )) * (W(i,j+1,k  )+W(i,j,k  )) &
                                 -(V(i,j,k  )+V(i,j,k-1)) * (W(i,j+1,k-1)+W(i,j,k-1)))
+                V2(i,j,k) = V2(i,j,k) + dV / dzmin
               end if
-              V2(i,j,k) = V2(i,j,k) + dV / dzmin
             end do
            end do
           end do
@@ -1313,11 +1319,12 @@ module CDS
               if (Wtype(i,j,k)==0) then
                 dW =     9 * (UV1(li  ,lj,lk) - UV1(li-1,lj,lk))
                 dW = dW -    (UV3(li+1,lj,lk) - UV3(li-2,lj,lk))/3
+                W2(i,j,k) = W2(i,j,k) + dW / dxmin
               else if (Wtype(i,j,k)<0) then  !near a boundary - 2nd order
                 dW = coef2ord * ((W(i+1,j,k)+W(i  ,j,k)) * (U(i  ,j,k+1)+U(i  ,j,k)) &
                                 -(W(i  ,j,k)+W(i-1,j,k)) * (U(i-1,j,k+1)+U(i-1,j,k)))
+                W2(i,j,k) = W2(i,j,k) + dW / dxmin
               end if
-              W2(i,j,k) = W2(i,j,k) + dW / dxmin
             end do
            end do
           end do
@@ -1356,11 +1363,12 @@ module CDS
               if (Wtype(i,j,k)==0) then
                 dW =     9 * (UV1(li,lj  ,lk) - UV1(li,lj-1,lk))
                 dW = dW -    (UV3(li,lj+1,lk) - UV3(li,lj-2,lk))/3
+                W2(i,j,k) = W2(i,j,k) + dW / dymin
               else if (Wtype(i,j,k)<0) then  !near a boundary - 2nd order
                 dW = coef2ord * ((W(i,j+1,k)+W(i,j  ,k)) * (V(i,j,k+1)+V(i,j  ,k  )) &
                                 -(W(i,j  ,k)+W(i,j-1,k)) * (V(i,j-1,k)+V(i,j-1,k+1)))
+                W2(i,j,k) = W2(i,j,k) + dW / dymin
               end if
-              W2(i,j,k) = W2(i,j,k) + dW / dymin
             end do
            end do
           end do
@@ -1399,11 +1407,12 @@ module CDS
               if (Wtype(i,j,k)==0) then
                 dW =     9 * (UV1(li,lj,lk+1) - UV1(li,lj,lk  ))
                 dW = dW -    (UV3(li,lj,lk+2) - UV3(li,lj,lk-1))/3
+                W2(i,j,k) = W2(i,j,k) + dW / dzmin
               else if (Wtype(i,j,k)<0) then  !near a boundary - 2nd order
                 dW = coef2ord * ((W(i,j,k+1)+W(i,j,k  )) * (W(i,j,k+1)+W(i,j,k  )) &
                                 -(W(i,j,k  )+W(i,j,k-1)) * (W(i,j,k  )+W(i,j,k-1)))
+                W2(i,j,k) = W2(i,j,k) + dW / dzmin
               end if
-              W2(i,j,k) = W2(i,j,k) + dW / dzmin
             end do
            end do
           end do
