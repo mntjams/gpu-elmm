@@ -372,10 +372,12 @@ implicit none
     WMP%depscalar = 0
     WMP%evaporative_fraction = 0.1
 
+    !type==0 below, therefore we need 
+    ! type of free bounderies not to be -1
     if (Btype(We)==NOSLIP) then
       do k = 1,Prnz
        do j = 1,Prny
-         if (Prtype(1,j,k)<=0) then
+         if (Prtype(1,j,k)==0) then
            WMP%xi = 1
            WMP%yj = j
            WMP%zk = k
@@ -394,7 +396,7 @@ implicit none
     if (Btype(Ea)==NOSLIP) then
       do k = 1,Prnz
        do j = 1,Prny
-         if (Prtype(Prnx,j,k)<=0) then
+         if (Prtype(Prnx,j,k)==0) then
            WMP%xi = Prnx
            WMP%yj = j
            WMP%zk = k
@@ -413,7 +415,7 @@ implicit none
     if (Btype(So)==NOSLIP.or.(Btype(So)==DIRICHLET.and.sideU(2,So)==0)) then
       do k = 1,Prnz
        do i = 1,Prnx
-         if (Prtype(i,1,k)<=0) then
+         if (Prtype(i,1,k)==0) then
            WMP%xi = i
            WMP%yj = 1
            WMP%zk = k
@@ -438,7 +440,7 @@ implicit none
     if (Btype(No)==NOSLIP.or.(Btype(No)==DIRICHLET.and.sideU(2,No)==0)) then
       do k = 1,Prnz
        do i = 1,Prnx
-         if (Prtype(i,Prny,k)<=0) then
+         if (Prtype(i,Prny,k)==0) then
            WMP%xi = i
            WMP%yj = Prny
            WMP%zk = k
@@ -463,7 +465,7 @@ implicit none
     if (Btype(Bo)==NOSLIP.or.(Btype(Bo)==DIRICHLET.and.sideU(3,Bo)==0)) then
       do j = 1,Prny
        do i = 1,Prnx
-         if (Prtype(i,j,1)<=0) then
+         if (Prtype(i,j,1)==0) then
 
            WMP%xi = i
            WMP%yj = j
@@ -502,7 +504,7 @@ implicit none
 
       do j = 1,Prny
        do i = 1,Prnx
-         if (Prtype(i,j,Prnz)<=0) then
+         if (Prtype(i,j,Prnz)==0) then
            WMP%xi = i
            WMP%yj = j
            WMP%zk = Prnz
