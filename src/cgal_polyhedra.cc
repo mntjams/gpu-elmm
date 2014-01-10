@@ -28,7 +28,7 @@ typedef CGAL::Bbox_3 Bbox_3;
 
 typedef struct {double x,y,z;} d3;
 
-typedef struct {Polyhedron *poly; Tree * tree;} Polytree;
+typedef struct {Polyhedron *poly; Tree *tree;} Polytree;
 
 using std::cout;
 using std::endl;
@@ -71,7 +71,7 @@ extern "C" {
                 Point(outside_ref->x,outside_ref->y,outside_ref->z));
     
     int n = ptree->tree->number_of_intersected_primitives(seg);
-    
+
     return n%2 == 1;
   }
   
