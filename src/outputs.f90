@@ -845,6 +845,10 @@ contains
         call Save(StaggeredFrameDomains(i), time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
       end do
     end if
+    
+    if (mod(endstep,1000) == 0) then
+      call OutputTimeSeries
+    end if
 
   end subroutine OutTstep
 
@@ -899,14 +903,13 @@ contains
   end subroutine AddSubgridRMS
 
 
-
-  subroutine OutputProfiles
+  subroutine OutputTimeSeries
     character(5) :: prob
     real(knd) :: S,S2,nom,denom
     integer :: i,j,k,unit
 
     call newunit(unit)
-
+    
     do k = 1,size(probes)
 
       write(prob,"(i0)") k
@@ -1036,7 +1039,18 @@ contains
       end do
       close(unit)
     end if
+    
+  end subroutine OutputTimeSeries
+  
+  
+  
 
+  subroutine OutputProfiles
+    character(5) :: prob
+    real(knd) :: S,S2,nom,denom
+    integer :: i,j,k,unit
+
+    call newunit(unit)
 
     if (store%BLprofiles==1.and.averaging==1) then
 
@@ -2104,6 +2118,8 @@ contains
     call OutputScalars(Scalar)
 
     call OutputUVW(U,V,W,"U.vtk","V.vtk","W.vtk")
+    
+    call OutputTimeSeries
 
     if (averaging==1.and.time>=timeavg1) then
 
@@ -2474,13 +2490,13 @@ contains
         do k = mink,maxk
          do j = minj,maxj
           do i = mini,maxi
-            if (Prtype(i,j,k)<=0) then
+!             if (Prtype(i,j,k)<=0) then
               vbuffer(:,i,j,k) = real([ (U(i,j,k)+U(i-1,j,k))/2, &
                                         (V(i,j,k)+V(i,j-1,k))/2, &
                                         (W(i,j,k)+W(i,j,k-1))/2 ], real32)
-            else
-              vbuffer(:,i,j,k) = 0
-            end if
+!             else
+!               vbuffer(:,i,j,k) = 0
+!             end if
           end do
          end do
         end do
