@@ -17,7 +17,7 @@ contains
     integer                  :: neighbours(3,6)
     real(knd)     :: dist,nearx,neary,nearz
     integer       :: i,j,k,m,n,o,p
-    integer       :: nb
+    integer       :: nb, n_neighbours
 
     allocate(WMP%depscalar(num_of_scalars))
 
@@ -36,11 +36,15 @@ contains
        if (Prtype(i,j,k)<=0) then
         dist = huge(dist)
         nb = 0
-
+        n_neighbours=0
+        
+        if (k==1.and.((Btype(Bo)==DIRICHLET).or.(Btype(Bo)==NOSLIP))) n_neighbours = n_neighbours + 1
+         
         do p=1,6
            m=neighbours(1,p)
            n=neighbours(2,p)
            o=neighbours(3,p)
+           if (Prtype(i+m,j+n,k+o)>0) n_neighbours = n_neighbours + 1
            if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs([m,n,o]))==1)) then
              call SetCurrentSB(CurrentSB,Prtype(i+m,j+n,k+o))
              call CurrentSB%Closest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
@@ -51,7 +55,31 @@ contains
            endif
         enddo
 
-        if (nb>0) then
+        if (nb>0.and.n_neighbours==1) then
+          if (k==1) then
+            dist = huge(dist)
+            nb = 0
+            n_neighbours=0
+            if (k==1.and.((Btype(Bo)==DIRICHLET).or.(Btype(Bo)==NOSLIP))) n_neighbours = n_neighbours + 1
+            do p=1,6
+               m=neighbours(1,p)
+               n=neighbours(2,p)
+               o=neighbours(3,p)
+               
+               if (Prtype(i+m,j+n,k+o)>0) n_neighbours = n_neighbours + 1
+
+               if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs([m,n,o]))==1)) then
+                 call SetCurrentSB(CurrentSB,Prtype(i+m,j+n,k+o))
+                 call CurrentSB%Closest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
+                 if (sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
+                  dist = sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
+                  nb = Prtype(i+m,j+n,k+o)
+
+                 endif
+               endif
+            enddo
+            stop "????"
+          end if
           call SetCurrentSB(CurrentSB,nb)
           WMP%xi = i
           WMP%yj = j
@@ -326,7 +354,10 @@ module ImmersedBoundary
     module procedure ScalFlIBPtoIBP
   end interface
 
-
+  !number of least square interpolation points
+  !must be higher than the interpolation polynomial order
+  integer, parameter :: n_ls = 2
+   
 contains
 
 
@@ -364,7 +395,7 @@ contains
   end subroutine ScalFlIBPtoIBP
 
 
-
+  
   pure recursive function TIBPoint_Interpolate(IBP,U,lb) result(Uint)
     real(knd) :: Uint
     type(TIBPoint),intent(in) :: IBP
@@ -404,7 +435,7 @@ contains
     Uint = Uint / (n+1)
   end function TIBPoint_InterpolateTDiff
 
-
+  
   pure recursive function TIBPoint_ScalFlSource(IBP,Scalar,sctype)  result(src)  !Virtual scalar source for the Immersed Boundary Method with prescribed scalar flux on the boundary
     real(knd) :: src
 
@@ -431,7 +462,7 @@ contains
   end function TIBPoint_ScalFlSource
 
 
-
+  
   pure recursive function TIBPoint_Viscosity(IBP,Viscosity)  result(src)  !Virtual scalar source for the Immersed Boundary Method with prescribed scalar flux on the boundary
     real(knd) :: src
 
@@ -443,7 +474,7 @@ contains
   end function TIBPoint_Viscosity
 
 
-
+  
   pure recursive function TIBPoint_MomentumSource(IBP,U) result(src)
     real(knd) :: src
 
@@ -455,10 +486,154 @@ contains
   end function TIBPoint_MomentumSource
 
 
-
-
-
   recursive subroutine TVelIBPoint_Create(IBP,xi,yj,zk,xU,yU,zU,Utype,component)
+    type(TVelIBPoint),intent(out)               :: IBP
+    integer,intent(in)                          :: xi,yj,zk
+    real(knd),dimension(-2:),intent(in)         :: xU,yU,zU
+    integer,dimension(-2:,-2:,-2:),intent(in)   :: Utype
+    integer,intent(in)                          :: component
+
+    type(SolidBody),pointer :: SB
+    integer :: dirx,diry,dirz,n1,n2,nx,ny,nz
+    real(knd) :: x,y,z
+    real(knd) :: x2,y2,z2
+    real(knd) :: xnear,ynear,znear
+    real(knd) :: tx,ty,tz
+    logical :: freexm,freeym,freezm
+    logical :: freexp,freeyp,freezp
+    logical :: free1xm,free1ym,free1zm
+    logical :: free1xp,free1yp,free1zp
+    real(knd) :: distxm, distym, distzm
+    real(knd) :: distxp, distyp, distzp
+    integer :: i
+
+    !real coordinates of the IB forcing point
+    x = xU(xi)
+    y = yU(yj)
+    z = zU(zk)
+    call SetCurrentSB(SB,Utype(xi,yj,zk))
+    
+    IBP%component = component
+    
+    !integer grid coordinates
+    IBP%xi = xi
+    IBP%yj = yj
+    IBP%zk = zk
+
+    if (.not. SB%Inside(x,y,z,0._knd)) then
+      call null_point
+      return
+    end if
+
+    call SB%ClosestOut(xnear,ynear,znear,x,y,z)
+
+    if (hypot(xnear,hypot(ynear,znear))<=0.1_knd*(dxmin*dymin*dzmin)**(1._knd/3)) then
+      call null_point
+      return
+    end if
+
+    freexm = all([ ( Utype(xi-i,yj  ,zk  )<=0, i = 1, n_ls ) ])
+    freeym = all([ ( Utype(xi  ,yj-i,zk  )<=0, i = 1, n_ls ) ])
+    freezm = all([ ( Utype(xi  ,yj  ,zk-i)<=0, i = 1, n_ls ) ])
+    freexp = all([ ( Utype(xi+i,yj  ,zk  )<=0, i = 1, n_ls ) ])
+    freeyp = all([ ( Utype(xi  ,yj+i,zk  )<=0, i = 1, n_ls ) ])
+    freezp = all([ ( Utype(xi  ,yj  ,zk+i)<=0, i = 1, n_ls ) ])
+    
+    free1xm = Utype(xi-1,yj  ,zk  )<=0
+    free1ym = Utype(xi  ,yj-1,zk  )<=0
+    free1zm = Utype(xi  ,yj  ,zk-1)<=0
+    free1xp = Utype(xi+1,yj  ,zk  )<=0
+    free1yp = Utype(xi  ,yj+1,zk  )<=0
+    free1zp = Utype(xi  ,yj  ,zk+1)<=0
+    
+    if ((free1xm.and.free1xp) .or. (free1ym.and.free1yp) .or. (free1zm.and.free1zp)) then
+      call null_point
+      return
+    end if  
+
+    if ( (.not.freexm) .and. (.not.freexp) ) then
+      dirx = 0
+    else if (freexm) then
+      dirx = -1
+    else
+      dirx = 1
+    end if
+      
+    if ( (.not.freeym) .and. (.not.freeyp) ) then
+      diry = 0
+    else if (freeym) then
+      diry = -1
+    else
+      diry = 1
+    end if
+      
+    if ( (.not.freezm) .and. (.not.freezp) ) then
+      dirz = 0
+    else if (freezm) then
+      dirz = -1
+    else
+      dirz = 1
+    end if
+      
+    tx = 0
+    ty = 0
+    tz = 0
+      
+    if (dirx/=0) then
+      x2 = xU(xi+dirx)
+      tx = SB%ClosestOnLineOut(x,y,z,x2,y,z)
+      
+      if (tx>1 .or. tx<0.05) then
+        dirx = 0
+        tx = 0
+      end if
+      
+      IBP%distx = tx * (xU(xi+dirx) - xU(xi))
+    end if
+      
+    if (diry/=0) then
+      y2 = yU(yj+diry)
+      ty = SB%ClosestOnLineOut(x,y,z,x,y2,z)
+      
+      if (ty>1 .or. ty<0.05) then
+        diry = 0
+        ty = 0
+      end if
+      
+      IBP%disty = ty * (yU(yj+diry) - yU(yj))
+    end if
+      
+    if (dirz/=0) then
+      z2 = zU(zk+dirz)
+      tz = SB%ClosestOnLineOut(x,y,z,x,y,z2)
+      
+      if (tz>1 .or. tz<0.05) then
+        dirz = 0
+        tz = 0
+      end if
+      
+      IBP%distz = tz * (zU(zk+dirz) - zU(zk))
+    end if
+    
+    IBP%dirx = dirx
+    IBP%diry = diry
+    IBP%dirz = dirz
+
+    IBP%IntPoints = InterpolationPoints(IBP,xU,yU,zU)
+     
+    IBP%interp = size(IBP%IntPoints)
+    
+  contains
+  
+    subroutine null_point
+      IBP%interp = 0
+      allocate(IBP%IntPoints(0))
+    end subroutine
+    
+  end subroutine TVelIBPoint_Create
+
+
+  recursive subroutine TVelIBPoint_Create_old(IBP,xi,yj,zk,xU,yU,zU,Utype,component)
     type(TVelIBPoint),intent(out)               :: IBP
     integer,intent(in)                          :: xi,yj,zk
     real(knd),dimension(-2:),intent(in)         :: xU,yU,zU
@@ -470,6 +645,7 @@ contains
     real(knd) x,y,z,xnear,ynear,znear,t
     logical free100,free010,free001
     real(knd) x2,y2,z2
+    integer :: i
 
     x = xU(xi)                                !real coordinates of the IB forcing point
     y = yU(yj)
@@ -525,19 +701,19 @@ contains
     if (dirx==0) then                                               !If there is a cell free of solid bodies in the direction
       free100=.false.
     else
-      free100 = (Utype(xi+IBP%dirx,yj,zk)<=0)
+      free100 = all([ ( Utype(xi+IBP%dirx*i,yj,zk)<=0, i=1,3 ) ])
     endif
 
     if (diry==0) then
       free010=.false.
     else
-      free010 = (Utype(xi,yj+IBP%diry,zk)<=0)
+      free010 = all([ ( Utype(xi,yj+IBP%diry*i,zk)<=0, i=1,3 ) ])
     endif
 
     if (dirz==0) then
       free001=.false.
     else
-      free001 = (Utype(xi,yj,zk+IBP%dirz)<=0)
+      free001 = all([ ( Utype(xi,yj,zk+IBP%dirz*i)<=0, i=1,3 ) ])
     endif
 
     nx = 0
@@ -580,16 +756,6 @@ contains
     if (diry/=0) n2 = n2+1
     if (dirz/=0) n2 = n2+1
 
-if (abs(IBP%distx)>10000.or. abs(IBP%disty)>10000.or. abs(IBP%distz)>10000 ) then
-  print *,"line",__LINE__
-  print *,xi,yj,zk
-  print *,x,y,z
-  print *,xnear,ynear,znear
-  print *,IBP%distx,IBP%disty,IBP%distz
-  print *,Utype(xi,yj,zk)
-  stop
-end if
-
     if (n1>n2) then   ! If too many free directions, treat as directly on the boundary,
       IBP%interp = 0  ! because we are probably at some edge.
       IBP%distx = 0
@@ -618,15 +784,8 @@ end if
       IBP%diry = 0
       IBP%dirz = 0
     endif
-if (abs(IBP%distx)>10000.or. abs(IBP%disty)>10000.or. abs(IBP%distz)>10000 ) then
-  print *,"line",__LINE__
-  print *,xi,yj,zk
-  print *,x,y,z
-  print *,xnear,ynear,znear
-  print *,IBP%distx,IBP%disty,IBP%distz
-  print *,Utype(xi,yj,zk)
-  stop
-end if
+
+    
     if ((dirx==0.and.diry==0.and.dirz==0).or.((.not.free001).and.(.not.free010).and.(.not.free100))) then
                               !If no free direction, the boundary is here.
       IBP%interp = 0
@@ -674,8 +833,8 @@ end if
           dirx = 0
           IBP%dirx = 0
           IBP%distx = 0
-          IBP%disty = IBP%disty*t
-          IBP%distz = IBP%distz*t
+          IBP%disty = (y2-y)*t
+          IBP%distz = (z2-z)*t
         end if
       endif
 
@@ -705,9 +864,9 @@ end if
         else
           diry = 0
           IBP%diry = 0
-          IBP%distx = IBP%distx*t
+          IBP%distx = (x2-x)*t
           IBP%disty = 0
-          IBP%distz = IBP%distz*t
+          IBP%distz = (z2-z)*t
         end if
       endif
 
@@ -737,8 +896,8 @@ end if
         else
           dirz = 0
           IBP%dirz = 0
-          IBP%distx = IBP%distx*t
-          IBP%disty = IBP%disty*t
+          IBP%distx = (x2-x)*t
+          IBP%disty = (y2-y)*t
           IBP%distz = 0
         end if
       endif
@@ -750,14 +909,30 @@ end if
 
       if (diry==1.or.dirz==1) then                   !If other dir components nonzero, delete them and
         x2 = xU(xi+IBP%dirx)
+        
         t = SB%ClosestOnLineOut(x,y,z,x2,y,z)  !find an intersection of the new vector with the boundary
-        diry = 0
-        dirz = 0
-        IBP%diry = 0
-        IBP%dirz = 0
-        IBP%distx = t*IBP%distx
-        IBP%disty = 0
-        IBP%distz = 0
+
+        if (t>=2) then
+          IBP%interp = 0
+          IBP%interpdir = 0
+          IBP%distx = 0
+          IBP%disty = 0
+          IBP%distz = 0
+          dirx = 0
+          diry = 0
+          dirz = 0
+          IBP%dirx = 0
+          IBP%diry = 0
+          IBP%dirz = 0
+        else
+          diry = 0
+          dirz = 0
+          IBP%diry = 0
+          IBP%dirz = 0
+          IBP%distx = t*(x2-x)
+          IBP%disty = 0
+          IBP%distz = 0
+        end if
       endif
 
     elseif (free010.and.diry==1) then               !the same in y
@@ -767,14 +942,30 @@ end if
 
       if (dirx==1.or.dirz==1) then
         y2 = yU(yj+IBP%diry)
+        
         t = SB%ClosestOnLineOut(x,y,z,x,y2,z)
-        dirx = 0
-        dirz = 0
-        IBP%dirx = 0
-        IBP%dirz = 0
-        IBP%distx = 0
-        IBP%disty = t*IBP%disty
-        IBP%distz = 0
+        
+        if (t>=2) then
+          IBP%interp = 0
+          IBP%interpdir = 0
+          IBP%distx = 0
+          IBP%disty = 0
+          IBP%distz = 0
+          dirx = 0
+          diry = 0
+          dirz = 0
+          IBP%dirx = 0
+          IBP%diry = 0
+          IBP%dirz = 0
+        else
+          dirx = 0
+          dirz = 0
+          IBP%dirx = 0
+          IBP%dirz = 0
+          IBP%distx = 0
+          IBP%disty = t*(y2-y)
+          IBP%distz = 0
+        end if
       endif
 
     elseif (free001.and.dirz==1) then               !the same in z
@@ -784,56 +975,199 @@ end if
 
       if (dirx==1.or.diry==1) then
         z2 = zU(zk+IBP%dirz)
+        
         t = SB%ClosestOnLineOut(x,y,z,x,y,z2)
-        dirx = 0
-        diry = 0
-        IBP%dirx = 0
-        IBP%diry = 0
-        IBP%distx = 0
-        IBP%disty = 0
-        IBP%distz = t*IBP%distz
+        
+        if (t>=2) then
+          IBP%interp = 0
+          IBP%interpdir = 0
+          IBP%distx = 0
+          IBP%disty = 0
+          IBP%distz = 0
+          dirx = 0
+          diry = 0
+          dirz = 0
+          IBP%dirx = 0
+          IBP%diry = 0
+          IBP%dirz = 0
+        else
+          dirx = 0
+          diry = 0
+          IBP%dirx = 0
+          IBP%diry = 0
+          IBP%distx = 0
+          IBP%disty = 0
+          IBP%distz = (z2-z)
+        end if
       endif
 
-    else                                           ! We should have find some interpolation and not come here!
-      write(*,*) "Assertion error"
-      write(*,*) "free100",free100
-      write(*,*) "free010",free010
-      write(*,*) "free001",free001
-      write(*,*) "dirx",dirx
-      write(*,*) "diry",diry
-      write(*,*) "dirz",dirz
-      write(*,*) "i",IBP%xi
-      write(*,*) "j",IBP%yj
-      write(*,*) "j",IBP%zk
-      write(*,*) "distx",IBP%distx
-      write(*,*) "disty",IBP%disty
-      write(*,*) "distz",IBP%distz
-      write(*,*) "x",x
-      write(*,*) "y",y
-      write(*,*) "z",z
-      write(*,*) "component",IBP%component
+    else
+      ! We should have find some interpolation and not come here!
+      write(*,*) "Assert error line",__LINE__,__FILE__
+      write(*,*) "component",component
+      write(*,*) "xi,yj,zk",xi,yj,zk
+      write(*,*) "xyz",x,y,z
+      write(*,*) "xyznear",xnear,ynear,znear
+      write(*,*) "interp",IBP%interp
+      write(*,*) "interpdir",IBP%interpdir
+      write(*,*) "distxyz",IBP%distx,IBP%disty,IBP%distz
+      write(*,*) "Utype",Utype(xi,yj,zk)
+      write(*,*) "dirxyz",IBP%dirx,IBP%diry,IBP%dirz
+      write(*,*) "free",free100,free010,free001
       stop
     endif
     
-if (abs(IBP%distx)>20.or. abs(IBP%disty)>20.or. abs(IBP%distz)>20 ) then
-  print *,"line",__LINE__
-  print *,xi,yj,zk
-  print *,x,y,z
-  print *,xnear,ynear,znear
-  print *,IBP%distx,IBP%disty,IBP%distz
-  print *,Utype(xi,yj,zk)
-  print *,"dir",dirx,diry,dirz
-  print *,free001,free010,free100
-  stop
-end if
+    if (abs(IBP%distx)>dxmin*2.or. abs(IBP%disty)>dymin*2.or. abs(IBP%distz)>dzmin*2 ) then
+      write(*,*) "Assert error line",__LINE__,__FILE__
+      write(*,*) "component",component
+      write(*,*) "xi,yj,zk",xi,yj,zk
+      write(*,*) "xyz",x,y,z
+      write(*,*) "xyznear",xnear,ynear,znear
+      write(*,*) "interp",IBP%interp
+      write(*,*) "interpdir",IBP%interpdir
+      write(*,*) "distxyz",IBP%distx,IBP%disty,IBP%distz
+      write(*,*) "Utype",Utype(xi,yj,zk)
+      write(*,*) "dirxyz",IBP%dirx,IBP%diry,IBP%dirz
+      write(*,*) "free",free100,free010,free001
+      stop
+    end if
 
     allocate(IBP%IntPoints(IBP%interp))
 
     call TVelIBPoint_InterpolationCoefs(IBP,xU,yU,zU)
 
-  end subroutine TVelIBPoint_Create
+    if (any(IBP%IntPoints%coef>1E-5)) then
+      write(*,*) "Assert error line",__LINE__,__FILE__
+      write(*,*) "point coefs",IBP%IntPoints%coef
+      write(*,*) "component",component
+      write(*,*) "xi,yj,zk",xi,yj,zk
+      write(*,*) "xyz",x,y,z
+      write(*,*) "xyznear",xnear,ynear,znear
+      write(*,*) "interp",IBP%interp
+      write(*,*) "interpdir",IBP%interpdir
+      write(*,*) "distxyz",IBP%distx,IBP%disty,IBP%distz
+      write(*,*) "Utype",Utype(xi,yj,zk)
+      write(*,*) "dirxyz",IBP%dirx,IBP%diry,IBP%dirz
+      write(*,*) "free",free100,free010,free001
+      stop
+    end if
 
+  end subroutine TVelIBPoint_Create_old
 
+  recursive function InterpolationPoints(IBP,xU,yU,zU) result(res)
+    type(TInterpolationPoint),allocatable :: res(:)
+    type(TVelIBpoint), intent(in)         :: IBP
+    real(knd),dimension(-2:), intent(in)  :: xU,yU,zU
+    
+    type(TInterpolationPoint),target      :: tmp(3*n_ls)
+    type(TInterpolationPoint), pointer    :: t(:)
+    real(knd) :: xr, yr, zr, x(0:n_ls), y(0:n_ls), z(0:n_ls)
+    real(knd) :: b(3), d(3), c
+    integer :: i,xi,yj,zk,dirx,diry,dirz
+    
+    interface IB_interpolation_coefs
+      module procedure IB_interpolation_coefs_1st_order
+    end interface
+    
+
+    xi = IBP%xi
+    yj = IBP%yj
+    zk = IBP%zk
+    dirx = IBP%dirx
+    diry = IBP%diry
+    dirz = IBP%dirz
+    
+    !distance from the wall
+    d = 1
+    
+    if (dirx/=0) then
+     
+      do i = 1, n_ls
+        tmp(i)%xi = xi + i*dirx
+        tmp(i)%yj = yj
+        tmp(i)%zk = zk
+      end do
+      
+      xr = xU(xi) + IBP%distx
+      x  = [ ( xU(xi+i*dirx), i = 0, n_ls ) ]
+      tmp(1:n_ls)%coef = IB_interpolation_coefs(xr,x)
+      
+      d(1)  = abs(x(0)-xr)
+        
+    end if
+
+    if (diry/=0) then
+
+      do i = 1, n_ls
+        tmp(n_ls + i)%xi = xi
+        tmp(n_ls + i)%yj = yj + i*diry
+        tmp(n_ls + i)%zk = zk
+      end do
+      
+      yr = yU(yj) + IBP%disty
+      y  = [ ( yU(yj+i*diry) , i = 0, n_ls ) ]
+      tmp(n_ls+1:2*n_ls)%coef = IB_interpolation_coefs(yr,y)
+      
+      d(2) = abs(y(0)-yr)
+      
+    end if
+    
+    if (dirz/=0) then
+     
+      do i = 1, n_ls
+        tmp(2*n_ls + i)%xi = xi
+        tmp(2*n_ls + i)%yj = yj
+        tmp(2*n_ls + i)%zk = zk + i*dirz
+      end do
+
+      zr = zU(zk) + IBP%distz
+      z  = [ ( zU(zk+i*dirz), i = 0, n_ls )  ]
+      tmp(2*n_ls+1:3*n_ls)%coef = IB_interpolation_coefs(zr,z)
+      
+      d(3) = abs(z(0)-zr)
+      
+    end if
+
+    !beta 1,2,3 in eq. 17-19 in Peller et al., doi:1.1002/fld.1227
+    b = 0
+    
+    if (dirx/=0) then
+      b(1) = product(d)/(d(1))**2
+    end if
+    
+    if (diry/=0) then
+      b(2) = product(d)/(d(2))**2
+    end if
+    
+    if (dirz/=0) then
+      b(3) = product(d)/(d(3))**2
+    end if
+    
+    !sum of betas
+    c = sum(b)
+
+    allocate(res(0))
+    
+    !NOTE: when well supported by compilers use associate (cf. http://gcc.gnu.org/bugzilla/show_bug.cgi?id=56386)
+    if (dirx/=0) then
+      t=>tmp(1:n_ls)
+      t%coef = t%coef * b(1)/c
+      res = [res, t]
+    end if
+
+    if (diry/=0) then
+      t=>tmp(n_ls+1:2*n_ls)
+      t%coef = t%coef * b(2)/c
+      res = [res, t]
+    end if
+
+    if (dirz/=0) then
+      t=>tmp(2*n_ls+1:3*n_ls)
+      t%coef = t%coef * b(3)/c
+      res = [res, t]
+    end if
+
+  end function
 
   recursive subroutine TVelIBPoint_InterpolationCoefs(IBP,xU,yU,zU)
     type(TVelIBpoint),intent(inout)     :: IBP
@@ -841,6 +1175,11 @@ end if
     real(knd) xr, yr, zr, x(0:3), y(0:3), z(0:3)
     real(knd) b1, b2, b3, c
     integer xi,yj,zk,dirx,diry,dirz
+    
+    interface IB_interpolation_coefs
+      module procedure IB_interpolation_coefs_1st_order
+    end interface
+    
 
     xi = IBP%xi
     yj = IBP%yj
@@ -876,8 +1215,7 @@ end if
           x  = [ zU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  ]
         endif
 
-        call IBLeastSquare2InterpolationCoefs(IBP%IntPoints%coef,xr,x)
-
+        IBP%IntPoints%coef = IB_interpolation_coefs(xr,x)
 
     elseif (IBP%interp==6) then
 
@@ -981,9 +1319,9 @@ end if
 
         endif
 
-        call IBLeastSquare2InterpolationCoefs(IBP%IntPoints(1:3)%coef,xr,x)
+        IBP%IntPoints(1:3)%coef = IB_interpolation_coefs(xr,x)
 
-        call IBLeastSquare2InterpolationCoefs(IBP%IntPoints(4:6)%coef,yr,y)
+        IBP%IntPoints(4:6)%coef = IB_interpolation_coefs(yr,y)
 
         !beta 1 and  2 in eq. 17-19 in Peller et al., doi:1.1002/fld.1227
         b1 = abs(y(0)-yr)/abs(x(0)-xr)
@@ -1040,11 +1378,13 @@ end if
         y  = [ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  ]
 
         zr = zU(zk) + IBP%distz
-        z  = [ yU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  ]
+        z  = [ zU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  ]
 
-        call IBLeastSquare2InterpolationCoefs(IBP%IntPoints(1:3)%coef,xr,x)
+        IBP%IntPoints(1:3)%coef = IB_interpolation_coefs(xr,x)
 
-        call IBLeastSquare2InterpolationCoefs(IBP%IntPoints(4:6)%coef,yr,y)
+        IBP%IntPoints(4:6)%coef = IB_interpolation_coefs(yr,y)
+
+        IBP%IntPoints(7:9)%coef = IB_interpolation_coefs(zr,z)
 
         !beta 1 and  2 in eq. 17-19 in Peller et al., doi:1.1002/fld.1227
         b1 = abs(y(0)-yr)*abs(z(0)-zr)/abs(x(0)-xr)
@@ -1059,36 +1399,53 @@ end if
 
         IBP%IntPoints(7:9)%coef = IBP%IntPoints(7:9)%coef * b3/c
 
+    else if (IBP%interp/=0) then
+        write(*,*) "Unknown interpolation",__FILE__,__LINE__
+        stop
     endif
 
   end subroutine TVelIBPoint_InterpolationCoefs
 
 
 
-
-  subroutine IBLeastSquare2InterpolationCoefs(Coefs,xr,x)!pure
-    real(knd),intent(out) :: Coefs(:)
+  pure function IB_interpolation_coefs_2nd_order(xr,x) result(Coefs)
     real(knd),intent(in)  :: xr,x(0:)
+    real(knd) :: Coefs(size(x)-1)
     real(knd) :: A1, A2, A4
     integer   :: n
 
-    n = size(Coefs)
+    n = size(x)-1
     if ( n<3 .or. size(x)<=n ) then
-      Coefs = 0
+      Coefs = 0*x(1:)
     else
       A1 = sum( x(1:) - xr )**2
       A2 = sum( (x(1:)**2 - xr**2) * (x(1:) - xr) )
       A4 = sum( x(1:)**2 - xr**2 )**2
-
+      
       Coefs = ( ( A2 * (x(1:)**2 - xr**2) - A4 * (x(1:) - xr) ) * (x(0)    - xr)&
             +   ( A2 * (x(1:) - xr) - A1 * (x(1:)**2 - xr**2) ) * (x(0)**2 - xr**2) )&
             / (A2**2 - A1*A4)
     end if
 
-  end subroutine IBLeastSquare2InterpolationCoefs
+  end function
 
 
+   function IB_interpolation_coefs_1st_order(xr,x) result(Coefs)
+    real(knd),intent(in)  :: xr,x(0:)
+    real(knd) :: Coefs(size(x)-1)
+    real(knd) :: A
+    integer   :: n
 
+    n = size(x)-1
+    if ( n<2 .or. size(x)<=n ) then
+      Coefs = 0*x(1:)
+    else
+      A = sum( (x(1:) - xr)**2 )
+
+      Coefs = (x(1:) - xr) * (x(0) - xr) / A
+    end if
+
+  end function
 
 
   subroutine TScalFlIBPoint_Create(IBP,xi,yj,zk)
@@ -1489,19 +1846,19 @@ end if
     integer,intent(in)    :: nx,ny,nz,s
     integer,intent(inout) :: Xtype(s:,s:,s:)
     integer i,j,k
-    if (Btype(We)==DIRICHLET.or.Btype(We)==NOSLIP) Xtype(:0,:,:) = -2
-    if (Btype(Ea)==DIRICHLET.or.Btype(Ea)==NOSLIP) Xtype(nx+1:,:,:) = -2
-    if (Btype(So)==DIRICHLET.or.Btype(So)==NOSLIP) Xtype(:,:0,:) = -2
-    if (Btype(No)==DIRICHLET.or.Btype(No)==NOSLIP) Xtype(:,ny+1:,:) = -2
-    if (Btype(Bo)==DIRICHLET.or.Btype(Bo)==NOSLIP) Xtype(:,:,:0) = -2
-    if (Btype(To)==DIRICHLET.or.Btype(To)==NOSLIP) Xtype(:,:,nz+1:) = -2
+!     if (Btype(We)==DIRICHLET.or.Btype(We)==NOSLIP) Xtype(:0,:,:) = -2
+!     if (Btype(Ea)==DIRICHLET.or.Btype(Ea)==NOSLIP) Xtype(nx+1:,:,:) = -2
+!     if (Btype(So)==DIRICHLET.or.Btype(So)==NOSLIP) Xtype(:,:0,:) = -2
+!     if (Btype(No)==DIRICHLET.or.Btype(No)==NOSLIP) Xtype(:,ny+1:,:) = -2
+!     if (Btype(Bo)==DIRICHLET.or.Btype(Bo)==NOSLIP) Xtype(:,:,:0) = -2
+!     if (Btype(To)==DIRICHLET.or.Btype(To)==NOSLIP) Xtype(:,:,nz+1:) = -2
 
     do k = 1,nz
       do j = 1,ny
         do i = 1,nx
           if (Xtype(i,j,k)==0.and. &
-              (any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)>0).or. &
-               any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)<-1) ) ) &
+              (any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)>0) )) &!.or. &
+!                any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)<-1) ) ) &
                                                         Xtype(i,j,k) = -1
         end do
       end do
