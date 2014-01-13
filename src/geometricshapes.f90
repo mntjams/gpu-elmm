@@ -124,10 +124,12 @@ module GeometricShapes
 
   type,extends(GeometricShape) :: Polyhedron
     type(c_ptr) :: cgalptr
-    type(r3)    :: ref
+    integer     :: n_ref_points = 3
+    type(r3),allocatable    :: ref(:)
   contains
     procedure,private :: ReadOff => Polyhedron_ReadOff
     procedure,private :: InitBbox => Polyhedron_InitBbox
+    procedure,private :: InitRefPoints => Polyhedron_InitRefPoints
     procedure,private :: InsideEps => Polyhedron_Inside
     procedure :: Closest => Polyhedron_Closest
     procedure :: IntersectsRay => Polyhedron_IntersectsRay
@@ -317,7 +319,7 @@ contains
     class(GeometricShape),intent(in) :: self
     real(knd),intent(out)  :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
-    
+
     call self%Closest(xnear,ynear,znear,x,y,z)
   end subroutine  
     
@@ -655,7 +657,9 @@ contains
 
     if (inearest==0) then
       write(*,*) "no nearest"
-      return
+      write(*,*) "dists", dists
+      write(*,*) "line ",__LINE__," in file ",__FILE__
+      stop
     endif
 
     if (self%Inside(xP(inearest),yP(inearest),zP(inearest), &
@@ -837,6 +841,8 @@ contains
     
     call res%ReadOff(filename)
     call res%InitBbox
+    call res%InitRefPoints
+    
   end function
   
   
@@ -860,55 +866,84 @@ contains
     associate(b=>self%bbox)
       call cgal_polyhedron_bbox(self%cgalptr, b%xmin, b%ymin, b%zmin, b%xmax, b%ymax, b%zmax)
 
-      b%xmin=max(b%xmin,xU(-2))
-      b%ymin=max(b%ymin,yV(-2))
-      b%zmin=max(b%zmin,zW(-2))
-      b%xmax=min(b%xmax,xU(Prnx+2))
-      b%ymax=min(b%ymax,yV(Prny+2))
-      b%zmax=min(b%zmax,zW(Prnz+2))
-      
-      self%ref = r3((b%xmin+b%xmax)/2, (b%ymin+b%ymax)/2, b%zmax + (b%zmax-b%zmin))
+      b%xmin = max(b%xmin, xU(-2))
+      b%ymin = max(b%ymin, yV(-2))
+      b%zmin = max(b%zmin, zW(-2))
+      b%xmax = min(b%xmax, xU(Prnx+2))
+      b%ymax = min(b%ymax, yV(Prny+2))
+      b%zmax = min(b%zmax, zW(Prnz+2))
+
     end associate
   end subroutine
   
+  subroutine Polyhedron_InitRefPoints(self)
+    class(Polyhedron),intent(inout) :: self
+    real(knd) :: p(self%n_ref_points)
+    integer :: i
+    
+    allocate(self%ref(self%n_ref_points))
+    
+    do i = 1, self%n_ref_points
+      call random_number(p)
+      
+      associate(b=>self%bbox)
+        self%ref(i) = r3(b%xmin+(b%xmax-b%xmin)*p(1), &
+                         b%ymin+(b%ymax-b%ymin)*p(2), &
+                         b%zmax + (0.1)*(b%zmax-b%zmin))
+      end associate
+    end do
+  end subroutine
+    
   logical function Polyhedron_Inside(self,x,y,z,eps) result(ins)
     class(Polyhedron),intent(in) :: self
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in) :: eps
+    integer :: i
+    logical :: tests(self%n_ref_points)
     
     !it is probably better to use one fixed reference point, 
     !because test segment aligned with probable walls could cause problems
+
     if (self%in_bbox(x,y,z,eps)) then
-      ins = &
-           cgal_polyhedron_inside(self%cgalptr, &
-                                  x,y,z, &
-                                  self%ref%x,self%ref%y,self%ref%z)
-      if (eps>0) then                            
-        if (.not.ins) ins = &
-             cgal_polyhedron_inside(self%cgalptr, &
-                                    x-eps,y,z, &
-                                    self%ref%x,self%ref%y,self%ref%z)
-        if (.not.ins) ins = &
-             cgal_polyhedron_inside(self%cgalptr, &
-                                    x+eps,y,z, &
-                                    self%ref%x,self%ref%y,self%ref%z)
-        if (.not.ins) ins = &
-             cgal_polyhedron_inside(self%cgalptr, &
-                                    x,y-eps,z, &
-                                    self%ref%x,self%ref%y,self%ref%z)
-        if (.not.ins) ins = &
-             cgal_polyhedron_inside(self%cgalptr, &
-                                    x,y-eps,z, &
-                                    self%ref%x,self%ref%y,self%ref%z)
-        if (.not.ins) ins = &
-             cgal_polyhedron_inside(self%cgalptr, &
-                                    x,y,z-eps, &
-                                    self%ref%x,self%ref%y,self%ref%z)
-        if (.not.ins) ins = &
-             cgal_polyhedron_inside(self%cgalptr, &
-                                    x,y,z+eps, &
-                                    self%ref%x,self%ref%y,self%ref%z)
-      end if
+         
+      do i = 1, self%n_ref_points
+       
+        tests(i) = &
+            cgal_polyhedron_inside(self%cgalptr, &
+                                    x,y,z, &
+                                    self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+
+        if (eps>0) then                            
+          if (.not.tests(i)) tests(i) = &
+              cgal_polyhedron_inside(self%cgalptr, &
+                                      x-eps,y,z, &
+                                      self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+          if (.not.tests(i)) tests(i) = &
+              cgal_polyhedron_inside(self%cgalptr, &
+                                      x+eps,y,z, &
+                                      self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+          if (.not.tests(i)) tests(i) = &
+              cgal_polyhedron_inside(self%cgalptr, &
+                                      x,y-eps,z, &
+                                      self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+          if (.not.tests(i)) tests(i) = &
+              cgal_polyhedron_inside(self%cgalptr, &
+                                      x,y-eps,z, &
+                                      self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+          if (.not.tests(i)) tests(i) = &
+              cgal_polyhedron_inside(self%cgalptr, &
+                                      x,y,z-eps, &
+                                      self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+          if (.not.tests(i)) tests(i) = &
+              cgal_polyhedron_inside(self%cgalptr, &
+                                      x,y,z+eps, &
+                                      self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+        end if
+
+      end do
+      
+      ins = any(tests)
+      
     else
       ins = .false.
     end if
@@ -1777,7 +1812,7 @@ contains
 
     xyz = matmul(self%inv_matrix, [x,y,z])
     
-    call self%original%Closest(xyznear(1), &
+    call self%original%ClosestOut(xyznear(1), &
                                xyznear(2), &
                                xyznear(3), &
                                xyz(1), & 
@@ -2327,10 +2362,11 @@ contains
     t2 = 1
     !First, find a point lying outside. We should have the right direction.
     if (self%Inside(x2,y2,z2)) then
+     t1 = 1
      do
       t2 = t2*1.1_knd
       if (.not. self%Inside(x+(x2-x)*t2,y+(y2-y)*t2,z+(z2-z)*t2)) exit
-      if (t2>2) then
+      if (t2>=2) then
         t = 10
         return
       end if
