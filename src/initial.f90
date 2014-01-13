@@ -69,7 +69,7 @@ contains
    end interface
 
    call newunit(unit)
-
+  
    !the command line arguments can also be specified in cmd.conf
    call read_cmd_conf
 
@@ -88,6 +88,7 @@ contains
    call get(limitertype)
    call get(limparam)
    call get(masssourc)
+   masssourc = 0 !HACK: to avoid problems with spurious scalars fluxes for now
    call get(steady)
    call get(tasktype)
    write(*,*) "tasktype=",tasktype
@@ -639,8 +640,6 @@ contains
    end if
 
    write(*,*) "num_of_scalars",num_of_scalars
-
-   windangle = 0._knd
 
    projectiontype = 1
 
@@ -1490,24 +1489,6 @@ contains
        call BoundViscosity(Viscosity)
 
     end if !init conditions not from file
-
-
-    !prepare arrays with indexes of points to be nulled every timestep
-
-    nUnull = 0
-
-    !$omp parallel do reduction(+:nUnull)
-    do k = 1,Unz
-     do j = 1,Uny
-      do i = 1,Unx
-       if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
-           .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
-           .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  nUnull = nUnull+1
-      end do
-     end do
-    end do
-    !$omp end parallel do
-
 
     write(*,*) "set"
   endsubroutine InitialConditions
