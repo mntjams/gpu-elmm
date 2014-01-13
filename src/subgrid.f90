@@ -423,11 +423,12 @@ module Subgrid
 
         a2 = (i1**3)/27 - i1*i2/6 +i3/2
 
-        if (a1>10*epsilon(1._sigma_knd)) then
-           c =  a2 / sqrt(a1**3)
-        else
-           c = 0
-        end if
+        !This requires no FPE trapping is in progress!
+        c =  a2 / sqrt(a1**3)
+        
+        !If c is NaN let it be 0.
+        if (c/=c) c = 0
+
         c = max(-1._sigma_knd,min(1._sigma_knd,c))
         a3 = acos(c) / 3
 

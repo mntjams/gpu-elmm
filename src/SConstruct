@@ -12,6 +12,7 @@ SB = ARGUMENTS.get('SB','')
 customPB = ARGUMENTS.get('customPB','')
 PB = ARGUMENTS.get('PB','')
 extra = ARGUMENTS.get('extra','')
+cgal = ARGUMENTS.get('cgal','')
 
 extra_flag = ' ' + str(extra)
 
@@ -66,7 +67,7 @@ else:
   if str(fast)=='yes':
     fast_flag = ' -Ofast'# -Warray-temporaries'
   else:
-   fast_flag = ' -fcheck=all -ffpe-trap=zero,overflow,invalid -Wall -Wsurprising -Waliasing -Wimplicit-interface -Wno-unused-dummy-argument -Wno-unused -Werror'
+    fast_flag = ' -fcheck=all -Wall -Wsurprising -Waliasing -Wimplicit-interface -Wno-unused-dummy-argument -Wno-unused -Werror'
   
   if str(lto)=='yes':
     lto_flag = ' -flto'
@@ -160,14 +161,16 @@ objs += env.Object(target=target_dir+'volumesources',  source='volumesources.f90
 objs += env.Object(target=target_dir+'linesources',    source='linesources.f90')
 objs += env.Object(target=target_dir+'puffs',          source='puffs.f90')
 
-#Support for CGAL for geometry files reading.
-objs += env.Object(target=target_dir+'cgal_polyhedra_cc',  source='cgal_polyhedra.cc', CPPFLAGS=" -Ofast -frounding-math -std=c++11")
-objs += env.Object(target=target_dir+'cgal_polyhedra',  source='cgal_polyhedra.f90')
-env.Append(LIBS = ['CGAL'])
+if cgal=='no':
+  #Disable support for CGAL. Useful for enabling valgrind.
+  objs += env.Object(target=target_dir+'dummy_cgal_polyhedra',  source='dummy_cgal_polyhedra.f90')
+else:
+  #Support for CGAL for geometry files reading.
+  objs += env.Object(target=target_dir+'cgal_polyhedra_cc',  source='cgal_polyhedra.cc', CPPFLAGS=" -Ofast -frounding-math -std=c++11")
+  objs += env.Object(target=target_dir+'cgal_polyhedra',  source='cgal_polyhedra.f90')
+  env.Append(LIBS = ['CGAL'])
 
 
-#Disable support for CGAL. Useful for enabling valgrind.
-#objs += env.Object(target=target_dir+'dummy_cgal_polyhedra',  source='dummy_cgal_polyhedra.f90')
 
 
 objs += env.Object(target=target_dir+'elevationmodels',source='elevationmodels.f90')
