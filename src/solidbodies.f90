@@ -118,12 +118,12 @@ contains
             !$omp parallel do private(i,j,k) schedule(dynamic)
             do k = 0,Unz+1
              do j = 0,Uny+1
-               do i = 0,Unx+1
-                  if (CurrentSB%Inside(xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
+              do i = 0,Unx+1
+                 if (CurrentSB%Inside(xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
                            Utype(i,j,k) = CurrentSB%numofbody
-               enddo
               enddo
              enddo
+            enddo
             !$omp end parallel do
         end select
       end subroutine
@@ -196,11 +196,16 @@ contains
   subroutine ReadSolidBodiesFromFile(filename)
     use Strings
     character(*),intent(in) :: filename
+    integer :: l
+    
+    l = len(filename)
 
-    if (filename(len(filename)-4:len(filename))=='.obst') then
+    if (filename(l-4:l)=='.obst') then
       call ReadObst(filename)
-    else if (filename(len(filename)-3:len(filename))=='.off') then
+    else if (filename(l-3:l)=='.off') then
       call ReadOff(filename)
+    else if (filename(l-3:l)=='.xyz'.or.filename(l-3:l)=='.elv') then
+      call ReadTerrain(filename)
     end if
     
   end subroutine ReadSolidBodiesFromFile
@@ -208,10 +213,7 @@ contains
   
 
   subroutine ReadObst(filename)
-    use Strings
     character(*),intent(in) :: filename
-    integer unit,io
-    character(180) :: line
     type(SolidBody) :: SB
 
     allocate(SB%GeometricShape, source=Union(filename))
@@ -245,9 +247,20 @@ contains
     end if
 
   end subroutine ReadOff
+  
+  
+  
+  subroutine ReadTerrain(filename)
+    use ElevationModels, only: uniform_DEM
+    character(*),intent(in) :: filename
 
+    !assume z0 the same as for the lower boundary
+    !TODO: implement variating z0 from a similar file
+    call AddSolidBody(SolidBody(Terrain(uniform_DEM(filename)),z0 = z0B))
+  end subroutine ReadTerrain
 
-
+  
+  
   subroutine AddSolidBody_scalar(SB)
     type(SolidBody),intent(in) :: SB
     !NOTE: expecting numofbody value unspecified and not important in the calling code
