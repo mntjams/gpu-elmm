@@ -920,11 +920,11 @@
   !Slower using HMPP than CPU, but if we avoid memory transfer, it is still profitable.
 
   !$hmpp <tsteps> AttenuateTop codelet
-  subroutine AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,zPr,zW,U,V,W,temperature,enable_buoyancy)
+  subroutine AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype,zPr,zW,U,V,W)
 
   implicit none
 
-  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,enable_buoyancy
+  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
   integer,intent(in)      :: Btype(6)
 #ifdef __HMPP
 #include "hmpp-include.f90"
@@ -933,12 +933,10 @@
   real(knd),intent(inout) :: U(-2:Unx+3,-2:Uny+3,-2:Unz+3)
   real(knd),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
   real(knd),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
 #else
   real(knd),intent(in)    :: zPr(-2:)
   real(knd),intent(in)    :: zW(-3:)
   real(knd),intent(inout),dimension(-2:,-2:,-2:) :: U,V,W
-  real(knd),dimension(-1:,-1:,-1:),intent(inout) :: temperature
 #endif
   integer i,j,k,bufn,mini,maxi,maxUi
   real(knd) ze,zs,zb,p
@@ -973,6 +971,7 @@
     enddo
 
     !$omp parallel private(i,j,k,p,zb)
+    
     !$omp do
     do k=Unz-bufn,Unz
       p = 0
@@ -1106,58 +1105,7 @@
       enddo
     enddo
     !$omp end do
-
-
-
-    if (enable_buoyancy==1) then
-
-      !$omp do
-      do k=Prnz-bufn,Prnz
-        avg(k) = 0
-      enddo
-      !$omp end do
-
-      !$omp do
-      do k=Prnz-bufn,Prnz
-        p = 0
-        !$hmppcg grid blocksize myblocksize
-        !$hmppcg gridify (j,i) global(p), reduce(+:p)
-        do j=1,Prny
-          do i=mini,maxi
-            p = p+temperature(i,j,k)
-          enddo
-        enddo
-        avg(k) = p
-      enddo
-      !$omp end do
-
-      !$omp do
-      do k=Prnz-bufn,Prnz
-        avg(k) = avg(k)/((maxi-mini+1)*Prny)
-      enddo
-      !$omp end do
-
-      !$omp do
-      do k=Prnz-bufn,Prnz
-        zb=(zPr(k)-zs)/(ze-zs)
-        DF(k) = DampF(zb)
-      enddo
-      !$omp end do
-
-      !$omp do
-      !$hmppcg grid blocksize myblocksize
-      !$hmppcg permute(k,i,j)
-      !$hmppcg gridify (k,i)
-      do k=Prnz-bufn,Prnz
-        do j=-1,Prny+1
-          do i=-1,Prnx+1
-            temperature(i,j,k) = avg(k)+DF(k)*(temperature(i,j,k)-avg(k))
-          enddo
-        enddo
-      enddo
-      !$omp end do
-
-    endif
+    
     !$omp end parallel
 
   endsubroutine AttenuateTop
@@ -1284,17 +1232,17 @@
 #ifdef __HMPP
 #include "hmpp-include.f90"
 #endif
-  real(knd) DampF
-  real(knd),intent(in)::x
-  intrinsic exp
+    real(knd) DampF
+    real(knd),intent(in)::x
+    intrinsic exp
 
-  if (x<=0) then
-    DampF = 1
-  elseif (x>=1) then
-    DampF = 0
-  else
-   DampF=(1-0.04_knd*x**2)*(1-(1-exp(10._knd*x**2))/(1-exp(10._knd)))
-  endif
+    if (x<=0) then
+      DampF = 1
+    elseif (x>=1) then
+      DampF = 0
+    else
+     DampF = (1-0.04_knd*x**2) * ( 1 - (1-exp(10._knd*x**2)) / (1-exp(10._knd)) )
+    endif
   endfunction Dampf
 
 

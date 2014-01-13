@@ -209,7 +209,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
     if ((Btype(To) ==FreeSlipBuff) .and. (Prnz>15))  then
         !$hmpp <tsteps> AttenuateTop callsite, args[*].noupdate = true
         call AttenuateTop(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Btype, &
-                          zPr,zW,U2,V2,W2,temperature,enable_buoyancy)
+                          zPr,zW,U2,V2,W2)
     end if
 
     if ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) then
@@ -283,8 +283,8 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
     end if
 
 
-     !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
-     call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
+    !$hmpp <tsteps> NullInterior callsite, args[*].noupdate = true
+    call NullInterior(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
                            nUnull,nVnull,nWnull,Unull,Vnull,Wnull,U,V,W)
 
 
@@ -408,6 +408,7 @@ end subroutine TMarchRK3
 
 #else
      if (gridtype==UNIFORMGRID) then
+
       call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
      else
       call GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
@@ -1227,7 +1228,7 @@ end subroutine TMarchRK3
     integer   :: i,xi,yj,zk
     real(knd) :: src
 
-    if (size(UIBPoints)+size(UIBPoints)+size(UIBPoints)>0) then
+    if (size(UIBPoints)+size(VIBPoints)+size(WIBPoints)>0) then
       !$hmpp <tsteps> delegatedstore, args[ForwEul::U3,ForwEul::V3,ForwEul::W3]
       call BoundU(1,U3,Uin)
       call BoundU(2,V3,Vin)

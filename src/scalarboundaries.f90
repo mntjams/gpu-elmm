@@ -240,7 +240,7 @@ contains
           arr(i,j,nz+2) = arr(i,j,2)
         end do
       end do
-    else if (btype(To)==NEUMANN) then
+    else if (btype(To)==NEUMANN.or.btype(To)==NEUMANN_BUFF) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,nz+1) = arr(i,j,nz) + side(To)*dzW(nz+1)

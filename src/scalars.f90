@@ -187,6 +187,12 @@ contains
       if (computedeposition>0) call Deposition(Scalar_2,2._knd*RK_alpha(RK_stage))
 
       if (computegravsettling>0) call GravSettling(Scalar_2,2._knd*RK_alpha(RK_stage))
+       
+      if (ScalBtype(To)==NEUMANN_BUFF) then
+         do i=1,num_of_scalars
+            call AttenuateTopScalar(Scalar_2(:,:,:,i))
+         end do
+      end if
 
       call assign(Scalar, Scalar_2)
 
@@ -205,26 +211,35 @@ contains
 #else
     if (enable_buoyancy>0) then
 
-      call stage(Temperature,Temperature_2,Temperature_adv, &
-                 ScalarTypeTemperature,BoundTemperature,TemperatureExtra,temperature_flux_profile)
+      call stage(Temperature, Temperature_2, Temperature_adv, &
+                 ScalarTypeTemperature, TempBtype, &
+                 BoundTemperature, TemperatureExtra, &
+                 temperature_flux_profile)
+      
       where (Prtype>0) Temperature(0:Prnx+1,0:Prny+1,0:Prnz+1) = temperature_ref
+      
     end if
 
     if (enable_moisture>0) then
 
-      call stage(Moisture,Moisture_2,Moisture_adv, &
-                 ScalarTypeMoisture,BoundMoisture,MoistureExtra,moisture_flux_profile)
+      call stage(Moisture, Moisture_2, Moisture_adv, &
+                 ScalarTypeMoisture, MoistBtype, &
+                 BoundMoisture, MoistureExtra, &
+                 moisture_flux_profile)
+      
       where (Prtype>0) Moisture(0:Prnx+1,0:Prny+1,0:Prnz+1) = moisture_ref
+      
     end if
 #endif
 
     contains
 
-      subroutine stage(Array,Array2,Array_adv, &
-                       scalar_type,boundary_procedure,extra_procedure, &
+      subroutine stage(Array, Array2, Array_adv, &
+                       scalar_type, btype, &
+                       boundary_procedure, extra_procedure, &
                        flux_profile)
         real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Array,Array2,Array_adv
-        integer,intent(in) :: scalar_type
+        integer,intent(in) :: scalar_type, btype(6)
         procedure(boundary_interface) :: boundary_procedure
         procedure(extra_interface) :: extra_procedure
         real(knd),intent(out),optional :: flux_profile(0:)
@@ -270,6 +285,8 @@ contains
 
         call DiffScalar(Array2,Array, &
                         scalar_type,boundary_procedure,2._knd*RK_alpha(RK_stage))
+        
+        if (btype(To)==NEUMANN_BUFF) call AttenuateTopScalar(Array2)
 
         call assign(Array,Array2)
       end subroutine
@@ -1195,6 +1212,95 @@ contains
     !$omp end do
     !$omp end parallel
   endsubroutine AddScalarDiffVector
+  
+  
+  
+  subroutine AttenuateTopScalar(Phi)
+    real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Phi
+    integer i,j,k,bufn,mini,maxi
+    real(knd) ze,zs,zb,p
+    real(knd) :: DF( Prnz - max(5,Prnz/4) : Prnz), &
+                 avg( Prnz - max(5,Prnz/4) : Prnz)
+
+    bufn = max(5,Prnz/4)
+    
+    if (Btype(We)==DIRICHLET.or.Btype(We)==TURBULENTINLET.or.Btype(We)==INLETFROMFILE) then
+      mini = min(5,Prnx)
+    else
+      mini = 1
+    endif
+
+    if (Btype(Ea)==DIRICHLET.or.Btype(We)==TURBULENTINLET.or.Btype(We)==OUTLETBUFF) then
+      maxi = max(1,Prnx-5)
+    else
+      maxi = Prnx
+    endif
+
+    zs = zW(Prnz-bufn)
+    ze = zW(Prnz)
+
+
+    !$omp parallel private(i,j,k,p,zb)
+    
+    !$omp do
+    do k = Prnz-bufn, Prnz
+      avg(k) = 0
+    enddo
+    !$omp end do
+
+    !$omp do
+    do k = Prnz-bufn, Prnz
+      p = 0
+      do j = 1, Prny
+        do i = mini, maxi
+          p = p + Phi(i,j,k)
+        enddo
+      enddo
+      avg(k) = p
+    enddo
+    !$omp end do
+
+    !$omp do
+    do k = Prnz-bufn, Prnz
+      avg(k) = avg(k)/((maxi-mini+1)*Prny)
+    enddo
+    !$omp end do
+
+    !$omp do
+    do k = Prnz-bufn, Prnz
+      zb = (zPr(k)-zs)/(ze-zs)
+      DF(k) = DampF(zb)
+    enddo
+    !$omp end do
+
+    !$omp do
+    do k = Prnz-bufn, Prnz
+      do j = -1, Prny+1
+        do i = -1, Prnx+1
+          Phi(i,j,k) = avg(k)+DF(k)*(Phi(i,j,k)-avg(k))
+        enddo
+      enddo
+    enddo
+    !$omp end do
+
+    !$omp end parallel
+    
+  contains
+  
+    pure function DampF(x)
+      !local version for scalars, does not have to be the same as the one used for velocities
+      real(knd) DampF
+      real(knd),intent(in)::x
+
+      if (x<=0) then
+        DampF = 1
+      elseif (x>=1) then
+        DampF = 0
+      else
+       DampF = (1-0.04_knd*x**2) * ( 1 - (1-exp(10._knd*x**2)) / (1-exp(10._knd)) )
+      endif
+    endfunction Dampf
+  endsubroutine AttenuateTopScalar
 
 
 
