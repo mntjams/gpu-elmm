@@ -2,7 +2,9 @@
 #define STRING32 32
 module str_lists
 #define TYPEPARAM character(STRING32)
-#include "paramlists-inc.f90"
+#include "list-inc-def.f90"
+contains
+#include "list-inc-proc.f90"
 #undef TYPEPARAM
 end module
 
