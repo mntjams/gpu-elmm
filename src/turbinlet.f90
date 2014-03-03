@@ -347,8 +347,8 @@ contains
     end if
 
     if (windangle/=0) then
-        Vinavg = Uinavg * sin(windangle/180._knd*pi)
         Uinavg = Uinavg * cos(windangle/180._knd*pi)
+        Vinavg = Uinavg * sin(windangle/180._knd*pi)
     end if
 
   end subroutine InitMeanProfiles
