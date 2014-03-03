@@ -11,7 +11,7 @@ module Kinds
 !   integer,parameter :: real32 = selected_real_kind(p=6,r=37)
 !   integer,parameter :: real64 = selected_real_kind(p=15,r=200)
 
-  integer,parameter :: DBL = real64, SNG = real32
+  integer,parameter :: dbl = real64, sng = real32
 
 #ifdef DPREC
   integer,parameter :: knd = DBL                                       !knd is default real kind for the whole program, choosing double
@@ -19,11 +19,11 @@ module Kinds
   integer,parameter :: knd = SNG                                       !knd is default real kind for the whole program, choosing single
 #endif
 
-  integer,parameter :: TIM = knd                                       !Kind for time variables, can be double for very small timesteps.
+  integer,parameter :: tim = knd                                       !Kind for time variables, can be double for very small timesteps.
                                                                        !It may affect performance
 
-  integer,parameter :: SINT = kind(1)                                  !To save memory a smaller type can be used for some integer
-  integer,parameter :: SLOG = SINT                                     ! and logical arrays. Note the same KIND value is guaranteed
+  integer,parameter :: sint = kind(1)                                  !To save memory a smaller type can be used for some integer
+  integer,parameter :: slog = sint                                     ! and logical arrays. Note the same KIND value is guaranteed
                                                                        ! the default intrinsic types.
                                                                        !This can have some negative effect on speed however
 end module Kinds
