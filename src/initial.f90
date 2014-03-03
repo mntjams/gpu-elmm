@@ -1813,15 +1813,15 @@ contains
         Vin = 0
         Win = 0
       case (ShearInletType)
-        call SHEARINLET(ShearInletTypeParameter)
+        call ShearInlet(ShearInletTypeParameter)
       case (ParabolicInletType)
-        call PARINLET
+        call ParabolicInlet
       case (TurbulentInletType)
         call GetTurbulentInlet
       case (FromFileInletType)
         call GetInletFromFile(start_time)
       case default
-        call CONSTINLET
+        call ConstantInlet
     endselect
 
 

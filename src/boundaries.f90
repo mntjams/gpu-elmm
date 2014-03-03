@@ -1,6 +1,6 @@
-module BOUNDARIES
-use PARAMETERS
-use WALLMODELS
+module Boundaries
+use Parameters
+use Wallmodels
 
 implicit none
 
@@ -8,7 +8,7 @@ implicit none
   private
   public volumePr, GridCoords, GridCoords_U, GridCoords_V, GridCoords_W, InDomain,&
          BoundU, Bound_Phi, Bound_Pr, Bound_Q,&
-         ShearInlet, ParInlet, ConstInlet
+         ShearInlet, ParabolicInlet, ConstantInlet
 
   interface GridCoords
     module procedure GridCoords_scalar
@@ -79,7 +79,7 @@ implicit none
       end do
 
     end if
-  endsubroutine GridCoords_scalar
+  end subroutine GridCoords_scalar
 
   subroutine GridCoords_vector(ri,r)
     integer,intent(out):: ri(3)
@@ -1145,62 +1145,51 @@ implicit none
 
 
 
-  subroutine CONSTINLET
+  subroutine ConstantInlet
     !Dirichlet inlet condition
     !Uin must be allocated beforehand
     integer j,k
 
-    do k=lbound(Uin,2),ubound(Uin,2)
-     do j=lbound(Uin,1),ubound(Uin,1)
-       Uin(j,k)=Uinlet
-     end do
-    end do
 
-    do k=lbound(Vin,2),ubound(Vin,2)
-     do j=lbound(Vin,1),ubound(Vin,1)
-       Vin(j,k)=0
-     end do
-    end do
+    Uin = Uinlet * cos(windangle/180._knd*pi)
 
-    do k=lbound(Win,2),ubound(Win,2)
-     do j=lbound(Win,1),ubound(Win,1)
-       Win(j,k)=0
-     end do
-    end do
+    Vin =  Uinlet * sin(windangle/180._knd*pi)
 
-  endsubroutine CONSTINLET
+    Win = 0
 
-  subroutine SHEARINLET(G)
+  end subroutine
+
+  subroutine ShearInlet(G)
     real(knd) G
     integer j,k
 
-    do k=lbound(Uin,2),ubound(Uin,2)
-     do j=lbound(Uin,1),ubound(Uin,1)
-       Uin(j,k)=G*(zPr(k)-((zW(Wnz+1)+zW(0))/2._knd))
+    do k = lbound(Uin,2),ubound(Uin,2)
+     do j = lbound(Uin,1),ubound(Uin,1)
+       Uin(j,k) = G*(zPr(k)-((zW(Wnz+1)+zW(0))/2._knd))
      end do
     end do
 
-    Vin=0
-    Win=0
+    Vin = 0
+    Win = 0
 
-  endsubroutine SHEARINLET
+  end subroutine
 
-  subroutine PARINLET
+  subroutine ParabolicInlet
     integer j,k
     real(knd) lz
 
     lz = zW(Prnz) - zW(0)
 
-    do k=lbound(Uin,2),ubound(Uin,2)
-     do j=lbound(Uin,1),ubound(Uin,1)
-       Uin(j,k)=1.5*Uinlet*(1-((lz/2._knd-(zPr(k)-zW(0)))/(lz/2._knd))**2)
+    do k = lbound(Uin,2),ubound(Uin,2)
+     do j = lbound(Uin,1),ubound(Uin,1)
+       Uin(j,k) = 1.5*Uinlet*(1-((lz/2._knd-(zPr(k)-zW(0)))/(lz/2._knd))**2)
      end do
     end do
 
-    Vin=0
-    Win=0
+    Vin = 0
+    Win = 0
 
-  endsubroutine PARINLET
+  end subroutine
 
 
-end module BOUNDARIES
+end module Boundaries
