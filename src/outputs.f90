@@ -495,6 +495,7 @@ contains
 
 
   subroutine OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
+    use Wallmodels, only: ComputeViscsWM
     real(knd),dimension(-2:,-2:,-2:),intent(in)   :: U,V,W
     real(knd),dimension(1:,1:,1:),intent(in)      :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
@@ -507,6 +508,12 @@ contains
     real(knd) :: time_weight
     real(knd) :: fl_L, fl_R
     integer, save :: fnum = 0
+
+    ! We compute the subgrid stresses from the eddy viscosity even at the walls
+    ! We should not set also TDiff
+    if (wallmodeltype>0.and.store%probes_fluxes==1.and.store%BLprofiles==1) then
+      call ComputeViscsWM(U,V,W,Pr,Temperature)
+    end if
 
     times(step)=time
 
@@ -2117,7 +2124,7 @@ contains
 
     call OutputScalars(Scalar)
 
-    call OutputUVW(U,V,W,"U.vtk","V.vtk","W.vtk")
+    call OutputUVW(U,V,W,"output/U.vtk","output/V.vtk","output/W.vtk")
     
     call OutputTimeSeries
 

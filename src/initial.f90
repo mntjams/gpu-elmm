@@ -1484,6 +1484,7 @@ contains
 
        if (wallmodeltype>0) then
                       call ComputeViscsWM(U,V,W,Pr,Temperature)
+                      call ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
        end if
 
        call BoundViscosity(Viscosity)
@@ -1900,6 +1901,9 @@ contains
 
    !create arrays of w.m. points from the list
    call MoveWMPointsToArray
+
+   !creates masks for computation of diffusive fluxes
+   call InitWMMasks
 
    if (enable_radiation==1) then
      !compute the radiation balance and prepare the wall fluxes 

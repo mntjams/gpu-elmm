@@ -403,52 +403,44 @@
   subroutine TimeStepEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                dxmin,dxU,dyV,dzW,CFL,Uref,steady,time,endtime,&
                U,V,W,dt)
-  implicit none
-#ifdef __HMPP
-#include "hmpp-include.f90"
-  intrinsic min,max,abs
-#endif
-  integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,steady
-  real(knd),intent(in) :: dxmin
-  real(knd),intent(in) :: CFL,Uref
-  real(TIM),intent(in) :: time,endtime
-#ifdef __HMPP
-  real(knd),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
-  real(knd),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(in)  :: U
-  real(knd),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(in)  :: V
-  real(knd),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(in)  :: W
-#else
-  real(knd),dimension(-2:),intent(in)  :: dxU,dyV,dzW
-  real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
-#endif
-  real(TIM),intent(out) :: dt
-  integer i,j,k
-  real(knd) m,p
+    use ieee_arithmetic
 
+    integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,steady
+    real(knd),intent(in) :: dxmin
+    real(knd),intent(in) :: CFL,Uref
+    real(TIM),intent(in) :: time,endtime
+    real(knd),dimension(-2:),intent(in)  :: dxU,dyV,dzW
+    real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+    real(TIM),intent(out) :: dt
+    integer i,j,k
+    real(knd) m, p
+    logical nan
+
+    nan = .false.
     m = 0
-   !$omp parallel do private(i,j,k,p) reduction(max:m)
-   !$hmppcg grid blocksize myblocksize2
-   !$hmppcg permute (k,i,j)
-   !$hmppcg gridify (k,i), private(p), reduce (max:m)
-   do k=1,Prnz
-     do j=1,Prny
-      do i=1,Prnx
-       p = MAX(abs(U(i,j,k)/dxU(i)),abs(U(i-1,j,k)/dxU(i-1)))
-       p = MAX(p,abs(V(i,j,k)/dyV(j)),abs(V(i,j-1,k)/dyV(j-1)))
-       p = MAX(p,abs(W(i,j,k)/dzW(k)),abs(W(i,j,k-1)/dzW(k-1)))
-       m = max(m,p)
+    !$omp parallel do private(i,j,k,p) reduction(max:m) reduction(.or.:nan)
+    do k=1,Prnz
+      do j=1,Prny
+        do i=1,Prnx
+          !For scalar advection the sum proved to be necessary when the flow is not aligned to grid.
+          p = max(abs(U(i,j,k)/dxU(i)),abs(U(i-1,j,k)/dxU(i-1)))
+          p = p + max(abs(V(i,j,k)/dyV(j)),abs(V(i,j-1,k)/dyV(j-1)))
+          p = p + max(abs(W(i,j,k)/dzW(k)),abs(W(i,j,k-1)/dzW(k-1)))
+          
+          m = max(m,p)
+          if (ieee_is_nan(p)) nan = .true.
+        enddo
       enddo
-     enddo
     enddo
     !$omp end parallel do
 
-    if (m>0) then
-     dt = MIN(CFL/m,dxmin/Uref)
+    if (nan) then
+      dt = tiny(dt)
+    else if (m>0) then
+      dt = min(CFL/m,max(dxmin,dymin,dzmin)/Uref)
     else
-     dt = dxmin/Uref
+      dt = dxmin/Uref
     endif
-    
-!     if (step<3) dt = dt/100
 
     if (steady/=1.and.dt+time>endtime)  dt = endtime-time
 
@@ -896,7 +888,170 @@
   end subroutine ForwEul
 
 
+  subroutine ForwEul2(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
+                    dxPr,dyPr,dzPr,dxU,dyV,dzW,&
+                    U,V,W,U2,V2,W2,U3,V3,W3,nu,&
+                    dt,coef)
 
+  implicit none
+
+  integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
+
+
+  real(knd),intent(in),dimension(-2:,-2:,-2:) :: U,V,W
+  real(knd),intent(in),dimension(-2:,-2:,-2:) :: U2,V2,W2
+  real(knd),intent(out),dimension(-2:,-2:,-2:):: U3,V3,W3
+  real(knd),intent(in),dimension(-1:,-1:,-1:) :: nu
+  real(knd),intent(in),dimension(-2:) :: dxU,dyV,dzW
+  real(knd),intent(in),dimension(-2:) :: dxPr,dyPr,dzPr
+  real(knd),intent(in) :: dt,coef
+
+  real(knd) :: Ap, recdxmin2, recdymin2, recdzmin2
+  integer i,j,k
+
+
+     Ap = coef*dt
+
+     recdxmin2 = 1._knd / dxmin**2
+     recdymin2 = 1._knd / dymin**2
+     recdzmin2 = 1._knd / dzmin**2
+
+     !$omp parallel private(i,j,k)
+
+     !$omp do
+     do k=1,Unz
+      do j=1,Uny
+       do i=1,Unx
+            U3(i,j,k) = 0
+            if (Uflx_mask(i+1,j,k)) &
+              U3(i,j,k) = U3(i,j,k) + &
+               nu(i+1,j,k) * (U(i+1,j,k)-U(i,j,k)) *recdxmin2
+            if (Uflx_mask(i,j,k)) &
+              U3(i,j,k) = U3(i,j,k) - &
+                nu(i,j,k) * (U(i,j,k)-U(i-1,j,k)) * recdxmin2 
+            if (Ufly_mask(i,j+1,k)) &
+              U3(i,j,k) = U3(i,j,k) + &
+                0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (U(i,j+1,k)-U(i,j,k)) * recdymin2
+            if (Ufly_mask(i,j,k)) &
+              U3(i,j,k) = U3(i,j,k) - &
+                0.25_knd * (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (U(i,j,k)-U(i,j-1,k)) * recdymin2
+            if (Uflz_mask(i,j,k+1)) &
+              U3(i,j,k) = U3(i,j,k) + &
+                0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (U(i,j,k+1)-U(i,j,k)) * recdzmin2
+            if (Uflz_mask(i,j,k)) &
+              U3(i,j,k) = U3(i,j,k) - &
+                0.25_knd * (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (U(i,j,k)-U(i,j,k-1)) * recdzmin2
+       enddo
+      enddo
+     enddo
+     !$omp end do
+#define comp 1
+#define wrk U3
+#include "wmfluxes-inc.f90"
+#undef wrk
+#undef comp
+     !$omp do
+     do k=1,Unz
+      do j=1,Uny
+       do i=1,Unx
+         U3(i,j,k) = U3(i,j,k) * Ap
+         U3(i,j,k) = U3(i,j,k) + U(i,j,k) + U2(i,j,k)
+       enddo
+      enddo
+     enddo
+     !$omp end do nowait
+
+
+     !$omp do
+     do k=1,Vnz
+      do j=1,Vny
+       do i=1,Vnx
+            V3(i,j,k) = 0
+            if (Vflx_mask(i+1,j,k)) &
+              V3(i,j,k) = V3(i,j,k) + &
+                0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (V(i+1,j,k)-V(i,j,k)) * recdxmin2
+            if (Vflx_mask(i,j,k)) &
+              V3(i,j,k) = V3(i,j,k) - &
+                0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (V(i,j,k)-V(i-1,j,k)) * recdxmin2
+            if (Vfly_mask(i,j+1,k)) &
+              V3(i,j,k) = V3(i,j,k) + &
+                nu(i,j+1,k) * (V(i,j+1,k)-V(i,j,k)) * recdymin2
+            if (Vfly_mask(i,j,k)) &
+              V3(i,j,k) = V3(i,j,k) - &
+                nu(i,j,k) * (V(i,j,k)-V(i,j-1,k)) * recdymin2
+            if (Vflz_mask(i,j,k+1)) &
+              V3(i,j,k) = V3(i,j,k) + &
+                0.25_knd * (nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * (V(i,j,k+1)-V(i,j,k)) * recdzmin2
+            if (Vflz_mask(i,j,k)) &
+              V3(i,j,k) = V3(i,j,k) - &
+                0.25_knd * (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (V(i,j,k)-V(i,j,k-1)) * recdzmin2
+       enddo
+      enddo
+     enddo
+     !$omp end do
+#define comp 2
+#define wrk V3
+#include "wmfluxes-inc.f90"
+#undef wrk
+#undef comp
+     !$omp do
+     do k=1,Vnz
+      do j=1,Vny
+       do i=1,Vnx
+         V3(i,j,k) = V3(i,j,k) * Ap
+         V3(i,j,k) = V3(i,j,k) + V(i,j,k) + V2(i,j,k)
+       enddo
+      enddo
+     enddo
+     !$omp end do nowait
+
+
+     !$omp do
+     do k=1,Wnz
+      do j=1,Wny
+       do i=1,Wnx
+            W3(i,j,k) = 0
+            if (Wflx_mask(i+1,j,k)) &
+              W3(i,j,k) = W3(i,j,k) + &
+                0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (W(i+1,j,k)-W(i,j,k)) * recdxmin2
+            if (Wflx_mask(i,j,k)) &
+              W3(i,j,k) = W3(i,j,k) - &
+                0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (W(i,j,k)-W(i-1,j,k)) * recdxmin2
+            if (Wfly_mask(i,j+1,k)) &
+              W3(i,j,k) = W3(i,j,k) + &
+                0.25_knd * (nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * (W(i,j+1,k)-W(i,j,k)) * recdymin2
+            if (Wfly_mask(i,j,k)) &
+              W3(i,j,k) = W3(i,j,k) - &
+                0.25_knd * (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (W(i,j,k)-W(i,j-1,k)) * recdymin2
+            if (Wflz_mask(i,j,k+1)) &
+              W3(i,j,k) = W3(i,j,k) + &
+                nu(i,j,k+1) * (W(i,j,k+1)-W(i,j,k)) * recdzmin2
+            if (Wflz_mask(i,j,k)) &
+              W3(i,j,k) = W3(i,j,k) - &
+                nu(i,j,k) * (W(i,j,k)-W(i,j,k-1)) * recdzmin2
+       enddo
+      enddo
+     enddo
+     !$omp end do
+#define comp 3
+#define wrk W3
+#include "wmfluxes-inc.f90"
+#undef wrk
+#undef comp
+     !$omp do
+     do k=1,Wnz
+      do j=1,Wny
+       do i=1,Wnx
+         W3(i,j,k) = W3(i,j,k) * Ap
+         W3(i,j,k) = W3(i,j,k) + W(i,j,k) + W2(i,j,k)
+       enddo
+      enddo
+     enddo
+     !$omp end do
+
+     !$omp end parallel
+
+  end subroutine ForwEul2
 
 #endif
 

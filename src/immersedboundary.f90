@@ -2,12 +2,12 @@ module ImmersedBoundaryWM
   use Parameters
   use SolidBodies
   use GeometricShapes, only: Terrain, Ray
-  use WallModels, only: WMPoint, AddWMPoint, WMPoints
+  use WallModels
   
   implicit none
 
   private
-  public GetSolidBodiesWM, GetWMFluxes
+  public GetSolidBodiesWM, GetSolidBodiesWM_UVW, GetWMFluxes
  
 contains
   
@@ -36,7 +36,7 @@ contains
        if (Prtype(i,j,k)<=0) then
         dist = huge(dist)
         nb = 0
-        n_neighbours=0
+        n_neighbours=2
         
         if (k==1.and.((Btype(Bo)==DIRICHLET).or.(Btype(Bo)==NOSLIP))) n_neighbours = n_neighbours + 1
          
@@ -51,9 +51,9 @@ contains
              if (sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
               dist = sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
               nb = Prtype(i+m,j+n,k+o)
-             endif
-           endif
-        enddo
+             end if
+           end if
+        end do
 
         if (nb>0.and.n_neighbours==1) then
           if (k==1) then
@@ -75,9 +75,9 @@ contains
                   dist = sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
                   nb = Prtype(i+m,j+n,k+o)
 
-                 endif
-               endif
-            enddo
+                 end if
+               end if
+            end do
             stop "????"
           end if
           call SetCurrentSB(CurrentSB,nb)
@@ -95,24 +95,157 @@ contains
                 WMP%z0 = geomshape%PrPoints(i,j)%z0
               else
                 WMP%z0 = 0
-              endif
+              end if
             class default
               if (CurrentSB%rough) then
                 WMP%z0 = CurrentSB%z0
               else
                 WMP%z0 = 0
-              endif
+              end if
           end select
 
           call AddWMPoint(WMP)
-        endif
-       endif
-      enddo
-     enddo
-    enddo
+        end if
+       end if
+      end do
+     end do
+    end do
 
     
   end subroutine GetSolidBodiesWM
+  
+  
+  
+  
+  subroutine GetSolidBodiesWM_UVW
+    integer                  :: neighbours(3,MINUSX:PLUSZ)
+    real(knd), target        :: r_neighbours(3,MINUSX:PLUSZ)
+
+    !six triplets [1,0,0], [-1,0,0], [0,1,0],...
+    neighbours = 0
+    neighbours(1, MINUSX) = -1
+    neighbours(1, PLUSX)  =  1
+    neighbours(2, MINUSY) = -1
+    neighbours(2, PLUSY)  =  1
+    neighbours(3, MINUSZ) = -1
+    neighbours(3, PLUSZ)  =  1
+    
+    r_neighbours = real(neighbours, knd)
+    
+    call helper(1, Unx, Uny, Unz, xU(-2:), yPr, zPr, Utype)
+
+    call helper(2, Vnx, Vny, Vnz, xPr, yV(-2:), zPr, Vtype)
+
+    call helper(3, Wnx, Wny, Wnz, xPr, yPr, zW(-2:), Wtype)
+
+  contains
+  
+    subroutine helper(component, nx, ny, nz, x, y, z, Xtype)
+      integer, intent(in) :: component, nx, ny, nz
+      real(knd), intent(in) :: x(-2:), y(-2:), z(-2:)
+      integer, intent(in) :: Xtype(-2:,-2:,-2:)
+      type(WMPointUVW) :: p
+      type(SolidBody), pointer :: SB
+      real(knd), pointer, contiguous :: dirvec(:)
+      real(knd)     :: nearx, neary, nearz, t, distvec(3)
+      integer       :: i, j, k, m, n, o, dir
+
+      do k = 1, nz
+       do j = 1, ny
+        do i = 1, nx
+        
+          if (Xtype(i,j,k) < 0) then
+
+            do dir = MINUSX, PLUSZ
+
+              dirvec => r_neighbours(:,dir)
+
+              m = neighbours(1,dir)
+              n = neighbours(2,dir)
+              o = neighbours(3,dir)
+              
+              if ((Xtype(i+m,j+n,k+o)>0)) then
+              
+                call SetCurrentSB(SB, Xtype(i+m,j+n,k+o))
+                
+                call SB%Closest(nearx ,neary, nearz, x(i), y(j), z(k))
+                
+                distvec = [nearx - x(i), neary - y(j), nearz - z(k)]
+                
+                if (.not. right_direction(distvec, dirvec)) then
+                  t = SB%ClosestOnLineOut( x(i+m), y(j+n), z(k+o), &
+                                                   x(i),   y(j),   z(k) )
+                  nearx = xU(i+m) + t * ( x(i) - x(i+m) )
+                  neary = yPr(j+n) + t * ( y(j) - y(j+n) )
+                  nearz = zPr(k+o) + t * ( z(k) - z(k+o) )
+                  distvec = [nearx - x(i), neary - y(j), nearz - z(k)]
+                end if
+                
+                p%xi = i
+                p%yj = j
+                p%zk = k
+                
+                p%distx = distvec(1)
+                p%disty = distvec(2)
+                p%distz = distvec(3)
+                
+                p%ustar = 1
+                
+                select type (geomshape => SB%GeometricShape)
+                  type is (Terrain)
+                  
+                    select case (component)
+                      case (1)
+                        if (geomshape%UPoints(i,j)%rough) then
+                          p%z0 = geomshape%UPoints(i,j)%z0
+                        else
+                          p%z0 = 0
+                        end if
+                      case (2)
+                        if (geomshape%VPoints(i,j)%rough) then
+                          p%z0 = geomshape%VPoints(i,j)%z0
+                        else
+                          p%z0 = 0
+                        end if
+                      case (3)
+                        if (geomshape%PrPoints(i,j)%rough) then
+                          p%z0 = geomshape%PrPoints(i,j)%z0
+                        else
+                          p%z0 = 0
+                        end if
+                    end select
+                    
+                  class default
+                  
+                    if (SB%rough) then
+                      p%z0 = SB%z0
+                    else
+                      p%z0 = 0
+                    end if
+                    
+                end select
+
+                call AddWMPointUVW(p, component, dir)
+              
+              end if
+
+            end do
+             
+          end if
+
+        end do
+       end do
+      end do
+    end subroutine
+  
+    logical function right_direction(a, b)
+      !checks if the angle between two vectors is small enough
+      real(knd), intent(in) :: a(3), b(3)
+      right_direction = ( dot_product(a, b) / (norm2(a) * norm2(b)) ) > 0.4
+    end function
+
+  end subroutine GetSolidBodiesWM_UVW
+  
   
   subroutine GetWMFluxes
     use SolarRadiation
@@ -257,23 +390,24 @@ end module ImmersedBoundaryWM
 
 
 
-module ImmersedBoundary
 
-  use Parameters
-  use Lists
-  use SolidBodies
-  use ImmersedBoundaryWM
 
+
+
+
+
+
+
+
+
+
+
+
+
+module IBPoint_types
+  use Kinds
+  
   implicit none
-
-  private
-
-  public TIBPoint, TIBPoint_MomentumSource, TIBPoint_ScalFlSource, TIBPoint_Viscosity, &
-         UIBPoints, VIBPoints, WIBPoints, ScalFlIBPoints, &
-         GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
-         !InitSolidBodies imported from SolidBodies
-
-
 
   type TInterpolationPoint
     integer   :: xi                !coordinates of the interpolation points
@@ -314,6 +448,52 @@ module ImmersedBoundary
     integer :: n_WMPs = 0 !number of associated wall model points feeding the  !  contains
  !    procedure Create         => TScalFlIBPoint_Create
   end type TScalFlIBPoint
+end module IBPoint_types
+
+
+module VelIBPoint_list
+  use IBPoint_types
+#define TYPEPARAM type(TVelIBPoint)
+#include "list-inc-def.f90"
+contains
+#include "list-inc-proc.f90"
+#undef TYPEPARAM
+end module VelIBPoint_list
+
+
+module ScalFlIBPoint_list
+  use IBPoint_types
+#define TYPEPARAM type(TScalFlIBPoint)
+#include "list-inc-def.f90"
+contains
+#include "list-inc-proc.f90"
+#undef TYPEPARAM
+end module ScalFlIBPoint_list
+
+
+
+
+
+
+module ImmersedBoundary
+
+  use Parameters
+  use IBPoint_types
+  use VelIBPoint_list, only: VelIBPointList => list
+  use ScalFlIBPoint_list, only: ScalFlIBPointList => list
+  use SolidBodies
+  use ImmersedBoundaryWM
+
+  implicit none
+
+  private
+
+  public TIBPoint, TIBPoint_MomentumSource, TIBPoint_ScalFlSource, TIBPoint_Viscosity, &
+         UIBPoints, VIBPoints, WIBPoints, ScalFlIBPoints, &
+         GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
+         !InitSolidBodies imported from SolidBodies
+
+
 
 
   interface Create
@@ -341,7 +521,8 @@ module ImmersedBoundary
  !     procedure Viscosity        => TIBPoint_Viscosity
   end type TIBPoint
 
-  type(List)  :: UIBPointsList, VIBPointsList, WIBPointsList, ScalFlIBPointsList
+  type(VelIBPointList)  :: UIBPointsList, VIBPointsList, WIBPointsList
+  type(ScalFlIBPointList)  :: ScalFlIBPointsList
 
   type(TIBPoint),dimension(:),allocatable,save :: UIBPoints, VIBPoints, WIBPoints
   type(TIBPoint),dimension(:),allocatable,save :: ScalFlIBPoints
@@ -352,6 +533,10 @@ module ImmersedBoundary
 
   interface assignment (=)
     module procedure ScalFlIBPtoIBP
+  end interface
+  
+  interface IB_interpolation_coefs
+    module procedure IB_interpolation_coefs_1st_order
   end interface
 
   !number of least square interpolation points
@@ -409,7 +594,7 @@ contains
       Uint = Uint + IBP%IntPoints(i)%coef * U(IBP%IntPoints(i)%xi,&
                                               IBP%IntPoints(i)%yj,&
                                               IBP%IntPoints(i)%zk)
-    enddo
+    end do
   end function TIBPoint_Interpolate
 
 
@@ -428,8 +613,8 @@ contains
                         IBP%IntPoints(i)%yj,&
                         IBP%IntPoints(i)%zk)
         n = n + 1
-      endif
-    enddo
+      end if
+    end do
 
     Uint = Uint + U(IBP%xi,IBP%yj,IBP%zk)
     Uint = Uint / (n+1)
@@ -455,7 +640,7 @@ contains
       intTDiff = TIBPoint_InterpolateTDiff(IBP,TDiff)
 
       if (intTDiff>0)  intscal = intscal + IBP%moisture_flux * IBP%dist / intTDiff
-    endif
+    end if
 
     src = (intscal - Scalar(IBP%xi,IBP%yj,IBP%zk)) / dt
 
@@ -519,7 +704,7 @@ contains
     IBP%xi = xi
     IBP%yj = yj
     IBP%zk = zk
-
+call null_point; return
     if (.not. SB%Inside(x,y,z,0._knd)) then
       call null_point
       return
@@ -676,45 +861,45 @@ contains
 
       return
 
-    endif
+    end if
 
 
     if (abs(IBP%distx)<(xU(xi+1)-xU(xi-1))/1000._knd) then      !if too close to the boundary, set the distance to 0
       IBP%distx = 0
       dirx = 0
       IBP%dirx = 0
-    endif
+    end if
 
     if (abs(IBP%disty)<(yU(yj+1)-yU(yj-1))/1000._knd) then
       IBP%disty = 0
       diry = 0
       IBP%diry = 0
-    endif
+    end if
 
     if (abs(IBP%distz)<(zU(zk+1)-zU(zk-1))/1000._knd) then
       IBP%distz = 0
       dirz = 0
       IBP%dirz = 0
-    endif
+    end if
 
 
     if (dirx==0) then                                               !If there is a cell free of solid bodies in the direction
       free100=.false.
     else
       free100 = all([ ( Utype(xi+IBP%dirx*i,yj,zk)<=0, i=1,3 ) ])
-    endif
+    end if
 
     if (diry==0) then
       free010=.false.
     else
       free010 = all([ ( Utype(xi,yj+IBP%diry*i,zk)<=0, i=1,3 ) ])
-    endif
+    end if
 
     if (dirz==0) then
       free001=.false.
     else
       free001 = all([ ( Utype(xi,yj,zk+IBP%dirz*i)<=0, i=1,3 ) ])
-    endif
+    end if
 
     nx = 0
     ny = 0
@@ -725,32 +910,32 @@ contains
     if (Utype(xi+1,yj,zk)<=0) then
       n1 = n1+1
       nx = nx+1
-    endif
+    end if
 
     if (Utype(xi-1,yj,zk)<=0) then
       n1 = n1+1
       nx = nx+1
-    endif
+    end if
 
     if (Utype(xi,yj+1,zk)<=0) then
       n1 = n1+1
       ny = ny+1
-    endif
+    end if
 
     if (Utype(xi,yj-1,zk)<=0) then
       n1 = n1+1
       ny = ny+1
-    endif
+    end if
 
     if (Utype(xi,yj,zk+1)<=0) then
       n1 = n1+1
       nz = nz+1
-    endif
+    end if
 
     if (Utype(xi,yj,zk-1)<=0) then
       n1 = n1+1
       nz = nz+1
-    endif
+    end if
 
     if (dirx/=0) n2 = n2+1
     if (diry/=0) n2 = n2+1
@@ -767,7 +952,7 @@ contains
       IBP%dirx = 0
       IBP%diry = 0
       IBP%dirz = 0
-    endif
+    end if
 
       !At least in one direction free  cells on both sides.
       !Unresolvably small object or a thin wall -> treat as directly on the boundary.
@@ -783,7 +968,7 @@ contains
       IBP%dirx = 0
       IBP%diry = 0
       IBP%dirz = 0
-    endif
+    end if
 
     
     if ((dirx==0.and.diry==0.and.dirz==0).or.((.not.free001).and.(.not.free010).and.(.not.free100))) then
@@ -836,7 +1021,7 @@ contains
           IBP%disty = (y2-y)*t
           IBP%distz = (z2-z)*t
         end if
-      endif
+      end if
 
     elseif ((.not.free010).and.(free100.and.dirx==1).and.(free001.and.dirz==1)) then  !the same normal to y
 
@@ -868,7 +1053,7 @@ contains
           IBP%disty = 0
           IBP%distz = (z2-z)*t
         end if
-      endif
+      end if
 
     elseif ((.not.free001).and.(free100.and.dirx==1).and.(free010.and.diry==1)) then  !the same normal to z
 
@@ -900,7 +1085,7 @@ contains
           IBP%disty = (y2-y)*t
           IBP%distz = 0
         end if
-      endif
+      end if
 
     elseif (free100.and.dirx==1) then  !Only one free direction, use linear interpolation in direction x.
 
@@ -933,7 +1118,7 @@ contains
           IBP%disty = 0
           IBP%distz = 0
         end if
-      endif
+      end if
 
     elseif (free010.and.diry==1) then               !the same in y
 
@@ -966,7 +1151,7 @@ contains
           IBP%disty = t*(y2-y)
           IBP%distz = 0
         end if
-      endif
+      end if
 
     elseif (free001.and.dirz==1) then               !the same in z
 
@@ -999,7 +1184,7 @@ contains
           IBP%disty = 0
           IBP%distz = (z2-z)
         end if
-      endif
+      end if
 
     else
       ! We should have find some interpolation and not come here!
@@ -1015,7 +1200,7 @@ contains
       write(*,*) "dirxyz",IBP%dirx,IBP%diry,IBP%dirz
       write(*,*) "free",free100,free010,free001
       stop
-    endif
+    end if
     
     if (abs(IBP%distx)>dxmin*2.or. abs(IBP%disty)>dymin*2.or. abs(IBP%distz)>dzmin*2 ) then
       write(*,*) "Assert error line",__LINE__,__FILE__
@@ -1065,9 +1250,9 @@ contains
     real(knd) :: b(3), d(3), c
     integer :: i,xi,yj,zk,dirx,diry,dirz
     
-    interface IB_interpolation_coefs
-      module procedure IB_interpolation_coefs_1st_order
-    end interface
+!     interface IB_interpolation_coefs
+!       module procedure IB_interpolation_coefs_1st_order
+!     end interface
     
 
     xi = IBP%xi
@@ -1176,9 +1361,9 @@ contains
     real(knd) b1, b2, b3, c
     integer xi,yj,zk,dirx,diry,dirz
     
-    interface IB_interpolation_coefs
-      module procedure IB_interpolation_coefs_1st_order
-    end interface
+!     interface IB_interpolation_coefs
+!       module procedure IB_interpolation_coefs_1st_order
+!     end interface
     
 
     xi = IBP%xi
@@ -1213,7 +1398,7 @@ contains
         else
           xr = zU(zk) + IBP%distz
           x  = [ zU(zk), zU(zk+dirz), zU(zk+2*dirz), zU(zk+3*dirz)  ]
-        endif
+        end if
 
         IBP%IntPoints%coef = IB_interpolation_coefs(xr,x)
 
@@ -1317,7 +1502,7 @@ contains
           yr = yU(yj) + IBP%disty
           y  = [ yU(yj), yU(yj+diry), yU(yj+2*diry), yU(yj+3*diry)  ]
 
-        endif
+        end if
 
         IBP%IntPoints(1:3)%coef = IB_interpolation_coefs(xr,x)
 
@@ -1402,7 +1587,7 @@ contains
     else if (IBP%interp/=0) then
         write(*,*) "Unknown interpolation",__FILE__,__LINE__
         stop
-    endif
+    end if
 
   end subroutine TVelIBPoint_InterpolationCoefs
 
@@ -1477,17 +1662,17 @@ contains
     if (abs(distx)<(xPr(xi+1)-xPr(xi-1))/100._knd) then  !If very close to the boundary, set the boundary here
       distx = 0
       dirx = 0
-    endif
+    end if
 
     if (abs(disty)<(yPr(yj+1)-yPr(yj-1))/100._knd) then
       disty = 0
       diry = 0
-    endif
+    end if
 
     if (abs(distz)<(zW(zk+1)-zW(zk-1))/100._knd) then
       distz = 0
       dirz = 0
-    endif
+    end if
 
 
     freep00 = (Prtype(xi+1,yj,zk)<=0)   !logicals denoting if the cell in plus x direction is free of SB
@@ -1537,7 +1722,7 @@ contains
       dirx = 0
       diry = 0
       dirz = 0
-    endif
+    end if
 
 
     if (dirx==0.and.diry==0.and.dirz==0) then   !If dir>0 treat as on the boundary.
@@ -1564,32 +1749,32 @@ contains
           IBP%IntPoints(i) = TInterpolationPoint(xi + 1, yj, zk, 1._knd / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + xPr(xi+1)-xPr(xi)
-        endif
+        end if
         if (freem00) then
           IBP%IntPoints(i) = TInterpolationPoint(xi - 1, yj, zk, 1._knd / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + xPr(xi)-xPr(xi-1)
-        endif
+        end if
         if (free0p0) then
           IBP%IntPoints(i) = TInterpolationPoint(xi, yj + 1, zk, 1._knd / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + yPr(yj+1)-yPr(yj)
-        endif
+        end if
         if (free0m0) then
           IBP%IntPoints(i) = TInterpolationPoint(xi, yj - 1, zk, 1._knd / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + yPr(yj)-yPr(yj-1)
-        endif
+        end if
         if (free00p) then
           IBP%IntPoints(i) = TInterpolationPoint(xi, yj, zk + 1, 1._knd / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + zPr(zk+1)-zPr(zk)
-        endif
+        end if
         if (free00m) then
           IBP%IntPoints(i) = TInterpolationPoint(xi, yj, zk - 1, 1._knd / nfreedirs)
           i = i + 1
           IBP%dist = IBP%dist + zPr(zk)-zPr(zk-1)
-        endif
+        end if
         IBP%dist = IBP%dist / nfreedirs
 
       else  !some edge
@@ -1603,7 +1788,7 @@ contains
         IBP%interp = 1
         IBP%dist = sqrt((x-xPr(IBP%xi+dirx2))**2+(y-yPr(IBP%yj+diry2))**2+(z-zPr(IBP%zk+dirz2))**2)
 
-      endif
+      end if
 
     elseif (nfreedirs==1.or.ndirs==1) then     !Only one free point outside, interpolate from there.
 
@@ -1646,7 +1831,7 @@ contains
           IBP%IntPoints(2)%coef = 1-IBP%IntPoints(1)%coef
           IBP%interp = 2
           IBP%dist = sqrt((disty*t)**2+(distz*t)**2)
-        endif
+        end if
 
       elseif (diry==0) then     !plane xz
 
@@ -1674,7 +1859,7 @@ contains
           IBP%IntPoints(2)%coef = 1-IBP%IntPoints(1)%coef
           IBP%interp = 2
           IBP%dist = sqrt((distx*t)**2+(distz*t)**2)
-        endif
+        end if
 
       else                 !plane xy
 
@@ -1702,8 +1887,8 @@ contains
           IBP%IntPoints(2)%coef = 1-IBP%IntPoints(1)%coef
           IBP%interp = 2
           IBP%dist = sqrt((distx*t)**2+(disty*t)**2)
-        endif
-      endif
+        end if
+      end if
 
     else                         !more than two free directions
 
@@ -1787,9 +1972,9 @@ contains
         IBP%IntPoints(4)%zk = IBP%zk+dirz
         IBP%IntPoints(4)%coef = (1-abs(distx*tz)/abs(xPr(xi+dirx)-x))*&
                                   (1-abs(disty*tz)/abs(yPr(yj+diry)-y))
-      endif
+      end if
 
-    endif
+    end if
 
     IBP%temperature_flux = SB%temperature_flux
 
@@ -1807,35 +1992,38 @@ contains
     allocate(ScalFlIBPoints(ScalFlIBPointsList%Len()))
 
     i = 0
-    call UIBPointsList%for_each(CopyIBPoint)
+    call UIBPointsList%for_each(CopyVelIBPoint)
     i = 0
-    call VIBPointsList%for_each(CopyIBPoint)
+    call VIBPointsList%for_each(CopyVelIBPoint)
     i = 0
-    call WIBPointsList%for_each(CopyIBPoint)
+    call WIBPointsList%for_each(CopyVelIBPoint)
     i = 0
-    call ScalFlIBPointsList%for_each(CopyIBPoint)
+    call ScalFlIBPointsList%for_each(CopyScalFlIBPoint)
 
     contains
 
-      subroutine CopyIBPoint(CurrentIBPoint)
-        class(*) :: CurrentIBPoint
+      subroutine CopyVelIBPoint(CurrentIBPoint)
+        type(TVelIBPoint) :: CurrentIBPoint
 
         i = i + 1
 
-        select type (CurrentIBPoint)
-          type is (TVelIBPoint)
-            if (CurrentIBPoint%component==1) then
-              UIBPoints(i) = CurrentIBPoint
-            elseif (CurrentIBPoint%component==2) then
-              VIBPoints(i) = CurrentIBPoint
-            else
-              WIBPoints(i) = CurrentIBPoint
-            endif
-          type is (TScalFlIBPoint)
-            ScalFlIBPoints(i) = CurrentIBPoint
-          class default
-            stop "Type error in immersed boundary points list."
-        end select
+        if (CurrentIBPoint%component==1) then
+          UIBPoints(i) = CurrentIBPoint
+        elseif (CurrentIBPoint%component==2) then
+          VIBPoints(i) = CurrentIBPoint
+        else
+          WIBPoints(i) = CurrentIBPoint
+        end if
+
+      end subroutine
+
+      subroutine CopyScalFlIBPoint(CurrentIBPoint)
+        type(TScalFlIBPoint) :: CurrentIBPoint
+
+        i = i + 1
+
+        ScalFlIBPoints(i) = CurrentIBPoint
+
       end subroutine
 
   end subroutine MoveIBPointsToArray
@@ -2030,11 +2218,11 @@ contains
           .or.Utype(i,j-1,k)<=0.or.Utype(i,j,k+1)<=0.or.Utype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xU(-2:),yPr(-2:),zPr(-2:),Utype,1)
             call  UIBPointsList%add(IBP)
-        endif
-       endif
-      enddo
-     enddo
-    enddo
+        end if
+       end if
+      end do
+     end do
+    end do
 
     do k = 1,Vnz
      do j = 1,Vny
@@ -2044,11 +2232,11 @@ contains
           .or.Vtype(i,j-1,k)<=0.or.Vtype(i,j,k+1)<=0.or.Vtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yV(-2:),zPr(-2:),Vtype,2)
             call  VIBPointsList%add(IBP)
-        endif
-       endif
-      enddo
-     enddo
-    enddo
+        end if
+       end if
+      end do
+     end do
+    end do
 
     do k = 1,Wnz
      do j = 1,Wny
@@ -2058,11 +2246,11 @@ contains
           .or.Wtype(i,j-1,k)<=0.or.Wtype(i,j,k+1)<=0.or.Wtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yPr(-2:),zW(-2:),Wtype,3)
             call  WIBPointsList%add(IBP)
-        endif
-       endif
-      enddo
-     enddo
-    enddo
+        end if
+       end if
+      end do
+     end do
+    end do
 
     do k = 1,Prnz
      do j = 1,Prny
@@ -2072,18 +2260,18 @@ contains
           .or.Prtype(i,j-1,k)<=0.or.Prtype(i,j,k+1)<=0.or.Prtype(i,j,k-1)<=0)  then
             call  Create(SIBP,i,j,k)
             call  ScalFlIBPointsList%add(SIBP)
-        endif
-       endif
-      enddo
-     enddo
-    enddo
+        end if
+       end if
+      end do
+     end do
+    end do
 
     call MoveIBPointsToArray
 
-    call UIBPointsList%deallocate
-    call VIBPointsList%deallocate
-    call WIBPointsList%deallocate
-    call ScalFlIBPointsList%deallocate
+    call UIBPointsList%finalize
+    call VIBPointsList%finalize
+    call WIBPointsList%finalize
+    call ScalFlIBPointsList%finalize
 
   end subroutine InitImBoundaries
 
@@ -2097,6 +2285,8 @@ contains
     call InitImBoundaries
 
     call GetSolidBodiesWM
+
+    call GetSolidBodiesWM_UVW
 
   end subroutine GetSolidBodiesBC
 

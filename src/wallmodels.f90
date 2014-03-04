@@ -14,70 +14,126 @@ module Sort
   end interface
 end module Sort
 
+module WMPoint_types
+  use Kinds
+
+  type WMpoint   !points in which we apply wall model
+
+    integer   :: xi
+    integer   :: yj
+    integer   :: zk
+
+    real(knd) :: distx
+    real(knd) :: disty
+    real(knd) :: distz
+
+    real(knd) :: area_factor ![m^-1] area of the solid wall divided by the volume of the cell(xi,yj,zk)
+
+    real(knd) :: z0 = 0
+    real(knd) :: ustar = 1
+    real(knd) :: temp = 0
+    real(knd) :: temperature_flux = 0
+    real(knd) :: moisture_flux = 0
+    real(knd) :: wallu = 0
+    real(knd) :: wallv = 0
+    real(knd) :: wallw = 0
+
+    real(knd) :: albedo = 0.2 !for shortwave radiation
+    real(knd) :: emmissivity = 0.8 !for longwave radiation
+    
+    real(knd) :: evaporative_fraction = 0
+
+    real(knd),allocatable:: depscalar(:)
+
+ !    integer,allocatable :: bound_IBPs(:)   
+
+    type(WMpoint),pointer:: next=>null()
+
+  end type WMpoint
+
+
+  type WMpointUVW   !points in which we apply wall model
+  
+    real(knd) :: flux
+
+    integer   :: xi
+    integer   :: yj
+    integer   :: zk
+
+    real(knd) :: distx
+    real(knd) :: disty
+    real(knd) :: distz
+
+    real(knd) :: z0 = 0
+    real(knd) :: ustar = 1
+
+    real(knd) :: wallu = 0
+    real(knd) :: wallv = 0
+    real(knd) :: wallw = 0
+
+  end type WMpointUVW
+
+end module
+
+module WMPointLists
+  use WMPoint_types
+#define TYPEPARAM type(WMPoint)
+#include "list-inc-def.f90"
+contains
+#include "list-inc-proc.f90"
+#undef TYPEPARAM
+end module
+
+module WMPointUVWLists
+  use WMPoint_types
+#define TYPEPARAM type(WMPointUVW)
+#include "list-inc-def.f90"
+contains
+#include "list-inc-proc.f90"
+#undef TYPEPARAM
+end module
 
 
 module Wallmodels
-use PARAMETERS
+  use Parameters
+  use WMPoint_types
+  use WMPointLists, only: WMPointList => list
+  use WMPointUVWLists, only: WMPointUVWList => list
 
+  implicit none
 
-implicit none
-
- private
- public WMPoint, AddWMPoint, FirstWMPoint, ComputeViscsWM, MoveWMPointsToArray, GetOutsideBoundariesWM, &
-        InitTempFl, GroundDeposition, GroundUstar, WMPoints, ListLength, wallmodeltype
+  private
+  public WMPoint, WMpointUVW, &
+         AddWMPoint, AddWMPointUVW, &
+         MoveWMPointsToArray, GetOutsideBoundariesWM, InitWMMasks, &
+         ComputeViscsWM, ComputeUVWFluxesWM, &
+         InitTempFl, GroundDeposition, GroundUstar, wallmodeltype
 #ifdef __HMPP
- public hmppWMpoint,WMPtoHMPP
+  public hmppWMpoint,WMPtoHMPP
 #endif
 
- type WMpoint   !points in which we apply wall model
+  integer, parameter, public :: MINUSX = 1, PLUSX = 2, MINUSY = 3, PLUSY = 4, MINUSZ = 5, PLUSZ = 6
 
-   integer   :: xi
-   integer   :: yj
-   integer   :: zk
+  type(WMPointUVWList) :: UxmWMPsL, UxpWMPsL, UymWMPsL, UypWMPsL, UzmWMPsL, UzpWMPsL, &
+                          VxmWMPsL, VxpWMPsL, VymWMPsL, VypWMPsL, VzmWMPsL, VzpWMPsL, &
+                          WxmWMPsL, WxpWMPsL, WymWMPsL, WypWMPsL, WzmWMPsL, WzpWMPsL
 
-   real(knd) :: distx
-   real(knd) :: disty
-   real(knd) :: distz
+  type(WMPointList) :: WMPointsList
 
-   real(knd) :: area_factor ![m^-1] area of the solid wall divided by the volume of the cell(xi,yj,zk)
+  type(WMPointUVW), dimension(:), allocatable, public :: &
+      UxmWMpoints, UxpWMpoints, UymWMpoints, UypWMpoints, UzmWMpoints, UzpWMPoints, &
+      VxmWMpoints, VxpWMpoints, VymWMpoints, VypWMpoints, VzmWMpoints, VzpWMpoints, &
+      WxmWMpoints, WxpWMpoints, WymWMpoints, WypWMpoints, WzmWMpoints, WzpWMpoints
 
-   real(knd) :: z0 = 0
-   real(knd) :: ustar = 1
-   real(knd) :: temp = 0
-   real(knd) :: temperature_flux = 0
-   real(knd) :: moisture_flux = 0
-   real(knd) :: wallu = 0
-   real(knd) :: wallv = 0
-   real(knd) :: wallw = 0
+  type(WMPoint), dimension(:), allocatable, public :: WMPoints
 
-   real(knd) :: albedo = 0.2 !for shortwave radiation
-   real(knd) :: emmissivity = 0.8 !for longwave radiation
-   
-   real(knd) :: evaporative_fraction = 0
+  logical(slog),dimension(:,:,:),allocatable,public :: Uflx_mask, Ufly_mask, Uflz_mask
+  logical(slog),dimension(:,:,:),allocatable,public :: Vflx_mask, Vfly_mask, Vflz_mask
+  logical(slog),dimension(:,:,:),allocatable,public :: Wflx_mask, Wfly_mask, Wflz_mask
 
-   real(knd),allocatable:: depscalar(:)
+  integer :: wallmodeltype
 
-!    integer,allocatable :: bound_IBPs(:)   
-
-   type(WMpoint),pointer:: next=>null()
-
- end type WMpoint
-
- type(WMpoint),pointer::FirstWMPoint=>null(), LastWMPoint=>null()
-
- type(WMPoint),dimension(:),allocatable :: WMPoints
-
- interface ListLength
-   module procedure WMPoint_ListLength
- end interface
-
- interface assignment(=)
-   module procedure WMPtoWMP
- end interface
-
- integer :: wallmodeltype
-
- contains
+contains
 
 #ifdef __HMPP
   elemental subroutine WMPtoHMPP(ToWMP,FromWMP)
@@ -100,41 +156,8 @@ implicit none
   end subroutine WMPtoHMPP
 #endif
 
-  subroutine WMPtoWMP(ToWMP,FromWMP)
-    type(WMPoint),intent(out) :: ToWMP
-    type(WMPoint),intent(in)  :: FromWMP
 
-    ToWMP%xi = FromWMP%xi
-    ToWMP%yj = FromWMP%yj
-    ToWMP%zk = FromWMP%zk
-
-    ToWMP%distx = FromWMP%distx
-    ToWMP%disty = FromWMP%disty
-    ToWMP%distz = FromWMP%distz
-
-    ToWMP%area_factor = FromWMP%area_factor
-
-    ToWMP%z0     = FromWMP%z0
-    ToWMP%ustar  = FromWMP%ustar
-    ToWMP%temp   = FromWMP%temp
-    ToWMP%temperature_flux = FromWMP%temperature_flux
-    ToWMP%moisture_flux = FromWMP%moisture_flux
-    ToWMP%wallu  = FromWMP%wallu
-    ToWMP%wallv  = FromWMP%wallv
-    ToWMP%wallw  = FromWMP%wallw
-
-    allocate(ToWMP%depscalar(size(FromWMP%depscalar)), source=FromWMP%depscalar)
-
-!     associate(src => FromWMP%bound_IBPs)
-!       if (allocated(FromWMP%bound_IBPs)) allocate(ToWMP%bound_IBPs(size(src)), source=src)
-!     end associate
-
-
-  end subroutine WMPtoWMP
-
-
-
-  subroutine ComputeAreaFactor(p)
+  elemental subroutine ComputeAreaFactor(p)
     type(WMpoint),intent(inout):: p
     real(knd) :: out_norm(3)
     !FIXME: Not accurate!!!
@@ -146,138 +169,145 @@ implicit none
 
 
 
-  subroutine AddWMpoint(WMP)
-    type(WMpoint),intent(in):: WMP
+  subroutine AddWMPoint(WMP)
+    type(WMPoint), intent(in) :: WMP
 
-    if (.not.associated(LastWMPoint)) then
+    call WMPointsList%add(WMP)
 
-     allocate(FirstWMPoint)
-
-     if (computedeposition>0) then
-       allocate( FirstWMPoint%depscalar(size(WMP%depscalar)) )
-       FirstWMPoint%depscalar = 0
-     end if
-
-     FirstWMPoint = WMP
-     LastWMPoint=>FirstWMPoint
-
-    else
-
-     allocate(LastWMPoint%next)
-
-     if (computedeposition>0) then
-       allocate( LastWMPoint%next%depscalar(size(WMP%depscalar)) )
-       LastWMPoint%next%depscalar = 0
-     end if
-
-     LastWMPoint%next = WMP
-     LastWMPoint=>LastWMPoint%next
-
-    end if
-
-    call ComputeAreaFactor(LastWMPoint)
-
-  end subroutine AddWMPoint
+  end subroutine
 
 
-  subroutine WMPoint_DeallocateList(WMP)
-    type(WMPoint),pointer,intent(inout) :: WMP
-    type(WMPoint),pointer :: Aux,Aux2
+  subroutine AddWMPointUVW(WMP, component, direction)
+    type(WMPointUVW), intent(in) :: WMP
+    integer, intent(in) :: component, direction
 
-    if (.not.associated(WMP)) return
+    select case (component)
+      case (1)
+        call add(WMP, direction, UxmWMPsL, UxpWMPsL, UymWMPsL, UypWMPsL, UzmWMPsL, UzpWMPsL)
+      case (2)
+        call add(WMP, direction, VxmWMPsL, VxpWMPsL, VymWMPsL, VypWMPsL, VzmWMPsL, VzpWMPsL)
+      case (3)
+        call add(WMP, direction, WxmWMPsL, WxpWMPsL, WymWMPsL, WypWMPsL, WzmWMPsL, WzpWMPsL)
+    end select
 
-    Aux => WMP
+  contains
+    subroutine add(p, dir, xm, xp, ym, yp, zm, zp)
+      type(WMPointUVW), intent(in) :: p
+      integer, intent(in) :: dir
+      type(WMPointUVWList), intent(inout) :: xm, xp, ym, yp, zm, zp
+      select case (dir)
+        case (MINUSX)
+          call xm%add(p)
+        case (PLUSX)
+          call xp%add(p)
+        case (MINUSY)
+          call ym%add(p)
+        case (PLUSY)
+          call yp%add(p)
+        case (MINUSZ)
+          call zm%add(p)
+        case (PLUSZ)
+          call zp%add(p)
+      end select
+    end subroutine
+  end subroutine
 
-    do
-      if (allocated(Aux%depscalar)) deallocate(Aux%depscalar)
-      if (associated(Aux%next)) then
-        Aux => Aux%next
-      else
-        exit
-      end if
-    end do
-
-
-    Aux =>WMP
-
-    do
-
-      if (associated(Aux%next)) then
-        Aux2 => Aux%next
-      else
-        Aux2 => null()
-      end if
-
-      deallocate(Aux)
-
-      if (associated(Aux2)) then
-        Aux => Aux2
-      else
-        exit
-      end if
-
-    end do
-
-    WMP => null()
-
-  end subroutine WMPoint_DeallocateList
 
 
 
   subroutine MoveWMPointsToArray
-    type(WMPoint),pointer :: CurrentWMPoint
+
+    call MoveWMPointsToArrayPr
+    call MoveWMPointsToArrayUVW
+  end subroutine
+
+
+
+
+  subroutine MoveWMPointsToArrayPr
+    type(WMPoint),pointer :: p
     integer :: i
 
-    allocate(WMPoints(WMPoint_ListLength(FirstWMPoint)))
+    allocate(WMPoints(WMPointsList%len()))
 
     if (size(WMPoints)>0) then
 
-      CurrentWMPoint => FirstWMPoint
-      i = 0
-      do
-       if (associated(CurrentWMPoint)) then
-         i = i + 1
-         WMPoints(i) = CurrentWMPoint
-       else
-         exit
-       end if
-       CurrentWMPoint => CurrentWMPoint%next
+      call WMPointsList%iter_restart
+
+      do i = 1, size(WMPoints)
+        p => WMPointsList%iter_next()
+        if (associated(p)) then
+          WMPoints(i) = p
+        else
+          write(*,*) "Assert error, pointer not associated. File ",__FILE__," line ",__LINE__
+          stop
+        end if
       end do
 
       call RemoveDuplicateWMPoints(WMPoints)
 
-    end if
-
-    call WMPoint_DeallocateList(FirstWMPoint)
-
-  end subroutine MoveWMPointsToArray
-
-
-
-  function WMPoint_ListLength(WMP) result(nWMP)
-    integer :: nWMP
-    type(WMPoint),pointer :: WMP
-    type(WMPoint),pointer :: CurrentWMPoint
-
-    nWMP = 0
-
-    if (associated(WMP)) then
-
-      CurrentWMPoint => WMP
-
-      do
-        nWMP = nWMP + 1
-
-        if (associated(CurrentWMPoint%next)) then
-          CurrentWMPoint => CurrentWMPoint%next
-        else
-          exit
-        end if
-      end do
+      call ComputeAreaFactor(WMPoints)
 
     end if
 
-  end function WMPoint_ListLength
+    call WMPointsList%finalize
+
+  end subroutine MoveWMPointsToArrayPr
+
+
+
+  subroutine MoveWMPointsToArrayUVW
+    type(WMPointUVW),pointer :: p
+    integer :: i
+
+    call helper(UxmWMPsL, UxmWMpoints)
+    call helper(UxpWMPsL, UxpWMpoints)
+    call helper(UymWMPsL, UymWMpoints)
+    call helper(UypWMPsL, UypWMpoints)
+    call helper(UzmWMPsL, UzmWMpoints)
+    call helper(UzpWMPsL, UzpWMpoints)
+
+    call helper(VxmWMPsL, VxmWMpoints)
+    call helper(VxpWMPsL, VxpWMpoints)
+    call helper(VymWMPsL, VymWMpoints)
+    call helper(VypWMPsL, VypWMpoints)
+    call helper(VzmWMPsL, VzmWMpoints)
+    call helper(VzpWMPsL, VzpWMpoints)
+
+    call helper(WxmWMPsL, WxmWMpoints)
+    call helper(WxpWMPsL, WxpWMpoints)
+    call helper(WymWMPsL, WymWMpoints)
+    call helper(WypWMPsL, WypWMpoints)
+    call helper(WzmWMPsL, WzmWMpoints)
+    call helper(WzpWMPsL, WzpWMpoints)
+
+  contains
+    subroutine helper(l, arr)
+      type(WMPointUVWList), intent(inout) :: l
+      type(WMPointUVW), allocatable, intent(out) :: arr(:)
+
+      allocate(arr(l%len()))
+
+      if (size(arr)>0) then
+
+        call l%iter_restart
+
+        do i = 1, size(arr)
+          p => l%iter_next()
+          if (associated(p)) then
+            arr(i) = p
+          else
+            write(*,*) "Assert error, pointer not associated. File ",__FILE__," line ",__LINE__
+            stop
+          end if
+        end do
+
+      end if
+
+      call l%finalize
+    end subroutine
+  end subroutine MoveWMPointsToArrayUVW
+
 
 
   subroutine RemoveDuplicateWMPoints(WMPoints)
@@ -342,7 +372,7 @@ implicit none
     else if (A%distx**2+A%disty**2+A%distz**2 > B%distx**2+B%disty**2+B%distz**2) then
       res =  1_c_int
     else
-      res =  0_C_int
+      res =  0_c_int
     end if
 
   end function CompareWMPoints
@@ -355,15 +385,21 @@ implicit none
 
 
 
-
-
-
-
-
-
-
-
+ 
   subroutine GetOutsideBoundariesWM(nscalars)
+    integer, intent(in) :: nscalars
+
+    call GetOutsideBoundariesWM_Pr(nscalars)
+
+    call GetOutsideBoundariesWM_UVW
+  end subroutine
+
+
+
+
+
+
+  subroutine GetOutsideBoundariesWM_Pr(nscalars)
     integer, intent(in) :: nscalars
     integer       :: i,j,k
     type(WMPoint) :: WMP
@@ -526,12 +562,265 @@ implicit none
       end do
     end if
 
-  end subroutine GetOutsideBoundariesWM
+  end subroutine GetOutsideBoundariesWM_Pr
+
+
+  subroutine GetOutsideBoundariesWM_UVW
+
+    call helper(1, Unx, Uny, Unz, xU(-2:), yPr, zPr, Utype)
+
+    call helper(2, Vnx, Vny, Vnz, xPr, yV(-2:), zPr, Vtype)
+
+    call helper(3, Wnx, Wny, Wnz, xPr, yPr, zW(-2:), Wtype)
+
+  contains
+
+    subroutine helper(component, nx, ny, nz, x, y, z, Xtype)
+      integer, intent(in) :: component, nx, ny, nz
+      real(knd), intent(in) :: x(-2:), y(-2:), z(-2:)
+      integer, intent(in) :: Xtype(-2:,-2:,-2:)
+      integer       :: i,j,k
+      type(WMPointUVW) :: p
+
+      !type==0 below, therefore we need 
+      ! type of free bounderies not to be -1
+      if (Btype(We)==NOSLIP) then
+        do k = 1,nz
+         do j = 1,ny
+           if (Xtype(1,j,k)==0.and.Xtype(0,j,k)<=0) then
+             p%xi = 1
+             p%yj = j
+             p%zk = k
+             p%distx = xU(0) - x(1)
+             p%disty = 0
+             p%distz = 0
+             p%ustar = 1
+
+             p%z0 = z0W
+             call AddWMPointUVW(p, component, We)
+           end if
+         end do
+        end do
+      end if
+
+      if (Btype(Ea)==NOSLIP) then
+        do k = 1,nz
+         do j = 1,ny
+           if (Xtype(nx,j,k)==0.and.Xtype(nx+1,j,k)<=0) then
+             p%xi = nx
+             p%yj = j
+             p%zk = k
+             p%distx = xU(Unx+1) - x(nx)
+             p%disty = 0
+             p%distz = 0
+             p%ustar = 1
+
+             p%z0 = z0E
+             call AddWMPointUVW(p, component, Ea)
+           end if
+         end do
+        end do
+      end if
+
+      if (Btype(So)==NOSLIP.or.(Btype(So)==DIRICHLET.and.sideU(2,So)==0)) then
+        do k = 1,nz
+         do i = 1,nx
+           if (Xtype(i,1,k)==0.and.Xtype(i,0,k)<=0) then
+             p%xi = i
+             p%yj = 1
+             p%zk = k
+             p%distx = 0
+             p%disty = yV(0) - y(1)
+             p%distz = 0
+             p%ustar = 1
+
+             if (Btype(So)==DIRICHLET) then
+               p%wallu = sideU(1,So)
+               p%wallv = 0
+               p%wallw = sideU(3,So)
+             end if
+
+             p%z0 = z0S
+             call AddWMPointUVW(p, component, So)
+           end if
+         end do
+        end do
+      end if
+
+      if (Btype(No)==NOSLIP.or.(Btype(No)==DIRICHLET.and.sideU(2,No)==0)) then
+        do k = 1,nz
+         do i = 1,nx
+           if (Xtype(i,ny,k)==0.and.Xtype(i,ny+1,k)<=0) then
+             p%xi = i
+             p%yj = ny
+             p%zk = k
+             p%distx = 0
+             p%disty = yV(Vny+1) - y(ny)
+             p%distz = 0
+             p%ustar = 1
+
+             if (Btype(No)==DIRICHLET) then
+               p%wallu = sideU(1,No)
+               p%wallv = 0
+               p%wallw = sideU(3,No)
+             end if
+
+             p%z0 = z0N
+             call AddWMPointUVW(p, component, No)
+           end if
+         end do
+        end do
+      end if
+
+      if (Btype(Bo)==NOSLIP.or.(Btype(Bo)==DIRICHLET.and.sideU(3,Bo)==0)) then
+        do j = 1,ny
+         do i = 1,nx
+           if (Xtype(i,j,1)==0.and.Xtype(i,j,0)<=0) then
+
+             p%xi = i
+             p%yj = j
+             p%zk = 1
+             p%distx = 0
+             p%disty = 0
+             p%distz = zW(0) - z(1)
+             p%ustar = 1
+
+             if (Btype(Bo)==DIRICHLET) then
+               p%wallu = sideU(1,Bo)
+               p%wallv = sideU(2,Bo)
+               p%wallw = 0
+             end if
+
+             p%z0 = z0B
+
+             call AddWMPointUVW(p, component, Bo)
+
+           end if
+         end do
+        end do
+      end if
+
+      if (Btype(To)==NOSLIP.or.(Btype(To)==DIRICHLET.and.sideU(3,To)==0)) then
+
+        do j = 1,ny
+         do i = 1,nx
+           if (Xtype(i,j,nz)==0.and.Xtype(i,j,nz+1)<=0) then
+             p%xi = i
+             p%yj = j
+             p%zk = nz
+             p%distx = 0
+             p%disty = 0
+             p%distz = zW(Wnz+1) - z(nz)
+             p%ustar = 1
+
+             if (Btype(To)==DIRICHLET) then
+               p%wallu = sideU(1,To)
+               p%wallv = sideU(2,To)
+               p%wallw = 0
+             end if
+
+             p%z0 = z0T
+             call AddWMPointUVW(p, component, To)
+           end if
+         end do
+        end do
+      end if
+
+    end subroutine helper
+
+  end subroutine GetOutsideBoundariesWM_UVW
 
 
 
 
+  
+  
+  subroutine InitWMMasks
+    allocate(Uflx_mask(Unx+1,Uny,Unz))
+    allocate(Ufly_mask(Unx,Uny+1,Unz))
+    allocate(Uflz_mask(Unx,Uny,Unz+1))
+  
+    allocate(Vflx_mask(Vnx+1,Vny,Vnz))
+    allocate(Vfly_mask(Vnx,Vny+1,Vnz))
+    allocate(Vflz_mask(Vnx,Vny,Vnz+1))
+  
+    allocate(Wflx_mask(Wnx+1,Wny,Wnz))
+    allocate(Wfly_mask(Wnx,Wny+1,Wnz))
+    allocate(Wflz_mask(Wnx,Wny,Wnz+1))
 
+    Uflx_mask = .true.
+    Ufly_mask = .true.
+    Uflz_mask = .true.
+
+    Vflx_mask = .true.
+    Vfly_mask = .true.
+    Vflz_mask = .true.
+
+    Wflx_mask = .true.
+    Wfly_mask = .true.
+    Wflz_mask = .true.
+
+    call set_masks(Uflx_mask, Ufly_mask, Uflz_mask, &
+                   UxmWMpoints, UxpWMpoints, UymWMpoints, UypWMpoints, UzmWMpoints, UzpWMpoints, Unx, Uny, Unz, Utype)
+
+    call set_masks(Vflx_mask, Vfly_mask, Vflz_mask, &
+                   VxmWMpoints, VxpWMpoints, VymWMpoints, VypWMpoints, VzmWMpoints, VzpWMpoints, Vnx, Vny, Vnz, Vtype)
+
+    call set_masks(Wflx_mask, Wfly_mask, Wflz_mask, &
+                   WxmWMpoints, WxpWMpoints, WymWMpoints, WypWMpoints, WzmWMpoints, WzpWMpoints, Wnx, Wny, Wnz, Wtype)
+
+  contains
+  
+    subroutine set_masks(flx, fly, flz, xm, xp, ym, yp, zm, zp, nx, ny, nz, Xtype)
+      logical(slog), dimension(:,:,:), intent(inout) :: flx, fly, flz
+      type(WMpointUVW),  dimension(:), intent(in)    :: xm, xp, ym, yp, zm, zp
+      integer, intent(in) :: nx, ny, nz
+      integer, intent(in) :: Xtype(-2:,-2:,-2:)
+      !TODO: take care of red and black points
+      integer :: i, j, k
+      do i = 1, size(xm)
+        associate(p => xm(i))
+            flx(p%xi,p%yj,p%zk) = .false.
+        end associate
+      end do
+      do i = 1, size(xp)
+        associate(p => xp(i))
+            flx(p%xi+1,p%yj,p%zk) = .false.
+        end associate
+      end do
+      do i = 1, size(ym)
+        associate(p => ym(i))
+            fly(p%xi,p%yj,p%zk) = .false.
+        end associate
+      end do
+      do i = 1, size(yp)
+        associate(p => yp(i))
+            fly(p%xi,p%yj+1,p%zk) = .false.
+        end associate
+      end do
+      do i = 1, size(zm)
+        associate(p => zm(i))
+            flz(p%xi,p%yj,p%zk) = .false.
+        end associate
+      end do
+      do i = 1, size(zp)
+        associate(p => zp(i))
+            flz(p%xi,p%yj,p%zk+1) = .false.
+        end associate
+      end do
+
+      do k = 1, nz
+        do j = 1, ny
+          do i = 1, nx
+            if (Xtype(i,j,k)>0.and.Xtype(i-1,j,k)>0) flx(i,j,k) = .false.
+            if (Xtype(i,j,k)>0.and.Xtype(i,j-1,k)>0) fly(i,j,k) = .false.
+            if (Xtype(i,j,k)>0.and.Xtype(i,j,k-1)>0) flz(i,j,k) = .false.
+          end do
+        end do
+      end do
+    end subroutine
+
+  end subroutine
 
 
 
@@ -599,19 +888,15 @@ implicit none
   end subroutine WMFlatUstar
 
 
-   subroutine WMFlatVisc(visc,ustar,distvect,uvect,walluvect)
-    real(knd),intent(out)   :: visc
-    real(knd),intent(inout) :: ustar
-    real(knd),intent(in)    :: distvect(3),uvect(3),walluvect(3)
-    real(knd) vect(3),vel,dist
+  subroutine WMFlatStress(ustar,distvect,uvect,walluvect,tan_vel,distance,tan_vect)
+    real(knd), intent(inout) :: ustar
+    real(knd), intent(in)    :: distvect(3), uvect(3), walluvect(3)
+    real(knd), optional, intent(out)   :: tan_vel, distance, tan_vect(3)
+    real(knd) :: vel, dist, tan_vect_loc(3)
 
-    dist = sqrt(sum(distvect**2))
+    call vel_and_dist(tan_vect_loc, dist, uvect, walluvect, distvect)
 
-    vect = uvect - walluvect
-
-    vect = vect - dot_product(vect,distvect) * distvect / dist**2  !tangential part
-
-    vel = sqrt(sum(vect**2))
+    vel = norm2(tan_vect_loc)
 
     if (vel/=0) then
 
@@ -620,6 +905,21 @@ implicit none
     end if
 
     if (ustar<0) ustar = 0
+
+    if (present(tan_vel)) tan_vel = vel
+    if (present(distance)) distance = dist
+    if (present(tan_vect)) tan_vect = tan_vect_loc
+
+  end subroutine WMFlatStress
+
+
+  subroutine WMFlatVisc(visc,ustar,distvect,uvect,walluvect)
+    real(knd),intent(out)   :: visc
+    real(knd),intent(inout) :: ustar
+    real(knd),intent(in)    :: distvect(3), uvect(3), walluvect(3)
+    real(knd) :: vel, dist
+
+    call WMFlatStress(ustar,distvect,uvect,walluvect,vel,dist)
 
     if (vel>0) then
 
@@ -651,34 +951,35 @@ implicit none
     real(knd),intent(in) :: vel,dist,z0
     real(knd),parameter  :: eps = 1e-4_knd
     real(knd),parameter  :: yplcrit = 11.225_knd
+    real(knd) :: dist_plus
 
-    if (dist<=z0) then
-     if (Re>0) then
-      call WMFlatUstar(ustar,vel,dist)
-     else
-      ustar = 0
-     end if
-    else
+    dist_plus = sqrt(dist * Re * vel)
+
+    !under z0 the whole concept of rougness parameter breaks down
+    !if in the laminar region for flat boundary layer also treat as flat and possibly laminar
+    if (dist<=z0 .or. dist_plus<yplcrit) then
+      if (Re>0) then
+        call WMFlatUstar(ustar,vel,dist)
+      else
+        ustar = 0
+      end if
+    else 
       ustar = vel * 0.41_knd / log(dist/z0)
     end if
 
   end subroutine WMRoughUstar
 
 
-  pure subroutine WMRoughVisc(visc,ustar,z0,distvect,uvect,walluvect)
-    real(knd),intent(out)   :: visc
-    real(knd),intent(inout) :: ustar
-    real(knd),intent(in)    :: z0
-    real(knd),intent(in)    :: distvect(3),uvect(3),walluvect(3)
-    real(knd) vect(3),vel,dist
+  pure subroutine WMRoughStress(ustar,z0,distvect,uvect,walluvect,tan_vel,distance,tan_vect)
+    real(knd), intent(inout) :: ustar
+    real(knd), intent(in)    :: z0
+    real(knd), intent(in)    :: distvect(3), uvect(3), walluvect(3)
+    real(knd), optional, intent(out)   :: tan_vel, distance, tan_vect(3)
+    real(knd) :: vel, dist, tan_vect_loc(3)
 
-    dist = sqrt(sum(distvect**2))
+    call vel_and_dist(tan_vect_loc, dist, uvect, walluvect, distvect)
 
-    vect = uvect - walluvect
-
-    vect = vect - dot_product(vect,distvect) * distvect / dist**2  !tangential part
-
-    vel = sqrt(sum(vect**2))
+    vel = norm2(tan_vect_loc)
 
     if (vel/=0) then
 
@@ -687,6 +988,22 @@ implicit none
     end if
 
     if (ustar<0) ustar = 0
+
+    if (present(tan_vel)) tan_vel = vel
+    if (present(distance)) distance = dist
+    if (present(tan_vect)) tan_vect = tan_vect_loc
+
+  end subroutine WMRoughStress
+
+
+  pure subroutine WMRoughVisc(visc,ustar,z0,distvect,uvect,walluvect)
+    real(knd),intent(out)   :: visc
+    real(knd),intent(inout) :: ustar
+    real(knd),intent(in)    :: z0
+    real(knd),intent(in)    :: distvect(3), uvect(3), walluvect(3)
+    real(knd) vect(3), vel, dist
+
+    call WMRoughStress(ustar,z0,distvect,uvect,walluvect,vel,dist)
 
     if (vel>0 .and. ustar**2 * dist/vel>1._knd/Re) then
       visc = ustar**2 * dist/vel
@@ -697,6 +1014,18 @@ implicit none
     end if
 
   end subroutine WMRoughVisc
+
+
+  pure subroutine vel_and_dist(tan_vect, dist, uvect, walluvect, distvect)
+    real(knd), intent(out) :: tan_vect(3),  dist
+    real(knd), intent(in)  :: uvect(3), walluvect(3), distvect(3)
+
+    dist = norm2(distvect)
+
+    tan_vect = uvect - walluvect
+
+    tan_vect = tan_vect - dot_product(tan_vect,distvect) * distvect / dist**2  !tangential part
+  end subroutine
 
 
 
@@ -886,13 +1215,13 @@ implicit none
 
 
 
-  pure subroutine WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_fluxux,Re,temperature_ref,grav_acc)
+  pure subroutine WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_flux,Re,temperature_ref,grav_acc)
     implicit none
 
     real(knd),intent(inout) :: ustar
     real(knd),parameter  :: eps = 1e-3
     real(knd),parameter  :: yplcrit = 11.225_knd
-    real(knd),intent(in) :: vel,dist,z0,temperature_fluxux
+    real(knd),intent(in) :: vel,dist,z0,temperature_flux
     real(knd),intent(in) :: Re,temperature_ref,grav_acc
     real(knd) ustar2,zL,zL2,Psi
     integer i
@@ -925,7 +1254,7 @@ implicit none
       if (ustar<1E-4) then
        zL = -10000
       else
-       zL2 = Obukhov_zL(ustar,temperature_fluxux,temperature_ref,grav_acc,dist)
+       zL2 = Obukhov_zL(ustar,temperature_flux,temperature_ref,grav_acc,dist)
        zL = zL+(zL2-zL)/2
       end if
 
@@ -946,8 +1275,8 @@ implicit none
 
 
 
-  pure subroutine WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_fluxux,vel,dist,z0,tempdif)
-    real(knd),intent(inout) :: ustar,temperature_fluxux
+  pure subroutine WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,tempdif)
+    real(knd),intent(inout) :: ustar,temperature_flux
     real(knd),intent(in) :: vel,dist,z0,tempdif
     real(knd),parameter :: eps = 1e-3
     real(knd),parameter :: yplcrit = 11.225
@@ -975,7 +1304,7 @@ implicit none
       i = 0
       if (Rib>0.34_knd) then
                           ustar = 0
-                          temperature_fluxux = 0
+                          temperature_flux = 0
       else
         do
           i = i+1
@@ -987,10 +1316,10 @@ implicit none
 
         if (i>=50.or.zL>100) then
           ustar = 0
-          temperature_fluxux = 0
+          temperature_flux = 0
         else
           ustar = vel*0.4_knd/(log(dist/z0)-PsiM_MO(zL))
-          temperature_fluxux = 0.4_knd*ustar*tempdif/(log(dist/z0)-PsiH_MO(zL))
+          temperature_flux = 0.4_knd*ustar*tempdif/(log(dist/z0)-PsiH_MO(zL))
         end if
       end if
     end if
@@ -1264,6 +1593,167 @@ implicit none
 
 
 
+
+
+  subroutine ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),dimension(1:,1:,1:),   intent(in) :: Pr
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
+
+
+
+
+    if (enable_buoyancy==1.and. TempBtype(Bo)==DIRICHLET) call Bound_temperature_flux(BsideTFLArr)
+
+    call fluxes(UxmWMpoints, 1, MINUSX)
+    call fluxes(UxpWMpoints, 1, PLUSX)
+    call fluxes(UymWMpoints, 1, MINUSY)
+    call fluxes(UypWMpoints, 1, PLUSY)
+    call fluxes(UzmWMpoints, 1, MINUSZ)
+    call fluxes(UzpWMpoints, 1, PLUSZ)
+
+    call fluxes(VxmWMpoints, 2, MINUSX)
+    call fluxes(VxpWMpoints, 2, PLUSX)
+    call fluxes(VymWMpoints, 2, MINUSY)
+    call fluxes(VypWMpoints, 2, PLUSY)
+    call fluxes(VzmWMpoints, 2, MINUSZ)
+    call fluxes(VzpWMpoints, 2, PLUSZ)
+
+    call fluxes(WxmWMpoints, 3, MINUSX)
+    call fluxes(WxpWMpoints, 3, PLUSX)
+    call fluxes(WymWMpoints, 3, MINUSY)
+    call fluxes(WypWMpoints, 3, PLUSY)
+    call fluxes(WzmWMpoints, 3, MINUSZ)
+    call fluxes(WzpWMpoints, 3, PLUSZ)
+
+
+  contains
+
+    subroutine fluxes(points, component, direction)
+      type(WMPointUVW), intent(inout), target :: points(:)
+      integer, intent(in) :: component, direction
+      integer i,j,xi,yj,zk
+      real(knd) dist(3), vel(3), wallvel(3), tan_vect(3), mag
+      type(WMPointUVW), pointer :: p
+      real(knd), parameter :: eps = 0.0001_knd
+
+      !$omp parallel do private(i,xi,yj,zk,dist,vel,wallvel,tan_vect,p,mag)
+      do i = 1,size(points)
+
+!         associate (p => points(i))  NOTE: ASSOCIATE supported only in OpenMP 4
+          p => points(i)
+          xi = p%xi
+          yj = p%yj
+          zk = p%zk
+
+          dist = [p%distx, p%disty, p%distz]
+
+          if (all(dist==0))then
+            write(*,*) "ijk",xi,yj,zk
+            write(*,*) "dist",dist
+            stop "Error, WM point can not be exactly on the wall!"
+          end if
+
+          vel = local_velocity(U,V,W,component,xi,yj,zk)
+
+          wallvel = [p%wallu, p%wallv, p%wallw]
+
+
+          if (p%z0>0) then
+
+             if (enable_buoyancy==1 .and. TempBtype(Bo)==CONSTFLUX) then
+
+               stop "Not implemented!"
+
+             else if (enable_buoyancy==1 .and. TempBtype(Bo)==DIRICHLET) then
+
+               stop "Not implemented!"
+
+             else
+
+               call WMRoughStress(p%ustar, p%z0, &
+                                  dist, vel, wallvel, tan_vect = tan_vect)
+             end if
+
+          else
+
+             if (Re<=0) then
+               stop "The wall model requires positive viscosity or roughness length."
+             end if
+
+
+             call WMFlatStress(p%ustar, &
+                               dist, vel, wallvel, tan_vect = tan_vect)
+           end if
+
+           mag = norm2(tan_vect)
+
+           if (mag>eps) then
+
+             p%flux = tan_vect(component) / mag * p%ustar**2
+
+             if (mod(direction,2)==1) p%flux = - p%flux
+
+           else
+
+             p%flux = 0
+
+           end if
+
+!         end associate
+
+      end do
+      !$omp end parallel do
+
+    end subroutine
+
+  end subroutine ComputeUVWFluxesWM
+
+
+  pure function local_velocity(U,V,W,component,xi,yj,zk) result(vel)
+    real(knd) :: vel(3)
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    integer, intent(in) :: component, xi, yj, zk
+
+    select case (component)
+      case (1)
+        vel(1) =   U(xi, yj, zk)
+        vel(2) = ( V(xi-1,yj,  zk) + &
+                   V(xi,  yj,  zk) + &
+                   V(xi-1,yj+1,zk) + &
+                   V(xi,  yj+1,zk) &
+                 ) / 4._knd
+        vel(3) = ( W(xi-1,yj, zk  ) + &
+                   W(xi,  yj, zk  ) + &
+                   W(xi-1,yj, zk+1) + &
+                   W(xi,  yj, zk+1) &
+                 ) / 4._knd
+      case (2)
+        vel(1) = ( U(xi  ,yj-1,zk) + &
+                   U(xi,  yj,  zk) + &
+                   U(xi+1,yj-1,zk) + &
+                   U(xi+1,yj,  zk) &
+                 ) / 4._knd
+        vel(2) =   V(xi, yj, zk)
+        vel(3) = ( W(xi, yj-1,zk  ) + &
+                   W(xi, yj,  zk  ) + &
+                   W(xi, yj-1,zk+1) + &
+                   W(xi, yj,  zk+1) &
+                 ) / 4._knd
+      case (3)
+        vel(1) = ( U(xi  ,yj, zk-1) + &
+                   U(xi,  yj, zk  ) + &
+                   U(xi+1,yj, zk-1) + &
+                   U(xi+1,yj, zk  ) &
+                 ) / 4._knd
+        vel(2) = ( V(xi, yj,  zk-1) + &
+                   V(xi, yj,  zk  ) + &
+                   V(xi, yj+1,zk-1) + &
+                   V(xi, yj+1,zk  ) &
+                 ) / 4._knd
+        vel(3) =   W(xi, yj, zk)
+    end select
+  end function
 
 
   pure real(knd) function GroundUstar()

@@ -38,7 +38,7 @@ module TSTEPS
   real(knd),dimension(:,:,:),allocatable :: V2,Vstar
   real(knd),dimension(:,:,:),allocatable :: W2,Wstar
 
-  real(knd),allocatable:: Apu(:,:,:),ApV(:,:,:),ApW(:,:,:)
+  real(knd),dimension(:,:,:),allocatable:: Apu, ApV, ApW, wrk
 
 contains
 
@@ -47,6 +47,7 @@ contains
 #endif
 
  subroutine TSteps_Deallocate
+   use Wallmodels
    if (allocated(U3)) deallocate(U3)
    if (allocated(V3)) deallocate(V3)
    if (allocated(W3)) deallocate(W3)
@@ -60,6 +61,18 @@ contains
    if (allocated(ApU)) deallocate(ApU)
    if (allocated(ApV)) deallocate(ApV)
    if (allocated(ApW)) deallocate(ApW)
+   if (allocated(wrk)) deallocate(wrk)
+
+   !imported from Wallmodels
+   if (allocated(Uflx_mask)) deallocate(Uflx_mask)
+   if (allocated(Ufly_mask)) deallocate(Ufly_mask)
+   if (allocated(Uflz_mask)) deallocate(Uflz_mask)
+   if (allocated(Vflx_mask)) deallocate(Vflx_mask)
+   if (allocated(Vfly_mask)) deallocate(Vfly_mask)
+   if (allocated(Vflz_mask)) deallocate(Vflz_mask)
+   if (allocated(Wflx_mask)) deallocate(Wflx_mask)
+   if (allocated(Wfly_mask)) deallocate(Wfly_mask)
+   if (allocated(Wflz_mask)) deallocate(Wflz_mask)
  end subroutine
 
 
@@ -382,7 +395,7 @@ end subroutine TMarchRK3
 !      !$hmpp <tsteps> advancedload, args[ForwEul::Visc]
 
      !$hmpp <tsteps> ForwEul callsite, args[*].noupdate = true
-     call ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
+     call ForwEul2(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
                   dxPr,dyPr,dzPr,dxU,dyV,dzW, &
                   U,V,W,U2,V2,W2,U3,V3,W3,Viscosity, &
                   dt,coef)
@@ -408,8 +421,7 @@ end subroutine TMarchRK3
 
 #else
      if (gridtype==UNIFORMGRID) then
-
-      call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
+      call UNIFREDBLACK2(U,V,W,U2,V2,W2,U3,V3,W3,coef)
      else
       call GENREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
      end if
@@ -474,31 +486,31 @@ end subroutine TMarchRK3
        end if
 
 
-       Ap = coef*dt/(2._knd)
+       Ap = coef * dt / 2
        S = 0
        l = 0
 
-       recdxmin2=1./dxmin**2
-       recdymin2=1./dymin**2
-       recdzmin2=1./dzmin**2
+       recdxmin2 = 1._knd / dxmin**2
+       recdymin2 = 1._knd / dymin**2
+       recdzmin2 = 1._knd / dzmin**2
 
        !$omp parallel private(i,j,k,bi,bj,bk)
 
        !The explicit part, which doesn't have to be changed inside the loop
        !$omp do schedule(runtime)
-       do bk = 1,Unz,tilenz(narr)
-        do bj = 1,Uny,tileny(narr)
-         do bi = 1,Unx,tilenx(narr)
-          do k = bk,min(bk+tilenz(narr)-1,Unz)
-           do j = bj,min(bj+tileny(narr)-1,Uny)
-            do i = bi,min(bi+tilenx(narr)-1,Unx)
+       do bk = 1, Unz, tilenz(narr)
+        do bj = 1, Uny, tileny(narr)
+         do bi = 1, Unx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Unz)
+           do j = bj, min(bj+tileny(narr)-1,Uny)
+            do i = bi, min(bi+tilenx(narr)-1,Unx)
               U2(i,j,k) = U2(i,j,k)+Ap*( &
               ((nu(i+1,j,k) * (U(i+1,j,k)-U(i,j,k)) - &
-              nu(i,j,k) * (U(i,j,k)-U(i-1,j,k)))*recdxmin2+0.25_knd * ( &
+              nu(i,j,k) * (U(i,j,k)-U(i-1,j,k))) * recdxmin2+0.25_knd * ( &
                ((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (U(i,j+1,k)-U(i,j,k)) - &
-               (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (U(i,j,k)-U(i,j-1,k)))*recdymin2 + &
+               (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (U(i,j,k)-U(i,j-1,k))) * recdymin2 + &
                ((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (U(i,j,k+1)-U(i,j,k)) - &
-               (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (U(i,j,k)-U(i,j,k-1)))*recdzmin2)))
+               (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (U(i,j,k)-U(i,j,k-1))) * recdzmin2)))
             end do
            end do
           end do
@@ -507,19 +519,19 @@ end subroutine TMarchRK3
        end do
        !$omp end do nowait
        !$omp do schedule(runtime)
-       do bk = 1,Vnz,tilenz(narr)
-        do bj = 1,Vny,tileny(narr)
-         do bi = 1,Vnx,tilenx(narr)
-          do k = bk,min(bk+tilenz(narr)-1,Vnz)
-           do j = bj,min(bj+tileny(narr)-1,Vny)
-            do i = bi,min(bi+tilenx(narr)-1,Vnx)
+       do bk = 1, Vnz, tilenz(narr)
+        do bj = 1, Vny, tileny(narr)
+         do bi = 1, Vnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Vnz)
+           do j = bj, min(bj+tileny(narr)-1,Vny)
+            do i = bi, min(bi+tilenx(narr)-1,Vnx)
               V2(i,j,k) = V2(i,j,k)+Ap*( &
             (0.25_knd * ((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (V(i+1,j,k)-V(i,j,k)) - &
-            (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (V(i,j,k)-V(i-1,j,k)))*recdxmin2 + &
+            (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (V(i,j,k)-V(i-1,j,k))) * recdxmin2 + &
              (nu(i,j+1,k) * (V(i,j+1,k)-V(i,j,k)) - &
-             nu(i,j,k) * (V(i,j,k)-V(i,j-1,k)))*recdymin2 + &
+             nu(i,j,k) * (V(i,j,k)-V(i,j-1,k))) * recdymin2 + &
              0.25_knd * ((nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * (V(i,j,k+1)-V(i,j,k)) - &
-             (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (V(i,j,k)-V(i,j,k-1)))*recdzmin2))
+             (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (V(i,j,k)-V(i,j,k-1))) * recdzmin2))
             end do
            end do
           end do
@@ -528,19 +540,19 @@ end subroutine TMarchRK3
        end do
        !$omp end do nowait
        !$omp do schedule(runtime)
-       do bk = 1,Wnz,tilenz(narr)
-        do bj = 1,Wny,tileny(narr)
-         do bi = 1,Wnx,tilenx(narr)
-          do k = bk,min(bk+tilenz(narr)-1,Wnz)
-           do j = bj,min(bj+tileny(narr)-1,Wny)
-            do i = bi,min(bi+tilenx(narr)-1,Wnx)
+       do bk = 1, Wnz, tilenz(narr)
+        do bj = 1, Wny, tileny(narr)
+         do bi = 1, Wnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Wnz)
+           do j = bj, min(bj+tileny(narr)-1,Wny)
+            do i = bi, min(bi+tilenx(narr)-1,Wnx)
               W2(i,j,k) = W2(i,j,k)+Ap*( &
             (0.25_knd * (((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (W(i+1,j,k)-W(i,j,k)) - &
-            (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (W(i,j,k)-W(i-1,j,k)))*recdxmin2 + &
+            (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (W(i,j,k)-W(i-1,j,k))) * recdxmin2 + &
              ((nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * (W(i,j+1,k)-W(i,j,k)) - &
-             (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (W(i,j,k)-W(i,j-1,k)))*recdymin2) + &
+             (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (W(i,j,k)-W(i,j-1,k))) * recdymin2) + &
              (nu(i,j,k+1) * (W(i,j,k+1)-W(i,j,k)) - &
-             nu(i,j,k) * (W(i,j,k)-W(i,j,k-1)))*recdzmin2))
+             nu(i,j,k) * (W(i,j,k)-W(i,j,k-1))) * recdzmin2))
             end do
            end do
           end do
@@ -551,18 +563,18 @@ end subroutine TMarchRK3
 
        !Auxiliary coefficients to better efficiency in loops
        !$omp do schedule(runtime)
-       do bk = 1,Unz,tilenz(narr)
-        do bj = 1,Uny,tileny(narr)
-         do bi = 1,Unx,tilenx(narr)
-          do k = bk,min(bk+tilenz(narr)-1,Unz)
-           do j = bj,min(bj+tileny(narr)-1,Uny)
-            do i = bi,min(bi+tilenx(narr)-1,Unx)
+       do bk = 1, Unz, tilenz(narr)
+        do bj = 1, Uny, tileny(narr)
+         do bi = 1, Unx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Unz)
+           do j = bj, min(bj+tileny(narr)-1,Uny)
+            do i = bi, min(bi+tilenx(narr)-1,Unx)
               ApU(i,j,k) = ((nu(i+1,j,k) + &
-                          nu(i,j,k))*recdxmin2 + &
+                          nu(i,j,k)) * recdxmin2 + &
                           0.25_knd * (((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) + &
-                          (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)))*recdymin2 + &
+                          (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k))) * recdymin2 + &
                           ((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) + &
-                          (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)))*recdzmin2))
+                          (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1))) * recdzmin2))
             end do
            end do
           end do
@@ -578,18 +590,18 @@ end subroutine TMarchRK3
 
        !$omp parallel private(i,j,k,bi,bj,bk)
        !$omp do schedule(runtime)
-       do bk = 1,Vnz,tilenz(narr)
-        do bj = 1,Vny,tileny(narr)
-         do bi = 1,Vnx,tilenx(narr)
-          do k = bk,min(bk+tilenz(narr)-1,Vnz)
-           do j = bj,min(bj+tileny(narr)-1,Vny)
-            do i = bi,min(bi+tilenx(narr)-1,Vnx)
+       do bk = 1, Vnz, tilenz(narr)
+        do bj = 1, Vny, tileny(narr)
+         do bi = 1, Vnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Vnz)
+           do j = bj, min(bj+tileny(narr)-1,Vny)
+            do i = bi, min(bi+tilenx(narr)-1,Vnx)
               ApV(i,j,k) = ((nu(i,j+1,k) + &
-                         nu(i,j,k))*recdymin2 + &
+                         nu(i,j,k)) * recdymin2 + &
                          0.25_knd * (((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) + &
-                          (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)))*recdxmin2 + &
+                          (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k))) * recdxmin2 + &
                          ((nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) + &
-                         (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)))*recdzmin2))
+                         (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1))) * recdzmin2))
             end do
            end do
           end do
@@ -605,18 +617,18 @@ end subroutine TMarchRK3
 
        !$omp parallel private(i,j,k,bi,bj,bk,Suavg,Svavg,Swavg)
        !$omp do schedule(runtime)
-       do bk = 1,Wnz,tilenz(narr)
-        do bj = 1,Wny,tileny(narr)
-         do bi = 1,Wnx,tilenx(narr)
-          do k = bk,min(bk+tilenz(narr)-1,Wnz)
-           do j = bj,min(bj+tileny(narr)-1,Wny)
-            do i = bi,min(bi+tilenx(narr)-1,Wnx)
+       do bk = 1, Wnz, tilenz(narr)
+        do bj = 1, Wny, tileny(narr)
+         do bi = 1, Wnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Wnz)
+           do j = bj, min(bj+tileny(narr)-1,Wny)
+            do i = bi, min(bi+tilenx(narr)-1,Wnx)
               ApW(i,j,k) = (0.25_knd * (((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) + &
-                          (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)))*recdxmin2 + &
+                          (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k))) * recdxmin2 + &
                          ((nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) + &
-                         (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)))*recdymin2) + &
+                         (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k))) * recdymin2) + &
                          (nu(i,j,k+1) + &
-                         nu(i,j,k))*recdzmin2)
+                         nu(i,j,k)) * recdzmin2)
             end do
            end do
           end do
@@ -659,18 +671,18 @@ end subroutine TMarchRK3
         Sw = 0
         !$omp parallel private(i,j,k,bi,bj,bk,p) reduction(max:Su,Sv,Sw)
         !$omp do schedule(runtime)
-        do bk = 1,Unz,tilenz(narr2)
-         do bj = 1,Uny,tileny(narr2)
-          do bi = 1,Unx,tilenx(narr2)
-           do k = bk,min(bk+tilenz(narr2)-1,Unz)
-            do j = bj,min(bj+tileny(narr2)-1,Uny)
-             do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Unx),2
+        do bk = 1, Unz, tilenz(narr2)
+         do bj = 1, Uny, tileny(narr2)
+          do bi = 1, Unx, tilenx(narr2)
+           do k = bk, min(bk+tilenz(narr2)-1,Unz)
+            do j = bj, min(bj+tileny(narr2)-1,Uny)
+             do i = bi+mod(bi+j+k-1,2), min(bi+tilenx(narr2)-1,Unx), 2
                p=((nu(i+1,j,k) * (U3(i+1,j,k)) - &
-                nu(i,j,k) * (-U3(i-1,j,k)))*recdxmin2 + &
+                nu(i,j,k) * (-U3(i-1,j,k))) * recdxmin2 + &
                 0.25_knd * (((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (U3(i,j+1,k)) - &
-                (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (-U3(i,j-1,k)))*recdymin2 + &
+                (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (-U3(i,j-1,k))) * recdymin2 + &
                 ((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (U3(i,j,k+1)) - &
-                (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (-U3(i,j,k-1)))*recdzmin2))
+                (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (-U3(i,j,k-1))) * recdzmin2))
                p = Ap*p+U2(i,j,k)+U(i,j,k)
                p = p*ApU(i,j,k)
                Su = max(Su,abs(p-U3(i,j,k)))
@@ -683,18 +695,18 @@ end subroutine TMarchRK3
         end do
         !$omp enddo nowait
         !$omp do schedule(runtime)
-        do bk = 1,Vnz,tilenz(narr2)
-         do bj = 1,Vny,tileny(narr2)
-          do bi = 1,Vnx,tilenx(narr2)
-           do k = bk,min(bk+tilenz(narr2)-1,Vnz)
-            do j = bj,min(bj+tileny(narr2)-1,Vny)
-             do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Vnx),2
+        do bk = 1, Vnz, tilenz(narr2)
+         do bj = 1, Vny, tileny(narr2)
+          do bi = 1, Vnx, tilenx(narr2)
+           do k = bk, min(bk+tilenz(narr2)-1,Vnz)
+            do j = bj, min(bj+tileny(narr2)-1,Vny)
+             do i = bi+mod(bi+j+k-1,2), min(bi+tilenx(narr2)-1,Vnx), 2
                p=((nu(i,j+1,k) * (V3(i,j+1,k)) - &
-                nu(i,j,k) * (-V3(i,j-1,k)))*recdymin2 + &
+                nu(i,j,k) * (-V3(i,j-1,k))) * recdymin2 + &
                 0.25_knd * (((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (V3(i+1,j,k)) - &
-                (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (-V3(i-1,j,k)))*recdxmin2 + &
+                (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (-V3(i-1,j,k))) * recdxmin2 + &
                 ((nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * (V3(i,j,k+1)) - &
-                (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (-V3(i,j,k-1)))*recdzmin2))
+                (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (-V3(i,j,k-1))) * recdzmin2))
                p = Ap*p+V2(i,j,k)+V(i,j,k)
                p = p*ApV(i,j,k)
                Sv = max(Sv,abs(p-V3(i,j,k)))
@@ -707,18 +719,18 @@ end subroutine TMarchRK3
         end do
         !$omp enddo nowait
         !$omp do schedule(runtime)
-        do bk = 1,Wnz,tilenz(narr2)
-         do bj = 1,Wny,tileny(narr2)
-          do bi = 1,Wnx,tilenx(narr2)
-           do k = bk,min(bk+tilenz(narr2)-1,Wnz)
-            do j = bj,min(bj+tileny(narr2)-1,Wny)
-             do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Wnx),2
+        do bk = 1, Wnz, tilenz(narr2)
+         do bj = 1, Wny, tileny(narr2)
+          do bi = 1, Wnx, tilenx(narr2)
+           do k = bk, min(bk+tilenz(narr2)-1,Wnz)
+            do j = bj, min(bj+tileny(narr2)-1,Wny)
+             do i = bi+mod(bi+j+k-1,2), min(bi+tilenx(narr2)-1,Wnx), 2
                p=(0.25_knd * (((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (W3(i+1,j,k)) - &
-                (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (-W3(i-1,j,k)))*recdxmin2 + &
+                (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (-W3(i-1,j,k))) * recdxmin2 + &
                 ((nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * (W3(i,j+1,k)) - &
-                (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (-W3(i,j-1,k)))*recdymin2) + &
+                (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (-W3(i,j-1,k))) * recdymin2) + &
                 (nu(i,j,k+1) * (W3(i,j,k+1)) - &
-                nu(i,j,k) * (-W3(i,j,k-1)))*recdzmin2)
+                nu(i,j,k) * (-W3(i,j,k-1))) * recdzmin2)
                p = Ap*p+W2(i,j,k)+W(i,j,k)
                p = p*ApW(i,j,k)
                Sw = max(Sw,abs(p-W3(i,j,k)))
@@ -732,18 +744,18 @@ end subroutine TMarchRK3
         !$omp enddo
 
         !$omp do schedule(runtime)
-        do bk = 1,Unz,tilenz(narr2)
-         do bj = 1,Uny,tileny(narr2)
-          do bi = 1,Unx,tilenx(narr2)
-           do k = bk,min(bk+tilenz(narr2)-1,Unz)
-            do j = bj,min(bj+tileny(narr2)-1,Uny)
-             do i = bi+mod(bi+j+k,2),min(bi+tilenx(narr2)-1,Unx),2
+        do bk = 1, Unz, tilenz(narr2)
+         do bj = 1, Uny, tileny(narr2)
+          do bi = 1, Unx, tilenx(narr2)
+           do k = bk, min(bk+tilenz(narr2)-1,Unz)
+            do j = bj, min(bj+tileny(narr2)-1,Uny)
+             do i = bi+mod(bi+j+k,2), min(bi+tilenx(narr2)-1,Unx), 2
                p=((nu(i+1,j,k) * (U3(i+1,j,k)) - &
-                 nu(i,j,k) * (-U3(i-1,j,k)))*recdxmin2 + &
+                 nu(i,j,k) * (-U3(i-1,j,k))) * recdxmin2 + &
                  0.25_knd * (((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (U3(i,j+1,k)) - &
-                 (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (-U3(i,j-1,k)))*recdymin2 + &
+                 (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (-U3(i,j-1,k))) * recdymin2 + &
                  ((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (U3(i,j,k+1)) - &
-                 (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (-U3(i,j,k-1)))*recdzmin2))
+                 (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (-U3(i,j,k-1))) * recdzmin2))
                 p = Ap*p+U2(i,j,k)+U(i,j,k)
                 p = p*ApU(i,j,k)
 
@@ -758,18 +770,18 @@ end subroutine TMarchRK3
         end do
         !$omp enddo nowait
         !$omp do schedule(runtime)
-        do bk = 1,Vnz,tilenz(narr2)
-         do bj = 1,Vny,tileny(narr2)
-          do bi = 1,Vnx,tilenx(narr2)
-           do k = bk,min(bk+tilenz(narr2)-1,Vnz)
-            do j = bj,min(bj+tileny(narr2)-1,Vny)
-             do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Vnx),2
+        do bk = 1, Vnz, tilenz(narr2)
+         do bj = 1, Vny, tileny(narr2)
+          do bi = 1, Vnx, tilenx(narr2)
+           do k = bk, min(bk+tilenz(narr2)-1,Vnz)
+            do j = bj, min(bj+tileny(narr2)-1,Vny)
+             do i = bi+mod(bi+j+k-1,2), min(bi+tilenx(narr2)-1,Vnx), 2
                p=((nu(i,j+1,k) * (V3(i,j+1,k)) - &
-                nu(i,j,k) * (-V3(i,j-1,k)))*recdymin2 + &
+                nu(i,j,k) * (-V3(i,j-1,k))) * recdymin2 + &
                 0.25_knd * (((nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (V3(i+1,j,k)) - &
-                (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (-V3(i-1,j,k)))*recdxmin2 + &
+                (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (-V3(i-1,j,k))) * recdxmin2 + &
                 ((nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * (V3(i,j,k+1)) - &
-                (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (-V3(i,j,k-1)))*recdzmin2))
+                (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (-V3(i,j,k-1))) * recdzmin2))
                p = Ap*p+V2(i,j,k)+V(i,j,k)
                p = p*ApV(i,j,k)
                Sv = max(Sv,abs(p-V3(i,j,k)))
@@ -782,18 +794,18 @@ end subroutine TMarchRK3
         end do
         !$omp enddo nowait
         !$omp do schedule(runtime)
-        do bk = 1,Wnz,tilenz(narr2)
-         do bj = 1,Wny,tileny(narr2)
-          do bi = 1,Wnx,tilenx(narr2)
-           do k = bk,min(bk+tilenz(narr2)-1,Wnz)
-            do j = bj,min(bj+tileny(narr2)-1,Wny)
-             do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Wnx),2
+        do bk = 1, Wnz, tilenz(narr2)
+         do bj = 1, Wny, tileny(narr2)
+          do bi = 1, Wnx, tilenx(narr2)
+           do k = bk, min(bk+tilenz(narr2)-1,Wnz)
+            do j = bj, min(bj+tileny(narr2)-1,Wny)
+             do i = bi+mod(bi+j+k-1,2), min(bi+tilenx(narr2)-1,Wnx), 2
                p=(0.25_knd * (((nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (W3(i+1,j,k)) - &
-                (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (-W3(i-1,j,k)))*recdxmin2 + &
+                (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (-W3(i-1,j,k))) * recdxmin2 + &
                 ((nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * (W3(i,j+1,k)) - &
-                (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (-W3(i,j-1,k)))*recdymin2) + &
+                (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (-W3(i,j-1,k))) * recdymin2) + &
                 (nu(i,j,k+1) * (W3(i,j,k+1)) - &
-                nu(i,j,k) * (-W3(i,j,k-1)))*recdzmin2)
+                nu(i,j,k) * (-W3(i,j,k-1))) * recdzmin2)
                p = Ap*p+W2(i,j,k)+W(i,j,k)
                p = p*ApW(i,j,k)
                Sw = max(Sw,abs(p-W3(i,j,k)))
@@ -813,6 +825,686 @@ end subroutine TMarchRK3
        end do
 
   end subroutine UNIFREDBLACK
+  
+  
+  
+  subroutine UNIFREDBLACK2(U,V,W,U2,V2,W2,U3,V3,W3,coef)
+    use Parameters, nu => Viscosity
+    !$ use omp_lib
+    real(knd),dimension(-2:,-2:,-2:),intent(in):: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),intent(inout):: U2,V2,W2,U3,V3,W3
+    real(knd),intent(in):: coef
+    real(knd) recdxmin2,recdymin2,recdzmin2                                                               !reciprocal values of dx**2
+    real(knd) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
+    integer i,j,k,bi,bj,bk,l
+    integer,parameter :: narr = 3, narr2 = 5 !number of arrays in the loop
+    integer,save :: called = 0
+
+       if (called==0) then
+         allocate(Apu(1:Unx,1:Uny,1:Unz))
+         allocate(ApV(1:Vnx,1:Vny,1:Vnz))
+         allocate(ApW(1:Wnx,1:Wny,1:Wnz))
+         !buffer of 1 only to avoid conditionals when doing WM fluxes
+         allocate(wrk(0:max(Unx+1,Vnx+1,Wnx+1), &
+                      0:max(Uny+1,Vny+1,Wny+1), &
+                      0:max(Unz+1,Uny+1,Wnz+1)))
+         called = 1
+       end if
+
+
+       Ap = coef * dt / 2
+       S = 0
+       l = 0
+
+       recdxmin2 = 1._knd / dxmin**2
+       recdymin2 = 1._knd / dymin**2
+       recdzmin2 = 1._knd / dzmin**2
+
+!        !$ call omp_set_nested(.true.)
+       !$omp parallel private(i,j,k,bi,bj,bk)
+
+       !The explicit part, which doesn't have to be changed inside the loop
+       !$omp do schedule(runtime)
+       do bk = 1, Unz, tilenz(narr)
+        do bj = 1, Uny, tileny(narr)
+         do bi = 1, Unx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Unz)
+           do j = bj, min(bj+tileny(narr)-1,Uny)
+            do i = bi, min(bi+tilenx(narr)-1,Unx)
+              wrk(i,j,k) = 0
+              if (Uflx_mask(i+1,j,k)) &
+                wrk(i,j,k) = wrk(i,j,k) + &
+                 nu(i+1,j,k) * (U(i+1,j,k)-U(i,j,k)) *recdxmin2
+              if (Uflx_mask(i,j,k)) &
+                wrk(i,j,k) = wrk(i,j,k) - &
+                  nu(i,j,k) * (U(i,j,k)-U(i-1,j,k)) * recdxmin2 
+              if (Ufly_mask(i,j+1,k)) &
+                wrk(i,j,k) = wrk(i,j,k) + &
+                  0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (U(i,j+1,k)-U(i,j,k)) * recdymin2
+              if (Ufly_mask(i,j,k)) &
+                wrk(i,j,k) = wrk(i,j,k) - &
+                  0.25_knd * (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (U(i,j,k)-U(i,j-1,k)) * recdymin2
+              if (Uflz_mask(i,j,k+1)) &
+                wrk(i,j,k) = wrk(i,j,k) + &
+                  0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (U(i,j,k+1)-U(i,j,k)) * recdzmin2
+              if (Uflz_mask(i,j,k)) &
+                wrk(i,j,k) = wrk(i,j,k) - &
+                  0.25_knd * (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (U(i,j,k)-U(i,j,k-1)) * recdzmin2
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+#define comp 1
+#include "wmfluxes-inc.f90"
+#undef comp
+       !$omp do schedule(runtime)
+       do bk = 1, Unz, tilenz(narr)
+        do bj = 1, Uny, tileny(narr)
+         do bi = 1, Unx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Unz)
+           do j = bj, min(bj+tileny(narr)-1,Uny)
+            do i = bi, min(bi+tilenx(narr)-1,Unx)
+              U2(i,j,k) = U2(i,j,k) + Ap * wrk(i,j,k)
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do nowait
+       !$omp do schedule(runtime)
+       do bk = 1, Vnz, tilenz(narr)
+        do bj = 1, Vny, tileny(narr)
+         do bi = 1, Vnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Vnz)
+           do j = bj, min(bj+tileny(narr)-1,Vny)
+            do i = bi, min(bi+tilenx(narr)-1,Vnx)
+              wrk(i,j,k) = 0
+              if (Vflx_mask(i+1,j,k)) &
+                wrk(i,j,k) = wrk(i,j,k) + &
+                  0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (V(i+1,j,k)-V(i,j,k)) * recdxmin2
+              if (Vflx_mask(i,j,k)) &
+                wrk(i,j,k) = wrk(i,j,k) - &
+                  0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (V(i,j,k)-V(i-1,j,k)) * recdxmin2
+              if (Vfly_mask(i,j+1,k)) &
+                wrk(i,j,k) = wrk(i,j,k) + &
+                  nu(i,j+1,k) * (V(i,j+1,k)-V(i,j,k)) * recdymin2
+              if (Vfly_mask(i,j,k)) &
+                wrk(i,j,k) = wrk(i,j,k) - &
+                  nu(i,j,k) * (V(i,j,k)-V(i,j-1,k)) * recdymin2
+              if (Vflz_mask(i,j,k+1)) &
+                wrk(i,j,k) = wrk(i,j,k) + &
+                  0.25_knd * (nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * (V(i,j,k+1)-V(i,j,k)) * recdzmin2
+              if (Vflz_mask(i,j,k)) &
+                wrk(i,j,k) = wrk(i,j,k) - &
+                  0.25_knd * (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (V(i,j,k)-V(i,j,k-1)) * recdzmin2
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+#define comp 2
+#include "wmfluxes-inc.f90"
+#undef comp
+       !$omp do schedule(runtime)
+       do bk = 1, Vnz, tilenz(narr)
+        do bj = 1, Vny, tileny(narr)
+         do bi = 1, Vnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Vnz)
+           do j = bj, min(bj+tileny(narr)-1,Vny)
+            do i = bi, min(bi+tilenx(narr)-1,Vnx)
+              V2(i,j,k) = V2(i,j,k) + Ap * wrk(i,j,k)
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+       !$omp do schedule(runtime)
+       do bk = 1, Wnz, tilenz(narr)
+        do bj = 1, Wny, tileny(narr)
+         do bi = 1, Wnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Wnz)
+           do j = bj, min(bj+tileny(narr)-1,Wny)
+            do i = bi, min(bi+tilenx(narr)-1,Wnx)
+              wrk(i,j,k) = 0
+              if (Wflx_mask(i+1,j,k)) &
+                wrk(i,j,k) = wrk(i,j,k) + &
+                  0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (W(i+1,j,k)-W(i,j,k)) * recdxmin2
+              if (Wflx_mask(i,j,k)) &
+                wrk(i,j,k) = wrk(i,j,k) - &
+                  0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (W(i,j,k)-W(i-1,j,k)) * recdxmin2
+              if (Wfly_mask(i,j+1,k)) &
+                wrk(i,j,k) = wrk(i,j,k) + &
+                  0.25_knd * (nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * (W(i,j+1,k)-W(i,j,k)) * recdymin2
+              if (Wfly_mask(i,j,k)) &
+                wrk(i,j,k) = wrk(i,j,k) - &
+                  0.25_knd * (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (W(i,j,k)-W(i,j-1,k)) * recdymin2
+              if (Wflz_mask(i,j,k+1)) &
+                wrk(i,j,k) = wrk(i,j,k) + &
+                  nu(i,j,k+1) * (W(i,j,k+1)-W(i,j,k)) * recdzmin2
+              if (Wflz_mask(i,j,k)) &
+                wrk(i,j,k) = wrk(i,j,k) - &
+                  nu(i,j,k) * (W(i,j,k)-W(i,j,k-1)) * recdzmin2
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+#define comp 3
+#include "wmfluxes-inc.f90"
+#undef comp
+       !$omp do schedule(runtime)
+       do bk = 1, Wnz, tilenz(narr)
+        do bj = 1, Wny, tileny(narr)
+         do bi = 1, Wnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Wnz)
+           do j = bj, min(bj+tileny(narr)-1,Wny)
+            do i = bi, min(bi+tilenx(narr)-1,Wnx)
+              W2(i,j,k) = W2(i,j,k) + Ap * wrk(i,j,k)
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+
+       !Auxiliary coefficients to better efficiency in loops
+       !$omp do schedule(runtime)
+       do bk = 1, Unz, tilenz(narr)
+        do bj = 1, Uny, tileny(narr)
+         do bi = 1, Unx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Unz)
+           do j = bj, min(bj+tileny(narr)-1,Uny)
+            do i = bi, min(bi+tilenx(narr)-1,Unx)
+              ApU(i,j,k) = 0
+              if (Uflx_mask(i+1,j,k)) &
+                ApU(i,j,k) = ApU(i,j,k) + &
+                  nu(i+1,j,k) * recdxmin2
+              if (Uflx_mask(i,j,k)) &
+                ApU(i,j,k) = ApU(i,j,k) + &
+                  nu(i,j,k) * recdxmin2
+              if (Ufly_mask(i,j+1,k)) &
+                ApU(i,j,k) = ApU(i,j,k) + &
+                  0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * recdymin2
+              if (Ufly_mask(i,j,k)) &
+                ApU(i,j,k) = ApU(i,j,k) + &
+                  0.25_knd * (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * recdymin2
+              if (Uflz_mask(i,j,k+1)) &
+                ApU(i,j,k) = ApU(i,j,k) + &
+                  0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * recdzmin2
+              if (Uflz_mask(i,j,k)) &
+                ApU(i,j,k) = ApU(i,j,k) + &
+                  0.25_knd * (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * recdzmin2
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+       !$omp end parallel
+
+!        ApU = 1._knd/(1._knd+Ap*ApU)
+       call multiply_and_add_scalar(ApU, Ap, 1._knd)
+       call reciprocal(ApU, 1._knd)
+
+       !$omp parallel private(i,j,k,bi,bj,bk)
+       !$omp do schedule(runtime)
+       do bk = 1, Vnz, tilenz(narr)
+        do bj = 1, Vny, tileny(narr)
+         do bi = 1, Vnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Vnz)
+           do j = bj, min(bj+tileny(narr)-1,Vny)
+            do i = bi, min(bi+tilenx(narr)-1,Vnx)
+              ApV(i,j,k) =0
+              if (Vflx_mask(i+1,j,k)) &
+                ApV(i,j,k) = ApV(i,j,k) + &
+                  0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * recdxmin2
+              if (Vflx_mask(i,j,k)) &
+                ApV(i,j,k) = ApV(i,j,k) + &
+                  0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * recdxmin2
+              if (Vfly_mask(i,j+1,k)) &
+                ApV(i,j,k) = ApV(i,j,k) + &
+                  nu(i,j+1,k) * recdymin2
+              if (Vfly_mask(i,j,k)) &
+                ApV(i,j,k) = ApV(i,j,k) + &
+                  nu(i,j,k) * recdymin2
+              if (Vflz_mask(i,j,k+1)) &
+                ApV(i,j,k) = ApV(i,j,k) + &
+                  0.25_knd * (nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * recdzmin2
+              if (Vflz_mask(i,j,k)) &
+                ApV(i,j,k) = ApV(i,j,k) + &
+                  0.25_knd * (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * recdzmin2
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+       !$omp end parallel
+
+!        ApV = 1._knd/(1._knd+Ap*ApV)
+       call multiply_and_add_scalar(ApV, Ap, 1._knd)
+       call reciprocal(ApV, 1._knd)
+
+       !$omp parallel private(i,j,k,bi,bj,bk,Suavg,Svavg,Swavg)
+       !$omp do schedule(runtime)
+       do bk = 1, Wnz, tilenz(narr)
+        do bj = 1, Wny, tileny(narr)
+         do bi = 1, Wnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1,Wnz)
+           do j = bj, min(bj+tileny(narr)-1,Wny)
+            do i = bi, min(bi+tilenx(narr)-1,Wnx)
+              ApW(i,j,k) = 0
+              if (Wflx_mask(i+1,j,k)) &
+                ApW(i,j,k) = ApW(i,j,k) + &
+                  0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * recdxmin2
+              if (Wflx_mask(i,j,k)) &
+                ApW(i,j,k) = ApW(i,j,k) + &
+                  0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * recdxmin2
+              if (Wfly_mask(i,j+1,k)) &
+                ApW(i,j,k) = ApW(i,j,k) + &
+                  0.25_knd * (nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * recdymin2
+              if (Wfly_mask(i,j,k)) &
+                ApW(i,j,k) = ApW(i,j,k) + &
+                  0.25_knd * (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * recdymin2
+              if (Wflz_mask(i,j,k+1)) &
+                ApW(i,j,k) = ApW(i,j,k) + &
+                  nu(i,j,k+1) * recdzmin2
+              if (Wflz_mask(i,j,k)) &
+                ApW(i,j,k) = ApW(i,j,k) + &
+                  nu(i,j,k) * recdzmin2
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+       !$omp end parallel
+
+
+!        ApW = 1._knd/(1._knd+Ap*ApW)
+       call multiply_and_add_scalar(ApW, Ap, 1._knd)
+       call reciprocal(ApW, 1._knd)
+
+
+
+!        !$omp workshare   !problem with gfortran-4.7 - valgrind sees uninitialized values
+!        Suavg = abs(MAXVAL(U3(1:Unx,1:Uny,1:Unz)))  !maximum values of velocities to norm the residues.
+!        Svavg = abs(MAXVAL(V3(1:Vnx,1:Vny,1:Vnz)))
+!        Swavg = abs(MAXVAL(W3(1:Wnx,1:Wny,1:Wnz)))
+!        !$omp end workshare
+
+       Suavg=0
+       Svavg=0
+       Swavg=0
+
+       if (Suavg<=1e-3_knd) Suavg = 1
+       if (Svavg<=1e-3_knd) Svavg = 1
+       if (Swavg<=1e-3_knd) Swavg = 1
+
+
+       do l=1,maxCNiter               !Gauss-Seidel iteration for Crank-Nicolson result
+         call BoundU(1,U3,Uin)
+         call BoundU(2,V3,Vin)
+         call BoundU(3,W3,Win)
+
+         S = 0
+         Su = 0
+         Sv = 0
+         Sw = 0
+         !$omp parallel private(i,j,k,bi,bj,bk,p) reduction(max:Su,Sv,Sw)
+         !$omp do schedule(runtime)
+         do bk = 1, Unz, tilenz(narr2)
+          do bj = 1, Uny, tileny(narr2)
+           do bi = 1, Unx, tilenx(narr2)
+            do k = bk, min(bk+tilenz(narr2)-1,Unz)
+             do j = bj, min(bj+tileny(narr2)-1,Uny)
+              do i = bi+mod(bi+j+k-1,2), min(bi+tilenx(narr2)-1,Unx), 2
+                wrk(i,j,k) = 0
+                if (Uflx_mask(i+1,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    nu(i+1,j,k) * U3(i+1,j,k) * recdxmin2
+                if (Uflx_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    nu(i,j,k) * U3(i-1,j,k) * recdxmin2
+                if (Ufly_mask(i,j+1,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * U3(i,j+1,k) * recdymin2
+                if (Ufly_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * U3(i,j-1,k) * recdymin2
+                if (Uflz_mask(i,j,k+1)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * U3(i,j,k+1) * recdzmin2
+                if (Uflz_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * U3(i,j,k-1) * recdzmin2
+              end do
+             end do
+            end do
+           end do
+          end do
+         end do
+         !$omp enddo
+#define comp 1
+#include "wmfluxes-inc.f90"
+#undef comp
+         !$omp do schedule(runtime)
+         do bk = 1, Unz, tilenz(narr2)
+          do bj = 1, Uny, tileny(narr2)
+           do bi = 1, Unx, tilenx(narr2)
+            do k = bk, min(bk+tilenz(narr2)-1,Unz)
+             do j = bj, min(bj+tileny(narr2)-1,Uny)
+              do i = bi+mod(bi+j+k-1,2), min(bi+tilenx(narr2)-1,Unx), 2
+                p = Ap * wrk(i,j,k) + U2(i,j,k) + U(i,j,k)
+                p = p * ApU(i,j,k)
+                Su = max(Su,abs(p-U3(i,j,k)))
+                U3(i,j,k) = p
+              end do
+             end do
+            end do
+           end do
+          end do
+         end do
+         !$omp enddo
+
+         !$omp do schedule(runtime)
+         do bk = 1, Vnz, tilenz(narr2)
+          do bj = 1, Vny, tileny(narr2)
+           do bi = 1, Vnx, tilenx(narr2)
+            do k = bk, min(bk+tilenz(narr2)-1,Vnz)
+             do j = bj, min(bj+tileny(narr2)-1,Vny)
+              do i = bi+mod(bi+j+k-1,2), min(bi+tilenx(narr2)-1,Vnx), 2
+                wrk(i,j,k) = 0
+                if (Vflx_mask(i+1,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * V3(i+1,j,k) * recdxmin2
+                if (Vflx_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * V3(i-1,j,k) * recdxmin2
+                if (Vfly_mask(i,j+1,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    nu(i,j+1,k) * V3(i,j+1,k) * recdymin2
+                if (Vfly_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    nu(i,j,k) * V3(i,j-1,k) * recdymin2
+                if (Vflz_mask(i,j,k+1)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * V3(i,j,k+1) * recdzmin2
+                if (Vflz_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * V3(i,j,k-1) * recdzmin2
+              end do
+             end do
+            end do
+           end do
+          end do
+         end do
+         !$omp enddo
+#define comp 2
+#include "wmfluxes-inc.f90"
+#undef comp
+         !$omp do schedule(runtime)
+         do bk = 1, Vnz, tilenz(narr2)
+          do bj = 1, Vny, tileny(narr2)
+           do bi = 1, Vnx, tilenx(narr2)
+            do k = bk, min(bk+tilenz(narr2)-1,Vnz)
+             do j = bj, min(bj+tileny(narr2)-1,Vny)
+              do i = bi+mod(bi+j+k-1,2), min(bi+tilenx(narr2)-1,Vnx), 2
+                p = Ap * wrk(i,j,k) + V2(i,j,k) + V(i,j,k)
+                p = p * ApV(i,j,k)
+                Sv = max(Sv,abs(p-V3(i,j,k)))
+                V3(i,j,k) = p
+              end do
+             end do
+            end do
+           end do
+          end do
+         end do
+         !$omp enddo
+         
+         !$omp do schedule(runtime)
+         do bk = 1, Wnz, tilenz(narr2)
+          do bj = 1, Wny, tileny(narr2)
+           do bi = 1, Wnx, tilenx(narr2)
+            do k = bk, min(bk+tilenz(narr2)-1,Wnz)
+             do j = bj, min(bj+tileny(narr2)-1,Wny)
+              do i = bi+mod(bi+j+k-1,2), min(bi+tilenx(narr2)-1,Wnx), 2
+                wrk(i,j,k) = 0
+                if (Wflx_mask(i+1,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                   0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * W3(i+1,j,k) * recdxmin2
+                if (Wflx_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                   0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * W3(i-1,j,k) * recdxmin2
+                if (Wfly_mask(i,j+1,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                   0.25_knd * (nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * W3(i,j+1,k) * recdymin2
+                if (Wfly_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                   0.25_knd * (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * W3(i,j-1,k) * recdymin2
+                if (Wflz_mask(i,j,k+1)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                   nu(i,j,k+1) * W3(i,j,k+1) * recdzmin2
+                if (Wflz_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                   nu(i,j,k) * W3(i,j,k-1) * recdzmin2
+              end do
+             end do
+            end do
+           end do
+          end do
+         end do
+         !$omp enddo
+#define comp 3
+#include "wmfluxes-inc.f90"
+#undef comp
+         !$omp do schedule(runtime)
+         do bk = 1, Wnz, tilenz(narr2)
+          do bj = 1, Wny, tileny(narr2)
+           do bi = 1, Wnx, tilenx(narr2)
+            do k = bk, min(bk+tilenz(narr2)-1,Wnz)
+             do j = bj, min(bj+tileny(narr2)-1,Wny)
+              do i = bi+mod(bi+j+k-1,2), min(bi+tilenx(narr2)-1,Wnx), 2
+                p = Ap * wrk(i,j,k) + W2(i,j,k) + W(i,j,k)
+                p = p * ApW(i,j,k)
+                Sw = max(Sw,abs(p-W3(i,j,k)))
+                W3(i,j,k) = p
+              end do
+             end do
+            end do
+           end do
+          end do
+         end do
+         !$omp enddo
+
+
+         !$omp do schedule(runtime)
+         do bk = 1, Unz, tilenz(narr2)
+          do bj = 1, Uny, tileny(narr2)
+           do bi = 1, Unx, tilenx(narr2)
+            do k = bk, min(bk+tilenz(narr2)-1,Unz)
+             do j = bj, min(bj+tileny(narr2)-1,Uny)
+              do i = bi+mod(bi+j+k,2), min(bi+tilenx(narr2)-1,Unx), 2
+                wrk(i,j,k) = 0
+                if (Uflx_mask(i+1,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    nu(i+1,j,k) * U3(i+1,j,k) * recdxmin2
+                if (Uflx_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    nu(i,j,k) * U3(i-1,j,k) * recdxmin2
+                if (Ufly_mask(i,j+1,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * U3(i,j+1,k) * recdymin2
+                if (Ufly_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * U3(i,j-1,k) * recdymin2
+                if (Uflz_mask(i,j,k+1)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * U3(i,j,k+1) * recdzmin2
+                if (Uflz_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * U3(i,j,k-1) * recdzmin2
+              end do
+             end do
+            end do
+           end do
+          end do
+         end do
+         !$omp enddo
+#define comp 1
+#include "wmfluxes-inc.f90"
+#undef comp
+         !$omp do schedule(runtime)
+         do bk = 1, Unz, tilenz(narr2)
+          do bj = 1, Uny, tileny(narr2)
+           do bi = 1, Unx, tilenx(narr2)
+            do k = bk, min(bk+tilenz(narr2)-1,Unz)
+             do j = bj, min(bj+tileny(narr2)-1,Uny)
+              do i = bi+mod(bi+j+k,2), min(bi+tilenx(narr2)-1,Unx), 2
+                p = Ap * wrk(i,j,k) + U2(i,j,k) + U(i,j,k)
+                p = p * ApU(i,j,k)
+                Su = max(Su,abs(p-U3(i,j,k)))
+                U3(i,j,k) = p
+              end do
+             end do
+            end do
+           end do
+          end do
+         end do
+         !$omp enddo
+         
+         !$omp do schedule(runtime)
+         do bk = 1, Vnz, tilenz(narr2)
+          do bj = 1, Vny, tileny(narr2)
+           do bi = 1, Vnx, tilenx(narr2)
+            do k = bk, min(bk+tilenz(narr2)-1,Vnz)
+             do j = bj, min(bj+tileny(narr2)-1,Vny)
+              do i = bi+mod(bi+j+k,2), min(bi+tilenx(narr2)-1,Vnx), 2
+                wrk(i,j,k) = 0
+                if (Vflx_mask(i+1,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * V3(i+1,j,k) * recdxmin2
+                if (Vflx_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * V3(i-1,j,k) * recdxmin2
+                if (Vfly_mask(i,j+1,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    nu(i,j+1,k) * V3(i,j+1,k) * recdymin2
+                if (Vfly_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    nu(i,j,k) * V3(i,j-1,k) * recdymin2
+                if (Vflz_mask(i,j,k+1)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * V3(i,j,k+1) * recdzmin2
+                if (Vflz_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                    0.25_knd * (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * V3(i,j,k-1) * recdzmin2
+              end do
+             end do
+            end do
+           end do
+          end do
+         end do
+         !$omp enddo
+#define comp 2
+#include "wmfluxes-inc.f90"
+#undef comp
+         !$omp do schedule(runtime)
+         do bk = 1, Vnz, tilenz(narr2)
+          do bj = 1, Vny, tileny(narr2)
+           do bi = 1, Vnx, tilenx(narr2)
+            do k = bk, min(bk+tilenz(narr2)-1,Vnz)
+             do j = bj, min(bj+tileny(narr2)-1,Vny)
+              do i = bi+mod(bi+j+k,2), min(bi+tilenx(narr2)-1,Vnx), 2
+                p = Ap * wrk(i,j,k) + V2(i,j,k) + V(i,j,k)
+                p = p * ApV(i,j,k)
+                Sv = max(Sv,abs(p-V3(i,j,k)))
+                V3(i,j,k) = p
+              end do
+             end do
+            end do
+           end do
+          end do
+         end do
+         !$omp enddo
+         
+         !$omp do schedule(runtime)
+         do bk = 1, Wnz, tilenz(narr2)
+          do bj = 1, Wny, tileny(narr2)
+           do bi = 1, Wnx, tilenx(narr2)
+            do k = bk, min(bk+tilenz(narr2)-1,Wnz)
+             do j = bj, min(bj+tileny(narr2)-1,Wny)
+              do i = bi+mod(bi+j+k,2), min(bi+tilenx(narr2)-1,Wnx), 2
+                wrk(i,j,k) = 0
+                if (Wflx_mask(i+1,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                   0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * W3(i+1,j,k) * recdxmin2
+                if (Wflx_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                   0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * W3(i-1,j,k) * recdxmin2
+                if (Wfly_mask(i,j+1,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                   0.25_knd * (nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * W3(i,j+1,k) * recdymin2
+                if (Wfly_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                   0.25_knd * (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * W3(i,j-1,k) * recdymin2
+                if (Wflz_mask(i,j,k+1)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                   nu(i,j,k+1) * W3(i,j,k+1) * recdzmin2
+                if (Wflz_mask(i,j,k)) &
+                  wrk(i,j,k) = wrk(i,j,k) + &
+                   nu(i,j,k) * W3(i,j,k-1) * recdzmin2
+              end do
+             end do
+            end do
+           end do
+          end do
+         end do
+         !$omp enddo
+#define comp 3
+#include "wmfluxes-inc.f90"
+#undef comp
+         !$omp do schedule(runtime)
+         do bk = 1, Wnz, tilenz(narr2)
+          do bj = 1, Wny, tileny(narr2)
+           do bi = 1, Wnx, tilenx(narr2)
+            do k = bk, min(bk+tilenz(narr2)-1,Wnz)
+             do j = bj, min(bj+tileny(narr2)-1,Wny)
+              do i = bi+mod(bi+j+k,2), min(bi+tilenx(narr2)-1,Wnx), 2
+                p = Ap * wrk(i,j,k) + W2(i,j,k) + W(i,j,k)
+                p = p * ApW(i,j,k)
+                Sw = max(Sw,abs(p-W3(i,j,k)))
+                W3(i,j,k) = p
+              end do
+             end do
+            end do
+           end do
+          end do
+         end do
+         !$omp enddo
+         !$omp end parallel
+         S = max(Su/Suavg,Sv/Svavg,Sw/Swavg)
+         write (*,*) "CN ",l,S
+
+         if (S<=epsCN) exit
+       end do
+
+
+  end subroutine UNIFREDBLACK2
 
 
 
@@ -971,7 +1663,7 @@ end subroutine TMarchRK3
         !$omp do
         do k=1,Unz
          do j=1,Uny
-          do i=1+mod(j+k,2),Unx,2
+          do i=1+mod(j+k,2),Unx, 2
             p=((nu(i+1,j,k) * (U3(i+1,j,k))/dxPr(i+1) - &
              nu(i,j,k) * (-U3(i-1,j,k))/dxPr(i))/dxU(i) + &
              (0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k))* &
@@ -995,7 +1687,7 @@ end subroutine TMarchRK3
         !$omp do
         do k=1,Vnz
          do j=1,Vny
-          do i=1+mod(j+k,2),Vnx,2
+          do i=1+mod(j+k,2),Vnx, 2
             p=((0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k))* &
                          (V3(i+1,j,k))/dxU(i) - &
              0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k))* &
@@ -1017,7 +1709,7 @@ end subroutine TMarchRK3
         !$omp do
         do k=1,Wnz
          do j=1,Wny
-          do i=1+mod(j+k,2),Wnx,2
+          do i=1+mod(j+k,2),Wnx, 2
             p=((0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k))* &
                          (W3(i+1,j,k))/dxU(i) - &
              0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k))* &
@@ -1040,7 +1732,7 @@ end subroutine TMarchRK3
         !$omp do
         do k=1,Unz
          do j=1,Uny
-          do i=1+mod(j+k+1,2),Unx,2
+          do i=1+mod(j+k+1,2),Unx, 2
             p=((nu(i+1,j,k) * (U3(i+1,j,k))/dxPr(i+1) - &
              nu(i,j,k) * (-U3(i-1,j,k))/dxPr(i))/dxU(i) + &
              (0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k))* &
@@ -1064,7 +1756,7 @@ end subroutine TMarchRK3
         !$omp do
         do k=1,Vnz
          do j=1,Vny
-          do i=1+mod(j+k+1,2),Vnx,2
+          do i=1+mod(j+k+1,2),Vnx, 2
             p=((0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k))* &
                          (V3(i+1,j,k))/dxU(i) - &
              0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k))* &
@@ -1086,7 +1778,7 @@ end subroutine TMarchRK3
         !$omp do
         do k=1,Wnz
          do j=1,Wny
-          do i=1+mod(j+k+1,2),Wnx,2
+          do i=1+mod(j+k+1,2),Wnx, 2
             p=((0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k))* &
                          (W3(i+1,j,k))/dxU(i) - &
              0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k))* &
@@ -1180,7 +1872,8 @@ end subroutine TMarchRK3
      end if
 
      if (wallmodeltype>0) then
-                     call ComputeViscsWM(U,V,W,Pr,Temperature)
+!                      call ComputeViscsWM(U,V,W,Pr,Temperature)
+                     call ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
      end if
 
      do i=1,size(ScalFlIBPoints)
