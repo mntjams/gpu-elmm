@@ -401,6 +401,8 @@ module Subgrid
       pure subroutine Sigmas(s1,s2,s3,grads)
         !from Hasan, Basser, Parker, Alexander, http://dx.doi.org/10.1006/jmre.2001.2400
         !via Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
+        use ieee_arithmetic
+
         real(knd),intent(out) :: s1,s2,s3
         real(knd),intent(in)  :: grads(3,3)
 
@@ -427,9 +429,9 @@ module Subgrid
         c =  a2 / sqrt(a1**3)
         
         !If c is NaN let it be 0.
-        if (c/=c) c = 0
+        if (ieee_is_nan(c)) c = 0
 
-        c = max(-1._sigma_knd,min(1._sigma_knd,c))
+        c = max(-1._sigma_knd, min(1._sigma_knd,c))
         a3 = acos(c) / 3
 
         c = 2*sqrt(a1)
