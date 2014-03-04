@@ -214,11 +214,9 @@ contains
 
   subroutine ReadObst(filename)
     character(*),intent(in) :: filename
-    type(SolidBody) :: SB
-
-    allocate(SB%GeometricShape, source=Union(filename))
     
-    call AddSolidBody(SB)
+    !assume z0 the same as for the lower boundary
+    call AddSolidBody(SolidBody(Union(filename), z0 = z0B))
   end subroutine ReadObst
   
   
@@ -226,21 +224,12 @@ contains
   subroutine ReadOff(filename)
     character(*),intent(in) :: filename
     logical :: ex
-    type(SolidBody) :: SB
 
     inquire(file=filename,exist=ex)
 
     if (ex) then
-      allocate(Polyhedron :: SB%GeometricShape)
-      
-      select type (geomshape => SB%GeometricShape)
-        type is (Polyhedron)
-       
-          geomshape = Polyhedron(filename)
-      
-          call AddSolidBody(SB)
-      end select
-      
+      !assume z0 the same as for the lower boundary
+      call AddSolidBody(SolidBody(Polyhedron(filename), z0 = z0B))
     else
       write(*,*) "Error, file ",filename," does not exist."
       stop
@@ -256,7 +245,7 @@ contains
 
     !assume z0 the same as for the lower boundary
     !TODO: implement variating z0 from a similar file
-    call AddSolidBody(SolidBody(Terrain(uniform_DEM(filename)),z0 = z0B))
+    call AddSolidBody(SolidBody(Terrain(uniform_DEM(filename), z0 = z0B)))
   end subroutine ReadTerrain
 
   
