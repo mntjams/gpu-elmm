@@ -190,15 +190,27 @@ correctcompatibility = 2
        end do
       end do
       !$omp end parallel do
-
-      S=S*dxmin/(Prny*Prnz)
-
-      uncompatibility = S
       
-      if (correctcompatibility==1) then
-        !$omp parallel workshare
-        U(Unx+1,:,:) = U(Unx+1,:,:)+S
-        !$omp end parallel workshare
+      if (abs(windangle-90)<1.or.abs(windangle+90)<1) then
+        S=S*dymin/(Prnx*Prnz)
+
+        uncompatibility = S
+        
+        if (correctcompatibility==1) then
+          !$omp parallel workshare
+          V(:,Vny+1,:) = V(:,Vny+1,:)+S
+          !$omp end parallel workshare
+        end if
+      else
+        S=S*dxmin/(Prny*Prnz)
+
+        uncompatibility = S
+        
+        if (correctcompatibility==1) then
+          !$omp parallel workshare
+          U(Unx+1,:,:) = U(Unx+1,:,:)+S
+          !$omp end parallel workshare
+        end if
       end if
     end if
 
