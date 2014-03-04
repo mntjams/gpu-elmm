@@ -158,7 +158,6 @@ module GeometricShapes
     real(knd) xc,yc,zc
     real(knd) a,b,c
     real(knd) r
-    logical :: rough = .false. !T rough surface, F flat surface
   contains
     procedure :: InsideEps => CylJacket_Inside
     procedure :: Closest => CylJacket_Closest
@@ -252,6 +251,8 @@ module GeometricShapes
   interface Plane
     module procedure Plane_Init_3r_32
     module procedure Plane_Init_3r_64
+    module procedure Plane_Init_v3_32
+    module procedure Plane_Init_v3_64
   end interface
 
   interface ConvexPolyhedron
@@ -264,6 +265,14 @@ module GeometricShapes
   
   interface Ellipsoid
     module procedure Ellipsoid_Init
+  end interface
+  
+  interface CylJacket
+    module procedure CylJacket_Init
+  end interface
+  
+  interface Cylinder
+    module procedure Cylinder_Init
   end interface
   
   interface Terrain
@@ -535,6 +544,24 @@ contains
     
     res = Plane_Init_3r(real(xc,knd), real(yc,knd), real(zc,knd), &
                         real(a,knd),  real(b,knd),  real(c,knd))
+  end function
+  
+  function Plane_Init_v3_32(point, vec) result(res)
+    !Point and an outward normal
+    type(Plane) :: res
+    real(real32),intent(in) :: point(3), vec(3)
+    
+    res = Plane_Init_3r(real(point(1),knd), real(point(2),knd), real(point(3),knd), &
+                        real(vec(1),knd),  real(vec(2),knd),  real(vec(3),knd))
+  end function
+  
+  function Plane_Init_v3_64(point, vec) result(res)
+    !Point and an outward normal
+    type(Plane) :: res
+    real(real64),intent(in) :: point(3), vec(3)
+    
+    res = Plane_Init_3r(real(point(1),knd), real(point(2),knd), real(point(3),knd), &
+                        real(vec(1),knd),  real(vec(2),knd),  real(vec(3),knd))
   end function
   
   logical function Plane_Inside(self,x,y,z,eps) result(ins)
@@ -1046,10 +1073,9 @@ contains
   
   
 
-  function Ellipsoid_Init(xc,yc,zc,a,b,c,rough) result(res)
+  function Ellipsoid_Init(xc,yc,zc,a,b,c) result(res)
     type(Ellipsoid) :: res
     real(knd),intent(in) :: xc, yc, zc, a, b, c
-    logical,intent(in),optional :: rough
     
     res%xc = xc
     res%yc = yc
@@ -1113,10 +1139,43 @@ contains
   
 
 
+  function CylJacket_Init(point, vec, radius) result(res)
+    type(CylJacket) :: res
+    real(knd),intent(in) :: point(3), vec(3), radius
+    
+    res%xc = point(1)
+    res%yc = point(2)
+    res%zc = point(3)
+    res%a = vec(1)
+    res%b = vec(2)
+    res%c = vec(3)
+    res%r = radius
+  end function
 
 
 
+  function Cylinder_Init(point1, point2, radius, infinite) result(res)
+    type(Cylinder) :: res
+    real(knd),intent(in) :: point1(3), point2(3), radius
+    logical,intent(in),optional :: infinite
+    logical :: finite
+    
+    res%jacket = CylJacket(point1, point2-point1, radius)
+    
+    finite = .true.
+    if (present(infinite)) then
+      if (.not.infinite) then
+        finite = .false.
+      end if
+    end if
+    
+    if (finite) then
+      res%plane1 = Plane(point1, point1-point2)
+      res%plane2 = Plane(point2, point2-point1)
+    end if
 
+  end function
+  
   logical function CylJacket_Inside(self,x,y,z,eps) result(ins)
     class(CylJacket),intent(in) :: self
     real(knd),intent(in) :: x,y,z
