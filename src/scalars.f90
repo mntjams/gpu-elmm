@@ -1477,38 +1477,33 @@ contains
   endfunction DepositionFlux
 
   subroutine Deposition(SCAL,coef)
-  real(knd),dimension(-1:,-1:,-1:,1:),intent(inout) :: SCAL
-  real(knd),intent(in) :: coef
-  type(WMPoint),pointer :: WMP
-  integer i
-  real(knd) deptmp
-   if (associated(FirstWMPoint)) then
-   WMP => FirstWMPoint
-   do
-    if (allocated(WMP%depscalar)) then
-    if (partdistrib>0) then
-     do i = 1,partdistrib
-      deptmp = abs(DepositionFlux(WMP,SCAL(WMP%xi,WMP%yj,WMP%zk,1)*percdistrib(i),partdiam(i),partrho(i)))&
-          *coef*dt*dxPr(WMP%xi)*dyPr(WMP%yj)
-      WMP%depscalar(1) = WMP%depscalar(1)+deptmp/(dxPr(WMP%xi)*dyPr(WMP%yj)*dzPr(WMP%zk))
-      SCAL(WMP%xi,WMP%yj,WMP%zk,1) = SCAL(WMP%xi,WMP%yj,WMP%zk,1)-deptmp/(dxPr(WMP%xi)*dyPr(WMP%yj)*dzPr(WMP%zk))
-     end do
-    else
-     do i = 1,num_of_scalars
-      deptmp = abs(DepositionFlux(WMP,SCAL(WMP%xi,WMP%yj,WMP%zk,i),partdiam(i),partrho(i)))&
-          *coef*dt*dxPr(WMP%xi)*dyPr(WMP%yj)
-      WMP%depscalar(i) = WMP%depscalar(i)+deptmp/(dxPr(WMP%xi)*dyPr(WMP%yj)*dzPr(WMP%zk))
-      SCAL(WMP%xi,WMP%yj,WMP%zk,i) = SCAL(WMP%xi,WMP%yj,WMP%zk,i)-deptmp/(dxPr(WMP%xi)*dyPr(WMP%yj)*dzPr(WMP%zk))
-     end do
-    end if
-    end if
-    if (associated(WMP%next)) then
-     WMP => WMP%next
-    else
-     exit
-    end if
-   end do
-   end if
+    real(knd),dimension(-1:,-1:,-1:,1:),intent(inout) :: SCAL
+    real(knd),intent(in) :: coef
+    integer   :: i, j
+    real(knd) :: deptmp
+    
+    do j = 1, size(WMPoints)
+      associate(p => WMPoints(j))
+        if (allocated(p%depscalar)) then
+          if (partdistrib>0) then
+            do i = 1,partdistrib
+              deptmp = abs(DepositionFlux(p,SCAL(p%xi,p%yj,p%zk,1)*percdistrib(i),partdiam(i),partrho(i)))&
+                  *coef*dt*dxPr(p%xi)*dyPr(p%yj)
+              p%depscalar(1) = p%depscalar(1)+deptmp/(dxPr(p%xi)*dyPr(p%yj)*dzPr(p%zk))
+              SCAL(p%xi,p%yj,p%zk,1) = SCAL(p%xi,p%yj,p%zk,1)-deptmp/(dxPr(p%xi)*dyPr(p%yj)*dzPr(p%zk))
+            end do
+          else
+            do i = 1,num_of_scalars
+              deptmp = abs(DepositionFlux(p,SCAL(p%xi,p%yj,p%zk,i),partdiam(i),partrho(i)))&
+                  *coef*dt*dxPr(p%xi)*dyPr(p%yj)
+              p%depscalar(i) = p%depscalar(i)+deptmp/(dxPr(p%xi)*dyPr(p%yj)*dzPr(p%zk))
+              SCAL(p%xi,p%yj,p%zk,i) = SCAL(p%xi,p%yj,p%zk,i)-deptmp/(dxPr(p%xi)*dyPr(p%yj)*dzPr(p%zk))
+            end do
+          end if
+        end if
+      end associate
+    end do
+    
   endsubroutine Deposition
 
 
