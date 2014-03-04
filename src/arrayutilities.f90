@@ -100,7 +100,7 @@ module ArrayUtilities
   public exchange_alloc, assign, add, &
          set, multiply, add_multiplied, &
          multiply_and_add_scalar, reciprocal, &
-         add_element, avg, dist, l2
+         add_element, avg, dist
 
   interface exchange_alloc
     module procedure exchange_alloc_1D
@@ -666,14 +666,6 @@ module ArrayUtilities
       
       c = b - a
       res = hypot(c(1),hypot(c(2),c(3)))
-    end function
-      
-    
-    pure function l2(a) result(res)   
-      real(knd) :: res
-      real(knd),intent(in) :: a(3)
-
-      res = hypot(a(1),hypot(a(2),a(3)))
     end function
       
     
