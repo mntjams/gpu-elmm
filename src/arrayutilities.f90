@@ -661,11 +661,9 @@ module ArrayUtilities
     
     pure function dist(a,b) result(res)   
       real(knd) :: res
-      real(knd),intent(in) :: a(3),b(3)
-      real(knd) :: c(3)
-      
-      c = b - a
-      res = hypot(c(1),hypot(c(2),c(3)))
+      real(knd),intent(in) :: a(3), b(3)
+
+      res = norm2(b - a)
     end function
       
     
