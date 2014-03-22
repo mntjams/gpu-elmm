@@ -30,8 +30,7 @@ module Tiling
       !$omp do
       do narrays=1,size(tilenx)
 
-        bn = tilesize/(storage_size(1._knd)/storage_size('a'))
-                                          !requires F2008, c_sizeof not supported by Solaris Studio 12.3
+        bn = int( tilesize/(storage_size(1._knd)/storage_size('a')) )
 
         bn = bn/narrays !four arrays U,V,W,Visc
 
