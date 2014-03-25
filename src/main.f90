@@ -98,7 +98,11 @@ program CLMM
 
   write (*,*) "Saving results..."
 
+
   call OUTPUT(U,V,W,Pr,Temperature,Moisture,Scalar)
+
+
+  call DeallocateGlobals
 
 
   contains
@@ -153,6 +157,37 @@ program CLMM
      endif
 
    end subroutine AllocateGlobals
+
+
+   subroutine DeallocateGlobals
+    !To assist memory leak checking because some compilers do not
+    !deallocate main program and module variables automatically
+    !(in F2008 they have the SAVE attribute).
+
+    deallocate(U, V, W, Pr)
+
+    deallocate(Temperature, Moisture, Scalar)
+
+    deallocate(Viscosity, TDiff)
+
+    deallocate(xU, yV, zW, dxU, dyV, dzW)
+    deallocate(xPr, yPr, zPr, dxPr, dyPr, dzPr)
+
+    deallocate(Utype, Vtype, Wtype, Prtype)
+
+    deallocate(Uin, Vin, Win)
+
+    if (allocated(TempIn)) deallocate(TempIn)
+    if (allocated(MoistIn)) deallocate(MoistIn)
+
+    if (allocated(BsideTArr)) deallocate(BsideTArr)
+    if (allocated(BsideTFlArr)) deallocate(BsideTFlArr)
+
+    if (allocated(BsideMArr)) deallocate(BsideMArr)
+    if (allocated(BsideMFlArr)) deallocate(BsideMFlArr)
+
+
+   end subroutine
 
 
 end program CLMM

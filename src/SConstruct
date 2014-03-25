@@ -6,6 +6,7 @@ fast = ARGUMENTS.get('fast','')
 lto = ARGUMENTS.get('lto','')
 prof = ARGUMENTS.get('prof','')
 diag = ARGUMENTS.get('diag','')
+sanitize = ARGUMENTS.get('sanitize','')
 dir = ARGUMENTS.get('dir','')
 customSB = ARGUMENTS.get('customSB','')
 SB = ARGUMENTS.get('SB','')
@@ -39,18 +40,18 @@ if str(comp)=='intel':
   if str(fast)=='yes':
    fast_flag = ' -O3 -shared-intel'
   else:
-   fast_flag = '-O0 -shared-intel -check all -traceback -warn nounused -fstack-protector -ftrapuv'
+   fast_flag = ' -g -debug extended -O0 -shared-intel -check all -traceback -warn nounused -fstack-protector -fpe1'
 
   if str(lto)=='yes':
     lto_flag = ' -ipo'
   else:
     lto_flag = ''
 
-  env.Append(F90FLAGS='-cpp -g -debug -standard-semantics -assume nostd_mod_proc_name -heap-arrays 200')
+  env.Append(F90FLAGS='-cpp -standard-semantics -heap-arrays 200')
 
   env.Append(LIBPATH = ['/usr/local/poisfft_intel/','/usr/local/openblas-intel/lib/'])
 
-  env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_intel/'])
+  env.Append(F90PATH = [target_dir,target_dir+'/P/'])
 
   if str(diag)=='yes':
     env.Append(F90FLAGS=' -diag-enable sc1 -diag-enable sc-precise')
@@ -67,8 +68,11 @@ else:
   if str(fast)=='yes':
     fast_flag = ' -Ofast'# -Warray-temporaries'
   else:
-    fast_flag = ' -fcheck=all -Wall -Wsurprising -Waliasing -Wimplicit-interface -Wno-unused-dummy-argument -Wno-unused -Werror'
-  
+    fast_flag = ' -fcheck=all -Wall -Wsurprising -Waliasing -Wimplicit-interface -Wno-unused-dummy-argument -Wno-unused -Wno-aliasing  -Werror'
+    
+  if str(sanitize)=='yes':
+    fast_flag += ' -fsanitize=undefined -fsanitize=address -fsanitize=unreachable -fsanitize=null'
+    
   if str(lto)=='yes':
     lto_flag = ' -flto'
   else:
@@ -78,9 +82,9 @@ else:
   
   env.Append(F90FLAGS='-cpp -fbacktrace -g -fstack-arrays -static')
 
-  env.Append(LIBPATH = ['/usr/local/poisfft_gcc/'])
+  #env.Append(LIBPATH = ['/usr/local/poisfft_gcc/'])
 
-  env.Append(F90PATH = ['${TARGET.dir}','/usr/local/poisfft_gcc/'])
+  env.Append(F90PATH = [target_dir,target_dir+'/P/'])#,'/usr/local/poisfft_gcc/']
   
   env.Append(FORTRANMODDIRPREFIX = '-J')
   
@@ -95,7 +99,7 @@ except:
 try:
   fc = os.environ['FC']
   if len(fc)>0:
-    env.Replace(F90 = fc)
+    env.Replace(F90 = fc, FORTRAN = fc)
 except:
   pass
 
@@ -106,14 +110,14 @@ if prof=="yes":
 else:
   prof_flag=''
   
-env.Append(F90FLAGS= fast_flag + omp_flag + prof_flag + lto_flag + extra_flag + prec_flag + ' -gdwarf-3')
+env.Append(F90FLAGS= fast_flag + omp_flag + prof_flag + lto_flag + extra_flag + prec_flag)# + ' -gdwarf-3'
   
 env.Append(LINKFLAGS= fast_flag + omp_flag + prof_flag + lto_flag + extra_flag) # + '-Bdynamic -lpoisfft -lfftw3 -lfftw3f -lfftw3_omp -lfftw3f_omp -Bstatic -lgfortran -lquadmath -lstdc++ -llapack -L/usr/lib/x86_64-linux-uclibc/usr/lib/ -lc -lm -lpthread'  -Wl,--verbose
     
-env.Append(FORTRANMODDIR = '${TARGET.dir}')
+env.Append(FORTRANMODDIR = target_dir)
 
 #instead of openblas, any blas and lapack can be used.
-env.Append(LIBS = ['openblas','poisfft','fftw3','fftw3f','fftw3_omp','fftw3f_omp','pthread','stdc++'])
+env.Append(LIBS = ['openblas','fftw3','fftw3f','fftw3_omp','fftw3f_omp','pthread','stdc++'])
 
 if customSB=='yes':
  env.Append(F90FLAGS='-DCUSTOMSB')
@@ -136,11 +140,18 @@ else:
 
 
 #May be used to compile PoisFFT directly, adjust the correct path.
-#objs = env.Object(target=target_dir+'P/precisions', source='../../PoisFFT/src/precisions.f90')
-#objs += env.Object(target=target_dir+'P/parameters', source='../../PoisFFT/src/parameters.f90')
-#objs += env.Object(target=target_dir+'P/fft', source='../../PoisFFT/src/fft.f90')
-#objs += env.Object(target=target_dir+'P/poisfft', source='../../PoisFFT/src/poisfft.f90')
-#objs += env.Object(target=target_dir+'P/main', source='../../PoisFFT/src/main.f90')
+Mkdir(target_dir+'/P/')
+objs = env.Object(target=target_dir+'P/customfftw3', source='../../PoisFFT/src/customfftw3.f90')
+objs += env.Object(target=target_dir+'P/precisions', source='../../PoisFFT/src/precisions.f90')
+objs += env.Object(target=target_dir+'P/parameters', source='../../PoisFFT/src/parameters.f90')
+objs += env.Object(target=target_dir+'P/fft', source='../../PoisFFT/src/fft.f90')
+Depends(objs[-1], '../../PoisFFT/src/fft-inc.f90')
+Depends(objs[-1], objs[0])
+Depends(objs[-1], objs[1])
+Depends(objs[-1], objs[2])
+objs += env.Object(target=target_dir+'P/poisfft', source='../../PoisFFT/src/poisfft.f90')
+Depends(objs[-1], '../../PoisFFT/src/poisfft-inc.f90')
+objs += env.Object(target=target_dir+'P/main', source='../../PoisFFT/src/main.f90')
 
 
 objs =  env.Object(target=target_dir+'parameters',     source='parameters.f90')
@@ -193,10 +204,11 @@ objs += env.Object(target=target_dir+'cds',            source='cds.f90')
 objs += env.Object(target=target_dir+'laxfried',       source='laxfried.f90')
 objs += env.Object(target=target_dir+'laxwend',        source='laxwend.f90')
 objs += env.Object(target=target_dir+'tsteps',         source='tsteps.f90')
+Depends(objs[-1], 'tsteps-shared.f90')
 objs += env.Object(target=target_dir+'main',           source='main.f90')
 
 objs = filter(lambda o: str(o)[-4:] != '.mod', objs)
 
-t = env.Program(target=target_dir+'CLMM', source= objs + SBfile + PBfile)
+t = env.Program(target=target_dir+'CLMM', source= objs + SBfile + PBfile + [target_dir+'P/poisfft.o'] + [target_dir+'P/fft.o'])
 
 Default(t)

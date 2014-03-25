@@ -62,8 +62,8 @@ contains
     else
       do k = 1,nz
         do j = 1,ny
-          arr(0,j,k)  = arr(1,j,k) - side(We)*dxU(0)
-          arr(-1,j,k) = arr(1,j,k) - side(We)*(dxU(0)+dxU(-1))
+          arr(0,j,k)  = arr(1,j,k)
+          arr(-1,j,k) = arr(2,j,k)
         end do
       end do
     end if
@@ -100,8 +100,8 @@ contains
     else
       do k = 1,nz
         do j = 1,ny
-          arr(nx+1,j,k) = arr(nx,j,k) + side(Ea)*dxU(nx+1)
-          arr(nx+2,j,k) = arr(nx,j,k) + side(Ea)*(dxU(nx+1)+dxU(nx+2))
+          arr(nx+1,j,k) = arr(nx,j,k)
+          arr(nx+2,j,k) = arr(nx-1,j,k)
         end do
       end do
     end if
@@ -139,8 +139,8 @@ contains
     else
       do k = 1,nz
         do i=-1,nx+2
-          arr(i,0,k)  = arr(i,1,k) - side(So)*dyV(0)
-          arr(i,-1,k) = arr(i,1,k) - side(So)*(dyV(0)+dyV(-1))
+          arr(i,0,k)  = arr(i,1,k)
+          arr(i,-1,k) = arr(i,2,k)
         end do
       end do
     end if
@@ -177,14 +177,21 @@ contains
     else
       do k = 1,nz
         do i=-1,ny+2
-          arr(i,ny+1,k) = arr(i,ny,k) + side(No)*dyV(ny+1)
-          arr(i,ny+2,k) = arr(i,ny,k) + side(No)*(dyV(ny+1)+dyV(ny+2))
+          arr(i,ny+1,k) = arr(i,ny,k)
+          arr(i,ny+2,k) = arr(i,ny-1,k)
         end do
       end do
     end if
 
 
-    if (btype(Bo)==PERIODIC) then
+    if (btype(Bo)==DIRICHLET) then
+      do j=-1,ny+2
+        do i=-1,nx+2
+          arr(i,j,nz+1) = side(Bo) - (arr(i,j,1)-side(Bo))
+          arr(i,j,nz+2) = side(Bo) - (arr(i,j,2)-side(Bo))
+        end do
+      end do
+    else if (btype(Bo)==PERIODIC) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,0)  = arr(i,j,nz)
@@ -198,30 +205,19 @@ contains
           arr(i,j,-1) = arr(i,j,1) - side(Bo)*(dzW(0)+dzW(-1))
         end do
       end do
-    else if (btype(Bo)==CONSTFLUX.or.btype(Bo)==DIRICHLET) then
+    else if (btype(Bo)==CONSTFLUX) then
       do j=-1,ny+2
         do i=-1,nx+2
-          if (present(BsideFlArr).and.present(BsideArr)) then
-            if (abs(BsideFlArr(i,j))<tiny(1._knd) .and. &
-                TDiff(i,j,1)<1.1_knd/(Prandtl*Re) .and. &
-                btype(Bo)==DIRICHLET)                    then
-              arr(i,j,0) = BsideArr(i,j)
-            else
-              arr(i,j,0) = arr(i,j,1) + &
-                  BsideFlArr(i,j)*dzW(0) / ((TDiff(i,j,1)+TDiff(i,j,0))/(2._knd))
-            end if
-          else
             arr(i,j,0) = arr(i,j,1) + &
                 side(Bo)*dzW(0)/((TDiff(i,j,1)+TDiff(i,j,0))/(2._knd))
-          end if
           arr(i,j,-1) = arr(i,j,0)-(arr(i,j,1)-arr(i,j,0))
         end do
       end do
     else
       do j=-1,ny+2
         do i=-1,nx+2
-          arr(i,j,0)  = arr(i,j,1) - side(Bo)*dzW(0)
-          arr(i,j,-1) = arr(i,j,1) - side(Bo)*(dzW(0)+dzW(-1))
+          arr(i,j,0)  = arr(i,j,1)
+          arr(i,j,-1) = arr(i,j,2)
         end do
       end do
     end if
@@ -258,8 +254,8 @@ contains
     else
       do j=-1,ny+2
         do i=-1,nx+2
-          arr(i,j,nz+1) = arr(i,j,nz) + side(To)*dzW(nz+1)
-          arr(i,j,nz+2) = arr(i,j,nz) + side(To)*(dzW(nz+1)+dzW(nz+2))
+          arr(i,j,nz+1) = arr(i,j,nz)
+          arr(i,j,nz+2) = arr(i,j,nz-1)
         end do
       end do
      end if

@@ -26,9 +26,9 @@ contains
 
   subroutine InitSolarRadiation
     real(knd) :: horiz_component, horiz_angle
-    real(knd) :: azimuth,elevation
+    real(knd) :: azimuth, z
     integer i
-   
+      
     sun_azimuth = 237
     sun_elevation = 53
     
@@ -42,28 +42,54 @@ contains
     allocate(svf_vecs(3,svf_nrays))
     
     do i=1,svf_nrays
-    
+      !second algorithm at http://mathworld.wolfram.com/SpherePointPicking.html
       call random_number(azimuth)
-      call random_number(elevation)
-      elevation = elevation * pi / 2
+      call random_number(z)
+
       azimuth = azimuth * pi * 2
-      horiz_component = cos(elevation)
+      horiz_component = sqrt(1 - z**2)
 
       svf_vecs(1,i) = horiz_component * cos(azimuth)
       svf_vecs(2,i) = horiz_component * sin(azimuth)
-      svf_vecs(3,i) = sin(elevation)
+      svf_vecs(3,i) = z
     end do
     
   end subroutine
   
+ 
   
   
-  pure function longwave_radiation(T) result(res)
+  pure function out_lw_radiation(emmisivity, T) result(res)
     real(knd) :: res
-    real(knd),intent(in) :: T
+    real(knd),intent(in) :: emmisivity, T
     
-    res = SB_sigma * T**4
+    res = SB_sigma * emmisivity * T**4
   end function
   
+  pure function in_lw_radiation() result(res)
+    real(knd) :: res
+    !http://www.the-cryosphere-discuss.net/2/487/2008/tcd-2-487-2008.pdf
+    res = clear_sky_lw_radiation() * cloud_factor_lw()
+  end function
+  
+  pure function clear_sky_lw_radiation() result(res)
+    real(knd) :: res
+    real(knd) :: wv_press, atmosphere_emmisivity
+    
+    wv_press = moisture_ref / (moisture_ref + 0.622) * &
+                               bottom_pressure
+    
+    atmosphere_emmisivity = 0.23 + &
+               0.44 * (wv_press / temperature_ref)**(0.125_knd)
+    
+    res = SB_sigma * atmosphere_emmisivity * temperature_ref**4
+  end function
+  
+  pure function cloud_factor_lw() result(res)
+    real(knd) :: res
+    real(knd) :: cloud_fraction
+    cloud_fraction = 0
+    res = 1 + 0.22 * cloud_fraction**2
+  end function
   
 end module SolarRadiation

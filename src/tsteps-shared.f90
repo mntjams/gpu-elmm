@@ -18,9 +18,9 @@
   real(knd),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
   real(knd),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
 #else
-  real(knd),intent(in),dimension(-2:) :: dxU,dyV,dzW
-  real(knd),intent(inout) :: Pr(1:,1:,1:)
-  real(knd),intent(inout),dimension(-2:,-2:,-2:) :: U,V,W
+  real(knd),intent(in),contiguous,dimension(-2:) :: dxU,dyV,dzW
+  real(knd),intent(inout),contiguous :: Pr(1:,1:,1:)
+  real(knd),intent(inout),contiguous,dimension(-2:,-2:,-2:) :: U,V,W
 #endif
   real(knd) :: A
   integer i,j,k
@@ -75,7 +75,7 @@
   subroutine StressBoundaryFlux(U2,V2)
     use ArrayUtilities,only: add
     use Outputs,only: profuw,profvw, profuwsgs, profvwsgs
-    real(knd),dimension(-2:,-2:,-2:),intent(inout) :: U2,V2
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U2,V2
     real(knd) :: flux
     integer :: first,last
     
@@ -124,11 +124,11 @@
  subroutine Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,Temperature,Moisture,beta,rho,RK_stage)
   use VolumeSources, only: ResistanceForce
   use VTKArray
-  real(knd),dimension(-2:,-2:,-2:),intent(in)    :: U,V,W
-  real(knd),dimension(-2:,-2:,-2:),intent(out)   :: U2,V2,W2
-  real(knd),dimension(-2:,-2:,-2:),intent(inout) :: Ustar,Vstar,Wstar
-  real(knd),dimension(-1:,-1:,-1:),intent(in)    :: Temperature
-  real(knd),dimension(-1:,-1:,-1:),intent(in)    :: Moisture
+  real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U,V,W
+  real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out)   :: U2,V2,W2
+  real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: Ustar,Vstar,Wstar
+  real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Temperature
+  real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Moisture
 #endif
   real(knd),dimension(1:3),intent(in) :: beta,rho
   integer,intent(in) :: RK_stage
@@ -143,7 +143,7 @@
         do k=1,Unz
          do j=1,Uny
           do i=1,Unx
-           U2(i,j,k) = Ustar(i,j,k)*rho(RK_stage)
+           U2(i,j,k) = Ustar(i,j,k)*rho(RK_stage)*dt
           enddo
          enddo
         enddo
@@ -155,7 +155,7 @@
         do k=1,Vnz
          do j=1,Vny
           do i=1,Vnx
-           V2(i,j,k) = Vstar(i,j,k)*rho(RK_stage)
+           V2(i,j,k) = Vstar(i,j,k)*rho(RK_stage)*dt
           enddo
          enddo
         enddo
@@ -167,7 +167,7 @@
         do k=1,Wnz
          do j=1,Wny
           do i=1,Wnx
-           W2(i,j,k) = Wstar(i,j,k)*rho(RK_stage)
+           W2(i,j,k) = Wstar(i,j,k)*rho(RK_stage)*dt
           enddo
          enddo
         enddo
@@ -254,7 +254,7 @@
       if (convmet>0) then
 
 #ifdef __HMPP
-          call CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,dt,Ustar,Vstar,Wstar,U,V,W)
+          call CDS_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxmin,dymin,dzmin,Ustar,Vstar,Wstar,U,V,W)
 #else
         if (convmet==2) then
           call CDU(Ustar,U,V,W)
@@ -314,14 +314,16 @@
 
       if (abs(coriolisparam)>tiny(1._knd)) call CoriolisForce(Unx,Uny,Unz,Vnx,Vny,Vnz,&
                                                     coriolisparam,&
-                                                    Ustar,Vstar,U,V,dt)
+                                                    Ustar,Vstar,U,V)
 
       if (enable_buoyancy==1) call BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,&
-                                grav_acc,temperature_ref,Wstar,Temperature,Moisture,dt)
+                                grav_acc,temperature_ref,Wstar,Temperature,Moisture)
 
       call ResistanceForce(Ustar,Vstar,Wstar,U,V,W)
       
       call StressBoundaryFlux(Ustar,Vstar)
+      
+      if (explicit_diffusion==1) call MomentumDiffusion(Ustar,Vstar,Wstar,U,V,W)
       
 
       !$omp parallel private(i,j,k)
@@ -332,7 +334,7 @@
       do k=1,Unz
        do j=1,Uny
         do i=1,Unx
-         U2(i,j,k) = U2(i,j,k)+Ustar(i,j,k)*beta(RK_stage)
+         U2(i,j,k) = U2(i,j,k)+Ustar(i,j,k)*beta(RK_stage)*dt
         enddo
        enddo
       enddo
@@ -344,7 +346,7 @@
       do k=1,Vnz
        do j=1,Vny
         do i=1,Vnx
-         V2(i,j,k) = V2(i,j,k)+Vstar(i,j,k)*beta(RK_stage)
+         V2(i,j,k) = V2(i,j,k)+Vstar(i,j,k)*beta(RK_stage)*dt
         enddo
        enddo
       enddo
@@ -356,7 +358,7 @@
       do k=1,Wnz
        do j=1,Wny
         do i=1,Wnx
-         W2(i,j,k) = W2(i,j,k)+Wstar(i,j,k)*beta(RK_stage)
+         W2(i,j,k) = W2(i,j,k)+Wstar(i,j,k)*beta(RK_stage)*dt
         enddo
        enddo
       enddo
@@ -409,8 +411,8 @@
     real(knd),intent(in) :: dxmin
     real(knd),intent(in) :: CFL,Uref
     real(TIM),intent(in) :: time,endtime
-    real(knd),dimension(-2:),intent(in)  :: dxU,dyV,dzW
-    real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+    real(knd),dimension(-2:),contiguous,intent(in)  :: dxU,dyV,dzW
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
     real(TIM),intent(out) :: dt
     integer i,j,k
     real(knd) m, p
@@ -452,20 +454,20 @@
 
 
 
-  subroutine BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,grav_acc,temperature_ref,W2,Temperature,Moisture,dt)
+  subroutine BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,grav_acc,temperature_ref,W2,Temperature,Moisture)
     implicit none
 #ifdef __HMPP
 #include "hmpp-include.f90"
 #endif
     integer,intent(in) :: Prnx,Prny,Prnz,Wnx,Wny,Wnz
 #ifdef __HMPP
-    real(knd),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W2
-    real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: Temperature
+    real(knd),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),contiguous,intent(inout) :: W2
+    real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),contiguous,intent(in) :: Temperature
 #else
-    real(knd),dimension(-2:,-2:,-2:),intent(inout) :: W2
-    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature,Moisture
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: W2
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature,Moisture
 #endif
-    real(knd),intent(in) :: grav_acc,temperature_ref,dt
+    real(knd),intent(in) :: grav_acc,temperature_ref
     real(knd) A,A2,temperature_virt
     integer i,j,k
 
@@ -474,14 +476,14 @@
       if (enable_liquid==1) then
         stop "Liquid water not implemented."
       else
-        A = grav_acc*dt/temperature_ref
+        A = grav_acc / temperature_ref
         A2 = A / 2._KND
 
         call apply_moist(1)
         call apply_moist(2)
       end if
     else
-      A = grav_acc*dt/temperature_ref
+      A = grav_acc / temperature_ref
       A2 = A / 2._KND
       !$omp parallel do private(i,j,k)
       !$hmppcg grid blocksize myblocksize
@@ -527,7 +529,7 @@
 
   subroutine CoriolisForce(Unx,Uny,Unz,Vnx,Vny,Vnz,&
                                  coriolisparam,&
-                                 U2,V2,U,V,dt)
+                                 U2,V2,U,V)
   implicit none
 #ifdef __HMPP
 #include "hmpp-include.f90"
@@ -539,14 +541,12 @@
   real(knd),dimension(-2:Unx+3,-2:Uny+3,-2:Unz+3),intent(inout) :: U2
   real(knd),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: V2
 #else
-  real(knd),dimension(-2:,-2:,-2:),intent(in)    :: U,V
-  real(knd),dimension(-2:,-2:,-2:),intent(inout) :: U2,V2
+  real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U,V
+  real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U2,V2
 #endif
-  real(knd),intent(in):: coriolisparam,dt
-  real(knd) A
+  real(knd),intent(in):: coriolisparam
   integer i,j,k
 
-   A=-dt
    if (coriolisparam>0) then
    !$omp parallel private(i,j,k)
    !$omp do
@@ -556,7 +556,8 @@
     do k=1,Unz
      do j=1,Uny
       do i=1,Unx
-           U2(i,j,k) = U2(i,j,k)-A*coriolisparam*(V(i,j-1,k)+V(i+1,j-1,k)+V(i,j,k)+V(i+1,j,k))/4._knd
+           U2(i,j,k) = U2(i,j,k) + &
+              coriolisparam*(V(i,j-1,k)+V(i+1,j-1,k)+V(i,j,k)+V(i+1,j,k))/4._knd
       enddo
      enddo
     enddo
@@ -569,7 +570,8 @@
     do k=1,Vnz
      do j=1,Vny
       do i=1,Vnx
-           V2(i,j,k) = V2(i,j,k)+A*coriolisparam*(U(i-1,j,k)+U(i-1,j+1,k)+U(i,j,k)+U(i,j+1,k))/4._knd
+           V2(i,j,k) = V2(i,j,k) - &
+              coriolisparam*(U(i-1,j,k)+U(i-1,j+1,k)+U(i,j,k)+U(i,j+1,k))/4._knd
       enddo
      enddo
     enddo
@@ -582,313 +584,7 @@
 
 
 
-
-
-
-#ifdef __HMPP
-  !$hmpp <tsteps> ForwEul codelet
   subroutine ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-                    dxPr,dyPr,dzPr,dxU,dyV,dzW,&
-                    U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
-                    dt,coef)
-
-  implicit none
-
-#include "hmpp-include.f90"
-
-  integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
-  real(knd),intent(in):: U(-2:Unx+3,-2:Uny+3,-2:Unz+3),V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(knd),intent(in):: U2(-2:Unx+3,-2:Uny+3,-2:Unz+3),V2(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W2(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(knd),intent(out):: U3(-2:Unx+3,-2:Uny+3,-2:Unz+3),V3(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),W3(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
-  real(knd),intent(in):: Viscosity(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)
-  real(knd),intent(in) :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
-  real(knd),intent(in) :: dxPr(-2:Prnx+3),dyPr(-2:Prny+3),dzPr(-2:Prnz+3),dt,coef
-  real(knd) :: Ap,Ax,Ay,Az,dxmin,dymin,dzmin
-  integer i,j,k
-
-
-     dxmin = dxPr(1)
-     dymin = dyPr(1)
-     dzmin = dzPr(1)
-
-     Ap = coef*dt
-
-     Ax = 1._knd/(dxmin**2)
-     Ay = 1._knd/(dymin**2)
-     Az = 1._knd/(dzmin**2)
-
-
-     !$hmppcg grid blocksize myblocksize
-     !$hmppcg permute (k,i,j)
-     !$hmppcg gridify(k,i)
-     do k=1,Unz
-      do j=1,Uny
-       do i=1,Unx
-         U3(i,j,k) =&
-             (Viscosity(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
-             Viscosity(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*Ax
-         U3(i,j,k) = U3(i,j,k) +&
-             Ay*0.25_knd*((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
-             (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))
-         U3(i,j,k) = U3(i,j,k) +&
-             Az*0.25_knd*((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
-             (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))
-         U3(i,j,k) = U3(i,j,k) * Ap
-       enddo
-      enddo
-     enddo
-     !$hmppcg grid blocksize myblocksize
-     !$hmppcg permute (k,i,j)
-     !$hmppcg gridify(k,i)
-     do k=1,Unz    !Forward Euler for the first approximation
-      do j=1,Uny
-       do i=1,Unx
-         U3(i,j,k) = U3(i,j,k) + U(i,j,k) + U2(i,j,k)
-       enddo
-      enddo
-     enddo
-
-     !$hmppcg grid blocksize myblocksize
-     !$hmppcg permute (k,i,j)
-     !$hmppcg gridify(k,i)
-     do k=1,Vnz
-      do j=1,Vny
-       do i=1,Vnx
-         V3(i,j,k) =&
-             (Viscosity(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
-             Viscosity(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*Ay
-         V3(i,j,k) = V3(i,j,k) +&
-             Ax*0.25_knd*((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
-             (Viscosity(i,j+1,k)+Viscosity(i,j,k)+Viscosity(i-1,j+1,k)+Viscosity(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))
-         V3(i,j,k) = V3(i,j,k) +&
-             Az*0.25_knd*((Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
-             (Viscosity(i,j+1,k)+Viscosity(i,j+1,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))
-         V3(i,j,k) = V3(i,j,k) * Ap
-       enddo
-      enddo
-     enddo
-     !$hmppcg grid blocksize myblocksize
-     !$hmppcg permute (k,i,j)
-     !$hmppcg gridify(k,i)
-     do k=1,Vnz
-      do j=1,Vny
-       do i=1,Vnx
-         V3(i,j,k) = V3(i,j,k) + V(i,j,k) + V2(i,j,k)
-       enddo
-      enddo
-     enddo
-
-     !$hmppcg grid blocksize myblocksize
-     !$hmppcg permute (k,i,j)
-     !$hmppcg gridify(k,i)
-     do k=1,Wnz
-      do j=1,Wny
-       do i=1,Wnx
-         W3(i,j,k) =&
-             Ax*0.25_knd*((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
-             (Viscosity(i,j,k+1)+Viscosity(i,j,k)+Viscosity(i-1,j,k+1)+Viscosity(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))
-         W3(i,j,k) = W3(i,j,k) +&
-             Ay*0.25_knd*((Viscosity(i,j+1,k+1)+Viscosity(i,j,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
-             (Viscosity(i,j,k+1)+Viscosity(i,j-1,k+1)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))
-         W3(i,j,k) = W3(i,j,k) +&
-             (Viscosity(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
-             Viscosity(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*Az
-         W3(i,j,k) = W3(i,j,k) * Ap
-       enddo
-      enddo
-     enddo
-     !$hmppcg grid blocksize myblocksize
-     !$hmppcg permute (k,i,j)
-     !$hmppcg gridify(k,i)
-     do k=1,Wnz
-      do j=1,Wny
-       do i=1,Wnx
-         W3(i,j,k) = W3(i,j,k) + W(i,j,k) + W2(i,j,k)
-       enddo
-      enddo
-     enddo
-
-  end subroutine ForwEul
-
-
-
-#else
-
-
-
-  subroutine ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
-                    dxPr,dyPr,dzPr,dxU,dyV,dzW,&
-                    U,V,W,U2,V2,W2,U3,V3,W3,Visc,&
-                    dt,coef)
-
-  implicit none
-
-  integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
-
-
-  real(knd),intent(in),dimension(-2:,-2:,-2:) :: U,V,W
-  real(knd),intent(in),dimension(-2:,-2:,-2:) :: U2,V2,W2
-  real(knd),intent(out),dimension(-2:,-2:,-2:):: U3,V3,W3
-  real(knd),intent(in),dimension(-1:,-1:,-1:) :: Visc
-  real(knd),intent(in),dimension(-2:) :: dxU,dyV,dzW
-  real(knd),intent(in),dimension(-2:) :: dxPr,dyPr,dzPr
-  real(knd),intent(in) :: dt,coef
-
-  real(knd) :: Ap,Ax,Ay,Az
-  integer i,j,k
-
-
-     Ap = coef*dt
-
-     Ax = 1._knd/(dxmin**2)
-     Ay = 1._knd/(dymin**2)
-     Az = 1._knd/(dzmin**2)
-
-     if (gridtype==uniformgrid) then
-       !$omp parallel private(i,j,k)
-
-       !$omp do
-       do k=1,Unz
-        do j=1,Uny
-         do i=1,Unx
-           U3(i,j,k) =&
-               (Viscosity(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))-&
-               Viscosity(i,j,k)*(U(i,j,k)-U(i-1,j,k)))*Ax
-           U3(i,j,k) = U3(i,j,k) +&
-               Ay*0.25_knd*((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(U(i,j+1,k)-U(i,j,k))-&
-               (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(U(i,j,k)-U(i,j-1,k)))
-           U3(i,j,k) = U3(i,j,k) +&
-               Az*0.25_knd*((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(U(i,j,k+1)-U(i,j,k))-&
-               (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(U(i,j,k)-U(i,j,k-1)))
-           U3(i,j,k) = U3(i,j,k) * Ap
-         enddo
-        enddo
-       enddo
-       !$omp end do
-       !$omp do
-       do k=1,Unz
-        do j=1,Uny
-         do i=1,Unx
-           U3(i,j,k) = U3(i,j,k) + U(i,j,k) + U2(i,j,k)
-         enddo
-        enddo
-       enddo
-       !$omp end do nowait
-
-
-       !$omp do
-       do k=1,Vnz
-        do j=1,Vny
-         do i=1,Vnx
-           V3(i,j,k) =&
-               (Viscosity(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))-&
-               Viscosity(i,j,k)*(V(i,j,k)-V(i,j-1,k)))*Ay
-           V3(i,j,k) = V3(i,j,k) +&
-               Ax*0.25_knd*((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(V(i+1,j,k)-V(i,j,k))-&
-               (Viscosity(i,j+1,k)+Viscosity(i,j,k)+Viscosity(i-1,j+1,k)+Viscosity(i-1,j,k))*(V(i,j,k)-V(i-1,j,k)))
-           V3(i,j,k) = V3(i,j,k) +&
-               Az*0.25_knd*((Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(V(i,j,k+1)-V(i,j,k))-&
-               (Viscosity(i,j+1,k)+Viscosity(i,j+1,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(V(i,j,k)-V(i,j,k-1)))
-           V3(i,j,k) = V3(i,j,k) * Ap
-         enddo
-        enddo
-       enddo
-       !$omp end do
-       !$omp do
-       do k=1,Vnz
-        do j=1,Vny
-         do i=1,Vnx
-           V3(i,j,k) = V3(i,j,k) + V(i,j,k) + V2(i,j,k)
-         enddo
-        enddo
-       enddo
-       !$omp end do nowait
-
-
-       !$omp do
-       do k=1,Wnz
-        do j=1,Wny
-         do i=1,Wnx
-           W3(i,j,k) =+&
-               Ax*0.25_knd*((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(W(i+1,j,k)-W(i,j,k))-&
-               (Viscosity(i,j,k+1)+Viscosity(i,j,k)+Viscosity(i-1,j,k+1)+Viscosity(i-1,j,k))*(W(i,j,k)-W(i-1,j,k)))
-           W3(i,j,k) = W3(i,j,k) +&
-               Ay*0.25_knd*((Viscosity(i,j+1,k+1)+Viscosity(i,j,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(W(i,j+1,k)-W(i,j,k))-&
-               (Viscosity(i,j,k+1)+Viscosity(i,j-1,k+1)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(W(i,j,k)-W(i,j-1,k)))
-           W3(i,j,k) = W3(i,j,k) +&
-               (Viscosity(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))-&
-               Viscosity(i,j,k)*(W(i,j,k)-W(i,j,k-1)))*Az
-           W3(i,j,k) = W3(i,j,k) * Ap
-         enddo
-        enddo
-       enddo
-       !$omp end do
-       !$omp do
-       do k=1,Wnz
-        do j=1,Wny
-         do i=1,Wnx
-           W3(i,j,k) = W3(i,j,k) + W(i,j,k) + W2(i,j,k)
-         enddo
-        enddo
-       enddo
-       !$omp end do
-
-       !$omp end parallel
-     else
-       !$omp parallel private(i,j,k)
-
-       !$omp do
-       do k=1,Unz    !Forward Euler for the first approximation
-        do j=1,Uny
-         do i=1,Unx
-          U3(i,j,k) = U(i,j,k)+U2(i,j,k)+Ap*(&
-          ((Viscosity(i+1,j,k)*(U(i+1,j,k)-U(i,j,k))/dxPr(i+1)-&
-          Viscosity(i,j,k)*(U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i)+&
-           0.25_knd*(((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(U(i,j+1,k)-U(i,j,k))/dyV(j)-&
-           (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j)+&
-           ((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)-&
-           (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))))
-         enddo
-        enddo
-       enddo
-       !$omp end do nowait
-       !$omp do
-       do k=1,Vnz
-        do j=1,Vny
-         do i=1,Vnx
-          V3(i,j,k) = V(i,j,k)+V2(i,j,k)+Ap*(&
-          ((Viscosity(i,j+1,k)*(V(i,j+1,k)-V(i,j,k))/dyPr(j+1)-&
-           Viscosity(i,j,k)*(V(i,j,k)-V(i,j-1,k))/dyPr(j))/dyV(j)+&
-           0.25_knd*(((Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(V(i+1,j,k)-V(i,j,k))/dxU(i)-&
-          (Viscosity(i,j+1,k)+Viscosity(i,j,k)+Viscosity(i-1,j+1,k)+Viscosity(i-1,j,k))*(V(i,j,k)-V(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-           ((Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)-&
-           (Viscosity(i,j+1,k)+Viscosity(i,j+1,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))*(V(i,j,k)-V(i,j,k-1))/dzW(k-1))/dzPr(k))))
-         enddo
-        enddo
-       enddo
-       !$omp end do nowait
-       !$omp do
-       do k=1,Wnz
-        do j=1,Wny
-         do i=1,Wnx
-          W3(i,j,k) = W(i,j,k)+W2(i,j,k)+Ap*(&
-          0.25_knd*(((Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(W(i+1,j,k)-W(i,j,k))/dxU(i)-&
-          (Viscosity(i,j,k+1)+Viscosity(i,j,k)+Viscosity(i-1,j,k+1)+Viscosity(i-1,j,k))*(W(i,j,k)-W(i-1,j,k))/dxU(i-1))/dxPr(i)+&
-           ((Viscosity(i,j+1,k+1)+Viscosity(i,j,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k))*(W(i,j+1,k)-W(i,j,k))/dyV(j)-&
-           (Viscosity(i,j,k+1)+Viscosity(i,j-1,k+1)+Viscosity(i,j,k)+Viscosity(i,j-1,k))*(W(i,j,k)-W(i,j-1,k))/dyV(j-1))/dyPr(j))+&
-           (Viscosity(i,j,k+1)*(W(i,j,k+1)-W(i,j,k))/dzPr(k+1)-&
-           Viscosity(i,j,k)*(W(i,j,k)-W(i,j,k-1))/dzPr(k))/dzW(k))
-         enddo
-        enddo
-       enddo
-       !$omp end do
-
-       !$omp end parallel
-     end if
-  end subroutine ForwEul
-
-
-  subroutine ForwEul2(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                     dxPr,dyPr,dzPr,dxU,dyV,dzW,&
                     U,V,W,U2,V2,W2,U3,V3,W3,nu,&
                     dt,coef)
@@ -898,12 +594,12 @@
   integer,intent(in) :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
 
 
-  real(knd),intent(in),dimension(-2:,-2:,-2:) :: U,V,W
-  real(knd),intent(in),dimension(-2:,-2:,-2:) :: U2,V2,W2
-  real(knd),intent(out),dimension(-2:,-2:,-2:):: U3,V3,W3
-  real(knd),intent(in),dimension(-1:,-1:,-1:) :: nu
-  real(knd),intent(in),dimension(-2:) :: dxU,dyV,dzW
-  real(knd),intent(in),dimension(-2:) :: dxPr,dyPr,dzPr
+  real(knd),intent(in),dimension(-2:,-2:,-2:),contiguous :: U,V,W
+  real(knd),intent(in),dimension(-2:,-2:,-2:),contiguous :: U2,V2,W2
+  real(knd),intent(out),dimension(-2:,-2:,-2:),contiguous:: U3,V3,W3
+  real(knd),intent(in),dimension(-1:,-1:,-1:),contiguous :: nu
+  real(knd),intent(in),dimension(-2:),contiguous :: dxU,dyV,dzW
+  real(knd),intent(in),dimension(-2:),contiguous :: dxPr,dyPr,dzPr
   real(knd),intent(in) :: dt,coef
 
   real(knd) :: Ap, recdxmin2, recdymin2, recdzmin2
@@ -1051,9 +747,151 @@
 
      !$omp end parallel
 
-  end subroutine ForwEul2
+  end subroutine ForwEul
 
-#endif
+
+
+
+
+
+
+
+
+
+  subroutine MomentumDiffusion(U2,V2,W2,U,V,W)
+    use Parameters, nu => Viscosity
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U2,V2,W2
+    real(knd) :: Ap, recdxmin2, recdymin2, recdzmin2
+    integer :: i,j,k,bi,bj,bk
+    integer, parameter :: narr = 6
+       
+     recdxmin2 = 1._knd / dxmin**2
+     recdymin2 = 1._knd / dymin**2
+     recdzmin2 = 1._knd / dzmin**2
+
+     !$omp parallel private(i,j,k,bi,bj,bk)
+     !$omp do schedule(runtime) collapse(3)
+     do bk = 1, Unz, tilenz(narr)
+      do bj = 1, Uny, tileny(narr)
+       do bi = 1, Unx, tilenx(narr)
+        do k = bk, min(bk+tilenz(narr)-1,Unz)
+         do j = bj, min(bj+tileny(narr)-1,Uny)
+          do i = bi, min(bi+tilenx(narr)-1,Unx)
+            if (Uflx_mask(i+1,j,k)) &
+              U2(i,j,k) = U2(i,j,k) + &
+               nu(i+1,j,k) * (U(i+1,j,k)-U(i,j,k)) *recdxmin2
+            if (Uflx_mask(i,j,k)) &
+              U2(i,j,k) = U2(i,j,k) - &
+                nu(i,j,k) * (U(i,j,k)-U(i-1,j,k)) * recdxmin2 
+            if (Ufly_mask(i,j+1,k)) &
+              U2(i,j,k) = U2(i,j,k) + &
+                0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (U(i,j+1,k)-U(i,j,k)) * recdymin2
+            if (Ufly_mask(i,j,k)) &
+              U2(i,j,k) = U2(i,j,k) - &
+                0.25_knd * (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (U(i,j,k)-U(i,j-1,k)) * recdymin2
+            if (Uflz_mask(i,j,k+1)) &
+              U2(i,j,k) = U2(i,j,k) + &
+                0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (U(i,j,k+1)-U(i,j,k)) * recdzmin2
+            if (Uflz_mask(i,j,k)) &
+              U2(i,j,k) = U2(i,j,k) - &
+                0.25_knd * (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (U(i,j,k)-U(i,j,k-1)) * recdzmin2
+          enddo
+         enddo
+        enddo
+       enddo
+      enddo
+     enddo
+     !$omp end do
+#define comp 1
+#define wrk U2
+#include "wmfluxes-inc.f90"
+#undef wrk
+#undef comp
+
+
+     !$omp do schedule(runtime) collapse(3)
+     do bk = 1, Vnz, tilenz(narr)
+      do bj = 1, Vny, tileny(narr)
+       do bi = 1, Vnx, tilenx(narr)
+        do k = bk, min(bk+tilenz(narr)-1,Vnz)
+         do j = bj, min(bj+tileny(narr)-1,Vny)
+          do i = bi, min(bi+tilenx(narr)-1,Vnx)
+            if (Vflx_mask(i+1,j,k)) &
+              V2(i,j,k) = V2(i,j,k) + &
+                0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (V(i+1,j,k)-V(i,j,k)) * recdxmin2
+            if (Vflx_mask(i,j,k)) &
+              V2(i,j,k) = V2(i,j,k) - &
+                0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (V(i,j,k)-V(i-1,j,k)) * recdxmin2
+            if (Vfly_mask(i,j+1,k)) &
+              V2(i,j,k) = V2(i,j,k) + &
+                nu(i,j+1,k) * (V(i,j+1,k)-V(i,j,k)) * recdymin2
+            if (Vfly_mask(i,j,k)) &
+              V2(i,j,k) = V2(i,j,k) - &
+                nu(i,j,k) * (V(i,j,k)-V(i,j-1,k)) * recdymin2
+            if (Vflz_mask(i,j,k+1)) &
+              V2(i,j,k) = V2(i,j,k) + &
+                0.25_knd * (nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * (V(i,j,k+1)-V(i,j,k)) * recdzmin2
+            if (Vflz_mask(i,j,k)) &
+              V2(i,j,k) = V2(i,j,k) - &
+                0.25_knd * (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (V(i,j,k)-V(i,j,k-1)) * recdzmin2
+          enddo
+         enddo
+        enddo
+       enddo
+      enddo
+     enddo
+     !$omp end do
+#define comp 2
+#define wrk V2
+#include "wmfluxes-inc.f90"
+#undef wrk
+#undef comp
+
+
+     !$omp do schedule(runtime) collapse(3)
+     do bk = 1, Wnz, tilenz(narr)
+      do bj = 1, Wny, tileny(narr)
+       do bi = 1, Wnx, tilenx(narr)
+        do k = bk, min(bk+tilenz(narr)-1,Wnz)
+         do j = bj, min(bj+tileny(narr)-1,Wny)
+          do i = bi, min(bi+tilenx(narr)-1,Wnx)
+            if (Wflx_mask(i+1,j,k)) &
+              W2(i,j,k) = W2(i,j,k) + &
+                0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (W(i+1,j,k)-W(i,j,k)) * recdxmin2
+            if (Wflx_mask(i,j,k)) &
+              W2(i,j,k) = W2(i,j,k) - &
+                0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (W(i,j,k)-W(i-1,j,k)) * recdxmin2
+            if (Wfly_mask(i,j+1,k)) &
+              W2(i,j,k) = W2(i,j,k) + &
+                0.25_knd * (nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * (W(i,j+1,k)-W(i,j,k)) * recdymin2
+            if (Wfly_mask(i,j,k)) &
+              W2(i,j,k) = W2(i,j,k) - &
+                0.25_knd * (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (W(i,j,k)-W(i,j-1,k)) * recdymin2
+            if (Wflz_mask(i,j,k+1)) &
+              W2(i,j,k) = W2(i,j,k) + &
+                nu(i,j,k+1) * (W(i,j,k+1)-W(i,j,k)) * recdzmin2
+            if (Wflz_mask(i,j,k)) &
+              W2(i,j,k) = W2(i,j,k) - &
+                nu(i,j,k) * (W(i,j,k)-W(i,j,k-1)) * recdzmin2
+          end do
+         end do
+        end do
+       end do
+      end do
+     end do
+     !$omp end do
+#define comp 3
+#define wrk V2
+#include "wmfluxes-inc.f90"
+#undef wrk
+#undef comp
+     !$omp end parallel
+
+  end subroutine MomentumDiffusion
+
+
+
 
 
 
@@ -1089,9 +927,9 @@
   real(knd),intent(inout) :: V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3)
   real(knd),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
 #else
-  real(knd),intent(in)    :: zPr(-2:)
-  real(knd),intent(in)    :: zW(-3:)
-  real(knd),intent(inout),dimension(-2:,-2:,-2:) :: U,V,W
+  real(knd),contiguous,intent(in)    :: zPr(-2:)
+  real(knd),contiguous,intent(in)    :: zW(-3:)
+  real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U,V,W
 #endif
   integer i,j,k,bufn,mini,maxi,maxUi
   real(knd) ze,zs,zb,p
@@ -1283,10 +1121,10 @@
   real(knd),intent(inout) :: W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3)
   real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(inout) :: temperature
 #else
-  real(knd),intent(in)    :: xPr(-2:)
-  real(knd),intent(in)    :: xU(-3:)
-  real(knd),intent(inout),dimension(-2:,-2:,-2:) :: U,V,W
-  real(knd),dimension(-1:,-1:,-1:),intent(inout) :: temperature
+  real(knd),contiguous,intent(in)    :: xPr(-2:)
+  real(knd),contiguous,intent(in)    :: xU(-3:)
+  real(knd),contiguous,intent(inout),dimension(-2:,-2:,-2:) :: U,V,W
+  real(knd),dimension(-1:,-1:,-1:),contiguous,intent(inout) :: temperature
 #endif
   integer i,j,k,bufn
   real(knd) p,xe,xs,xb,DF
@@ -1417,8 +1255,8 @@
   real(knd),dimension(-2:Vnx+3,-2:Vny+3,-2:Vnz+3),intent(inout) :: V
   real(knd),dimension(-2:Wnx+3,-2:Wny+3,-2:Wnz+3),intent(inout) :: W
 #else
-  integer,dimension(:,:),intent(in)      :: Unull,Vnull,Wnull
-  real(knd),dimension(-2:,-2:,-2:),intent(inout) :: U,V,W
+  integer,dimension(:,:),contiguous,intent(in)              :: Unull,Vnull,Wnull
+  real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U,V,W
 #endif
   integer i
 

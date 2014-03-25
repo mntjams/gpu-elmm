@@ -409,13 +409,14 @@ module VolumeSources
       svf = sky_view_factor(xr,yr,zr)
       
       inc_radiation_flux = angle_to_sun * solar_direct_flux() + &
-                           solar_diffuse_flux()*svf
+                           solar_diffuse_flux()*svf + &
+                           in_lw_radiation()
 
       radiation_balance = inc_radiation_flux * (1-PB%albedo) - &
-                          longwave_radiation(temperature_ref) * svf * PB%emmissivity
+                          out_lw_radiation(PB%emmissivity, temperature_ref) * svf
 
       total_heat_flux = radiation_balance - &
-                        (0.2 * radiation_balance) !crude guess of the storage flux
+                        (0.1 * radiation_balance) !crude guess of the storage flux
 
       !FIXME: surface flux to volume flux APPROXIMATE!                  
       total_heat_flux = total_heat_flux/dot_product([dxmin,dymin,dzmin],abs(out_norm))
@@ -675,14 +676,13 @@ module VolumeSources
       end associate
     end subroutine MoistureVolumeSources
 
-    subroutine ScalarVolumeSources(Scalar)
-      real(knd),dimension(-1:,-1:,-1:,1:),intent(inout) :: Scalar
+    subroutine ScalarVolumeSources(Scalar, sc)
+      real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Scalar
+      integer, intent(in) :: sc
       integer j
 
       if (allocated(ScalarFlVolumes)) then
-        do j=1,num_of_scalars
-          call FluxKernel(Scalar(:,:,:,j),ScalarFlVolumes(j)%volumes)
-        end do
+        call FluxKernel(Scalar(:,:,:), ScalarFlVolumes(sc)%volumes)
       end if
 
     end subroutine ScalarVolumeSources

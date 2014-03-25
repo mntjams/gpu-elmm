@@ -17,7 +17,7 @@ contains
     integer                  :: neighbours(3,6)
     real(knd)     :: dist,nearx,neary,nearz
     integer       :: i,j,k,m,n,o,p
-    integer       :: nb, n_neighbours
+    integer       :: nb
 
     allocate(WMP%depscalar(num_of_scalars))
 
@@ -36,15 +36,12 @@ contains
        if (Prtype(i,j,k)<=0) then
         dist = huge(dist)
         nb = 0
-        n_neighbours=2
-        
-        if (k==1.and.((Btype(Bo)==DIRICHLET).or.(Btype(Bo)==NOSLIP))) n_neighbours = n_neighbours + 1
          
         do p=1,6
            m=neighbours(1,p)
            n=neighbours(2,p)
            o=neighbours(3,p)
-           if (Prtype(i+m,j+n,k+o)>0) n_neighbours = n_neighbours + 1
+
            if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs([m,n,o]))==1)) then
              call SetCurrentSB(CurrentSB,Prtype(i+m,j+n,k+o))
              call CurrentSB%Closest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
@@ -55,32 +52,10 @@ contains
            end if
         end do
 
-        if (nb>0.and.n_neighbours==1) then
-          if (k==1) then
-            dist = huge(dist)
-            nb = 0
-            n_neighbours=0
-            if (k==1.and.((Btype(Bo)==DIRICHLET).or.(Btype(Bo)==NOSLIP))) n_neighbours = n_neighbours + 1
-            do p=1,6
-               m=neighbours(1,p)
-               n=neighbours(2,p)
-               o=neighbours(3,p)
-               
-               if (Prtype(i+m,j+n,k+o)>0) n_neighbours = n_neighbours + 1
-
-               if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs([m,n,o]))==1)) then
-                 call SetCurrentSB(CurrentSB,Prtype(i+m,j+n,k+o))
-                 call CurrentSB%Closest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
-                 if (sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
-                  dist = sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
-                  nb = Prtype(i+m,j+n,k+o)
-
-                 end if
-               end if
-            end do
-            stop "????"
-          end if
+        if (nb>0) then
+                    
           call SetCurrentSB(CurrentSB,nb)
+          
           WMP%xi = i
           WMP%yj = j
           WMP%zk = k
@@ -105,6 +80,7 @@ contains
           end select
 
           call AddWMPoint(WMP)
+          
         end if
        end if
       end do
@@ -290,15 +266,16 @@ allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
 
           !temporary
           svf = sky_view_factor(xr,yr,zr)
-
+      
           inc_radiation_flux = angle_to_sun * solar_direct_flux() + &
-                               solar_diffuse_flux()*svf
+                               solar_diffuse_flux()*svf + &
+                               in_lw_radiation()
 
           radiation_balance = inc_radiation_flux * (1-p%albedo) - &
-                              longwave_radiation(temperature_ref) * svf * p%emmissivity
+                              out_lw_radiation(p%emmissivity, temperature_ref) * svf
 
           total_heat_flux = radiation_balance - &
-                            (0.2 * radiation_balance) !crude guess of the storage flux
+                            (0.1 * radiation_balance) !crude guess of the storage flux
 
           if (enable_moisture==1) then
             latent_heat_flux = total_heat_flux * p%evaporative_fraction
@@ -488,7 +465,7 @@ module ImmersedBoundary
 
   private
 
-  public TIBPoint, TIBPoint_MomentumSource, TIBPoint_ScalFlSource, TIBPoint_Viscosity, &
+  public TIBPoint, TIBPoint_Interpolate, TIBPoint_MomentumSource, TIBPoint_ScalFlSource, TIBPoint_Viscosity, &
          UIBPoints, VIBPoints, WIBPoints, ScalFlIBPoints, &
          GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
          !InitSolidBodies imported from SolidBodies
@@ -704,7 +681,7 @@ contains
     IBP%xi = xi
     IBP%yj = yj
     IBP%zk = zk
-call null_point; return
+! call null_point; return
     if (.not. SB%Inside(x,y,z,0._knd)) then
       call null_point
       return

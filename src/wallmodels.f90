@@ -31,9 +31,14 @@ module WMPoint_types
 
     real(knd) :: z0 = 0
     real(knd) :: ustar = 1
-    real(knd) :: temp = 0
+
+    real(knd) :: temperature = 0
     real(knd) :: temperature_flux = 0
+
     real(knd) :: moisture_flux = 0
+
+    real(knd) :: div = 0 !divergence when zeroing out trans-boundary velocities
+
     real(knd) :: wallu = 0
     real(knd) :: wallv = 0
     real(knd) :: wallw = 0
@@ -44,10 +49,6 @@ module WMPoint_types
     real(knd) :: evaporative_fraction = 0
 
     real(knd),allocatable:: depscalar(:)
-
- !    integer,allocatable :: bound_IBPs(:)   
-
-    type(WMpoint),pointer:: next=>null()
 
   end type WMpoint
 
@@ -70,6 +71,9 @@ module WMPoint_types
     real(knd) :: wallu = 0
     real(knd) :: wallv = 0
     real(knd) :: wallw = 0
+
+    real(knd) :: temperature = 0
+    real(knd) :: temperature_flux = 0
 
   end type WMpointUVW
 
@@ -106,7 +110,7 @@ module Wallmodels
   public WMPoint, WMpointUVW, &
          AddWMPoint, AddWMPointUVW, &
          MoveWMPointsToArray, GetOutsideBoundariesWM, InitWMMasks, &
-         ComputeViscsWM, ComputeUVWFluxesWM, &
+         ComputeViscsWM, ComputeUVWFluxesWM, DivergenceWM, &
          InitTempFl, GroundDeposition, GroundUstar, wallmodeltype
 #ifdef __HMPP
   public hmppWMpoint,WMPtoHMPP
@@ -126,6 +130,8 @@ module Wallmodels
       WxmWMpoints, WxpWMpoints, WymWMpoints, WypWMpoints, WzmWMpoints, WzpWMpoints
 
   type(WMPoint), dimension(:), allocatable, public :: WMPoints
+
+  logical(slog),dimension(:,:,:),allocatable,public :: Scflx_mask, Scfly_mask, Scflz_mask
 
   logical(slog),dimension(:,:,:),allocatable,public :: Uflx_mask, Ufly_mask, Uflz_mask
   logical(slog),dimension(:,:,:),allocatable,public :: Vflx_mask, Vfly_mask, Vflz_mask
@@ -150,7 +156,7 @@ contains
 
     ToWMP%z0     = FromWMP%z0
     ToWMP%ustar  = FromWMP%ustar
-    ToWMP%temp   = FromWMP%temp
+    ToWMP%temperature   = FromWMP%temperature
     ToWMP%temperature_flux = FromWMP%temperature_flux
 
   end subroutine WMPtoHMPP
@@ -519,14 +525,12 @@ contains
 
            WMP%z0 = z0B
 
-           if (TempBtype(Bo)==CONSTFLUX) then
+           if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==WALL_FLUX) then
              WMP%temperature_flux = sideTemp(Bo)
-           else
-             WMP%temp = 0
            end if
 
-           if (TempBtype(Bo)==DIRICHLET) then
-             WMP%temp = sideTemp(Bo)
+           if (TempBtype(Bo)==DIRICHLET.or.TempBtype(Bo)==WALL_DIRICHLET) then
+             WMP%temperature = sideTemp(Bo)
            end if
 
            call AddWMPoint(WMP)
@@ -736,29 +740,25 @@ contains
   
   
   subroutine InitWMMasks
-    allocate(Uflx_mask(Unx+1,Uny,Unz))
-    allocate(Ufly_mask(Unx,Uny+1,Unz))
-    allocate(Uflz_mask(Unx,Uny,Unz+1))
-  
-    allocate(Vflx_mask(Vnx+1,Vny,Vnz))
-    allocate(Vfly_mask(Vnx,Vny+1,Vnz))
-    allocate(Vflz_mask(Vnx,Vny,Vnz+1))
-  
-    allocate(Wflx_mask(Wnx+1,Wny,Wnz))
-    allocate(Wfly_mask(Wnx,Wny+1,Wnz))
-    allocate(Wflz_mask(Wnx,Wny,Wnz+1))
+    integer :: i, j, k
 
-    Uflx_mask = .true.
-    Ufly_mask = .true.
-    Uflz_mask = .true.
+    allocate(Scflx_mask(0:Prnx,Prny,Prnz))
+    allocate(Scfly_mask(Prnx,0:Prny,Prnz))
+    allocate(Scflz_mask(Prnx,Prny,0:Prnz))
 
-    Vflx_mask = .true.
-    Vfly_mask = .true.
-    Vflz_mask = .true.
+    Scflx_mask = .true.
+    Scfly_mask = .true.
+    Scflz_mask = .true.
 
-    Wflx_mask = .true.
-    Wfly_mask = .true.
-    Wflz_mask = .true.
+    do k = 1, Prnz
+      do j = 1, Prny
+        do i = 1, Prnx
+          if (Prtype(i,j,k)>0.or.Prtype(i+1,j,k)>0) Scflx_mask(i,j,k) = .false.
+          if (Prtype(i,j,k)>0.or.Prtype(i,j+1,k)>0) Scfly_mask(i,j,k) = .false.
+          if (Prtype(i,j,k)>0.or.Prtype(i,j,k+1)>0) Scflz_mask(i,j,k) = .false.
+        end do
+      end do
+    end do
 
     call set_masks(Uflx_mask, Ufly_mask, Uflz_mask, &
                    UxmWMpoints, UxpWMpoints, UymWMpoints, UypWMpoints, UzmWMpoints, UzpWMpoints, Unx, Uny, Unz, Utype)
@@ -772,12 +772,21 @@ contains
   contains
   
     subroutine set_masks(flx, fly, flz, xm, xp, ym, yp, zm, zp, nx, ny, nz, Xtype)
-      logical(slog), dimension(:,:,:), intent(inout) :: flx, fly, flz
-      type(WMpointUVW),  dimension(:), intent(in)    :: xm, xp, ym, yp, zm, zp
+      logical(slog), dimension(:,:,:), allocatable, intent(out) :: flx, fly, flz
+      type(WMpointUVW),  dimension(:), intent(in) :: xm, xp, ym, yp, zm, zp
       integer, intent(in) :: nx, ny, nz
       integer, intent(in) :: Xtype(-2:,-2:,-2:)
-      !TODO: take care of red and black points
       integer :: i, j, k
+
+      allocate(flx(nx+1,ny,nz))
+      allocate(fly(nx,ny+1,nz))
+      allocate(flz(nx,ny,nz+1))
+  
+      flx = .true.
+      fly = .true.
+      flz = .true.
+
+
       do i = 1, size(xm)
         associate(p => xm(i))
             flx(p%xi,p%yj,p%zk) = .false.
@@ -820,12 +829,34 @@ contains
       end do
     end subroutine
 
+  end subroutine InitWMMasks
+
+
+
+  subroutine DivergenceWM(U, V, W)
+    real(knd), contiguous, intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    integer :: i, xi, yj, zk
+    real(knd) :: div
+
+    !$omp parallel do private(i, xi, yj, zk, div)
+    do i=1,size(WMPoints)
+      xi = WMPoints(i)%xi
+      yj = WMPoints(i)%yj
+      zk = WMPoints(i)%zk
+
+      div = 0
+      if (Prtype(xi+1,yj,zk)<=0) div = div + U(xi,yj,zk) / dxmin
+      if (Prtype(xi-1,yj,zk)<=0) div = div - U(xi-1,yj,zk) / dxmin
+      if (Prtype(xi,yj+1,zk)<=0) div = div + V(xi,yj,zk) / dymin
+      if (Prtype(xi,yj-1,zk)<=0) div = div - V(xi,yj-1,zk) / dymin
+      if (Prtype(xi,yj,zk+1)<=0) div = div + W(xi,yj,zk) / dzmin
+      if (Prtype(xi,yj,zk-1)<=0) div = div - W(xi,yj,zk-1) / dzmin
+
+      WMPoints(i)%div = div
+    end do
+    !$omp end parallel do
+
   end subroutine
-
-
-
-
-
 
 
 
@@ -1496,23 +1527,10 @@ contains
     integer i,j,xi,yj,zk
     real(knd) tdif
     real(knd) dist(3), vel(3), wallvel(3), prgrad(3)
+    real(knd) visc
 
 
-    if (enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET) then
-      !$omp parallel private(i,j)
-      !$omp do
-      do j = 1,Prny
-        do i = 1,Prnx
-          BsideTArr(i,j) = SurfTemperature(xPr(i),yPr(j), time+dt/2._TIM)
-        end do
-       end do
-      !$omp end do
-      !$omp end parallel
-    end if
-
-
-
-    !$omp parallel do private(i,xi,yj,zk,tdif, vel, wallvel, dist, prgrad)
+    !$omp parallel do private(i,xi,yj,zk,tdif, vel, wallvel, dist, prgrad, visc)
     do i = 1,size(WMPoints)
 
       xi = WMPoints(i)%xi
@@ -1536,25 +1554,22 @@ contains
 
       if (WMPoints(i)%z0>0) then
 
-         if (enable_buoyancy==1 .and. TempBtype(Bo)==CONSTFLUX) then
+         if (enable_buoyancy==1 .and. WMPoints(i)%temperature>0) then
 
-           call WM_MO_FLUX(Viscosity(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%temperature_flux, &
-                           WMPoints(i)%z0, dist, vel)
+           tdif = WMPoints(i)%temperature - Temperature(xi,yj,zk)
 
-         else if (enable_buoyancy==1 .and. TempBtype(Bo)==DIRICHLET) then
-
-           if (WMPoints(i)%zk==1) WMPoints(i)%temp = BsideTArr(WMPoints(i)%xi,WMPoints(i)%yj)
-
-           tdif = WMPoints(i)%temp - Temperature(xi,yj,zk)
-
-           call WM_MO_DIRICHLET(Viscosity(xi, yj, zk), WMPoints(i)%ustar, WMPoints(i)%temperature_flux, &
+           call WM_MO_DIRICHLET(visc, WMPoints(i)%ustar, &
+                                WMPoints(i)%temperature_flux, &
                                 WMPoints(i)%z0, tdif, dist, vel)
 
-           if (zk==1) BsideTFLArr(xi,yj) = WMPoints(i)%temperature_flux
+         else if (enable_buoyancy==1 .and. WMPoints(i)%temperature_flux>0) then
+
+           call WM_MO_FLUX(visc, WMPoints(i)%ustar, WMPoints(i)%temperature_flux, &
+                           WMPoints(i)%z0, dist, vel)
 
          else
 
-           call WMRoughVisc(Viscosity(xi, yj, zk), &
+           call WMRoughVisc(visc, &
                             WMPoints(i)%ustar, WMPoints(i)%z0, &
                             dist, vel, wallvel)
          end if
@@ -1569,18 +1584,20 @@ contains
 
            call WallPrGradient(prgrad,xi,yj,zk,Pr,Prtype)
 
-           call WMFlatPrGradVisc(Viscosity(xi, yj, zk), &
+           call WMFlatPrGradVisc(visc, &
                            WMPoints(i)%ustar, &
                            dist, vel, wallvel, prgrad)
 
          else
 
-           call WMFlatVisc(Viscosity(xi, yj, zk), &
+           call WMFlatVisc(visc, &
                            WMPoints(i)%ustar, &
                            dist, vel, wallvel)
 
          end if
        end if
+
+       Viscosity(xi,yj,zk) = visc
 
     end do
     !$omp end parallel do
@@ -1660,12 +1677,12 @@ contains
 
 
           if (p%z0>0) then
-
-             if (enable_buoyancy==1 .and. TempBtype(Bo)==CONSTFLUX) then
+!TODO: The temperature flux is always 0 now in momentum points, so no stability effect here!
+             if (enable_buoyancy==1 .and. p%temperature>0) then
 
                stop "Not implemented!"
 
-             else if (enable_buoyancy==1 .and. TempBtype(Bo)==DIRICHLET) then
+             else if (enable_buoyancy==1 .and. p%temperature_flux>0) then
 
                stop "Not implemented!"
 

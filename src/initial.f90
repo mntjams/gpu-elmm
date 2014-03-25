@@ -88,7 +88,7 @@ contains
    call get(limitertype)
    call get(limparam)
    call get(masssourc)
-   masssourc = 0 !HACK: to avoid problems with spurious scalars fluxes for now
+   masssourc = 1 !Seems to be necessary for stability. Caution with scalar fluxes.
    call get(steady)
    call get(tasktype)
    write(*,*) "tasktype=",tasktype
@@ -1015,10 +1015,10 @@ contains
 
 
   subroutine InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
-  real(knd),intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(knd),intent(inout) :: Temperature(-1:,-1:,-1:)
-  real(knd),intent(inout) :: Moisture(-1:,-1:,-1:)
-  real(knd),intent(inout) :: Scalar(-1:,-1:,-1:,:)
+  real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+  real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
+  real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
+  real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
   integer i,j,k
   real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
   real(knd),allocatable :: Q(:,:,:)

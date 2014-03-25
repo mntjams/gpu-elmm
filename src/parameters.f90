@@ -63,7 +63,7 @@ module Parameters
   real(knd) :: grav_acc = 0, coriolisparam = 0
 
   real(knd) :: top_pressure !mean pressure at the top boundary - calculated
-  real(knd) :: bottom_pressure = 0
+  real(knd) :: bottom_pressure = 101325.0
 
   real(knd) :: ShearInletTypeParameter,Uinlet
 
@@ -85,7 +85,7 @@ module Parameters
   real(TIM) :: timefram1,timefram2,timeavg1,timeavg2
 
   integer :: tempmet,poissmet,convmet,masssourc,frames,steady
-  integer :: tasktype,averaging,impldiff
+  integer :: tasktype,averaging,explicit_diffusion = 1
 
   integer :: enable_buoyancy = 0 !1 if enabled, zero otherwise
   integer :: enable_moisture = 0
@@ -125,7 +125,7 @@ module Parameters
   integer,parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
 
   real(knd) :: temperature_ref = 295
-  real(knd) :: moisture_ref = 0.001 !TODO: compute from specific humidity
+  real(knd) :: moisture_ref = 0.001 !TODO: compute from relative humidity
 
   integer,dimension(6) :: Btype      !boundary condition types for velocity, see below for values
   integer,dimension(6) :: TempBtype  !boundary condition types for temperature
@@ -148,7 +148,7 @@ module Parameters
 
   integer,parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6, &  !boundary condition types
                         TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10, RADIATION=7, &
-                        NEUMANN_BUFF=8, AUTOMATICFLUX=11
+                        NEUMANN_BUFF=8, AUTOMATICFLUX=11, WALL_DIRICHLET=12, WALL_FLUX=13
   !inlet types
   integer,parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
                        ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5
