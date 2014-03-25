@@ -79,8 +79,8 @@ module Outputs
     integer :: vort = 0
     integer :: Pr = 0
     integer :: lambda2 = 0
-    integer :: scalars = 0
-    integer :: sumscalars = 1
+    integer :: scalars = 1
+    integer :: sumscalars = 0
     integer :: temperature = 1
     integer :: moisture = 1
     integer :: temperature_flux = 0
@@ -154,8 +154,8 @@ module Outputs
 
   type TDisplaySwitches
     integer :: delta = 0
-    integer :: ustar = 1
-    integer :: tstar = 1
+    integer :: ustar = 0
+    integer :: tstar = 0
   end type
 
   type(TDisplaySwitches),save :: display
@@ -496,11 +496,11 @@ contains
 
   subroutine OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
     use Wallmodels, only: ComputeViscsWM
-    real(knd),dimension(-2:,-2:,-2:),intent(in)   :: U,V,W
-    real(knd),dimension(1:,1:,1:),intent(in)      :: Pr
-    real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
-    real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Moisture
-    real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)   :: U,V,W
+    real(knd),dimension(1:,1:,1:),contiguous,intent(in)      :: Pr
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)   :: Temperature
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)   :: Moisture
+    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: Scalar
     real(knd),intent(in) :: delta
 
     integer :: l,i,j,k
@@ -861,8 +861,8 @@ contains
 
 
   subroutine AddSubgridRMS(U_r,V_r,W_r,U,V,W,weight)
-    real(knd),dimension(-2:,-2:,-2:),intent(inout)   :: U_r,V_r,W_r
-    real(knd),dimension(-2:,-2:,-2:),intent(in)   :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout)   :: U_r,V_r,W_r
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)   :: U,V,W
     real(knd),intent(in) :: weight
     real(knd) :: Ax,Ay,Az
     integer :: i,j,k
@@ -1223,10 +1223,10 @@ contains
 
 
   subroutine OutputOut(U,V,W,Pr,Temperature,Moisture)
-    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-    real(knd),dimension(1:,1:,1:),intent(in) :: Pr
-    real(knd),intent(in) :: Temperature(-1:,-1:,-1:)
-    real(knd),intent(in) :: Moisture(-1:,-1:,-1:)
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
+    real(knd),dimension(1:,1:,1:),contiguous,intent(in) :: Pr
+    real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
+    real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
     character(70) :: str
     integer i,j,k,unit
     real(real32),allocatable :: tmp(:,:,:,:)
@@ -1405,7 +1405,7 @@ contains
 
 
   subroutine OutputScalars(Scalar)
-    real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: Scalar
+    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: Scalar
     character(70) :: str
     real(knd),dimension(:,:,:),allocatable :: depos
     character(8) ::  scalname
@@ -1516,11 +1516,11 @@ contains
 
 
   subroutine OutputAvg(U,V,W,U_r,V_r,W_r,Pr,Temperature,Moisture)
-    real(knd),allocatable,dimension(:,:,:),intent(in)    :: U,V,W
-    real(knd),allocatable,dimension(:,:,:),intent(inout) :: U_r,V_r,W_r
-    real(knd),allocatable,dimension(:,:,:),intent(in)    :: Pr
-    real(knd),allocatable,dimension(:,:,:),intent(in)    :: Temperature
-    real(knd),allocatable,dimension(:,:,:),intent(in)    :: Moisture
+    real(knd),dimension(:,:,:),contiguous,intent(in)    :: U,V,W
+    real(knd),dimension(:,:,:),contiguous,intent(inout) :: U_r,V_r,W_r
+    real(knd),dimension(:,:,:),contiguous,intent(in)    :: Pr
+    real(knd),dimension(:,:,:),contiguous,intent(in)    :: Temperature
+    real(knd),dimension(:,:,:),contiguous,intent(in)    :: Moisture
     character(70) :: str
     character(8) ::  scalname="scalar00"
     integer i,j,k,l,unit
@@ -1672,7 +1672,7 @@ contains
   end subroutine OutputAvg
 
   subroutine OutputScalarStats(S_avg,S_max,S_int)
-    real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: S_avg,S_max,S_int
+    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: S_avg,S_max,S_int
     character(70) :: str
     integer unit
     
@@ -1727,7 +1727,7 @@ contains
   contains
   
     subroutine aux(S,suff)
-      real(knd),dimension(-1:,-1:,-1:,:),intent(in) :: S
+      real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: S
       character(*),intent(in) :: suff
       integer :: l
       character(8) ::  scalname="scalar00"
@@ -1748,7 +1748,7 @@ contains
 
 
   subroutine OutputUVW(U,V,W,fnameU,fnameV,fnameW,avg_mode_arg)
-    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     character(*),intent(in) :: fnameU,fnameV,fnameW
     logical,optional,intent(in) :: avg_mode_arg
     character(70) :: str
@@ -2030,7 +2030,7 @@ contains
   end subroutine
 
   subroutine SaveScalarVTKFluxes(Avg,Adv,Turb,file_name,x,y,z)
-    real(knd),dimension(:,:,:,:),intent(in) :: Avg,Adv,Turb
+    real(knd),dimension(:,:,:,:),contiguous,intent(in) :: Avg,Adv,Turb
     character(*),intent(in) :: file_name
     real(knd),allocatable,intent(in) :: x(:),y(:),z(:)
     integer :: nx,ny,nz
@@ -2109,11 +2109,11 @@ contains
   end subroutine SaveScalarVTKFluxes
 
   subroutine Output(U,V,W,Pr,Temperature,Moisture,Scalar)
-    real(knd),dimension(-2:,-2:,-2:),intent(inout) :: U,V,W
-    real(knd),intent(inout) :: Pr(1:,1:,1:)
-    real(knd),intent(in) :: Temperature(-1:,-1:,-1:)
-    real(knd),intent(in) :: Moisture(-1:,-1:,-1:)
-    real(knd),intent(in) :: Scalar(-1:,-1:,-1:,:)
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U,V,W
+    real(knd),contiguous,intent(inout) :: Pr(1:,1:,1:)
+    real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
+    real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
+    real(knd),contiguous,intent(in) :: Scalar(-1:,-1:,-1:,:)
     integer i
 
     call BoundU(1,U,Uin)
@@ -2152,7 +2152,7 @@ contains
 
   pure real(knd) function ScalarVerticalFlux(i,j,k,Scal,W)
     integer, intent(in)   :: i,j,k
-    real(knd), intent(in) :: Scal(-1:,-1:,-1:), W(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in) :: Scal(-1:,-1:,-1:), W(-2:,-2:,-2:)
 
     ScalarVerticalFlux = Scal(i,j,k) * (W(i,j,k)+W(i,j,k-1))/2 + &
                        TDiff(i,j,k) * (Scal(i,j,k+1)-Scal(i,j,k-1)) / (zW(k+1)-zW(k-1))
@@ -2161,7 +2161,7 @@ contains
   pure function Vorticity(i,j,k,U,V,W)
     real(knd), dimension(3) :: Vorticity
     integer, intent(in)     :: i,j,k
-    real(knd),dimension(-2:,-2:,-2:), intent(in) :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
 
     Vorticity = [         (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
                               -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin), &
@@ -2244,10 +2244,10 @@ contains
 
 
   subroutine Frame(U,V,W,Pr,Temperature,Moisture,Scalar,n)
-    real(knd),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-    real(knd),intent(in) :: Temperature(-1:,-1:,-1:)
-    real(knd),intent(in) :: Moisture(-1:,-1:,-1:)
-    real(knd),intent(in) :: Scalar(-1:,-1:,-1:,:)
+    real(knd),contiguous,intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+    real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
+    real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
+    real(knd),contiguous,intent(in) :: Scalar(-1:,-1:,-1:,:)
     integer,intent(in)   :: n
     integer i,j,k,l,m
     character(40) :: fname
@@ -2544,7 +2544,7 @@ contains
 
 
   subroutine StressProfiles(U,V,W)
-    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     real(knd) :: S
     real(knd),allocatable,save ::fp(:),ht(:),gp(:)
     integer   :: i,j,k,l,n
@@ -2632,10 +2632,10 @@ contains
   
   
   subroutine ScalarFluxSGSProfiles(W,Temperature,Moisture,Scalar)
-    real(knd),dimension(-2:,-2:,-2:),intent(in) :: W
-    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
-    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Moisture
-    real(knd),dimension(-1:,-1:,-1:,1:),intent(in) :: Scalar
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Moisture
+    real(knd),dimension(-1:,-1:,-1:,1:),contiguous,intent(in) :: Scalar
     real(knd) :: S
     integer   :: i,j,k,l,n
 
@@ -2719,10 +2719,10 @@ contains
 
 
   subroutine BLProfiles(U,V,W,Temperature,Moisture,Scalar)
-    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
-    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Moisture
-    real(knd),dimension(-1:,-1:,-1:,1:),intent(in) :: Scalar
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Moisture
+    real(knd),dimension(-1:,-1:,-1:,1:),contiguous,intent(in) :: Scalar
     real(knd) :: S
     integer   :: i,j,k,l,n
 
@@ -2946,7 +2946,7 @@ contains
 
   function TotKE(U,V,W) result(res)
     real(knd) :: res
-    real(knd),dimension(-2:,-2:,-2:) :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     real(knd) Um,Vm,Wm
     integer i,j,k
     real(knd) lx,ly,lz
@@ -2975,7 +2975,7 @@ contains
 
   pure real(knd) function VorticityMag(i,j,k,U,V,W) result(res)
     integer,intent(in) :: i,j,k
-    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
 
     res = sum(Vorticity(i,j,k,U,V,W)**2)
     res = Sqrt(res)
@@ -2984,7 +2984,7 @@ contains
 
   pure real(knd) function Lambda2(i,j,k,U,V,W) result(res)
     integer,intent(in) :: i,j,k
-    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
 
     res = ((U(i,j,k)-U(i-1,j,k))/dxmin)**2
     res = res + ((V(i,j,k)-V(i,j-1,k))/dymin)**2
@@ -3002,7 +3002,7 @@ contains
 
 
   subroutine OutputU2(U,V,W)
-    real(knd),dimension(-2:,-2:,-2:) :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     integer unit
     character(70) :: str
 
@@ -3113,8 +3113,8 @@ contains
 
   subroutine OUTINLET(U,V,W,Temperature)
     !for output of 2d data for use as an inilet condition later
-    real(knd),dimension(-2:,-2:,-2:) :: U,V,W
-    real(knd),dimension(-1:,-1:,-1:) :: Temperature
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
     integer,save ::fnum
     integer,save :: called = 0
 
