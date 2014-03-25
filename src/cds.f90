@@ -17,7 +17,8 @@ module CDS
 
 
     subroutine CDUdiv(U2,U,V,W)
-    real(knd) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),contiguous,intent(out) :: U2(-2:,-2:,-2:)
+    real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer nx,ny,nz,i,j,k
     real(knd) Ax,Ay,Az,Utmp
     real(knd),allocatable,dimension(:),save:: fe,fp,gn,ht
@@ -80,7 +81,8 @@ module CDS
 
 
     subroutine CDVdiv(V2,U,V,W)
-    real(knd) :: V2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),contiguous,intent(out) :: V2(-2:,-2:,-2:)
+    real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer nx,ny,nz,i,j,k
     real(knd) Ax,Ay,Az,Vtmp
     real(knd),allocatable,dimension(:),save:: gn,gp,fe,ht
@@ -143,7 +145,8 @@ module CDS
 
 
     subroutine CDWdiv(W2,U,V,W)
-    real(knd) :: W2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),contiguous,intent(out) :: W2(-2:,-2:,-2:)
+    real(knd),contiguous,intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer nx,ny,nz,i,j,k
     real(knd) Ax,Ay,Az,Wtmp
     real(knd),allocatable,dimension(:),save:: ht,hp,fe,gn
@@ -211,7 +214,8 @@ module CDS
 
 
     subroutine CDUadv(U2,U,V,W)
-    real(knd) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),contiguous,intent(out) :: U2(-2:,-2:,-2:)
+    real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer i,j,k
     real(knd) Ax,Ay,Az,Vadv,Wadv
 
@@ -244,7 +248,8 @@ module CDS
 
 
     subroutine CDVadv(V2,U,V,W)
-    real(knd) :: V2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),contiguous,intent(out) :: V2(-2:,-2:,-2:)
+    real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer i,j,k
     real(knd) Ax,Ay,Az,Uadv,Wadv
 
@@ -277,7 +282,8 @@ module CDS
 
 
     subroutine CDWadv(W2,U,V,W)
-    real(knd) :: W2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),contiguous,intent(out) :: W2(-2:,-2:,-2:)
+    real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer i,j,k
     real(knd) Ax,Ay,Az,Uadv,Vadv
 
@@ -320,7 +326,8 @@ module CDS
 
 
     subroutine CDU(U2,U,V,W)
-    real(knd) :: U2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),contiguous,intent(out) :: U2(-2:,-2:,-2:)
+    real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
 
      U2 = 0
      call CDUdiv(U2,U,V,W)
@@ -334,7 +341,8 @@ module CDS
 
 
     subroutine CDV(V2,U,V,W)
-    real(knd) :: V2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),contiguous,intent(out) :: V2(-2:,-2:,-2:)
+    real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
 
      V2 = 0
      call CDVdiv(V2,U,V,W)
@@ -348,7 +356,8 @@ module CDS
 
 
     subroutine CDW(W2,U,V,W)
-    real(knd) :: W2(-2:,-2:,-2:),U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),contiguous,intent(out) :: W2(-2:,-2:,-2:)
+    real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
 
      W2 = 0
      call CDWdiv(W2,U,V,W)
@@ -373,8 +382,8 @@ module CDS
 
 
     subroutine CDS4U(U2,U,V,W)
-      real(knd),dimension(-2:,-2:,-2:),intent(out) :: U2
-      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: U2
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
       integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
       integer,parameter :: mask2(2) = [ 8, 8 ]
@@ -463,8 +472,8 @@ module CDS
 
 
     subroutine CDS4V(V2,U,V,W)
-      real(knd),dimension(-2:,-2:,-2:),intent(out) :: V2
-      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: V2
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
       integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
       integer,parameter :: mask2(2) = [ 8, 8 ]
@@ -554,8 +563,8 @@ module CDS
 
 
     subroutine CDS4W(W2,U,V,W)
-      real(knd),dimension(-2:,-2:,-2:),intent(out) :: W2
-      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: W2
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
       integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
       integer,parameter :: mask2(2) = [  8, 8 ]
@@ -659,8 +668,8 @@ module CDS
 
 
     subroutine CDS4_2U(U2,U,V,W)
-      real(knd),dimension(-2:,-2:,-2:),intent(out) :: U2
-      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: U2
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
       integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
       integer,parameter :: mask2(2) = [ 8, 8 ]
@@ -749,8 +758,8 @@ module CDS
 
 
     subroutine CDS4_2V(V2,U,V,W)
-      real(knd),dimension(-2:,-2:,-2:),intent(out) :: V2
-      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: V2
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
       integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
       integer,parameter :: mask2(2) = [ 8, 8 ]
@@ -840,8 +849,8 @@ module CDS
 
 
     subroutine CDS4_2W(W2,U,V,W)
-      real(knd),dimension(-2:,-2:,-2:),intent(out) :: W2
-      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: W2
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
       integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
       integer,parameter :: mask2(2) = [  8, 8 ]
@@ -942,8 +951,8 @@ module CDS
 
     subroutine CD4divU(U2,U,V,W)
       !Morinishi et al., JCP 143, http://dx.doi.org/10.1006/jcph.1998.5962
-      real(knd),dimension(-2:,-2:,-2:),intent(out) :: U2
-      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: U2
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
       integer,parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
       integer,parameter :: coef2ord = divcoef / 4
@@ -1106,8 +1115,8 @@ module CDS
 
     subroutine CD4divV(V2,U,V,W)
       !Morinishi et al., JCP 143, http://dx.doi.org/10.1006/jcph.1998.5962
-      real(knd),dimension(-2:,-2:,-2:),intent(out) :: V2
-      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: V2
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
       integer,parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
       integer,parameter :: coef2ord = divcoef / 4
@@ -1275,8 +1284,8 @@ module CDS
 
     subroutine CD4divW(W2,U,V,W)
       !Morinishi et al., JCP 143, http://dx.doi.org/10.1006/jcph.1998.5962
-      real(knd),dimension(-2:,-2:,-2:),intent(out) :: W2
-      real(knd),dimension(-2:,-2:,-2:),intent(in)  :: U,V,W
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: W2
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
       integer,parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
       integer,parameter :: divcoef = 256
       integer,parameter :: coef2ord = divcoef / 4
