@@ -207,9 +207,9 @@ contains
    !$omp end  parallel
 
 
-   call multiply(Uin(1:Prny,1:Prnz),p)
-   call multiply(Vin(1:Prny,1:Prnz),p)
-   call multiply(Win(1:Prny,1:Prnz),p)
+   call multiply(Uin,p)
+   call multiply(Vin,p)
+   call multiply(Win,p)
 
 
    call BoundUin(1,Uin)
