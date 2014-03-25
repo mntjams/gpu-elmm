@@ -49,9 +49,6 @@ correctcompatibility = 2
 
     if (debugparam>1.and.called>1) call system_clock(count=time1)
 
-    write (*,*) "Preparing pressure correction"
-
-
     dt2 = coef*dt
     if (Re>0)  then
       dt3 = coef*dt / (2._TIM*Re)
@@ -377,8 +374,10 @@ correctcompatibility = 2
     integer i
     logical, save :: called = .false.
     integer bounds(6)
+#ifdef POIS_SOLVER_TIME
     integer(DBL), save :: trate
     integer(DBL)       :: t1, t2
+#endif
 
     do i=1,6
       if (Btype(i)==PERIODIC) then
@@ -391,15 +390,21 @@ correctcompatibility = 2
     if (.not.called) then
       call New(Solver,Prnx,Prny,Prnz,dxmin,dymin,dzmin,bounds)
       called = .true.
+#ifdef POIS_SOLVER_TIME
       call system_clock(count_rate=trate)
+#endif
     end if
 
+#ifdef POIS_SOLVER_TIME
     call system_clock(count=t1)
+#endif
 
     call Execute(Solver,Phi,RHS)
 
+#ifdef POIS_SOLVER_TIME
     call system_clock(count=t2)
     write(*,*) "solver cpu time", real(t2-t1)/real(trate)
+#endif
 
   end subroutine POISS_POISFFT
 
