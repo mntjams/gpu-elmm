@@ -84,7 +84,7 @@ contains
 
  subroutine TMarchRK3(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
   use RK3
-  real(knd),allocatable,intent(inout) :: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)  !allocatable to anable move_alloc
+  real(knd),allocatable,intent(inout) :: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)
   real(knd),allocatable,intent(inout) :: Temperature(:,:,:),Moisture(:,:,:),Scalar(:,:,:,:)
   real(knd),intent(out) :: delta
 
@@ -97,13 +97,14 @@ contains
   if (called==0) then
    called = 1
 
-   allocate(U2(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)))
-   allocate(V2(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)))
-   allocate(W2(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)))
+   !just to allocate it and make it defined in all points
+   U2 = U
+   V2 = V
+   W2 = W
 
-   allocate(Ustar(lbound(U,1):ubound(U,1),lbound(U,2):ubound(U,2),lbound(U,3):ubound(U,3)))
-   allocate(Vstar(lbound(V,1):ubound(V,1),lbound(V,2):ubound(V,2),lbound(V,3):ubound(V,3)))
-   allocate(Wstar(lbound(W,1):ubound(W,1),lbound(W,2):ubound(W,2),lbound(W,3):ubound(W,3)))
+   Ustar = U
+   Vstar = V
+   Wstar = W
 
 
    !$omp parallel sections
@@ -388,105 +389,112 @@ end subroutine TMarchRK3
                      Pr,U2,V2,W2, &
                      dt,coef)
 
-if (explicit_diffusion<=0) then
-   Re_gt_0: if (Re>0) then
+    if (explicit_diffusion<=0) then
 
-     !Diffusion using Crank Nicolson
-     !first approximation using forward Euler
-     !iteration SOR or Gauss-Seidel
+       !semi-implicit diffusion
 
+       Re_gt_0: if (Re>0) then
 
-!      !$hmpp <tsteps> advancedload, args[ForwEul::Visc]
-
-     !$hmpp <tsteps> ForwEul callsite, args[*].noupdate = true
-     call ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
-                  dxPr,dyPr,dzPr,dxU,dyV,dzW, &
-                  U,V,W,U2,V2,W2,U3,V3,W3,Viscosity, &
-                  dt,coef)
+         !Diffusion using Crank Nicolson
+         !first approximation using forward Euler
+         !iteration SOR or Gauss-Seidel
 
 
-     !$omp parallel sections
-     !$omp section
-     call BoundU(1,U3,Uin)
-     !$omp section
-     call BoundU(2,V3,Vin)
-     !$omp section
-     call BoundU(3,W3,Win)
-     !$omp end parallel sections
-     call IBMomentum(U3,V3,W3)
+    !      !$hmpp <tsteps> advancedload, args[ForwEul::Visc]
 
-     !Performs the diffusion terms
+         !$hmpp <tsteps> ForwEul callsite, args[*].noupdate = true
+         call ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
+                      dxPr,dyPr,dzPr,dxU,dyV,dzW, &
+                      U,V,W,U2,V2,W2,U3,V3,W3,Viscosity, &
+                      dt,coef)
+
+
+         !$omp parallel sections
+         !$omp section
+         call BoundU(1,U3,Uin)
+         !$omp section
+         call BoundU(2,V3,Vin)
+         !$omp section
+         call BoundU(3,W3,Win)
+         !$omp end parallel sections
+         call IBMomentum(U3,V3,W3)
+
+         !Performs the diffusion terms
 #ifdef __HMPP
-!       !$hmpp <tsteps>  advancedload, args[UnifRedBlack::maxCNiter,UnifRedBlack::epsCN]
+    !       !$hmpp <tsteps>  advancedload, args[UnifRedBlack::maxCNiter,UnifRedBlack::epsCN]
 
-      !$hmpp <tsteps> UNIFREDBLACK callsite, args[*].noupdate=true
-      call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz, &
-                            Btype,sideU, &
-                            dt,dxmin,dymin,dzmin, &
-                            Uin,Vin,Win, &
-                            U,V,W,U2,V2,W2,U3,V3,W3,Visc, &
-                            coef,maxCNiter,epsCN,it,S)
+          !$hmpp <tsteps> UNIFREDBLACK callsite, args[*].noupdate=true
+          call UNIFREDBLACK_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz, &
+                                Btype,sideU, &
+                                dt,dxmin,dymin,dzmin, &
+                                Uin,Vin,Win, &
+                                U,V,W,U2,V2,W2,U3,V3,W3,Visc, &
+                                coef,maxCNiter,epsCN,it,S)
 
-     !$hmpp <tsteps> delegatedstore, args[UnifRedBlack::iters,UnifRedBlack::residuum]
+         !$hmpp <tsteps> delegatedstore, args[UnifRedBlack::iters,UnifRedBlack::residuum]
 
-      write(*,*) "back from GPU CN", it,S
+          write(*,*) "back from GPU CN", it,S
 
 #else
-     if (gridtype==UNIFORMGRID) then
-      call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
-     else
-      stop
-     end if
-     call exchange_alloc(U2,U3)
-     call exchange_alloc(V2,V3)
-     call exchange_alloc(W2,W3)
+         if (gridtype==UNIFORMGRID) then
+          call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
+         else
+          stop
+         end if
+         call exchange_alloc(U2,U3)
+         call exchange_alloc(V2,V3)
+         call exchange_alloc(W2,W3)
 #endif
 
-   else  Re_gt_0  !Re<=0
+       else  Re_gt_0  !Re<=0
 
-    U2 = U+U2
-    V2 = V+V2
-    W2 = W+W2
+        U2 = U+U2
+        V2 = V+V2
+        W2 = W+W2
 
-   end if   Re_gt_0
+       end if   Re_gt_0
 
-   !$omp parallel sections
-   !$omp section
-   call BoundU(1,U2,Uin)
-   !$omp section
-   call BoundU(2,V2,Vin)
-   !$omp section
-   call BoundU(3,W2,Win)
-   !$omp end parallel sections
-   call IBMomentum(U2,V2,W2)
+       !$omp parallel sections
+       !$omp section
+       call BoundU(1,U2,Uin)
+       !$omp section
+       call BoundU(2,V2,Vin)
+       !$omp section
+       call BoundU(3,W2,Win)
+       !$omp end parallel sections
+       call IBMomentum(U2,V2,W2)
 
-   if (debuglevel>=2) then  !Compute and output the mean friction in the domain.
-    S = 0
-    do k=1,Unz
-     do j=1,Uny
-      do i=1,Unx
-       S = S-((Viscosity(i+1,j,k) * (U(i+1,j,k)-U(i,j,k))/dxPr(i+1) - &
-       Viscosity(i,j,k) * (U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i) + &
-         (0.25_knd * (Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))* &
-               (U(i,j+1,k)-U(i,j,k))/dyV(j) - &
-         0.25_knd * (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k))* &
-               (U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j) + &
-          (0.25_knd * (Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))* &
-               (U(i,j,k+1)-U(i,j,k))/dzW(k) - &
-         0.25_knd * (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))* &
-               (U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))
-      end do
-     end do
-    end do
+       if (debuglevel>=2) then  !Compute and output the mean friction in the domain.
+        S = 0
+        do k=1,Unz
+         do j=1,Uny
+          do i=1,Unx
+           S = S-((Viscosity(i+1,j,k) * (U(i+1,j,k)-U(i,j,k))/dxPr(i+1) - &
+           Viscosity(i,j,k) * (U(i,j,k)-U(i-1,j,k))/dxPr(i))/dxU(i) + &
+             (0.25_knd * (Viscosity(i+1,j+1,k)+Viscosity(i+1,j,k)+Viscosity(i,j+1,k)+Viscosity(i,j,k))* &
+                   (U(i,j+1,k)-U(i,j,k))/dyV(j) - &
+             0.25_knd * (Viscosity(i+1,j,k)+Viscosity(i+1,j-1,k)+Viscosity(i,j,k)+Viscosity(i,j-1,k))* &
+                   (U(i,j,k)-U(i,j-1,k))/dyV(j-1))/dyPr(j) + &
+              (0.25_knd * (Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))* &
+                   (U(i,j,k+1)-U(i,j,k))/dzW(k) - &
+             0.25_knd * (Viscosity(i+1,j,k)+Viscosity(i+1,j,k-1)+Viscosity(i,j,k)+Viscosity(i,j,k-1))* &
+                   (U(i,j,k)-U(i,j,k-1))/dzW(k-1))/dzPr(k))
+          end do
+         end do
+        end do
 
-    S = S/(Unx*Uny*Unz)
-    write(*,*) "Mean friction:", S
-   end if
-else
-    U2 = U+U2
-    V2 = V+V2
-    W2 = W+W2
-end if
+        S = S/(Unx*Uny*Unz)
+        write(*,*) "Mean friction:", S
+       end if
+
+    else !explicit diffusion
+
+        call add(U2, U)
+        call add(V2, V)
+        call add(W2, W)
+
+    end if
+
   end subroutine OtherTerms
 
 
