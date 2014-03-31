@@ -5,7 +5,7 @@ module Endianness
   implicit none
 
   private
-  public :: GetEndianness, BigEnd, SwapB
+  public :: GetEndianness, BigEnd, SwapB, littleendian
 
   logical, save :: littleendian = .true.
 
