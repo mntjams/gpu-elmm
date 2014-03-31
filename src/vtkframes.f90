@@ -1,0 +1,673 @@
+module VTKFrames
+  use iso_c_binding, only: c_ptr
+  use Kinds
+  use Parameters
+  use Pthreads
+  use Endianness
+  use Frames_common
+  
+  implicit none
+  
+  private
+  
+  public TFrameFlags, AddDomain, SaveVTKFrames, FinalizeVTKFrames, TFrameDomain
+
+  
+  type TFrameFlags
+    integer :: U = 1
+    integer :: vorticity = 0
+    integer :: Pr = 0
+    integer :: lambda2 = 0
+    integer :: scalars = 1
+    integer :: sumscalars = 0
+    integer :: temperature = 1
+    integer :: moisture = 1
+    integer :: temperature_flux = 0
+    integer :: moisture_flux = 0
+    integer :: scalar_flux = 0
+  end type
+  
+  type, extends(TFrameBase) :: TFrameDomain
+    integer   :: dimension,direction
+    real(knd) :: position
+    
+    type(TFrameFlags) :: flags
+    
+    !big endian copies of coordinates
+    real(knd),allocatable,dimension(:) :: xPr_be, yPr_be, zPr_be
+    
+    real(knd), allocatable :: Pr(:,:,:)
+    real(knd), allocatable :: U(:,:,:,:)
+    real(knd), allocatable :: Temperature(:,:,:), Moisture(:,:,:), Scalar(:,:,:,:)
+    real(knd), allocatable :: TemperatureFl(:,:,:), MoistureFl(:,:,:), ScalarFl(:,:,:,:)
+    real(knd), allocatable :: Lambda2(:,:,:), Vorticity(:,:,:,:)
+    
+    character(4)  :: suffix = ".vtk"
+  contains
+    procedure :: Fill => TFrameDomain_Fill
+    procedure :: Save => TFrameDomain_Save
+    procedure :: SetRest => TFrameDomain_SetRest
+  end type TFrameDomain
+  
+  interface TFrameDomain
+    module procedure TFrameDomain_Init
+  end interface
+  
+  interface AddDomain
+    module procedure AddFrameDomain
+  end interface
+  
+  type(TFrameDomain), allocatable :: FrameDomains(:)
+  
+  character, parameter :: lf = achar(10)
+
+  integer :: frame_unit = 1999000
+  
+contains
+
+
+  subroutine add_element_fd(a,e)
+    type(TFrameDomain),allocatable,intent(inout) :: a(:)
+    type(TFrameDomain),intent(in) :: e
+    type(TFrameDomain),allocatable :: tmp(:)
+
+    if (.not.allocated(a)) then
+      a = [e]
+    else
+      call move_alloc(a,tmp)
+      allocate(a(size(tmp)+1))
+      a(1:size(tmp)) = tmp
+      a(size(tmp)+1) = e
+    end if
+  end subroutine
+    
+  subroutine AddFrameDomain(D)
+    type(TFrameDomain),intent(in) :: D
+
+    call add_element_fd(FrameDomains, D)
+
+  end subroutine
+
+  subroutine TFrameDomain_SetRest(D, num_of_scalars)
+    use Boundaries, only: GridCoords
+    class(TFrameDomain),intent(inout) :: D
+    integer, intent(in) :: num_of_scalars
+    integer :: mini,maxi,minj,maxj,mink,maxk
+
+    if (D%dimension==3) then
+
+      D%minPri = 1
+      D%maxPri = Prnx
+      D%minPrj = 1
+      D%maxPrj = Prny
+      D%minPrk = 1
+      D%maxPrk = Prnz
+
+    else
+
+      if (D%direction==1) then
+
+        call GridCoords(D%minPri, D%minPrj, D%minPrk, D%position, &
+                        (yV(Prny+1)+yV(0))/2._knd, (zW(Prnz+1)+zW(0))/2._knd )
+
+        D%maxPri = D%minPri
+        D%minPrj = 1
+        D%maxPrj = Prny
+        D%minPrk = 1
+        D%maxPrk = Prnz
+
+      elseif (D%direction==2) then
+
+        call GridCoords(D%minPri, D%minPrj, D%minPrk, (xU(Prnx+1)+xU(0))/2._knd, &
+                        D%position, (zW(Prnz+1)+zW(0))/2._knd )
+
+        D%maxPrj = D%minPrj
+        D%minPri = 1
+        D%maxPri = Prnx
+        D%minPrk = 1
+        D%maxPrk = Prnz
+
+      else
+
+        call GridCoords(D%minPri, D%minPrj, D%minPrk, (xU(Prnx+1)+xU(0))/2._knd, &
+                        (yV(Prny+1)+yV(0))/2._knd, D%position )
+
+        D%maxPrk = D%minPrk
+        D%minPri = 1
+        D%maxPri = Prnx
+        D%minPrj = 1
+        D%maxPrj = Prny
+
+      end if
+
+    end if
+    
+    D%sizePr = max( (D%maxPri - D%minPri + 1) * (D%maxPrj - D%minPrj + 1) * (D%maxPrk - D%minPrk + 1) , 0 )
+    
+    mini = D%minPri
+    minj = D%minPrj
+    mink = D%minPrk
+    maxi = D%maxPri
+    maxj = D%maxPrj
+    maxk = D%maxPrk
+
+    D%xPr = xPr(mini:maxi)
+    D%yPr = yPr(minj:maxj)
+    D%zPr = zPr(mink:maxk)
+    
+    D%xPr_be = BigEnd(D%xPr)
+    D%yPr_be = BigEnd(D%yPr)
+    D%zPr_be = BigEnd(D%zPr)
+    
+    if (D%flags%Pr==1) then
+      allocate(D%Pr(mini:maxi,minj:maxj,mink:maxk))
+    end if
+
+    if (D%flags%lambda2==1) then
+      allocate(D%lambda2(mini:maxi,minj:maxj,mink:maxk))
+    end if
+
+    if (D%flags%scalars==1) then
+      allocate(D%Scalar(mini:maxi,minj:maxj,mink:maxk,num_of_scalars))
+    elseif (D%flags%sumscalars==1.and.num_of_scalars>0) then
+      allocate(D%Scalar(mini:maxi,minj:maxj,mink:maxk,1))
+    end if
+
+    if (enable_buoyancy.and.D%flags%temperature==1) then
+      allocate(D%Temperature(mini:maxi,minj:maxj,mink:maxk))
+    end if
+
+    if (enable_moisture.and.D%flags%moisture==1) then
+      allocate(D%Moisture(mini:maxi,minj:maxj,mink:maxk))
+    end if
+
+    if (enable_buoyancy.and.D%flags%temperature_flux==1) then
+      allocate(D%TemperatureFl(mini:maxi,minj:maxj,mink:maxk))
+    end if
+
+    if (enable_moisture.and.D%flags%moisture_flux==1) then
+      allocate(D%MoistureFl(mini:maxi,minj:maxj,mink:maxk))
+    end if
+
+    if (D%flags%scalar_flux==1) then
+      if (D%flags%scalars==1) then
+        allocate(D%ScalarFl(mini:maxi,minj:maxj,mink:maxk,num_of_scalars))
+      elseif (D%flags%sumscalars==1.and.num_of_scalars>0) then
+        allocate(D%ScalarFl(mini:maxi,minj:maxj,mink:maxk,1))
+      end if
+    end if
+
+    if (D%flags%U==1) then
+      allocate(D%U(3,mini:maxi,minj:maxj,mink:maxk))
+    end if
+
+    if (D%flags%vorticity==1) then
+      allocate(D%vorticity(3,mini:maxi,minj:maxj,mink:maxk))
+    end if
+    
+    D%ranges_set = .true.
+  end subroutine TFrameDomain_SetRest
+  
+  
+  
+  
+  
+  
+  
+  
+  subroutine SaveVTKFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    real(knd),intent(in) :: time
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
+    real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), &
+                                       Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
+                                       Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
+    integer :: i
+    
+    if (allocated(FrameDomains)) then
+      do i=1,size(FrameDomains)
+        call FrameDomains(i)%Save(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+      end do
+    end if
+  end subroutine
+
+  subroutine FinalizeVTKFrames
+    integer :: i
+    if (allocated(FrameDomains)) then
+      do i=1,size(FrameDomains)
+        call FrameDomains(i)%Finalize
+      end do
+      deallocate(FrameDomains)
+    end if
+  end subroutine  
+  
+  
+  
+  
+  
+  
+  
+  function TFrameDomain_Init(label,dimension,direction,position,time_params,frame_flags) result(D)
+    type(TFrameDomain) :: D
+    character(*) :: label
+    integer,intent(in) :: dimension,direction
+    real(knd),intent(in) :: position
+    type(TFrameTimes),intent(in) :: time_params
+    type(TFrameFlags),intent(in) :: frame_flags
+
+    D%base_name = "output/frame-"//label
+
+    D%frame_times = time_params
+
+    D%flags = frame_flags
+
+    D%unit = frame_unit + 1
+    frame_unit = D%unit
+
+    D%dimension = dimension
+    D%direction = direction
+    D%position = position
+
+  end function
+  
+  
+  
+  
+
+  subroutine TFrameDomain_Fill(D, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    use Output_helpers, only: Lambda2, ScalarVerticalFlux
+    !Fill the output buffers for asynchronous output
+    class(TFrameDomain),intent(inout) :: D
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
+    real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), Viscosity(-1:,-1:,-1:), &
+                                       Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), &
+                                       Scalar(-1:,-1:,-1:,1:)
+    integer :: i,j,k,l,m
+    integer :: mini,maxi,minj,maxj,mink,maxk
+    
+    if (.not.D%ranges_set) call D%SetRest(num_of_scalars = size(Scalar,4))
+
+    mini = D%minPri
+    minj = D%minPrj
+    mink = D%minPrk
+    maxi = D%maxPri
+    maxj = D%maxPrj
+    maxk = D%maxPrk
+
+    if (D%flags%Pr==1) then
+      D%Pr = real(Pr(mini:maxi,minj:maxj,mink:maxk), real32)
+    end if
+
+    if (D%flags%lambda2==1) then
+      do k = mink,maxk
+       do j = minj,maxj
+        do i = mini,maxi
+          if (Prtype(i,j,k)<=0) then
+            D%lambda2(i,j,k) = real(Lambda2(i,j,k,U,V,W), real32)
+          else
+            D%lambda2(i,j,k) = 0
+          end if
+        end do
+       end do
+      end do
+
+    end if
+
+    if (D%flags%scalars==1) then
+      do l = 1,num_of_scalars
+       do k = mink,maxk
+        do j = minj,maxj
+         do i = mini,maxi
+           if (Prtype(i,j,k)<=0) then
+             D%Scalar(i,j,k,l) = real(Scalar(i,j,k,l), real32)
+           else
+             D%Scalar(i,j,k,l) = 0
+           end if
+         end do
+        end do
+       end do
+      end do
+    elseif (D%flags%sumscalars==1.and.num_of_scalars>0) then
+      do k = mink,maxk
+       do j = minj,maxj
+        do i = mini,maxi
+          if (Prtype(i,j,k)<=0) then
+            D%Scalar(i,j,k,1) = real(sum(Scalar(i,j,k,:)), real32)
+          else
+            D%Scalar(i,j,k,1) = 0
+          end if
+        end do
+       end do
+      end do
+    end if
+
+    if (enable_buoyancy.and.D%flags%temperature==1) then
+      do k = mink,maxk
+       do j = minj,maxj
+        do i = mini,maxi
+          if (Prtype(i,j,k)<=0) then
+            D%Temperature(i,j,k) = real(Temperature(i,j,k), real32)
+          else
+            D%Temperature(i,j,k) = real(temperature_ref, real32)
+          end if
+        end do
+       end do
+      end do
+    end if
+
+    if (enable_moisture.and.D%flags%moisture==1) then
+      do k = mink,maxk
+       do j = minj,maxj
+        do i = mini,maxi
+          if (Prtype(i,j,k)<=0) then
+            D%Moisture(i,j,k) = real(Moisture(i,j,k), real32)
+          else
+            D%Moisture(i,j,k) = real(moisture_ref, real32)
+          end if
+        end do
+       end do
+      end do
+    end if
+
+    if (enable_buoyancy.and.D%flags%temperature_flux==1) then
+      do k = mink,maxk
+       do j = minj,maxj
+        do i = mini,maxi
+          if (Prtype(i,j,k)<=0) then
+            D%TemperatureFl(i,j,k) = real(ScalarVerticalFlux(i,j,k,Temperature,W), real32)
+          else
+            D%TemperatureFl(i,j,k) = 0
+          end if
+        end do
+       end do
+      end do
+    end if
+
+    if (enable_moisture.and.D%flags%moisture_flux==1) then
+      do k = mink,maxk
+       do j = minj,maxj
+        do i = mini,maxi
+          if (Prtype(i,j,k)<=0) then
+            D%MoistureFl(i,j,k) = real(ScalarVerticalFlux(i,j,k,Moisture,W), real32)
+          else
+            D%MoistureFl(i,j,k) = 0
+          end if
+        end do
+       end do
+      end do
+    end if
+
+    if (D%flags%scalar_flux==1) then
+      if (D%flags%scalars==1) then
+        do l = 1,num_of_scalars
+          do k = mink,maxk
+           do j = minj,maxj
+            do i = mini,maxi
+              if (Prtype(i,j,k)<=0) then
+                D%ScalarFl(i,j,k,l) = real( ScalarVerticalFlux(i,j,k,Scalar(:,:,:,l),W) , real32)
+              else
+                D%ScalarFl(i,j,k,l) = 0
+              end if
+            end do
+           end do
+          end do
+        end do
+      elseif (D%flags%sumscalars==1.and.num_of_scalars>0) then
+        do k = mink,maxk
+         do j = minj,maxj
+          do i = mini,maxi
+            if (Prtype(i,j,k)<=0) then
+              D%ScalarFl(i,j,k,1) = real(ScalarVerticalFlux(i,j,k,sum(Scalar,4),W) , real32)
+            else
+              D%ScalarFl(i,j,k,1) = 0
+            end if
+          end do
+         end do
+        end do
+      end if
+    end if
+
+    if (D%flags%U==1) then
+      do k = mink,maxk
+       do j = minj,maxj
+        do i = mini,maxi
+          if (Prtype(i,j,k)<=0) then
+            D%U(1,i,j,k) = real( (U(i,j,k)+U(i-1,j,k))/2, real32)
+            D%U(2,i,j,k) = real( (V(i,j,k)+V(i,j-1,k))/2, real32)
+            D%U(3,i,j,k) = real( (W(i,j,k)+W(i,j,k-1))/2, real32)
+          else
+            D%U(:,i,j,k) = 0
+          end if
+        end do
+       end do
+      end do
+    end if
+
+    if (D%flags%vorticity==1) then
+      do k = mink,maxk
+       do j = minj,maxj
+        do i = mini,maxi
+          if (Prtype(i,j,k)<=0) then
+            D%vorticity(:,i,j,k) = real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin) &
+                                     - (V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin), real32)
+            D%vorticity(:,i,j,k) = real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin) &
+                                     - (W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin), real32)
+            D%vorticity(:,i,j,k) = real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin) &
+                                     - (U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin), real32)
+          else
+            D%vorticity(:,i,j,k) = 0
+          end if
+        end do
+       end do
+      end do
+    end if
+  end subroutine TFrameDomain_Fill
+  
+  
+  
+  subroutine SaveBuffers(Dptr) bind(C)
+    use iso_c_binding, only: c_f_pointer
+    type(c_ptr),value :: Dptr
+    type(TFrameDomain),pointer :: D
+    character(40) :: file_name
+    character(70) :: str
+    character(8) ::  scalname="scalar00"
+    integer :: mini, maxi, minj, maxj, mink, maxk
+    integer :: unit
+    integer :: sc
+
+    call c_f_pointer(Dptr, D)
+
+    write(file_name,'(a,i0,a)') trim(D%base_name)//"-",D%frame_number,trim(D%suffix)
+
+    write(*,*) "Saving VTK frame:",file_name,"   time:",time
+
+
+    if (littleendian) then
+      if (allocated(D%Pr))            D%Pr = SwapB(D%Pr)
+      if (allocated(D%U))             D%U = SwapB(D%U)
+      if (allocated(D%Temperature))   D%Temperature = SwapB(D%Temperature)
+      if (allocated(D%Moisture))      D%Moisture = SwapB(D%Moisture)
+      if (allocated(D%Scalar))        D%Scalar = SwapB(D%Scalar)
+      if (allocated(D%TemperatureFl)) D%TemperatureFl = SwapB(D%TemperatureFl)
+      if (allocated(D%MoistureFl))    D%MoistureFl = SwapB(D%MoistureFl)
+      if (allocated(D%ScalarFl))      D%ScalarFl = SwapB(D%ScalarFl)
+      if (allocated(D%Lambda2))       D%Lambda2 = SwapB(D%Lambda2)
+      if (allocated(D%Vorticity))     D%Vorticity = SwapB(D%Vorticity)
+    end if
+
+    mini = D%minPri
+    minj = D%minPrj
+    mink = D%minPrk
+    maxi = D%maxPri
+    maxj = D%maxPrj
+    maxk = D%maxPrk
+
+    open(D%unit,file = file_name, &
+      access='stream',status='replace',form="unformatted",action="write")
+
+    write(D%unit) "# vtk DataFile Version 2.0", lf
+    write(D%unit) "CLMM output file", lf
+    write(D%unit) "BINARY", lf
+    write(D%unit) "DATASET RECTILINEAR_GRID", lf
+    str="DIMENSIONS"
+    write(str(12:),*) maxi-mini+1,maxj-minj+1,maxk-mink+1
+    write(D%unit) str, lf
+    str="X_COORDINATES"
+    write(str(15:),'(i5,2x,a)') maxi-mini+1,"float"
+    write(D%unit) str, lf
+    write(D%unit) D%xPr_be, lf
+    str="Y_COORDINATES"
+    write(str(15:),'(i5,2x,a)') maxj-minj+1,"float"
+    write(D%unit) str, lf
+    write(D%unit) D%yPr_be, lf
+    str="Z_COORDINATES"
+    write(str(15:),'(i5,2x,a)') maxk-mink+1,"float"
+    write(D%unit) str, lf
+    write(D%unit) D%zPr_be, lf
+    str="POINT_DATA"
+    write(str(12:),*) D%sizePr
+    write(D%unit) str, lf
+
+    if (D%flags%Pr==1) then
+      write(D%unit) "SCALARS p float", lf
+      write(D%unit) "LOOKUP_TABLE default", lf
+      write(D%unit) D%Pr, lf
+    end if
+
+    if (D%flags%lambda2==1) then
+      write(D%unit) "SCALARS lambda2 float", lf
+      write(D%unit) "LOOKUP_TABLE default", lf
+      write(D%unit) D%lambda2, lf
+    end if
+
+    if (D%flags%scalars==1) then
+      scalname(1:6)="scalar"
+      do sc = 1,num_of_scalars
+       write(scalname(7:8),"(I2.2)") sc
+       write(D%unit) "SCALARS ", scalname , " float", lf
+       write(D%unit) "LOOKUP_TABLE default", lf
+       write(D%unit) D%Scalar(:,:,:,sc), lf
+      end do
+    elseif (D%flags%sumscalars==1.and.num_of_scalars==1) then
+      write(D%unit) "SCALARS ", "scalar" , " float", lf
+      write(D%unit) "LOOKUP_TABLE default", lf
+      write(D%unit) D%Scalar(:,:,:,1), lf
+    end if
+
+    if (enable_buoyancy.and.D%flags%temperature==1) then
+      write(D%unit) "SCALARS temperature float", lf
+      write(D%unit) "LOOKUP_TABLE default", lf
+      write(D%unit) D%Temperature, lf
+    end if
+
+    if (enable_moisture.and.D%flags%moisture==1) then
+      write(D%unit) "SCALARS moisture float", lf
+      write(D%unit) "LOOKUP_TABLE default", lf
+      write(D%unit) D%Moisture, lf
+    end if
+
+    if (enable_buoyancy.and.D%flags%temperature_flux==1) then
+      write(D%unit) "SCALARS temperature_flux float", lf
+      write(D%unit) "LOOKUP_TABLE default", lf
+      write(D%unit) D%TemperatureFl, lf
+    end if
+
+    if (enable_buoyancy.and.D%flags%moisture_flux==1) then
+      write(D%unit) "SCALARS moisture_flux float", lf
+      write(D%unit) "LOOKUP_TABLE default", lf
+      write(D%unit) D%MoistureFl, lf
+    end if
+
+    if (D%flags%scalar_flux==1) then
+      if (D%flags%scalars==1) then
+        scalname(1:6)="scalar_flux"
+        do sc = 1,num_of_scalars
+          write(scalname(7:8),"(I2.2)") sc
+          write(D%unit) "SCALARS ", scalname , " float", lf
+          write(D%unit) "LOOKUP_TABLE default", lf
+          write(D%unit) D%ScalarFl(:,:,:,sc), lf
+        end do
+      elseif (D%flags%sumscalars==1.and.num_of_scalars>0) then
+        write(D%unit) "SCALARS scalar_flux float", lf
+        write(D%unit) "LOOKUP_TABLE default", lf
+        write(D%unit) D%ScalarFl(:,:,:,1), lf
+      end if
+    end if
+
+    if (D%flags%U==1) then
+      write(D%unit) "VECTORS u float", lf
+      write(D%unit) D%U
+      write(D%unit) lf
+    end if
+
+    if (D%flags%vorticity==1) then
+      write(D%unit) "VECTORS vorticity float", lf
+      write(D%unit) D%vorticity, lf
+    end if
+    close(D%unit)
+
+  end subroutine SaveBuffers
+  
+
+  subroutine TFrameDomain_Save(D, time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    use iso_c_binding, only: c_loc, c_funloc
+    class(TFrameDomain),target,asynchronous,intent(inout) :: D
+    real(knd),intent(in) :: time
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),intent(in) :: Pr(1:,1:,1:), &
+                            Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
+                            Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
+    integer err
+
+    associate(start   => D%frame_times%start,&
+              end     => D%frame_times%end,&
+              nframes => D%frame_times%nframes)
+
+      if ( (time >= start) .and. (time <= end + (end-start)/(nframes-1)) &
+        .and. (time >= start + (D%frame_number+1)*(end-start) / (nframes-1)) ) then
+
+        D%frame_number = D%frame_number + 1
+
+        if (.not.allocated(D%times)) allocate(D%times(D%frame_number:D%frame_number+100))
+
+        call Add(D%times,D%frame_number,time)
+
+        if (D%in_progress) call D%Wait
+
+        call D%Fill(U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+
+        select type (Dnp => D)
+          type is (TFrameDomain)
+            call pthread_create_opaque(Dnp%threadptr, &
+                                       c_funloc(SaveBuffers), &
+                                       c_loc(Dnp), err)
+        end select
+
+        if (err==0) then
+          D%in_progress = .true.
+        else
+          write (*,*) "Error in creating frame thread. Will run again synchronously. Code:",err
+          select type (Dnp => D)
+            type is (TFrameDomain)
+              call SaveBuffers(c_loc(Dnp))
+          end select
+        end if
+
+      end if
+
+    end associate
+  end subroutine TFrameDomain_Save
+
+
+  
+  subroutine TFrameDomain_Finalize(D)
+    class(TFrameDomain),intent(inout) :: D
+
+    if (D%in_progress) call D%Wait
+
+    call D%SaveTimes
+
+  end subroutine
+
+    
+end module VTKFrames
