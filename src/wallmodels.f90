@@ -1462,7 +1462,7 @@ contains
     real(knd),intent(in) :: Temperature(-1:,-1:,-1:)
     integer i
 
-    if (enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET) then
+    if (enable_buoyancy.and.TempBtype(Bo)==DIRICHLET) then
       do i = 1,size(WMPoints)
         if (WMPoints(i)%zk==1) WMPoints(i)%temperature_flux = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&
                        (temperature(WMPoints(i)%xi,WMPoints(i)%yj,1) - temperature(WMPoints(i)%xi,WMPoints(i)%yj,0))
@@ -1554,7 +1554,7 @@ contains
 
       if (WMPoints(i)%z0>0) then
 
-         if (enable_buoyancy==1 .and. WMPoints(i)%temperature>0) then
+         if (enable_buoyancy .and. WMPoints(i)%temperature>0) then
 
            tdif = WMPoints(i)%temperature - Temperature(xi,yj,zk)
 
@@ -1562,7 +1562,7 @@ contains
                                 WMPoints(i)%temperature_flux, &
                                 WMPoints(i)%z0, tdif, dist, vel)
 
-         else if (enable_buoyancy==1 .and. WMPoints(i)%temperature_flux>0) then
+         else if (enable_buoyancy .and. WMPoints(i)%temperature_flux>0) then
 
            call WM_MO_FLUX(visc, WMPoints(i)%ustar, WMPoints(i)%temperature_flux, &
                            WMPoints(i)%z0, dist, vel)
@@ -1602,7 +1602,7 @@ contains
     end do
     !$omp end parallel do
 
-    if (enable_buoyancy==1.and. TempBtype(Bo)==DIRICHLET) call Bound_temperature_flux(BsideTFLArr)
+    if (enable_buoyancy.and. TempBtype(Bo)==DIRICHLET) call Bound_temperature_flux(BsideTFLArr)
 
 
   end subroutine ComputeViscsWM
@@ -1620,7 +1620,7 @@ contains
 
 
 
-    if (enable_buoyancy==1.and. TempBtype(Bo)==DIRICHLET) call Bound_temperature_flux(BsideTFLArr)
+    if (enable_buoyancy.and. TempBtype(Bo)==DIRICHLET) call Bound_temperature_flux(BsideTFLArr)
 
     call fluxes(UxmWMpoints, 1, MINUSX)
     call fluxes(UxpWMpoints, 1, PLUSX)
@@ -1678,11 +1678,11 @@ contains
 
           if (p%z0>0) then
 !TODO: The temperature flux is always 0 now in momentum points, so no stability effect here!
-             if (enable_buoyancy==1 .and. p%temperature>0) then
+             if (enable_buoyancy .and. p%temperature>0) then
 
                stop "Not implemented!"
 
-             else if (enable_buoyancy==1 .and. p%temperature_flux>0) then
+             else if (enable_buoyancy .and. p%temperature_flux>0) then
 
                stop "Not implemented!"
 

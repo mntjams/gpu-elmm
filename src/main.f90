@@ -89,7 +89,7 @@ program CLMM
   endif
 
 #ifdef __HMPP
-  call GetDataFromGPU(.true.,.true.,.true.,.true.,enable_buoyancy==1,&
+  call GetDataFromGPU(.true.,.true.,.true.,.true.,enable_buoyancy,&
                       U,     V,     W,     Pr,    Temperature)
 #endif
 
@@ -121,14 +121,14 @@ program CLMM
      Pr = 0000
 
 
-     if (enable_buoyancy==1) then
+     if (enable_buoyancy) then
        allocate(Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
        Temperature = 0
      else
        allocate(Temperature(0,0,0))
      endif
 
-     if (enable_moisture==1) then
+     if (enable_moisture) then
        allocate(Moisture(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
        Moisture = 0
      else
@@ -145,8 +145,8 @@ program CLMM
 
      allocate(Viscosity(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
 
-     if (enable_buoyancy==1 .or. &
-         enable_moisture==1 .or. &
+     if (enable_buoyancy .or. &
+         enable_moisture .or. &
          num_of_scalars>0)      then
 
        allocate(TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))

@@ -87,12 +87,12 @@ module Parameters
   integer :: tempmet,poissmet,convmet,masssourc,frames,steady
   integer :: tasktype,averaging,explicit_diffusion = 1
 
-  integer :: enable_buoyancy = 0 !1 if enabled, zero otherwise
-  integer :: enable_moisture = 0
-  integer :: enable_liquid   = 0 !enable condensation of water vapor
+  logical :: enable_buoyancy = .false. !1 if enabled, zero otherwise
+  logical :: enable_moisture = .false.
+  logical :: enable_liquid   = .false. !enable condensation of water vapor
   integer :: num_of_scalars  = 0
 
-  integer :: enable_radiation = 0
+  logical :: enable_radiation = .false.
 
   integer :: partdistrib,computedeposition,computegravsettling
   integer :: maxCNiter,maxPOISSONiter,endstep

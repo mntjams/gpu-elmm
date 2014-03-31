@@ -204,12 +204,12 @@ contains
       Pr_avg = 0
     end if
 
-    if (enable_buoyancy==1.and.store%avg_temperature==1) then
+    if (enable_buoyancy.and.store%avg_temperature==1) then
      allocate(Temperature_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
      Temperature_avg = 0
     end if
 
-    if (enable_moisture==1.and.store%avg_moisture==1) then
+    if (enable_moisture.and.store%avg_moisture==1) then
      allocate(Moisture_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
      Moisture_avg = 0
     end if
@@ -267,12 +267,12 @@ contains
        momentum_fluxes_sgs_time = huge(1.0)
      end if
 
-     if (enable_buoyancy==1) then
+     if (enable_buoyancy) then
        allocate(temp_time(size(probes),0:max_number_of_time_steps))
        temp_time = huge(1.0_knd)
      end if
 
-     if (enable_moisture==1) then
+     if (enable_moisture) then
        allocate(moist_time(size(probes),0:max_number_of_time_steps))
        moist_time = huge(1.0_knd)
      end if
@@ -301,7 +301,7 @@ contains
      ustar = huge(1.0)
    end if
 
-   if (wallmodeltype>0.and.enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
+   if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
      allocate(tstar(2,0:max_number_of_time_steps))
      tstar = huge(1.0)
    end if
@@ -547,7 +547,7 @@ contains
                               Pr(p%i,min(p%j+1,Vny+1),min(p%k+1,Wnz+1)), &
                               Pr(min(p%i+1,Unx+1),min(p%j+1,Vny+1),min(p%k+1,Wnz+1)))
 
-        if (enable_buoyancy==1) then
+        if (enable_buoyancy) then
           temp_time(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)), &
                              (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)), &
                              (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)), &
@@ -561,7 +561,7 @@ contains
                              Temperature(p%i+1,p%j+1,p%k+1))
         end if
 
-        if (enable_moisture==1) then
+        if (enable_moisture) then
           moist_time(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)), &
                              (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)), &
                              (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)), &
@@ -689,11 +689,11 @@ contains
         Pr_avg = Pr_avg + Pr(1:Prnx,1:Prny,1:Prnz) * time_weight
       end if
 
-      if (enable_buoyancy==1.and.store%avg_temperature==1) then
+      if (enable_buoyancy.and.store%avg_temperature==1) then
         Temperature_avg = Temperature_avg + temperature * time_weight
       end if
 
-      if (enable_moisture==1.and.store%avg_moisture==1) then
+      if (enable_moisture.and.store%avg_moisture==1) then
         Moisture_avg = Moisture_avg + moisture * time_weight
       end if
 
@@ -745,7 +745,7 @@ contains
    end if
 
 
-    if (wallmodeltype>0.and.enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
+    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
      S2 = SUM(BsideTFLArr(1:Prnx,1:Prny))/(Prnx*Prny)
      S=-S*S2
 
@@ -791,14 +791,14 @@ contains
        profvvavg = profvvavg + profvv * time_weight
        profwwavg = profwwavg + profww * time_weight
 
-       if (enable_buoyancy==1) then
+       if (enable_buoyancy) then
          proftempavg = proftempavg + proftemp * time_weight
          proftempflavg = proftempflavg + proftempfl * time_weight
          proftempflsgsavg = proftempflsgsavg + proftempflsgs * time_weight
          profttavg = profttavg + proftt * time_weight
        end if
 
-       if (enable_buoyancy==1) then
+       if (enable_buoyancy) then
          profmoistavg = profmoistavg + profmoist * time_weight
          profmoistflavg = profmoistflavg + profmoistfl * time_weight
          profmoistflsgsavg = profmoistflsgsavg + profmoistflsgs * time_weight
@@ -924,7 +924,7 @@ contains
         close(unit)
       end if
 
-      if (enable_buoyancy==1) then
+      if (enable_buoyancy) then
         open(unit,file="output/temptimep"//trim(prob)//".txt")
         do j = 0,endstep
          write(unit,*) times(j),temp_time(k,j)
@@ -932,7 +932,7 @@ contains
         close(unit)
       end if
 
-      if (enable_moisture==1) then
+      if (enable_moisture) then
         open(unit,file="output/moisttimep"//trim(prob)//".txt")
         do j = 0,endstep
          write(unit,*) times(j),moist_time(k,j)
@@ -988,7 +988,7 @@ contains
       close(unit)
     end if
 
-    if (wallmodeltype>0.and.enable_buoyancy==1.and.TempBtype(Bo)==DIRICHLET.and.store%tstar==1) then
+    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.store%tstar==1) then
       open(unit,file="output/tflux.txt")
       do j = 0,endstep
        write(unit,*) times(j),tstar(:,j)
@@ -1069,7 +1069,7 @@ contains
        end do
        close(unit)
 
-       if (enable_buoyancy==1) then
+       if (enable_buoyancy) then
 
           open(unit,file="output/proftemp.txt")
           do k = 1,Prnz
@@ -1133,7 +1133,7 @@ contains
        end if !enable_buoyancy == 1
 
 
-       if (enable_moisture==1) then
+       if (enable_moisture) then
 
           open(unit,file="output/profmoist.txt")
           do k = 1,Prnz
@@ -1236,7 +1236,7 @@ contains
          write(unit) lf
        end if
 
-       if (enable_buoyancy>0.and.store%out_temperature==1) then
+       if (enable_buoyancy.and.store%out_temperature==1) then
          write(unit) "SCALARS temperature float",lf
          write(unit) "LOOKUP_TABLE default",lf
 
@@ -1245,7 +1245,7 @@ contains
          write(unit) lf
        end if
 
-       if (enable_moisture>0.and.store%out_moisture==1) then
+       if (enable_moisture.and.store%out_moisture==1) then
          write(unit) "SCALARS moisture float",lf
          write(unit) "LOOKUP_TABLE default",lf
 
@@ -1548,7 +1548,7 @@ contains
           write(unit) lf
         end if
 
-        if (enable_buoyancy==1.and.store%avg_temperature==1) then
+        if (enable_buoyancy.and.store%avg_temperature==1) then
           write(unit) "SCALARS temperature float",lf
           write(unit) "LOOKUP_TABLE default",lf
 
@@ -1557,7 +1557,7 @@ contains
           write(unit) lf
         end if
 
-        if (enable_moisture==1.and.store%avg_moisture==1) then
+        if (enable_moisture.and.store%avg_moisture==1) then
           write(unit) "SCALARS moisture float",lf
           write(unit) "LOOKUP_TABLE default",lf
 
@@ -2215,7 +2215,7 @@ contains
     real(knd) :: S
     integer   :: i,j,k,l,n
 
-    if (enable_buoyancy==1) then
+    if (enable_buoyancy) then
       !proftempfl is computed directly during advection step
 
       !$omp parallel do private(i,j,k,n,S)
@@ -2235,7 +2235,7 @@ contains
       !$omp end parallel do
     end if
 
-    if (enable_moisture==1) then
+    if (enable_moisture) then
       !profmoistfl is computed directly during advection step
 
       !$omp parallel do private(i,j,k,n,S)
@@ -2442,7 +2442,7 @@ contains
     !$omp end do
     !$omp end parallel
 
-    if (enable_buoyancy==1) then
+    if (enable_buoyancy) then
       !$omp parallel do private(i,j,k,n,S)
       do k = 1,Prnz
         S = 0
@@ -2461,7 +2461,7 @@ contains
     end if ! size(Temperature)
 
 
-    if (enable_moisture==1) then
+    if (enable_moisture) then
       !$omp parallel private(i,j,k,n,S)
       !$omp do
       do k = 1,Prnz
@@ -2689,7 +2689,7 @@ contains
     write(unit) U(mini,1:Uny,1:Unz)
     write(unit) V(mini,1:Vny,1:Vnz)
     write(unit) W(mini,1:Wny,1:Wnz)
-    if (enable_buoyancy==1) then
+    if (enable_buoyancy) then
          write(unit) Temperature(mini,1:Prny,1:Prnz)
     end if
     close(unit)

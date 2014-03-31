@@ -239,9 +239,9 @@ contains
 real(knd),allocatable :: svf_array(:,:,:)   
 allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
     
-    enable_radiation = 1
+    enable_radiation = .true.
     
-    if (enable_buoyancy==1 .and. enable_radiation==1) then
+    if (enable_buoyancy .and. enable_radiation) then
       do i=1,size(WMPoints)
       
         associate(p => WMPoints(i))
@@ -277,7 +277,7 @@ allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
           total_heat_flux = radiation_balance - &
                             (0.1 * radiation_balance) !crude guess of the storage flux
 
-          if (enable_moisture==1) then
+          if (enable_moisture) then
             latent_heat_flux = total_heat_flux * p%evaporative_fraction
             sensible_heat_flux = total_heat_flux - latent_heat_flux
             p%moisture_flux = latent_heat_flux / (rho_air_ref * Lv_water_ref)
@@ -2153,7 +2153,7 @@ contains
 ! 
 !     do i=1,size(WMPoints)
 !       associate (p => WMPoints(i))
-!         if (enable_buoyancy==1) then
+!         if (enable_buoyancy) then
 !           do j=1,size(p%bound_IBPs)
 !             associate (IBP => ScalFlIBPoints(p%bound_IBPs(j)))
 !               IBP%temperature_flux = IBP%temperature_flux + p%temperature_flux/IBP%n_WMPs
@@ -2161,7 +2161,7 @@ contains
 !           end do
 !         end if
 !         
-!         if (enable_moisture==1) then
+!         if (enable_moisture) then
 !           do j=1,size(p%bound_IBPs)
 !             associate (IBP => ScalFlIBPoints(p%bound_IBPs(j)))
 !               IBP%moisture_flux = IBP%moisture_flux + p%moisture_flux/IBP%n_WMPs
@@ -2170,8 +2170,8 @@ contains
 !         end if
 !         
 !         if (p%zk==1) then
-!           if (enable_buoyancy==1) BsideTFlArr(p%xi,p%yj) = p%temperature_flux
-!           if (enable_moisture==1) BsideMFlArr(p%xi,p%yj) = p%moisture_flux
+!           if (enable_buoyancy) BsideTFlArr(p%xi,p%yj) = p%temperature_flux
+!           if (enable_moisture) BsideMFlArr(p%xi,p%yj) = p%moisture_flux
 !         end if
 !       end associate
 !     end do

@@ -399,7 +399,7 @@ contains
        allocate(In1,In2)
        allocate(In1%U(Uny,Unz),In1%V(Vny,Vnz),In1%W(Wny,Wnz))
        allocate(In2%U(Uny,Unz),In2%V(Vny,Vnz),In2%W(Wny,Wnz))
-       if (enable_buoyancy==1) allocate(In1%temperature(Prny,Prnz),In2%temperature(Prny,Prnz))
+       if (enable_buoyancy) allocate(In1%temperature(Prny,Prnz),In2%temperature(Prny,Prnz))
 
        if ((Prny/=Prny2).or.(Prnz/=Prnz2).or.(Vny/=Vny2).or.(Wnz/=Wnz2).or.((dx2-dxPr(0))/dx2>0.1)) then
         write(*,*) "Mismatch of computational grid and inlet file."
@@ -480,7 +480,7 @@ contains
     Uin(1:Uny,1:Unz) = c1*In1%U+c2*In2%U
     Vin(1:Vny,1:Vnz) = c1*In1%V+c2*In2%V
     Win(1:Wny,1:Wnz) = c1*In1%W+c2*In2%W
-    if (enable_buoyancy==1) TempIn(1:Prny,1:Prnz) = c1*In1%temperature+c2*In2%temperature
+    if (enable_buoyancy) TempIn(1:Prny,1:Prnz) = c1*In1%temperature+c2*In2%temperature
 
   end subroutine GetInletFromFile
 
@@ -491,7 +491,7 @@ contains
     read(unitnum) In%U
     read(unitnum) In%V
     read(unitnum) In%W
-    if (enable_buoyancy>0) then
+    if (enable_buoyancy) then
          read(unitnum) In%temperature
     end if
   end subroutine ReadInletFromFile

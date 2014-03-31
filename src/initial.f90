@@ -269,10 +269,10 @@ contains
      call get(sideTemp(To))
      close(unit)
    else
-     enable_buoyancy = 0
+     enable_buoyancy = .false.
    end if
 
-   if (enable_buoyancy==1) then
+   if (enable_buoyancy) then
 
      open(unit,file="temp_profile.conf",status="old",action="read",iostat = io)
 
@@ -327,10 +327,10 @@ contains
      call get(sideMoist(To))
      close(unit)
    else
-     enable_moisture = 0
+     enable_moisture = .false.
    end if
 
-   if (enable_moisture==1) then
+   if (enable_moisture) then
 
      open(unit,file="moist_profile.conf",status="old",action="read",iostat = io)
 
@@ -509,11 +509,11 @@ contains
      call get(frame_flags%sumscalars)
      if (num_of_scalars < 1) frame_flags%sumscalars = 0
      call get(frame_flags%temperature)
-     if (enable_buoyancy /= 1) frame_flags%temperature = 0
+     if (.not.enable_buoyancy) frame_flags%temperature = 0
      call get(frame_flags%moisture)
-     if (enable_buoyancy /= 1) frame_flags%moisture = 0
+     if (.not.enable_buoyancy) frame_flags%moisture = 0
      call get(frame_flags%temperature_flux)
-     if (enable_buoyancy /= 1) frame_flags%temperature_flux = 0
+     if (.not.enable_buoyancy) frame_flags%temperature_flux = 0
      call get(frame_flags%scalar_flux)
      if (num_of_scalars < 1) frame_flags%scalar_flux = 0
 
@@ -551,9 +551,9 @@ contains
        call get(frame_save_flags%Pr)
        call get(frame_save_flags%Viscosity)
        call get(frame_save_flags%Temperature)
-       if (enable_buoyancy /= 1) frame_save_flags%Temperature = .false.
+       if (.not.enable_buoyancy) frame_save_flags%Temperature = .false.
        call get(frame_save_flags%Moisture)
-       if (enable_moisture /= 1) frame_save_flags%Moisture = .false.
+       if (.not.enable_moisture) frame_save_flags%Moisture = .false.
        call get(frame_save_flags%Scalar)
        if (num_of_scalars < 1) frame_save_flags%Scalar = .false.
 
@@ -574,12 +574,12 @@ contains
    if (io==0) then
      call read_namelist_output
 
-     if (enable_buoyancy /= 1) then
+     if (.not.enable_buoyancy) then
        store%out_temperature = 0
        store%out_moisture = 0
      end if
 
-     if (enable_buoyancy/=1) then
+     if (.not.enable_buoyancy) then
        store%avg_temperature = 0
        store%avg_moisture = 0
      end if
@@ -961,7 +961,7 @@ contains
      end do
     end do
    end do
-   if (enable_buoyancy==1) then
+   if (enable_buoyancy) then
     do i = 1,3
      read(unit,*)
     end do
@@ -1045,8 +1045,8 @@ contains
        else
          Viscosity = 0
        end if
-       if (enable_buoyancy==1.or. &
-           enable_moisture==1.or. &
+       if (enable_buoyancy.or. &
+           enable_moisture.or. &
            num_of_scalars>0)        TDiff = 1._knd/(Re*Prandtl)
 
        call BoundU(1,U,Uin)
@@ -1341,7 +1341,7 @@ contains
          !$omp end parallel
        end if
 
-       if (enable_buoyancy==1.and.tasktype==2) then
+       if (enable_buoyancy.and.tasktype==2) then
 
          do k = 0,Prnz+1
           do j = 0,Prny+1
@@ -1358,7 +1358,7 @@ contains
           end do
          end do
 
-       elseif (enable_buoyancy==1.and.tasktype==3) then
+       elseif (enable_buoyancy.and.tasktype==3) then
 
          do k = 0,Prnz+1
           do j = 0,Prny+1
@@ -1372,15 +1372,15 @@ contains
           end do
          end do
 
-       elseif (enable_buoyancy==1) then
+       elseif (enable_buoyancy) then
 
          call InitScalarProfile(TempIn,TemperatureProfile,temperature_ref)
 
          call InitScalar(TempIn,TemperatureProfile,Temperature)
 
-       end if !byoyancy and tasktype
+       end if !buoyancy and tasktype
 
-       if (enable_moisture==1) then
+       if (enable_moisture) then
 
          call InitScalarProfile(MoistIn,MoistureProfile,moisture_ref)
 
@@ -1388,7 +1388,7 @@ contains
 
        end if
 
-       if (enable_buoyancy==1) then
+       if (enable_buoyancy) then
 
          call InitHydrostaticPressure(Pr,Temperature,Moisture)
 
@@ -1410,8 +1410,8 @@ contains
        end if
 
        if (Re>0 .and.&
-             (enable_buoyancy==1.or. &
-              enable_moisture==1.or. &
+             (enable_buoyancy.or. &
+              enable_moisture.or. &
               num_of_scalars>0))     then
          !$omp parallel
          !$omp workshare
@@ -1455,8 +1455,8 @@ contains
 
        call BoundViscosity(Viscosity)
 
-       if (enable_buoyancy==1.or. &
-           enable_moisture==1.or. &
+       if (enable_buoyancy.or. &
+           enable_moisture.or. &
            num_of_scalars>0)     then
 
          !$omp parallel
@@ -1470,11 +1470,11 @@ contains
          call BoundViscosity(TDiff)
        end if
 
-       if (enable_buoyancy==1) then
+       if (enable_buoyancy) then
          call BoundTemperature(Temperature)
        end if
 
-       if (enable_moisture==1) then
+       if (enable_moisture) then
          call BoundMoisture(Moisture)
        end if
 
@@ -1806,9 +1806,9 @@ contains
     Vin = 0
     Win = 0
 
-    if (enable_buoyancy>0) allocate(TempIn(-1:Prny+2,-1:Prnz+2))
+    if (enable_buoyancy) allocate(TempIn(-1:Prny+2,-1:Prnz+2))
 
-    if (enable_moisture>0) allocate(MoistIn(-1:Prny+2,-1:Prnz+2))
+    if (enable_moisture) allocate(MoistIn(-1:Prny+2,-1:Prnz+2))
 
     select case (inlettype)
       case (ZeroInletType)
@@ -1828,12 +1828,12 @@ contains
     endselect
 
 
-    if (enable_buoyancy==1) then
+    if (enable_buoyancy) then
        if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==DIRICHLET) then
 
          allocate(BsideTFlArr(-1:Prnx+2,-1:Prny+2))
 
-         if (enable_radiation==1) then
+         if (enable_radiation) then
            BsideTFlArr = 0
          else if (TempBtype(Bo)==CONSTFLUX) then
            BsideTFlArr = sideTemp(Bo)
@@ -1853,12 +1853,12 @@ contains
     if (.not.allocated(BsideTFlArr))  allocate(BsideTFlArr(0,0))
 
 
-    if (enable_moisture==1) then
+    if (enable_moisture) then
        if (MoistBtype(Bo)==CONSTFLUX.or.MoistBtype(Bo)==DIRICHLET) then
 
          allocate(BsideMFlArr(-1:Prnx+2,-1:Prny+2))
 
-         if (enable_radiation==1) then
+         if (enable_radiation) then
            BsideMFlArr = 0
          else if (MoistBtype(Bo)==CONSTFLUX) then
            BsideMFlArr = sideMoist(Bo)
@@ -1907,7 +1907,7 @@ contains
    !creates masks for computation of diffusive fluxes
    call InitWMMasks
 
-   if (enable_radiation==1) then
+   if (enable_radiation) then
      !compute the radiation balance and prepare the wall fluxes 
      call InitIBPFluxes
      !set the immersed boundary values for fluxes

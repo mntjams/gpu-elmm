@@ -115,7 +115,7 @@ contains
    !$omp section
    call BoundU(3,W,Win)
    !$omp section
-   if (enable_buoyancy==1) call BoundTemperature(temperature)
+   if (enable_buoyancy) call BoundTemperature(temperature)
    !$omp end parallel sections
     call IBMomentum(U,V,W)
 
@@ -170,7 +170,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
 
     !$hmpp <tsteps> advancedload, args[TimeStepEul::U,TimeStepEul::V,TimeStepEul::W]
 
-    if (enable_buoyancy==1) then
+    if (enable_buoyancy) then
      !$hmpp <tsteps> advancedload, args[Convection::temperature]
     end if
 
@@ -283,7 +283,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
      !$hmpp <tsteps> AttenuateOut2 callsite, args[*].noupdate = true
       call AttenuateOut(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
                         xPr,xU,U,V,W,temperature,enable_buoyancy)
-!       if (enable_buoyancy==1) then
+!       if (enable_buoyancy) then
 ! #ifdef __HMPP
 ! !              !$hmpp <tsteps> BoundTemperature callsite
 !              call BoundTemperature_GPU(Prnx,Prny,Prnz,dxmin,dymin,dzmin,Re,TempBtype,sideTemp,BsideTArr,BsideTFLArr,TDiff,TempIn,temperature)
@@ -1570,9 +1570,9 @@ end subroutine TMarchRK3
 
      call BoundViscosity(Viscosity)
 
-     if (sgstype/=StabSubgridModel.and.enable_buoyancy==1)  call ComputeTDiff(U,V,W)
+     if (sgstype/=StabSubgridModel.and.enable_buoyancy)  call ComputeTDiff(U,V,W)
 
-     if (enable_buoyancy==1) call BoundViscosity(TDiff)
+     if (enable_buoyancy) call BoundViscosity(TDiff)
 #endif
 
   end subroutine SubgridStresses

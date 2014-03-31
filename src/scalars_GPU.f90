@@ -535,7 +535,7 @@
 
     call BoundViscosity_GPU(Prnx,Prny,Prnz,Btype,Visc)
 
-    if (enable_buoyancy==1) then
+    if (enable_buoyancy) then
       if (Re>0) then
 
        !$hmppcg grid blocksize myblocksize

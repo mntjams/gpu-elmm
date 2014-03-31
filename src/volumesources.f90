@@ -289,7 +289,7 @@ module VolumeSources
                      Melem%yj = j
                      Melem%zk = k
                        
-                     if (enable_buoyancy==1 .and. enable_radiation==1) then
+                     if (enable_buoyancy .and. enable_radiation) then
 
                        associate (p=>PB) !workaround for gfortran 4.8 bug
                        select type (p)
@@ -310,13 +310,13 @@ module VolumeSources
                        Melem%flux = 0
                      end if
                      
-                     if (enable_buoyancy==1 .and. associated(PB%get_temperature_flux)) then
+                     if (enable_buoyancy .and. associated(PB%get_temperature_flux)) then
                      
                          Telem%flux = Telem%flux + &
                                       PB%get_temperature_flux(xPr(i),yPr(j),zPr(k))
                      end if
                      
-                     if (enable_moisture==1 .and. associated(PB%get_moisture_flux)) then
+                     if (enable_moisture .and. associated(PB%get_moisture_flux)) then
 
                          Melem%flux = Melem%flux + &
                                       PB%get_moisture_flux(xPr(i),yPr(j),zPr(k))
@@ -421,7 +421,7 @@ module VolumeSources
       !FIXME: surface flux to volume flux APPROXIMATE!                  
       total_heat_flux = total_heat_flux/dot_product([dxmin,dymin,dzmin],abs(out_norm))
                         
-      if (enable_moisture==1) then
+      if (enable_moisture) then
         latent_heat_flux = total_heat_flux * PB%evaporative_fraction
         sensible_heat_flux = total_heat_flux - latent_heat_flux
         Melem%flux  = latent_heat_flux / (rho_air_ref * Lv_water_ref)
@@ -536,7 +536,7 @@ module VolumeSources
         call ScalarFlVolumesLists(j)%list%for_each(CopyPoint)
       end do
       
-      if (enable_radiation==1) call SaveFluxes
+      if (enable_radiation) call SaveFluxes
 
       contains
 

@@ -129,7 +129,7 @@ contains
 
     call DivergenceWM(U, V, W)
 
-    if (enable_buoyancy>0) then
+    if (enable_buoyancy) then
 
       call stage(Temperature, Temperature_2, Temperature_adv, &
                  ScalarTypeTemperature, TempBtype, &
@@ -140,7 +140,7 @@ contains
       
     end if
 
-    if (enable_moisture>0) then
+    if (enable_moisture) then
 
       call stage(Moisture, Moisture_2, Moisture_adv, &
                  ScalarTypeMoisture, MoistBtype, &
@@ -1775,7 +1775,7 @@ contains
     do k=1,Prnz
      t_virt = sum(TempIn(1:Prny,k))/Prny
 
-     if (enable_moisture==1) t_virt = theta_v(t_virt,sum(MoistIn(1:Prny,k))/Prny)
+     if (enable_moisture) t_virt = theta_v(t_virt,sum(MoistIn(1:Prny,k))/Prny)
 
      p = p + grav_acc*dzPr(k) * &
                   ( t_virt - temperature_ref )&
@@ -1808,7 +1808,7 @@ contains
         real(knd) :: res
         integer,intent(in) :: i,j,k
 
-        if (enable_moisture==1) then
+        if (enable_moisture) then
           res = Temperature(i,j,k) * (1._knd + 0.61_knd * Moisture(i,j,k))
         else
           res = Temperature(i,j,k)
@@ -1819,7 +1819,7 @@ contains
         real(knd) :: res
         real(knd),intent(in) :: T,q
 
-        if (enable_moisture==1) then
+        if (enable_moisture) then
           res = T * (1._knd + 0.61_knd * q)
         else
           res = T

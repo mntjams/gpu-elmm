@@ -316,7 +316,7 @@
                                                     coriolisparam,&
                                                     Ustar,Vstar,U,V)
 
-      if (enable_buoyancy==1) call BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,&
+      if (enable_buoyancy) call BuoyancyForce(Prnx,Prny,Prnz,Wnx,Wny,Wnz,&
                                 grav_acc,temperature_ref,Wstar,Temperature,Moisture)
 
       call ResistanceForce(Ustar,Vstar,Wstar,U,V,W)
@@ -472,8 +472,8 @@
     integer i,j,k
 
 
-    if (enable_moisture==1) then
-      if (enable_liquid==1) then
+    if (enable_moisture) then
+      if (enable_liquid) then
         stop "Liquid water not implemented."
       else
         A = grav_acc / temperature_ref
@@ -1111,7 +1111,8 @@
 
   implicit none
 
-  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,enable_buoyancy
+  integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
+  logical, intent(in)     :: enable_buoyancy
 #ifdef __HMPP
 #include "hmpp-include.f90"
   real(knd),intent(in)    :: xPr(-2:Prnx+3)
@@ -1193,7 +1194,7 @@
     enddo
     !$omp end do
 
-    if (enable_buoyancy==1) then
+    if (enable_buoyancy) then
       !$omp do
       !$hmppcg grid blocksize myblocksize
       !$hmppcg gridify (k,j) private(p,xb,DF)
