@@ -7,7 +7,7 @@ module TSTEPS
   use LAXWend
   use BOUNDARIES, only: BoundU,Bound_Q
   use ScalarBoundaries, only: BoundTemperature, BoundViscosity
-  use POISSON !it exports Pr_Correct and GetPrFromGPU
+  use Pressure !it exports PressureCorrection and GetPrFromGPU
   use OUTPUTS, only: store,display,proftempfl,profmoistfl
   use SCALARS, only: ScalarRK3, ComputeTDiff
   use Subgrid, only: sgstype, SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma
@@ -254,7 +254,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
 
 
     if (poissmet>0) then
-       call Pr_Correct(U2,V2,W2,Pr,Q,2._knd*RK_alpha(RK_stage))
+       call PressureCorrection(U2,V2,W2,Pr,Q,2._knd*RK_alpha(RK_stage))
     end if
 
 

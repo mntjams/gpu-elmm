@@ -5,7 +5,7 @@ module Initial
   use LIMITERS, only: limparam, limitertype
   use MULTIGRID, only: SetMGParams
   use MULTIGRID2d, only: SetMGParams2d
-  use POISSON
+  use Pressure
   use BOUNDARIES
   use ScalarBoundaries
   use OUTPUTS, only: store, display, probes, scalar_probes, ReadProbes
@@ -1434,7 +1434,7 @@ contains
        !$omp end parallel
 
 
-       call Pr_Correct(U,V,W,Pr,Q,1._knd)
+       call PressureCorrection(U,V,W,Pr,Q,1._knd)
 
 
        if (sgstype==SubgridModel) then
