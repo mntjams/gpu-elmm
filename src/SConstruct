@@ -33,7 +33,7 @@ if str(comp)=='intel':
   env = Environment(tools=['default','ifort'])
 
   if str(omp)!='no':
-    omp_flag = ' -openmp'
+    omp_flag = ' -openmp -recursive'
   else:
     omp_flag = ''
 
@@ -195,8 +195,12 @@ objs += env.Object(target=target_dir+'scalarboundaries',source='scalarboundaries
 objs += env.Object(target=target_dir+'scalars',        source='scalars.f90')
 objs += env.Object(target=target_dir+'filters',        source='filters.f90')
 objs += env.Object(target=target_dir+'subgrid',        source='subgrid.f90')
-objs += env.Object(target=target_dir+'pthreads',       source='pthreads.c')
+objs += env.Object(target=target_dir+'pthreadsc',      source='pthreads.c')
+objs += env.Object(target=target_dir+'pthreadsf',      source='pthreads.f90')
+objs += env.Object(target=target_dir+'frames_common',  source='frames_common.f90')
 objs += env.Object(target=target_dir+'frames',         source='frames.f90')
+objs += env.Object(target=target_dir+'output_helpers', source='output_helpers.f90')
+objs += env.Object(target=target_dir+'vtkframes',      source='vtkframes.f90')
 objs += env.Object(target=target_dir+'outputs',        source='outputs.f90')
 objs += env.Object(target=target_dir+'poisson',        source='poisson.F90')
 objs += env.Object(target=target_dir+'initial',        source='initial.f90')

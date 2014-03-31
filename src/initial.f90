@@ -8,8 +8,7 @@ module Initial
   use POISSON
   use BOUNDARIES
   use ScalarBoundaries
-  use OUTPUTS, only: store, display, probes, scalar_probes, frame_flags, &
-                     AddFrameDomain, SetFrameDomains, StaggeredFrameDomains, ReadProbes
+  use OUTPUTS, only: store, display, probes, scalar_probes, ReadProbes
   use SCALARS
   use Filters, only: filtertype, filter_ratios
   use Subgrid
@@ -37,7 +36,10 @@ contains
 
 
  subroutine ReadConfiguration
-   use StaggeredFrames, only: rrange, TFrameTimes, TSaveFlags, Init
+   use StaggeredFrames, only: rrange, TFrameTimes, TSaveFlags, &
+                              TStaggeredFrameDomain,  AddDomain
+   use VTKFrames, only: TFrameFlags, &
+                              TFrameDomain,  AddDomain
    integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter,minGPUlevel
    real(knd) mgepsinnerGS
    integer   i,io,io2,itmp
@@ -53,6 +55,7 @@ contains
    type(rrange) :: range
    type(TFrameTimes) :: frame_times
    type(TSaveFlags) :: frame_save_flags
+   type(TFrameFlags) :: frame_flags
    character(10) :: domain_label
    integer :: num_staggered_domains
    integer :: number_of_probes, number_of_scalar_probes
@@ -492,13 +495,13 @@ contains
 
    open(unit,file="frames.conf",status="old",action="read",iostat = io)
    if (io==0) then
-     call get(frames)
-     call get(timefram1)
-     call get(timefram2)
+       call get(frame_times%nframes)
+       call get(frame_times%start)
+       call get(frame_times%end)
      read(unit,fmt='(/)')
 
      read(unit,*) frame_flags%U
-     call get(frame_flags%vort)
+     call get(frame_flags%vorticity)
      call get(frame_flags%Pr)
      call get(frame_flags%lambda2)
      call get(frame_flags%scalars)
@@ -511,8 +514,8 @@ contains
      if (enable_buoyancy /= 1) frame_flags%moisture = 0
      call get(frame_flags%temperature_flux)
      if (enable_buoyancy /= 1) frame_flags%temperature_flux = 0
-     call get(frame_flags%scalfl)
-     if (num_of_scalars < 1) frame_flags%scalfl = 0
+     call get(frame_flags%scalar_flux)
+     if (num_of_scalars < 1) frame_flags%scalar_flux = 0
 
      call get(numframeslices)
 
@@ -520,7 +523,9 @@ contains
        call get(dimension)
        call get(direction)
        call get(position)
-       call AddFrameDomain(dimension,direction,position)
+       call AddDomain(TFrameDomain(achar(iachar('a')+i-1), &
+                      dimension, direction, position, &
+                      frame_times, frame_flags))
      end do
 
    else
@@ -533,8 +538,6 @@ contains
    open(unit,file="stagframes.conf",status="old",action="read",iostat = io)
    if (io==0) then
      call get(num_staggered_domains)
-
-     allocate(StaggeredFrameDomains(num_staggered_domains))
 
      do i = 1,num_staggered_domains
        read(unit,fmt=*)
@@ -554,14 +557,13 @@ contains
        call get(frame_save_flags%Scalar)
        if (num_of_scalars < 1) frame_save_flags%Scalar = .false.
 
-       call Init(StaggeredFrameDomains(i), trim(domain_label), &
-                 range, &
-                 frame_times, &
-                 frame_save_flags )
+       call AddDomain(TStaggeredFrameDomain(trim(domain_label), &
+                                            range, &
+                                            frame_times, &
+                                            frame_save_flags))
      end do
      close(unit)
    else
-     allocate(StaggeredFrameDomains(0))
      write (*,*) "stagframes.conf not found, no staggered frames will be saved."
    end if
 
@@ -1922,8 +1924,6 @@ contains
 
    !add puff sources, each containing one or more points
    call InitPuffSources
-
-   call SetFrameDomains
 
     write (*,*) "set"
   end subroutine InitBoundaryConditions

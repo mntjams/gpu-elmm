@@ -7,14 +7,16 @@ module Outputs
   use Turbinlet, only: Ustar_inlet
   use Endianness
   use FreeUnit
+  use VTKFrames
   use StaggeredFrames
+  use Output_helpers
 
   implicit none
  
 
   private
-  public store, display, probes, scalar_probes, frame_flags, &
-         OutTStep, Output, AllocateOutputs, AddFrameDomain, SetFrameDomains, ReadProbes, StaggeredFrameDomains, &
+  public store, display, probes, scalar_probes,  &
+         OutTStep, Output, AllocateOutputs, ReadProbes,  &
           proftempfl, profmoistfl, profuw, profvw, profuwsgs, profvwsgs
 
   real(knd),dimension(:),allocatable :: profuavg,profuavg2,profvavg,profvavg2,profuuavg,profvvavg,profwwavg, &
@@ -73,28 +75,6 @@ module Outputs
 
   !for passive scalars
   type(TProbe),allocatable,dimension(:),save :: scalar_probes
-
-  type TFrameFlags
-    integer :: U = 1
-    integer :: vort = 0
-    integer :: Pr = 0
-    integer :: lambda2 = 0
-    integer :: scalars = 1
-    integer :: sumscalars = 0
-    integer :: temperature = 1
-    integer :: moisture = 1
-    integer :: temperature_flux = 0
-    integer :: scalfl = 0
-  end type
-
-  type(TFrameFlags) :: frame_flags
-
-  type TFrameDomain
-    integer   :: dimension,direction
-    real(knd) :: position
-    integer   :: mini=0, maxi=0, minj=0, maxj=-1, mink=-1, maxk=-1
-  end type TFrameDomain
-
 
   type TOutputSwitches
     integer :: U = 0
@@ -159,10 +139,6 @@ module Outputs
   end type
 
   type(TDisplaySwitches),save :: display
-
-  type(TFrameDomain),allocatable :: FrameDomains(:)
-
-  type(TStaggeredFrameDomain),allocatable :: StaggeredFrameDomains(:)
 
   !line feed
   character,parameter :: lf = achar(10)
@@ -839,19 +815,9 @@ contains
   end if
 
 
-    if (frames>0)then
-       if ((time>=timefram1).and.(time<=timefram2+(timefram2-timefram1)/(frames-1))&
-         .and.(time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
-        fnum = fnum+1
-        call Frame(U,V,W,Pr,Temperature,Moisture,Scalar,fnum)
-       end if
-    end if
+    call SaveVTKFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
 
-    if (allocated(StaggeredFrameDomains)) then
-      do i=1,size(StaggeredFrameDomains)
-        call Save(StaggeredFrameDomains(i), time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
-      end do
-    end if
+    call SaveStaggeredFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
     
     if (mod(endstep,1000) == 0) then
       call OutputTimeSeries
@@ -2108,6 +2074,8 @@ contains
     close(unit)
   end subroutine SaveScalarVTKFluxes
 
+
+
   subroutine Output(U,V,W,Pr,Temperature,Moisture,Scalar)
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U,V,W
     real(knd),contiguous,intent(inout) :: Pr(1:,1:,1:)
@@ -2140,407 +2108,15 @@ contains
 
     end if
 
-    if (allocated(StaggeredFrameDomains)) then
-      do i=1,size(StaggeredFrameDomains)
-        call Finalize(StaggeredFrameDomains(i))
-      end do
-    end if
+    call FinalizeVTKFrames
+
+    call FinalizeStaggeredFrames
 
     write(*,*) "saved"
   end subroutine Output
 
 
-  pure real(knd) function ScalarVerticalFlux(i,j,k,Scal,W)
-    integer, intent(in)   :: i,j,k
-    real(knd), contiguous, intent(in) :: Scal(-1:,-1:,-1:), W(-2:,-2:,-2:)
 
-    ScalarVerticalFlux = Scal(i,j,k) * (W(i,j,k)+W(i,j,k-1))/2 + &
-                       TDiff(i,j,k) * (Scal(i,j,k+1)-Scal(i,j,k-1)) / (zW(k+1)-zW(k-1))
-  end function ScalarVerticalFlux
-
-  pure function Vorticity(i,j,k,U,V,W)
-    real(knd), dimension(3) :: Vorticity
-    integer, intent(in)     :: i,j,k
-    real(knd),dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
-
-    Vorticity = [         (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin)&
-                              -(V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin), &
-                           (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin)&
-                             -(W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin), &
-                           (V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin)&
-                             -(U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin) ]
-  end function Vorticity
-
-
-  subroutine AddFrameDomain(dim,dir,pos)
-    integer,intent(in) :: dim, dir
-    real(knd) :: pos
-
-    if (.not.allocated(FrameDomains)) then
-      FrameDomains = [TFrameDomain(dim,dir,pos)]
-    else
-      FrameDomains = [FrameDomains, TFrameDomain(dim,dir,pos)]
-    end if
-  end subroutine
-
-  subroutine SetFrameDomains
-    call SetFrameDomain(FrameDomains)
-  end subroutine
-
-  elemental subroutine SetFrameDomain(domain)
-    type(TFrameDomain),intent(inout) :: domain
-
-
-        if (domain%dimension==3) then
-
-          domain%mini = 1
-          domain%maxi = Prnx
-          domain%minj = 1
-          domain%maxj = Prny
-          domain%mink = 1
-          domain%maxk = Prnz
-
-        else
-
-          if (domain%direction==1) then
-
-            call GridCoords(domain%mini, domain%minj, domain%mink, domain%position, &
-                            (yV(Prny+1)+yV(0))/2._knd, (zW(Prnz+1)+zW(0))/2._knd )
-
-            domain%maxi = domain%mini
-            domain%minj = 1
-            domain%maxj = Prny
-            domain%mink = 1
-            domain%maxk = Prnz
-
-          elseif (domain%direction==2) then
-
-            call GridCoords(domain%mini, domain%minj, domain%mink, (xU(Prnx+1)+xU(0))/2._knd, &
-                            domain%position, (zW(Prnz+1)+zW(0))/2._knd )
-
-            domain%maxj = domain%minj
-            domain%mini = 1
-            domain%maxi = Prnx
-            domain%mink = 1
-            domain%maxk = Prnz
-
-          else
-
-            call GridCoords(domain%mini, domain%minj, domain%mink, (xU(Prnx+1)+xU(0))/2._knd, &
-                            (yV(Prny+1)+yV(0))/2._knd, domain%position )
-
-            domain%maxk = domain%mink
-            domain%mini = 1
-            domain%maxi = Prnx
-            domain%minj = 1
-            domain%maxj = Prny
-
-          end if
-
-        end if
-
-  end subroutine SetFrameDomain
-
-
-
-  subroutine Frame(U,V,W,Pr,Temperature,Moisture,Scalar,n)
-    real(knd),contiguous,intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-    real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
-    real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
-    real(knd),contiguous,intent(in) :: Scalar(-1:,-1:,-1:,:)
-    integer,intent(in)   :: n
-    integer i,j,k,l,m
-    character(40) :: fname
-    character(4) :: fsuffix,fnumber
-    character(70) :: str
-    character(8) ::  scalname="scalar00"
-    integer mini,maxi,minj,maxj,mink,maxk
-    integer unit
-    real(real32),allocatable :: buffer(:,:,:),vbuffer(:,:,:,:)
-
-    fsuffix=".vtk"
-
-    !$omp parallel do default(none) &
-    !$omp  shared(n,FrameDomains,frame_flags,time,fsuffix,xPr,yPr,zPr,Prtype,Pr,U,V,W, &
-    !$omp    scalar,Temperature,Moisture,enable_moisture,enable_buoyancy,num_of_scalars, &
-    !$omp    dxmin,dymin,dzmin,temperature_ref,moisture_ref) &
-    !$omp  private(fname,fnumber,mini,maxi,minj,maxj,mink,maxk,unit,buffer,vbuffer,str,scalname)
-    do m = 1,size(FrameDomains)
-
-      fname="output/frame-"//achar(iachar('a')+m-1)//"-"
-      write(fnumber,"(I4.4)") n
-      write(*,*) "Saving frame:",fnumber,"   time:",time
-
-
-      mini = FrameDomains(m)%mini
-      minj = FrameDomains(m)%minj
-      mink = FrameDomains(m)%mink
-      maxi = FrameDomains(m)%maxi
-      maxj = FrameDomains(m)%maxj
-      maxk = FrameDomains(m)%maxk
-
-      allocate(buffer(mini:maxi,minj:maxj,mink:maxk))
-
-      if (frame_flags%U==1 .or. frame_flags%vort==1) then
-        allocate(vbuffer(3,mini:maxi,minj:maxj,mink:maxk))
-      end if
-
-
-      !$omp critical
-      call newunit(unit)
-      open(unit,file = trim(fname)//trim(fnumber)//trim(fsuffix), &
-        access='stream',status='replace',form="unformatted",action="write")
-      !$omp end critical
-
-      write(unit) "# vtk DataFile Version 2.0",lf
-      write(unit) "CLMM output file",lf
-      write(unit) "BINARY",lf
-      write(unit) "DATASET RECTILINEAR_GRID",lf
-      str="DIMENSIONS"
-      write(str(12:),*) maxi-mini+1,maxj-minj+1,maxk-mink+1
-      write(unit) str,lf
-      str="X_COORDINATES"
-      write(str(15:),'(i5,2x,a)') maxi-mini+1,"float"
-      write(unit) str,lf
-      write(unit) (BigEnd(real(xPr(i), real32)), i = mini,maxi),lf
-      str="Y_COORDINATES"
-      write(str(15:),'(i5,2x,a)') maxj-minj+1,"float"
-      write(unit) str,lf
-      write(unit) (BigEnd(real(yPr(j), real32)), j = minj,maxj),lf
-      str="Z_COORDINATES"
-      write(str(15:),'(i5,2x,a)') maxk-mink+1,"float"
-      write(unit) str,lf
-      write(unit) (BigEnd(real(zPr(k), real32)), k = mink,maxk),lf
-      str="POINT_DATA"
-      write(str(12:),*) (maxi-mini+1)*(maxj-minj+1)*(maxk-mink+1)
-      write(unit) str,lf
-
-      if (frame_flags%Pr==1) then
-        write(unit) "SCALARS p float",lf
-        write(unit) "LOOKUP_TABLE default",lf
-        
-        write(unit) BigEnd(real(Pr(mini:maxi,minj:maxj,mink:maxk), real32))
-
-        write(unit) lf
-      end if
-
-      if (frame_flags%lambda2==1) then
-        write(unit) "SCALARS lambda2 float",lf
-        write(unit) "LOOKUP_TABLE default",lf
-        do k = mink,maxk
-         do j = minj,maxj
-          do i = mini,maxi
-            if (Prtype(i,j,k)<=0) then
-              buffer(i,j,k) = real(Lambda2(i,j,k,U,V,W), real32)
-            else
-              buffer(i,j,k) = 0
-            end if
-          end do
-         end do
-        end do
-
-        write(unit) BigEnd(buffer)
-
-        write(unit) lf
-      end if
-
-      if (frame_flags%scalars==1) then
-        scalname(1:6)="scalar"
-        do l = 1,num_of_scalars
-         write(scalname(7:8),"(I2.2)") l
-         write(unit) "SCALARS ", scalname , " float",lf
-         write(unit) "LOOKUP_TABLE default",lf
-
-         do k = mink,maxk
-          do j = minj,maxj
-           do i = mini,maxi
-             if (Prtype(i,j,k)<=0) then
-               buffer(i,j,k) = real(SCALAR(i,j,k,l), real32)
-             else
-               buffer(i,j,k) = 0
-             end if
-           end do
-          end do
-         end do
-
-         write(unit) BigEnd(buffer)
-
-         write(unit) lf
-        end do
-      elseif (frame_flags%sumscalars==1.and.num_of_scalars==1) then
-        write(unit) "SCALARS ", "scalar" , " float",lf
-        write(unit) "LOOKUP_TABLE default",lf
-        do k = mink,maxk
-         do j = minj,maxj
-          do i = mini,maxi
-            if (Prtype(i,j,k)<=0) then
-              buffer(i,j,k) =  real(SUM(SCALAR(i,j,k,:)), real32)
-            else
-              buffer(i,j,k) = 0._real32
-            end if
-          end do
-         end do
-        end do
-
-        write(unit) BigEnd(buffer)
-
-        write(unit) lf
-      end if
-
-      if (enable_buoyancy==1.and.frame_flags%temperature==1) then
-        write(unit) "SCALARS temperature float",lf
-        write(unit) "LOOKUP_TABLE default",lf
-        do k = mink,maxk
-         do j = minj,maxj
-          do i = mini,maxi
-            if (Prtype(i,j,k)<=0) then
-              buffer(i,j,k) = real(Temperature(i,j,k), real32)
-            else
-              buffer(i,j,k) = real(temperature_ref, real32)
-            end if
-          end do
-         end do
-        end do
-
-        write(unit) BigEnd(buffer)
-
-        write(unit) lf
-      end if
-
-      if (enable_moisture==1.and.frame_flags%moisture==1) then
-        write(unit) "SCALARS moisture float",lf
-        write(unit) "LOOKUP_TABLE default",lf
-        do k = mink,maxk
-         do j = minj,maxj
-          do i = mini,maxi
-            if (Prtype(i,j,k)<=0) then
-              buffer(i,j,k) = real(Moisture(i,j,k), real32)
-            else
-              buffer(i,j,k) = real(moisture_ref, real32)
-            end if
-          end do
-         end do
-        end do
-
-        write(unit) BigEnd(buffer)
-
-        write(unit) lf
-      end if
-
-      if (enable_buoyancy==1.and.frame_flags%temperature_flux==1) then
-        write(unit) "SCALARS temperature_flux float", lf
-        write(unit) "LOOKUP_TABLE default", lf
-
-        do k = mink,maxk
-         do j = minj,maxj
-          do i = mini,maxi
-            if (Prtype(i,j,k)<=0) then
-              buffer(i,j,k) = real(ScalarVerticalFlux(i,j,k,Temperature,W), real32)
-            else
-              buffer(i,j,k) = 0
-            end if
-          end do
-         end do
-        end do
-
-        write(unit) BigEnd(buffer)
-
-        write(unit) lf
-      end if
-
-      if (frame_flags%scalfl==1) then
-        if (frame_flags%scalars==1) then
-          scalname(1:6)="scalfl"
-          do l = 1,num_of_scalars
-            write(scalname(7:8),"(I2.2)") l
-            write(unit) "SCALARS ", scalname , " float", lf
-            write(unit) "LOOKUP_TABLE default", lf
-            do k = mink,maxk
-             do j = minj,maxj
-              do i = mini,maxi
-                if (Prtype(i,j,k)<=0) then
-                  buffer(i,j,k) = real( ScalarVerticalFlux(i,j,k,Scalar(:,:,:,l),W) , real32)
-                else
-                  buffer(i,j,k) = 0
-                end if
-              end do
-             end do
-            end do
-
-            write(unit) BigEnd(buffer)
-
-            write(unit) lf
-          end do
-        elseif (frame_flags%sumscalars==1.and.num_of_scalars>0) then
-          write(unit) "SCALARS scalfl float", lf
-          write(unit) "LOOKUP_TABLE default", lf
-          do k = mink,maxk
-           do j = minj,maxj
-            do i = mini,maxi
-              if (Prtype(i,j,k)<=0) then
-                buffer(i,j,k) = real(ScalarVerticalFlux(i,j,k,SUM(Scalar(:,:,:,:),4),W) , real32)
-              else
-                buffer(i,j,k) = 0
-              end if
-            end do
-           end do
-          end do
-
-          write(unit) BigEnd(buffer)
-
-          write(unit) lf
-        end if
-      end if
-
-      if (frame_flags%U==1) then
-        write(unit) "VECTORS u float",lf
-        do k = mink,maxk
-         do j = minj,maxj
-          do i = mini,maxi
-!             if (Prtype(i,j,k)<=0) then
-              vbuffer(:,i,j,k) = real([ (U(i,j,k)+U(i-1,j,k))/2, &
-                                        (V(i,j,k)+V(i,j-1,k))/2, &
-                                        (W(i,j,k)+W(i,j,k-1))/2 ], real32)
-!             else
-!               vbuffer(:,i,j,k) = 0
-!             end if
-          end do
-         end do
-        end do
-
-        write(unit) BigEnd(vbuffer)
-
-        write(unit) lf
-      end if
-
-      if (frame_flags%vort==1) then
-        write(unit) "VECTORS vort float",lf
-        do k = mink,maxk
-         do j = minj,maxj
-          do i = mini,maxi
-            if (Prtype(i,j,k)<=0) then
-              vbuffer(:,i,j,k) = real([ (W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin) &
-                                       - (V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin), &
-                                        (U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin) &
-                                       - (W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin), &
-                                        (V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin) &
-                                       - (U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin) ], real32)
-            else
-              vbuffer(:,i,j,k) = 0
-            end if
-          end do
-         end do
-        end do
-
-        write(unit) BigEnd(vbuffer)
-
-      end if
-      close(unit)
-      if (allocated(buffer)) deallocate(buffer)
-      if (allocated(vbuffer)) deallocate(vbuffer)
-    end do   !frame_domains
-    !$omp end parallel do
-  end subroutine Frame
 
 
   subroutine StressProfiles(U,V,W)
@@ -2944,61 +2520,6 @@ contains
   end subroutine BLProfiles
 
 
-  function TotKE(U,V,W) result(res)
-    real(knd) :: res
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    real(knd) Um,Vm,Wm
-    integer i,j,k
-    real(knd) lx,ly,lz
-
-    lx = xU(Prnx) - xU(0)
-    ly = yV(Prny) - yV(0)
-    lz = zW(Prnz) - zW(0)
-
-    res = 0
-    Um = 0
-    Vm = 0
-    Wm = 0
-    !$omp parallel do private(i,j,k) reduction(+:res)
-    do k = 1,Prnz
-     do j = 1,Prny
-      do i = 1,Prnx
-       res = res + (((U(i-1,j,k)+U(i,j,k))/2._knd-Um)**2+&
-                       ((V(i,j-1,k)+V(i,j,k))/2._knd-Vm)**2+&
-                       ((W(i,j,k-1)+W(i,j,k))/2._knd-Wm)**2)
-      end do
-     end do
-    end do
-    !$omp end parallel do
-    res = res*lx*ly*lz/2
-  end function TotKE
-
-  pure real(knd) function VorticityMag(i,j,k,U,V,W) result(res)
-    integer,intent(in) :: i,j,k
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-
-    res = sum(Vorticity(i,j,k,U,V,W)**2)
-    res = Sqrt(res)
-  end function VorticityMag
-
-
-  pure real(knd) function Lambda2(i,j,k,U,V,W) result(res)
-    integer,intent(in) :: i,j,k
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-
-    res = ((U(i,j,k)-U(i-1,j,k))/dxmin)**2
-    res = res + ((V(i,j,k)-V(i,j-1,k))/dymin)**2
-    res = res + ((W(i,j,k)-W(i,j,k-1))/dzmin)**2
-    res = res + ((V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(4*dxmin))**2
-    res = res + ((W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4*dxmin))**2
-    res = res + ((U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4*dymin))**2
-    res = res + ((W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4*dymin))**2
-    res = res + ((U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4*dzmin))**2
-    res = res + ((V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(4*dzmin))**2
-    res = -Sqrt(res)
-    res = VorticityMag(i,j,k,U,V,W) + res
-  end function Lambda2
-
 
 
   subroutine OutputU2(U,V,W)
@@ -3147,7 +2668,7 @@ contains
     character(12) :: fname
     integer mini,maxi,minj,maxj,mink,maxk,unit
 
-    call GridCoords(mini,minj,mink,FrameDomains(1)%position,(yV(Prny+1)+yV(0))/2._knd,(zW(Prnz+1)+zW(0))/2._knd)
+    call GridCoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._knd,(yV(Prny+1)+yV(0))/2._knd,(zW(Prnz+1)+zW(0))/2._knd)
     maxi = mini
     minj = 1
     maxj = Prny
