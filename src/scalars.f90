@@ -1770,7 +1770,7 @@ contains
     end interface
 
 
-    p = bottom_pressure - (zW(Prnz+1)-zW(0))
+    p = bottom_pressure
 
     do k=1,Prnz
      t_virt = sum(TempIn(1:Prny,k))/Prny
