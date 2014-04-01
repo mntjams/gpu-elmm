@@ -10,3 +10,5 @@
 custom*.f90
 bin/*
 *.dblite
+custom
+
