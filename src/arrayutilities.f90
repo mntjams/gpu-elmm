@@ -100,7 +100,7 @@ module ArrayUtilities
   public exchange_alloc, assign, add, &
          set, multiply, add_multiplied, &
          multiply_and_add_scalar, reciprocal, &
-         add_element, avg, dist
+         add_element, avg, dist, cross_product
 
   interface exchange_alloc
     module procedure exchange_alloc_1D
@@ -666,5 +666,14 @@ module ArrayUtilities
       res = norm2(b - a)
     end function
       
+    function cross_product(a,b) result(axb)
+      real(knd),dimension(3) :: axb
+      real(knd),dimension(3),intent(in) :: a
+      real(knd),dimension(3),intent(in) :: b 
+       
+      axb(1) = a(2)*b(3) - a(3)*b(2)
+      axb(2) = a(3)*b(1) - a(1)*b(3)
+      axb(3) = a(1)*b(2) - a(2)*b(1)
+    end function
     
 end module ArrayUtilities
