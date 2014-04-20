@@ -613,10 +613,10 @@ contains
     use iso_c_binding, only: c_loc, c_funloc
     class(TFrameDomain),target,asynchronous,intent(inout) :: D
     real(knd),intent(in) :: time
-    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-    real(knd),intent(in) :: Pr(1:,1:,1:), &
-                            Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
-                            Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
+    real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), &
+                                       Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
+                                       Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
     integer err
 
     associate(start   => D%frame_times%start,&
