@@ -43,8 +43,8 @@ module WMPoint_types
     real(knd) :: wallv = 0
     real(knd) :: wallw = 0
 
-    real(knd) :: albedo = 0.2 !for shortwave radiation
-    real(knd) :: emmissivity = 0.8 !for longwave radiation
+    real(knd) :: albedo = 0.1 !for shortwave radiation - asphalt
+    real(knd) :: emissivity = 0.9 !for longwave radiation - asphalt
     
     real(knd) :: evaporative_fraction = 0
 
