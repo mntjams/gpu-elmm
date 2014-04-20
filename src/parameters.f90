@@ -51,7 +51,7 @@ module Parameters
 
   integer   :: max_number_of_time_steps    !maximum number of time steps
 
-  real(TIM) :: dt,start_time,end_time
+  real(TIM) :: start_time,end_time
 
   real(knd) :: dxmin,dymin,dzmin,CFL,Uref  !minimum grid spacing, dimensions of the domain
 

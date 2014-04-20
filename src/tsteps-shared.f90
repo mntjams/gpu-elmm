@@ -3,13 +3,13 @@
   subroutine PressureGrad(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,dxU,dyV,dzW,&
                           Btype,prgradientx,prgradienty,&
                           Pr,U,V,W,&
-                          dt,coef)
+                          coef)
   implicit none
 #ifdef __HMPP
 #include "hmpp-include.f90"
 #endif
   integer,intent(in)      :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz
-  real(knd),intent(in)    :: prgradientx,prgradienty,dt,coef
+  real(knd),intent(in)    :: prgradientx,prgradienty,coef
   integer,intent(in)      :: Btype(6)
 #ifdef __HMPP
   real(knd),intent(in)    :: dxU(-2:Prnx+2),dyV(-2:Prny+2),dzW(-2:Prnz+2)
@@ -22,12 +22,13 @@
   real(knd),intent(inout),contiguous :: Pr(1:,1:,1:)
   real(knd),intent(inout),contiguous,dimension(-2:,-2:,-2:) :: U,V,W
 #endif
-  real(knd) :: A
+  real(knd) :: A, Ax, Ay, Az
   integer i,j,k
 
-   A=-coef*dt
-   A=-coef*dt
-   A=-coef*dt
+   A = -coef
+   Ax = - coef / dxmin
+   Ay = - coef / dymin
+   Az = - coef / dzmin
 
    !$omp parallel
    !$omp do
@@ -37,7 +38,7 @@
    do k=1,Unz
     do j=1,Uny
      do i=1,Unx
-          U(i,j,k) = U(i,j,k)+A*(Pr(i+1,j,k)-Pr(i,j,k))/dxU(i)+A*prgradientx
+          U(i,j,k) = U(i,j,k)+Ax * (Pr(i+1,j,k)-Pr(i,j,k)) + A * prgradientx
      enddo
     enddo
    enddo
@@ -49,7 +50,7 @@
    do k=1,Vnz
     do j=1,Vny
      do i=1,Vnx
-          V(i,j,k) = V(i,j,k)+A*(Pr(i,j+1,k)-Pr(i,j,k))/dyV(j)+A*prgradienty
+          V(i,j,k) = V(i,j,k)+Ay * (Pr(i,j+1,k)-Pr(i,j,k)) + A * prgradienty
      enddo
     enddo
    enddo
@@ -61,7 +62,7 @@
    do k=1,Wnz
     do j=1,Wny
      do i=1,Wnx
-          W(i,j,k) = W(i,j,k)+A*(Pr(i,j,k+1)-Pr(i,j,k))/dzW(k)
+          W(i,j,k) = W(i,j,k) + Az * (Pr(i,j,k+1)-Pr(i,j,k))
      enddo
     enddo
    enddo
@@ -72,10 +73,11 @@
 
   
   
-  subroutine StressBoundaryFlux(U2,V2)
+  subroutine StressBoundaryFlux(U2,V2,dt)
     use ArrayUtilities,only: add
     use Outputs,only: profuw,profvw, profuwsgs, profvwsgs
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U2,V2
+    real(knd),intent(in) :: dt
     real(knd) :: flux
     integer :: first,last
     
@@ -121,7 +123,7 @@
   real(knd),dimension(-1:Prnx+2,-1:Prny+2,-1:Prnz+2),intent(in) :: temperature
   intrinsic abs
 #else
- subroutine Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,Temperature,Moisture,beta,rho,RK_stage)
+ subroutine Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,Temperature,Moisture,beta,rho,RK_stage,dt)
   use VolumeSources, only: ResistanceForce
   use VTKArray
   real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U,V,W
@@ -132,6 +134,7 @@
 #endif
   real(knd),dimension(1:3),intent(in) :: beta,rho
   integer,intent(in) :: RK_stage
+  real(knd),intent(in) :: dt
   integer i,j,k
 
       if (RK_stage>1) then
@@ -320,11 +323,11 @@
                                 grav_acc,temperature_ref,Wstar,Temperature,Moisture)
 
       call ResistanceForce(Ustar,Vstar,Wstar,U,V,W)
-      
-      call StressBoundaryFlux(Ustar,Vstar)
-      
+
+      call StressBoundaryFlux(Ustar,Vstar,dt)
+
       if (explicit_diffusion==1) call MomentumDiffusion(Ustar,Vstar,Wstar,U,V,W)
-      
+
 
       !$omp parallel private(i,j,k)
       !$omp do
@@ -587,7 +590,7 @@
   subroutine ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,&
                     dxPr,dyPr,dzPr,dxU,dyV,dzW,&
                     U,V,W,U2,V2,W2,U3,V3,W3,nu,&
-                    dt,coef)
+                    coef)
 
   implicit none
 
@@ -600,13 +603,13 @@
   real(knd),intent(in),dimension(-1:,-1:,-1:),contiguous :: nu
   real(knd),intent(in),dimension(-2:),contiguous :: dxU,dyV,dzW
   real(knd),intent(in),dimension(-2:),contiguous :: dxPr,dyPr,dzPr
-  real(knd),intent(in) :: dt,coef
+  real(knd),intent(in) :: coef
 
   real(knd) :: Ap, recdxmin2, recdymin2, recdzmin2
   integer i,j,k
 
 
-     Ap = coef*dt
+     Ap = coef
 
      recdxmin2 = 1._knd / dxmin**2
      recdymin2 = 1._knd / dymin**2
@@ -771,7 +774,7 @@
      recdzmin2 = 1._knd / dzmin**2
 
      !$omp parallel private(i,j,k,bi,bj,bk)
-     !$omp do schedule(runtime) collapse(3)
+     !$omp do schedule(runtime) !collapse(3)
      do bk = 1, Unz, tilenz(narr)
       do bj = 1, Uny, tileny(narr)
        do bi = 1, Unx, tilenx(narr)
@@ -810,7 +813,7 @@
 #undef comp
 
 
-     !$omp do schedule(runtime) collapse(3)
+     !$omp do schedule(runtime) !collapse(3)
      do bk = 1, Vnz, tilenz(narr)
       do bj = 1, Vny, tileny(narr)
        do bi = 1, Vnx, tilenx(narr)
@@ -849,7 +852,7 @@
 #undef comp
 
 
-     !$omp do schedule(runtime) collapse(3)
+     !$omp do schedule(runtime) !collapse(3)
      do bk = 1, Wnz, tilenz(narr)
       do bj = 1, Wny, tileny(narr)
        do bi = 1, Wnx, tilenx(narr)

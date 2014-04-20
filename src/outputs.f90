@@ -470,13 +470,14 @@ contains
 
 
 
-  subroutine OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
+  subroutine OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
     use Wallmodels, only: ComputeViscsWM
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)   :: U,V,W
     real(knd),dimension(1:,1:,1:),contiguous,intent(in)      :: Pr
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)   :: Temperature
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)   :: Moisture
     real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: Scalar
+    real(knd),intent(in) :: dt
     real(knd),intent(in) :: delta
 
     integer :: l,i,j,k
@@ -648,7 +649,7 @@ contains
       dissip(step)=(tke(step-1)-tke(step))/(times(step)-times(step-1))
     end if
 
-    if (store%delta_time==1) then
+    if (store%delta_time==1.and.dt>0) then
       delta_time(step)=delta/dt
     end if
 
@@ -766,14 +767,26 @@ contains
       call StressProfiles(U,V,W)
     end if
 
-    if ((store%BLprofiles==1 .and. &
+    if (store%BLprofiles==1 .and. &
          (averaging==1 .and. &
          ( time>=timeavg1 .and. &
-         time<=timeavg2))) .or. &
-       (TempBtype(To)==AUTOMATICFLUX .or. &
-        MoistBtype(To)==AUTOMATICFLUX .or. &
-        ScalBType(To)==AUTOMATICFLUX)) then
-      call ScalarFluxSGSProfiles(W,Temperature,Moisture,Scalar)
+         time<=timeavg2))) then
+
+      call FluxSGSProfiles(W,Temperature,Moisture,Scalar)
+
+    else if (TempBtype(To)==AUTOMATICFLUX .or. &
+             MoistBtype(To)==AUTOMATICFLUX .or. &
+             ScalBType(To)==AUTOMATICFLUX) then
+
+      if (TempBtype(To)==AUTOMATICFLUX.and.enable_buoyancy) &
+        call TemperatureFluxSGSProfile(W,Temperature)
+
+      if (MoistBtype(To)==AUTOMATICFLUX.and.enable_moisture) &
+        call MoistureFluxSGSProfile(W,Moisture)
+
+      if (ScalBtype(To)==AUTOMATICFLUX.and.num_of_scalars>0) &
+        call ScalarFluxSGSProfile(W,Scalar)
+
     end if
 
     if (store%BLprofiles==1) then
@@ -1482,11 +1495,11 @@ contains
 
 
   subroutine OutputAvg(U,V,W,U_r,V_r,W_r,Pr,Temperature,Moisture)
-    real(knd),dimension(:,:,:),contiguous,intent(in)    :: U,V,W
-    real(knd),dimension(:,:,:),contiguous,intent(inout) :: U_r,V_r,W_r
-    real(knd),dimension(:,:,:),contiguous,intent(in)    :: Pr
-    real(knd),dimension(:,:,:),contiguous,intent(in)    :: Temperature
-    real(knd),dimension(:,:,:),contiguous,intent(in)    :: Moisture
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U,V,W
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U_r,V_r,W_r
+    real(knd),dimension(1:,1:,1:),contiguous,intent(in)    :: Pr
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Temperature
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Moisture
     character(70) :: str
     character(8) ::  scalname="scalar00"
     integer i,j,k,l,unit
@@ -2207,7 +2220,7 @@ contains
   end subroutine StressProfiles
   
   
-  subroutine ScalarFluxSGSProfiles(W,Temperature,Moisture,Scalar)
+  subroutine FluxSGSProfiles(W,Temperature,Moisture,Scalar)
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Moisture
@@ -2215,46 +2228,67 @@ contains
     real(knd) :: S
     integer   :: i,j,k,l,n
 
-    if (enable_buoyancy) then
-      !proftempfl is computed directly during advection step
+    
+    if (enable_buoyancy) call TemperatureFluxSGSProfile(W,Temperature)
+    if (enable_moisture) call MoistureFluxSGSProfile(W,Moisture)
+    if (num_of_scalars>0) call ScalarFluxSGSProfile(W,Scalar)
+  end subroutine
 
-      !$omp parallel do private(i,j,k,n,S)
-      do k = 0,Prnz
-        S = 0
-        n = 0
-        do j = 1,Prny
-         do i = 1,Prnx
-           if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-             S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Temperature(i,j,k+1)-Temperature(i,j,k)))/dzW(k)
-             n = n + 1
-           end if
-         end do
-        end do
-        proftempflsgs(k) = S / max(n,1)
+
+  subroutine TemperatureFluxSGSProfile(W,Temperature)
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
+    real(knd) :: S
+    integer   :: i,j,k,l,n
+    !proftempfl is computed directly during advection step
+
+    !$omp parallel do private(i,j,k,n,S)
+    do k = 0,Prnz
+      S = 0
+      n = 0
+      do j = 1,Prny
+       do i = 1,Prnx
+         if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
+           S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Temperature(i,j,k+1)-Temperature(i,j,k)))/dzW(k)
+           n = n + 1
+         end if
+       end do
       end do
-      !$omp end parallel do
-    end if
+      proftempflsgs(k) = S / max(n,1)
+    end do
+    !$omp end parallel do
+  end subroutine
 
-    if (enable_moisture) then
-      !profmoistfl is computed directly during advection step
+  subroutine MoistureFluxSGSProfile(W,Moisture)
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Moisture
+    real(knd) :: S
+    integer   :: i,j,k,l,n
+    !profmoistfl is computed directly during advection step
 
-      !$omp parallel do private(i,j,k,n,S)
-      do k = 0,Prnz
-        S = 0
-        n = 0
-        do j = 1,Prny
-         do i = 1,Prnx
-           if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-             S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Moisture(i,j,k+1)-Moisture(i,j,k)))/dzW(k)
-             n = n + 1
-           end if
-         end do
-        end do
-        profmoistflsgs(k) = S / max(n,1)
+    !$omp parallel do private(i,j,k,n,S)
+    do k = 0,Prnz
+      S = 0
+      n = 0
+      do j = 1,Prny
+       do i = 1,Prnx
+         if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
+           S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Moisture(i,j,k+1)-Moisture(i,j,k)))/dzW(k)
+           n = n + 1
+         end if
+       end do
       end do
-      !$omp end parallel do
-    end if
+      profmoistflsgs(k) = S / max(n,1)
+    end do
+    !$omp end parallel do
+  end subroutine
       
+  subroutine ScalarFluxSGSProfile(W,Scalar)
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
+    real(knd),dimension(-1:,-1:,-1:,1:),contiguous,intent(in) :: Scalar
+    real(knd) :: S
+    integer   :: i,j,k,l,n
+
     do l = 1,num_of_scalars
       !$omp parallel private(i,j,k,n,S)
       !$omp do
@@ -2289,9 +2323,9 @@ contains
       !$omp end do
       !$omp end parallel
     end do
+  end subroutine
 
-
-  end subroutine ScalarFluxSGSProfiles
+  
 
 
   subroutine BLProfiles(U,V,W,Temperature,Moisture,Scalar)

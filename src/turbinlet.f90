@@ -34,7 +34,8 @@ contains
 
 
 
- subroutine GetTurbInletXie
+ subroutine GetTurbInletXie(dt)
+   real(knd),intent(in) :: dt
    logical,save:: called=.false.
    integer i,j,k
    integer,save:: filtny,filtnz,bigNy,bigNz

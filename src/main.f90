@@ -18,6 +18,8 @@ program CLMM
 
   real(knd) :: delta = 0
 
+  real(knd) :: dt = 0 !time_step
+
   pi=2.0_knd*acos(0.0_knd)
 
 
@@ -40,7 +42,7 @@ program CLMM
   time = start_time
   step = 0
 
-  call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
+  call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
 
 
 
@@ -58,7 +60,7 @@ program CLMM
 
 
 
-      call TMarchRK3(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
+      call TMarchRK3(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
 
 
 
@@ -66,7 +68,7 @@ program CLMM
       time = time + dt
 
 
-      call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
+      call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
 
 
       if ((steady==1) .and. (delta<eps)) then

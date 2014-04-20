@@ -29,9 +29,9 @@ module CDS
      nz=Unz
 
      if (gridtype==UNIFORMGRID) then
-        Ax=0.25*dt/dxmin
-        Ay=0.25*dt/dymin
-        Az=0.25*dt/dzmin
+        Ax=0.25/dxmin
+        Ay=0.25/dymin
+        Az=0.25/dzmin
 
         !$omp parallel do private(i,j,k)
         do k=1,nz
@@ -67,7 +67,7 @@ module CDS
                       -(gn(j-1)*U(i,j,k)+(1-gn(j-1))*U(i,j-1,k))*(fp(i)*V(i+1,j-1,k)+(1-fp(i))*V(i,j-1,k)))/dyPr(j)
            Utmp=Utmp+( (ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k)) &
                       -(ht(k-1)*U(i,j,k)+(1-ht(k-1))*U(i,j,k-1))*(fp(i)*W(i+1,j,k-1)+(1-fp(i))*W(i,j,k-1)))/dzPr(k)
-           U2(i,j,k)=-dt*Utmp
+           U2(i,j,k)=-Utmp
           end do
          end do
         end do
@@ -94,9 +94,9 @@ module CDS
      nz=Vnz
 
      if (gridtype==UNIFORMGRID) then
-        Ax=0.25*dt/dxmin
-        Ay=0.25*dt/dymin
-        Az=0.25*dt/dzmin
+        Ax=0.25/dxmin
+        Ay=0.25/dymin
+        Az=0.25/dzmin
 
         !$omp parallel do private(i,j,k)
         do k=1,nz
@@ -132,7 +132,7 @@ module CDS
                       -(fe(i-1)*V(i,j,k)+(1-fe(i-1))*V(i-1,j,k))*(gp(j)*U(i-1,j+1,k)+(1-gp(j))*U(i-1,j,k)))/dxPr(i)
            Vtmp=Vtmp+( (ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k)) &
                       -(ht(k-1)*V(i,j,k)+(1-ht(k-1))*V(i,j,k-1))*(gp(j)*W(i,j+1,k-1)+(1-gp(j))*W(i,j,k-1)))/dzPr(k)
-           V2(i,j,k)=-dt*Vtmp
+           V2(i,j,k)=-Vtmp
           end do
          end do
         end do
@@ -157,9 +157,9 @@ module CDS
      nz=Wnz
 
      if (gridtype==UNIFORMGRID) then
-        Ax=0.25*dt/dxmin
-        Ay=0.25*dt/dymin
-        Az=0.25*dt/dzmin
+        Ax=0.25/dxmin
+        Ay=0.25/dymin
+        Az=0.25/dzmin
 
         !$omp parallel do private(i,j,k)
         do k=1,nz
@@ -195,7 +195,7 @@ module CDS
                       -(fe(i-1)*W(i,j,k)+(1-fe(i-1))*W(i-1,j,k))*(hp(k)*U(i-1,j,k+1)+(1-hp(k))*U(i-1,j,k)))/dxPr(i)
            Wtmp=Wtmp+( (gn(j)*W(i,j+1,k)+(1-gn(j))*W(i,j,k))*(hp(k)*V(i,j,k+1)+(1-hp(k))*V(i,j,k)) &
                       -(gn(j-1)*W(i,j,k)+(1-gn(j-1))*W(i,j-1,k))*(hp(k)*V(i,j-1,k+1)+(1-hp(k))*V(i,j-1,k)))/dzPr(k)
-           W2(i,j,k)=-dt*Wtmp
+           W2(i,j,k)=-Wtmp
           end do
          end do
         end do
@@ -221,9 +221,9 @@ module CDS
 
 
      if (gridtype==UNIFORMGRID) then
-        Ax=0.5*dt/dxmin
-        Ay=0.125*dt/dymin
-        Az=0.125*dt/dzmin
+        Ax=0.5/dxmin
+        Ay=0.125/dymin
+        Az=0.125/dzmin
 
         !$omp parallel do private(i,j,k,Vadv,Wadv)
         do k=1,Unz
@@ -255,9 +255,9 @@ module CDS
 
 
      if (gridtype==UNIFORMGRID) then
-        Ax=0.125*dt/dxmin
-        Ay=0.5*dt/dymin
-        Az=0.125*dt/dzmin
+        Ax=0.125/dxmin
+        Ay=0.5/dymin
+        Az=0.125/dzmin
 
         !$omp parallel do private(i,j,k,Uadv,Wadv)
         do k=1,Vnz
@@ -289,9 +289,9 @@ module CDS
 
 
      if (gridtype==UNIFORMGRID) then
-        Ax=0.125*dt/dxmin
-        Ay=0.125*dt/dymin
-        Az=0.5*dt/dzmin
+        Ax=0.125/dxmin
+        Ay=0.125/dymin
+        Az=0.5/dzmin
 
         !$omp parallel do private(i,j,k,Uadv,Vadv)
         do k=1,Wnz
@@ -464,7 +464,7 @@ module CDS
       end do
 
       !$omp workshare
-      U2 = U2 * dt / divcoef
+      U2 = U2 / divcoef
       !$omp end workshare
       !$omp end parallel
 
@@ -555,7 +555,7 @@ module CDS
       end do
 
       !$omp workshare
-      V2 = V2 * dt / divcoef
+      V2 = V2 / divcoef
       !$omp end workshare
       !$omp end parallel
 
@@ -645,7 +645,7 @@ module CDS
       end do
 
       !$omp workshare
-      W2 = W2 * dt / divcoef
+      W2 = W2 / divcoef
       !$omp end workshare
       !$omp end parallel
 
@@ -750,7 +750,7 @@ module CDS
       end do
 
       !$omp workshare
-      U2 = U2 * dt / divcoef
+      U2 = U2 / divcoef
       !$omp end workshare
       !$omp end parallel
 
@@ -841,7 +841,7 @@ module CDS
       end do
 
       !$omp workshare
-      V2 = V2 * dt / divcoef
+      V2 = V2 / divcoef
       !$omp end workshare
       !$omp end parallel
 
@@ -931,7 +931,7 @@ module CDS
       end do
 
       !$omp workshare
-      W2 = W2 * dt / divcoef
+      W2 = W2 / divcoef
       !$omp end workshare
       !$omp end parallel
 
@@ -1099,7 +1099,7 @@ module CDS
       !$omp end do
       !$omp end parallel
 
-      call multiply(U2,-dt/divcoef)
+      call multiply(U2,-1._knd/divcoef)
 
     end subroutine CD4divU
 
@@ -1263,7 +1263,7 @@ module CDS
       !$omp end do
       !$omp end parallel
 
-      call multiply(V2,-dt/divcoef)
+      call multiply(V2,-1._knd/divcoef)
 
     end subroutine CD4divV
 
@@ -1432,7 +1432,7 @@ module CDS
       !$omp end do
       !$omp end parallel
 
-      call multiply(W2,-dt/divcoef)
+      call multiply(W2,-1._knd/divcoef)
 
     end subroutine CD4divW
 
@@ -1615,7 +1615,7 @@ module CDS
 !       end do
 !
 !       !$omp workshare
-!       U2 = U2 * dt / divcoef
+!       U2 = U2 / divcoef
 !       !$omp end workshare
 !       !$omp end parallel
 !
@@ -1775,7 +1775,7 @@ module CDS
 !       end do
 !
 !       !$omp workshare
-!       V2 = V2 * dt / divcoef
+!       V2 = V2 / divcoef
 !       !$omp end workshare
 !       !$omp end parallel
 !
@@ -1935,7 +1935,7 @@ module CDS
 !       end do
 !
 !       !$omp workshare
-!       W2 = W2 * dt / divcoef
+!       W2 = W2 / divcoef
 !       !$omp end workshare
 !       !$omp end parallel
 !

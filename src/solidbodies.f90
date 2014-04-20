@@ -1,7 +1,6 @@
 module SolidBodies
 
   use Parameters
-  use Lists
   use Body_class
   use GeometricShapes
 
@@ -20,7 +19,14 @@ module SolidBodies
     real(knd) :: temperature_flux = 0
     real(knd) :: moisture_flux = 0
     !other scalar fluxes assumed zero
+    
+    !building brick - Santamouris - Environmental Design of Urban Buildings
+    real(knd) :: emissivity = 0.45 
+    real(knd) :: albedo = 0.3
   end type SolidBody
+  
+#define TYPEPARAM type(SolidBody)
+#include "list-inc-def.f90"
 
   type(List) :: SolidBodiesList
 
@@ -37,29 +43,21 @@ module SolidBodies
 
 contains
 
-
+#include "list-inc-proc.f90"
+#undef TYPEPARAM
 
   subroutine SetCurrentSB(SB,n)
     type(SolidBody),pointer,intent(out) :: SB
     integer,intent(in) :: n
-    class(*),pointer :: ptr
     integer i
 
     call SolidBodiesList%iter_restart
 
     do i = 1,n
-      call SolidBodiesList%iter_next(ptr)
+      SB => SolidBodiesList%iter_next()
     enddo
 
-    if (associated(ptr)) then
-      select type (ptr)
-        type is (SolidBody)
-          SB => ptr
-        class default
-          write (*,*) "Error, wrong dynamic type of item in SolidBodiesList."
-          stop
-      end select
-    else
+    if (.not.associated(SB)) then
       write (*,*) "Error, no SolidBody with number",n,"in the list."
       stop
     end if
@@ -85,88 +83,73 @@ contains
     contains
 
       subroutine SetPrtype(CurrentSB)
-        class(*) :: CurrentSB
+        type(SolidBody) :: CurrentSB
         integer i,j,k
 
-        select type (CurrentSB)
-          type is (SolidBody)
-
-            if (CurrentSB%numofbody==0) stop "Error, numofbody==0, did you use AddSolidBody()?"
-        
-            !$omp parallel do private(i,j,k) schedule(dynamic)
-            do k = 0,Prnz+1
-             do j = 0,Prny+1
-              do i = 0,Prnx+1
-                 if (CurrentSB%Inside(xPr(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000)) &
-                          Prtype(i,j,k) = CurrentSB%numofbody
-              enddo
-             enddo
-            enddo
-            !$omp end parallel do
-        end select
+        if (CurrentSB%numofbody==0) stop "Error, numofbody==0, did you use AddSolidBody()?"
+    
+        !$omp parallel do private(i,j,k) schedule(dynamic)
+        do k = 0,Prnz+1
+         do j = 0,Prny+1
+          do i = 0,Prnx+1
+             if (CurrentSB%Inside(xPr(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000)) &
+                      Prtype(i,j,k) = CurrentSB%numofbody
+          enddo
+         enddo
+        enddo
+        !$omp end parallel do
       end subroutine
 
       subroutine SetUtype(CurrentSB)
-        class(*) :: CurrentSB
+        type(SolidBody) :: CurrentSB
         integer i,j,k
 
-        select type (CurrentSB)
-          type is (SolidBody)
-
-            if (CurrentSB%numofbody==0) stop "Error, numofbody==0, did you use AddSolidBody()?"
-        
-            !$omp parallel do private(i,j,k) schedule(dynamic)
-            do k = 0,Unz+1
-             do j = 0,Uny+1
-              do i = 0,Unx+1
-                 if (CurrentSB%Inside(xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
-                           Utype(i,j,k) = CurrentSB%numofbody
-              enddo
-             enddo
-            enddo
-            !$omp end parallel do
-        end select
+        if (CurrentSB%numofbody==0) stop "Error, numofbody==0, did you use AddSolidBody()?"
+    
+        !$omp parallel do private(i,j,k) schedule(dynamic)
+        do k = 0,Unz+1
+         do j = 0,Uny+1
+          do i = 0,Unx+1
+             if (CurrentSB%Inside(xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
+                       Utype(i,j,k) = CurrentSB%numofbody
+          enddo
+         enddo
+        enddo
+        !$omp end parallel do
       end subroutine
 
       subroutine SetVtype(CurrentSB)
-        class(*) :: CurrentSB
+        type(SolidBody) :: CurrentSB
         integer i,j,k
 
-        select type (CurrentSB)
-          type is (SolidBody)
-
-            if (CurrentSB%numofbody==0) stop "Error, numofbody==0, did you use AddSolidBody()?"
-        
-            !$omp parallel do private(i,j,k) schedule(dynamic)
-            do k = 0,Vnz+1
-             do j = 0,Vny+1
-              do i = 0,Vnx+1
-                 if (CurrentSB%Inside(xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
-                           Vtype(i,j,k) = CurrentSB%numofbody
-              enddo
-             enddo
-            enddo
-            !$omp end parallel do
-        end select
+        if (CurrentSB%numofbody==0) stop "Error, numofbody==0, did you use AddSolidBody()?"
+    
+        !$omp parallel do private(i,j,k) schedule(dynamic)
+        do k = 0,Vnz+1
+         do j = 0,Vny+1
+          do i = 0,Vnx+1
+             if (CurrentSB%Inside(xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
+                       Vtype(i,j,k) = CurrentSB%numofbody
+          enddo
+         enddo
+        enddo
+        !$omp end parallel do
       end subroutine
 
       subroutine SetWtype(CurrentSB)
-        class(*) :: CurrentSB
+        type(SolidBody) :: CurrentSB
         integer i,j,k
 
-         select type (CurrentSB)
-          type is (SolidBody)
-            !$omp parallel do private(i,j,k) schedule(dynamic)
-            do k = 0,Wnz+1
-             do j = 0,Wny+1
-              do i = 0,Wnx+1
-                 if (CurrentSB%Inside(xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
-                           Wtype(i,j,k) = CurrentSB%numofbody
-              enddo
-             enddo
-            enddo
-            !$omp end parallel do
-        end select
+        !$omp parallel do private(i,j,k) schedule(dynamic)
+        do k = 0,Wnz+1
+         do j = 0,Wny+1
+          do i = 0,Wnx+1
+             if (CurrentSB%Inside(xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
+                       Wtype(i,j,k) = CurrentSB%numofbody
+          enddo
+         enddo
+        enddo
+        !$omp end parallel do
       end subroutine
 
   end subroutine FindInsideCells
@@ -197,27 +180,33 @@ contains
     use Strings
     character(*),intent(in) :: filename
     integer :: l
+    character(5) :: suffix
     
     l = len(filename)
-
-    if (filename(l-4:l)=='.obst') then
-      call ReadObst(filename)
-    else if (filename(l-3:l)=='.off') then
-      call ReadOff(filename)
-    else if (filename(l-3:l)=='.xyz'.or.filename(l-3:l)=='.elv') then
-      call ReadTerrain(filename)
-    end if
     
+    suffix = filename(index(filename,'.',back=.true.):)
+
+    if (suffix=='.obst'.or.suffix=='.geom') then
+      call ReadUnion(filename)
+    else if (suffix=='.off') then
+      call ReadOff(filename)
+    else if (suffix=='.xyz'.or.suffix=='.elv') then
+      call ReadTerrain(filename)
+    else
+      write(*,*) "Unknown file format "//suffix
+      stop
+    end if
+
   end subroutine ReadSolidBodiesFromFile
   
   
 
-  subroutine ReadObst(filename)
+  subroutine ReadUnion(filename)
     character(*),intent(in) :: filename
     
     !assume z0 the same as for the lower boundary
     call AddSolidBody(SolidBody(Union(filename), z0 = z0B))
-  end subroutine ReadObst
+  end subroutine ReadUnion
   
   
   

@@ -605,9 +605,7 @@ contains
        allocate(probes(number_of_probes))
 
        do i = 1,number_of_probes
-         call get(probes(i)%x)
-         call get(probes(i)%y)
-         call get(probes(i)%z)
+         call get(probes(i)%x, probes(i)%y, probes(i)%z)
        end do
 
        scalar_probes = probes
@@ -792,12 +790,6 @@ contains
    if (Btype(We)==INLETFROMFILE) inlettype = FromFileInletType
 
 
-   if (Abs(Uinlet)>0) then
-     dt = Abs(dxmin/Uinlet)
-   else
-     dt = dxmin
-   end if
-
    if ((timeavg1>=0).and.(timeavg2>=timeavg1)) then
      averaging = 1
    else
@@ -824,8 +816,21 @@ contains
      end subroutine
      subroutine lget1(x)
        logical,intent(out) :: x
+       character(120) :: line, fname
+       integer :: ierr, tmp
        read(unit,fmt='(/)')
-       read(unit,*) x
+       read(unit,'(a)') line
+       read(line,*,iostat=ierr) x
+       if (ierr/=0) then
+         read(line,*,iostat=ierr) tmp
+         if (ierr/=0) then
+           inquire(unit,name=fname)
+           write(*,*) "Stop expected a boolean flag in file "//trim(fname)
+           write(*,*) "Received '"//trim(line)//"' instead."
+           stop
+         end if
+         x = tmp /=0
+       end if
      end subroutine
      subroutine lget2(x,y)
        logical,intent(out) :: x,y
@@ -1024,6 +1029,7 @@ contains
   integer i,j,k
   real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
   real(knd),allocatable :: Q(:,:,:)
+  real(knd) :: dt
 
     call init_random_seed
 
@@ -1245,7 +1251,7 @@ contains
 
          do i = 1,Prnx
            
-           call GetTurbulentInlet
+           call GetTurbulentInlet(dt)
            !$omp parallel private(j,k)
            !$omp do
            do k = 1,Unz
@@ -1504,7 +1510,7 @@ contains
   subroutine InitBoundaryConditions
   real(knd),allocatable:: xU2(:),yV2(:),zW2(:)
   integer i,j,k,nx,ny,nz,nxup,nxdown,nyup,nydown,nzup,nzdown,io
-  real(knd) P
+  real(knd) P,dt
   integer unit
 
     nx = Prnx-1
@@ -1820,7 +1826,12 @@ contains
       case (ParabolicInletType)
         call ParabolicInlet
       case (TurbulentInletType)
-        call GetTurbulentInlet
+        if (Abs(Uinlet)>0) then
+          dt = Abs(dxmin/Uinlet)
+        else
+          dt = dxmin
+        end if
+        call GetTurbulentInlet(dt)
       case (FromFileInletType)
         call GetInletFromFile(start_time)
       case default

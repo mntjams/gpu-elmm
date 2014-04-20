@@ -59,11 +59,11 @@ contains
  
   
   
-  pure function out_lw_radiation(emmisivity, T) result(res)
+  pure function out_lw_radiation(emissivity, T) result(res)
     real(knd) :: res
-    real(knd),intent(in) :: emmisivity, T
+    real(knd),intent(in) :: emissivity, T
     
-    res = SB_sigma * emmisivity * T**4
+    res = SB_sigma * emissivity * T**4
   end function
   
   pure function in_lw_radiation() result(res)
@@ -74,15 +74,15 @@ contains
   
   pure function clear_sky_lw_radiation() result(res)
     real(knd) :: res
-    real(knd) :: wv_press, atmosphere_emmisivity
+    real(knd) :: wv_press, atmosphere_emissivity
     
     wv_press = moisture_ref / (moisture_ref + 0.622) * &
                                bottom_pressure
     
-    atmosphere_emmisivity = 0.23 + &
+    atmosphere_emissivity = 0.23 + &
                0.44 * (wv_press / temperature_ref)**(0.125_knd)
     
-    res = SB_sigma * atmosphere_emmisivity * temperature_ref**4
+    res = SB_sigma * atmosphere_emissivity * temperature_ref**4
   end function
   
   pure function cloud_factor_lw() result(res)

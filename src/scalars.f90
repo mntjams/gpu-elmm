@@ -2,7 +2,6 @@ module Scalars
  use Parameters
  use ArrayUtilities
  use Wallmodels
- use ImmersedBoundary, only: TIBPoint, ScalFlIBPoints,TIBPoint_ScalFlSource
  use Limiters, only: Limiter, limparam
  use Boundaries
  use ScalarBoundaries
@@ -81,7 +80,7 @@ contains
     if (allocated(Ap)) deallocate(Ap)
   end subroutine
 
-  subroutine ScalarRK3(U,V,W,Temperature,Moisture,Scalar,RK_stage, &
+  subroutine ScalarRK3(U, V, W, Temperature, Moisture, Scalar, RK_stage, dt, &
                 temperature_flux_profile, moisture_flux_profile)
     use RK3
     use VolumeSources, only: ScalarVolumeSources
@@ -89,9 +88,10 @@ contains
     real(knd), contiguous, intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd), contiguous, intent(inout) :: Temperature(-1:,-1:,-1:),Moisture(-1:,-1:,-1:)
     real(knd), contiguous, intent(inout) :: Scalar(-1:,-1:,-1:,1:)
+    real(knd), intent(in)                :: dt
     real(knd), contiguous, intent(out)   :: temperature_flux_profile(:)
     real(knd), contiguous, intent(out)   :: moisture_flux_profile(:)
-    integer,  intent(in)    :: RK_stage
+    integer,  intent(in)                 :: RK_stage
 
 
     integer :: sc
@@ -159,9 +159,9 @@ contains
                  BoundScalar, ScalarExtra)
     end do
 
-    if (computedeposition>0) call Deposition(Scalar_2,2._knd*RK_alpha(RK_stage))
+    if (computedeposition>0) call Deposition(Scalar_2,2._knd*RK_alpha(RK_stage)*dt)
 
-    if (computegravsettling>0) call GravSettling(Scalar_2,2._knd*RK_alpha(RK_stage))
+    if (computegravsettling>0) call GravSettling(Scalar_2,2._knd*RK_alpha(RK_stage)*dt)
 
 
     contains
@@ -219,7 +219,7 @@ contains
           call boundary_procedure(Array)
 
           call DiffScalar(Array2,Array, &
-                          scalar_type,boundary_procedure,2._knd*RK_alpha(RK_stage))
+                          scalar_type,boundary_procedure,2._knd*RK_alpha(RK_stage)*dt)
           call assign(Array,Array2)
         end if
 
@@ -705,7 +705,7 @@ contains
   real(knd),intent(in) :: coef
   integer,intent(in) :: sctype
   procedure(boundary_interface) :: boundary_procedure
-  integer nx,ny,nz,i,j,k,bi,bj,bk,l,xi,yj,zk
+  integer nx,ny,nz,i,j,k,bi,bj,bk,l
   real(knd) p,S
   real(knd) A,Ax,Ay,Az
   integer,parameter :: narr = 3, narr2 = 5
@@ -723,7 +723,7 @@ contains
   if (Re>0) then
 
 
-   A = dt*coef
+   A = coef
    Ax = 1._knd/(dxmin**2)
    Ay = 1._knd/(dymin**2)
    Az = 1._knd/(dzmin**2)
@@ -732,7 +732,7 @@ contains
 
    !initital value using forward Euler
    if (gridtype==uniformgrid) then
-     !$omp do schedule(runtime) collapse(3)
+     !$omp do schedule(runtime) !collapse(3)
      do bk = 1,Prnz,tilenz(narr)
       do bj = 1,Prny,tileny(narr)
        do bi = 1,Prnx,tilenx(narr)
@@ -761,7 +761,7 @@ contains
      end do
      !$omp end do
    else
-     !$omp do schedule(runtime) collapse(3)
+     !$omp do schedule(runtime) !collapse(3)
      do bk = 1,Prnz,tilenz(narr)
       do bj = 1,Prny,tileny(narr)
        do bi = 1,Prnx,tilenx(narr)
@@ -794,20 +794,12 @@ contains
 
    call boundary_procedure(SCAL2)
 
-   !$omp parallel private(i,j,k,bi,bj,bk,p,xi,yj,zk)
-   !$omp do schedule(runtime)
-   do i = 1,ubound(ScalFlIBPoints,1)
-     xi = ScalFlIBPoints(i)%xi
-     yj = ScalFlIBPoints(i)%yj
-     zk = ScalFlIBPoints(i)%zk
-     p = TIBPoint_ScalFlSource(ScalFlIBPoints(i),Scal2,sctype) * dt
-     SCAL2(xi,yj,zk) = SCAL2(xi,yj,zk) + p
-     SCAL3(xi,yj,zk) = SCAL3(xi,yj,zk) + p
-   end do
-   !$omp end do nowait
+   call Scalar_ImmersedBoundaries(SCAL2)
+   call Scalar_ImmersedBoundaries(SCAL3)
 
+   !$omp parallel private(i,j,k,bi,bj,bk)
    if (gridtype==uniformgrid) then
-    !$omp do schedule(runtime) collapse(3)
+    !$omp do schedule(runtime) !collapse(3)
     do bk = 1,Prnz,tilenz(narr)
      do bj = 1,Prny,tileny(narr)
       do bi = 1,Prnx,tilenx(narr)
@@ -828,7 +820,7 @@ contains
     end do
     !$omp end do
    else
-    !$omp do schedule(runtime) collapse(3)
+    !$omp do schedule(runtime) !collapse(3)
     do bk = 1,Prnz,tilenz(narr)
      do bj = 1,Prny,tileny(narr)
       do bi = 1,Prnx,tilenx(narr)
@@ -857,7 +849,7 @@ contains
 
     if (gridtype==uniformgrid) then
      !$omp parallel private(i,j,k,p) reduction(max:S)
-     !$omp do schedule(runtime) collapse(3)
+     !$omp do schedule(runtime) !collapse(3)
      do bk = 1,Prnz,tilenz(narr2)
       do bj = 1,Prny,tileny(narr2)
        do bi = 1,Prnx,tilenx(narr2)
@@ -884,7 +876,7 @@ contains
       end do
      end do
      !$omp end do
-     !$omp do schedule(runtime) collapse(3)
+     !$omp do schedule(runtime) !collapse(3)
      do bk = 1,Prnz,tilenz(narr2)
       do bj = 1,Prny,tileny(narr2)
        do bi = 1,Prnx,tilenx(narr2)
@@ -914,7 +906,7 @@ contains
      !$omp endparallel
     else
      !$omp parallel private(i,j,k,p) reduction(max:S)
-     !$omp do schedule(runtime) collapse(3)
+     !$omp do schedule(runtime) !collapse(3)
      do bk = 1,Prnz,tilenz(narr2)
       do bj = 1,Prny,tileny(narr2)
        do bi = 1,Prnx,tilenx(narr2)
@@ -939,7 +931,7 @@ contains
       end do
      end do
      !$omp end do
-     !$omp do schedule(runtime) collapse(3)
+     !$omp do schedule(runtime) !collapse(3)
      do bk = 1,Prnz,tilenz(narr2)
       do bj = 1,Prny,tileny(narr2)
        do bi = 1,Prnx,tilenx(narr2)
@@ -978,14 +970,7 @@ contains
 
    call boundary_procedure(SCAL2)
 
-   !$omp parallel do private(i,j,k,bi,bj,bk,p,xi,yj,zk)
-   do i = 1,ubound(ScalFlIBPoints,1)
-     xi = ScalFlIBPoints(i)%xi
-     yj = ScalFlIBPoints(i)%yj
-     zk = ScalFlIBPoints(i)%zk
-     SCAL2(xi,yj,zk) = SCAL2(xi,yj,zk) + TIBPoint_ScalFlSource(ScalFlIBPoints(i),Scal2,sctype) * dt
-   end do
-   !$omp end parallel do
+   call Scalar_ImmersedBoundaries(Scal2)
 
 
   end if
@@ -1009,7 +994,7 @@ contains
     Ay = 1 / (2 * dymin**2)
     Az = 1 / (2 * dzmin**2)
 
-   !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
+   !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) !collapse(3)
     do bk = 1, Prnz,tilenz(narr)
      do bj = 1, Prny,tileny(narr)
       do bi = 1, Prnx,tilenx(narr)
@@ -1525,14 +1510,14 @@ contains
           if (partdistrib>0) then
             do i = 1,partdistrib
               deptmp = abs(DepositionFlux(p,SCAL(p%xi,p%yj,p%zk,1)*percdistrib(i),partdiam(i),partrho(i)))&
-                  *coef*dt*dxPr(p%xi)*dyPr(p%yj)
+                  *coef*dxPr(p%xi)*dyPr(p%yj)
               p%depscalar(1) = p%depscalar(1)+deptmp/(dxPr(p%xi)*dyPr(p%yj)*dzPr(p%zk))
               SCAL(p%xi,p%yj,p%zk,1) = SCAL(p%xi,p%yj,p%zk,1)-deptmp/(dxPr(p%xi)*dyPr(p%yj)*dzPr(p%zk))
             end do
           else
             do i = 1,num_of_scalars
               deptmp = abs(DepositionFlux(p,SCAL(p%xi,p%yj,p%zk,i),partdiam(i),partrho(i)))&
-                  *coef*dt*dxPr(p%xi)*dyPr(p%yj)
+                  *coef*dxPr(p%xi)*dyPr(p%yj)
               p%depscalar(i) = p%depscalar(i)+deptmp/(dxPr(p%xi)*dyPr(p%yj)*dzPr(p%zk))
               SCAL(p%xi,p%yj,p%zk,i) = SCAL(p%xi,p%yj,p%zk,i)-deptmp/(dxPr(p%xi)*dyPr(p%yj)*dzPr(p%zk))
             end do
@@ -1558,7 +1543,7 @@ contains
      do j = 1,Prny
       do i = 1,Prnx
        us = real(SedimVelocity(partdiam(l),partrho(l),press,temp), knd)
-       flux(i,j,k) = us*SCAL(i,j,k+1,l)*coef*dt*dxPr(i)*dyPr(j)
+       flux(i,j,k) = us*SCAL(i,j,k+1,l)*coef*dxPr(i)*dyPr(j)
       end do
      end do
     end do

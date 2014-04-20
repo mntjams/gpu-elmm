@@ -63,6 +63,16 @@ contains
           WMP%disty = neary-yPr(j)
           WMP%distz = nearz-zPr(k)
           WMP%ustar = 1
+          
+          !HACK
+          if (hypot(WMP%distx,WMP%disty)>abs(WMP%distz)*0.2) then
+            !Santamouris - Environmental Design of Urban Buildings
+            WMP%albedo = 0.3 !red brick 
+            WMP%emissivity = 0.9 !red brick 
+          else
+            WMP%albedo = CurrentSB%albedo
+            WMP%emissivity = CurrentSB%emissivity
+          end if
 
           select type (geomshape => CurrentSB%GeometricShape)
             type is (Terrain)
@@ -226,18 +236,15 @@ contains
   subroutine GetWMFluxes
     use SolarRadiation
     use PhysicalProperties
-    use VolumeSources
+    use PlantBody_type
     
     real(knd) :: inc_radiation_flux, radiation_balance, angle_to_sun, &
                  total_heat_flux, sensible_heat_flux, latent_heat_flux
-    real(knd) :: out_norm(3), xr, yr, zr, svf
+    real(knd) :: out_norm(3), xr(3), distv(3), svf
     
     type(Ray) :: r
     
     integer :: i
-    
-real(knd),allocatable :: svf_array(:,:,:)   
-allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
     
     enable_radiation = .true.
     
@@ -245,34 +252,32 @@ allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
       do i=1,size(WMPoints)
       
         associate(p => WMPoints(i))
-          out_norm = [-p%distx, -p%disty, -p%distz] / &
-                     hypot(hypot(p%distx,p%disty),p%distz)
-      
+
+          distv = [p%distx, p%disty, p%distz]
+
+          out_norm = - distv / norm2(distv)
+
           angle_to_sun = max(0._knd, dot_product(out_norm, vector_to_sun))
 
+          xr = [xPr(p%xi), yPr(p%yj), zPr(p%zk)] + distv * 0.9_knd
 
-          xr = xPr(p%xi)+p%distx*0.9_knd
-          yr = yPr(p%yj)+p%disty*0.9_knd
-          zr = zPr(p%zk)+p%distz*0.9_knd
           if (angle_to_sun>0._knd) then
-            r = Ray([xr, yr, zr], &
-                    vector_to_sun)
-                     
+            r = Ray(xr, vector_to_sun)
             if ((SolidBodiesList%any(DoIntersect)) .or. &
-                (SourceBodiesList%any(DoIntersectPlants))) then
+                (PlantBodiesList%any(DoIntersectPlants))) then
               angle_to_sun = 0
             end if
           end if
 
           !temporary
-          svf = sky_view_factor(xr,yr,zr)
-      
+          svf = sky_view_factor(xr)
+
           inc_radiation_flux = angle_to_sun * solar_direct_flux() + &
                                solar_diffuse_flux()*svf + &
                                in_lw_radiation()
 
           radiation_balance = inc_radiation_flux * (1-p%albedo) - &
-                              out_lw_radiation(p%emmissivity, temperature_ref) * svf
+                              out_lw_radiation(p%emissivity, temperature_ref) * svf
 
           total_heat_flux = radiation_balance - &
                             (0.1 * radiation_balance) !crude guess of the storage flux
@@ -284,7 +289,7 @@ allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
           else
             sensible_heat_flux = total_heat_flux
           end if
-          
+
           p%temperature_flux = sensible_heat_flux / (rho_air_ref * Cp_air_ref)
 
         end associate  
@@ -297,18 +302,18 @@ allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
     
     contains
     
-      real(knd) function sky_view_factor(x,y,z)
-        real(knd),intent(in) :: x,y,z
+      real(knd) function sky_view_factor(xyz)
+        real(knd),intent(in) :: xyz(3)
         integer :: i,nfree
 
         
         nfree = 0
         
         do i=1,svf_nrays
-          r = Ray([x,y,z],svf_vecs(:,i))
+          r = Ray(xyz, svf_vecs(:,i))
         
           if (.not.((SolidBodiesList%any(DoIntersect)) .or. &
-                    (SourceBodiesList%any(DoIntersectPlants)))) then
+                    (PlantBodiesList%any(DoIntersectPlants)))) then
             nfree = nfree + 1
           end if
         end do
@@ -318,29 +323,17 @@ allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
       end function
   
       logical function DoIntersect(item) result(res)
-        class(*) :: item
-        
-        select type (item)
-          class is (SolidBody)
-            res = item%IntersectsRay(r)
-          class default
-            stop "Non-SolidBody i the list."
-        end select
+        type(SolidBody), intent(in) :: item
+
+        res = item%IntersectsRay(r)
       end function
       
       logical function DoIntersectPlants(item) result(res)
-        class(*) :: item
-        
-        select type (item)
-          class is (PlantBody)
-            res = item%IntersectsRay(r)
-          class is (VolumeSourceBody)
-            res = .false.
-          class default
-            stop "Non-VolumeSourceBody i the list."
-        end select
+        type(PlantBody), intent(in) :: item
+
+        res = item%IntersectsRay(r)
       end function
-      
+     
       subroutine SaveFluxes
         use VTKArray
         real(knd),allocatable :: temperature_flux(:,:,:)
@@ -353,10 +346,8 @@ allocate(svf_array(1:Prnx,1:Prny,1));svf_array = 0
             temperature_flux(p%xi,p%yj,p%zk) = p%temperature_flux
           end associate
         end do
-        
-        call VtkArraySimple("output/tempfl.vtk",temperature_flux)
-        
-        call VtkArraySimple("output/svf.vtk",svf_array)
+
+!         call VtkArraySimple("tempfl.vtk",temperature_flux)
         
       end subroutine
       
@@ -465,7 +456,7 @@ module ImmersedBoundary
 
   private
 
-  public TIBPoint, TIBPoint_Interpolate, TIBPoint_MomentumSource, TIBPoint_ScalFlSource, TIBPoint_Viscosity, &
+  public TIBPoint, TIBPoint_Interpolate, TIBPoint_Viscosity, &
          UIBPoints, VIBPoints, WIBPoints, ScalFlIBPoints, &
          GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
          !InitSolidBodies imported from SolidBodies
@@ -598,33 +589,6 @@ contains
   end function TIBPoint_InterpolateTDiff
 
   
-  pure recursive function TIBPoint_ScalFlSource(IBP,Scalar,sctype)  result(src)  !Virtual scalar source for the Immersed Boundary Method with prescribed scalar flux on the boundary
-    real(knd) :: src
-
-    type(TIBPoint),intent(in) :: IBP
-    real(knd),intent(in)      :: Scalar(-1:,-1:,-1:)
-    integer,intent(in)        :: sctype
-
-    real(knd) intscal,intTDiff
-
-    intscal = TIBPoint_Interpolate(IBP,Scalar,-1)
-
-    if (sctype==ScalarTypeTemperature) then
-      intTDiff = TIBPoint_InterpolateTDiff(IBP,TDiff)
-
-      if (intTDiff>0)  intscal = intscal + IBP%temperature_flux * IBP%dist / intTDiff
-    else if (sctype==ScalarTypeMoisture) then
-      intTDiff = TIBPoint_InterpolateTDiff(IBP,TDiff)
-
-      if (intTDiff>0)  intscal = intscal + IBP%moisture_flux * IBP%dist / intTDiff
-    end if
-
-    src = (intscal - Scalar(IBP%xi,IBP%yj,IBP%zk)) / dt
-
-  end function TIBPoint_ScalFlSource
-
-
-  
   pure recursive function TIBPoint_Viscosity(IBP,Viscosity)  result(src)  !Virtual scalar source for the Immersed Boundary Method with prescribed scalar flux on the boundary
     real(knd) :: src
 
@@ -636,16 +600,6 @@ contains
   end function TIBPoint_Viscosity
 
 
-  
-  pure recursive function TIBPoint_MomentumSource(IBP,U) result(src)
-    real(knd) :: src
-
-    type(TIBpoint),intent(in) :: IBP
-    real(knd),intent(in)                      :: U(-2:,-2:,-2:)
-
-    src = (TIBPoint_Interpolate(IBP,U,-2) - U(IBP%xi,IBP%yj,IBP%zk)) / dt
-
-  end function TIBPoint_MomentumSource
 
 
   recursive subroutine TVelIBPoint_Create(IBP,xi,yj,zk,xU,yU,zU,Utype,component)

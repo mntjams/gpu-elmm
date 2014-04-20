@@ -3,8 +3,6 @@ module TSTEPS
   use PARAMETERS
   use ArrayUtilities
   use CDS!, only: CDU, CDV, CDW, CDS4U, CDS4V, CDS4W, CDS4_2U, CDS4_2V, CDS4_2W
-  use LAXFRIED
-  use LAXWend
   use BOUNDARIES, only: BoundU,Bound_Q
   use ScalarBoundaries, only: BoundTemperature, BoundViscosity
   use Pressure !it exports PressureCorrection and GetPrFromGPU
@@ -82,11 +80,11 @@ contains
  end subroutine
 
 
- subroutine TMarchRK3(U,V,W,Pr,Temperature,Moisture,Scalar,delta)
+ subroutine TMarchRK3(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
   use RK3
   real(knd),allocatable,intent(inout) :: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)
   real(knd),allocatable,intent(inout) :: Temperature(:,:,:),Moisture(:,:,:),Scalar(:,:,:,:)
-  real(knd),intent(out) :: delta
+  real(knd),intent(out) :: dt, delta
 
   integer RK_stage
   integer,save:: called = 0
@@ -182,7 +180,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
   end if
 
   if ((Btype(We) ==TurbulentInlet).or.(Btype(Ea) ==TurbulentInlet)) then
-    call GetTurbulentInlet
+    call GetTurbulentInlet(dt)
     !$hmpp <tsteps> advancedload, args[BoundU::sideU,BoundU::Uin,BoundV::Uin,BoundW::Uin]
   else if (Btype(We) ==InletFromFile) then
     call GetInletFromFile(time)
@@ -207,19 +205,17 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
     if (debugparam>1) call system_clock(count=time1)
 
 
-
     call SubgridStresses(U,V,W,Pr,Temperature)
-
 
     !$hmpp <tsteps> advancedload, args[Convection::RK_stage]
 
 
     !$hmpp <tsteps> Convection callsite, args[*].noupdate = true
-    call Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,Temperature,Moisture,RK_beta,RK_rho,RK_stage)
+    call Convection(U,V,W,U2,V2,W2,Ustar,Vstar,Wstar,Temperature,Moisture,RK_beta,RK_rho,RK_stage,dt)
 
-    call ScalarRK3(U,V,W,Temperature,Moisture,Scalar,RK_stage,proftempfl,profmoistfl)
+    call ScalarRK3(U,V,W,Temperature,Moisture,Scalar,RK_stage,dt,proftempfl,profmoistfl)
 
-    call OtherTerms(U,V,W,U2,V2,W2,Pr,2._knd*RK_alpha(RK_stage))
+    call OtherTerms(U,V,W,U2,V2,W2,Pr,2._knd*RK_alpha(RK_stage)*dt)
 
     !download U2 V2 and W2 to main memory Attenuates below are to slow on GPU, waiting for HMPP update
 !     !$hmpp <tsteps> delegatedstore, args[UnifRedblack::U2,UnifRedblack::V2,UnifRedblack::W2]
@@ -254,7 +250,7 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
 
 
     if (poissmet>0) then
-       call PressureCorrection(U2,V2,W2,Pr,Q,2._knd*RK_alpha(RK_stage))
+       call PressureCorrection(U2,V2,W2,Pr,Q,2._knd*RK_alpha(RK_stage)*dt)
     end if
 
 
@@ -265,11 +261,11 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
     if (RK_stage==1) delta = 0
 #ifdef DEBUG
     if (debuglevel>0.or.steady==1) then
-      if (Unx*Uny*Unz>0) then  &
+      if (Unx*Uny*Unz>0) &
         delta = delta+sum(abs(U(1:Unx,1:Uny,1:Unz)-U2(1:Unx,1:Uny,1:Unz)))/(Unx*Uny*Unz)
-      if (Vnx*Vny*Vnz>0) then  &
+      if (Vnx*Vny*Vnz>0) &
         delta = delta+sum(abs(V(1:Vnx,1:Vny,1:Vnz)-V2(1:Vnx,1:Vny,1:Vnz)))/(Vnx*Vny*Vnz)
-      if (Wnx*Wny*Wnz>0) then  &
+      if (Wnx*Wny*Wnz>0) &
         delta = delta+sum(abs(W(1:Wnx,1:Wny,1:Wnz)-W2(1:Wnx,1:Wny,1:Wnz)))/(Wnx*Wny*Wnz)
     end if
 #endif
@@ -387,7 +383,7 @@ end subroutine TMarchRK3
                      dxU,dyV,dzW, &
                      Btype,prgradientx,prgradienty, &
                      Pr,U2,V2,W2, &
-                     dt,coef)
+                     coef)
 
     if (explicit_diffusion<=0) then
 
@@ -406,7 +402,7 @@ end subroutine TMarchRK3
          call ForwEul(Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz, &
                       dxPr,dyPr,dzPr,dxU,dyV,dzW, &
                       U,V,W,U2,V2,W2,U3,V3,W3,Viscosity, &
-                      dt,coef)
+                      coef)
 
 
          !$omp parallel sections
@@ -528,7 +524,7 @@ end subroutine TMarchRK3
        end if
 
 
-       Ap = coef * dt / 2
+       Ap = coef / 2
        S = 0
        l = 0
 
@@ -540,7 +536,7 @@ end subroutine TMarchRK3
        !$omp parallel private(i,j,k,bi,bj,bk)
 
        !The explicit part, which doesn't have to be changed inside the loop
-       !$omp do schedule(runtime) collapse(3)
+       !$omp do schedule(runtime) !collapse(3)
        do bk = 1, Unz, tilenz(narr)
         do bj = 1, Uny, tileny(narr)
          do bi = 1, Unx, tilenx(narr)
@@ -576,7 +572,7 @@ end subroutine TMarchRK3
 #define comp 1
 #include "wmfluxes-inc.f90"
 #undef comp
-       !$omp do schedule(runtime) collapse(3)
+       !$omp do schedule(runtime) !collapse(3)
        do bk = 1, Unz, tilenz(narr)
         do bj = 1, Uny, tileny(narr)
          do bi = 1, Unx, tilenx(narr)
@@ -591,7 +587,7 @@ end subroutine TMarchRK3
         end do
        end do
        !$omp end do nowait
-       !$omp do schedule(runtime) collapse(3)
+       !$omp do schedule(runtime) !collapse(3)
        do bk = 1, Vnz, tilenz(narr)
         do bj = 1, Vny, tileny(narr)
          do bi = 1, Vnx, tilenx(narr)
@@ -627,7 +623,7 @@ end subroutine TMarchRK3
 #define comp 2
 #include "wmfluxes-inc.f90"
 #undef comp
-       !$omp do schedule(runtime) collapse(3)
+       !$omp do schedule(runtime) !collapse(3)
        do bk = 1, Vnz, tilenz(narr)
         do bj = 1, Vny, tileny(narr)
          do bi = 1, Vnx, tilenx(narr)
@@ -642,7 +638,7 @@ end subroutine TMarchRK3
         end do
        end do
        !$omp end do
-       !$omp do schedule(runtime) collapse(3)
+       !$omp do schedule(runtime) !collapse(3)
        do bk = 1, Wnz, tilenz(narr)
         do bj = 1, Wny, tileny(narr)
          do bi = 1, Wnx, tilenx(narr)
@@ -695,7 +691,7 @@ end subroutine TMarchRK3
        !$omp end do
 
        !Auxiliary coefficients to better efficiency in loops
-       !$omp do schedule(runtime) collapse(3)
+       !$omp do schedule(runtime) !collapse(3)
        do bk = 1, Unz, tilenz(narr)
         do bj = 1, Uny, tileny(narr)
          do bi = 1, Unx, tilenx(narr)
@@ -735,7 +731,7 @@ end subroutine TMarchRK3
        call reciprocal(ApU, 1._knd)
 
        !$omp parallel private(i,j,k,bi,bj,bk)
-       !$omp do schedule(runtime) collapse(3)
+       !$omp do schedule(runtime) !collapse(3)
        do bk = 1, Vnz, tilenz(narr)
         do bj = 1, Vny, tileny(narr)
          do bi = 1, Vnx, tilenx(narr)
@@ -775,7 +771,7 @@ end subroutine TMarchRK3
        call reciprocal(ApV, 1._knd)
 
        !$omp parallel private(i,j,k,bi,bj,bk,Suavg,Svavg,Swavg)
-       !$omp do schedule(runtime) collapse(3)
+       !$omp do schedule(runtime) !collapse(3)
        do bk = 1, Wnz, tilenz(narr)
         do bj = 1, Wny, tileny(narr)
          do bi = 1, Wnx, tilenx(narr)
@@ -826,7 +822,7 @@ end subroutine TMarchRK3
          Sv = 0
          Sw = 0
          !$omp parallel private(i,j,k,bi,bj,bk,p) reduction(max:Su,Sv,Sw)
-         !$omp do schedule(runtime) collapse(3)
+         !$omp do schedule(runtime) !collapse(3)
          do bk = 1, Unz, tilenz(narr2)
           do bj = 1, Uny, tileny(narr2)
            do bi = 1, Unx, tilenx(narr2)
@@ -864,7 +860,7 @@ end subroutine TMarchRK3
 #define comp 1
 #include "wmfluxes-inc.f90"
 #undef comp
-         !$omp do schedule(runtime) collapse(3)
+         !$omp do schedule(runtime) !collapse(3)
          do bk = 1, Unz, tilenz(narr2)
           do bj = 1, Uny, tileny(narr2)
            do bi = 1, Unx, tilenx(narr2)
@@ -885,7 +881,7 @@ end subroutine TMarchRK3
          end do
          !$omp enddo
 
-         !$omp do schedule(runtime) collapse(3)
+         !$omp do schedule(runtime) !collapse(3)
          do bk = 1, Vnz, tilenz(narr2)
           do bj = 1, Vny, tileny(narr2)
            do bi = 1, Vnx, tilenx(narr2)
@@ -923,7 +919,7 @@ end subroutine TMarchRK3
 #define comp 2
 #include "wmfluxes-inc.f90"
 #undef comp
-         !$omp do schedule(runtime) collapse(3)
+         !$omp do schedule(runtime) !collapse(3)
          do bk = 1, Vnz, tilenz(narr2)
           do bj = 1, Vny, tileny(narr2)
            do bi = 1, Vnx, tilenx(narr2)
@@ -944,7 +940,7 @@ end subroutine TMarchRK3
          end do
          !$omp enddo
          
-         !$omp do schedule(runtime) collapse(3)
+         !$omp do schedule(runtime) !collapse(3)
          do bk = 1, Wnz, tilenz(narr2)
           do bj = 1, Wny, tileny(narr2)
            do bi = 1, Wnx, tilenx(narr2)
@@ -982,7 +978,7 @@ end subroutine TMarchRK3
 #define comp 3
 #include "wmfluxes-inc.f90"
 #undef comp
-         !$omp do schedule(runtime) collapse(3)
+         !$omp do schedule(runtime) !collapse(3)
          do bk = 1, Wnz, tilenz(narr2)
           do bj = 1, Wny, tileny(narr2)
            do bi = 1, Wnx, tilenx(narr2)
@@ -1004,7 +1000,7 @@ end subroutine TMarchRK3
          !$omp enddo
 
 
-         !$omp do schedule(runtime) collapse(3)
+         !$omp do schedule(runtime) !collapse(3)
          do bk = 1, Unz, tilenz(narr2)
           do bj = 1, Uny, tileny(narr2)
            do bi = 1, Unx, tilenx(narr2)
@@ -1042,7 +1038,7 @@ end subroutine TMarchRK3
 #define comp 1
 #include "wmfluxes-inc.f90"
 #undef comp
-         !$omp do schedule(runtime) collapse(3)
+         !$omp do schedule(runtime) !collapse(3)
          do bk = 1, Unz, tilenz(narr2)
           do bj = 1, Uny, tileny(narr2)
            do bi = 1, Unx, tilenx(narr2)
@@ -1063,7 +1059,7 @@ end subroutine TMarchRK3
          end do
          !$omp enddo
          
-         !$omp do schedule(runtime) collapse(3)
+         !$omp do schedule(runtime) !collapse(3)
          do bk = 1, Vnz, tilenz(narr2)
           do bj = 1, Vny, tileny(narr2)
            do bi = 1, Vnx, tilenx(narr2)
@@ -1101,7 +1097,7 @@ end subroutine TMarchRK3
 #define comp 2
 #include "wmfluxes-inc.f90"
 #undef comp
-         !$omp do schedule(runtime) collapse(3)
+         !$omp do schedule(runtime) !collapse(3)
          do bk = 1, Vnz, tilenz(narr2)
           do bj = 1, Vny, tileny(narr2)
            do bi = 1, Vnx, tilenx(narr2)
@@ -1122,7 +1118,7 @@ end subroutine TMarchRK3
          end do
          !$omp enddo
          
-         !$omp do schedule(runtime) collapse(3)
+         !$omp do schedule(runtime) !collapse(3)
          do bk = 1, Wnz, tilenz(narr2)
           do bj = 1, Wny, tileny(narr2)
            do bi = 1, Wnx, tilenx(narr2)
@@ -1160,7 +1156,7 @@ end subroutine TMarchRK3
 #define comp 3
 #include "wmfluxes-inc.f90"
 #undef comp
-         !$omp do schedule(runtime) collapse(3)
+         !$omp do schedule(runtime) !collapse(3)
          do bk = 1, Wnz, tilenz(narr2)
           do bj = 1, Wny, tileny(narr2)
            do bi = 1, Wnx, tilenx(narr2)
@@ -1210,7 +1206,7 @@ end subroutine TMarchRK3
 
 
 
-       Ap = coef*dt/(2._knd)
+       Ap = coef/(2._knd)
        S = 0
        l = 0
 
@@ -1530,7 +1526,6 @@ end subroutine TMarchRK3
 
 
 #else
-
      if (wallmodeltype>0) then
                        !resulting Viscosity intentionally overwritten
                        call ComputeViscsWM(U,V,W,Pr,Temperature)
@@ -1563,12 +1558,12 @@ end subroutine TMarchRK3
                      call ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
      end if
 
+     call BoundViscosity(Viscosity)
+
      do i=1,size(ScalFlIBPoints)
        Viscosity(ScalFlIBPoints(i)%xi,ScalFlIBPoints(i)%yj,ScalFlIBPoints(i)%zk) =  &
                                                TIBPoint_Viscosity(ScalFlIBPoints(i),Viscosity)
      end do
-
-     call BoundViscosity(Viscosity)
 
      if (sgstype/=StabSubgridModel.and.enable_buoyancy)  call ComputeTDiff(U,V,W)
 

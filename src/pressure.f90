@@ -48,9 +48,9 @@ correctcompatibility = 2
 
     if (debugparam>1.and.called>1) call system_clock(count=time1)
 
-    dt2 = coef*dt
+    dt2 = coef
     if (Re>0)  then
-      dt3 = coef*dt / (2._TIM*Re)
+      dt3 = coef / (2._TIM*Re)
     else
       dt3 = 0
     end if

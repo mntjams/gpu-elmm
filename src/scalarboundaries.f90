@@ -18,7 +18,6 @@ contains
     real(knd),intent(in)    :: side(6)
     real(knd),intent(in),optional :: in(-1:,-1:)
     real(knd),intent(in),allocatable,optional :: BsideArr(:,:), BsideFlArr(:,:)
-    real(knd) invalue
     integer i,j,k,nx,ny,nz
 
     nx = Prnx
@@ -29,12 +28,12 @@ contains
       do k = 1,nz
         do j = 1,ny
           if (present(in)) then
-            invalue = in(j,k)
+            arr(0,j,k)  = in(j,k) - (arr(1,j,k)-in(j,k))
+            arr(-1,j,k) = in(j,k) - (arr(2,j,k)-in(j,k))
           else
-            invalue = side(We)
+            arr(0,j,k)  = side(We) - (arr(1,j,k)-side(We))
+            arr(-1,j,k) = side(We) - (arr(2,j,k)-side(We))
           end if
-          arr(0,j,k)  = in(j,k) - (arr(1,j,k)-side(We))
-          arr(-1,j,k) = in(j,k) - (arr(2,j,k)-side(We))
         end do
       end do
     else if (btype(We)==PERIODIC) then
@@ -291,8 +290,8 @@ contains
   end subroutine BoundMoisture
 
 
-  pure subroutine BoundViscosity(Nu)
-    real(knd),intent(inout) :: Nu(-1:,-1:,-1:)
+  subroutine BoundViscosity(Nu)
+    real(knd),contiguous,intent(inout) :: Nu(-1:,-1:,-1:)
     integer i,j,k,nx,ny,nz
 
     nx = Prnx

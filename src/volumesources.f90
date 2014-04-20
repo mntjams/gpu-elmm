@@ -1,7 +1,91 @@
+module VolumeSourceBody_type
+  use Kinds
+  use Body_class, only: Body
+  
+  implicit none
+
+  type, extends(Body) :: VolumeSourceBody
+    procedure(temperature_interface),pointer  :: get_temperature_flux => null()
+    procedure(temperature_interface),pointer  :: get_moisture_flux    => null()
+    procedure(scalar_flux_interface),pointer :: get_scalar_flux      => null()
+  end type VolumeSourceBody
+
+  abstract interface
+    function temperature_interface(self,x,y,z) result(res)
+      import
+      real(knd) :: res
+      class(VolumeSourceBody),intent(in) :: self
+      real(knd),intent(in) :: x,y,z
+    end function
+    function scalar_flux_interface(self,x,y,z,num_of_scalar) result(res)
+      import
+      real(knd) :: res
+      class(VolumeSourceBody),intent(in) :: self
+      real(knd),intent(in) :: x,y,z
+      integer,intent(in) :: num_of_scalar
+    end function
+  end interface
+    
+
+  
+#define TYPEPARAM type(VolumeSourceBody)
+#include "list-inc-def.f90"
+
+  type(List) :: SourceBodiesList
+
+contains
+#include "list-inc-proc.f90"
+#undef TYPEPARAM
+
+end module
+
+
+
+module PlantBody_type
+  use Kinds
+  use Body_class, only: Body
+  
+  implicit none
+
+  type, extends(Body) :: PlantBody
+    integer :: plant_type !problem specific, used by custom routines
+    real(knd) :: albedo = 0.3_knd
+    real(knd) :: emmissivity = 0.7_knd
+    real(knd) :: evaporative_fraction = 0.6_knd
+    procedure(resistance_interface),pointer  :: get_resistance       => null()
+  end type PlantBody
+  
+  abstract interface
+    function resistance_interface(self,x,y,z) result(res)
+      import
+      real(knd) :: res
+      class(PlantBody),intent(in) :: self
+      real(knd),intent(in) :: x,y,z
+    end function
+  end interface
+  
+#define TYPEPARAM type(PlantBody)
+#include "list-inc-def.f90"
+
+  type(List) :: PlantBodiesList
+  
+
+contains
+#include "list-inc-proc.f90"
+#undef TYPEPARAM
+
+  
+end module
+
+
+
+
 module VolumeSources
   use Parameters
   use Lists
   use Body_class
+  use VolumeSourceBody_type, only: VolumeSourceBody, SourceBodiesList
+  use PlantBody_type, only: PlantBody, PlantBodiesList
 
   implicit none
 ! 
@@ -56,40 +140,16 @@ module VolumeSources
     module procedure AddScalarFlVolumesContainer
   end interface
 
-  type ScalarFlVolumesListContainer
-    type(List) :: list
-  end type
-  
-  type, extends(Body) :: VolumeSourceBody
-    procedure(resistance_interface),pointer  :: get_resistance       => null()
-    procedure(resistance_interface),pointer  :: get_temperature_flux => null()
-    procedure(resistance_interface),pointer  :: get_moisture_flux    => null()
-    procedure(scalar_flux_interface),pointer :: get_scalar_flux      => null()
-  end type VolumeSourceBody
-
-  abstract interface
-    function resistance_interface(self,x,y,z) result(res)
-      import
-      real(knd) :: res
-      class(VolumeSourceBody),intent(in) :: self
-      real(knd),intent(in) :: x,y,z
-    end function
-    function scalar_flux_interface(self,x,y,z,num_of_scalar) result(res)
-      import
-      real(knd) :: res
-      class(VolumeSourceBody),intent(in) :: self
-      real(knd),intent(in) :: x,y,z
-      integer,intent(in) :: num_of_scalar
-    end function
-  end interface
-
-  type(List) :: SourceBodiesList
 
   type(List) :: UResistanceVolumesList, &
                  VResistanceVolumesList, &
                  WResistanceVolumesList, &
                  TemperatureFlVolumesList, &
                  MoistureFlVolumesList
+                 
+  type ScalarFlVolumesListContainer
+    type(List) :: list
+  end type
                  
   type(ScalarFlVolumesListContainer),allocatable :: ScalarFlVolumesLists(:)
 
@@ -102,13 +162,6 @@ module VolumeSources
   type(TemperatureFlVolume),allocatable :: TemperatureFlVolumes(:)
   type(MoistureFlVolume)   ,allocatable :: MoistureFlVolumes(:)
   type(ScalarFlVolumesContainer),allocatable :: ScalarFlVolumes(:)
-  
-  type, extends(VolumeSourceBody) :: PlantBody
-    integer :: plant_type !problem specific, used by custom routines
-    real(knd) :: albedo = 0.3_knd
-    real(knd) :: emmissivity = 0.7_knd
-    real(knd) :: evaporative_fraction = 0.6_knd
-  end type PlantBody
   
   contains
 
@@ -155,195 +208,208 @@ module VolumeSources
       !find cells inside the canopy and store them in a list
       logical,allocatable :: InsidePr(:,:,:)
       
-!       !$omp parallel sections
-!       !$omp section
-      call SourceBodiesList%for_each(GetUCells)
+      call PlantBodiesList%for_each(GetUCells)
 
-!       !$omp section
-      call SourceBodiesList%for_each(GetVCells)
+      call PlantBodiesList%for_each(GetVCells)
 
-!       !$omp section
-      call SourceBodiesList%for_each(GetWCells)
+      call PlantBodiesList%for_each(GetWCells)
 
-!       !$omp section
       allocate(ScalarFlVolumesLists(num_of_scalars))
 
       allocate(InsidePr(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
       
-      call SourceBodiesList%for_each(GetOtherCells)
-!       !$omp end parallel sections
+      call SourceBodiesList%for_each(GetOtherCells_VolumeSources)
+
+      call PlantBodiesList%for_each(GetOtherCells_Plants)
+
 
       contains
 
         subroutine GetUCells(PB)
-          class(*) :: PB
+          type(PlantBody) :: PB
           type(TResistanceVolume) :: elem
           integer i,j,k
 
-          select type (PB)
-            class is (VolumeSourceBody)
-              if (associated(PB%get_resistance)) then
-                do k = 0,Unz+1
-                 do j = 0,Uny+1
-                  do i = 0,Unx+1
-                     if (Inside(PB,xU(i),yPr(j),zPr(k))) then
-                       elem%xi = i
-                       elem%yj = j
-                       elem%zk = k
-                       elem%flux = PB%get_resistance(xU(i),yPr(j),zPr(k))
-                       call UResistanceVolumesList%add(elem)
-                     end if
-                  enddo
-                 enddo
-                enddo
-              end if
-            class default
-              stop "Not a VolumeSourceBody."
-          end select
+           if (associated(PB%get_resistance)) then
+             do k = 0,Unz+1
+              do j = 0,Uny+1
+               do i = 0,Unx+1
+                  if (Inside(PB,xU(i),yPr(j),zPr(k))) then
+                    elem%xi = i
+                    elem%yj = j
+                    elem%zk = k
+                    elem%flux = PB%get_resistance(xU(i),yPr(j),zPr(k))
+                    call UResistanceVolumesList%add(elem)
+                  end if
+               enddo
+              enddo
+             enddo
+           end if
         end subroutine
 
         subroutine GetVCells(PB)
-          class(*) :: PB
+          type(PlantBody) :: PB
           type(TResistanceVolume) :: elem
           integer i,j,k
 
-          select type (PB)
-            class is (VolumeSourceBody)
-              if (associated(PB%get_resistance)) then
-                do k = 0,Vnz+1
-                 do j = 0,Vny+1
-                  do i = 0,Vnx+1
-                     if (Inside(PB,xPr(i),yV(j),zPr(k))) then
-                       elem%xi = i
-                       elem%yj = j
-                       elem%zk = k
-                       elem%flux = PB%get_resistance(xPr(i),yV(j),zPr(k))
-                       call VResistanceVolumesList%add(elem)
-                     end if
-                  enddo
-                 enddo
-                enddo
-              end if
-            class default
-              stop "Not a VolumeSourceBody."
-          end select
+          if (associated(PB%get_resistance)) then
+            do k = 0,Vnz+1
+             do j = 0,Vny+1
+              do i = 0,Vnx+1
+                 if (Inside(PB,xPr(i),yV(j),zPr(k))) then
+                   elem%xi = i
+                   elem%yj = j
+                   elem%zk = k
+                   elem%flux = PB%get_resistance(xPr(i),yV(j),zPr(k))
+                   call VResistanceVolumesList%add(elem)
+                 end if
+              enddo
+             enddo
+            enddo
+          end if
         end subroutine
 
         subroutine GetWCells(PB)
-          class(*) :: PB
+          type(PlantBody) :: PB
           type(TResistanceVolume) :: elem
           integer i,j,k
 
-          select type (PB)
-            class is (VolumeSourceBody)
-              if (associated(PB%get_resistance)) then
-                do k = 0,Wnz+1
-                 do j = 0,Wny+1
-                  do i = 0,Wnx+1
-                     if (Inside(PB,xPr(i),yPr(j),zW(k))) then
-                       elem%xi = i
-                       elem%yj = j
-                       elem%zk = k
-                       elem%flux = PB%get_resistance(xPr(i),yPr(j),zW(k))
-                       call WResistanceVolumesList%add(elem)
-                     end if
-                  enddo
-                 enddo
-                enddo
-              end if
-            class default
-              stop "Not a VolumeSourceBody."
-          end select
+          if (associated(PB%get_resistance)) then
+            do k = 0,Wnz+1
+             do j = 0,Wny+1
+              do i = 0,Wnx+1
+                 if (Inside(PB,xPr(i),yPr(j),zW(k))) then
+                   elem%xi = i
+                   elem%yj = j
+                   elem%zk = k
+                   elem%flux = PB%get_resistance(xPr(i),yPr(j),zW(k))
+                   call WResistanceVolumesList%add(elem)
+                 end if
+              enddo
+             enddo
+            enddo
+          end if
         end subroutine
 
-        subroutine GetOtherCells(PB)
+        subroutine GetOtherCells_VolumeSources(VSB)
+          type(VolumeSourceBody) :: VSB
+          type(TemperatureFlVolume) :: Telem
+          type(MoistureFlVolume) :: Melem
+          type(ScalarFlVolume) :: Selem
+          integer i,j,k,sc
+
+          InsidePr = .false.
+          
+          do k = 0,Prnz+1
+           do j = 0,Prny+1
+            do i = 0,Prnx+1
+               InsidePr(i,j,k) = VSB%Inside(xPr(i),yPr(j),zPr(k))
+            end do
+           end do
+          end do
+          
+        
+          do k = 0,Prnz+1
+           do j = 0,Prny+1
+            do i = 0,Prnx+1
+               if (InsidePr(i,j,k)) then
+               
+                 Telem%xi = i
+                 Telem%yj = j
+                 Telem%zk = k
+                 Melem%xi = i
+                 Melem%yj = j
+                 Melem%zk = k
+
+                 Telem%flux = 0
+                 Melem%flux = 0
+
+                 
+                 if (enable_buoyancy .and. associated(VSB%get_temperature_flux)) then
+                 
+                     Telem%flux = Telem%flux + &
+                                  VSB%get_temperature_flux(xPr(i),yPr(j),zPr(k))
+                 end if
+                 
+                 if (enable_moisture .and. associated(VSB%get_moisture_flux)) then
+
+                     Melem%flux = Melem%flux + &
+                                  VSB%get_moisture_flux(xPr(i),yPr(j),zPr(k))
+                   
+                 end if
+
+                 if (Telem%flux/=0) call TemperatureFlVolumesList%add(Telem)
+
+                 if (Melem%flux/=0) call MoistureFlVolumesList%add(Melem)
+                  
+                 
+                 if (associated(VSB%get_scalar_flux)) then
+                   do sc = 1,num_of_scalars
+                     Selem%xi = i
+                     Selem%yj = j
+                     Selem%zk = k
+                     Selem%flux = VSB%get_scalar_flux(xPr(i),yPr(j),zPr(k),sc)
+                     if (Selem%flux/=0) call ScalarFlVolumesLists(sc)%list%add(Selem)
+                   end do
+                 end if
+               end if
+            enddo
+           enddo
+          enddo
+        end subroutine
+
+        subroutine GetOtherCells_Plants(PB)
           use SolarRadiation, only: enable_radiation
-          class(*) :: PB
+          type(PlantBody) :: PB
           type(TemperatureFlVolume) :: Telem
           type(MoistureFlVolume) :: Melem
           type(ScalarFlVolume) :: Selem
           integer i,j,k,sc
           
-          select type (PB)
-            class is (VolumeSourceBody)
-              InsidePr = .false.
-              
-              do k = 0,Prnz+1
-               do j = 0,Prny+1
-                do i = 0,Prnx+1
-                   InsidePr(i,j,k) = PB%Inside(xPr(i),yPr(j),zPr(k))
-                end do
-               end do
-              end do
-              
-            
-              do k = 0,Prnz+1
-               do j = 0,Prny+1
-                do i = 0,Prnx+1
-                   if (InsidePr(i,j,k)) then
+
+          InsidePr = .false.
+          
+          do k = 0,Prnz+1
+           do j = 0,Prny+1
+            do i = 0,Prnx+1
+               InsidePr(i,j,k) = PB%Inside(xPr(i),yPr(j),zPr(k))
+            end do
+           end do
+          end do
+          
+        
+          do k = 0,Prnz+1
+           do j = 0,Prny+1
+            do i = 0,Prnx+1
+               if (InsidePr(i,j,k)) then
+               
+                 Telem%xi = i
+                 Telem%yj = j
+                 Telem%zk = k
+                 Melem%xi = i
+                 Melem%yj = j
+                 Melem%zk = k
                    
-                     Telem%xi = i
-                     Telem%yj = j
-                     Telem%zk = k
-                     Melem%xi = i
-                     Melem%yj = j
-                     Melem%zk = k
-                       
-                     if (enable_buoyancy .and. enable_radiation) then
-
-                       associate (p=>PB) !workaround for gfortran 4.8 bug
-                       select type (p)
-                         class is (PlantBody)
-                           if (on_border(i,j,k)) then
-                             call GetRadiationFluxes(p,Telem,Melem,xPr(i),yPr(j),zPr(k))
-                           else
-                             Telem%flux = 0
-                             Melem%flux = 0
-                           end if
-                         class default
-                           Telem%flux = 0
-                           Melem%flux = 0
-                       end select
-                       end associate
-                     else
-                       Telem%flux = 0
-                       Melem%flux = 0
-                     end if
-                     
-                     if (enable_buoyancy .and. associated(PB%get_temperature_flux)) then
-                     
-                         Telem%flux = Telem%flux + &
-                                      PB%get_temperature_flux(xPr(i),yPr(j),zPr(k))
-                     end if
-                     
-                     if (enable_moisture .and. associated(PB%get_moisture_flux)) then
-
-                         Melem%flux = Melem%flux + &
-                                      PB%get_moisture_flux(xPr(i),yPr(j),zPr(k))
-                       
-                     end if
-
-                     if (Telem%flux/=0) call TemperatureFlVolumesList%add(Telem)
-
-                     if (Melem%flux/=0) call MoistureFlVolumesList%add(Melem)
-                      
-                     
-                     if (associated(PB%get_scalar_flux)) then
-                       do sc = 1,num_of_scalars
-                         Selem%xi = i
-                         Selem%yj = j
-                         Selem%zk = k
-                         Selem%flux = PB%get_scalar_flux(xPr(i),yPr(j),zPr(k),sc)
-                         if (Selem%flux/=0) call ScalarFlVolumesLists(sc)%list%add(Selem)
-                       end do
-                     end if
+                 if (enable_buoyancy .and. enable_radiation) then
+                   if (on_border(i,j,k)) then
+                     call GetRadiationFluxes(PB,Telem,Melem,xPr(i),yPr(j),zPr(k))
+                   else
+                     Telem%flux = 0
+                     Melem%flux = 0
                    end if
-                enddo
-               enddo
-              enddo
-            class default
-              stop "Not a VolumeSourceBody."
-          end select
+                 else
+                   Telem%flux = 0
+                   Melem%flux = 0
+                 end if
+
+                 if (Telem%flux/=0) call TemperatureFlVolumesList%add(Telem)
+
+                 if (Melem%flux/=0) call MoistureFlVolumesList%add(Melem)
+
+               end if
+            enddo
+           enddo
+          enddo
         end subroutine
 
         
@@ -377,36 +443,32 @@ module VolumeSources
       type(Ray) :: r
       real(knd) :: out_norm(3)
       real(knd) :: inc_radiation_flux, radiation_balance, angle_to_sun, &
-                   total_heat_flux, sensible_heat_flux, latent_heat_flux,&
-                   xnear, ynear, znear, distx, disty, distz
-      real(knd) :: xr, yr, zr, svf
-                   
-      call PB%ClosestOut(xnear,ynear,znear,x,y,z)
+                   total_heat_flux, sensible_heat_flux, latent_heat_flux
+      real(knd) :: xr(3), svf
 
-      distx = xnear - x
-      disty = ynear - y
-      distz = znear - z
-      
-      out_norm = [distx, disty, distz] / &
-                 hypot(hypot(distx,disty),distz)
-  
+      out_norm = PB%OutwardNormal(x,y,z)
+
+      if (norm2(out_norm)<epsilon(1._knd)) then
+        write(*,*) "Error, zero outward normal at file",__FILE__,"line",__LINE__
+        stop
+      end if
+
       angle_to_sun = max(0._knd, dot_product(out_norm, vector_to_sun))
 
-      xr = x + distx * 1.1_knd
-      yr = y + disty * 1.1_knd
-      zr = z + distz * 1.1_knd
+      xr = [x,y,z] * out_norm * min(dxmin,dymin,dzmin) / 10
+      
       if (angle_to_sun>0._knd) then
-        r = Ray([xr, yr, zr], &
+        r = Ray(xr, &
                 vector_to_sun)
 
         if ((SolidBodiesList%any(DoIntersect)) .or. &
-            (SourceBodiesList%any(DoIntersectPlants))) then
+            (PlantBodiesList%any(DoIntersectPlants))) then
           angle_to_sun = 0
         end if
       end if
       
       !temporary
-      svf = sky_view_factor(xr,yr,zr)
+      svf = sky_view_factor(xr)
       
       inc_radiation_flux = angle_to_sun * solar_direct_flux() + &
                            solar_diffuse_flux()*svf + &
@@ -434,18 +496,18 @@ module VolumeSources
 
       contains
           
-        real(knd) function sky_view_factor(x,y,z)
-          real(knd),intent(in) :: x,y,z
+        real(knd) function sky_view_factor(xyz)
+          real(knd),intent(in) :: xyz(3)
           integer :: i,nfree
 
           
           nfree = 0
           
           do i=1,svf_nrays
-            r = Ray([x,y,z],svf_vecs(:,i))
+            r = Ray(xyz, svf_vecs(:,i))
           
             if (.not.((SolidBodiesList%any(DoIntersect)) .or. &
-                      (SourceBodiesList%any(DoIntersectPlants)))) then
+                      (PlantBodiesList%any(DoIntersectPlants)))) then
               nfree = nfree + 1
             end if
           end do
@@ -455,27 +517,15 @@ module VolumeSources
         end function
   
         logical function DoIntersect(item) result(res)
-          class(*) :: item
-          
-          select type (item)
-            class is (SolidBody)
-              res = item%IntersectsRay(r)
-            class default
-              stop "Non-SolidBody i the list."
-          end select
+          type(SolidBody), intent(in) :: item
+
+          res = item%IntersectsRay(r)
         end function
         
         logical function DoIntersectPlants(item) result(res)
-          class(*) :: item
-          
-          select type (item)
-            class is (PlantBody)
-              res = item%IntersectsRay(r)
-            class is (VolumeSourceBody)
-              res = .false.
-            class default
-              stop "Non-SolidBody i the list."
-          end select
+          type(PlantBody), intent(in) :: item
+
+          res = item%IntersectsRay(r)
         end function
       
 
@@ -642,7 +692,7 @@ module VolumeSources
            if (allocated(src)) then
              do i=1,size(src)
                associate (xi => src(i)%xi, yj => src(i)%yj, zk => src(i)%zk)
-                 X2(xi,yj,zk) = X2(xi,yj,zk) - dt * src(i)%flux * fun(xi,yj,zk) * X(xi,yj,zk)              
+                 X2(xi,yj,zk) = X2(xi,yj,zk) - src(i)%flux * fun(xi,yj,zk) * X(xi,yj,zk)              
                end associate
              end do
            end if
@@ -657,7 +707,7 @@ module VolumeSources
       associate (X=>Temperature, src=> TemperatureFlVolumes)
        do i=1,size(src)
          associate (xi => src(i)%xi, yj => src(i)%yj, zk => src(i)%zk)
-           X(xi,yj,zk) = X(xi,yj,zk) + dt * src(i)%flux
+           X(xi,yj,zk) = X(xi,yj,zk) + src(i)%flux
          end associate
        end do
       end associate      
@@ -670,7 +720,7 @@ module VolumeSources
       associate (X=>Moisture, src=> MoistureFlVolumes)
        do i=1,size(src)
          associate (xi => src(i)%xi, yj => src(i)%yj, zk => src(i)%zk)
-           X(xi,yj,zk) = X(xi,yj,zk) + dt * src(i)%flux
+           X(xi,yj,zk) = X(xi,yj,zk) + src(i)%flux
          end associate
        end do
       end associate
@@ -694,7 +744,7 @@ module VolumeSources
       !Assume src is allocated. It must hold if we called MovePointsToArray properly.
        do i=1,size(src)
          associate (xi => src(i)%xi, yj => src(i)%yj, zk => src(i)%zk)
-           X(xi,yj,zk) = X(xi,yj,zk) + dt * src(i)%flux
+           X(xi,yj,zk) = X(xi,yj,zk) + src(i)%flux
          end associate
        end do
 
