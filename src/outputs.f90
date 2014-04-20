@@ -181,38 +181,38 @@ contains
    if (store%avg_U==0.and.store%avg_U_rms>1) store%avg_U = 1
 
    if (averaging==1) then
-    if (store%avg_U>0) then
-      allocate(U_avg(-2:Unx+3,-2:Uny+3,-2:Unz+3))
-      allocate(V_avg(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
-      allocate(W_avg(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-      U_avg = 0
-      V_avg = 0
-      W_avg = 0
-    end if
+     if (store%avg_U>0) then
+       allocate(U_avg(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+       allocate(V_avg(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+       allocate(W_avg(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+       U_avg = 0
+       V_avg = 0
+       W_avg = 0
+     end if
 
-    if (store%avg_U_rms>0) then
-      allocate(U_rms(-2:Unx+3,-2:Uny+3,-2:Unz+3))
-      allocate(V_rms(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
-      allocate(W_rms(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-      U_rms = 0
-      V_rms = 0
-      W_rms = 0
-    end if
+     if (store%avg_U_rms>0) then
+       allocate(U_rms(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+       allocate(V_rms(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+       allocate(W_rms(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+       U_rms = 0
+       V_rms = 0
+       W_rms = 0
+     end if
 
-    if (store%avg_Pr==1) then
-      allocate(Pr_avg(1:Prnx,1:Prny,1:Prnz))
-      Pr_avg = 0
-    end if
+     if (store%avg_Pr==1) then
+       allocate(Pr_avg(1:Prnx,1:Prny,1:Prnz))
+       Pr_avg = 0
+     end if
 
-    if (enable_buoyancy.and.store%avg_temperature==1) then
-     allocate(Temperature_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-     Temperature_avg = 0
-    end if
+     if (enable_buoyancy.and.store%avg_temperature==1) then
+       allocate(Temperature_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+       Temperature_avg = 0
+     end if
 
-    if (enable_moisture.and.store%avg_moisture==1) then
-     allocate(Moisture_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-     Moisture_avg = 0
-    end if
+     if (enable_moisture.and.store%avg_moisture==1) then
+       allocate(Moisture_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+       Moisture_avg = 0
+     end if
    end if
 
    if (num_of_scalars>0.and.store%scalars_avg==1) then
