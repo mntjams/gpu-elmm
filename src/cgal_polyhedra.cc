@@ -35,25 +35,42 @@ using std::endl;
 
 extern "C" {
  
-  void polyhedron_from_file (Polytree  **pptree, const char *fname){
+  void polyhedron_from_file (Polytree  **pptree, const char *fname, int * const ierr){
     Polyhedron *polyhedron = new Polyhedron;
     
     std::ifstream in(fname);
-    in >> *polyhedron;
-    
+
     cout << " Reading file " << fname << " " << endl;
 
+    try {
+      in >> *polyhedron;
+    }
+    catch(...) {
+      *ierr = 2;
+      return;
+    }
+    
     Tree *tree = new Tree(polyhedron->facets_begin(),polyhedron->facets_end());
     
     cout << " facets: " << polyhedron->size_of_facets() << endl;
     cout << " halfedges: " << polyhedron->size_of_halfedges() << endl;
     cout << " vertices: " << polyhedron->size_of_vertices() << endl;
     
+    if (polyhedron->size_of_facets()==0 ||
+        polyhedron->size_of_halfedges()==0 ||
+        polyhedron->size_of_vertices()==0){
+         *ierr = 1;
+         return;
+        };
+    
     tree->accelerate_distance_queries();
     
     *pptree = new Polytree;
     (*pptree)->poly = polyhedron;
     (*pptree)->tree = tree;
+    
+    *ierr = 0;
+    
   }
   
   void polyhedron_closest (const Polytree *ptree, const d3 *query, d3 *near){

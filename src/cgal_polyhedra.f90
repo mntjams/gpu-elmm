@@ -18,10 +18,11 @@ module CGAL_Polyhedra
   
   interface
   
-    subroutine polyhedron_from_file(ptree, fname) bind(C,name="polyhedron_from_file")
+    subroutine polyhedron_from_file(ptree, fname, ierr) bind(C,name="polyhedron_from_file")
       import
       type(c_ptr),intent(out) :: ptree
       character(kind=c_char),intent(in) :: fname(*)
+      integer(c_int),intent(out) :: ierr
     end subroutine
     
     subroutine polyhedron_closest(ptree, query, near) bind(C,name="polyhedron_closest")
@@ -84,9 +85,17 @@ contains
   subroutine cgal_polyhedron_read(ptree, fname)
     type(c_ptr),intent(out) :: ptree
     character(*),intent(in) :: fname
+    integer(c_int) :: ierr
+
+    call polyhedron_from_file(ptree, fname//c_null_char, ierr)
     
-    write(*,*) "reading file ",fname
-    call polyhedron_from_file(ptree, fname//c_null_char)
+    if (ierr==1) then
+      write(*,*) "Error reading file "//fname//" it appears to be empty."
+      stop
+    else if (ierr==1) then
+      write(*,*) "Error reading file "//fname//"."
+      stop
+    end if
   end subroutine
 
   subroutine cgal_polyhedron_closest_s(ptree, xq,yq,zq, xn,yn,zn)
