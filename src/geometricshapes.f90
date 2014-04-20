@@ -69,6 +69,7 @@ module GeometricShapes
     procedure(Inside_interface),private,deferred :: InsideEps
     procedure(Closest_interface), deferred :: Closest
     procedure :: ClosestOut => GeometricShape_ClosestOut
+    procedure :: OutwardNormal => GeometricShape_OutwardNormal
     procedure :: IntersectsRay => GeometricShape_IntersectsRay
   end type
 
@@ -124,7 +125,7 @@ module GeometricShapes
 
   type,extends(GeometricShape) :: Polyhedron
     type(c_ptr) :: cgalptr
-    integer     :: n_ref_points = 3
+    integer     :: n_ref_points = 1
     type(r3),allocatable    :: ref(:)
   contains
     procedure,private :: ReadOff => Polyhedron_ReadOff
@@ -150,6 +151,7 @@ module GeometricShapes
   contains
     procedure,private :: InsideEps => Ellipsoid_Inside
     procedure :: Closest => Ellipsoid_Closest
+    procedure :: OutwardNormal => Ellipsoid_OutwardNormal
     procedure :: IntersectsRay => Ellipsoid_IntersectsRay
   end type
 
@@ -253,6 +255,8 @@ module GeometricShapes
     module procedure Plane_Init_3r_64
     module procedure Plane_Init_v3_32
     module procedure Plane_Init_v3_64
+    module procedure Plane_Init_3xv3_32
+    module procedure Plane_Init_3xv3_64
   end interface
 
   interface ConvexPolyhedron
@@ -301,7 +305,8 @@ module GeometricShapes
   
   interface Union
     !TODO change to a polymorphic function that changes result according to data read
-    module procedure Union_Init_Obst
+    module procedure Union_Init
+    module procedure Union_Init_File
   end interface
   
   real(knd),parameter :: unit_matrix_3(3,3) = reshape(source=[0,0,1,0,1,0,0,0,1], &
@@ -330,7 +335,16 @@ contains
     real(knd),intent(in) :: x,y,z
 
     call self%Closest(xnear,ynear,znear,x,y,z)
-  end subroutine  
+  end subroutine
+    
+  function GeometricShape_OutwardNormal(self,x,y,z) result(res)
+    real(knd) :: res(3)
+    class(GeometricShape),intent(in) :: self
+    real(knd),intent(in) :: x,y,z
+
+    res = huge(res)
+    stop "OutwardNormal not implemented for this shape"
+  end function
     
   logical function GeometricShape_IntersectsRay(self,r) result(intersects)
     class(GeometricShape),intent(in) :: self
@@ -562,6 +576,48 @@ contains
     
     res = Plane_Init_3r(real(point(1),knd), real(point(2),knd), real(point(3),knd), &
                         real(vec(1),knd),  real(vec(2),knd),  real(vec(3),knd))
+  end function
+  
+  function Plane_Init_3xv3_knd(point1, point2, point3) result(res)
+    !three points in righthand order
+    use ArrayUtilities, only: cross_product
+    type(Plane) :: res
+    real(knd),intent(in) :: point1(3), point2(3), point3(3)
+    real(knd) :: vec(3)
+    
+    vec = cross_product(point3-point2, point1-point2)
+    
+    if (norm2(vec)<epsilon(vec)) then
+      write(*,*) "Error, in line ",__LINE__," in file ",__FILE__
+      write(*,*) "Points",point1, point2, point3,"lie on a single line." 
+      stop
+    end if
+    
+    res = Plane(point2, vec)
+  end function
+  
+  function Plane_Init_3xv3_32(point1, point2, point3) result(res)
+    !three points in righthand order
+    use ArrayUtilities, only: cross_product
+    type(Plane) :: res
+    real(real32),intent(in) :: point1(3), point2(3), point3(3)
+    real(real32) :: vec(3)
+    
+    res = Plane_Init_3xv3_knd(real(point1, knd), &
+                              real(point2, knd), &
+                              real(point3, knd))
+  end function
+  
+  function Plane_Init_3xv3_64(point1, point2, point3) result(res)
+    !three points in righthand order
+    use ArrayUtilities, only: cross_product
+    type(Plane) :: res
+    real(real64),intent(in) :: point1(3), point2(3), point3(3)
+    real(real64) :: vec(3)
+    
+    res = Plane_Init_3xv3_knd(real(point1, knd), &
+                              real(point2, knd), &
+                              real(point3, knd))
   end function
   
   logical function Plane_Inside(self,x,y,z,eps) result(ins)
@@ -905,14 +961,14 @@ contains
   
   subroutine Polyhedron_InitRefPoints(self)
     class(Polyhedron),intent(inout) :: self
-    real(knd) :: p(self%n_ref_points)
+    real(knd) :: p(3)
     integer :: i
     
     allocate(self%ref(self%n_ref_points))
     
     do i = 1, self%n_ref_points
       call random_number(p)
-      
+      p = 0.5
       associate(b=>self%bbox)
         self%ref(i) = r3(b%xmin+(b%xmax-b%xmin)*p(1), &
                          b%ymin+(b%ymax-b%ymin)*p(2), &
@@ -938,33 +994,33 @@ contains
         tests(i) = &
             cgal_polyhedron_inside(self%cgalptr, &
                                     x,y,z, &
-                                    self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+                                    x,y,self%ref(i)%z)
 
         if (eps>0) then                            
           if (.not.tests(i)) tests(i) = &
               cgal_polyhedron_inside(self%cgalptr, &
                                       x-eps,y,z, &
-                                      self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+                                      x,y,self%ref(i)%z)
           if (.not.tests(i)) tests(i) = &
               cgal_polyhedron_inside(self%cgalptr, &
                                       x+eps,y,z, &
-                                      self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+                                      x,y,self%ref(i)%z)
           if (.not.tests(i)) tests(i) = &
               cgal_polyhedron_inside(self%cgalptr, &
                                       x,y-eps,z, &
-                                      self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+                                      x,y,self%ref(i)%z)
           if (.not.tests(i)) tests(i) = &
               cgal_polyhedron_inside(self%cgalptr, &
                                       x,y-eps,z, &
-                                      self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+                                      x,y,self%ref(i)%z)
           if (.not.tests(i)) tests(i) = &
               cgal_polyhedron_inside(self%cgalptr, &
                                       x,y,z-eps, &
-                                      self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+                                      x,y,self%ref(i)%z)
           if (.not.tests(i)) tests(i) = &
               cgal_polyhedron_inside(self%cgalptr, &
                                       x,y,z+eps, &
-                                      self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+                                      x,y,self%ref(i)%z)
         end if
 
       end do
@@ -996,7 +1052,6 @@ contains
            cgal_polyhedron_intersects_ray(self%cgalptr, &
                                           r%xc, r%yc, r%zc, &
                                           r%a,  r%b,  r%c )
- 
   end function
 
 
@@ -1123,6 +1178,18 @@ contains
     znear = self%c * c*t + self%zc
   end subroutine
   
+  function Ellipsoid_OutwardNormal(self,x,y,z) result(res)
+    real(knd) :: res(3)
+    class(Ellipsoid),intent(in) :: self
+    real(knd),intent(in) :: x,y,z
+
+    res(1) = 2 * (x - self%xc) / self%a**2
+    res(2) = 2 * (y - self%yc) / self%b**2
+    res(3) = 2 * (z - self%zc) / self%c**2
+
+    if (norm2(res)>0) res = res / norm2(res)
+  end function
+  
   logical function Ellipsoid_IntersectsRay(self,r) result(res)
      class(Ellipsoid),intent(in) :: self
      class(Ray),intent(in) :: r
@@ -1130,11 +1197,12 @@ contains
      !FIXME: constructors contain irrelevant properties and no keywords due to problem in ifort as of version 14
      type(Sphere),parameter :: unit_sphere = Sphere( Bbox(0,0,0,0,0,0), 0._knd,  0._knd,&
                                                       0._knd,  1._knd)
+
      r2 = Ray((r%xc - self%xc)/self%a, (r%yc - self%yc)/self%b, (r%zc - self%zc)/self%c, &
                   r%a/self%a, r%b/self%b, r%c/self%c )
-     
-     res = unit_sphere%IntersectsRay(r2)
 
+     res = unit_sphere%IntersectsRay(r2)
+     
   end function
   
 
@@ -2093,6 +2161,21 @@ contains
      res%size = size(res%items)
   end function
   
+  
+  function Union_Init_File(filename) result(res)
+    type(Union) :: res    
+    character(*),intent(in) :: filename
+    integer :: l
+    
+    l = len(filename)
+    if (filename(l-4:l)=='.obst') then
+      res = Union_Init_Obst(filename)
+    else if (filename(l-4:l)=='.geom') then
+      res = Union_Init_Geom(filename)
+    end if
+  end function
+  
+     
   function Union_Init_Obst(filename) result(res)
     use Strings, only: upcase
     type(Union) :: res    
@@ -2204,7 +2287,212 @@ contains
           a(size(tmp)+1) = e
         end if
       end subroutine
-  end function
+  end function Union_Init_Obst
+  
+  
+  function Union_Init_Geom(filename) result(res)
+    use Strings, only: upcase
+    type(Union) :: res    
+    character(*),intent(in) :: filename
+    integer :: unit, io
+    integer :: ipoint, ipolyhedron
+    integer :: npoints, npolyhedra
+    type(ConvexPolyhedron) :: poly
+    type(ConvexPolyhedron),allocatable :: items(:)
+    real(knd),allocatable :: points(:,:)
+    character(180) :: line
+
+    open(newunit=unit,file=filename,action='read',status='old',iostat=io)
+    
+    if (io==0) then
+      
+      call read_points
+      
+      call read_polyhedra
+
+      close(unit)
+
+    else
+
+      write(*,*) "Could not open file ",filename
+      stop
+
+    end if
+    
+    call move_alloc(items,res%items)
+    
+    res%size = size(res%items)
+    
+    contains
+    
+      subroutine empty_lines(line, sub)
+        character(*), intent(out) :: line
+        interface
+          subroutine sub
+          end subroutine
+        end interface
+        do
+          read (unit, '(a)', iostat=io) line
+          if (io/=0) call npoints_error
+          if (len_trim(line)>0) exit
+        end do
+      end subroutine
+    
+      subroutine read_points
+      
+        call read_npoints
+        
+        allocate(points(3,0:npoints-1))
+        
+        do ipoint = 0, npoints-1
+          call read_point(points(:,ipoint))
+        end do
+      end subroutine
+      
+      subroutine read_npoints
+        call empty_lines(line, npoints_error)
+        call read_npoints_str(line)
+        call read_npoints_num(line)
+      end subroutine
+      
+      subroutine read_npoints_str(line)
+        character(*), intent(inout) :: line
+        line = adjustl(line)
+        if (.not.upcase(line(1:7))=='POINTS:') then
+          write (*,*) "Error reading points header in file", filename
+          write (*,*) "Expected 'POINTS:', found:", trim(line)
+          stop
+        end if
+        line = line(8:)
+      end subroutine
+      
+      subroutine read_npoints_num(line)
+        character(*), intent(inout) :: line
+        
+        line = adjustl(line)
+        read(line,*,iostat=io) npoints
+        if (io/=0) call npoints_error
+      end subroutine
+      
+      subroutine npoints_error
+        write (*,*) "Error reading points header in file", filename
+        stop
+      end subroutine
+
+      subroutine read_point(p)
+        real(knd), intent(out) :: p(3)
+
+        read (unit, '(a)', iostat=io) line
+        if (io/=0) call point_error
+        
+        read (line, *, iostat=io) p
+        if (io/=0) call point_error
+      end subroutine
+
+      subroutine point_error
+        write (*,*) "Error reading point ",ipoint,"in file", filename
+        stop
+      end subroutine
+
+      subroutine read_polyhedra
+      
+        call read_npolyhedra
+        
+        allocate(items(npolyhedra))
+        
+        do ipolyhedron = 1, npolyhedra
+          call read_polyhedron(items(ipolyhedron))
+        end do
+      end subroutine
+      
+      subroutine read_npolyhedra
+        do
+          read (unit, '(a)', iostat=io) line
+          if (io/=0) call npolyhedra_error
+          if (len_trim(line)>0) exit
+        end do
+        call read_npolyhedra_str(line)
+        call read_npolyhedra_num(line)
+      end subroutine
+      
+      subroutine read_npolyhedra_str(line)
+        character(*), intent(inout) :: line
+        integer :: ind
+
+        line = adjustl(line)
+        if (.not.upcase(line(1:12))=='POLYHEDRONS:' .and. &
+            .not.upcase(line(1:10))=='POLYHEDRA:') then
+          write (*,*) "Error reading polyhedra header in file", filename
+          write (*,*) "Expected 'POLYHEDRA:', found:", trim(line)
+          stop
+        end if
+        ind = index(line(1:12),':')
+        line = line(ind+1:)
+      end subroutine
+      
+      subroutine read_npolyhedra_num(line)
+        character(*), intent(inout) :: line
+        
+        line = adjustl(line)
+        read(line,*,iostat=io) npolyhedra
+        if (io/=0) call npolyhedra_error
+      end subroutine
+      
+      subroutine npolyhedra_error
+        write (*,*) "Error reading polyhedra header in file", filename
+        stop
+      end subroutine
+
+      subroutine read_polyhedron(poly)
+        type(ConvexPolyhedron), intent(out) :: poly
+        type(Plane), allocatable :: planes(:)
+
+        call empty_lines(line, polyhedron_error)
+        
+        do
+          call read_plane(planes, io)
+          if (io/=0) exit
+        end do
+        
+        if (.not.allocated(planes)) call polyhedron_error
+        
+        poly = ConvexPolyhedron(planes)
+      end subroutine
+
+      subroutine polyhedron_error
+        write (*,*) "Error reading polyhedron ",ipolyhedron,"in file", filename
+        stop
+      end subroutine
+      
+      subroutine read_plane(planes, iostat)
+        type(Plane), allocatable, intent(inout) :: planes(:)
+        integer, intent(out) :: iostat
+        integer :: ind(3)
+        
+        read (unit, '(a)', iostat=iostat) line
+        if (iostat/=0) return
+        read(line, *, iostat=iostat) ind
+        if (iostat/=0) return
+        call add_element( planes, Plane(points(:,ind(1)), &
+                                        points(:,ind(2)), &
+                                        points(:,ind(3))) ) 
+      end subroutine
+
+      subroutine add_element(a,e)
+        type(Plane),allocatable,intent(inout) :: a(:)
+        type(Plane),intent(in) :: e
+        type(Plane),allocatable :: tmp(:)
+
+        if (.not.allocated(a)) then
+          a = [e]
+        else
+          call move_alloc(a,tmp)
+          allocate(a(size(tmp)+1))
+          a(1:size(tmp)) = tmp
+          a(size(tmp)+1) = e
+        end if
+      end subroutine
+  end function Union_Init_Geom
   
   
   
@@ -2345,6 +2633,7 @@ module Body_class
      procedure :: Closest
      procedure :: ClosestOut
      procedure :: ClosestOnLineOut
+     procedure :: OutwardNormal
      procedure :: IntersectsRay
   end type
   interface Inside
@@ -2445,6 +2734,15 @@ contains
     enddo
 
   end function ClosestOnLineOut
+
+  function OutwardNormal(self,x,y,z) result(res)
+    real(knd) :: res(3)
+    class(Body),intent(in) :: self
+    real(knd),intent(in) :: x,y,z
+
+    res = self%GeometricShape%OutwardNormal(x,y,z)
+ 
+  end function
 
   logical function IntersectsRay(self,r) result(intersects)
     class(Body),intent(in) :: self
