@@ -224,7 +224,7 @@ module Subgrid
        dy2 = dymin**2
        dz2 = dzmin**2
 
-       !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) collapse(3)
+       !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) !collapse(3)
        do bk = 1,Prnz,tilenz(narr)
         do bj = 1,Prny,tileny(narr)
          do bi = 1,Prnx,tilenx(narr)
@@ -282,7 +282,7 @@ module Subgrid
 
       else !general grid
 
-       !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) collapse(3)
+       !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) !collapse(3)
        do bk = 1,Prnz,tilenz(narr)
         do bj = 1,Prny,tileny(narr)
          do bi = 1,Prnx,tilenx(narr)
@@ -348,7 +348,8 @@ module Subgrid
       width = filter_ratio * (dxmin*dymin*dzmin)**(1._knd/3._knd)
       C = (Csig*width)**2
 
-      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk) schedule(runtime) collapse(3)
+      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk) schedule(runtime)
+      ! !collapse(3)
       do bk = 1,Prnz,tilenz(narr)
        do bj = 1,Prny,tileny(narr)
         do bi = 1,Prnx,tilenx(narr)
@@ -427,10 +428,8 @@ module Subgrid
 
         !This requires no FPE trapping is in progress!
         c =  a2 / sqrt(a1**3)
-        
-        !If c is NaN let it be 0.
-        if (ieee_is_nan(c)) c = 0
 
+        !If c is NaN let it be 1.
         c = max(-1._sigma_knd, min(1._sigma_knd,c))
         a3 = acos(c) / 3
 
