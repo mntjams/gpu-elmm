@@ -44,8 +44,8 @@ module Frames_common
     subroutine fill_interface(D, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
       import
       class(TFrameBase),intent(inout) :: D
-      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-      real(knd),intent(in) :: Pr(1:,1:,1:), Viscosity(-1:,-1:,-1:), &
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
+      real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), Viscosity(-1:,-1:,-1:), &
                               Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), &
                               Scalar(-1:,-1:,-1:,1:)
     end subroutine
@@ -53,10 +53,10 @@ module Frames_common
       import
       class(TFrameBase),target,asynchronous,intent(inout) :: D
       real(knd),intent(in) :: time
-      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-      real(knd),intent(in) :: Pr(1:,1:,1:), Viscosity(-1:,-1:,-1:), &
-                              Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), &
-                              Scalar(-1:,-1:,-1:,1:)
+      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
+      real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), Viscosity(-1:,-1:,-1:), &
+                                         Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), &
+                                         Scalar(-1:,-1:,-1:,1:)
     end subroutine
   end interface
 
