@@ -19,10 +19,14 @@ module Initial
   use ImmersedBoundary, only: GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
   use VolumeSources!, only: InitVolumeSources, InitVolumeSourceBodies, ScalarFlVolume, ScalarFlVolumesContainer
   use LineSources, only: InitLineSources
+  use PointSources, only: InitPointSources
   use WALLMODELS
   use TILING, only: tilesize,InitTiles
   use FreeUnit, only: newunit
   use Puffs, only: InitPuffSources
+#ifdef MPI
+  use custom_mpi
+#endif
 
   implicit none
 
@@ -40,6 +44,7 @@ contains
                               TStaggeredFrameDomain,  AddDomain
    use VTKFrames, only: TFrameFlags, &
                               TFrameDomain,  AddDomain
+   use PoisFFT, only: PoisFFT_NeumannStag, PoisFFT_Periodic
    integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter,minGPUlevel
    real(knd) mgepsinnerGS
    integer   i,io,io2,itmp
@@ -71,6 +76,8 @@ contains
      procedure rgetv3
    end interface
 
+   output_dir = "output/"
+
    call newunit(unit)
   
    !the command line arguments can also be specified in cmd.conf
@@ -91,33 +98,32 @@ contains
    call get(limitertype)
    call get(limparam)
    call get(masssourc)
-   masssourc = 1 !Seems to be necessary for stability. Caution with scalar fluxes.
+!    masssourc = 1 !Seems to be necessary for stability. Caution with scalar fluxes.
    call get(steady)
    call get(tasktype)
-   write(*,*) "tasktype=",tasktype
    call get(initcondsfromfile)
    call get(timeavg1)
    call get(timeavg2)
    call get(Re)
-   write(*,*) "Re=",Re
+   if (master) write(*,*) "Re=",Re
    call get(start_time)
-   write(*,*) "start_time=",start_time
+   if (master) write(*,*) "start_time=",start_time
    call get(end_time)
-   write(*,*) "end_time=",end_time
+   if (master) write(*,*) "end_time=",end_time
    call get(max_number_of_time_steps)
-   write(*,*) "max_number_of_time_steps=",max_number_of_time_steps
+   if (master) write(*,*) "max_number_of_time_steps=",max_number_of_time_steps
    call get(eps)
-   write(*,*) "eps=",eps
+   if (master) write(*,*) "eps=",eps
    call get(maxCNiter)
-   write(*,*) "maxCNiter=",maxCNiter
+   if (master) write(*,*) "maxCNiter=",maxCNiter
    call get(epsCN)
-   write(*,*) "epsCN=",epsCN
+   if (master) write(*,*) "epsCN=",epsCN
    call get(maxPOISSONiter)
-   write(*,*) "maxPOISSONiter=",maxPOISSONiter
+   if (master) write(*,*) "maxPOISSONiter=",maxPOISSONiter
    call get(epsPOISSON)
-   write(*,*) "epsPOISSON=",epsPOISSON
+   if (master) write(*,*) "epsPOISSON=",epsPOISSON
    call get(debugparam)
-   write(*,*) "debug parameter=",debugparam
+   if (master) write(*,*) "debug parameter=",debugparam
    close(unit)
 
 
@@ -126,8 +132,8 @@ contains
    call get(filtertype)
 
    if (filtertype > size(filter_ratios)) then
-     write(*,*) "Chosen filter type does not exist. Maximum index is:",size(filter_ratios)
-     stop
+     if (master) write(*,*) "Chosen filter type does not exist. Maximum index is:",size(filter_ratios)
+     call error_stop
    end if
 
    call get(wallmodeltype)
@@ -141,64 +147,64 @@ contains
    read(unit,fmt='(/)')
 
    read(unit,*) x0
-   write(*,*) "x0=",x0
+   if (master) write(*,*) "x0=",x0
    call get(y0)
    write(*,*) "y0=",y0
    call get(z0)
-   write(*,*) "z0=",z0
+   if (master) write(*,*) "z0=",z0
    read(unit,fmt='(/)')
 
    read(unit,*) lx
    if (lx>0) then
-     write(*,*) "lx=",lx
+     if (master) write(*,*) "lx=",lx
    else
-     write (*,*) "Domain length in x direction must be positive."
-     stop
+     if (master) write (*,*) "Domain length in x direction must be positive."
+     call error_stop
    end if
    read(unit,fmt='(/)')
 
    read(unit,*) ly
    if (ly>0) then
-     write(*,*) "ly=",ly
+     if (master) write(*,*) "ly=",ly
    else
-     write (*,*) "Domain length in y direction must be positive."
-     stop
+     if (master) write (*,*) "Domain length in y direction must be positive."
+     call error_stop
    end if
    read(unit,fmt='(/)')
 
    read(unit,*) lz
    if (lz>0) then
-     write(*,*) "lz=",lz
+     if (master) write(*,*) "lz=",lz
    else
-     write (*,*) "Domain length in z direction must be positive."
-     stop
+     if (master) write (*,*) "Domain length in z direction must be positive."
+     call error_stop
    end if
    read(unit,fmt='(/)')
 
    read(unit,*) Prnx
    if (Prnx>0) then
-     write(*,*) "nx=",Prnx
+     if (master) write(*,*) "nx=",Prnx
    else
-     write (*,*) "Number of cells in x direction must be positive."
-     stop
+     if (master) write (*,*) "Number of cells in x direction must be positive."
+     call error_stop
    end if
    read(unit,fmt='(/)')
 
    read(unit,*) Prny
    if (Prny>0) then
-     write(*,*) "ny=",Prny
+     if (master) write(*,*) "ny=",Prny
    else
-     write (*,*) "Number of cells in y direction must be positive."
-     stop
+     if (master) write (*,*) "Number of cells in y direction must be positive."
+     call error_stop
    end if
    read(unit,fmt='(/)')
 
    read(unit,*) Prnz
    if (Prnz>0) then
-     write(*,*) "nz=",Prnz
+     if (master) write(*,*) "nz=",Prnz
    else
-     write (*,*) "Number of cells in z direction must be positive."
-     stop
+     if (master) write (*,*) "Number of cells in z direction must be positive."
+     call error_stop
    end if
    close(unit)
 
@@ -233,18 +239,18 @@ contains
 
    if (io==0) then
      call get(CoriolisParam)
-     write(*,*) "coriolisparam=",CoriolisParam
+     if (master) write(*,*) "coriolisparam=",CoriolisParam
      call get(PrGradientX)
-     write(*,*) "prgradientx=",PrGradientX
+     if (master) write(*,*) "prgradientx=",PrGradientX
      call get(PrGradientY)
-     write(*,*) "prgradienty=",PrGradientY
+     if (master) write(*,*) "prgradienty=",PrGradientY
      call get(SubsidenceGradient)
-     write(*,*) "SubsidenceGradient=",SubsidenceGradient
+     if (master) write(*,*) "SubsidenceGradient=",SubsidenceGradient
      close(unit)
 
    else
 
-     write(*,*) "Warning! Could not open file large_scale.conf. Using defaults."
+     if (master) write(*,*) "Warning! Could not open file large_scale.conf. Using defaults."
 
    end if
 
@@ -294,7 +300,7 @@ contains
 
      else
 
-       write(*,*) "Warning! Could not open file temp_profile.conf. Using defaults."
+       if (master) write(*,*) "Warning! Could not open file temp_profile.conf. Using defaults."
        TemperatureProfile%randomize = 0
 
        allocate(TemperatureProfile%Sections(0))
@@ -352,7 +358,7 @@ contains
 
      else
 
-       write(*,*) "Warning! Could not open file moist_profile.conf. Using defaults."
+       if (master) write(*,*) "Warning! Could not open file moist_profile.conf. Using defaults."
        MoistureProfile%randomize = 0
 
        allocate(MoistureProfile%Sections(0))
@@ -369,9 +375,9 @@ contains
    call get(inlettype)
    call get(profiletype)
    call get(ShearInletTypeParameter)
-   write(*,*) "G=",ShearInletTypeParameter
+   if (master) write(*,*) "G=",ShearInletTypeParameter
    call get(Uinlet)
-   write(*,*) "Uinlet=",Uinlet
+   if (master) write(*,*) "Uinlet=",Uinlet
    call get(Ustar_surf_inlet)  !-<u'w'>
    call get(stress_gradient_inlet) !in relative part per 1m
    call get(z0_inlet)
@@ -450,7 +456,7 @@ contains
      close(unit)
    else
      num_of_scalars = 0
-     write (*,*) "scalars.conf not found, no passive scalars for computation."
+     if (master) write (*,*) "scalars.conf not found, no passive scalars for computation."
    end if
 
 
@@ -459,6 +465,15 @@ contains
       
       if (io==0) then
         call get_line_sources
+        close(unit)
+      end if
+   end if
+
+   if (num_of_scalars>0) then
+      open(unit, file="point_sources.conf",status="old",action="read",iostat=io)
+      
+      if (io==0) then
+        call get_point_sources
         close(unit)
       end if
    end if
@@ -493,82 +508,7 @@ contains
      end if
    end if
 
-   open(unit,file="frames.conf",status="old",action="read",iostat = io)
-   if (io==0) then
-       call get(frame_times%nframes)
-       call get(frame_times%start)
-       call get(frame_times%end)
-     read(unit,fmt='(/)')
-
-     read(unit,*) frame_flags%U
-     call get(frame_flags%vorticity)
-     call get(frame_flags%Pr)
-     call get(frame_flags%lambda2)
-     call get(frame_flags%scalars)
-     if (num_of_scalars < 1) frame_flags%scalars = 0
-     call get(frame_flags%sumscalars)
-     if (num_of_scalars < 1) frame_flags%sumscalars = 0
-     call get(frame_flags%temperature)
-     if (.not.enable_buoyancy) frame_flags%temperature = 0
-     call get(frame_flags%moisture)
-     if (.not.enable_buoyancy) frame_flags%moisture = 0
-     call get(frame_flags%temperature_flux)
-     if (.not.enable_buoyancy) frame_flags%temperature_flux = 0
-     call get(frame_flags%scalar_flux)
-     if (num_of_scalars < 1) frame_flags%scalar_flux = 0
-
-     call get(numframeslices)
-
-     do i = 1,numframeslices
-       call get(dimension)
-       call get(direction)
-       call get(position)
-       call AddDomain(TFrameDomain(achar(iachar('a')+i-1), &
-                      dimension, direction, position, &
-                      frame_times, frame_flags))
-     end do
-
-   else
-     frames = 0
-     write (*,*) "frames.conf not found, no vtk frames will be saved."
-   end if
-   close(unit)
-
-
-   open(unit,file="stagframes.conf",status="old",action="read",iostat = io)
-   if (io==0) then
-     call get(num_staggered_domains)
-
-     do i = 1,num_staggered_domains
-       read(unit,fmt=*)
-       call get(domain_label)
-       call get(range%min%x,range%max%x)
-       call get(range%min%y,range%max%y)
-       call get(range%min%z,range%max%z)
-       call get(frame_times%nframes)
-       call get(frame_times%start, frame_times%end)
-       call get(frame_save_flags%U, frame_save_flags%V, frame_save_flags%W)
-       call get(frame_save_flags%Pr)
-       call get(frame_save_flags%Viscosity)
-       call get(frame_save_flags%Temperature)
-       if (.not.enable_buoyancy) frame_save_flags%Temperature = .false.
-       call get(frame_save_flags%Moisture)
-       if (.not.enable_moisture) frame_save_flags%Moisture = .false.
-       call get(frame_save_flags%Scalar)
-       if (num_of_scalars < 1) frame_save_flags%Scalar = .false.
-
-       call AddDomain(TStaggeredFrameDomain(trim(domain_label), &
-                                            range, &
-                                            frame_times, &
-                                            frame_save_flags))
-     end do
-     close(unit)
-   else
-     write (*,*) "stagframes.conf not found, no staggered frames will be saved."
-   end if
-
-
-
+  
 
    open(unit,file="output.conf",status="old",action="read",iostat = io)
    if (io==0) then
@@ -592,7 +532,7 @@ contains
      end if
      close(unit)
    else
-     write(*,*) "No output.conf found, defaults will be used."
+     if (master) write(*,*) "No output.conf found, defaults will be used."
    end if
 
    !probes_file and scalar_probes_file read from command line
@@ -609,14 +549,15 @@ contains
        end do
 
        scalar_probes = probes
+
+       close(unit)
+
      else
        allocate(probes(0))
        allocate(scalar_probes(0))
      end if
 
    else
-
-     close(unit)
 
      if (len_trim(probes_file)>0) then
        call ReadProbes(probes,number_of_probes,probes_file)
@@ -639,7 +580,7 @@ contains
      close(unit)
    end if
 
-   write(*,*) "num_of_scalars",num_of_scalars
+   if (master) write(*,*) "num_of_scalars",num_of_scalars
 
    projectiontype = 1
 
@@ -647,96 +588,102 @@ contains
 
    if (CFL<=0)  CFL = 0.5
 
+   if (master) then
 
-   write(*,*) "Boundaries:"
+     write(*,*) "Boundaries:"
 
-   write(*,'(a2)',advance='no') " W "
-   select case (Btype(We))
-     case (NOSLIP)
-      write(*,*) "noslip"
-     case (FREESLIP)
-      write(*,*) "freeslip"
-     case (PERIODIC)
-      write(*,*) "periodic"
-     case (DIRICHLET)
-      write(*,*) "dirichlet"
-     case (NEUMANN)
-      write(*,*) "neumann"
-   endselect
+     write(*,'(a2)',advance='no') " W "
+     select case (Btype(We))
+       case (NOSLIP)
+         write(*,*) "noslip"
+       case (FREESLIP)
+         write(*,*) "freeslip"
+       case (PERIODIC)
+         write(*,*) "periodic"
+       case (DIRICHLET)
+         write(*,*) "dirichlet"
+       case (NEUMANN)
+         write(*,*) "neumann"
+     endselect
 
-   write(*,'(a2)',advance='no') " E "
-   select case (Btype(Ea))
-     case (NOSLIP)
-      write(*,*) "noslip"
-     case (FREESLIP)
-      write(*,*) "freeslip"
-     case (PERIODIC)
-      write(*,*) "periodic"
-     case (DIRICHLET)
-      write(*,*) "dirichlet"
-     case (NEUMANN)
-      write(*,*) "neumann"
-   endselect
+     write(*,'(a2)',advance='no') " E "
+     select case (Btype(Ea))
+       case (NOSLIP)
+         write(*,*) "noslip"
+       case (FREESLIP)
+         write(*,*) "freeslip"
+       case (PERIODIC)
+         write(*,*) "periodic"
+       case (DIRICHLET)
+         write(*,*) "dirichlet"
+       case (NEUMANN)
+         write(*,*) "neumann"
+     endselect
 
-   write(*,'(a2)',advance='no') " S "
-   select case (Btype(So))
-     case (NOSLIP)
-      write(*,*) "noslip"
-     case (FREESLIP)
-      write(*,*) "freeslip"
-     case (PERIODIC)
-      write(*,*) "periodic"
-     case (DIRICHLET)
-      write(*,*) "dirichlet"
-     case (NEUMANN)
-      write(*,*) "neumann"
-   endselect
+     write(*,'(a2)',advance='no') " S "
+     select case (Btype(So))
+       case (NOSLIP)
+         write(*,*) "noslip"
+       case (FREESLIP)
+         write(*,*) "freeslip"
+       case (PERIODIC)
+         write(*,*) "periodic"
+       case (DIRICHLET)
+         write(*,*) "dirichlet"
+       case (NEUMANN)
+         write(*,*) "neumann"
+     endselect
 
-   write(*,'(a2)',advance='no') " N "
-   select case (Btype(No))
-     case (NOSLIP)
-      write(*,*) "noslip"
-     case (FREESLIP)
-      write(*,*) "freeslip"
-     case (PERIODIC)
-      write(*,*) "periodic"
-     case (DIRICHLET)
-      write(*,*) "dirichlet"
-     case (NEUMANN)
-      write(*,*) "neumann"
-   endselect
+     write(*,'(a2)',advance='no') " N "
+     select case (Btype(No))
+       case (NOSLIP)
+         write(*,*) "noslip"
+       case (FREESLIP)
+         write(*,*) "freeslip"
+       case (PERIODIC)
+         write(*,*) "periodic"
+       case (DIRICHLET)
+         write(*,*) "dirichlet"
+       case (NEUMANN)
+         write(*,*) "neumann"
+     endselect
 
-   write(*,'(a2)',advance='no') " B "
-   select case (Btype(Bo))
-     case (NOSLIP)
-      write(*,*) "noslip"
-     case (FREESLIP)
-      write(*,*) "freeslip"
-     case (PERIODIC)
-      write(*,*) "periodic"
-     case (DIRICHLET)
-      write(*,*) "dirichlet"
-     case (NEUMANN)
-      write(*,*) "neumann"
-   endselect
+     write(*,'(a2)',advance='no') " B "
+     select case (Btype(Bo))
+       case (NOSLIP)
+         write(*,*) "noslip"
+       case (FREESLIP)
+         write(*,*) "freeslip"
+       case (PERIODIC)
+         write(*,*) "periodic"
+       case (DIRICHLET)
+         write(*,*) "dirichlet"
+       case (NEUMANN)
+         write(*,*) "neumann"
+     endselect
 
-   write(*,'(a2)',advance='no') " T "
-   select case (Btype(To))
-     case (NOSLIP)
-      write(*,*) "noslip"
-     case (FREESLIP)
-      write(*,*) "freeslip"
-     case (PERIODIC)
-      write(*,*) "periodic"
-     case (DIRICHLET)
-      write(*,*) "dirichlet"
-     case (NEUMANN)
-      write(*,*) "neumann"
-   endselect
+     write(*,'(a2)',advance='no') " T "
+     select case (Btype(To))
+       case (NOSLIP)
+         write(*,*) "noslip"
+       case (FREESLIP)
+         write(*,*) "freeslip"
+       case (PERIODIC)
+         write(*,*) "periodic"
+       case (DIRICHLET)
+         write(*,*) "dirichlet"
+       case (NEUMANN)
+         write(*,*) "neumann"
+     endselect
+     
+     if ((Btype(We)==PERIODIC.or.Btype(Ea)==PERIODIC).and.Btype(We)/=Btype(Ea)) &
+       call error_stop("Error: Both X boundary conditions must be periodic or not periodic.")
+     if ((Btype(So)==PERIODIC.or.Btype(No)==PERIODIC).and.Btype(So)/=Btype(No)) &
+       call error_stop("Error: Both Y boundary conditions must be periodic or not periodic.")
+     if ((Btype(Bo)==PERIODIC.or.Btype(To)==PERIODIC).and.Btype(Bo)/=Btype(To)) &
+       call error_stop("Error: Both Z boundary conditions must be periodic or not periodic.")
 
-
-
-
+   end if
 
    dxmin = lx/(Prnx)
    dymin = ly/(Prny)
@@ -753,38 +700,23 @@ contains
      lz = dzmin
    end if
 
-   write(*,*) "dxmin ",dxmin
-   write(*,*) "dymin ",dymin
-   write(*,*) "dzmin ",dzmin
-
-   write(*,*) "lx:",lx
-   write(*,*) "ly:",ly
-   write(*,*) "lz:",lz
+#ifdef MPI
+  gPrnx = Prnx
+  gPrny = Prny
+  gPrnz = Prnz  
+#endif
 
 
-   if (Btype(Ea)==PERIODIC) then
-                          Unx = Prnx
-   else
-                          Unx = Prnx-1
+   if (master) then
+      write(*,*) "dxmin ",dxmin
+      write(*,*) "dymin ",dymin
+      write(*,*) "dzmin ",dzmin
+
+      write(*,*) "lx:",lx
+      write(*,*) "ly:",ly
+      write(*,*) "lz:",lz
    end if
-   Uny = Prny
-   Unz = Prnz
 
-   Vnx = Prnx
-   if (Btype(No)==PERIODIC) then
-                          Vny = Prny
-   else
-                          Vny = Prny-1
-   end if
-   Vnz = Prnz
-
-   Wnx = Prnx
-   Wny = Prny
-   if (Btype(To)==PERIODIC) then
-                          Wnz = Prnz
-   else
-                          Wnz = Prnz-1
-   end if
 
    if (Btype(We)==TURBULENTINLET) inlettype = TurbulentInletType
    if (Btype(We)==INLETFROMFILE) inlettype = FromFileInletType
@@ -798,16 +730,79 @@ contains
 
    if (.not.xgridfromfile.and..not.ygridfromfile.and..not.zgridfromfile) then
      gridtype = UNIFORMGRID
-     write(*,*) "Uniform grid"
+     if (master) write(*,*) "Uniform grid"
    else
      gridtype = GENERALGRID
-     write(*,*) "General grid"
+     if (master) write(*,*) "General grid not supported."; call error_stop
    end if
 
+   !Btype might get overwritten by MPI procedures
+   do i = We,To
+     if (Btype(i)==PERIODIC) then
+        PoissonBtype(i) = PoisFFT_PERIODIC
+     else
+        PoissonBtype(i) = PoisFFT_NeumannStag
+     end if
+   end do
+   
+   gxmin = x0
+   gxmax = x0 + lx
+   gymin = y0
+   gymax = y0 + ly
+   gzmin = z0
+   gzmax = z0 + lz
 
-   write(*,*) "set"
 
-   contains
+#ifdef MPI
+   call init_mpi_grid
+   
+   call init_mpi_boundaries
+   
+   x0 = x0 + offset_to_global_x * dxmin
+   y0 = y0 + offset_to_global_y * dymin
+   z0 = z0 + offset_to_global_z * dzmin
+#endif
+
+
+   !both procedures below use the name of the output directory (affected by MPI)
+   call read_frames
+   
+   call read_staggered_frames
+
+
+   if (Btype(Ea)==PERIODIC.or.Btype(Ea)>=MPI_BOUNDS) then
+                          Unx = Prnx
+   else
+                          Unx = Prnx-1
+   end if
+   Uny = Prny
+   Unz = Prnz
+
+   Vnx = Prnx
+   if (Btype(No)==PERIODIC.or.Btype(No)>=MPI_BOUNDS) then
+                          Vny = Prny
+   else
+                          Vny = Prny-1
+   end if
+   Vnz = Prnz
+
+   Wnx = Prnx
+   Wny = Prny
+   if (Btype(To)==PERIODIC.or.Btype(To)>=MPI_BOUNDS) then
+                          Wnz = Prnz
+   else
+                          Wnz = Prnz-1
+   end if
+
+   if (master) write(*,*) "set"
+   
+   
+   
+
+ contains
+ 
+ 
+ 
 
      subroutine chget1(x)
        character(*),intent(out) :: x
@@ -825,9 +820,9 @@ contains
          read(line,*,iostat=ierr) tmp
          if (ierr/=0) then
            inquire(unit,name=fname)
-           write(*,*) "Stop expected a boolean flag in file "//trim(fname)
-           write(*,*) "Received '"//trim(line)//"' instead."
-           stop
+           if (master) write(*,*) "Stop expected a boolean flag in file "//trim(fname)
+           if (master) write(*,*) "Received '"//trim(line)//"' instead."
+           call error_stop
          end if
          x = tmp /=0
        end if
@@ -903,24 +898,31 @@ contains
      end subroutine
 
      subroutine parse_command_line
+#ifdef MPI
+       use custom_mpi
+#endif
        namelist /cmd/ tilesize, debugparam, debuglevel, windangle, projectiontype, &
                        Prnx, Prny, Prnz,&
+#ifdef MPI
+                       npxyz, &
+#endif
                        obstacles_file, probes_file, scalar_probes_file
 
        if (len_trim(command_line)>0) then
          msg = ''
          read(command_line,nml = cmd,iostat = io,iomsg = msg)
          if (io/=0) then
-           write(*,*) io,"Error parsing command line."
-           write(*,*) msg
-           write(*,*) command_line
+           if (master) write(*,*) io,"Error parsing command line."
+           if (master) write(*,*) msg
+           if (master) write(*,*) command_line
          end if
        else
-         write(*,*) io,"Error getting command line."
+         if (master) write(*,*) io,"Error getting command line."
        end if
      end subroutine
 
      subroutine get_line_sources
+        use Strings, only: itoa
         use LineSources, only: ScalarLineSource, ScalarLineSources
         type(ScalarLineSource) :: src
         integer n
@@ -930,6 +932,9 @@ contains
         do i=1,n
           read(unit,fmt=*)
           call get(src%scalar_number)
+          if (src%scalar_number<0) call error_stop("Error: Scalar number of line source "//itoa(i)//" negative.")
+          if (src%scalar_number>num_of_scalars) call error_stop("Error: Scalar number of line source "//itoa(i)//" too large.")
+          
           call get(src%start)
           call get(src%end)
           call get(src%flux)
@@ -938,11 +943,112 @@ contains
         end do
      end subroutine
 
+     subroutine get_point_sources
+        use Strings, only: itoa
+        use PointSources, only: ScalarPointSource, ScalarPointSources
+        type(ScalarPointSource) :: src
+        integer n
+
+        call get(n)
+        allocate(ScalarPointSources(0))
+        do i=1,n
+          read(unit,fmt=*)
+          call get(src%scalar_number)
+          if (src%scalar_number<0) call error_stop("Error: Scalar number of point source "//itoa(i)//" negative.")
+          if (src%scalar_number>num_of_scalars) call error_stop("Error: Scalar number of point source "//itoa(i)//" too large.")
+          
+          call get(src%position)
+          call get(src%flux)
+          ScalarPointSources = [ScalarPointSources, src]
+        end do
+     end subroutine
+
      subroutine read_namelist_output
        namelist /output/ store, display
 
        read(unit,nml = output,iostat = io,iomsg = msg)
      end subroutine
+     
+     subroutine read_frames  
+       open(unit,file="frames.conf",status="old",action="read",iostat = io)
+       if (io==0) then
+       
+         call get(frame_times%nframes)
+         
+         if (frame_times%nframes>0) then
+           call get(frame_times%start)
+           call get(frame_times%end)
+           read(unit,fmt='(/)')
+
+           read(unit,*) frame_flags%U
+           call get(frame_flags%vorticity)
+           call get(frame_flags%Pr)
+           call get(frame_flags%lambda2)
+           call get(frame_flags%scalars)
+           if (num_of_scalars < 1) frame_flags%scalars = 0
+           call get(frame_flags%sumscalars)
+           if (num_of_scalars < 1) frame_flags%sumscalars = 0
+           call get(frame_flags%temperature)
+           if (.not.enable_buoyancy) frame_flags%temperature = 0
+           call get(frame_flags%moisture)
+           if (.not.enable_buoyancy) frame_flags%moisture = 0
+           call get(frame_flags%temperature_flux)
+           if (.not.enable_buoyancy) frame_flags%temperature_flux = 0
+           call get(frame_flags%scalar_flux)
+           if (num_of_scalars < 1) frame_flags%scalar_flux = 0
+
+           call get(numframeslices)
+
+           do i = 1,numframeslices
+             call get(dimension)
+             call get(direction)
+             call get(position)
+             call AddDomain(TFrameDomain(achar(iachar('a')+i-1), &
+                            dimension, direction, position, &
+                            frame_times, frame_flags))
+           end do
+         end if
+
+         close(unit)
+       else
+         frames = 0
+         if (master) write (*,*) "frames.conf not found, no vtk frames will be saved."
+       end if
+     end subroutine read_frames
+
+     subroutine read_staggered_frames
+       open(unit,file="stagframes.conf",status="old",action="read",iostat = io)
+       if (io==0) then
+         call get(num_staggered_domains)
+
+         do i = 1,num_staggered_domains
+           read(unit,fmt=*)
+           call get(domain_label)
+           call get(range%min%x,range%max%x)
+           call get(range%min%y,range%max%y)
+           call get(range%min%z,range%max%z)
+           call get(frame_times%nframes)
+           call get(frame_times%start, frame_times%end)
+           call get(frame_save_flags%U, frame_save_flags%V, frame_save_flags%W)
+           call get(frame_save_flags%Pr)
+           call get(frame_save_flags%Viscosity)
+           call get(frame_save_flags%Temperature)
+           if (.not.enable_buoyancy) frame_save_flags%Temperature = .false.
+           call get(frame_save_flags%Moisture)
+           if (.not.enable_moisture) frame_save_flags%Moisture = .false.
+           call get(frame_save_flags%Scalar)
+           if (num_of_scalars < 1) frame_save_flags%Scalar = .false.
+
+           call AddDomain(TStaggeredFrameDomain(trim(domain_label), &
+                                                range, &
+                                                frame_times, &
+                                                frame_save_flags))
+         end do
+         close(unit)
+       else
+         if (master) write (*,*) "stagframes.conf not found, no staggered frames will be saved."
+       end if
+     end subroutine read_staggered_frames
 
  end subroutine ReadConfiguration
 
@@ -1030,8 +1136,6 @@ contains
   real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
   real(knd),allocatable :: Q(:,:,:)
   real(knd) :: dt
-
-    call init_random_seed
 
     Pr(1:Prnx,1:Prny,1:Prnz) = 0
 
@@ -1252,34 +1356,35 @@ contains
          do i = 1,Prnx
            
            call GetTurbulentInlet(dt)
+           
            !$omp parallel private(j,k)
-           !$omp do
+           !$omp do collapse(2)
            do k = 1,Unz
             do j = 1,Uny
               if (Utype(i,j,k)<=0) then
-                    U(i,j,k) = Uin(j,k)
+                 U(i,j,k) = Uin(j,k)
               else
                  U(i,j,k) = 0
               end if
             end do
            end do
            !$omp end do nowait
-           !$omp do
+           !$omp do collapse(2)
            do k = 1,Vnz
             do j = 1,Vny
               if (Vtype(i,j,k)<=0) then
-                    V(i,j,k) = Vin(j,k)
+                 V(i,j,k) = Vin(j,k)
               else
                  V(i,j,k) = 0
               end if
             end do
            end do
            !$omp end do nowait
-           !$omp do
+           !$omp do collapse(2)
            do k = 1,Wnz
             do j = 1,Wny
               if (Wtype(i,j,k)<=0) then
-                    W(i,j,k) = Win(j,k)
+                 W(i,j,k) = Win(j,k)
               else
                  W(i,j,k) = 0
               end if
@@ -1291,50 +1396,47 @@ contains
 
        else
 
-!          !$omp parallel private(i,j,k)
-!          !$omp do
+         !$omp parallel private(i,j,k)
+         !$omp do collapse(3)
          do k = 1,Unz
           do j = 1,Uny
            do i = 1,Unx
             if (Utype(i,j,k)<=0) then
-                  call RANDOM_NUMBER(p)
-                  U(i,j,k) = Uin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_knd*(p-0.5_knd)!sin(2.*pi*xU(i)+1)*cos(2.*pi*yPr(j)-2)!Uin(j,k)!*(1+0.03_knd*(p-0.5_knd))
+               U(i,j,k) = Uin(j,k)
              else
                U(i,j,k) = 0
             end if
            end do
           end do
          end do
-!          !$omp end do
-!          !$omp do
+         !$omp end do nowait
+         !$omp do collapse(3)
          do k = 1,Vnz
           do j = 1,Vny
            do i = 1,Vnx
             if (Vtype(i,j,k)<=0) then
-                  call RANDOM_NUMBER(p)
-                  V(i,j,k) = Vin(j,k)!+(Sqrt((Uin(j,k))**2+(Vin(j,k))**2))*0.1_knd*(p-0.5_knd)!-cos(2.*pi*xPr(i)+1)*sin(2.*pi*yV(j)-2)!Uinlet*(0.3_knd*(p-0.5_knd))
+               V(i,j,k) = Vin(j,k)
              else
                V(i,j,k) = 0
             end if
            end do
           end do
          end do
-!          !$omp end do
-!          !$omp do
+         !$omp end do nowait
+         !$omp do collapse(3)
          do k = 1,Wnz
           do j = 1,Wny
            do i = 1,Wnx
             if (Wtype(i,j,k)<=0) then
-                  call RANDOM_NUMBER(p)
-                  W(i,j,k) = Win(j,k)!Uinlet*(0.00001_knd*(p-0.5_knd))
+               W(i,j,k) = Win(j,k)
              else
                W(i,j,k) = 0
             end if
            end do
           end do
          end do
-!          !$omp end do
-!          !$omp end parallel
+         !$omp end do
+         !$omp end parallel
        end if  !tasktype
 
 
@@ -1426,22 +1528,20 @@ contains
          !$omp end parallel
        end if  !Re>0
 
-       !$omp parallel
-       !$omp sections
-       !$omp section
+!        !$omp parallel
+!        !$omp sections
+!        !$omp section
        call BoundU(1,U,Uin)
-       !$omp section
+!        !$omp section
        call BoundU(2,V,Vin)
-       !$omp section
+!        !$omp section
        call BoundU(3,W,Win)
-       !$omp section
+!        !$omp section
        call Bound_Pr(Pr)
-       !$omp end sections
-       !$omp end parallel
-
+!        !$omp end sections
+!        !$omp end parallel
 
        call PressureCorrection(U,V,W,Pr,Q,1._knd)
-
 
        if (sgstype==SubgridModel) then
                          call SGS_Smag(U,V,W,2._knd)
@@ -1499,7 +1599,7 @@ contains
 
     end if !init conditions not from file
 
-    write(*,*) "set"
+    if (master) write(*,*) "set"
   endsubroutine InitialConditions
 
 
@@ -1508,10 +1608,13 @@ contains
 
 
   subroutine InitBoundaryConditions
-  real(knd),allocatable:: xU2(:),yV2(:),zW2(:)
-  integer i,j,k,nx,ny,nz,nxup,nxdown,nyup,nydown,nzup,nzdown,io
-  real(knd) P,dt
-  integer unit
+    use VTKFrames, only: InitVTKFrames
+    real(knd),allocatable:: xU2(:),yV2(:),zW2(:)
+    integer i,j,k,nx,ny,nz,nxup,nxdown,nyup,nydown,nzup,nzdown,io
+    real(knd) P,dt
+    integer unit
+
+    call init_random_seed
 
     nx = Prnx-1
     ny = Prny-1
@@ -1587,7 +1690,7 @@ contains
         read (unit,*,iostat = io) P
         if (io==0) then
           j = j+1
-          write(*,*) j
+          if (master) write(*,*) j
         else
           exit
         end if
@@ -1624,7 +1727,7 @@ contains
 
       open(unit,file="xgrid.txt")
       do j = 0,nx
-        write(*,*) j
+        if (master) write(*,*) j
         read(unit,*) xU2(j)
       end do
       close(unit)
@@ -1933,10 +2036,16 @@ contains
    !add arrays of the line source points
    call InitLineSources
 
+   !add arrays of the point source points
+   call InitPointSources
+
    !add puff sources, each containing one or more points
    call InitPuffSources
+   
+   !filter out frames outside the domain
+   call InitVTKFrames
 
-    write (*,*) "set"
+    if (master) write (*,*) "set"
   end subroutine InitBoundaryConditions
 
 
@@ -2048,20 +2157,32 @@ contains
 
 
 
-  subroutine INIT_RANDOM_SEED()
+  subroutine init_random_seed()
+    use rng_par_zig
+    !$ use omp_lib
+#ifdef MPI
+    use custom_mpi
+#endif
     integer :: i, n, clock
-    integer,dimension(:),allocatable :: seed
+    integer(int32),dimension(:),allocatable :: seed
+    integer :: nt
+    
+    nt = 1
+    !$omp parallel
+    !$ nt = omp_get_num_threads()
+    !$omp end parallel
+    
+    allocate(seed(nt))
 
-    call RANDOM_SEED(size = n)
-    allocate(seed(n))
+#ifdef MPI
+    seed = [( 1000 * i + myrank, i=1,size(seed) )]
+#else
+    seed = [( 1000 * i, i=1,size(seed) )]
+#endif
 
-    call SYSTEM_CLOCK(COUNT = clock)
+    call rng_init(nt, seed)
 
-    seed = 0!clock+37*[(i-1,i = 1,n)]
-    call RANDOM_SEED(PUT = seed)
-
-    deallocate(seed)
-  endsubroutine
+  end subroutine
 
 
 endmodule Initial

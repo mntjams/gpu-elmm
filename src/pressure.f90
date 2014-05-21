@@ -6,6 +6,9 @@ module Pressure
 #ifdef __HMPP
   use HMPP_codelets
 #endif
+#ifdef MPI
+  use custom_mpi
+#endif
 
   implicit none
 
@@ -35,7 +38,11 @@ contains
     integer(DBL), save :: trate
     integer(DBL), save :: time1, time2, time3, time4
     integer(DBL), save :: timem1, timem2, timem3, timem4
-correctcompatibility = 2
+#ifdef MPI
+    correctcompatibility = 2
+#else
+    correctcompatibility = 2
+#endif
     if (called==0) then
       allocate(Phi(0:Prnx+1,0:Prny+1,0:Prnz+1))
       allocate(RHS(0:Prnx+1,0:Prny+1,0:Prnz+1))
@@ -73,18 +80,17 @@ correctcompatibility = 2
       !$hmpp <tsteps> delegatedstore, args[PrePoisson::divergence,PrePoisson::RHS]
       if (debugparam>1.and.called>1) call system_clock(count=timem2)
     else
-      call PrePoisson(U,V,W,RHS,dt2,uncompatibility,divergence)
+      call PrePoisson(U,V,W,RHS,dt2,uncompatibility)
     end if
 #else
-    call PrePoisson(U,V,W,Q,RHS,dt2,uncompatibility,divergence)
+    call PrePoisson(U,V,W,Q,RHS,dt2,uncompatibility)
 #endif
 
     if (debugparam>1.and.called>1) call system_clock(count=time2)
 
-    if (correctcompatibility>=1) write(*,*) "Uncompatibility:",uncompatibility
-
-    write(*,*) "avgRHS:",divergence
-
+    if (correctcompatibility>=1) then
+      if (master) write(*,*) "Uncompatibility:",uncompatibility
+    end if
 
     if (poissmet==1) then
 
@@ -110,7 +116,7 @@ correctcompatibility = 2
 
     if (debugparam>1.and.called>1) then
      call system_clock(count=time3)
-     write (*,*) "ET of part 2", real(time3-time2)/real(trate)
+     if (master) write(*,*) "ET of part 2", real(time3-time2)/real(trate)
     endif
 
 #ifdef __HMPP
@@ -119,7 +125,7 @@ correctcompatibility = 2
       !$hmpp <tsteps> advancedload, args[PostPoisson::dt3,PostPoisson::Phi]
       if (debugparam>1.and.called>1) then
        call system_clock(count=timem4)
-       write (*,*) "ET of part 4", real((timem4-timem3)+(timem2-timem1))/real(trate)
+       if (master) write(*,*) "ET of part 4", real((timem4-timem3)+(timem2-timem1))/real(trate)
       endif
 
       !$hmpp <tsteps> PostPoisson callsite, args[*].noupdate=true
@@ -131,12 +137,13 @@ correctcompatibility = 2
       call PostPoisson(U,V,W,Pr,Phi,dt2,dt3)
     end if
 #else
-    call PostPoisson(U,V,W,Pr,Phi,dt2,dt3)
+    call PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3)
 #endif
     if (debugparam>1.and.called>1) then
      call system_clock(count=time4)
-     write (*,*) "ET of part 3", real((time4-time1)-(time3-time2))/real(trate)
+     if (master) write(*,*) "ET of part 3", real((time4-time1)-(time3-time2))/real(trate)
     endif
+    
   end subroutine PressureCorrection
 
 
@@ -152,27 +159,27 @@ correctcompatibility = 2
 
 
 
-  subroutine PrePoisson(U,V,W,Q,RHS,dt2,uncompatibility,divergence)
+  subroutine PrePoisson(U,V,W,Q,RHS,dt2,uncompatibility)
     real(knd),intent(inout) :: U(-2:,-2:,-2:)
     real(knd),intent(inout) :: V(-2:,-2:,-2:)
     real(knd),intent(inout) :: W(-2:,-2:,-2:)
     real(knd),intent(out)   :: RHS(0:,0:,0:)
     real(knd),allocatable,intent(in) :: Q(:,:,:)
-    real(knd),intent(out)   :: uncompatibility,divergence
+    real(knd),intent(out)   :: uncompatibility
     real(knd),intent(in)    :: dt2
     real(knd) :: S,S2
     integer   :: i,j,k
 
-    !$omp parallel
-    !$omp sections
-    !$omp section
+!     !$omp parallel
+!     !$omp sections
+!     !$omp section
     call BoundU(1,U,Uin)
-    !$omp section
+!     !$omp section
     call BoundU(2,V,Vin)
-    !$omp section
+!     !$omp section
     call BoundU(3,W,Win)
-    !$omp end sections
-    !$omp end parallel
+!     !$omp end sections
+!     !$omp end parallel
 
     if (correctcompatibility>=1) then
       S=0
@@ -186,12 +193,39 @@ correctcompatibility = 2
        end do
       end do
       !$omp end parallel do
-      
+
+#ifdef MPI
+      if (abs(windangle-90)<1.or.abs(windangle+90)<1) then
+        S=S*dymin/(gPrnx*gPrnz)
+
+        uncompatibility = S
+
+        uncompatibility = mpi_co_sum(uncompatibility)
+
+        if (correctcompatibility==1.and.jim==nyims) then
+          !$omp parallel workshare
+          V(:,Vny+1,:) = V(:,Vny+1,:)+S
+          !$omp end parallel workshare
+        end if
+      else
+        S=S*dxmin/(gPrny*gPrnz)
+
+        uncompatibility = S
+
+        uncompatibility = mpi_co_sum(uncompatibility)
+
+        if (correctcompatibility==1.and.iim==nxims) then
+          !$omp parallel workshare
+          U(Unx+1,:,:) = U(Unx+1,:,:)+S
+          !$omp end parallel workshare
+        end if
+      end if
+#else
       if (abs(windangle-90)<1.or.abs(windangle+90)<1) then
         S=S*dymin/(Prnx*Prnz)
 
         uncompatibility = S
-        
+
         if (correctcompatibility==1) then
           !$omp parallel workshare
           V(:,Vny+1,:) = V(:,Vny+1,:)+S
@@ -201,20 +235,20 @@ correctcompatibility = 2
         S=S*dxmin/(Prny*Prnz)
 
         uncompatibility = S
-        
+
         if (correctcompatibility==1) then
           !$omp parallel workshare
           U(Unx+1,:,:) = U(Unx+1,:,:)+S
           !$omp end parallel workshare
         end if
       end if
+#endif
     end if
 
     S=0
-    S2=0
 
     if (allocated(Q)) then
-      !$omp parallel do private(i,j,k) reduction(+:s2)
+      !$omp parallel do private(i,j,k)
       do k=1,Prnz            !divergence of U -> RHS
        do j=1,Prny
         do i=1,Prnx
@@ -222,21 +256,19 @@ correctcompatibility = 2
                          +(V(i,j,k)-V(i,j-1,k))/(dymin)&
                          +(W(i,j,k)-W(i,j,k-1))/(dzmin)&
                          -Q(i,j,k)
-             S2=S2+abs(RHS(i,j,k))
              RHS(i,j,k) = RHS(i,j,k)/(dt2)
         end do
        end do
       end do
       !$omp end parallel do
     else
-      !$omp parallel do private(i,j,k) reduction(+:s2)
+      !$omp parallel do private(i,j,k)
       do k=1,Prnz            !divergence of U -> RHS
        do j=1,Prny
         do i=1,Prnx
              RHS(i,j,k) = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
                          +(V(i,j,k)-V(i,j-1,k))/(dymin)&
                          +(W(i,j,k)-W(i,j,k-1))/(dzmin)
-             S2=S2+abs(RHS(i,j,k))
              RHS(i,j,k) = RHS(i,j,k)/(dt2)
         end do
        end do
@@ -244,21 +276,32 @@ correctcompatibility = 2
       !$omp end parallel do
     end if
 
-    divergence = S2/(Prnx*Prny*Prnz)
-
   end subroutine PrePoisson
 
 
 
 
-  subroutine PostPoisson(U,V,W,Pr,Phi,dt2,dt3)
+  subroutine PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3)
+#ifdef MPI
+    use custom_mpi
+    
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(knd) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+    integer :: ie
+#endif
     real(knd),intent(inout) :: U(-2:,-2:,-2:)
     real(knd),intent(inout) :: V(-2:,-2:,-2:)
     real(knd),intent(inout) :: W(-2:,-2:,-2:)
     real(knd),intent(inout) :: Pr(1:,1:,1:)
+    real(knd),allocatable,intent(in) :: Q(:,:,:)
     real(knd),intent(inout) :: Phi(0:,0:,0:)
     real(knd),intent(in)    :: dt2,dt3
-    real(knd) :: Phiref,Au,Av,Aw,dxmin2,dymin2,dzmin2
+    real(knd) :: Phi_ref,Au,Av,Aw,dxmin2,dymin2,dzmin2,S,p
     integer   :: i,j,k
 
 
@@ -312,25 +355,78 @@ correctcompatibility = 2
     end do
     !$omp end do
 
+#ifdef MPI
+    !images in top plane compute the reference pressure
+    if (kim==nzims) then
+      !$omp workshare
+      Phi_ref = sum(Pr(1:Prnx,1:Prny,Prnz))
+      !$omp end workshare
+      Phi_ref = mpi_co_sum(Phi_ref, comm = comm_plane_xy)
+      Phi_ref = Phi_ref / (gPrnx * gPrny)
+    end if
+
+    !all kim==nzims broadcast to images with smaller kim
+    call MPI_Bcast(Phi_ref, 1, MPI_KND, nzims-1, comm_row_z, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+
+#else
     !$omp workshare
-    Phiref = sum(Pr(1:Prnx,1:Prny,Prnz))/(Prnx*Prny)
-    Pr = Pr - (Phiref - top_pressure)
+    Phi_ref = sum(Pr(1:Prnx,1:Prny,Prnz)) / (Prnx*Prny)
+    !$omp end workshare
+#endif
+    !$omp workshare
+    Pr = Pr - (Phi_ref - top_pressure)
     !$omp end workshare
     
 
-    !$omp sections
-    !$omp section
-    call BoundU(1,U,Uin)
-    !$omp section
-    call BoundU(2,V,Vin)
-    !$omp section
-    call BoundU(3,W,Win)
-    !$omp section
-    call Bound_Pr(Pr)
-    !$omp end sections
     !$omp end parallel
+!     !$omp sections
+!     !$omp section
+    call BoundU(1,U,Uin)
+!     !$omp section
+    call BoundU(2,V,Vin)
+!     !$omp section
+    call BoundU(3,W,Win)
+!     !$omp section
+    call Bound_Pr(Pr)
+!     !$omp end sections
 
-
+    S = 0
+    if (allocated(Q)) then
+      !$omp parallel do private(i,j,k,p) reduction(+:S)
+      do k=1,Prnz            !divergence of U -> RHS
+       do j=1,Prny
+        do i=1,Prnx
+             p = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
+                         +(V(i,j,k)-V(i,j-1,k))/(dymin)&
+                         +(W(i,j,k)-W(i,j,k-1))/(dzmin)&
+                         -Q(i,j,k)
+             p = p / dt2
+             S = max(S,abs(p))
+        end do
+       end do
+      end do
+      !$omp end parallel do
+    else
+      !$omp parallel do private(i,j,k,p) reduction(+:S)
+      do k=1,Prnz            !divergence of U -> RHS
+       do j=1,Prny
+        do i=1,Prnx
+             p = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
+                         +(V(i,j,k)-V(i,j-1,k))/(dymin)&
+                         +(W(i,j,k)-W(i,j,k-1))/(dzmin)
+             p = p / dt2
+             S = max(S,abs(p))
+        end do
+       end do
+      end do
+      !$omp end parallel do
+    end if
+#ifdef MPI
+    S = mpi_co_max(S)
+#endif
+    
+    if (master) write(*,*) "max divergence:", S
 
    end subroutine PostPoisson
 

@@ -20,6 +20,8 @@ module FreeUnit
            return
         end if
      end do
+     
+     unit = -1
   end subroutine newunit
 
 end module FreeUnit

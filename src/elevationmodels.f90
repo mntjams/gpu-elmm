@@ -1,5 +1,6 @@
 module ElevationModels
   use Kinds
+  use Stop_procedures
   
   implicit none
 
@@ -49,7 +50,7 @@ contains
     open(newunit=unit, file=filename, status='old', action='read', iostat=io)
     if (io/=0) then
       write(*,'(*(g0))') "Could not open file ",filename
-      stop
+      call error_stop
     else
       do
         read(unit,*,iostat=io) points(:,current+1)
@@ -89,7 +90,7 @@ contains
       end do
       ny = size(points,2) / nx
       
-      if (nx*ny/=size(points,2)) stop "Error decomposing uniform DEM terrain grid."
+      if (nx*ny/=size(points,2)) call error_stop("Error decomposing uniform DEM terrain grid.")
     else
       yincreasing = points(2,2)>points(2,1)
       res%dy = abs(points(2,2)-points(2,1))
@@ -111,7 +112,7 @@ contains
       end do
       nx = size(points,2) / ny
       
-      if (nx*ny/=size(points,2)) stop "Error decomposing uniform DEM terrain grid."
+      if (nx*ny/=size(points,2)) call error_stop("Error decomposing uniform DEM terrain grid.")
     end if
 
     allocate(res%z(nx,ny))
@@ -193,7 +194,7 @@ contains
     open(newunit=unit, file=filename, access="stream", form="unformatted", status="old", action="read", iostat=io)
     if (io/=0) then
       write(*,'(*(g0,1x))') "Error opening file ",filename
-      stop
+      call error_stop
     end if
     read(unit) i
     if (i/=1) then
@@ -235,7 +236,7 @@ contains
       res = uniform_DEM_ELV(filename)
     else
       write(*,'(*(g0,1x))')  "Error, unknown file extension in file ",filename
-      stop
+      call error_stop
     end if
   end function
   

@@ -1,6 +1,7 @@
 module MULTIGRID
 
- use PARAMETERS
+ use Parameters
+ use Stop_procedures
 
  implicit none
 
@@ -415,7 +416,7 @@ contains
 
        write (*,*) "RCOND",rcond
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
      else
@@ -435,7 +436,7 @@ contains
                    rcond,ferr,berr,work,work2,info)
 
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
      endif
@@ -592,7 +593,7 @@ contains
        call  getrf(nxyz,nxyz,age,nxyz,ipivot,info)
 
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
     endif
@@ -611,7 +612,7 @@ contains
        call getrs("N",nxyz,1,age,nxyz,ipivot,bge,nxyz,info)
 
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
 
@@ -762,7 +763,7 @@ contains
        call  getrf(nxyz,nxyz,age,nxyz,ipivot,info)
 
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
 
@@ -771,7 +772,7 @@ contains
        call getri(nxyz,age,nxyz,ipivot,work,-1,info)
 
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
 
@@ -783,7 +784,7 @@ contains
        call getri(nxyz,age,nxyz,ipivot,work,ldwork,info)
 
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
 
@@ -1263,7 +1264,7 @@ contains
        write (*,*) 0+sx,":",nx,"--",1,":",Prnx
        write (*,*) 0+sy,":",ny,"--",1,":",Prny
        write (*,*) 0+sz,":",nz,"--",1,":",Prnz
-       stop
+       call error_stop
     endif
 
 

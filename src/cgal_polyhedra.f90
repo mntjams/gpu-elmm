@@ -1,5 +1,6 @@
 module CGAL_Polyhedra
   use iso_c_binding
+  use stop_procedures
   
   implicit none
   
@@ -18,10 +19,11 @@ module CGAL_Polyhedra
   
   interface
   
-    subroutine polyhedron_from_file(ptree, fname, ierr) bind(C,name="polyhedron_from_file")
+    subroutine polyhedron_from_file(ptree, fname, verbose, ierr) bind(C,name="polyhedron_from_file")
       import
       type(c_ptr),intent(out) :: ptree
       character(kind=c_char),intent(in) :: fname(*)
+      integer(c_int),value :: verbose !avoid bool in C++, not equal to c_bool
       integer(c_int),intent(out) :: ierr
     end subroutine
     
@@ -83,18 +85,25 @@ contains
 
 
   subroutine cgal_polyhedron_read(ptree, fname)
+#ifdef MPI
+    use custom_mpi, only: master
+#endif
     type(c_ptr),intent(out) :: ptree
     character(*),intent(in) :: fname
     integer(c_int) :: ierr
+    integer :: imaster
+    
+    imaster = 0
+#ifdef MPI
+    if (master)  imaster = 1
+#endif
 
-    call polyhedron_from_file(ptree, fname//c_null_char, ierr)
+    call polyhedron_from_file(ptree, fname//c_null_char, imaster, ierr)
     
     if (ierr==1) then
-      write(*,*) "Error reading file "//fname//" it appears to be empty."
-      stop
-    else if (ierr==1) then
-      write(*,*) "Error reading file "//fname//"."
-      stop
+      call error_stop("Error reading file "//fname//", it appears to be empty.")
+    else if (ierr==2) then
+      call error_stop("Error reading file "//fname//".")
     end if
   end subroutine
 

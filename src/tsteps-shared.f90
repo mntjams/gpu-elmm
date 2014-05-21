@@ -409,7 +409,9 @@
                dxmin,dxU,dyV,dzW,CFL,Uref,steady,time,endtime,&
                U,V,W,dt)
     use ieee_arithmetic
-
+#ifdef MPI
+    use custom_mpi
+#endif
     integer,intent(in)   :: Prnx,Prny,Prnz,Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,steady
     real(knd),intent(in) :: dxmin
     real(knd),intent(in) :: CFL,Uref
@@ -417,10 +419,10 @@
     real(knd),dimension(-2:),contiguous,intent(in)  :: dxU,dyV,dzW
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
     real(TIM),intent(out) :: dt
-    integer i,j,k
-    real(knd) m, p
-    logical nan
-
+    integer :: i,j,k
+    real(knd) :: m, p
+    logical :: nan
+    
     nan = .false.
     m = 0
     !$omp parallel do private(i,j,k,p) reduction(max:m) reduction(.or.:nan)
@@ -448,6 +450,10 @@
     endif
 
     if (steady/=1.and.dt+time>endtime)  dt = endtime-time
+    
+#ifdef MPI
+    dt = mpi_co_min(dt)
+#endif
 
   endsubroutine TimeStepEul
 
@@ -477,7 +483,7 @@
 
     if (enable_moisture) then
       if (enable_liquid) then
-        stop "Liquid water not implemented."
+        call error_stop("Liquid water not implemented.")
       else
         A = grav_acc / temperature_ref
         A2 = A / 2._KND

@@ -14,6 +14,7 @@ module Tiling
   contains
 
     subroutine InitTiles(Prnx,Prny,Prnz)
+      use custom_mpi
       integer,intent(in) :: Prnx,Prny,Prnz
       integer :: omp_threads = 1
       integer :: narrays
@@ -36,9 +37,9 @@ module Tiling
 
         rbn = bn**(1./3.)/(Prnx*Prny*Prnz)**(1./3.) !geometric mean to scale the tiling box
 
-        bnx = nint(Prnx*rbn)  !first try for tiling block size
-        bny = nint(Prny*rbn)
-        bnz = nint(Prnz*rbn)
+        bnx = max(nint(Prnx*rbn),1)  !first try for tiling block size
+        bny = max(nint(Prny*rbn),1)
+        bnz = max(nint(Prnz*rbn),1)
 
         if (mod(Prnz/bnz,omp_threads)/=0) then
           bnzo = bnz !original

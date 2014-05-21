@@ -65,6 +65,8 @@ module Outputs
     integer :: Ui,Uj,Uk,Vi,Vj,Vk,Wi,Wj,Wk    !grid coordinates of probes in the U,V,W grids
     integer :: i,j,k                         !grid coordinates of probes in the scalar grid
     real(knd) :: x,y,z                       !physical coordinates of probes
+    logical :: inside
+    integer :: number
   end type TProbe
 
   !for flow variables including scalar ones (temperature, moisture)
@@ -155,8 +157,7 @@ contains
 
     open(newunit=unit, file=pfile, status="old", action="read",iostat=io)
     if (io/=0) then
-      write(*,*) "Error: File ",pfile," could not be opened!"
-      stop
+      call error_stop("Error: File "//trim(pfile)//" could not be opened!")
     else
       nps = 0
       do
@@ -177,6 +178,7 @@ contains
 
   subroutine AllocateOutputs
     integer :: k
+
 
    if (store%avg_U==0.and.store%avg_U_rms>1) store%avg_U = 1
 
@@ -248,6 +250,49 @@ contains
 
    allocate(times(0:max_number_of_time_steps))
 
+   
+   do k = 1,size(probes)
+     associate(p => probes(k))
+       p%number = k
+       
+       p%inside = InDomain(p%x,p%y,p%z)
+       
+       call GridCoords(p%i,p%j,p%k,p%x,p%y,p%z)
+
+       p%i = max(p%i,1)
+       p%j = max(p%j,1)
+       p%k = max(p%k,1)
+       p%i = min(p%i,Prnx)
+       p%j = min(p%j,Prny)
+       p%k = min(p%k,Prnz)
+
+       call GridCoords_U(p%Ui,p%Uj,p%Uk,p%x,p%y,p%z)
+       call GridCoords_V(p%Vi,p%Vj,p%Vk,p%x,p%y,p%z)
+       call GridCoords_W(p%Wi,p%Wj,p%Wk,p%x,p%y,p%z)
+     end associate
+   end do
+   
+   probes = pack(probes, probes%inside)
+
+   do k = 1,size(scalar_probes)
+     associate(p => scalar_probes(k))
+       p%number = k
+       
+       p%inside = InDomain(p%x,p%y,p%z)
+       
+       call GridCoords(p%i,p%j,p%k,p%x,p%y,p%z)
+
+       p%i = max(p%i,1)
+       p%j = max(p%j,1)
+       p%k = max(p%k,1)
+       p%i = min(p%i,Prnx)
+       p%j = min(p%j,Prny)
+       p%k = min(p%k,Prnz)
+     end associate
+   end do
+
+   scalar_probes = pack(scalar_probes, scalar_probes%inside)
+
    if (size(probes)>0) then
 
      allocate(U_time(size(probes),0:max_number_of_time_steps), &
@@ -317,36 +362,6 @@ contains
        scalp_time = huge(1.0_knd)
     end if
    end if
-
-   do k = 1,size(probes)
-     associate(p => probes(k))
-       call GridCoords(p%i,p%j,p%k,p%x,p%y,p%z)
-
-       p%i = max(p%i,1)
-       p%j = max(p%j,1)
-       p%k = max(p%k,1)
-       p%i = min(p%i,Prnx)
-       p%j = min(p%j,Prny)
-       p%k = min(p%k,Prnz)
-
-       call GridCoords_U(p%Ui,p%Uj,p%Uk,p%x,p%y,p%z)
-       call GridCoords_V(p%Vi,p%Vj,p%Vk,p%x,p%y,p%z)
-       call GridCoords_W(p%Wi,p%Wj,p%Wk,p%x,p%y,p%z)
-     end associate
-   end do
-
-   do k = 1,size(scalar_probes)
-     associate(p => scalar_probes(k))
-       call GridCoords(p%i,p%j,p%k,p%x,p%y,p%z)
-
-       p%i = max(p%i,1)
-       p%j = max(p%j,1)
-       p%k = max(p%k,1)
-       p%i = min(p%i,Prnx)
-       p%j = min(p%j,Prny)
-       p%k = min(p%k,Prnz)
-     end associate
-   end do
 
    if (store%BLprofiles==1.and.averaging==1) then
      allocate(profU(0:Unz+1),profV(0:Vnz+1),profUavg(0:Unz+1),profVavg(0:Vnz+1),profUavg2(0:Unz+1),profVavg2(0:Vnz+1))
@@ -445,9 +460,9 @@ contains
    call GetEndianness
 
 #if _WIN32 || _WIN64
-   call execute_command_line("mkdir output")
+   call execute_command_line("mkdir "//trim(output_dir))
 #else
-   call execute_command_line("mkdir -p output")
+   call execute_command_line("mkdir -p "//trim(output_dir))
 #endif
 
    contains 
@@ -661,7 +676,7 @@ contains
 
 
     if (display%delta==1) then
-      write(*,*) "delta: ",delta
+      if (master) write(*,*) "delta: ",delta
     end if
 
 
@@ -735,9 +750,9 @@ contains
 
      if (display%ustar==1) then
        if (allocated(Ustar_inlet)) then
-        write(*,*) "ustar:",S,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
+        if (master) write(*,*) "ustar:",S,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
        else
-        write(*,*) "ustar:",S,"Re_tau:",S2
+        if (master) write(*,*) "ustar:",S,"Re_tau:",S2
        end if
      end if
      if (store%ustar==1) then
@@ -751,7 +766,7 @@ contains
      S=-S*S2
 
      if (display%tstar==1) then
-       write(*,*) "Tstar",S,"tflux", S2
+       if (master) write(*,*) "Tstar",S,"tflux", S2
      end if
 
      if (store%tstar==1) then
@@ -898,39 +913,39 @@ contains
     
     do k = 1,size(probes)
 
-      write(prob,"(i0)") k
+      write(prob,"(i0)") probes(k)%number
 
-      open(unit,file="output/Prtimep"//trim(prob)//".txt")
+      open(unit,file=trim(output_dir)//"Prtimep"//trim(prob)//".txt")
       do j = 0,endstep
        write(unit,*) times(j),Pr_time(k,j)
       end do
       close(unit)
 
-      open(unit,file="output/Utimep"//trim(prob)//".txt")
+      open(unit,file=trim(output_dir)//"Utimep"//trim(prob)//".txt")
       do j = 0,endstep
        write(unit,*) times(j),U_time(k,j)
       end do
       close(unit)
 
-      open(unit,file="output/Vtimep"//trim(prob)//".txt")
+      open(unit,file=trim(output_dir)//"Vtimep"//trim(prob)//".txt")
       do j = 0,endstep
        write(unit,*) times(j),V_time(k,j)
       end do
       close(unit)
 
-      open(unit,file="output/Wtimep"//trim(prob)//".txt")
+      open(unit,file=trim(output_dir)//"Wtimep"//trim(prob)//".txt")
       do j = 0,endstep
        write(unit,*) times(j),W_time(k,j)
       end do
       close(unit)
       
       if (store%probes_fluxes==1) then
-        open(unit,file="output/stresstimep"//trim(prob)//".txt")
+        open(unit,file=trim(output_dir)//"stresstimep"//trim(prob)//".txt")
         do j = 0,endstep
          write(unit,'(7(2x,g13.6))') times(j),momentum_fluxes_time(:,k,j)
         end do
         close(unit)
-        open(unit,file="output/sgstresstimep"//trim(prob)//".txt")
+        open(unit,file=trim(output_dir)//"sgstresstimep"//trim(prob)//".txt")
         do j = 0,endstep
          write(unit,'(7(2x,g13.6))') times(j),momentum_fluxes_time(:,k,j)
         end do
@@ -938,7 +953,7 @@ contains
       end if
 
       if (enable_buoyancy) then
-        open(unit,file="output/temptimep"//trim(prob)//".txt")
+        open(unit,file=trim(output_dir)//"temptimep"//trim(prob)//".txt")
         do j = 0,endstep
          write(unit,*) times(j),temp_time(k,j)
         end do
@@ -946,7 +961,7 @@ contains
       end if
 
       if (enable_moisture) then
-        open(unit,file="output/moisttimep"//trim(prob)//".txt")
+        open(unit,file=trim(output_dir)//"moisttimep"//trim(prob)//".txt")
         do j = 0,endstep
          write(unit,*) times(j),moist_time(k,j)
         end do
@@ -957,10 +972,10 @@ contains
 
     do k = 1,size(scalar_probes)
 
-      write(prob,"(i0)") k
+      write(prob,"(i0)") scalar_probes(k)%number
 
       if (num_of_scalars>0) then
-        open(unit,file="output/scaltimep"//trim(prob)//".txt")
+        open(unit,file=trim(output_dir)//"scaltimep"//trim(prob)//".txt")
         do j = 1,endstep
          write(unit,'(99(g0,tr3))') times(j),scalp_time(:,k,j)
         end do
@@ -970,7 +985,7 @@ contains
     end do
 
     if (store%delta_time==1) then
-      open(unit,file="output/delta_time.txt")
+      open(unit,file=trim(output_dir)//"delta_time.txt")
       do j = 1,endstep
        write(unit,*) times(j),delta_time(j)
       end do
@@ -978,7 +993,7 @@ contains
     end if
 
     if (store%tke==1) then
-      open(unit,file="output/tke.txt")
+      open(unit,file=trim(output_dir)//"tke.txt")
       do j = 0,endstep
        write(unit,*) times(j),tke(j)
       end do
@@ -986,7 +1001,7 @@ contains
     end if
 
     if (store%tke==1.and.store%dissip==1) then
-     open(unit,file="output/dissip.txt")
+     open(unit,file=trim(output_dir)//"dissip.txt")
       do j = 1,endstep
        write(unit,*) times(j),dissip(j)
       end do
@@ -994,7 +1009,7 @@ contains
     end if
 
     if (wallmodeltype>0.and.display%ustar==1) then
-      open(unit,file="output/Retau.txt")
+      open(unit,file=trim(output_dir)//"Retau.txt")
       do j = 0,endstep
        write(unit,*) times(j),ustar(:,j)
       end do
@@ -1002,7 +1017,7 @@ contains
     end if
 
     if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.store%tstar==1) then
-      open(unit,file="output/tflux.txt")
+      open(unit,file=trim(output_dir)//"tflux.txt")
       do j = 0,endstep
        write(unit,*) times(j),tstar(:,j)
       end do
@@ -1011,7 +1026,7 @@ contains
 
 
     if (num_of_scalars>0.and.store%scalsum_time==1) then
-      open(unit,file="output/scalsumtime.txt")
+      open(unit,file=trim(output_dir)//"scalsumtime.txt")
       do j = 1,endstep
        write(unit,*) times(j),scalsum_time(:,j)
       end do
@@ -1019,7 +1034,7 @@ contains
     end if
 
     if (num_of_scalars>0.and.store%scaltotsum_time==1) then
-      open(unit,file="output/scaltotsumtime.txt")
+      open(unit,file=trim(output_dir)//"scaltotsumtime.txt")
       do j = 1,endstep
        write(unit,*) times(j),sum(scalsum_time(:,j))
       end do
@@ -1040,43 +1055,43 @@ contains
 
     if (store%BLprofiles==1.and.averaging==1) then
 
-       open(unit,file="output/profu.txt")
+       open(unit,file=trim(output_dir)//"profu.txt")
        do k = 1,Unz
         write(unit,*) zPr(k),profuavg(k)
        end do
        close(unit)
 
-       open(unit,file="output/profv.txt")
+       open(unit,file=trim(output_dir)//"profv.txt")
        do k = 1,Vnz
         write(unit,*) zPr(k),profvavg(k)
        end do
        close(unit)
 
-       open(unit,file="output/profuu.txt")
+       open(unit,file=trim(output_dir)//"profuu.txt")
        do k = 1,Unz
         write(unit,*) zPr(k),profuuavg(k)
        end do
        close(unit)
 
-       open(unit,file="output/profvv.txt")
+       open(unit,file=trim(output_dir)//"profvv.txt")
        do k = 1,Vnz
         write(unit,*) zPr(k),profvvavg(k)
        end do
        close(unit)
 
-       open(unit,file="output/profww.txt")
+       open(unit,file=trim(output_dir)//"profww.txt")
        do k = 1,Wnz
         write(unit,*) zW(k),profwwavg(k)
        end do
        close(unit)
 
-       open(unit,file="output/profuw.txt")
+       open(unit,file=trim(output_dir)//"profuw.txt")
        do k = 0,Prnz
         write(unit,*) zW(k),profuwavg(k),profuwsgsavg(k)
        end do
        close(unit)
 
-       open(unit,file="output/profvw.txt")
+       open(unit,file=trim(output_dir)//"profvw.txt")
        do k = 0,Prnz
         write(unit,*) zW(k),profvwavg(k),profvwsgsavg(k)
        end do
@@ -1084,26 +1099,26 @@ contains
 
        if (enable_buoyancy) then
 
-          open(unit,file="output/proftemp.txt")
+          open(unit,file=trim(output_dir)//"proftemp.txt")
           do k = 1,Prnz
            write(unit,*) zPr(k),proftempavg(k)
           end do
           close(unit)
 
-          open(unit,file="output/proftempfl.txt")
+          open(unit,file=trim(output_dir)//"proftempfl.txt")
           do k = 0,Prnz
            write(unit,*) zW(k),proftempflavg(k),proftempflsgsavg(k)
           end do
           close(unit)
 
-          open(unit,file="output/proftt.txt")
+          open(unit,file=trim(output_dir)//"proftt.txt")
           do k = 1,Prnz
            write(unit,*) zPr(k),profttavg(k)
           end do
           close(unit)
 
           if (allocated(U_avg).and.allocated(V_avg).and.allocated(Temperature_avg)) then
-            open(unit,file="output/profRig.txt")
+            open(unit,file=trim(output_dir)//"profRig.txt")
             do k = 1,Prnz
              S = 0
              do j = 1,Prny
@@ -1116,7 +1131,7 @@ contains
             end do
             close(unit)
 
-            open(unit,file="output/profRf.txt")
+            open(unit,file=trim(output_dir)//"profRf.txt")
             do k = 1,Prnz
              S = 0
              S2 = 0
@@ -1148,19 +1163,19 @@ contains
 
        if (enable_moisture) then
 
-          open(unit,file="output/profmoist.txt")
+          open(unit,file=trim(output_dir)//"profmoist.txt")
           do k = 1,Prnz
            write(unit,*) zPr(k),profmoistavg(k)
           end do
           close(unit)
 
-          open(unit,file="output/profmoistfl.txt")
+          open(unit,file=trim(output_dir)//"profmoistfl.txt")
           do k = 0,Prnz
            write(unit,*) zW(k),profmoistflavg(k),profmoistflsgsavg(k)
           end do
           close(unit)
 
-          open(unit,file="output/profmm.txt")
+          open(unit,file=trim(output_dir)//"profmm.txt")
           do k = 1,Prnz
            write(unit,*) zPr(k),profmmavg(k)
           end do
@@ -1171,19 +1186,19 @@ contains
 
        if (num_of_scalars>0) then
 
-          open(unit,file="output/profscal.txt")
+          open(unit,file=trim(output_dir)//"profscal.txt")
           do k = 1,Prnz
            write(unit,*) zPr(k),(profscalavg(i,k), i = 1,num_of_scalars)
           end do
           close(unit)
 
-          open(unit,file="output/profscalfl.txt")
+          open(unit,file=trim(output_dir)//"profscalfl.txt")
           do k = 0,Prnz
            write(unit,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i = 1,num_of_scalars)
           end do
           close(unit)
 
-          open(unit,file="output/profss.txt")
+          open(unit,file=trim(output_dir)//"profss.txt")
           do k = 1,Prnz
            write(unit,*) zPr(k),(profssavg(i,k), i = 1,num_of_scalars)
           end do
@@ -1214,7 +1229,7 @@ contains
 
        call newunit(unit);
 
-       open(unit,file="output/out.vtk", &
+       open(unit,file=trim(output_dir)//"out.vtk", &
          access='stream',status='replace',form="unformatted",action="write")
 
        write(unit) "# vtk DataFile Version 2.0",lf
@@ -1397,7 +1412,7 @@ contains
 
           call newunit(unit)
 
-          open(unit,file="output/scalars.vtk", &
+          open(unit,file=trim(output_dir)//"scalars.vtk", &
             access='stream',status='replace',form="unformatted",action="write")
 
           write(unit) "# vtk DataFile Version 2.0",lf
@@ -1442,7 +1457,7 @@ contains
 
           call newunit(unit)
 
-          open(unit,file="output/deposition.vtk", &
+          open(unit,file=trim(output_dir)//"deposition.vtk", &
             access='stream',status='replace',form="unformatted",action="write")
 
           write(unit) "CLMM output file",lf
@@ -1517,7 +1532,7 @@ contains
 
         call newunit(unit)
 
-        open(unit,file="output/avg.vtk", &
+        open(unit,file=trim(output_dir)//"avg.vtk", &
           access='stream',status='replace',form="unformatted",action="write")
 
         write(unit) "# vtk DataFile Version 2.0",lf
@@ -1641,10 +1656,10 @@ contains
       end if !store%avg
 
       if (btest(store%avg_U,1)) &
-        call OutputUVW(U,V,W,"output/Uavg.vtk","output/Vavg.vtk","output/Wavg.vtk",.true.)
+        call OutputUVW(U,V,W,trim(output_dir)//"Uavg.vtk",trim(output_dir)//"Vavg.vtk",trim(output_dir)//"Wavg.vtk",.true.)
 
       if (btest(store%avg_U_rms,1)) &
-        call OutputUVW(U_r,V_r,W_r,"output/Urms.vtk","output/Vrms.vtk","output/Wrms.vtk",.true.)
+        call OutputUVW(U_r,V_r,W_r,trim(output_dir)//"Urms.vtk",trim(output_dir)//"Vrms.vtk",trim(output_dir)//"Wrms.vtk",.true.)
 
     end if !averaging
 
@@ -1661,7 +1676,7 @@ contains
           store%scalars_intermitency==1) &
         .and. num_of_scalars>0) then
        
-      open(newunit=unit,file="output/scalars_avg.vtk", &
+      open(newunit=unit,file=trim(output_dir)//"scalars_avg.vtk", &
         access='stream',status='replace',form="unformatted",action="write")
 
       write(unit) "# vtk DataFile Version 2.0",lf
@@ -1894,7 +1909,7 @@ contains
 
       call newunit(unit)
 
-      open(unit,file="output/Uinterp.txt")
+      open(unit,file=trim(output_dir)//"Uinterp.txt")
       do i = 1,size(UIBPoints)
         write(unit,*) "xi,yj,zk",UIBPoints(i)%xi,UIBPoints(i)%yj,UIBPoints(i)%zk
         write(unit,*) "interp",UIBPoints(i)%interp
@@ -1910,7 +1925,7 @@ contains
 
       call newunit(unit)
 
-      open(unit,file="output/Vinterp.txt")
+      open(unit,file=trim(output_dir)//"Vinterp.txt")
       do i = 1,size(VIBPoints)
         write(unit,*) "xi,yj,zk",VIBPoints(i)%xi,VIBPoints(i)%yj,VIBPoints(i)%zk
         write(unit,*) "interp",VIBPoints(i)%interp
@@ -1926,7 +1941,7 @@ contains
 
       call newunit(unit)
 
-      open(unit,file="output/Winterp.txt")
+      open(unit,file=trim(output_dir)//"Winterp.txt")
       do i = 1,size(WIBPoints)
         write(unit,*) "xi,yj,zk",WIBPoints(i)%xi,WIBPoints(i)%yj,WIBPoints(i)%zk
         write(unit,*) "interp",WIBPoints(i)%interp
@@ -1942,7 +1957,7 @@ contains
 
       call newunit(unit)
 
-      open(unit,file="output/Scinterp.txt")
+      open(unit,file=trim(output_dir)//"Scinterp.txt")
       do i = 1,size(ScalFlIBPoints)
         write(unit,*) "xi,yj,zk",ScalFlIBPoints(i)%xi,ScalFlIBPoints(i)%yj,ScalFlIBPoints(i)%zk
         write(unit,*) "interp",ScalFlIBPoints(i)%interp
@@ -1994,15 +2009,15 @@ contains
       call SaveScalarVTKFluxes(Scalar_fl_U_avg, &
                                Scalar_fl_U_adv, &
                                Scalar_fl_U_turb, &
-                               "output/scalflu.vtk",xU,yPr,zPr)
+                               trim(output_dir)//"scalflu.vtk",xU,yPr,zPr)
       call SaveScalarVTKFluxes(Scalar_fl_V_avg, &
                                Scalar_fl_V_adv, &
                                Scalar_fl_V_turb, &
-                               "output/scalflv.vtk",xPr,yV,zPr)
+                               trim(output_dir)//"scalflv.vtk",xPr,yV,zPr)
       call SaveScalarVTKFluxes(Scalar_fl_W_avg, &
                                Scalar_fl_W_adv, &
                                Scalar_fl_W_turb, &
-                               "output/scalflw.vtk",xPr,yPr,zW)
+                               trim(output_dir)//"scalflw.vtk",xPr,yPr,zW)
 
     end if
 
@@ -2105,7 +2120,7 @@ contains
 
     call OutputScalars(Scalar)
 
-    call OutputUVW(U,V,W,"output/U.vtk","output/V.vtk","output/W.vtk")
+    call OutputUVW(U,V,W,trim(output_dir)//"U.vtk",trim(output_dir)//"V.vtk",trim(output_dir)//"W.vtk")
     
     call OutputTimeSeries
 
@@ -2125,7 +2140,7 @@ contains
 
     call FinalizeStaggeredFrames
 
-    write(*,*) "saved"
+    if (master) write(*,*) "saved"
   end subroutine Output
 
 
@@ -2563,7 +2578,7 @@ contains
 
     call newunit(unit)
 
-    open(unit,file="output/U2.vtk")
+    open(unit,file=trim(output_dir)//"U2.vtk")
     write(unit) "# vtk DataFile Version 2.0",lf
     write(unit) "CLMM output file",lf
     write(unit) "BINARY",lf
@@ -2597,7 +2612,7 @@ contains
     close(unit)
 
 
-    open(unit,file="output/V2.vtk")
+    open(unit,file=trim(output_dir)//"V2.vtk")
     write(unit) "# vtk DataFile Version 2.0",lf
     write(unit) "CLMM output file",lf
     write(unit) "BINARY",lf
@@ -2631,7 +2646,7 @@ contains
     close(unit)
 
 
-    open(unit,file="output/W2.vtk")
+    open(unit,file=trim(output_dir)//"W2.vtk")
     write(unit) "# vtk DataFile Version 2.0",lf
     write(unit) "CLMM output file",lf
     write(unit) "BINARY",lf
@@ -2676,7 +2691,7 @@ contains
     if ((time>=timefram1).and.(time<=timefram2+(timefram2-timefram1)/(frames-1))&
         .and.(time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
      if (called==0) then
-      open(101,file="output/inletframeinfo.unf",form='unformatted',status='replace',action='write')
+      open(101,file=trim(output_dir)//"inletframeinfo.unf",form='unformatted',status='replace',action='write')
       write(101) Prny,Prnz  !for check of consistency of grids before use
       write(101) Vny
       write(101) Wnz
@@ -2713,7 +2728,7 @@ contains
     fname(1:5)="frame"
     write(fname(6:8),"(I3.3)") n
     fname(9:12)=".unf"
-    write(*,*) "Saving frame:",fname(1:6),"   time:",time
+    if (master) write(*,*) "Saving frame:",fname(1:6),"   time:",time
 
     call newunit(unit)
 

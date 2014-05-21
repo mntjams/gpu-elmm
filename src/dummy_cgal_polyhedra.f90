@@ -1,5 +1,6 @@
 module CGAL_Polyhedra
   use iso_c_binding
+  use stop_procedures
   
   implicit none
   
@@ -43,7 +44,7 @@ contains
     type(c_ptr),intent(out) :: ptree
     character(*),intent(in) :: fname
 
-    stop "Dummy CGAL!"
+    call error_stop("Dummy CGAL!")
   end subroutine
 
   subroutine cgal_polyhedron_closest_s(ptree, xq,yq,zq, xn,yn,zn)
@@ -52,7 +53,7 @@ contains
     real(c_float),intent(out) :: xn,yn,zn
     type(d3) :: query, near
 
-    stop "Dummy CGAL!"
+    call error_stop("Dummy CGAL!")
   end subroutine
   
   subroutine cgal_polyhedron_closest_d(ptree, xq,yq,zq, xn,yn,zn)
@@ -61,7 +62,7 @@ contains
     real(c_double),intent(out) :: xn,yn,zn
     type(d3) :: query, near
 
-    stop "Dummy CGAL!"
+    call error_stop("Dummy CGAL!")
   end subroutine
   
   subroutine cgal_polyhedron_bbox_s(ptree, xmin,ymin,zmin, xmax,ymax,zmax)
@@ -70,7 +71,7 @@ contains
     real(c_float),intent(out) :: xmax,ymax,zmax
     type(d3) :: min, max
 
-    stop "Dummy CGAL!"
+    call error_stop("Dummy CGAL!")
   end subroutine
   
   subroutine cgal_polyhedron_bbox_d(ptree, xmin,ymin,zmin, xmax,ymax,zmax)
@@ -79,7 +80,7 @@ contains
     real(c_double),intent(out) :: xmax,ymax,zmax
     type(d3) :: min, max
 
-    stop "Dummy CGAL!"
+    call error_stop("Dummy CGAL!")
   end subroutine
   
   function cgal_polyhedron_inside_s(ptree, xq,yq,zq, xr,yr,zr) result(res)
@@ -119,7 +120,7 @@ contains
   subroutine cgal_polyhedron_finalize(ptree)
     type(c_ptr),intent(inout) :: ptree
     
-    stop "Dummy CGAL!"
+    call error_stop("Dummy CGAL!")
   end subroutine
 
   

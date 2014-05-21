@@ -2,7 +2,12 @@ module TURBINLET
 
   use Parameters
   use ArrayUtilities
-
+#ifdef MPI
+  use exchange_mpi
+#endif
+  use rng_par_zig
+  !$ use omp_lib
+  
   implicit none
 
   private
@@ -23,7 +28,7 @@ module TURBINLET
 
 
    type TInlet
-    real(knd),allocatable,dimension(:,:) :: U,V,W,temperature
+     real(knd),allocatable,dimension(:,:) :: U,V,W,temperature
    end type
 
   interface GetTurbulentInlet
@@ -45,6 +50,13 @@ contains
    real(knd),allocatable,dimension(:,:,:),save :: Ru,Rv,Rw !arrays of randoms
    real(knd),allocatable,dimension(:,:,:),save :: Psiu,Psiv,Psiw
    real(knd),allocatable,dimension(:,:,:),save :: bfilt !filter coefficients (ii,jj,kk,kz)
+   integer :: tid
+   
+#ifdef MPI
+   !should not happen for 2D decomposition in X and Y
+   if (.not.(iim==1.or.iim==nxims)) return
+   if (nxims>1.and.iim==nxims.and.Btype(Ea)/=TurbulentInletType) return
+#endif
 
    if (.not. called) then
 
@@ -53,8 +65,8 @@ contains
       call InitMeanProfiles
 
 
-      filtnz = min(max(NINT(lturbz/dzmin),1),ceiling(1._knd*Prnz/3))
-      filtny = min(max(NINT(lturby/dymin),1),ceiling(1._knd*Prny/3))
+      filtnz = min(max(nint(lturbz/dzmin),1),ceiling(1._knd*Prnz/3))
+      filtny = min(max(nint(lturby/dymin),1),ceiling(1._knd*Prny/3))
 
 
       bigNy = 2*filtny
@@ -68,47 +80,54 @@ contains
       allocate(Psiv(1:Prny,1:Prnz,1:2))
       allocate(Psiw(1:Prny,1:Prnz,1:2))
 
-
-      do k=-bigNz+1,Prnz+bigNz
-       do j=-bigNy+1,Prny+bigNy
-         call RandomGauss(Ru(j,k,1))
-         call RandomGauss(Rv(j,k,1))
-         call RandomGauss(Rw(j,k,1))
+      !$omp parallel private(j,k,tid)
+      tid = 0
+      !$ tid = omp_get_thread_num()
+      
+      !$omp do collapse(2)
+      do k = -bigNz+1, Prnz+bigNz
+       do j = -bigNy+1, Prny+bigNy
+         call rng_norm(Ru(j,k,1), tid)
+         call rng_norm(Rv(j,k,1), tid)
+         call rng_norm(Rw(j,k,1), tid)
        end do
       end do
 
-      do k=-bigNz+1,Prnz+bigNz
-       do j=-bigNy+1,Prny+bigNy
-         call RandomGauss(Ru(j,k,2))
-         call RandomGauss(Rv(j,k,2))
-         call RandomGauss(Rw(j,k,2))
+      !$omp do collapse(2)
+      do k = -bigNz+1, Prnz+bigNz
+       do j = -bigNy+1, Prny+bigNy
+         call rng_norm(Ru(j,k,2), tid)
+         call rng_norm(Rv(j,k,2), tid)
+         call rng_norm(Rw(j,k,2), tid)
        end do
       end do
-
+ 
+      !$omp end parallel
 
 
       if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
         !$omp parallel workshare
-        forall(k=-bigNz+1:Prnz+bigNz,j=-bigNy+1:0)
+        forall(k = -bigNz+1:Prnz+bigNz,j = -bigNy+1:0)
            Ru(j,k,1:2) = Ru(j+Prny,k,1:2)
            Rv(j,k,1:2) = Rv(j+Prny,k,1:2)
            Rw(j,k,1:2) = Rw(j+Prny,k,1:2)
         end forall
-        forall(k=-bigNz+1:Prnz+bigNz,j = Prny+1:Prny+bigNy)
+        forall(k = -bigNz+1:Prnz+bigNz,j = Prny+1:Prny+bigNy)
            Ru(j,k,1:2) = Ru(j-Prny,k,1:2)
            Rv(j,k,1:2) = Rv(j-Prny,k,1:2)
            Rw(j,k,1:2) = Rw(j-Prny,k,1:2)
         end forall
         !$omp end  parallel workshare
       end if
+
       if  ((Btype(Bo)==PERIODIC).or.(Btype(To)==PERIODIC)) then
         !$omp parallel workshare
-        forall(k=-bigNz+1:0,j=-bigNy+1:Prny+bigNy)
+        forall(k = -bigNz+1:0,j = -bigNy+1:Prny+bigNy)
            Ru(j,k,1:2) = Ru(j,k+Prnz,1:2)
            Rv(j,k,1:2) = Rv(j,k+Prnz,1:2)
            Rw(j,k,1:2) = Rw(j,k+Prnz,1:2)
         end forall
-        forall(k = Prnz+1:Prnz+bigNz,j=-bigNy+1:Prny+bigNy)
+        forall(k = Prnz+1:Prnz+bigNz,j = -bigNy+1:Prny+bigNy)
            Ru(j,k,1:2) = Ru(j,k-Prnz,1:2)
            Rv(j,k,1:2) = Rv(j,k-Prnz,1:2)
            Rw(j,k,1:2) = Rw(j,k-Prnz,1:2)
@@ -116,56 +135,70 @@ contains
         !$omp end  parallel workshare
       end if
 
+#ifdef MPI
+      do i=1,2
+        call exchange_mpi_boundaries_yz(Ru(:,:,i), Prny, Prnz, Btype, &
+                                        -bigNy+1, -bigNz+1, bigNy, bigNz)
+        call exchange_mpi_boundaries_yz(Rv(:,:,i), Prny, Prnz, Btype, &
+                                        -bigNy+1, -bigNz+1, bigNy, bigNz)
+        call exchange_mpi_boundaries_yz(Rw(:,:,i), Prny, Prnz, Btype, &
+                                        -bigNy+1, -bigNz+1, bigNy, bigNz)
+      end do
+#endif
+
 
       allocate(bfilt(-bigNy:bigNy,-bigNz:bigNz,1))
       allocate(expsy(-bigNy:bigNy),expsz(-bigNz:bigNz))
 
       bysum = 0
-      do i=-bigNy,bigNy
+      do i = -bigNy,bigNy
        expsy(i) = exp(-pi*abs(i)/(bigNy))
        bysum = bysum+expsy(i)**2
       end do
-      bysum = SQRT(bysum)
+      bysum = sqrt(bysum)
       expsy = expsy/bysum
 
 
       bzsum = 0
-      do i=-bigNz,bigNz
+      do i = -bigNz,bigNz
        expsz(i) = exp(-pi*abs(i)/(bigNz))
        bzsum = bzsum+expsz(i)**2
       end do
-      bzsum = SQRT(bzsum)
+      bzsum = sqrt(bzsum)
       expsz = expsz/bzsum
 
       !$omp parallel private(j,k)
       !$omp do
-      do k=-bigNz,bigNz
-        do j=-bigNy,bigNy
+      do k = -bigNz,bigNz
+        do j = -bigNy,bigNy
            bfilt(j,k,1) = expsy(j)*expsz(k)
         end do
       end do
       !$omp end  do
       !$omp workshare
       forall(k = 1:Prnz,j = 1:Prny)
-           Psiu(j,k,1) = SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Ru(j-bigNy:j+bigNy,k-bigNz:k+bigNz,1))
-           Psiv(j,k,1) = SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rv(j-bigNy:j+bigNy,k-bigNz:k+bigNz,1))
-           Psiw(j,k,1) = SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rw(j-bigNy:j+bigNy,k-bigNz:k+bigNz,1))
+           Psiu(j,k,1) = sum(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Ru(j-bigNy:j+bigNy,k-bigNz:k+bigNz,1))
+           Psiv(j,k,1) = sum(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rv(j-bigNy:j+bigNy,k-bigNz:k+bigNz,1))
+           Psiw(j,k,1) = sum(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rw(j-bigNy:j+bigNy,k-bigNz:k+bigNz,1))
       end forall
 
-      compat = SUM(Uinavg(1:Prny,1:Prnz))
+      compat = sum(Uinavg(1:Prny,1:Prnz))
       !$omp end  workshare
       !$omp end  parallel
+#ifdef MPI
+     compat = mpi_co_sum(compat)
+#endif
 
       called=.true.
 
    end if
 
    !$omp parallel do private(i,j,k,Ui,Vi,Wi)  
-   do k = 1,Prnz
-     do j = 1,Prny
-        Psiu(j,k,2) = SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Ru(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
-        Psiv(j,k,2) = SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rv(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
-        Psiw(j,k,2) = SUM(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rw(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
+   do k = 1, Prnz
+     do j = 1, Prny
+        Psiu(j,k,2) = sum(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Ru(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
+        Psiv(j,k,2) = sum(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rv(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
+        Psiw(j,k,2) = sum(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rw(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
      end  do
    end  do
    !$omp end  parallel do
@@ -184,8 +217,8 @@ contains
    call set(Win,0._knd)
    !$omp parallel private(i,j,k,Ui,Vi,Wi)
    !$omp do
-   do k = 1,Prnz
-    do j = 1,Prny
+   do k = 1, Prnz
+    do j = 1, Prny
      Ui = Psiu(j,k,1)
      Vi = Psiv(j,k,1)
      Wi = Psiw(j,k,1)
@@ -203,10 +236,17 @@ contains
    !$omp end  do
 
    !$omp workshare
-   p = compat/SUM(Uin(1:Prny,1:Prnz))                  !To ensure the compatibility condition.
+   p = sum(Uin(1:Prny,1:Prnz)) 
+#ifdef MPI
+   !$omp workshare
+   !$omp single
+   p = mpi_co_sum(p)
+   !$omp single
+   !$omp workshare
+#endif
+   p = compat/p                  !To ensure the compatibility condition.
    !$omp end  workshare
    !$omp end  parallel
-
 
    call multiply(Uin,p)
    call multiply(Vin,p)
@@ -219,43 +259,72 @@ contains
 
    call BoundUin(3,Win)
 
-
-   do k=-bigNz+1,Prnz+bigNz
-    do j=-bigNy+1,Prny+bigNy
-      call RandomGauss(Ru(j,k,2))
-      call RandomGauss(Rv(j,k,2))
-      call RandomGauss(Rw(j,k,2))
+   !$omp parallel private(j,k,tid)
+   tid = 0
+   !$ tid = omp_get_thread_num()
+   
+   !$omp do collapse(2) 
+   do k = -bigNz+1, Prnz+bigNz
+    do j = -bigNy+1, Prny+bigNy
+      call rng_norm(Ru(j,k,2), tid)
+      call rng_norm(Rv(j,k,2), tid)
+      call rng_norm(Rw(j,k,2), tid)
     end do
    end do
+   !$omp end do
 
    if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
-     !$omp parallel workshare
-     forall(k=-bigNz+1:Prnz+bigNz,j=-bigNy+1:0)
-        Ru(j,k,1:2) = Ru(j+Prny,k,1:2)
-        Rv(j,k,1:2) = Rv(j+Prny,k,1:2)
-        Rw(j,k,1:2) = Rw(j+Prny,k,1:2)
-     end forall
-     forall(k=-bigNz+1:Prnz+bigNz,j = Prny+1:Prny+bigNy)
-        Ru(j,k,1:2) = Ru(j-Prny,k,1:2)
-        Rv(j,k,1:2) = Rv(j-Prny,k,1:2)
-        Rw(j,k,1:2) = Rw(j-Prny,k,1:2)
-     end forall
-     !$omp end  parallel workshare
+     !$omp do collapse(2)
+     do k = -bigNz+1, Prnz+bigNz
+       do j = -bigNy+1, 0
+         Ru(j,k,1:2) = Ru(j+Prny,k,1:2)
+         Rv(j,k,1:2) = Rv(j+Prny,k,1:2)
+         Rw(j,k,1:2) = Rw(j+Prny,k,1:2)
+       end do
+     end do
+     !$omp end do nowait
+     !$omp do collapse(2)
+     do k = -bigNz+1, Prnz+bigNz
+       do j = Prny+1, Prny+bigNy
+         Ru(j,k,1:2) = Ru(j-Prny,k,1:2)
+         Rv(j,k,1:2) = Rv(j-Prny,k,1:2)
+         Rw(j,k,1:2) = Rw(j-Prny,k,1:2)
+       end do
+     end do
+     !$omp end do
    end if
    if  ((Btype(Bo)==PERIODIC).or.(Btype(To)==PERIODIC)) then
-     !$omp parallel workshare
-     forall(k=-bigNz+1:0,j=-bigNy+1:Prny+bigNy)
-        Ru(j,k,1:2) = Ru(j,k+Prnz,1:2)
-        Rv(j,k,1:2) = Rv(j,k+Prnz,1:2)
-        Rw(j,k,1:2) = Rw(j,k+Prnz,1:2)
-     end forall
-     forall(k = Prnz+1:Prnz+bigNz,j=-bigNy+1:Prny+bigNy)
-        Ru(j,k,1:2) = Ru(j,k-Prnz,1:2)
-        Rv(j,k,1:2) = Rv(j,k-Prnz,1:2)
-        Rw(j,k,1:2) = Rw(j,k-Prnz,1:2)
-     end forall
-     !$omp end  parallel workshare
+     !$omp do collapse(2)
+     do k = -bigNz+1, 0
+       do j = -bigNy+1, Prny+bigNy
+         Ru(j,k,1:2) = Ru(j,k+Prnz,1:2)
+         Rv(j,k,1:2) = Rv(j,k+Prnz,1:2)
+         Rw(j,k,1:2) = Rw(j,k+Prnz,1:2)
+       end do
+     end do
+     !$omp end do nowait
+     !$omp do collapse(2)
+     do k = Prnz+1, Prnz+bigNz
+       do j = -bigNy+1, Prny+bigNy
+         Ru(j,k,1:2) = Ru(j,k-Prnz,1:2)
+         Rv(j,k,1:2) = Rv(j,k-Prnz,1:2)
+         Rw(j,k,1:2) = Rw(j,k-Prnz,1:2)
+       end do
+     end do
+     !$omp end do
    end if
+   !$omp end parallel
+
+#ifdef MPI
+   do i=1,2
+     call exchange_mpi_boundaries_yz(Ru(:,:,i), Prny, Prnz, Btype, &
+                                     -bigNy+1, -bigNz+1, bigNy, bigNz)
+     call exchange_mpi_boundaries_yz(Rv(:,:,i), Prny, Prnz, Btype, &
+                                     -bigNy+1, -bigNz+1, bigNy, bigNz)
+     call exchange_mpi_boundaries_yz(Rw(:,:,i), Prny, Prnz, Btype, &
+                                     -bigNy+1, -bigNz+1, bigNy, bigNz)
+   end do
+#endif
 
  end subroutine GetTurbInletXie
 
@@ -275,26 +344,27 @@ contains
 
     allocate(Ustar_inlet(1:Prnz))
     allocate(transform_tensor(1:6,1:Prny,1:Prnz))
-   !constant stress assumption
-     if ((profiletype==LOGPROF.and.Ustar_surf_inlet<=0).or.(profiletype==POWERPROF.and.Ustar_surf_inlet<=0)) then
+    
+    !constant stress assumption
+    if ((profiletype==LOGPROF.and.Ustar_surf_inlet<=0).or.(profiletype==POWERPROF.and.Ustar_surf_inlet<=0)) then
       Ustar_surf_inlet = abs(Karman*U_ref_inlet/log(z0_inlet/z_ref_inlet))
-     end if
+    end if
 
 
-      do k = 1,Prnz
-       Ustar_inlet(k) = Ustar_surf_inlet*SQRT(max(1+stress_gradient_inlet*zPr(k),1E-5_knd))
-      end do
+    do k = 1, Prnz
+      Ustar_inlet(k) = Ustar_surf_inlet*sqrt(max(1+stress_gradient_inlet*zPr(k),1E-5_knd))
+    end do
 
 
-    do k = 1,Prnz
-     do j = 1,Prny  ! tt1 = a11,tt2 = a21,tt3 = a22, tt4 = a31, tt5 = a32, tt6 = a33
-        transform_tensor(1,j,k) = SQRT((Ustar_inlet(k)**2)*relative_stress(1,1))
+    do k = 1, Prnz
+     do j = 1, Prny  ! tt1 = a11,tt2 = a21,tt3 = a22, tt4 = a31, tt5 = a32, tt6 = a33
+        transform_tensor(1,j,k) = sqrt((Ustar_inlet(k)**2)*relative_stress(1,1))
         transform_tensor(2,j,k) = (Ustar_inlet(k)**2)*relative_stress(2,1)/transform_tensor(1,j,k)
-        transform_tensor(3,j,k) = SQRT((Ustar_inlet(k)**2)*relative_stress(2,2)-transform_tensor(2,j,k)**2)
+        transform_tensor(3,j,k) = sqrt((Ustar_inlet(k)**2)*relative_stress(2,2)-transform_tensor(2,j,k)**2)
         transform_tensor(4,j,k) = (Ustar_inlet(k)**2)*relative_stress(3,1)/transform_tensor(1,j,k)
         transform_tensor(5,j,k) = ((Ustar_inlet(k)**2)*relative_stress(3,2)-&
                                  transform_tensor(2,j,k)*transform_tensor(4,j,k))/transform_tensor(3,j,k)
-        transform_tensor(6,j,k) = SQRT((Ustar_inlet(k)**2)*relative_stress(3,3)-&
+        transform_tensor(6,j,k) = sqrt((Ustar_inlet(k)**2)*relative_stress(3,3)-&
                                  transform_tensor(4,j,k)**2-transform_tensor(5,j,k)**2)
 
      end do
@@ -311,7 +381,7 @@ contains
 
     if  (profiletype==CONSTPROF) then
 
-      do k = 1,Prnz
+      do k = 1, Prnz
 
         Uinavg(:,k) = Uinlet
 
@@ -322,14 +392,14 @@ contains
       if (U_ref_inlet/=0.and.z_ref_inlet>0) then
 
         Ustar_prof = U_ref_inlet * Karman / log(z_ref_inlet/z0_inlet)
-        do k = 1,Prnz
+        do k = 1, Prnz
           Uinavg(:,k) = (Ustar_prof/Karman)*log(zPr(k)/z0_inlet)
         end do
 
       else
 
         Uinavg(:,1) = (Ustar_inlet(1)/Karman)*log(zPr(1)/z0_inlet)
-        do k = 2,Prnz
+        do k = 2, Prnz
           Uinavg(:,k) = (Ustar_inlet(k)/Karman)*log(zPr(k)/zPr(k-1)) + Uinavg(:,k-1)
         end do
 
@@ -337,7 +407,7 @@ contains
 
     else if (profiletype==POWERPROF) then
 
-      do k = 1,Prnz
+      do k = 1, Prnz
         Uinavg(:,k) = U_ref_inlet*(zPr(k)/z_ref_inlet)**power_exponent_inlet
       end do
 
@@ -354,28 +424,11 @@ contains
 
   end subroutine InitMeanProfiles
 
-  subroutine RandomGauss(res)  !more effective way: http://www.taygeta.com/random/gaussian.html
-    real(knd), intent(out) :: res
-    real(knd) p,S
-    integer,parameter:: n = 6
-    integer i
-
-    S = 0
-    do i = 1,n
-     call RANDOM_NUMBER(p)
-     S = S+p
-    end do
-    S = S-0.5*n
-    S = S/SQRT(n/12._knd)
-    res=(p-0.5)*sqrt(12._knd)!S
-
-  end  subroutine RandomGauss
-
 
   subroutine GetInletFromFile(t)
     real(TIM),intent(in):: t
     integer,save:: called = 0
-    integer Prny2,Prnz2,Vny2,Wnz2
+    integer Prny2, Prnz2, Vny2, Wnz2
     real(knd) dx2
     character(12):: fname
     integer,save:: inletfnum
@@ -392,7 +445,7 @@ contains
        if (io/=0) then
         write(*,*) 'Error while opening file inletframeinfo.unf'
        end if
-       read(102) Prny2,Prnz2  !for check of consistency of grids before use
+       read(102) Prny2, Prnz2  !for check of consistency of grids before use
        read(102) Vny2
        read(102) Wnz2
        read(102) dx2
@@ -403,8 +456,7 @@ contains
        if (enable_buoyancy) allocate(In1%temperature(Prny,Prnz),In2%temperature(Prny,Prnz))
 
        if ((Prny/=Prny2).or.(Prnz/=Prnz2).or.(Vny/=Vny2).or.(Wnz/=Wnz2).or.((dx2-dxPr(0))/dx2>0.1)) then
-        write(*,*) "Mismatch of computational grid and inlet file."
-        stop
+        call error_stop("Mismatch of computational grid and inlet file.")
        end if
        called = 1
        inletfnum = 1
@@ -416,7 +468,7 @@ contains
        open(11,file = fname,form='unformatted',status='old',action='read',iostat = io)
        if (io/=0) then
         write(*,*) "Error while opening file ", fname
-        stop
+        call error_stop
        end if
        read(102) t1
        call ReadInletFromFile(11,In1)
@@ -431,7 +483,7 @@ contains
         open(11,file = fname,form='unformatted',status='old',action='read',iostat = io)
        if (io/=0) then
         write(*,*) "Error while opening file ", fname
-        stop
+        call error_stop
        end if
        read(102) t2
        call ReadInletFromFile(11,In2)
@@ -454,7 +506,7 @@ contains
        open(11,file = fname,form='unformatted',status='old',action='read',iostat = io)
        if (io/=0) then
         write(*,*) "Error while opening file ", fname
-        stop
+        call error_stop
        end if
        Inp=>In1
        In1=>In2

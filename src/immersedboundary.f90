@@ -65,7 +65,7 @@ contains
           WMP%ustar = 1
           
           !HACK
-          if (hypot(WMP%distx,WMP%disty)>abs(WMP%distz)*0.2) then
+          if (hypot(WMP%distx,WMP%disty)<abs(WMP%distz)*5) then
             !Santamouris - Environmental Design of Urban Buildings
             WMP%albedo = 0.3 !red brick 
             WMP%emissivity = 0.9 !red brick 
@@ -274,7 +274,7 @@ contains
 
           inc_radiation_flux = angle_to_sun * solar_direct_flux() + &
                                solar_diffuse_flux()*svf + &
-                               in_lw_radiation()
+                               in_lw_radiation()*svf
 
           radiation_balance = inc_radiation_flux * (1-p%albedo) - &
                               out_lw_radiation(p%emissivity, temperature_ref) * svf
@@ -1130,7 +1130,7 @@ contains
       write(*,*) "Utype",Utype(xi,yj,zk)
       write(*,*) "dirxyz",IBP%dirx,IBP%diry,IBP%dirz
       write(*,*) "free",free100,free010,free001
-      stop
+      call error_stop
     end if
     
     if (abs(IBP%distx)>dxmin*2.or. abs(IBP%disty)>dymin*2.or. abs(IBP%distz)>dzmin*2 ) then
@@ -1145,7 +1145,7 @@ contains
       write(*,*) "Utype",Utype(xi,yj,zk)
       write(*,*) "dirxyz",IBP%dirx,IBP%diry,IBP%dirz
       write(*,*) "free",free100,free010,free001
-      stop
+      call error_stop
     end if
 
     allocate(IBP%IntPoints(IBP%interp))
@@ -1165,7 +1165,7 @@ contains
       write(*,*) "Utype",Utype(xi,yj,zk)
       write(*,*) "dirxyz",IBP%dirx,IBP%diry,IBP%dirz
       write(*,*) "free",free100,free010,free001
-      stop
+      call error_stop
     end if
 
   end subroutine TVelIBPoint_Create_old
@@ -1517,7 +1517,7 @@ contains
 
     else if (IBP%interp/=0) then
         write(*,*) "Unknown interpolation",__FILE__,__LINE__
-        stop
+        call error_stop
     end if
 
   end subroutine TVelIBPoint_InterpolationCoefs
@@ -2081,7 +2081,7 @@ contains
 !               ScalFlIBPoints(idx)%n_WMPs = ScalFlIBPoints(idx)%n_WMPs + 1
 !               call add_element(p%bound_IBPs, idx)
 !             else
-!               stop "This point does not have an IBP!"
+!               call error_stop("This point does not have an IBP!")
 !             end if
 !           end if
 !         end do

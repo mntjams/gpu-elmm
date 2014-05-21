@@ -10,7 +10,7 @@ module VTKFrames
   
   private
   
-  public TFrameFlags, AddDomain, SaveVTKFrames, FinalizeVTKFrames, TFrameDomain
+  public TFrameFlags, AddDomain, SaveVTKFrames, FinalizeVTKFrames, TFrameDomain, InitVTKFrames
 
   
   type TFrameFlags
@@ -34,13 +34,13 @@ module VTKFrames
     type(TFrameFlags) :: flags
     
     !big endian copies of coordinates
-    real(knd),allocatable,dimension(:) :: xPr_be, yPr_be, zPr_be
+    real(real32),allocatable,dimension(:) :: xPr_be, yPr_be, zPr_be
     
-    real(knd), allocatable :: Pr(:,:,:)
-    real(knd), allocatable :: U(:,:,:,:)
-    real(knd), allocatable :: Temperature(:,:,:), Moisture(:,:,:), Scalar(:,:,:,:)
-    real(knd), allocatable :: TemperatureFl(:,:,:), MoistureFl(:,:,:), ScalarFl(:,:,:,:)
-    real(knd), allocatable :: Lambda2(:,:,:), Vorticity(:,:,:,:)
+    real(real32), allocatable :: Pr(:,:,:)
+    real(real32), allocatable :: U(:,:,:,:)
+    real(real32), allocatable :: Temperature(:,:,:), Moisture(:,:,:), Scalar(:,:,:,:)
+    real(real32), allocatable :: TemperatureFl(:,:,:), MoistureFl(:,:,:), ScalarFl(:,:,:,:)
+    real(real32), allocatable :: Lambda2(:,:,:), Vorticity(:,:,:,:)
     
     character(4)  :: suffix = ".vtk"
   contains
@@ -64,6 +64,43 @@ module VTKFrames
   integer :: frame_unit = 1999000
   
 contains
+
+  impure elemental logical function InDomain(D) result(res)
+    type(TFrameDomain), intent(in) :: D
+    
+    if (D%dimension==3) then
+      res = .true.
+    else if (D%dimension==2) then
+      if (D%direction==1) then
+        res = (D%position>=xU(0) .and. &
+               (D%position<xU(Prnx) .or. &
+                (D%position==xU(Prnx).and.Btype(Ea)/=MPI_BOUNDARY)))
+      else if (D%direction==2) then   
+        res = (D%position>=yV(0) .and. &
+               (D%position<yV(Prny) .or. &
+                (D%position==yV(Prny).and.Btype(No)/=MPI_BOUNDARY)))
+      else if (D%direction==3) then   
+        res = (D%position>=zW(0) .and. &
+               (D%position<zW(Prnz) .or. &
+                (D%position==zW(Prnz).and.Btype(To)/=MPI_BOUNDARY)))
+      else
+        res = .false.
+      end if
+    else
+      res = .false.
+    end if
+  end function
+
+  subroutine InitVTKFrames
+    integer :: i
+  
+    FrameDomains = pack(FrameDomains, InDomain(FrameDomains))
+    
+    do i=1, size(FrameDomains)
+      call FrameDomains(i)%SetRest(num_of_scalars)
+    end do
+  
+  end subroutine
 
 
   subroutine add_element_fd(a,e)
@@ -155,9 +192,9 @@ contains
     D%yPr = yPr(minj:maxj)
     D%zPr = zPr(mink:maxk)
     
-    D%xPr_be = BigEnd(D%xPr)
-    D%yPr_be = BigEnd(D%yPr)
-    D%zPr_be = BigEnd(D%zPr)
+    D%xPr_be = BigEnd(real(D%xPr, real32))
+    D%yPr_be = BigEnd(real(D%yPr, real32))
+    D%zPr_be = BigEnd(real(D%zPr, real32))
     
     if (D%flags%Pr==1) then
       allocate(D%Pr(mini:maxi,minj:maxj,mink:maxk))
@@ -204,8 +241,6 @@ contains
     if (D%flags%vorticity==1) then
       allocate(D%vorticity(3,mini:maxi,minj:maxj,mink:maxk))
     end if
-    
-    D%ranges_set = .true.
   end subroutine TFrameDomain_SetRest
   
   
@@ -254,7 +289,7 @@ contains
     type(TFrameTimes),intent(in) :: time_params
     type(TFrameFlags),intent(in) :: frame_flags
 
-    D%base_name = "output/frame-"//label
+    D%base_name = trim(output_dir)//"frame-"//label
 
     D%frame_times = time_params
 
@@ -283,8 +318,6 @@ contains
                                        Scalar(-1:,-1:,-1:,1:)
     integer :: i,j,k,l,m
     integer :: mini,maxi,minj,maxj,mink,maxk
-    
-    if (.not.D%ranges_set) call D%SetRest(num_of_scalars = size(Scalar,4))
 
     mini = D%minPri
     minj = D%minPrj
@@ -464,7 +497,7 @@ contains
   
   
   
-  subroutine SaveBuffers(Dptr) bind(C)
+  recursive subroutine SaveBuffers(Dptr) bind(C)
     use iso_c_binding, only: c_f_pointer
     type(c_ptr),value :: Dptr
     type(TFrameDomain),pointer :: D
@@ -479,7 +512,7 @@ contains
 
     write(file_name,'(a,i0,a)') trim(D%base_name)//"-",D%frame_number,trim(D%suffix)
 
-    write(*,*) "Saving VTK frame:",file_name,"   time:",time
+!     write(*,*) "Saving VTK frame:",file_name,"   time:",time
 
 
     if (littleendian) then

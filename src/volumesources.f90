@@ -450,7 +450,7 @@ module VolumeSources
 
       if (norm2(out_norm)<epsilon(1._knd)) then
         write(*,*) "Error, zero outward normal at file",__FILE__,"line",__LINE__
-        stop
+        call error_stop
       end if
 
       angle_to_sun = max(0._knd, dot_product(out_norm, vector_to_sun))
@@ -472,7 +472,7 @@ module VolumeSources
       
       inc_radiation_flux = angle_to_sun * solar_direct_flux() + &
                            solar_diffuse_flux()*svf + &
-                           in_lw_radiation()
+                           in_lw_radiation()*svf
 
       radiation_balance = inc_radiation_flux * (1-PB%albedo) - &
                           out_lw_radiation(PB%emmissivity, temperature_ref) * svf
@@ -586,7 +586,7 @@ module VolumeSources
         call ScalarFlVolumesLists(j)%list%for_each(CopyPoint)
       end do
       
-      if (enable_radiation) call SaveFluxes
+!       if (enable_radiation) call SaveFluxes
 
       contains
 
@@ -611,7 +611,7 @@ module VolumeSources
             type is (ScalarFlVolume)
               ScalarFlVolumes(j)%volumes(i) = elem
             class default
-              stop "Type error in volume source list."
+              call error_stop("Type error in volume source list.")
           end select
         end subroutine
 
@@ -628,7 +628,7 @@ module VolumeSources
             end associate
           end do
           
-          call VtkArraySimple("output/tempflplants.vtk",temperature_flux)
+          call VtkArrayBin(trim(output_dir)//"tempflplants.vtk",temperature_flux)
           
         end subroutine
         

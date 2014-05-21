@@ -1,7 +1,7 @@
 import os
 comp = ARGUMENTS.get('comp','')
 prec = ARGUMENTS.get('prec','')
-omp = ARGUMENTS.get('omp','')
+openmp = ARGUMENTS.get('openmp','')
 fast = ARGUMENTS.get('fast','')
 lto = ARGUMENTS.get('lto','')
 prof = ARGUMENTS.get('prof','')
@@ -14,6 +14,7 @@ customPB = ARGUMENTS.get('customPB','')
 PB = ARGUMENTS.get('PB','')
 extra = ARGUMENTS.get('extra','')
 cgal = ARGUMENTS.get('cgal','')
+mpi = ARGUMENTS.get('mpi','')
 
 extra_flag = ' ' + str(extra)
 
@@ -32,10 +33,10 @@ else:
 if str(comp)=='intel':
   env = Environment(tools=['default','ifort','intelc'])
   
-  if str(omp)!='no':
-    omp_flag = ' -openmp -recursive'
+  if str(openmp)!='no':
+    openmp_flag = ' -openmp -recursive'
   else:
-    omp_flag = ''
+    openmp_flag = ''
 
   if str(fast)=='yes':
    fast_flag = ' -O3 -shared-intel'
@@ -60,18 +61,18 @@ if str(comp)=='intel':
 else:
   env = Environment()
  
-  if str(omp)!='no':
-    omp_flag = ' -fopenmp'
+  if str(openmp)!='no':
+    openmp_flag = ' -fopenmp'
   else:
-    omp_flag = ''
+    openmp_flag = ' -frecursive'
 
   if str(fast)=='yes':
     fast_flag = ' -Ofast'# -Warray-temporaries'
   else:
-    fast_flag = ' -fcheck=all -Wall -Wsurprising -Waliasing -Wimplicit-interface -Wno-unused-dummy-argument -Wno-unused -Wno-aliasing  -Werror'
-    
+    fast_flag = ' -Wall -Wsurprising -Waliasing -Wimplicit-interface -Wno-unused-dummy-argument -Wno-unused -Wno-aliasing  -Werror -fcheck=all -ffpe-trap=zero,overflow,invalid'
+
   if str(sanitize)=='yes':
-    fast_flag += ' -fsanitize=undefined -fsanitize=address -fsanitize=unreachable -fsanitize=null -fsanitize=signed-integer-overflow'
+    fast_flag += ' -fsanitize=address'# -fsanitize=undefined -fsanitize=address -fsanitize=unreachable -fsanitize=null -fsanitize=signed-integer-overflow'
     
   if str(lto)=='yes':
     lto_flag = ' -flto'
@@ -124,14 +125,26 @@ if prof=="yes":
 else:
   prof_flag=''
   
-env.Append(F90FLAGS= fast_flag + omp_flag + prof_flag + lto_flag + extra_flag + prec_flag)# + ' -gdwarf-3'
+env.Append(F90FLAGS= fast_flag + openmp_flag + prof_flag + lto_flag + extra_flag + prec_flag)# + ' -gdwarf-3'
   
-env.Append(LINKFLAGS= fast_flag + omp_flag + prof_flag + lto_flag + extra_flag) # + '-Bdynamic -lpoisfft -lfftw3 -lfftw3f -lfftw3_omp -lfftw3f_omp -Bstatic -lgfortran -lquadmath -lstdc++ -llapack -L/usr/lib/x86_64-linux-uclibc/usr/lib/ -lc -lm -lpthread'  -Wl,--verbose
+env.Append(LINKFLAGS= fast_flag + openmp_flag + prof_flag + lto_flag + extra_flag) # + '-Bdynamic -lpoisfft -lfftw3 -lfftw3f -lfftw3_omp -lfftw3f_omp -Bstatic -lgfortran -lquadmath -lstdc++ -llapack -L/usr/lib/x86_64-linux-uclibc/usr/lib/ -lc -lm -lpthread'  -Wl,--verbose
     
 env.Append(FORTRANMODDIR = target_dir)
 
+if str(mpi)=='yes':
+  env.Replace(LINK = 'mpif90')
+  env.Replace(F90 = 'mpif90')
+  env.Replace(CC = 'mpicc')
+  env.Replace(CXX = 'mpic++')
+  env.Append(F90FLAGS=' -DMPI')
+  env.Append(CFLAGS=' -DMPI')
+  env.Append(CXXFLAGS=' -DMPI')
+  env.Append(LIBS = ['pfft','pfftf','fftw3_mpi','fftw3f_mpi'])
+
 #instead of openblas, any blas and lapack can be used.
-env.Append(LIBS = ['openblas','fftw3','fftw3f','fftw3_omp','fftw3f_omp','pthread','stdc++'])
+env.Append(LIBS = ['openblas','fftw3','fftw3f','pthread','stdc++'])
+if str(openmp)!='no':
+  env.Append(LIBS = ['fftw3_omp','fftw3f_omp'])
 
 if customSB=='yes':
  env.Append(F90FLAGS='-DCUSTOMSB')
@@ -151,24 +164,39 @@ if customPB=='yes':
     PBfile = [str(PB)]
 else:
   PBfile=[]
-
+  
 
 #May be used to compile PoisFFT directly, adjust the correct path.
 Mkdir(target_dir+'/P/')
 objs = env.Object(target=target_dir+'P/customfftw3', source='../../PoisFFT/src/customfftw3.f90')
+if str(mpi)=='yes':
+  objs += env.Object(target=target_dir+'P/missing_pfft', source='../../PoisFFT/src/missing_pfft.c')
+  objs += env.Object(target=target_dir+'P/custompfft', source='../../PoisFFT/src/custompfft.f90')
 objs += env.Object(target=target_dir+'P/precisions', source='../../PoisFFT/src/precisions.f90')
 objs += env.Object(target=target_dir+'P/parameters', source='../../PoisFFT/src/parameters.f90')
 objs += env.Object(target=target_dir+'P/fft', source='../../PoisFFT/src/fft.f90')
 Depends(objs[-1], '../../PoisFFT/src/fft-inc.f90')
+Depends(objs[-1], '../../PoisFFT/src/plan_create.f90')
+Depends(objs[-1], '../../PoisFFT/src/data_allocate.f90')
+Depends(objs[-1], '../../PoisFFT/src/plan_create_many.f90')
+Depends(objs[-1], '../../PoisFFT/src/data_allocate_many.f90')
 Depends(objs[-1], objs[0])
-Depends(objs[-1], objs[1])
 Depends(objs[-1], objs[2])
+Depends(objs[-1], objs[3])
 objs += env.Object(target=target_dir+'P/poisfft', source='../../PoisFFT/src/poisfft.f90')
 Depends(objs[-1], '../../PoisFFT/src/poisfft-inc.f90')
-Depends(objs[-1], objs[2])
+Depends(objs[-1], '../../PoisFFT/src/loop_nest_3d.f90')
+Depends(objs[-1], objs[3])
 objs += env.Object(target=target_dir+'P/main', source='../../PoisFFT/src/main.f90')
 
-objs =  env.Object(target=target_dir+'parameters',     source='parameters.f90')
+if str(mpi)=='yes':
+  objs += env.Object(target=target_dir+'custom_mpi',        source='custom_mpi.f90')
+  objs += env.Object(target=target_dir+'exchange_mpi',      source='exchange_mpi.f90')
+
+
+objs += env.Object(target=target_dir+'parameters',     source='parameters.f90')
+objs += env.Object(target=target_dir+'rng_par_zig',    source='rng_par_zig.f90')
+objs += env.Object(target=target_dir+'stop',           source='stop.f90')
 objs += env.Object(target=target_dir+'lapack',         source='lapack.f')
 objs += env.Object(target=target_dir+'strings',        source='strings.f90')
 objs += env.Object(target=target_dir+'lists',          source='lists.f90')
@@ -185,6 +213,7 @@ objs += env.Object(target=target_dir+'solarradiation', source='solarradiation.f9
 objs += env.Object(target=target_dir+'wallmodels',     source='wallmodels.f90', F90FLAGS = filter(lambda flag: flag !='-flto' , env['F90FLAGS']))
 objs += env.Object(target=target_dir+'volumesources',  source='volumesources.f90')
 objs += env.Object(target=target_dir+'linesources',    source='linesources.f90')
+objs += env.Object(target=target_dir+'pointsources',   source='pointsources.f90')
 objs += env.Object(target=target_dir+'puffs',          source='puffs.f90')
 
 if cgal=='no':
@@ -192,7 +221,7 @@ if cgal=='no':
   objs += env.Object(target=target_dir+'dummy_cgal_polyhedra',  source='dummy_cgal_polyhedra.f90')
 else:
   #Support for CGAL for geometry files reading.
-  objs += env.Object(target=target_dir+'cgal_polyhedra_cc',  source='cgal_polyhedra.cc', CXXFLAGS="-O3 -std=c++11 -frounding-math")#" -Ofast -frounding-math -std=c++11")
+  objs += env.Object(target=target_dir+'cgal_polyhedra_cc',  source='cgal_polyhedra.cc', CXXFLAGS = env['CXXFLAGS'] + '-O3 -std=c++11 -frounding-math')
   objs += env.Object(target=target_dir+'cgal_polyhedra',  source='cgal_polyhedra.f90')
   Depends(objs[-1], 'cgal_polyhedra.cc')
   env.Append(LIBS = ['CGAL','boost_thread','boost_system'])
@@ -228,6 +257,6 @@ objs += env.Object(target=target_dir+'main',           source='main.f90')
 
 objs = filter(lambda o: str(o)[-4:] != '.mod', objs)
 
-t = env.Program(target=target_dir+'CLMM', source= objs + SBfile + PBfile + [target_dir+'P/poisfft.o'] + [target_dir+'P/fft.o'])
+t = env.Program(target=target_dir+'CLMM', source= objs + SBfile + PBfile)
 
 Default(t)

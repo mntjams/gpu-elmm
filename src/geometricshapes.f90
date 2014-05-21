@@ -343,7 +343,7 @@ contains
     real(knd),intent(in) :: x,y,z
 
     res = huge(res)
-    stop "OutwardNormal not implemented for this shape"
+    call error_stop("OutwardNormal not implemented for this shape")
   end function
     
   logical function GeometricShape_IntersectsRay(self,r) result(intersects)
@@ -590,7 +590,7 @@ contains
     if (norm2(vec)<epsilon(vec)) then
       write(*,*) "Error, in line ",__LINE__," in file ",__FILE__
       write(*,*) "Points",point1, point2, point3,"lie on a single line." 
-      stop
+      call error_stop
     end if
     
     res = Plane(point2, vec)
@@ -742,7 +742,7 @@ contains
       write(*,*) "no nearest"
       write(*,*) "dists", dists
       write(*,*) "line ",__LINE__," in file ",__FILE__
-      stop
+      call error_stop
     endif
 
     if (self%Inside(xP(inearest),yP(inearest),zP(inearest), &
@@ -924,7 +924,6 @@ contains
     
     call res%ReadOff(filename)
     call res%InitBbox
-    call res%InitRefPoints
     
   end function
   
@@ -939,7 +938,7 @@ contains
     
     if (.not.c_associated(self%cgalptr)) then
       write(*,*) "Error reading polyhedron from ",filename
-      stop
+      call error_stop
     end if
   end subroutine
   
@@ -948,6 +947,8 @@ contains
 
     associate(b=>self%bbox)
       call cgal_polyhedron_bbox(self%cgalptr, b%xmin, b%ymin, b%zmin, b%xmax, b%ymax, b%zmax)
+
+      call self%InitRefPoints
 
       b%xmin = max(b%xmin, xU(-2))
       b%ymin = max(b%ymin, yV(-2))
@@ -2217,7 +2218,7 @@ contains
     else
 
       write(*,*) "Could not open file ",filename
-      stop
+      call error_stop
 
     end if
     
@@ -2236,7 +2237,7 @@ contains
 
         if (io/=0) then
           write(*,*) "Expected number of planes in polyhedron, received '",trim(restline),"' instead."
-          stop
+          call error_stop
         end if
 
         allocate(poly%Planes(nPlanes))
@@ -2259,7 +2260,7 @@ contains
         read(unit,'(a)',iostat=io) line
         if (io/=0) then
           write(*,*) "Error reading the line with the plane definition."
-          stop
+          call error_stop
         end if
 
         if (count_multispaces(line) == 4) then
@@ -2269,7 +2270,7 @@ contains
         end if
         if (io/=0) then
           write(*,*) "Error parsing the line with the plane definition."
-          stop
+          call error_stop
         end if
       end subroutine ReadPlane
       
@@ -2315,7 +2316,7 @@ contains
     else
 
       write(*,*) "Could not open file ",filename
-      stop
+      call error_stop
 
     end if
     
@@ -2361,7 +2362,7 @@ contains
         if (.not.upcase(line(1:7))=='POINTS:') then
           write (*,*) "Error reading points header in file", filename
           write (*,*) "Expected 'POINTS:', found:", trim(line)
-          stop
+          call error_stop
         end if
         line = line(8:)
       end subroutine
@@ -2376,7 +2377,7 @@ contains
       
       subroutine npoints_error
         write (*,*) "Error reading points header in file", filename
-        stop
+        call error_stop
       end subroutine
 
       subroutine read_point(p)
@@ -2391,7 +2392,7 @@ contains
 
       subroutine point_error
         write (*,*) "Error reading point ",ipoint,"in file", filename
-        stop
+        call error_stop
       end subroutine
 
       subroutine read_polyhedra
@@ -2424,7 +2425,7 @@ contains
             .not.upcase(line(1:10))=='POLYHEDRA:') then
           write (*,*) "Error reading polyhedra header in file", filename
           write (*,*) "Expected 'POLYHEDRA:', found:", trim(line)
-          stop
+          call error_stop
         end if
         ind = index(line(1:12),':')
         line = line(ind+1:)
@@ -2440,7 +2441,7 @@ contains
       
       subroutine npolyhedra_error
         write (*,*) "Error reading polyhedra header in file", filename
-        stop
+        call error_stop
       end subroutine
 
       subroutine read_polyhedron(poly)
@@ -2461,7 +2462,7 @@ contains
 
       subroutine polyhedron_error
         write (*,*) "Error reading polyhedron ",ipolyhedron,"in file", filename
-        stop
+        call error_stop
       end subroutine
       
       subroutine read_plane(planes, iostat)
@@ -2535,7 +2536,7 @@ contains
     else
 
       write(*,*) "Could not open file ",filename
-      stop
+      call error_stop
 
     end if
     
@@ -2552,7 +2553,7 @@ contains
 
         if (io/=0) then
           write(*,*) "Expected number of planes in polyhedron, received '",trim(restline),"' instead."
-          stop
+          call error_stop
         end if
 
         allocate(poly%Planes(nPlanes))
@@ -2575,7 +2576,7 @@ contains
         read(unit,'(a)',iostat=io) line
         if (io/=0) then
           write(*,*) "Error reading the line with the plane definition."
-          stop
+          call error_stop
         end if
 
         if (count_multispaces(line) == 4) then
@@ -2585,7 +2586,7 @@ contains
         end if
         if (io/=0) then
           write(*,*) "Error parsing the line with the plane definition."
-          stop
+          call error_stop
         end if
       end subroutine ReadPlane
       

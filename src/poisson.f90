@@ -9,6 +9,9 @@ contains
 
   subroutine Poiss_PoisFFT(Phi,RHS)
     use poisfft
+#ifdef MPI
+    use custom_mpi
+#endif
 #ifdef DPREC
     type(PoisFFT_Solver3D_DP),save :: Solver
 #else
@@ -18,22 +21,19 @@ contains
     real(knd),dimension(0:,0:,0:),intent(in) :: RHS
     integer i
     logical, save :: called = .false.
-    integer bounds(6)
 #ifdef POIS_SOLVER_TIME
     integer(DBL), save :: trate
     integer(DBL)       :: t1, t2
 #endif
 
-    do i=1,6
-      if (Btype(i)==PERIODIC) then
-        bounds(i) = PoisFFT_PERIODIC
-      else
-        bounds(i) = PoisFFT_NeumannStag
-      end if
-    end do
 
     if (.not.called) then
-      call New(Solver,Prnx,Prny,Prnz,dxmin,dymin,dzmin,bounds)
+#ifdef MPI
+      call New(Solver,Prnx,Prny,Prnz,dxmin,dymin,dzmin,PoissonBtype, &
+               gPrns,offsets_to_global,poisfft_comm)
+#else
+      call New(Solver,Prnx,Prny,Prnz,dxmin,dymin,dzmin,PoissonBtype)
+#endif
       called = .true.
 #ifdef POIS_SOLVER_TIME
       call system_clock(count_rate=trate)
@@ -48,7 +48,7 @@ contains
 
 #ifdef POIS_SOLVER_TIME
     call system_clock(count=t2)
-    write(*,*) "solver cpu time", real(t2-t1)/real(trate)
+    if (master) write(*,*) "solver cpu time", real(t2-t1)/real(trate)
 #endif
 
   end subroutine
@@ -58,6 +58,10 @@ contains
 
 
   subroutine PoissSOR(Phi,RHS) 
+#ifdef MPI
+    use Boundaries
+    use custom_mpi
+#endif
     !Solves Poisson equation using Successive over-relaxation
 
     real(knd),dimension(0:,0:,0:),intent(inout) :: Phi
@@ -98,6 +102,10 @@ contains
     do while (l<=maxPoissoniter.and.S>epsPoisson)
       l=l+1
       S=0
+#ifdef MPI
+      call Bound_Phi(Phi)
+print *,Phi(1,1,1),Phi(1,1,nz+1)
+#endif
       !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
       !$OMP DO
       do k=1,nz
@@ -105,42 +113,42 @@ contains
           do i=1+mod(j+k,2),nx,2
             p=0
             Ap=0
-            if (i>1) then
+            if (i>1.or.Btype(We)>=MPI_BOUNDS) then
                       p=p+Phi(i-1,j,k)*Aw(i)
                       Ap=Ap+Aw(i)
             else if (Btype(We)==PERIODIC) then
                       p=p+Phi(nx,j,k)*Aw(i)
                       Ap=Ap+Aw(i)
             end if
-            if (i<nx) then
+            if (i<nx.or.Btype(Ea)>=MPI_BOUNDS) then
                       p=p+Phi(i+1,j,k)*Ae(i)
                       Ap=Ap+Ae(i)
             else if (Btype(We)==PERIODIC) then
                       p=p+Phi(1,j,k)*Ae(i)
                       Ap=Ap+Ae(i)
             end if
-            if (j>1) then
+            if (j>1.or.Btype(So)>=MPI_BOUNDS) then
                       p=p+Phi(i,j-1,k)*As(j)
                       Ap=Ap+As(j)
             else if (Btype(No)==PERIODIC) then
                       p=p+Phi(i,ny,k)*As(j)
                       Ap=Ap+As(j)
             end if
-            if (j<ny) then
+            if (j<ny.or.Btype(No)>=MPI_BOUNDS) then
                       p=p+Phi(i,j+1,k)*An(j)
                       Ap=Ap+An(j)
             else if (Btype(No)==PERIODIC) then
                       p=p+Phi(i,1,k)*An(j)
                       Ap=Ap+An(j)
             end if
-            if (k>1) then
+            if (k>1.or.Btype(Bo)>=MPI_BOUNDS) then
                       p=p+Phi(i,j,k-1)*Ab(k)
                       Ap=Ap+Ab(k)
             else if (Btype(To)==PERIODIC) then
                       p=p+Phi(i,j,nz)*Ab(k)
                       Ap=Ap+Ab(k)
             end if
-            if (k<nz) then
+            if (k<nz.or.Btype(To)>=MPI_BOUNDS) then
                       p=p+Phi(i,j,k+1)*At(k)
                       Ap=Ap+At(k)
             else if (Btype(To)==PERIODIC) then
@@ -211,9 +219,14 @@ contains
         end do
       end do
       !$OMP ENDDO
-      !$OMP ENDPARALLEL
+      !$OMP ENDPARALLEL   
       p=abs(maxval(Phi(1:nx,1:ny,1:nz)))
       if (p>0) S=S/p
+      
+#ifdef MPI
+      S = mpi_co_max(S)
+#endif
+
       if (MOD(l,10)==0)  write (*,*) "   Poisson iter: ",l,S
     end do
 

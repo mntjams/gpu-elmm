@@ -28,9 +28,12 @@ module Kinds
                                                                        !This can have some negative effect on speed however
 end module Kinds
 
+
+
 module Parameters
 
   use Kinds
+  use Stop_procedures
 
   implicit none
 
@@ -47,7 +50,12 @@ module Parameters
   integer :: Wnx,Wny,Wnz     !dimensions of grid for velocity component W
 
   integer :: Prnx,Prny,Prnz  !dimensions of grid for pressure
-
+#ifdef MPI
+  integer :: gPrnx, gPrny, gPrnz !global grid dimensions
+  integer :: offset_to_global_x = 0, offset_to_global_y = 0, offset_to_global_z = 0
+  integer :: gPrns(3), offsets_to_global(3) = 0
+#endif
+  
 
   integer   :: max_number_of_time_steps    !maximum number of time steps
 
@@ -92,7 +100,7 @@ module Parameters
   logical :: enable_liquid   = .false. !enable condensation of water vapor
   integer :: num_of_scalars  = 0
 
-  logical :: enable_radiation = .false.
+  logical :: enable_radiation = .true.
 
   integer :: partdistrib,computedeposition,computegravsettling
   integer :: maxCNiter,maxPOISSONiter,endstep
@@ -104,6 +112,8 @@ module Parameters
   real(knd),allocatable :: Uin(:,:),Vin(:,:),Win(:,:),Uoutb(:,:)
 
   real(knd),allocatable :: TempIn(:,:), MoistIn(:,:)
+
+  real(knd) :: gxmin, gxmax, gymin, gymax, gzmin, gzmax
 
   real(knd),allocatable :: xU(:),xPr(:),yV(:),yPr(:),zW(:),zPr(:)          !coordinates of grid points
   real(knd),allocatable :: dxU(:),dxPr(:),dyV(:),dyPr(:),dzW(:),dzPr(:)    !dxPr(i)=xU(i)-xU(i-1), dxU(i)=xPr(i+1)-xPr(i)
@@ -122,7 +132,7 @@ module Parameters
   logical   :: xgridfromfile,ygridfromfile,zgridfromfile
   integer   :: initcondsfromfile
 
-  integer,parameter :: Ea=1,We=2,So=3,No=4,Bo=5,To=6
+  integer,parameter :: We=1, Ea=2, So=3, No=4, Bo=5, To=6
 
   real(knd) :: temperature_ref = 295
   real(knd) :: moisture_ref = 0.001 !TODO: compute from relative humidity
@@ -131,6 +141,8 @@ module Parameters
   integer,dimension(6) :: TempBtype  !boundary condition types for temperature
   integer,dimension(6) :: MoistBtype !boundary condition types for temperature
   integer,dimension(6) :: ScalBtype  !boundary condition types for scalars
+  
+  integer,dimension(6) :: PoissonBtype !boundary conditions for the pressure solver
 
 
   real(knd),dimension(3,6)   :: sideU     !velocities on boundaries in case of Dirichlet BC
@@ -148,7 +160,8 @@ module Parameters
 
   integer,parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6, &  !boundary condition types
                         TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10, RADIATION=7, &
-                        NEUMANN_BUFF=8, AUTOMATICFLUX=11, WALL_DIRICHLET=12, WALL_FLUX=13
+                        NEUMANN_BUFF=8, AUTOMATICFLUX=11, WALL_DIRICHLET=12, WALL_FLUX=13, &
+                        MPI_BOUNDS=1000, MPI_BOUNDARY=1000, MPI_PERIODIC=1001
   !inlet types
   integer,parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
                        ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5
@@ -159,6 +172,8 @@ module Parameters
   integer,parameter :: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4
 
   integer :: debuglevel = 0 !amount of information to write out
+  
+  character(:), allocatable :: output_dir
 
 ! #ifdef __HMPP
  integer :: GPU = 0   !If the GPU is allocated

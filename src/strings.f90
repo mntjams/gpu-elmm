@@ -5,7 +5,7 @@ module Strings
 
   private
 
- public upcase, count_multispaces
+  public upcase, count_multispaces, itoa
 
   contains
 
@@ -45,5 +45,13 @@ module Strings
       end do
 
     end function count_multispaces
+    
+    function itoa(i) result(res)
+      character(:),allocatable :: res
+      integer,intent(in) :: i
+      character(range(i)+2) :: tmp
+      write(tmp,'(i0)') i
+      res = trim(tmp)
+    end function
 
 end module Strings

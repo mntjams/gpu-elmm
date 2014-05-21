@@ -172,13 +172,14 @@ contains
 
 
   function TStaggeredFrameDomain_Init(label,range,time_params,save_flags) result(D)
+    use Parameters, only: output_dir
     type(TStaggeredFrameDomain) :: D
     character(*) :: label
     type(rrange),intent(in) :: range
     type(TFrameTimes),intent(in) :: time_params
     type(TSaveFlags),intent(in) :: save_flags
 
-    D%base_name = "output/stagframe-"//label
+    D%base_name = trim(output_dir)//"stagframe-"//label
 
     D%frame_times = time_params
 
@@ -365,7 +366,7 @@ contains
 
 
 
-  subroutine SaveBuffer(Dptr) bind(C)
+  recursive subroutine SaveBuffer(Dptr) bind(C)
     use iso_c_binding, only: c_f_pointer
     type(c_ptr),value :: Dptr
     type(TStaggeredFrameDomain),pointer :: D
@@ -375,7 +376,7 @@ contains
 
     write(file_name,'(a,i0,a)') trim(D%base_name)//"-",D%frame_number,trim(D%suffix)
 
-    write(*,*) "Writing frame: ",file_name, " size: ",D%buffer_size
+!     write(*,*) "Writing frame: ",file_name, " size: ",D%buffer_size
 
     open(unit=D%unit, file=file_name, access='stream', form='unformatted', action='write', status='replace')
 

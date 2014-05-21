@@ -1,5 +1,8 @@
 module ScalarBoundaries
   use Parameters
+#ifdef MPI
+  use exchange_mpi
+#endif
 
   implicit none
 
@@ -24,6 +27,10 @@ contains
     ny = Prny
     nz = Prnz
 
+#ifdef MPI
+    call exchange_Sc_x(arr,btype)
+#endif
+    
     if (btype(We)==DIRICHLET) then
       do k = 1,nz
         do j = 1,ny
@@ -58,7 +65,7 @@ contains
           arr(-1,j,k) = arr(0,j,k) - (arr(1,j,k)-arr(0,j,k))
         end do
       end do
-    else
+    else if (btype(We)<MPI_BOUNDS) then
       do k = 1,nz
         do j = 1,ny
           arr(0,j,k)  = arr(1,j,k)
@@ -96,7 +103,7 @@ contains
           arr(nx+2,j,k) = arr(nx+1,j,k) - (arr(nx,j,k)-arr(nx+1,j,k))
         end do
       end do
-    else
+    else if (btype(Ea)<MPI_BOUNDS) then
       do k = 1,nz
         do j = 1,ny
           arr(nx+1,j,k) = arr(nx,j,k)
@@ -105,7 +112,10 @@ contains
       end do
     end if
 
-
+#ifdef MPI
+    call exchange_Sc_y(arr,btype)
+#endif
+    
     if (btype(So)==DIRICHLET) then
       do k = 1,nz
         do i=-1,nx+2
@@ -135,7 +145,7 @@ contains
           arr(i,-1,k) = arr(i,0,k) - (arr(i,1,k)-arr(i,0,k))
         end do
       end do
-    else
+    else if (btype(So)<MPI_BOUNDS) then
       do k = 1,nz
         do i=-1,nx+2
           arr(i,0,k)  = arr(i,1,k)
@@ -173,7 +183,7 @@ contains
           arr(i,ny+2,k) = arr(i,ny+1,k) - (arr(i,ny,k)-arr(i,ny+1,k))
         end do
       end do
-    else
+    else if (btype(No)<MPI_BOUNDS) then
       do k = 1,nz
         do i=-1,ny+2
           arr(i,ny+1,k) = arr(i,ny,k)
@@ -182,7 +192,10 @@ contains
       end do
     end if
 
-
+#ifdef MPI
+    call exchange_Sc_z(arr,btype)
+#endif
+    
     if (btype(Bo)==DIRICHLET) then
       do j=-1,ny+2
         do i=-1,nx+2
@@ -212,7 +225,7 @@ contains
           arr(i,j,-1) = arr(i,j,0)-(arr(i,j,1)-arr(i,j,0))
         end do
       end do
-    else
+    else if (btype(Bo)<MPI_BOUNDS) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,0)  = arr(i,j,1)
@@ -250,7 +263,7 @@ contains
           arr(i,j,nz+2) = arr(i,j,nz+1) - (arr(i,j,nz)-arr(i,j,nz+1))
         end do
       end do
-    else
+    else if (btype(To)<MPI_BOUNDS) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,nz+1) = arr(i,j,nz)
@@ -297,32 +310,20 @@ contains
     nx = Prnx
     ny = Prny
     nz = Prnz
-
-    if (Btype(To)==PERIODIC) then
-      do j = 1,ny
-       do i = 1,nx
-         Nu(i,j,0) = Nu(i,j,nz)
-         Nu(i,j,nz+1) = Nu(i,j,1)
-       end do
-      end do
-    else
-      do j = 1,ny
-       do i = 1,nx
-         Nu(i,j,0) = Nu(i,j,1)
-         Nu(i,j,nz+1) = Nu(i,j,nz)
-       end do
-      end do
-    end if
+    
+#ifdef MPI
+    call exchange_Sc_x(Nu, Btype)
+#endif
 
     if (Btype(Ea)==PERIODIC) then
-      do k = 0,nz+1
+      do k = 1,nz
        do j = 1,ny
          Nu(0,j,k) = Nu(nx,j,k)
          Nu(nx+1,j,k) = Nu(1,j,k)
        end do
       end do
-    else
-      do k = 0,nz+1
+    else if (Btype(Ea)<MPI_BOUNDS) then
+      do k = 1,nz
        do j = 1,ny
          Nu(0,j,k) = Nu(1,j,k)
          Nu(nx+1,j,k) = Nu(nx,j,k)
@@ -330,22 +331,46 @@ contains
       end do
     end if
 
+#ifdef MPI
+    call exchange_Sc_y(Nu, Btype)
+#endif
+
     if (Btype(No)==PERIODIC) then
-      do k = 0,nz+1
+      do k = 1,nz
        do i = 0,nx+1
          Nu(i,0,k) = Nu(i,ny,k)
          Nu(i,ny+1,k) = Nu(i,1,k)
        end do
       end do
-    else
-      do k = 0,nz+1
+    else if (Btype(No)<MPI_BOUNDS) then
+      do k = 1,nz
        do i = 0,nx+1
          Nu(i,0,k) = Nu(i,1,k)
          Nu(i,ny+1,k) = Nu(i,ny,k)
        end do
       end do
     end if
+    
+#ifdef MPI
+    call exchange_Sc_z(Nu, Btype)
+#endif
 
+    if (Btype(To)==PERIODIC) then
+      do j = 0,ny+1
+       do i = 0,nx+1
+         Nu(i,j,0) = Nu(i,j,nz)
+         Nu(i,j,nz+1) = Nu(i,j,1)
+       end do
+      end do
+    else if (Btype(To)<MPI_BOUNDS) then
+      do j = 0,ny+1
+       do i = 0,nx+1
+         Nu(i,j,0) = Nu(i,j,1)
+         Nu(i,j,nz+1) = Nu(i,j,nz)
+       end do
+      end do
+    end if
+    
   end subroutine BoundViscosity
 
 

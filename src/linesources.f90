@@ -63,15 +63,28 @@ module LineSources
     end function
     
     subroutine InitLineSources
-      integer i
+      integer :: i
+      type(ScalarFlVolumesContainer) :: points
       
       if (.not.allocated(ScalarLineSources)) then
+      
         allocate(ScalarLineSources(0))
+        
       else if (num_of_scalars>0) then
+      
         do i=1,size(ScalarLineSources)
-          call Add(ScalarFlVolumes,ScalarLineSources(i)%point_sources())
+          points = ScalarLineSources(i)%point_sources()
+          if (.not.empty(points)) call Add(ScalarFlVolumes,points)
         end do
+        
       end if
+      
+    contains
+      logical function empty(src)
+        type(ScalarFlVolumesContainer),intent(in) :: src
+        empty = .not.allocated(src%volumes)
+        if (.not.empty) empty = size(src%volumes)==0
+      end function
     end subroutine
     
 end module

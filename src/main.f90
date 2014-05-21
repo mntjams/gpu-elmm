@@ -5,6 +5,9 @@ program CLMM
   use TSteps, only: TMarchRK3, TSteps_Deallocate
   use Scalars, only: Scalars_Deallocate
   use Outputs, only: AllocateOutputs, OutTStep, Output
+#ifdef MPI
+  use custom_mpi
+#endif
 
   implicit none
 
@@ -18,25 +21,28 @@ program CLMM
 
   real(knd) :: delta = 0
 
-  real(knd) :: dt = 0 !time_step
+  real(tim) :: dt = 0 !time_step
 
   pi=2.0_knd*acos(0.0_knd)
 
+#ifdef MPI
+  call init_custom_mpi
+#endif
 
-  write (*,*) "Reading parameters..."
+  if (master) write (*,*) "Reading parameters..."
   call ReadConfiguration
 
 
-  write (*,*) "Setting up boundary conditions..."
+  if (master) write (*,*) "Setting up boundary conditions..."
   call InitBoundaryConditions
 
 
-  write (*,*) "Allocating arrays..."
+  if (master) write (*,*) "Allocating arrays..."
   call AllocateGlobals
 
   call AllocateOutputs
 
-  write (*,*) "Setting up initial conditions..."
+  if (master) write (*,*) "Setting up initial conditions..."
   call InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
 
   time = start_time
@@ -48,14 +54,16 @@ program CLMM
 
   if (end_time > start_time) then
 
-    write (*,*) "Computing..."
+    if (master) write (*,*) "Computing..."
 
     do step = 1, max_number_of_time_steps
 
-      write (*,*) "-----------"
-      write (*,*) " "
-      write (*,*) " "
-      write (*,*) "tstep:",step
+      if (master) then
+        write (*,*) "-----------"
+        write (*,*)
+        write (*,*)
+        write (*,*) "tstep:",step
+      end if
 
 
 
@@ -72,17 +80,17 @@ program CLMM
 
 
       if ((steady==1) .and. (delta<eps)) then
-        write (*,*) "Steady state reached."
+        if (master) write (*,*) "Steady state reached."
         exit
       endif
 
       if ((steady==0) .and. (time>=end_time)) then
-        write (*,*) "Time limit reached."
+        if (master) write (*,*) "Time limit reached."
         exit
       endif
 
       if (step>=3 .and. dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/10._knd)) then
-        write (*,*) "Solution diverged."
+        if (master) write (*,*) "Solution diverged."
         exit
       endif
 
@@ -98,15 +106,17 @@ program CLMM
   call TSteps_Deallocate
   call Scalars_Deallocate
 
-  write (*,*) "Saving results..."
+  if (master) write (*,*) "Saving results..."
 
 
   call OUTPUT(U,V,W,Pr,Temperature,Moisture,Scalar)
 
 
   call DeallocateGlobals
-
-
+  
+#ifdef MPI
+  call finalize_custom_mpi
+#endif
   contains
 
 
@@ -120,7 +130,7 @@ program CLMM
      U = 0
      V = 0
      W = 0
-     Pr = 0000
+     Pr = 0
 
 
      if (enable_buoyancy) then

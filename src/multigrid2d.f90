@@ -1,6 +1,7 @@
 module MULTIGRID2d
 
-use PARAMETERS
+use Parameters
+use Stop_procedures
 
 implicit none
 
@@ -279,7 +280,7 @@ contains
 
        write (*,*) "RCOND",rcond
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
      else
@@ -297,7 +298,7 @@ contains
                   ferr,berr,work,work2,info)
 
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
      endif
@@ -426,7 +427,7 @@ contains
        call  getrf(nxyz,nxyz,age,nxyz,ipivot,info)
 
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
     endif
@@ -443,7 +444,7 @@ contains
        call getrs("N",nxyz,1,age,nxyz,ipivot,bge,nxyz,info)
 
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
 
@@ -567,7 +568,7 @@ contains
        call  getrf(nxyz,nxyz,age,nxyz,ipivot,info)
 
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
 
@@ -576,7 +577,7 @@ contains
        call getri(nxyz,age,nxyz,ipivot,work,-1,info)
 
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
 
@@ -588,7 +589,7 @@ contains
        call getri(nxyz,age,nxyz,ipivot,work,ldwork,info)
 
        if (info/=0) then
-        stop
+        call error_stop
         write (*,*) "info",info
        endif
 
@@ -891,7 +892,7 @@ contains
        write (*,*) "Incorrect dimensions, multigrid, vs. grid defined in grid.conf:"
        write (*,*) 0+sx,":",nx,"--",1,":",Prnx
        write (*,*) 0+sz,":",nz,"--",1,":",Prnz
-       stop
+       call error_stop
     endif
 
     PhiMG(LMG)%Arr=0

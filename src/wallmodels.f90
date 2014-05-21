@@ -245,8 +245,7 @@ contains
         if (associated(p)) then
           WMPoints(i) = p
         else
-          write(*,*) "Assert error, pointer not associated. File ",__FILE__," line ",__LINE__
-          stop
+          call error_stop("Assert error, pointer not associated. File "//__FILE__//" line ",__LINE__)
         end if
       end do
 
@@ -304,7 +303,7 @@ contains
             arr(i) = p
           else
             write(*,*) "Assert error, pointer not associated. File ",__FILE__," line ",__LINE__
-            stop
+            call error_stop
           end if
         end do
 
@@ -1542,7 +1541,7 @@ contains
       if (all(dist==0))then
         write(*,*) "ijk",xi,yj,zk
         write(*,*) "dist",dist
-        stop "Error, WM point can not be exactly on the wall!"
+        call error_stop("Error, WM point can not be exactly on the wall!")
       end if
 
       vel(1) = (U(xi,yj,zk)+U(xi-1,yj,zk))/2._knd
@@ -1577,7 +1576,7 @@ contains
        else
 
          if (Re<=0) then
-           stop "The wall model requires positive viscosity or roughness length."
+           call error_stop("The wall model requires positive viscosity or roughness length.")
          end if
 
          if (wallmodeltype == 2) then
@@ -1668,7 +1667,7 @@ contains
           if (all(dist==0))then
             write(*,*) "ijk",xi,yj,zk
             write(*,*) "dist",dist
-            stop "Error, WM point can not be exactly on the wall!"
+            call error_stop("Error, WM point can not be exactly on the wall!")
           end if
 
           vel = local_velocity(U,V,W,component,xi,yj,zk)
@@ -1680,11 +1679,11 @@ contains
 !TODO: The temperature flux is always 0 now in momentum points, so no stability effect here!
              if (enable_buoyancy .and. p%temperature>0) then
 
-               stop "Not implemented!"
+               call error_stop("Not implemented!")
 
              else if (enable_buoyancy .and. p%temperature_flux>0) then
 
-               stop "Not implemented!"
+               call error_stop("Not implemented!")
 
              else
 
@@ -1695,7 +1694,7 @@ contains
           else
 
              if (Re<=0) then
-               stop "The wall model requires positive viscosity or roughness length."
+               call error_stop("The wall model requires positive viscosity or roughness length.")
              end if
 
 

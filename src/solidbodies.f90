@@ -59,7 +59,7 @@ contains
 
     if (.not.associated(SB)) then
       write (*,*) "Error, no SolidBody with number",n,"in the list."
-      stop
+      call error_stop
     end if
 
   end subroutine SetCurrentSB
@@ -86,7 +86,7 @@ contains
         type(SolidBody) :: CurrentSB
         integer i,j,k
 
-        if (CurrentSB%numofbody==0) stop "Error, numofbody==0, did you use AddSolidBody()?"
+        if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
         do k = 0,Prnz+1
@@ -104,7 +104,7 @@ contains
         type(SolidBody) :: CurrentSB
         integer i,j,k
 
-        if (CurrentSB%numofbody==0) stop "Error, numofbody==0, did you use AddSolidBody()?"
+        if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
         do k = 0,Unz+1
@@ -122,7 +122,7 @@ contains
         type(SolidBody) :: CurrentSB
         integer i,j,k
 
-        if (CurrentSB%numofbody==0) stop "Error, numofbody==0, did you use AddSolidBody()?"
+        if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
         do k = 0,Vnz+1
@@ -194,7 +194,7 @@ contains
       call ReadTerrain(filename)
     else
       write(*,*) "Unknown file format "//suffix
-      stop
+      call error_stop
     end if
 
   end subroutine ReadSolidBodiesFromFile
@@ -221,7 +221,7 @@ contains
       call AddSolidBody(SolidBody(Polyhedron(filename), z0 = z0B))
     else
       write(*,*) "Error, file ",filename," does not exist."
-      stop
+      call error_stop
     end if
 
   end subroutine ReadOff

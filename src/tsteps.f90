@@ -105,16 +105,16 @@ contains
    Wstar = W
 
 
-   !$omp parallel sections
-   !$omp section
+!    !$omp parallel sections
+!    !$omp section
    call BoundU(1,U,Uin)
-   !$omp section
+!    !$omp section
    call BoundU(2,V,Vin)
-   !$omp section
+!    !$omp section
    call BoundU(3,W,Win)
-   !$omp section
+!    !$omp section
    if (enable_buoyancy) call BoundTemperature(temperature)
-   !$omp end parallel sections
+!    !$omp end parallel sections
     call IBMomentum(U,V,W)
 
 
@@ -195,14 +195,14 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
   !$hmpp <tsteps> delegatedstore, args[TimeStepEul::dt]
 
 
-  write (*,*) "time:",time,"dt: ",dt
+  if (master) write (*,*) "time:",time,"dt: ",dt
 
   do RK_stage = 1,RK_stages
 
-    write(*,*) "stage:",RK_stage
+    if (master) write(*,*) "stage:",RK_stage
 
 
-    if (debugparam>1) call system_clock(count=time1)
+    if (debugparam>1.and.master) call system_clock(count=time1)
 
 
     call SubgridStresses(U,V,W,Pr,Temperature)
@@ -234,14 +234,14 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
     end if
 
 
-    !$omp parallel sections
-    !$omp section
+!     !$omp parallel sections
+!     !$omp section
     call BoundU(1,U2,Uin)
-    !$omp section
+!     !$omp section
     call BoundU(2,V2,Vin)
-    !$omp section
+!     !$omp section
     call BoundU(3,W2,Win)
-    !$omp end parallel sections
+!     !$omp end parallel sections
     call IBMomentum(U2,V2,W2)
 
     if (masssourc==1) then
@@ -311,27 +311,28 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
                          Btype,sideU, &
                          Win,W,0)
 #else
-!$omp parallel
-!$omp sections
-!$omp section
+! !$omp parallel
+! !$omp sections
+! !$omp section
         call BoundU(1,U,Uin)
-!$omp section
+! !$omp section
         call BoundU(2,V,Vin)
-!$omp section
+! !$omp section
         call BoundU(3,W,Win)
-!$omp end sections
-!$omp end parallel
+! !$omp end sections
+! !$omp end parallel
         call IBMomentum(U,V,W)
 #endif
 
 
-    if (debugparam>1) then
+    if (debugparam>1.and.master) then
      call system_clock(count=time2)
      write (*,*) "ET of part 1", (time2-time1)/real(trate,int64)
      time1 = time2
     end if
 
    end do
+   
    if (.false.) then
    !$hmpp <tsteps> release
    end if
@@ -435,7 +436,7 @@ end subroutine TMarchRK3
          if (gridtype==UNIFORMGRID) then
           call UNIFREDBLACK(U,V,W,U2,V2,W2,U3,V3,W3,coef)
          else
-          stop
+          call error_stop
          end if
          call exchange_alloc(U2,U3)
          call exchange_alloc(V2,V3)
@@ -1567,7 +1568,7 @@ end subroutine TMarchRK3
 
      if (sgstype/=StabSubgridModel.and.enable_buoyancy)  call ComputeTDiff(U,V,W)
 
-     if (enable_buoyancy) call BoundViscosity(TDiff)
+     if (size(TDiff)>0) call BoundViscosity(TDiff)
 #endif
 
   end subroutine SubgridStresses
@@ -1657,6 +1658,7 @@ end subroutine TMarchRK3
     use ImmersedBoundary, only: Up => UIBPoints, &
                                 Vp => VIBPoints, &
                                 Wp => WIBPoints
+    use vtkarray
 
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
     real(knd), intent(out) :: Q(0:,0:,0:)
@@ -1693,7 +1695,11 @@ end subroutine TMarchRK3
       Q(xi,yj,zk+1) = Q(xi,yj,zk+1) - W(xi,yj,zk)/dzPr(zk+1)
     end do
 
+!     call VtkArrayBin(output_dir//"Q1.vtk",Q,offsets_to_global)!(1:Prnx,1:Prny,1:Prnz)
+
     call Bound_Q(Q)
+
+!     call VtkArrayBin(output_dir//"Q2.vtk",Q,offsets_to_global)!(1:Prnx,1:Prny,1:Prnz)
 
   end subroutine IBMassSources
 

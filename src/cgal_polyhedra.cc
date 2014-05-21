@@ -35,12 +35,12 @@ using std::endl;
 
 extern "C" {
  
-  void polyhedron_from_file (Polytree  **pptree, const char *fname, int * const ierr){
+  void polyhedron_from_file (Polytree  **pptree, const char *fname, int verbose, int * const ierr){
     Polyhedron *polyhedron = new Polyhedron;
     
     std::ifstream in(fname);
 
-    cout << " Reading file " << fname << " " << endl;
+    if (verbose) {cout << " Reading file " << fname << " " << endl;}
 
     try {
       in >> *polyhedron;
@@ -52,15 +52,17 @@ extern "C" {
     
     Tree *tree = new Tree(polyhedron->facets_begin(),polyhedron->facets_end());
     
-    cout << " facets: " << polyhedron->size_of_facets() << endl;
-    cout << " halfedges: " << polyhedron->size_of_halfedges() << endl;
-    cout << " vertices: " << polyhedron->size_of_vertices() << endl;
+    if (verbose) {
+      cout << " facets: " << polyhedron->size_of_facets() << endl;
+      cout << " halfedges: " << polyhedron->size_of_halfedges() << endl;
+      cout << " vertices: " << polyhedron->size_of_vertices() << endl;
+    }
     
     if (polyhedron->size_of_facets()==0 ||
         polyhedron->size_of_halfedges()==0 ||
         polyhedron->size_of_vertices()==0){
-         *ierr = 1;
-         return;
+          *ierr = 1;
+          return;
         };
     
     tree->accelerate_distance_queries();
@@ -99,9 +101,10 @@ extern "C" {
       return ptree->tree->do_intersect(ray);
     }
     catch (...) {
-     cout << origin->x <<" "<< origin->y <<" "<< origin->z << endl;
-     cout << vec->x <<" "<< vec->y <<" "<< vec->z << endl;
-     return false;}
+      cout << origin->x <<" "<< origin->y <<" "<< origin->z << endl;
+      cout << vec->x <<" "<< vec->y <<" "<< vec->z << endl;
+      return false;
+    }
   }
   
   void polyhedron_bbox(const Polytree *ptree, d3 *const min, d3 *const max){

@@ -281,15 +281,6 @@ contains
 
         call DoPuffs(Scalar_adv(:,:,:,sc), sc)
 
-        if (scalsourcetype==pointsource) then
-
-            Scalar_adv(scalsrci(sc),scalsrcj(sc),scalsrck(sc),sc) = &
-                       Scalar_adv(scalsrci(sc),scalsrcj(sc),scalsrck(sc),sc)+&
-                       percdistrib(sc)*totalscalsource / &
-                           (dxPr(scalsrci(sc))*dyPr(scalsrcj(sc))*dzPr(scalsrck(sc)))
-
-        end if
-
         do i=1,size(WMPoints)
           associate (p => WMPoints(i))
 
@@ -1689,43 +1680,29 @@ contains
 
 
   subroutine InitScalar(ScalarIn,ScalarProfile,Sc)
+    use rng_par_zig
+    !$ use omp_lib
     real(knd),contiguous,intent(in)  :: ScalarIn(-1:,-1:)
     type(TScalarProfile),intent(in)  :: ScalarProfile
     real(knd),contiguous,intent(out) :: Sc(-1:,-1:,-1:)
-    real(knd) :: p_x,p_y,p_z,p
-    integer   :: i,j,k
+    real(knd) :: p
+    integer   :: i,j,k,tid
 
     if (ScalarProfile%randomize==1) then
-
-!       p_x=0.5_knd
-!       p_y=0.5_knd
-!       p_z=0.5_knd
-
+      tid = 0
+      !$omp parallel private(i,j,k,p,tid)
+      !$ tid = omp_get_thread_num()
+      
+      !$omp do
       do k=0,Prnz+1
-
-!         if (zPr(k) <= ScalarProfile%randomizeTop) then
-!           call random_number(p)
-!           p = p - 0.5
-!           p_z=(p_z+p)/2
-!         end if
-
         do j=0,Prny+1
-
-!           if (zPr(k) <= ScalarProfile%randomizeTop) then
-!             call random_number(p)
-!             p = p - 0.5
-!             p_y=(p_y+p)/2
-!           end if
-
            do i=0,Prnx+1
 
              if (zPr(k) <= ScalarProfile%randomizeTop) then
-               call random_number(p)
+               call rng_uni(p,tid)
                p = p - 0.5
-!               p_x=(p_x+p)/2
-!               p=p_x+p_y+p_z
              else
-               p=0
+               p = 0
              end if
 
              Sc(i,j,k)=ScalarIn(j,k) + ScalarProfile%randomizeAmplitude * 2 * p
@@ -1733,11 +1710,12 @@ contains
            end do
         end do
       end do
+      !$omp end parallel
 
     else
-
-      forall(i=0:Prnx+1) Sc(i,:,:)=ScalarIn(:,:)
-
+      !$omp workshare
+      forall(i=0:Prnx+1) Sc(i,:,:) = ScalarIn(:,:)
+      !$omp end workshare
     end if
 
   end subroutine InitScalar
