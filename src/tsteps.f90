@@ -195,11 +195,11 @@ write(*,*) "nhWMPointsHMPP:",nWMPoints
   !$hmpp <tsteps> delegatedstore, args[TimeStepEul::dt]
 
 
-  if (master) write (*,*) "time:",time,"dt: ",dt
+  if (master) write (*,'(a,f12.6,a,es12.4)') " time: ",time," dt: ",dt
 
   do RK_stage = 1,RK_stages
 
-    if (master) write(*,*) "stage:",RK_stage
+!     if (master) write(*,*) "stage:",RK_stage
 
 
     if (debugparam>1.and.master) call system_clock(count=time1)
@@ -386,7 +386,7 @@ end subroutine TMarchRK3
                      Pr,U2,V2,W2, &
                      coef)
 
-    if (explicit_diffusion<=0) then
+    if (.not.explicit_diffusion) then
 
        !semi-implicit diffusion
 
