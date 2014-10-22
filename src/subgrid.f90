@@ -425,7 +425,7 @@ module Subgrid
         a1 = max((i1**2)/9 - i2/3,0._sigma_knd)
 
         a2 = (i1**3)/27 - i1*i2/6 +i3/2
-if (a1<epsilon(a1)) a1 = 1
+
         !This requires no FPE trapping is in progress!
         c =  a2 / sqrt(a1**3)
 
