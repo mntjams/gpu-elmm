@@ -1,6 +1,7 @@
 module Kinds
 
   use iso_fortran_env
+  use iso_c_binding, only: c_int, c_float, c_double, c_size_t
 
   implicit none
 
@@ -39,7 +40,7 @@ module Parameters
 
   save
 
-  real(knd)           :: pi !computed at the first line of main
+  real(knd),parameter :: pi = acos(-1.0_knd)
   real(knd),parameter :: Karman=0.41_knd
   real(knd),parameter :: BoltzC=1.3806503e-23_knd
 
@@ -50,11 +51,12 @@ module Parameters
   integer :: Wnx,Wny,Wnz     !dimensions of grid for velocity component W
 
   integer :: Prnx,Prny,Prnz  !dimensions of grid for pressure
-#ifdef MPI
+
+  !relevant for MPI
   integer :: gPrnx, gPrny, gPrnz !global grid dimensions
   integer :: offset_to_global_x = 0, offset_to_global_y = 0, offset_to_global_z = 0
   integer :: gPrns(3), offsets_to_global(3) = 0
-#endif
+  !relevant for MPI
   
 
   integer   :: max_number_of_time_steps    !maximum number of time steps
@@ -93,14 +95,16 @@ module Parameters
   real(TIM) :: timefram1,timefram2,timeavg1,timeavg2
 
   integer :: tempmet,poissmet,convmet,masssourc,frames,steady
-  integer :: tasktype,averaging,explicit_diffusion = 1
+  integer :: tasktype, averaging
+
+  logical :: explicit_diffusion = .true.
 
   logical :: enable_buoyancy = .false. !1 if enabled, zero otherwise
   logical :: enable_moisture = .false.
   logical :: enable_liquid   = .false. !enable condensation of water vapor
   integer :: num_of_scalars  = 0
 
-  logical :: enable_radiation = .true.
+  logical :: enable_radiation = .false.
 
   integer :: partdistrib,computedeposition,computegravsettling
   integer :: maxCNiter,maxPOISSONiter,endstep
@@ -126,8 +130,6 @@ module Parameters
   integer,allocatable,dimension(:,:) :: Unull,Vnull,Wnull                !indexes of points to be nulled every timestep
 
   integer   :: nUnull,nVnull,nWnull  !second dimension of arrays above (number of points)
-
-  integer   :: step
 
   logical   :: xgridfromfile,ygridfromfile,zgridfromfile
   integer   :: initcondsfromfile
@@ -171,9 +173,14 @@ module Parameters
   integer,parameter :: SubgridModel=1,SigmaModel=2,VremanModel=3,StabSubgridModel=4
   integer,parameter :: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4
 
-  integer :: debuglevel = 0 !amount of information to write out
+  integer(c_int), bind(C,name="debuglevel") :: debuglevel = 0 !amount of information to write out
   
-  character(:), allocatable :: output_dir
+  character(:), allocatable :: output_dir, image_input_dir
+  character(2048) :: scratch_dir = ""
+
+  integer(dbl) :: timer_rate
+  real(KND) :: time_steps_time = 0
+  real(KND) :: poisson_solver_time = 0
 
 ! #ifdef __HMPP
  integer :: GPU = 0   !If the GPU is allocated
