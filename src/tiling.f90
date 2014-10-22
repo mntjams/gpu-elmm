@@ -14,7 +14,9 @@ module Tiling
   contains
 
     subroutine InitTiles(Prnx,Prny,Prnz)
+#ifdef MPI
       use custom_mpi
+#endif
       integer,intent(in) :: Prnx,Prny,Prnz
       integer :: omp_threads = 1
       integer :: narrays
