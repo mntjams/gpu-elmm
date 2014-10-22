@@ -1,6 +1,5 @@
 module Boundaries
   use Parameters
-  use Wallmodels
 #ifdef MPI
   use exchange_mpi
 #endif
@@ -22,7 +21,12 @@ implicit none
     module procedure InDomain_3r
     module procedure InDomain_vec
   end interface
-! 
+ 
+  interface InGlobalDomain
+    module procedure InGlobalDomain_3r
+    module procedure InGlobalDomain_vec
+  end interface
+ 
   interface volumePr
     module procedure volumePr_arr
     module procedure volumePr_int
@@ -222,6 +226,19 @@ implicit none
   logical function InDomain_vec(r)
     real(knd),intent(in) :: r(3)
     InDomain_vec = InDomain_3r(r(1),r(2),r(3))
+  end function
+
+
+  logical function InGlobalDomain_3r(x,y,z) result(res)
+    real(knd),intent(in) :: x,y,z
+    res = (x>=gxmin.and.x<=gxmax) .and. &
+          (y>=gymin.and.y<=gymax) .and. &
+          (z>=gzmin.and.z<=gzmax)
+  end function
+
+  logical function InGlobalDomain_vec(r)
+    real(knd),intent(in) :: r(3)
+    InGlobalDomain_vec = InGlobalDomain_3r(r(1),r(2),r(3))
   end function
 
 
