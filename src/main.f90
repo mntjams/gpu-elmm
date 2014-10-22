@@ -5,6 +5,7 @@ program CLMM
   use TSteps, only: TMarchRK3, TSteps_Deallocate
   use Scalars, only: Scalars_Deallocate
   use Outputs, only: AllocateOutputs, OutTStep, Output
+  use Endianness, only: GetEndianness
 #ifdef MPI
   use custom_mpi
 #endif
@@ -23,7 +24,13 @@ program CLMM
 
   real(tim) :: dt = 0 !time_step
 
-  pi=2.0_knd*acos(0.0_knd)
+  integer   :: time_step
+
+  real(knd) :: time_step_time
+
+  integer(dbl) :: time_steps_timer_count_1, time_steps_timer_count_2
+
+  call GetEndianness
 
 #ifdef MPI
   call init_custom_mpi
@@ -46,23 +53,25 @@ program CLMM
   call InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
 
   time = start_time
-  step = 0
+  time_step = 0
 
   call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
 
-
+  call system_clock(count_rate = timer_rate)
 
   if (end_time > start_time) then
 
     if (master) write (*,*) "Computing..."
 
-    do step = 1, max_number_of_time_steps
+    do time_step = 1, max_number_of_time_steps
+
+      call system_clock(count = time_steps_timer_count_1)
 
       if (master) then
-        write (*,*) "-----------"
-        write (*,*)
-        write (*,*)
-        write (*,*) "tstep:",step
+!         write (*,*) "-----------"
+!         write (*,*)
+!         write (*,*)
+        write (*,*) "tstep:",time_step
       end if
 
 
@@ -79,6 +88,14 @@ program CLMM
       call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
 
 
+      call system_clock(count = time_steps_timer_count_2)
+      if (master) then
+        time_step_time = real(time_steps_timer_count_2 - time_steps_timer_count_1, knd) / &
+          real(timer_rate, knd)
+        time_steps_time = time_steps_time + time_step_time
+!         print *,"time step wall clock time", time_step_time
+      end if
+
       if ((steady==1) .and. (delta<eps)) then
         if (master) write (*,*) "Steady state reached."
         exit
@@ -89,7 +106,7 @@ program CLMM
         exit
       endif
 
-      if (step>=3 .and. dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/10._knd)) then
+      if (time_step>=3 .and. dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/10._knd)) then
         if (master) write (*,*) "Solution diverged."
         exit
       endif
@@ -97,6 +114,9 @@ program CLMM
     enddo
 
   endif
+
+  if (master) write(*,*) "Total wall clock time for time steps", time_steps_time
+  if (master) write(*,*) "Wall clock time for poisson solver", poisson_solver_time
 
 #ifdef __HMPP
   call GetDataFromGPU(.true.,.true.,.true.,.true.,enable_buoyancy,&
@@ -109,7 +129,7 @@ program CLMM
   if (master) write (*,*) "Saving results..."
 
 
-  call OUTPUT(U,V,W,Pr,Temperature,Moisture,Scalar)
+  call Output(U,V,W,Pr,Temperature,Moisture,Scalar)
 
 
   call DeallocateGlobals
