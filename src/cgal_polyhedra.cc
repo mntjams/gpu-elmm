@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <list>
 
 #include <CGAL/IO/Polyhedron_iostream.h>
 #include <CGAL/Simple_cartesian.h>
@@ -89,9 +90,41 @@ extern "C" {
     Segment seg(Point(query->x,query->y,query->z),
                 Point(outside_ref->x,outside_ref->y,outside_ref->z));
     
-    int n = ptree->tree->number_of_intersected_primitives(seg);
+    std::list<Object_and_primitive_id> intersections;
+ 
+    ptree->tree->all_intersections(seg, std::back_inserter(intersections));
+    
 
-    return n%2 == 1;
+    std::vector<Point> points;
+
+    int i = 0;
+    for (auto iter = intersections.begin(); iter != intersections.end(); ++iter){
+      i += 1;
+      // gets intersection object
+      Object_and_primitive_id op = *iter;
+      CGAL::Object object = op.first;
+      Point point;
+      if(CGAL::assign(point,object)) {
+        points.push_back(point);
+      }
+         
+    }
+
+    int n_dist = 0;
+    // find how many of the points are distinct
+    for (std::vector<Point>::size_type i = 0; i < points.size(); ++i){
+      bool distinct = true;
+
+      for (std::vector<Point>::size_type j = 0; j < i; ++j){
+        Vector v = points[i] - points[j];
+        distinct = ( v.squared_length() > 1e-10 ); 
+
+        if (!distinct)  break;
+      }
+      if (distinct) n_dist += 1;
+    }
+
+    return n_dist%2 == 1;
   }
   
   bool polyhedron_intersects_ray(const Polytree *ptree, const d3 *origin, const d3 *vec){
