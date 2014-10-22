@@ -127,100 +127,15 @@ contains
   
   
   subroutine InitPuffSources
-   use Boundaries, only: GridCoords
-   !!!FIXME: Should come up with reading from a configuration file.
-!    integer :: xi(3),yj(3),zk(3)
-!    if (.not.allocated(PuffSources)) then
-!       allocate(PuffSources(3))
-!       call GridCoords(xi(1),yj(1),zk(1), &
-!                  -361.9_knd,125.1_knd,0.1_knd)
-!       call GridCoords(xi(2),yj(2),zk(2), &
-!                  -64.4_knd,38.3_knd,0.1_knd)
-!       call GridCoords(xi(3),yj(3),zk(3), &
-!                  -0._knd,0._knd,0.1_knd)
-!       PuffSources(1) = PuffSource(start_time=0.,&
-!                                   end_time=10000.0,&
-!                                   period=900.,&
-!                                   duration=29.,&
-!                                   clear=.true., &
-!                                   sources=[ScalarFlVolumesContainer(1, &
-!                                             [ScalarFlVolume(xi(1),yj(1),zk(2),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(2, &
-!                                             [ScalarFlVolume(xi(2),yj(2),zk(3),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(3, &
-!                                             [ScalarFlVolume(xi(3),yj(3),zk(3),1./(dxmin*dymin*dzmin))]) &
-!                                           ] &
-!                                  )
-!       PuffSources(2) = PuffSource(300.,10000.0,900.,29,clear=.true., &
-!                                   sources=[ScalarFlVolumesContainer(4, &
-!                                             [ScalarFlVolume(xi(1),yj(1),zk(2),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(5, &
-!                                             [ScalarFlVolume(xi(2),yj(2),zk(3),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(6, &
-!                                             [ScalarFlVolume(xi(3),yj(3),zk(3),1./(dxmin*dymin*dzmin))]) &
-!                                           ] &
-!                                  )
-!       PuffSources(3) = PuffSource(600.,10000.0,900.,29,clear=.true., &
-!                                   sources=[ScalarFlVolumesContainer(7, &
-!                                             [ScalarFlVolume(xi(1),yj(1),zk(2),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(8, &
-!                                             [ScalarFlVolume(xi(2),yj(2),zk(3),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(9, &
-!                                             [ScalarFlVolume(xi(3),yj(3),zk(3),1./(dxmin*dymin*dzmin))]) &
-!                                           ] &
-!                                  )
-!     end if
-
-!    integer :: xi(4),yj(4),zk(4)
-!    if (.not.allocated(PuffSources)) then
-!       allocate(PuffSources(3))
-!       call GridCoords(xi(1),yj(1),zk(1), &
-!                  0.0_knd,0.0_knd,0.1_knd)
-!       call GridCoords(xi(2),yj(2),zk(2), &
-!                  64.4_knd,-38.3_knd,0.1_knd)
-!       call GridCoords(xi(3),yj(3),zk(3), &
-!                  117.8_knd,90.5_knd,0.1_knd)
-!       call GridCoords(xi(4),yj(4),zk(4), &
-!                  361.9_knd,-125.1_knd,0.1_knd)
-!       PuffSources(1) = PuffSource(start_time=0.,&
-!                                   end_time=10000.0,&
-!                                   period=900.,&
-!                                   duration=29.,&
-!                                   clear=.true., &
-!                                   sources=[ScalarFlVolumesContainer(1, &
-!                                             [ScalarFlVolume(xi(1),yj(1),zk(1),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(2, &
-!                                             [ScalarFlVolume(xi(2),yj(2),zk(2),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(3, &
-!                                             [ScalarFlVolume(xi(3),yj(3),zk(3),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(4, &
-!                                             [ScalarFlVolume(xi(4),yj(4),zk(4),1./(dxmin*dymin*dzmin))]) &
-!                                           ] &
-!                                  )
-!       PuffSources(2) = PuffSource(300.,10000.0,900.,29,clear=.true., &
-!                                   sources=[ScalarFlVolumesContainer(5, &
-!                                             [ScalarFlVolume(xi(1),yj(1),zk(1),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(6, &
-!                                             [ScalarFlVolume(xi(2),yj(2),zk(2),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(7, &
-!                                             [ScalarFlVolume(xi(3),yj(3),zk(3),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(8, &
-!                                             [ScalarFlVolume(xi(4),yj(4),zk(4),1./(dxmin*dymin*dzmin))]) &
-!                                           ] &
-!                                  )
-!       PuffSources(3) = PuffSource(600.,10000.0,900.,29,clear=.true., &
-!                                   sources=[ScalarFlVolumesContainer(9, &
-!                                             [ScalarFlVolume(xi(1),yj(1),zk(1),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(10, &
-!                                             [ScalarFlVolume(xi(2),yj(2),zk(2),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(11, &
-!                                             [ScalarFlVolume(xi(3),yj(3),zk(3),1./(dxmin*dymin*dzmin))]), &
-!                                            ScalarFlVolumesContainer(12, &
-!                                             [ScalarFlVolume(xi(4),yj(4),zk(4),1./(dxmin*dymin*dzmin))]) &
-!                                           ] &
-!                                  )
-!     end if
-
+   use Boundaries, only: GridCoords, InDomain
+#if CUSTOM_PUFF_SOURCES
+   interface
+     subroutine  CustomPuffSources
+     end subroutine
+   end interface
+   
+   call CustomPuffSources
+#endif
   end subroutine
 
 
