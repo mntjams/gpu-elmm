@@ -26,6 +26,7 @@
 #define zp WzpWMpoints 
 
 #endif
+
       !$omp do
       do i = 1, size(xm)
 #define p xm(i)
