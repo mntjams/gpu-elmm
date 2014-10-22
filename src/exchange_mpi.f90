@@ -1,9 +1,16 @@
 module exchange_mpi
-  use custom_mpi
+  use custom_mpi, only: mpi_comm, w_rank, e_rank, s_rank, n_rank, b_rank, t_rank, &
+                        nxims, nyims, nzims, mpi_knd, mpi_status_size, iim, jim, kim
   use Kinds
-
+  
   implicit none
   
+  private
+  
+  public exchange_mpi_boundaries, exchange_mpi_boundaries_yz, exchange_Pr, &
+         exchange_Q, exchange_Sc_x, exchange_Sc_y, exchange_Sc_z, &
+         exchange_U_x, exchange_U_y, exchange_U_z
+
   interface
     subroutine MPI_Recv(BUF, COUNT, DATATYPE, SOURCE, TAG, COMM, STATUS, IERROR)
       import
@@ -813,7 +820,7 @@ contains
     subroutine send(a,to)
       real(knd), intent(in) :: a(:,:)
       integer, intent(in) :: to
-
+      !Must be mpi_comm, for `to` and `from` derived from `x_rank` to be valid!
       call MPI_Send(a, size(a) , MPI_KND, to, tag, mpi_comm, ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
