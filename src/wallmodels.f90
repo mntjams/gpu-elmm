@@ -987,7 +987,7 @@ contains
 
     !under z0 the whole concept of rougness parameter breaks down
     !if in the laminar region for flat boundary layer also treat as flat and possibly laminar
-    if (dist<=z0 .or. dist_plus<yplcrit) then
+    if (dist<=z0*2_knd .or. dist_plus<yplcrit*1.5_knd) then
       if (Re>0) then
         call WMFlatUstar(ustar,vel,dist)
       else
@@ -1536,19 +1536,19 @@ contains
       yj = WMPoints(i)%yj
       zk = WMPoints(i)%zk
 
-      dist(:) = [WMPoints(i)%distx, WMPoints(i)%disty, WMPoints(i)%distz]
+      dist = [WMPoints(i)%distx, WMPoints(i)%disty, WMPoints(i)%distz]
 
-      if (all(dist==0))then
+      if (norm2(dist)<(dxmin*dymin*dzmin)**(1._knd/3)/20) then
         write(*,*) "ijk",xi,yj,zk
         write(*,*) "dist",dist
-        call error_stop("Error, WM point can not be exactly on the wall!")
+        call error_stop("Error, WM point cannot be exactly on the wall!")
       end if
 
       vel(1) = (U(xi,yj,zk)+U(xi-1,yj,zk))/2._knd
       vel(2) = (V(xi,yj,zk)+V(xi,yj-1,zk))/2._knd
       vel(3) = (W(xi,yj,zk)+W(xi,yj,zk-1))/2._knd
 
-      wallvel(:) = [WMPoints(i)%wallu, WMPoints(i)%wallv, WMPoints(i)%wallw]
+      wallvel = [WMPoints(i)%wallu, WMPoints(i)%wallv, WMPoints(i)%wallw]
 
 
       if (WMPoints(i)%z0>0) then
@@ -1664,16 +1664,15 @@ contains
 
           dist = [p%distx, p%disty, p%distz]
 
-          if (all(dist==0))then
+          if (norm2(dist)<(dxmin*dymin*dzmin)**(1._knd/3)/20) then
             write(*,*) "ijk",xi,yj,zk
             write(*,*) "dist",dist
-            call error_stop("Error, WM point can not be exactly on the wall!")
+            call error_stop("Error, WM point UVW cannot be exactly on the wall!")
           end if
 
           vel = local_velocity(U,V,W,component,xi,yj,zk)
 
           wallvel = [p%wallu, p%wallv, p%wallw]
-
 
           if (p%z0>0) then
 !TODO: The temperature flux is always 0 now in momentum points, so no stability effect here!
