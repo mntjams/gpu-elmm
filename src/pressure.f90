@@ -39,9 +39,9 @@ contains
     integer(DBL), save :: time1, time2, time3, time4
     integer(DBL), save :: timem1, timem2, timem3, timem4
 #ifdef MPI
-    correctcompatibility = 2
+    correctcompatibility = 0
 #else
-    correctcompatibility = 2
+    correctcompatibility = 0
 #endif
     if (called==0) then
       allocate(Phi(0:Prnx+1,0:Prny+1,0:Prnz+1))
@@ -303,6 +303,7 @@ contains
     real(knd),intent(in)    :: dt2,dt3
     real(knd) :: Phi_ref,Au,Av,Aw,dxmin2,dymin2,dzmin2,S,p
     integer   :: i,j,k
+    logical, parameter :: check_divergence = .false.
 
 
     Au = dt2/dxmin
@@ -343,17 +344,33 @@ contains
     end do
     !$omp end do nowait
 
-    !$omp do private(k,j,i)
-    do k=1,Prnz
-     do j=1,Prny
-      do i=1,Prnx
-        Pr(i,j,k)=Pr(i,j,k)+Phi(i,j,k)-dt3*(((Phi(i+1,j,k)-Phi(i,j,k))-(Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2+&
-                                            ((Phi(i,j+1,k)-Phi(i,j,k))-(Phi(i,j,k)-Phi(i,j-1,k)))/dymin2+&
-                                            ((Phi(i,j,k+1)-Phi(i,j,k))-(Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
+    if (explicit_diffusion) then
+      !$omp do private(k,j,i)
+      do k=1,Prnz
+       do j=1,Prny
+        do i=1,Prnx
+          Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k)
+        end do
+       end do
       end do
-     end do
-    end do
-    !$omp end do
+      !$omp end do
+    else
+      !$omp do private(k,j,i)
+      do k=1,Prnz
+       do j=1,Prny
+        do i=1,Prnx
+          Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k) - &
+                       dt3*(((Phi(i+1,j,k)-Phi(i,j,k)) - &
+                             (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
+                            ((Phi(i,j+1,k)-Phi(i,j,k)) - &
+                             (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
+                            ((Phi(i,j,k+1)-Phi(i,j,k)) - &
+                             (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
+        end do
+       end do
+      end do
+      !$omp end do
+    end if
 
 #ifdef MPI
     !images in top plane compute the reference pressure
@@ -391,44 +408,45 @@ contains
     call Bound_Pr(Pr)
 !     !$omp end sections
 
-    S = 0
-    if (allocated(Q)) then
-      !$omp parallel do private(i,j,k,p) reduction(+:S)
-      do k=1,Prnz            !divergence of U -> RHS
-       do j=1,Prny
-        do i=1,Prnx
-             p = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
-                         +(V(i,j,k)-V(i,j-1,k))/(dymin)&
-                         +(W(i,j,k)-W(i,j,k-1))/(dzmin)&
-                         -Q(i,j,k)
-             p = p / dt2
-             S = max(S,abs(p))
-        end do
-       end do
-      end do
-      !$omp end parallel do
-    else
-      !$omp parallel do private(i,j,k,p) reduction(+:S)
-      do k=1,Prnz            !divergence of U -> RHS
-       do j=1,Prny
-        do i=1,Prnx
-             p = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
-                         +(V(i,j,k)-V(i,j-1,k))/(dymin)&
-                         +(W(i,j,k)-W(i,j,k-1))/(dzmin)
-             p = p / dt2
-             S = max(S,abs(p))
-        end do
-       end do
-      end do
-      !$omp end parallel do
-    end if
-#ifdef MPI
-    S = mpi_co_max(S)
-#endif
-    
-    if (master) write(*,*) "max divergence:", S
 
-   end subroutine PostPoisson
+    if (check_divergence) then
+      S = 0
+      if (allocated(Q)) then
+        !$omp parallel do private(i,j,k,p) reduction(max:S)
+        do k=1,Prnz            !divergence of U -> RHS
+         do j=1,Prny
+          do i=1,Prnx
+               p = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
+                           +(V(i,j,k)-V(i,j-1,k))/(dymin)&
+                           +(W(i,j,k)-W(i,j,k-1))/(dzmin)&
+                           -Q(i,j,k)
+               S = max(S,abs(p))
+          end do
+         end do
+        end do
+        !$omp end parallel do
+      else
+        !$omp parallel do private(i,j,k,p) reduction(max:S)
+        do k=1,Prnz            !divergence of U -> RHS
+         do j=1,Prny
+          do i=1,Prnx
+               p = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
+                           +(V(i,j,k)-V(i,j-1,k))/(dymin)&
+                           +(W(i,j,k)-W(i,j,k-1))/(dzmin)
+               S = max(S,abs(p))
+          end do
+         end do
+        end do
+        !$omp end parallel do
+      end if
+#ifdef MPI
+      S = mpi_co_max(S)
+#endif
+      
+      if (master) write(*,*) "max divergence:", S
+    end if
+
+  end subroutine PostPoisson
 
 
 end module Pressure
