@@ -8,15 +8,16 @@ module PoissonSolvers
 contains
 
   subroutine Poiss_PoisFFT(Phi,RHS)
-    use poisfft
+#ifdef DPREC
+    use PoisFFT, PoisFFT_Solver => PoisFFT_Solver3D_DP
+#else
+    use PoisFFT, PoisFFT_Solver => PoisFFT_Solver3D_SP
+#endif
 #ifdef MPI
     use custom_mpi
 #endif
-#ifdef DPREC
-    type(PoisFFT_Solver3D_DP),save :: Solver
-#else
-    type(PoisFFT_Solver3D_SP),save :: Solver
-#endif
+
+    type(PoisFFT_Solver),save :: Solver
     real(knd),dimension(0:,0:,0:),intent(inout) :: Phi
     real(knd),dimension(0:,0:,0:),intent(in) :: RHS
     integer i
@@ -29,10 +30,16 @@ contains
 
     if (.not.called) then
 #ifdef MPI
-      call New(Solver,Prnx,Prny,Prnz,dxmin,dymin,dzmin,PoissonBtype, &
-               gPrns,offsets_to_global,poisfft_comm)
+      Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
+                               [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
+                               PoissonBtype, &
+                               PoisFFT_FiniteDifference2, &
+                               gPrns,offsets_to_global,poisfft_comm)
 #else
-      call New(Solver,Prnx,Prny,Prnz,dxmin,dymin,dzmin,PoissonBtype)
+      Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
+                               [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
+                               PoissonBtype, &
+                               PoisFFT_FiniteDifference2)
 #endif
       called = .true.
 #ifdef POIS_SOLVER_TIME
@@ -48,7 +55,10 @@ contains
 
 #ifdef POIS_SOLVER_TIME
     call system_clock(count=t2)
-    if (master) write(*,*) "solver cpu time", real(t2-t1)/real(trate)
+    if (master) then
+      poisson_solver_time = poisson_solver_time + real(t2-t1,knd)/real(trate,knd)
+      if (master) write(*,*) "solver cpu time", real(t2-t1)/real(trate)
+    end if
 #endif
 
   end subroutine
