@@ -2,7 +2,6 @@ module Scalars
  use Parameters
  use ArrayUtilities
  use Wallmodels
- use Limiters, only: Limiter, limparam
  use Boundaries
  use ScalarBoundaries
  use TILING, only: tilenx, tileny, tilenz
@@ -207,7 +206,7 @@ contains
         end do
         !$omp end parallel do
 
-        if (explicit_diffusion==1) call Scalar_Diffusion(Array_adv, Array)
+        if (explicit_diffusion) call Scalar_Diffusion(Array_adv, Array)
 
         call extra_procedure
 
@@ -215,7 +214,7 @@ contains
 
         call add(Array, Array2)
 
-        if (explicit_diffusion<=0) then
+        if (.not.explicit_diffusion) then
           call boundary_procedure(Array)
 
           call DiffScalar(Array2,Array, &
@@ -523,7 +522,7 @@ contains
 
     real(knd) pure function  FluxLimiter(r)
       real(knd),intent(in) :: r
-      FluxLimiter=max(0._knd,min(2._knd*r,min(limparam,(1+2._knd*r)/3._knd)))
+      FluxLimiter=max(0._knd,min(2._knd*r,min(2._knd,(1+2._knd*r)/3._knd)))
     end function
 
   endsubroutine KAPPASCALARUG
@@ -682,7 +681,7 @@ contains
 
     real(knd) pure function  FluxLimiter(r)
       real(knd),intent(in) :: r
-      FluxLimiter=max(0._knd,min(2._knd*r,min(limparam,(1+2._knd*r)/3._knd)))
+      FluxLimiter=max(0._knd,min(2._knd*r,min(2._knd,(1+2._knd*r)/3._knd)))
     end function
 
   endsubroutine KAPPASCALARGG
@@ -1046,14 +1045,16 @@ contains
 
 
 
-  subroutine AddScalarAdvVector(ScU,ScV,ScW,SCAL,U,V,W,weight) !Kappa scheme with flux limiter
+  subroutine AddScalarAdvVector(ScU,ScV,ScW,SCAL,U,V,W,weight,probes_flux,px,py,pz) !Kappa scheme with flux limiter
     real(knd),contiguous,intent(inout) :: ScU(:,:,:) !Hunsdorfer et al. 1995, JCP
     real(knd),contiguous,intent(inout) :: ScV(:,:,:)
     real(knd),contiguous,intent(inout) :: ScW(:,:,:)
     real(knd),contiguous,intent(in)    :: Scal(-1:,-1:,-1:)
     real(knd),contiguous,intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd),intent(in) :: weight
-    integer i,j,k
+    real(knd),intent(out) :: probes_flux(:,:) !component, position
+    integer,intent(in) :: px(:), py(:), pz(:)
+    integer i,j,k,probe
     real(knd) vel,SL,SR,FLUX
     real(knd),parameter ::eps = 1e-8
 
@@ -1097,6 +1098,19 @@ contains
      end do
     end do
     !$omp end do nowait
+
+    !$omp do
+    do probe = 1, size(px)
+        i = px(probe)
+        j = py(probe)
+        k = pz(probe)
+        if (U(i,j,k)>0) then
+          probes_flux(1,probe) = U(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i-1,j,k))*SLOPE(i,j,k)/2._knd)
+        else
+          probes_flux(1,probe) = U(i,j,k)*(SCAL(i+1,j,k)+(SCAL(i+1,j,k)-SCAL(i+2,j,k))*SLOPE(i,j,k)/2._knd)
+       end if
+    end do
+    !$omp end do nowait
     !$omp end parallel
 
     call set(SLOPE,0._knd)
@@ -1135,6 +1149,19 @@ contains
      end do
     end do
     !$omp end do nowait
+
+    !$omp do
+    do probe = 1, size(px)
+        i = px(probe)
+        j = py(probe)
+        k = pz(probe)
+        if (V(i,j,k)>0) then
+          probes_flux(2,probe) = V(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j-1,k))*SLOPE(i,j,k)/2._knd)
+        else
+          probes_flux(2,probe) = V(i,j,k)*(SCAL(i,j+1,k)+(SCAL(i,j+1,k)-SCAL(i,j+2,k))*SLOPE(i,j,k)/2._knd)
+       end if
+    end do
+    !$omp end do nowait
     !$omp end parallel
 
 
@@ -1159,38 +1186,53 @@ contains
     !$omp end do
 
     !$omp do
-      do k = 1,Wnz
-       do j = 1,Wny
-        do i = 1,Wnx
-         if (W(i,j,k)>0) then
-          ScW(i,j,k) = ScW(i,j,k) + &
-                     weight * W(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._knd)
-         else
-          ScW(i,j,k) = ScW(i,j,k) + &
-                     weight * W(i,j,k)*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._knd)
-         end if
-        end do
-       end do
+    do k = 1,Wnz
+     do j = 1,Wny
+      do i = 1,Wnx
+       if (W(i,j,k)>0) then
+        ScW(i,j,k) = ScW(i,j,k) + &
+                   weight * W(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._knd)
+       else
+        ScW(i,j,k) = ScW(i,j,k) + &
+                   weight * W(i,j,k)*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._knd)
+       end if
       end do
-      !$omp end do
+     end do
+    end do
+    !$omp end do
+
+    !$omp do
+    do probe = 1, size(px)
+        i = px(probe)
+        j = py(probe)
+        k = pz(probe)
+        if (W(i,j,k)>0) then
+          probes_flux(3,probe) = W(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._knd)
+        else
+          probes_flux(3,probe) = W(i,j,k)*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._knd)
+       end if
+    end do
+    !$omp end do nowait
     !$omp end parallel
 
   contains
 
     real(knd) pure function  FluxLimiter(r)
       real(knd),intent(in) :: r
-      FluxLimiter=max(0._knd,min(2._knd*r,min(limparam,(1+2._knd*r)/3._knd)))
+      FluxLimiter=max(0._knd,min(2._knd*r,min(2._knd,(1+2._knd*r)/3._knd)))
     end function
 
   endsubroutine AddScalarAdvVector
   
-  subroutine AddScalarDiffVector(ScU,ScV,ScW,SCAL,weight)
+  subroutine AddScalarDiffVector(ScU,ScV,ScW,SCAL,weight,probes_flux,px,py,pz)
     real(knd),contiguous,intent(inout) :: ScU(:,:,:)
     real(knd),contiguous,intent(inout) :: ScV(:,:,:)
     real(knd),contiguous,intent(inout) :: ScW(:,:,:)
     real(knd),contiguous,intent(in)    :: Scal(-1:,-1:,-1:)
     real(knd),intent(in) :: weight
-    integer i,j,k
+    real(knd),intent(out) :: probes_flux(:,:) !component, position
+    integer,intent(in) :: px(:), py(:), pz(:)
+    integer i,j,k,probe
 
     !$omp parallel private (i,j,k)
     !$omp do
@@ -1204,6 +1246,14 @@ contains
     end do
     !$omp end do nowait
     !$omp do
+    do probe = 1, size(px)
+        i = px(probe)
+        j = py(probe)
+        k = pz(probe)
+        probes_flux(1,probe) = probes_flux(1,probe) + (TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))/dxmin
+    end do
+    !$omp end do nowait
+    !$omp do
     do k = 1,Vnz
      do j = 1,Vny
       do i = 1,Vnx
@@ -1211,6 +1261,14 @@ contains
                    weight * (TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))/dymin
       end do
      end do
+    end do
+    !$omp end do nowait
+    !$omp do
+    do probe = 1, size(px)
+        i = px(probe)
+        j = py(probe)
+        k = pz(probe)
+        probes_flux(2,probe) = probes_flux(2,probe) + (TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))/dymin
     end do
     !$omp end do nowait
     !$omp do
@@ -1222,7 +1280,15 @@ contains
       end do
      end do
     end do
-    !$omp end do
+    !$omp end do nowait
+    !$omp do
+    do probe = 1, size(px)
+        i = px(probe)
+        j = py(probe)
+        k = pz(probe)
+        probes_flux(3,probe) = probes_flux(3,probe) + (TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))/dzmin
+    end do
+    !$omp end do nowait
     !$omp end parallel
   endsubroutine AddScalarDiffVector
   
