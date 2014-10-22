@@ -15,12 +15,12 @@
 
 ! Parallel version - October 2006
 
-! Changed to subroutines, cleaned tab characters, 
-! unified to lower case, new interface -  May 2014 (Vladimir Fuka)
-
 ! This version has been customised for parallel processing use,
 ! specifically with OpenMP.  Each thread uses its own pseudo-random 
 ! sequence. (Gib Bogle)
+
+! Changed to subroutines, cleaned tab characters, 
+! unified to lower case, new interface (Vladimir Fuka) -  May 2014
 !--------------------------------------------------------------------------
 
 module rng_par_zig
