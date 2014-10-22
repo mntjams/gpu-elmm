@@ -8,7 +8,8 @@ module SolidBodies
 
   private
 
-  public SolidBody, InitSolidBodies, SetCurrentSB, FindInsideCells, obstacles_file
+  public SolidBody, InitSolidBodies, SetCurrentSB, FindInsideCells, &
+         obstacles_file, roughness_file, displacement_file
 #ifdef CUSTOMSB
   public  AddSolidBody, SolidBodiesList
 #endif
@@ -30,7 +31,11 @@ module SolidBodies
 
   type(List) :: SolidBodiesList
 
-  character(80) :: obstacles_file = ''
+  character(1024) :: obstacles_file = ''
+  
+  character(1024) :: roughness_file = ''
+  
+  character(1024) :: displacement_file = ''
   
   interface AddSolidBody
     module procedure AddSolidBody_scalar
@@ -92,7 +97,7 @@ contains
         do k = 0,Prnz+1
          do j = 0,Prny+1
           do i = 0,Prnx+1
-             if (CurrentSB%Inside(xPr(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000)) &
+             if (CurrentSB%Inside(xPr(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20)) &
                       Prtype(i,j,k) = CurrentSB%numofbody
           enddo
          enddo
@@ -110,7 +115,7 @@ contains
         do k = 0,Unz+1
          do j = 0,Uny+1
           do i = 0,Unx+1
-             if (CurrentSB%Inside(xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
+             if (CurrentSB%Inside(xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20))&
                        Utype(i,j,k) = CurrentSB%numofbody
           enddo
          enddo
@@ -128,7 +133,7 @@ contains
         do k = 0,Vnz+1
          do j = 0,Vny+1
           do i = 0,Vnx+1
-             if (CurrentSB%Inside(xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
+             if (CurrentSB%Inside(xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20))&
                        Vtype(i,j,k) = CurrentSB%numofbody
           enddo
          enddo
@@ -144,7 +149,7 @@ contains
         do k = 0,Wnz+1
          do j = 0,Wny+1
           do i = 0,Wnx+1
-             if (CurrentSB%Inside(xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._knd/3)/1000))&
+             if (CurrentSB%Inside(xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._knd/3)/20))&
                        Wtype(i,j,k) = CurrentSB%numofbody
           enddo
          enddo
@@ -191,7 +196,7 @@ contains
     else if (suffix=='.off') then
       call ReadOff(filename)
     else if (suffix=='.xyz'.or.suffix=='.elv') then
-      call ReadTerrain(filename)
+        call ReadTerrain(filename)
     else
       write(*,*) "Unknown file format "//suffix
       call error_stop
@@ -229,12 +234,25 @@ contains
   
   
   subroutine ReadTerrain(filename)
-    use ElevationModels, only: uniform_DEM
-    character(*),intent(in) :: filename
+    use ElevationModels, only: uniform_map
+    character(*), intent(in) :: filename
+    logical :: ex
 
-    !assume z0 the same as for the lower boundary
-    !TODO: implement variating z0 from a similar file
-    call AddSolidBody(SolidBody(Terrain(uniform_DEM(filename), z0 = z0B)))
+    !assume z0 the same as for the lower boundary if not specified otherwise
+    
+    if (len_trim(roughness_file)>0) then
+      if (len_trim(displacement_file)>0) then
+        call AddSolidBody(SolidBody(Terrain(uniform_map(filename), &
+                                            uniform_map(trim(roughness_file), default = z0B), &
+                                            uniform_map(trim(displacement_file)))))
+      else
+        call AddSolidBody(SolidBody(Terrain(uniform_map(trim(filename)), &
+                                            uniform_map(trim(roughness_file), default = 0._knd))))
+      end if
+    else
+      call AddSolidBody(SolidBody(Terrain(uniform_map(filename), z0 = z0B)))
+    end if
+
   end subroutine ReadTerrain
 
   

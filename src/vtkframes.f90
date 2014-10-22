@@ -10,7 +10,7 @@ module VTKFrames
   
   private
   
-  public TFrameFlags, AddDomain, SaveVTKFrames, FinalizeVTKFrames, TFrameDomain, InitVTKFrames
+  public TFrameFlags, TFrameDomain, AddDomain, SaveVTKFrames, FinalizeVTKFrames, InitVTKFrames, SaveBuffers
 
   
   type TFrameFlags
@@ -45,7 +45,7 @@ module VTKFrames
     character(4)  :: suffix = ".vtk"
   contains
     procedure :: Fill => TFrameDomain_Fill
-    procedure :: Save => TFrameDomain_Save
+    procedure :: DoSave => TFrameDomain_DoSave
     procedure :: SetRest => TFrameDomain_SetRest
   end type TFrameDomain
   
@@ -65,7 +65,7 @@ module VTKFrames
   
 contains
 
-  impure elemental logical function InDomain(D) result(res)
+  elemental logical function InDomain(D) result(res)
     type(TFrameDomain), intent(in) :: D
     
     if (D%dimension==3) then
@@ -90,6 +90,8 @@ contains
       res = .false.
     end if
   end function
+  
+  
 
   subroutine InitVTKFrames
     integer :: i
@@ -102,6 +104,7 @@ contains
   
   end subroutine
 
+  
 
   subroutine add_element_fd(a,e)
     type(TFrameDomain),allocatable,intent(inout) :: a(:)
@@ -117,6 +120,8 @@ contains
       a(size(tmp)+1) = e
     end if
   end subroutine
+  
+  
     
   subroutine AddFrameDomain(D)
     type(TFrameDomain),intent(in) :: D
@@ -124,6 +129,8 @@ contains
     call add_element_fd(FrameDomains, D)
 
   end subroutine
+  
+  
 
   subroutine TFrameDomain_SetRest(D, num_of_scalars)
     use Boundaries, only: GridCoords
@@ -295,8 +302,8 @@ contains
 
     D%flags = frame_flags
 
-    D%unit = frame_unit + 1
-    frame_unit = D%unit
+    D%unit = frame_unit
+    frame_unit = frame_unit + 1
 
     D%dimension = dimension
     D%direction = direction
@@ -480,11 +487,11 @@ contains
        do j = minj,maxj
         do i = mini,maxi
           if (Prtype(i,j,k)<=0) then
-            D%vorticity(:,i,j,k) = real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin) &
+            D%vorticity(1,i,j,k) = real((W(i,j+1,k)-W(i,j-1,k)+W(i,j+1,k-1)-W(i,j-1,k-1))/(4*dxmin) &
                                      - (V(i,j,k+1)-V(i,j,k-1)+V(i,j-1,k+1)-V(i,j-1,k-1))/(4*dymin), real32)
-            D%vorticity(:,i,j,k) = real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin) &
+            D%vorticity(2,i,j,k) = real((U(i,j,k+1)-U(i,j,k-1)+U(i-1,j,k+1)-U(i-1,j,k-1))/(4*dxmin) &
                                      - (W(i+1,j,k)-W(i-1,j,k)+W(i+1,j,k-1)-W(i-1,j,k-1))/(4*dymin), real32)
-            D%vorticity(:,i,j,k) = real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin) &
+            D%vorticity(3,i,j,k) = real((V(i+1,j,k)-V(i-1,j,k)+V(i+1,j-1,k)-V(i-1,j-1,k))/(4*dxmin) &
                                      - (U(i,j+1,k)-U(i,j-1,k)+U(i-1,j+1,k)-U(i-1,j-1,k))/(4*dymin), real32)
           else
             D%vorticity(:,i,j,k) = 0
@@ -501,19 +508,21 @@ contains
     use iso_c_binding, only: c_f_pointer
     type(c_ptr),value :: Dptr
     type(TFrameDomain),pointer :: D
-    character(40) :: file_name
+    character(2512) :: file_name
     character(70) :: str
-    character(8) ::  scalname="scalar00"
+    character(8) ::  scalname
     integer :: mini, maxi, minj, maxj, mink, maxk
     integer :: unit
     integer :: sc
 
+    scalname = "scalar00"
+    file_name = ""
+    
     call c_f_pointer(Dptr, D)
 
     write(file_name,'(a,i0,a)') trim(D%base_name)//"-",D%frame_number,trim(D%suffix)
 
 !     write(*,*) "Saving VTK frame:",file_name,"   time:",time
-
 
     if (littleendian) then
       if (allocated(D%Pr))            D%Pr = SwapB(D%Pr)
@@ -642,54 +651,36 @@ contains
   end subroutine SaveBuffers
   
 
-  subroutine TFrameDomain_Save(D, time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+  subroutine TFrameDomain_DoSave(D)
     use iso_c_binding, only: c_loc, c_funloc
+    use stop_procedures, only: error_stop
     class(TFrameDomain),target,asynchronous,intent(inout) :: D
-    real(knd),intent(in) :: time
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), &
-                                       Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
-                                       Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
     integer err
 
-    associate(start   => D%frame_times%start,&
-              end     => D%frame_times%end,&
-              nframes => D%frame_times%nframes)
+    err = 1
+    
+    select type (Dnp => D)
+      type is (TFrameDomain)
+        call pthread_create_opaque(Dnp%threadptr, &
+                                   c_funloc(SaveBuffers), &
+                                   c_loc(Dnp), err)
+      class default
+        call error_stop("Error: wrog type of D in TFrameDomain_DoSave.")
+    end select
 
-      if ( (time >= start) .and. (time <= end + (end-start)/(nframes-1)) &
-        .and. (time >= start + (D%frame_number+1)*(end-start) / (nframes-1)) ) then
+    if (err==0) then
+      D%in_progress = .true.
+    else
+      write (*,*) "Error in creating frame thread. Will run again synchronously. Code:",err
+      select type (Dnp => D)
+        type is (TFrameDomain)
+          call SaveBuffers(c_loc(Dnp))
+        class default
+          call error_stop("Error: wrog type of D in TFrameDomain_DoSave.")
+      end select
+    end if
 
-        D%frame_number = D%frame_number + 1
-
-        if (.not.allocated(D%times)) allocate(D%times(D%frame_number:D%frame_number+100))
-
-        call Add(D%times,D%frame_number,time)
-
-        if (D%in_progress) call D%Wait
-
-        call D%Fill(U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
-
-        select type (Dnp => D)
-          type is (TFrameDomain)
-            call pthread_create_opaque(Dnp%threadptr, &
-                                       c_funloc(SaveBuffers), &
-                                       c_loc(Dnp), err)
-        end select
-
-        if (err==0) then
-          D%in_progress = .true.
-        else
-          write (*,*) "Error in creating frame thread. Will run again synchronously. Code:",err
-          select type (Dnp => D)
-            type is (TFrameDomain)
-              call SaveBuffers(c_loc(Dnp))
-          end select
-        end if
-
-      end if
-
-    end associate
-  end subroutine TFrameDomain_Save
+  end subroutine TFrameDomain_DoSave
 
 
   

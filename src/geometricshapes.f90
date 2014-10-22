@@ -125,7 +125,7 @@ module GeometricShapes
 
   type,extends(GeometricShape) :: Polyhedron
     type(c_ptr) :: cgalptr
-    integer     :: n_ref_points = 1
+    integer     :: n_ref_points = 2
     type(r3),allocatable    :: ref(:)
   contains
     procedure,private :: ReadOff => Polyhedron_ReadOff
@@ -189,6 +189,7 @@ module GeometricShapes
     procedure,private :: InsideEps => Terrain_Inside
     procedure,private,nopass,non_overridable :: GridCoords => Terrain_GridCoords
     procedure :: Closest => Terrain_Closest
+    procedure :: LocalPlane => Terrain_LocalPlane
   end type
   
   type,extends(GeometricShape) :: Translation
@@ -214,8 +215,8 @@ module GeometricShapes
   end type
    
   type,extends(GeometricShape) :: LinearTransform
-    class(GeometricShape),allocatable,private :: original
-    real(knd),private :: matrix(3,3), inv_matrix(3,3)
+    class(GeometricShape),allocatable :: original
+    real(knd) :: matrix(3,3), inv_matrix(3,3)
   contains
     procedure,private :: in_bbox => LinearTransform_in_bbox 
     procedure,private :: InsideEps => LinearTransform_Inside
@@ -324,7 +325,7 @@ contains
     if (present(eps)) then
       ins = self%InsideEps(x,y,z,eps)
     else
-      ins = self%InsideEps(x,y,z,epsilon(1._knd))
+      ins = self%InsideEps(x,y,z,10*epsilon(1._knd))
     end if
     
   end function
@@ -626,17 +627,9 @@ contains
     real(knd),intent(in) ::eps
 
     if (self%GL) then
-      if (self%a*x+self%b*y+self%c*z+self%d>=-eps) then
-       ins = .true.
-      else
-       ins = .false.
-      endif
+      ins = self%a*x+self%b*y+self%c*z+self%d >= -eps*sqrt(self%a**2+self%b**2+self%c**2)
     else
-      if (self%a*x+self%b*y+self%c*z+self%d<=eps) then
-       ins = .true.
-      else
-       ins = .false.
-      endif
+      ins = self%a*x+self%b*y+self%c*z+self%d <= eps*sqrt(self%a**2+self%b**2+self%c**2)
     endif
   end function
 
@@ -649,7 +642,7 @@ contains
     if (abs(self%a)>tiny(1._knd).or. &
         abs(self%b)>tiny(1._knd).or. &
         abs(self%c)>tiny(1._knd)) then
-      t = -(self%a*x+self%b*y+self%c*z+self%d)/(self%a**2+self%b**2+self%c**2)
+      t = -(self%a*x+self%b*y+self%c*z+self%d)/sqrt(self%a**2+self%b**2+self%c**2)
     else
       t = 0
     endif
@@ -969,7 +962,6 @@ contains
     
     do i = 1, self%n_ref_points
       call random_number(p)
-      p = 0.5
       associate(b=>self%bbox)
         self%ref(i) = r3(b%xmin+(b%xmax-b%xmin)*p(1), &
                          b%ymin+(b%ymax-b%ymin)*p(2), &
@@ -982,51 +974,98 @@ contains
     class(Polyhedron),intent(in) :: self
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in) :: eps
+    real(knd) :: xn, yn, zn
     integer :: i
-    logical :: tests(self%n_ref_points)
     
     !it is probably better to use one fixed reference point, 
     !because test segment aligned with probable walls could cause problems
 
     if (self%in_bbox(x,y,z,eps)) then
          
-      do i = 1, self%n_ref_points
-       
-        tests(i) = &
-            cgal_polyhedron_inside(self%cgalptr, &
-                                    x,y,z, &
-                                    x,y,self%ref(i)%z)
+      ins = &
+          cgal_polyhedron_inside(self%cgalptr, &
+                                  x,y,z, &
+                                  x,y,gzmax+(gzmax-gzmin)/10)
 
-        if (eps>0) then                            
-          if (.not.tests(i)) tests(i) = &
-              cgal_polyhedron_inside(self%cgalptr, &
-                                      x-eps,y,z, &
-                                      x,y,self%ref(i)%z)
-          if (.not.tests(i)) tests(i) = &
-              cgal_polyhedron_inside(self%cgalptr, &
-                                      x+eps,y,z, &
-                                      x,y,self%ref(i)%z)
-          if (.not.tests(i)) tests(i) = &
-              cgal_polyhedron_inside(self%cgalptr, &
-                                      x,y-eps,z, &
-                                      x,y,self%ref(i)%z)
-          if (.not.tests(i)) tests(i) = &
-              cgal_polyhedron_inside(self%cgalptr, &
-                                      x,y-eps,z, &
-                                      x,y,self%ref(i)%z)
-          if (.not.tests(i)) tests(i) = &
-              cgal_polyhedron_inside(self%cgalptr, &
-                                      x,y,z-eps, &
-                                      x,y,self%ref(i)%z)
-          if (.not.tests(i)) tests(i) = &
-              cgal_polyhedron_inside(self%cgalptr, &
-                                      x,y,z+eps, &
-                                      x,y,self%ref(i)%z)
+      if (eps>0) then                            
+        if (.not.ins) then
+          call self%Closest(xn, yn, zn, x, y, z)
+          ins = norm2([xn-x, yn-y, zn-z])<eps
         end if
-
-      end do
+        
+        if (.not.ins) ins = &
+            cgal_polyhedron_inside(self%cgalptr, &
+                                    x-eps,y,z, &
+                                    x,y,gzmax+(gzmax-gzmin)/10)
+        if (.not.ins) ins = &
+            cgal_polyhedron_inside(self%cgalptr, &
+                                    x+eps,y,z, &
+                                    x,y,gzmax+(gzmax-gzmin)/10)
+        if (.not.ins) ins = &
+            cgal_polyhedron_inside(self%cgalptr, &
+                                    x,y-eps,z, &
+                                    x,y,gzmax+(gzmax-gzmin)/10)
+        if (.not.ins) ins = &
+            cgal_polyhedron_inside(self%cgalptr, &
+                                    x,y-eps,z, &
+                                    x,y,gzmax+(gzmax-gzmin)/10)
+        if (.not.ins) ins = &
+            cgal_polyhedron_inside(self%cgalptr, &
+                                    x,y,z-eps, &
+                                    x,y,gzmax+(gzmax-gzmin)/10)
+        if (.not.ins) ins = &
+            cgal_polyhedron_inside(self%cgalptr, &
+                                    x,y,z+eps, &
+                                    x,y,gzmax+(gzmax-gzmin)/10)
+                 
+      end if
       
-      ins = any(tests)
+      if (ins) then
+        ins = .true.
+        return
+      end if
+          
+!       do i = 1, self%n_ref_points
+!        
+!         ins = &
+!             cgal_polyhedron_inside(self%cgalptr, &
+!                                     x,y,z, &
+!                                     self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+! 
+!         if (eps>0) then
+!             
+!           if (.not.ins) ins = &
+!               cgal_polyhedron_inside(self%cgalptr, &
+!                                       x-eps,y,z, &
+!                                       self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+! !           if (.not.ins) ins = &
+! !               cgal_polyhedron_inside(self%cgalptr, &
+! !                                       x+eps,y,z, &
+! !                                       self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+! !           if (.not.ins) ins = &
+! !               cgal_polyhedron_inside(self%cgalptr, &
+! !                                       x,y-eps,z, &
+! !                                       self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+! !           if (.not.ins) ins = &
+! !               cgal_polyhedron_inside(self%cgalptr, &
+! !                                       x,y-eps,z, &
+! !                                       self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+! !           if (.not.ins) ins = &
+! !               cgal_polyhedron_inside(self%cgalptr, &
+! !                                       x,y,z-eps, &
+! !                                       self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+! !           if (.not.ins) ins = &
+! !               cgal_polyhedron_inside(self%cgalptr, &
+! !                                       x,y,z+eps, &
+! !                                       self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
+! !                                       
+!         end if
+!         
+!         if (ins) return
+! 
+!       end do
+      
+      ins = .false.
       
     else
       ins = .false.
@@ -1472,26 +1511,107 @@ contains
      comp = 3
     endif
   end subroutine Terrain_GridCoords
+  
+  
+  pure function Terrain_LocalPlane(self, xi, yj, comp) result(res)
+    type(Plane) :: res
+    class(Terrain), intent(in) :: self
+    integer, intent(in) :: xi, yj, comp
+    real(knd) :: a, b, zloc
+    
+    if (comp==1) then  !Construct a tangent plane using first diferences
 
+      zloc = self%UPoints(xi,yj)%elev
+      
+      if (xi<=0) then
+        a = (self%PrPoints(1,yj)%elev - self%PrPoints(0,yj)%elev) / dxmin
+      else if (xi>=Prnx+1) then
+        a = (self%PrPoints(Prnx+1,yj)%elev - self%PrPoints(Prnx,yj)%elev) / dxmin
+      else
+        a = (self%PrPoints(xi+1,yj)%elev - self%PrPoints(xi,yj)%elev) / dxmin
+      end if
+      
+      if (yj<=0) then
+        b = (self%UPoints(xi,1)%elev - self%UPoints(xi,0)%elev) / dymin
+      else if (yj>=Uny+1) then
+        b = (self%UPoints(xi,Uny+1)%elev - self%UPoints(xi,Uny)%elev) / dymin
+      else
+        b = (self%UPoints(xi,yj+1)%elev - self%UPoints(xi,yj-1)%elev) / (2*dymin)
+      end if
+
+      res%a = a
+      res%b = b
+      res%c = -1._knd
+      res%d = - a*xU(xi) - b*yPr(yj) + zloc
+
+    elseif (comp==2) then
+
+      zloc = self%VPoints(xi,yj)%elev
+      
+      if (xi<=0) then
+        a = (self%VPoints(1,yj)%elev - self%VPoints(0,yj)%elev) / dxmin
+      else if (xi>=Vnx+1) then
+        a = (self%VPoints(Vnx+1,yj)%elev - self%VPoints(Vnx,yj)%elev) / dxmin
+      else
+        a = (self%VPoints(xi+1,yj)%elev - self%VPoints(xi-1,yj)%elev) / (2*dxmin)
+      end if
+      
+      if (yj<=0) then
+        b = (self%PrPoints(xi,1)%elev - self%PrPoints(xi,0)%elev) / dymin
+      else if (yj>=Prny+1) then
+        b = (self%PrPoints(xi,Prny+1)%elev - self%PrPoints(xi,Prny)%elev) / dymin
+      else
+        b = (self%PrPoints(xi,yj+1)%elev - self%PrPoints(xi,yj)%elev) / dymin
+      end if
+
+      res%a = a
+      res%b = b
+      res%c = -1._knd
+      res%d = - a*xPr(xi) - b*yV(yj) + zloc
+
+    elseif (comp==3) then
+
+      zloc = self%PrPoints(xi,yj)%elev
+      
+      if (xi<=0) then
+        a = (self%UPoints(1,yj)%elev - self%UPoints(0,yj)%elev) / dxmin
+      else if (xi>=Unx+1) then
+        a = (self%UPoints(Unx+1,yj)%elev - self%UPoints(Unx,yj)%elev) / dxmin
+      else
+        a = (self%UPoints(xi,yj)%elev - self%UPoints(xi-1,yj)%elev) / dxmin
+      end if
+      
+      
+      if (yj<=0) then
+        b = (self%VPoints(xi,1)%elev - self%VPoints(xi,0)%elev) / dymin
+      else if (yj>=Vny+1) then
+        b = (self%VPoints(xi,Vny+1)%elev - self%VPoints(xi,Vny)%elev) / dymin
+      else
+        b = (self%VPoints(xi,yj)%elev - self%VPoints(xi,yj-1)%elev) / dymin
+      end if
+
+      res%a = a
+      res%b = b
+      res%c = -1._knd
+      res%d = - a*xPr(xi) - b*yPr(yj) + zloc
+
+    endif
+
+    res%gl = .true.
+  end function Terrain_LocalPlane
+  
   logical function Terrain_Inside(self,x,y,z,eps)
     class(Terrain),intent(in) :: self
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in) :: eps
-    logical ins
-    integer xi,yj,comp
-
-    ins = .false.
+    integer :: xi, yj, comp
+    type(Plane) :: Pl
+    
     call self%GridCoords(x,y,xi,yj,comp)
 
-    if (comp==1) then
-     if (z<=self%UPoints(xi,yj)%elev+eps) ins = .true.
-    elseif (comp==2) then
-     if (z<=self%VPoints(xi,yj)%elev+eps) ins = .true.
-    elseif (comp==3) then
-     if (z<=self%PrPoints(xi,yj)%elev+eps) ins = .true.
-    endif
-
-    Terrain_Inside = ins
+    Pl = self%LocalPlane(xi,yj,comp)
+    
+    Terrain_Inside = Pl%Inside(x, y, z, eps)
   end function
 
   subroutine Terrain_Closest(self,xnear,ynear,znear,x,y,z)
@@ -1500,53 +1620,17 @@ contains
     real(knd),intent(in) :: x,y,z
     type(Plane) :: Pl
     integer     :: xi,yj,comp
-    real(knd)   :: a,b,zloc
+
     xnear = x
     ynear = y
     znear = z
 
-    call Terrain_GridCoords(x,y,xi,yj,comp)
+    call self%GridCoords(x,y,xi,yj,comp)
 
-    if (comp==1) then  !Construct a tangent plane using first derivatives
-
-     zloc = self%UPoints(xi,yj)%elev
-     a = (self%PrPoints(xi+1,yj)%elev - self%PrPoints(xi,yj)%elev) / dxU(xi)
-     b = (self%UPoints(xi,yj+1)%elev - self%UPoints(xi,yj-1)%elev) / (yPr(yj+1)-yPr(yj-1))
-
-     Pl%a = a
-     Pl%b = b
-     Pl%c = -1._knd
-     Pl%d = - a*xU(xi) - b*yPr(yj) + zloc
-
-     call Pl%Closest(xnear,ynear,znear,x,y,z)
-
-    elseif (comp==2) then
-
-     zloc = self%VPoints(xi,yj)%elev
-     a = (self%VPoints(xi+1,yj)%elev - self%VPoints(xi-1,yj)%elev) / (xPr(xi+1)-xPr(xi-1))
-     b = (self%PrPoints(xi,yj+1)%elev - self%PrPoints(xi,yj)%elev) / dyV(yj)
-
-     Pl%a = a
-     Pl%b = b
-     Pl%c = -1._knd
-     Pl%d = - a*xPr(xi) - b*yV(yj) + zloc
-
-     call Pl%Closest(xnear,ynear,znear,x,y,z)
-
-    elseif (comp==3) then
-
-     zloc = self%PrPoints(xi,yj)%elev
-     a = (self%UPoints(xi,yj)%elev - self%UPoints(xi-1,yj)%elev) / dxPr(xi)
-     b = (self%VPoints(xi,yj)%elev - self%VPoints(xi,yj-1)%elev) / dyPr(yj)
-
-     Pl%a = a
-     Pl%b = b
-     Pl%c = -1._knd
-     Pl%d = - a*xPr(xi) - b*yPr(yj) + zloc
-
-     call Pl%Closest(xnear,ynear,znear,x,y,z)
-
-    endif
+    Pl = self%LocalPlane(xi,yj,comp)
+    
+    call Pl%Closest(xnear,ynear,znear,x,y,z)
+    
   end subroutine Terrain_Closest
   
   
@@ -1614,21 +1698,25 @@ contains
                         maxval(res%UPoints%elev), &
                         maxval(res%VPoints%elev))
     
-  end function
+  end function Terrain_Init_function
 
 
 
   
-  function Terrain_Init_uniform_DEM(xyz, z0) result(res)
-    use ElevationModels, only: uniform_DEM
+  function Terrain_Init_uniform_DEM(elevation, z0_map, displacement_map, z0) result(res)
+    use ElevationModels, only: map
     type(Terrain) :: res
-    class(uniform_DEM), intent(in) :: xyz
+    class(map), intent(in) :: elevation
+    class(map), optional, intent(in) :: z0_map
+    class(map), optional, intent(in) :: displacement_map
     real(knd), optional, intent(in) :: z0
     real(knd) :: z0_l
     logical :: rough
     integer :: i,j
     
-    if (present(z0)) then
+    if (present(z0_map)) then
+      rough = .true.
+    else if (present(z0)) then
       z0_l = z0
       rough = .true.
     else
@@ -1647,25 +1735,55 @@ contains
     
     do j = 0, Prny+1
       do i = 0, Prnx+1
-        res%PrPoints(i,j)%elev = xyz%elevation(xPr(i), yPr(j))
-        res%PrPoints(i,j)%rough = .true.
-        res%PrPoints(i,j)%z0 = z0_l
+        res%PrPoints(i,j)%elev = elevation%value(xPr(i), yPr(j))
+        
+        if (present(displacement_map)) &
+          res%PrPoints(i,j)%elev = res%PrPoints(i,j)%elev + &
+                                     displacement_map%value(xPr(i), yPr(j))
+        
+        res%PrPoints(i,j)%rough = rough
+
+        if (present(z0_map)) then
+          res%PrPoints(i,j)%z0 = z0_map%value(xPr(i), yPr(j))
+        else
+          res%PrPoints(i,j)%z0 = z0_l
+        end if
       end do
     end do
     
     do j = 0, Uny+1
       do i = 0, Unx+1
-        res%UPoints(i,j)%elev = xyz%elevation(xU(i), yPr(j))
+        res%UPoints(i,j)%elev = elevation%value(xU(i), yPr(j))
+        
+        if (present(displacement_map)) &
+          res%UPoints(i,j)%elev = res%UPoints(i,j)%elev + &
+                                     displacement_map%value(xU(i), yPr(j))
+                                     
         res%UPoints(i,j)%rough = rough
-        res%UPoints(i,j)%z0 = z0_l
+
+        if (present(z0_map)) then
+          res%UPoints(i,j)%z0 = z0_map%value(xU(i), yPr(j))
+        else
+          res%UPoints(i,j)%z0 = z0_l
+        end if
       end do
     end do
     
     do j = 0, Vny+1
       do i = 0, Vnx+1
-        res%VPoints(i,j)%elev = xyz%elevation(xPr(i), yV(j))
+        res%VPoints(i,j)%elev = elevation%value(xPr(i), yV(j))
+        
+        if (present(displacement_map)) &
+          res%VPoints(i,j)%elev = res%VPoints(i,j)%elev + &
+                                     displacement_map%value(xPr(i), yV(j))
+                                     
         res%VPoints(i,j)%rough = rough
-        res%VPoints(i,j)%z0 = z0_l
+
+        if (present(z0_map)) then
+          res%VPoints(i,j)%z0 = z0_map%value(xPr(i), yV(j))
+        else
+          res%VPoints(i,j)%z0 = z0_l
+        end if
       end do
     end do
     
@@ -1678,7 +1796,8 @@ contains
                         maxval(res%UPoints%elev), &
                         maxval(res%VPoints%elev))
                         
-  end function
+  end function Terrain_Init_uniform_DEM
+
 
 
 
@@ -2701,20 +2820,25 @@ contains
 
   real(knd) function ClosestOnLineOut(self,x,y,z,x2,y2,z2) result(t)
   !Find t, such that x+(x2-x)*t lies on the boundary of the SB
+  ! x lies inside SB
     class(Body),intent(in) :: self
     real(knd),intent(in) :: x,y,z,x2,y2,z2
-
     real(knd) t1,t2
     integer i
-
+    
+real(knd) b(3)
+if (debuglevel>0) then
+  call self%Closest(b(1),b(2),b(3),x2,y2,z2)
+  print *,"near",b
+end if
     t1 = 0
     t2 = 1
     !First, find a point lying outside. We should have the right direction.
-    if (self%Inside(x2,y2,z2)) then
+    if (self%Inside(x2,y2,z2,0._knd)) then
      t1 = 1
      do
       t2 = t2*1.1_knd
-      if (.not. self%Inside(x+(x2-x)*t2,y+(y2-y)*t2,z+(z2-z)*t2)) exit
+      if (.not. self%Inside(x+(x2-x)*t2,y+(y2-y)*t2,z+(z2-z)*t2,0._knd)) exit
       if (t2>=2) then
         t = 10
         return
@@ -2723,18 +2847,20 @@ contains
     endif
     
     t = (t1+t2)/2._knd
-
+if (debuglevel>0) print *,"*",t
     do i = 1,20         !The bisection method with maximum 20 iterations (should be well enough)
-     if (self%Inside(x+(x2-x)*t,y+(y2-y)*t,z+(z2-z)*t)) then
+     if (self%Inside(x+(x2-x)*t,y+(y2-y)*t,z+(z2-z)*t,0._knd)) then
       t1 = t
      else
       t2 = t
      endif
      t = (t1+t2)/2._knd
+if (debuglevel>0) print *,"**",t
      if (abs(t1-t2)<MIN(dxmin/1000._knd,dymin/1000._knd,dzmin/1000._knd))   exit
     enddo
-
+if (debuglevel>0) print *,"ins",self%Inside(x+(x2-x)*t*0.9,y+(y2-y)*t*0.9,z+(z2-z)*t*0.9,0._knd)
   end function ClosestOnLineOut
+  
 
   function OutwardNormal(self,x,y,z) result(res)
     real(knd) :: res(3)

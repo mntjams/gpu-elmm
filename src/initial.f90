@@ -15,7 +15,7 @@ module Initial
   use TURBINLET, only: GetTurbulentInlet, GetInletFromFile, TLag, Lturby, Lturbz, Ustar_inlet, relative_stress, &
                Ustar_surf_inlet, stress_gradient_inlet, U_ref_inlet, z_ref_inlet, z0_inlet, power_exponent_inlet
   use SolarRadiation, only: InitSolarRadiation
-  use SolidBodies, only: obstacles_file, InitSolidBodies
+  use SolidBodies, only: obstacles_file, roughness_file, displacement_file, InitSolidBodies
   use ImmersedBoundary, only: GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
   use VolumeSources!, only: InitVolumeSources, InitVolumeSourceBodies, ScalarFlVolume, ScalarFlVolumesContainer
   use LineSources, only: InitLineSources
@@ -68,6 +68,8 @@ contains
    integer :: dimension,direction
    real(knd) :: position
 
+   namelist /obstacles/ obstacles_file, roughness_file, displacement_file
+
    interface get
      procedure chget1
      procedure lget1, lget2, lget3
@@ -76,19 +78,30 @@ contains
      procedure rgetv3
    end interface
 
+   interface
+     subroutine CustomConfiguration
+     end subroutine
+   end interface
+
+   image_input_dir = "input/"
    output_dir = "output/"
 
    call newunit(unit)
   
-   !the command line arguments can also be specified in cmd.conf
+   !try read scratch_dir from environment, command line has priority
+   call get_scratch
+
+!    the command line arguments can also be specified in cmd.conf
    call read_cmd_conf
 
    call parse_command_line
 
+
    !the actual command line has priority over cmd.conf
    call read_command_line
-
+   !NOTE: it is parsed one more time lower in this subroutine
    call parse_command_line
+
 
    open(unit,file="main.conf",status="old",action="read")
    call get(CFL)
@@ -149,7 +162,7 @@ contains
    read(unit,*) x0
    if (master) write(*,*) "x0=",x0
    call get(y0)
-   write(*,*) "y0=",y0
+   if (master)write(*,*) "y0=",y0
    call get(z0)
    if (master) write(*,*) "z0=",z0
    read(unit,fmt='(/)')
@@ -575,8 +588,12 @@ contains
 
    open(unit,file="obstacles.conf",status="old",action="read",iostat = io)
    if (io==0) then
-     read(unit,fmt='(/)')
-     read(unit,'(a)') obstacles_file
+     read(unit,nml=obstacles,iostat=io,iomsg=msg)
+     if (io/=0) then
+       if (master) write(*,*) io,"Error reading from obstacles.conf."
+       if (master) write(*,*) msg
+       if (master) write(*,*) command_line
+     end if
      close(unit)
    end if
 
@@ -586,7 +603,7 @@ contains
 
    call parse_command_line
 
-   if (CFL<=0)  CFL = 0.5
+   if (CFL<=0)  CFL = 0.9
 
    if (master) then
 
@@ -722,7 +739,7 @@ contains
    if (Btype(We)==INLETFROMFILE) inlettype = FromFileInletType
 
 
-   if ((timeavg1>=0).and.(timeavg2>=timeavg1)) then
+   if (timeavg2>=timeavg1) then
      averaging = 1
    else
      averaging = 0
@@ -751,6 +768,13 @@ contains
    gymax = y0 + ly
    gzmin = z0
    gzmax = z0 + lz
+
+
+   if (len_trim(scratch_dir)>0) then
+     if (scratch_dir(len_trim(scratch_dir):len_trim(scratch_dir))/="/") &
+       scratch_dir = trim(scratch_dir) // "/"
+     output_dir = trim(scratch_dir) // output_dir
+   end if
 
 
 #ifdef MPI
@@ -793,6 +817,10 @@ contains
    else
                           Wnz = Prnz-1
    end if
+
+#ifdef CUSTOM_CONFIG
+   call CustomConfiguration
+#endif
 
    if (master) write(*,*) "set"
    
@@ -906,7 +934,7 @@ contains
 #ifdef MPI
                        npxyz, &
 #endif
-                       obstacles_file, probes_file, scalar_probes_file
+                       obstacles_file, probes_file, scalar_probes_file, scratch_dir
 
        if (len_trim(command_line)>0) then
          msg = ''
@@ -1053,89 +1081,235 @@ contains
  end subroutine ReadConfiguration
 
 
- subroutine ReadIC(U,V,W,Pr,Temperature)
-   real(knd),intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-   real(knd),intent(inout) :: Pr(1:,1:,1:)
-   real(knd),intent(inout) :: Temperature(-1:,-1:,-1:)
-   integer i,j,k,unit
+  subroutine ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
+    use Endianness
+#ifdef MPI
+    use exchange_mpi
+#endif
+    real(knd), intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd), intent(inout) :: Pr(1:,1:,1:)
+    real(knd), intent(inout) :: Temperature(-1:,-1:,-1:)
+    real(knd), intent(inout) :: Moisture(-1:,-1:,-1:)
+    real(knd), intent(inout) :: Scalar(-1:,-1:,-1:,:)
+    real(real32), allocatable :: buffer(:,:,:), UVWbuffer(:,:,:,:)
+    integer :: i, unit, stat, file_stat
+    logical :: exU(3)
+    character(2) :: scalnum
 
-   call newunit(unit)
+    allocate(buffer(Prnx,Prny,Prnz))
 
-   open(unit,file="in.vtk",position="rewind",status="old",action="read")
-   do i = 1,14
-    read(unit,*)
-   end do
-   do k = 1,Prnz
-    do j = 1,Prny
-     do i = 1,Prnx
-      read(unit,*) Pr(i,j,k)
-     end do
+    open(newunit=unit,file=image_input_dir//"in.vtk",access="stream",status="old",action="read",iostat=file_stat)
+
+    if (file_stat/=0) call error_stop("Error opening "//image_input_dir//"in.vtk")
+
+    call skip_to("SCALARS p float",stat)
+    if (stat/=0) then
+      Pr = 0
+      rewind(unit)
+    else
+      call skip_line
+      call skip_line
+      read(unit) buffer
+      Pr(1:Prnx,1:Prny,1:Prnz) =  real(BigEnd(buffer),knd)
+    end if
+
+    if (enable_buoyancy) then
+      call skip_to("SCALARS temperature float",stat)
+      if (stat/=0) then
+        call error_stop("No temperature field found in the initial conditions file " // &
+                        image_input_dir // "in.vtk")
+      else
+        call skip_line
+        call skip_line
+        read(unit) buffer
+        Temperature(1:Prnx,1:Prny,1:Prnz) =  real(BigEnd(buffer),knd)
+      end if
+    end if
+
+    if (enable_moisture) then
+      call skip_to("SCALARS moisture float",stat)
+      if (stat/=0) then
+        call error_stop("No moisture field found in the initial conditions file " // &
+                        image_input_dir // "in.vtk")
+      else
+        call skip_line
+        call skip_line
+        read(unit) buffer
+        Moisture(1:Prnx,1:Prny,1:Prnz) =  real(BigEnd(buffer),knd)
+      end if
+    end if
+
+    close(unit)
+
+
+
+    open(newunit=unit,file=image_input_dir//"scalars_in.vtk",access="stream",status="old",action="read",iostat=file_stat)
+
+    if (file_stat/=0) call error_stop("Error opening "//image_input_dir//"scalars_in.vtk")
+
+    do i = 1,num_of_scalars
+      write(scalnum,"(I2.2)") i
+      call skip_to("SCALARS scalar"//scalnum//" float",stat)
+      call skip_line
+      if (stat/=0) then
+        call error_stop("scalar"//scalnum//" field not found in the initial conditions file " // &
+                        image_input_dir // "in.vtk")
+      else
+        call skip_line
+        read(unit) buffer
+        Scalar(1:Prnx,1:Prny,1:Prnz,i) =  real(BigEnd(buffer),knd)
+      end if
     end do
-   end do
-   if (enable_buoyancy) then
-    do i = 1,3
-     read(unit,*)
-    end do
-    do k = 1,Prnz
-     do j = 1,Prny
-      do i = 1,Prnx
-       read(unit,*) temperature(i,j,k)
+
+    close(unit)
+
+
+    deallocate(buffer)
+
+
+    inquire(file=image_input_dir//"Uin.vtk", exist=exU(1))
+    inquire(file=image_input_dir//"Vin.vtk", exist=exU(2))
+    inquire(file=image_input_dir//"Win.vtk", exist=exU(3))
+    
+    if (all(exU)) then
+    
+      open(newunit=unit,file=image_input_dir//"Uin.vtk",access="stream",status="old",action="read")
+      call skip_to("SCALARS U float",stat)
+      call skip_line
+      call skip_line
+      allocate(buffer(1:Unx, 1:Uny, 1:Unz))
+      read(unit) buffer
+      U(1:Unx, 1:Uny, 1:Unz) = real(BigEnd(buffer), knd)
+      deallocate(buffer)
+      close(unit)
+
+      open(newunit=unit,file=image_input_dir//"Vin.vtk",access="stream",status="old",action="read")
+      call skip_to("SCALARS V float",stat)
+      call skip_line
+      call skip_line
+      allocate(buffer(1:Vnx, 1:Vny, 1:Vnz))
+      read(unit) buffer
+      V(1:Vnx, 1:Vny, 1:Vnz) = real(BigEnd(buffer), knd)
+      deallocate(buffer)
+      close(unit)
+
+      open(newunit=unit,file=image_input_dir//"Win.vtk",access="stream",status="old",action="read")
+      call skip_to("SCALARS W float",stat)
+      call skip_line
+      call skip_line
+      allocate(buffer(1:Wnx, 1:Wny, 1:Wnz))
+      read(unit) buffer
+      W(1:Wnx, 1:Wny, 1:Wnz) = real(BigEnd(buffer), knd)
+      deallocate(buffer)
+      close(unit)
+      
+    else
+    
+      open(newunit=unit,file=image_input_dir//"in.vtk",access="stream",status="old",action="read")
+      call skip_to("VECTORS u float",stat)
+      call skip_line
+      allocate(UVWbuffer(3, 1:Prnx, 1:Prny, 1:Prnz))
+      read(unit) UVWbuffer
+      UVWbuffer = BigEnd(UVWbuffer)
+      close(unit)
+      
+      U = 0
+      U(1:Prnx,1:Prny,1:Prnz) = real(UVWbuffer(1,1:Prnx,1:Prny,1:Prnz),knd)
+      U(0:Prnx-1,1:Prny,1:Prnz) = U(0:Prnx-1,1:Prny,1:Prnz) + U(1:Prnx,1:Prny,1:Prnz)
+    
+      V = 0
+      V(1:Prnx,1:Prny,1:Prnz) = real(UVWbuffer(2,1:Prnx,1:Prny,1:Prnz),knd)
+      V(1:Prnx,0:Prny-1,1:Prnz) = V(1:Prnx,0:Prny-1,1:Prnz) + V(1:Prnx,1:Prny,1:Prnz)
+    
+      W = 0
+      W(1:Prnx,1:Prny,1:Prnz) = real(UVWbuffer(3,1:Prnx,1:Prny,1:Prnz),knd)
+      W(0:Prnx-1,1:Prny,1:Prnz) = W(0:Prnx-1,1:Prny,1:Prnz) + W(1:Prnx,1:Prny,1:Prnz)
+
+#ifdef MPI
+      call exchange_U_x(U, Unx, Uny, Unz)
+      call exchange_U_y(V, Vnx, Vny, Vnz)
+      call exchange_U_z(W, Wnx, Wny, Wnz)
+#endif
+      if (Btype(Ea)>=MPI_BOUNDS.or.Btype(Ea)==PERIODIC) U(Prnx,1:Prny,1:Prnz) = U(Prnx,1:Prny,1:Prnz) + U(0,1:Prny,1:Prnz)
+      if (Btype(No)>=MPI_BOUNDS.or.Btype(No)==PERIODIC) V(1:Prnx,Prny,1:Prnz) = V(1:Prnx,Prny,1:Prnz) + V(1:Prnx,0,1:Prnz)
+      if (Btype(To)>=MPI_BOUNDS.or.Btype(To)==PERIODIC) W(1:Prnx,1:Prny,Prnz) = W(1:Prnx,1:Prny,Prnz) + W(1:Prnx,1:Prny,0)
+
+      U = U / 2
+      V = V / 2
+      W = W / 2
+    
+    end if
+
+
+  contains
+
+    subroutine skip_line
+      character :: ch
+      do
+        read(unit) ch
+        if (ch==new_line("a")) return
       end do
-     end do
-    end do
-   end if
-   close(unit)
+    end subroutine
 
-   open(unit,file="Uin.vtk",position="rewind",status="old",action="read")
-   do i = 1,14
-    read(unit,*)
-   end do
-   do k = 1,Unz
-    do j = 1,Uny
-     do i = 1,Unx
-      read(unit,*) U(i,j,k)
-     end do
-    end do
-   end do
-   close(unit)
+    subroutine skip_to(str, stat)
+      character(*), intent(in) :: str
+      integer, intent(out) :: stat
+      character :: ch
+      integer :: io
 
-   open(unit,file="Vin.vtk",position="rewind",status="old",action="read")
-   do i = 1,14
-    read(unit,*)
-   end do
-   do k = 1,Vnz
-    do j = 1,Vny
-     do i = 1,Vnx
-      read(unit,*) V(i,j,k)
-     end do
-    end do
-   end do
-   close(unit)
+      do
+        read(unit, iostat=io) ch
 
-   open(unit,file="Win.vtk",position="rewind",status="old",action="read")
-   do i = 1,14
-    read(unit,*)
-   end do
-   do k = 1,Wnz
-    do j = 1,Wny
-     do i = 1,Wnx
-      read(unit,*) W(i,j,k)
-     end do
-    end do
-   end do
- endsubroutine ReadIC
+        if (io/=0) then
+          stat = 1
+          return
+        end if
+        if (ch==str(1:1)) then
+print *,"'"//ch//"'", "'"//str//"'"
+          call check(str(2:), stat)
+          if (stat == 0) return
+        end if
+      end do
+    end subroutine
+
+    subroutine check(str, stat)
+      character(*), intent(in) :: str
+      integer, intent(out) :: stat
+      character :: ch
+      integer :: i, io
+
+      stat = 1
+      i = 0
+print *,"check:'"//str//"'"
+      do
+        i = i + 1
+
+        read(unit, iostat=io) ch
+print *,i,ch
+        if (io/=0) return
+
+        if (ch/=str(i:i)) return
+
+        if (i==len(str)) then
+          stat = 0
+          return
+        end if
+      end do
+    end subroutine
+
+  end subroutine ReadInitialConditions
 
 
 
   subroutine InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
-  real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
-  real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
-  real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
-  real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
-  integer i,j,k
-  real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
-  real(knd),allocatable :: Q(:,:,:)
-  real(knd) :: dt
+    real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+    real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
+    real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
+    real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
+    integer i,j,k
+    real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
+    real(knd),allocatable :: Q(:,:,:)
+    real(knd) :: dt
 
     Pr(1:Prnx,1:Prny,1:Prnz) = 0
 
@@ -1148,7 +1322,7 @@ contains
 
     if (initcondsfromfile==1) then
 
-       call ReadIC(U,V,W,Pr,Temperature)
+       call ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
 
        if (Re>0) then
          Viscosity = 1._knd/Re
@@ -1600,7 +1774,8 @@ contains
     end if !init conditions not from file
 
     if (master) write(*,*) "set"
-  endsubroutine InitialConditions
+
+  end subroutine InitialConditions
 
 
 
@@ -1609,6 +1784,7 @@ contains
 
   subroutine InitBoundaryConditions
     use VTKFrames, only: InitVTKFrames
+    use SurfaceFrames, only: InitSurfaceFrames
     real(knd),allocatable:: xU2(:),yV2(:),zW2(:)
     integer i,j,k,nx,ny,nz,nxup,nxdown,nyup,nydown,nzup,nzdown,io
     real(knd) P,dt
@@ -2044,6 +2220,7 @@ contains
    
    !filter out frames outside the domain
    call InitVTKFrames
+   call InitSurfaceFrames
 
     if (master) write (*,*) "set"
   end subroutine InitBoundaryConditions
@@ -2155,6 +2332,19 @@ contains
   end subroutine SetNullifiedPoints
 
 
+
+  subroutine get_scratch
+    use strings, only: itoa
+    integer :: l, stat
+
+    call get_environment_variable(name="SCRATCHDIR", length=l, status=stat)
+
+    if (stat==0 .and. l>0 .and. l<=len(scratch_dir)) then
+      call get_environment_variable(name="SCRATCHDIR", value=scratch_dir)
+    else if (stat==0 .and. l>len(scratch_dir)) then
+      call error_stop("SCRATCHDIR length exceeds variable length "//itoa(len(scratch_dir)))
+    end if
+  end subroutine
 
 
   subroutine init_random_seed()

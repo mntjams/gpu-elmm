@@ -4,36 +4,37 @@ module ElevationModels
   
   implicit none
 
-  type,abstract :: DEM
+  type,abstract :: map
   contains
-    procedure(elevation_interface),deferred :: elevation
+    procedure(map_interface),deferred :: value
   end type
   
-  interface
-    function elevation_interface(self, x, y) result(res)
+  abstract interface
+    function map_interface(self, x, y) result(res)
       import
       real(knd) :: res
-      class(DEM), intent(in) :: self
+      class(map), intent(in) :: self
       real(knd), intent(in) :: x, y
     end function
   end interface
   
-  type, extends(DEM) :: uniform_DEM
+  type, extends(map) :: uniform_map
     private
     real(knd), allocatable :: z(:,:)
-    real(knd) :: dx, dy, x1, y1, xn, yn    
+    real(knd) :: dx, dy, x1, y1, xn, yn
+    real(knd) :: default
   contains
-    procedure :: elevation => uniform_DEM_elevation
+    procedure :: value => uniform_map_value
   end type
   
-  interface uniform_DEM
-    module procedure uniform_DEM_init
+  interface uniform_map
+    module procedure uniform_map_init
   end interface
    
 contains
 
-  function uniform_DEM_XYZ(filename) result(res)
-    type(uniform_DEM) :: res
+  function uniform_map_XYZ(filename) result(res)
+    type(uniform_map) :: res
     character(*), intent(in) :: filename
     real(knd),allocatable :: points(:,:) !coordinate, index
     logical :: cmajor, xincreasing, yincreasing
@@ -49,8 +50,7 @@ contains
        
     open(newunit=unit, file=filename, status='old', action='read', iostat=io)
     if (io/=0) then
-      write(*,'(*(g0))') "Could not open file ",filename
-      call error_stop
+      call error_stop("Could not open file "//filename)
     else
       do
         read(unit,*,iostat=io) points(:,current+1)
@@ -90,7 +90,7 @@ contains
       end do
       ny = size(points,2) / nx
       
-      if (nx*ny/=size(points,2)) call error_stop("Error decomposing uniform DEM terrain grid.")
+      if (nx*ny/=size(points,2)) call error_stop("Error decomposing uniform map grid in file"//filename)
     else
       yincreasing = points(2,2)>points(2,1)
       res%dy = abs(points(2,2)-points(2,1))
@@ -112,7 +112,7 @@ contains
       end do
       nx = size(points,2) / ny
       
-      if (nx*ny/=size(points,2)) call error_stop("Error decomposing uniform DEM terrain grid.")
+      if (nx*ny/=size(points,2)) call error_stop("Error decomposing uniform map grid.")
     end if
 
     allocate(res%z(nx,ny))
@@ -176,8 +176,8 @@ contains
   
   
   
-  function uniform_DEM_ELV(filename) result(res)
-    type(uniform_DEM) :: res
+  function uniform_map_ELV(filename) result(res)
+    type(uniform_map) :: res
     character(*), intent(in) :: filename
     real(real32),allocatable :: z(:,:)
     integer(int32) :: i
@@ -193,13 +193,12 @@ contains
   
     open(newunit=unit, file=filename, access="stream", form="unformatted", status="old", action="read", iostat=io)
     if (io/=0) then
-      write(*,'(*(g0,1x))') "Error opening file ",filename
-      call error_stop
+      call error_stop("Error opening file "//filename)
     end if
     read(unit) i
     if (i/=1) then
       !TODO: implement automatic conversion using module Endianness
-      write(*,'(*(g0,1x))') "Error reading file ",filename,", wrong endianness?"
+      call error_stop("Error reading file "//filename//", wrong endianness?")
     end if
     read(unit) i
     nx = i
@@ -226,27 +225,35 @@ contains
   
   
   
-  function uniform_DEM_init(filename) result(res)
-    type(uniform_DEM) :: res
+  function uniform_map_init(filename, default) result(res)
+    type(uniform_map) :: res
     character(*), intent(in) :: filename
+    real(knd), optional, intent(in) :: default
+    real(knd) :: def_loc
     
     if (filename(len(filename)-2:) == "xyz") then
-      res = uniform_DEM_XYZ(filename)
+      res = uniform_map_XYZ(filename)
     else if (filename(len(filename)-2:) == "elv") then
-      res = uniform_DEM_ELV(filename)
+      res = uniform_map_ELV(filename)
     else
-      write(*,'(*(g0,1x))')  "Error, unknown file extension in file ",filename
-      call error_stop
+      call error_stop("Error, unknown file extension in file "//filename)
     end if
+    
+    if (present(default)) then
+      res%default = default
+    else
+      res%default = 0
+    end if
+
   end function
   
   
   
   
   
-  function uniform_DEM_elevation(self, x, y) result(res)
+  function uniform_map_value(self, x, y) result(res)
     real(knd) :: res
-    class(uniform_DEM), intent(in) :: self
+    class(uniform_map), intent(in) :: self
     real(knd), intent(in) :: x, y
     real(knd) :: x1, x2, y1, y2
     integer :: i1, i2, j1, j2
@@ -256,23 +263,29 @@ contains
     ny = size(self%z,2)
   
     i1 = int((x-self%x1)/self%dx) + 1
-    if (i1>=nx) then
+    if (i1>nx) then
+      res = self%default
+      return
+    else if (i1==nx) then
       i2 = nx
       i1 = nx - 1
     else if (i1<1) then
-      i1 = 1
-      i2 = 2
+      res = self%default
+      return
     else
       i2 = i1 + 1
     end if
     
     j1 = int((y-self%y1)/self%dy) + 1
-    if (j1>=ny) then
+    if (j1>ny) then
+      res = self%default
+      return
+    else if (j1==ny) then
       j2 = ny
       j1 = ny - 1
     else if (j1<1) then
-      j1 = 1
-      j2 = 2
+      res = self%default
+      return
     else
       j2 = j1 + 1
     end if

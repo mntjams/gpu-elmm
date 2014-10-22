@@ -12,14 +12,14 @@ module ImmersedBoundaryWM
 contains
   
   subroutine GetSolidBodiesWM
-    type(WMPoint)            :: WMP
-    type(SolidBody),pointer :: CurrentSB => null()
+    type(WMPoint)            :: p
+    type(SolidBody), pointer :: SB
     integer                  :: neighbours(3,6)
     real(knd)     :: dist,nearx,neary,nearz
-    integer       :: i,j,k,m,n,o,p
+    integer       :: i,j,k,m,n,o,r
     integer       :: nb
 
-    allocate(WMP%depscalar(num_of_scalars))
+    allocate(p%depscalar(num_of_scalars))
 
     !six triplets [1,0,0], [-1,0,0], [0,1,0],...
     neighbours = 0
@@ -30,6 +30,7 @@ contains
     neighbours(3,5) =  1
     neighbours(3,6) = -1
 
+!     !$omp parallel do private(i,j,k,dist,nb,m,n,o,r,SB,p) collapse(3) schedule(dynamic, 1000)
     do k = 1,Prnz
      do j = 1,Prny
       do i = 1,Prnx
@@ -37,14 +38,14 @@ contains
         dist = huge(dist)
         nb = 0
          
-        do p=1,6
-           m=neighbours(1,p)
-           n=neighbours(2,p)
-           o=neighbours(3,p)
+        do r=1,6
+           m=neighbours(1,r)
+           n=neighbours(2,r)
+           o=neighbours(3,r)
 
            if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs([m,n,o]))==1)) then
-             call SetCurrentSB(CurrentSB,Prtype(i+m,j+n,k+o))
-             call CurrentSB%Closest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
+             call SetCurrentSB(SB,Prtype(i+m,j+n,k+o))
+             call SB%Closest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
              if (sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
               dist = sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
               nb = Prtype(i+m,j+n,k+o)
@@ -54,43 +55,52 @@ contains
 
         if (nb>0) then
                     
-          call SetCurrentSB(CurrentSB,nb)
+          call SetCurrentSB(SB,nb)
           
-          WMP%xi = i
-          WMP%yj = j
-          WMP%zk = k
-          WMP%distx = nearx-xPr(i)
-          WMP%disty = neary-yPr(j)
-          WMP%distz = nearz-zPr(k)
-          WMP%ustar = 1
+          p%xi = i
+          p%yj = j
+          p%zk = k
+          p%distx = nearx-xPr(i)
+          p%disty = neary-yPr(j)
+          p%distz = nearz-zPr(k)
+          if (p%distx==0.and.p%disty==0.and.p%distz==0) then
+            print *, Prtype(i,j,k)
+            print *, i,j,k
+            print *, xPr(i), yPr(j), zPr(k)
+            call SB%Closest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
+            print *, nearx, neary, nearz
+            call error_stop("zero distance WM point")
+          end if
+          p%ustar = 1
           
           !HACK
-          if (hypot(WMP%distx,WMP%disty)<abs(WMP%distz)*5) then
+          if (hypot(p%distx,p%disty)<abs(p%distz)*5) then
             !Santamouris - Environmental Design of Urban Buildings
-            WMP%albedo = 0.3 !red brick 
-            WMP%emissivity = 0.9 !red brick 
+            p%albedo = 0.3 !red brick 
+            p%emissivity = 0.9 !red brick 
           else
-            WMP%albedo = CurrentSB%albedo
-            WMP%emissivity = CurrentSB%emissivity
+            p%albedo = SB%albedo
+            p%emissivity = SB%emissivity
           end if
 
-          select type (geomshape => CurrentSB%GeometricShape)
+          select type (geomshape => SB%GeometricShape)
             type is (Terrain)
               if (geomshape%PrPoints(i,j)%rough) then
-                WMP%z0 = geomshape%PrPoints(i,j)%z0
+                p%z0 = geomshape%PrPoints(i,j)%z0
               else
-                WMP%z0 = 0
+                p%z0 = 0
               end if
             class default
-              if (CurrentSB%rough) then
-                WMP%z0 = CurrentSB%z0
+              if (SB%rough) then
+                p%z0 = SB%z0
               else
-                WMP%z0 = 0
+                p%z0 = 0
               end if
           end select
-
-          call AddWMPoint(WMP)
           
+          !$omp critical
+          call AddWMPoint(p)
+          !$omp end critical
         end if
        end if
       end do
@@ -133,9 +143,10 @@ contains
       type(WMPointUVW) :: p
       type(SolidBody), pointer :: SB
       real(knd), pointer, contiguous :: dirvec(:)
-      real(knd)     :: nearx, neary, nearz, t, distvec(3)
+      real(knd)     :: nearx, neary, nearz, t, dist, distvec(3)
       integer       :: i, j, k, m, n, o, dir
-
+      
+!       !$omp parallel do private(i,j,k,dir,dirvec,m,n,o,SB,distvec,nearx,neary,nearz,p) collapse(3) schedule(dynamic, 1000) 
       do k = 1, nz
        do j = 1, ny
         do i = 1, nx
@@ -158,6 +169,8 @@ contains
                 
                 distvec = [nearx - x(i), neary - y(j), nearz - z(k)]
                 
+                dist = norm2(distvec)
+
                 if (.not. right_direction(distvec, dirvec)) then
                   t = SB%ClosestOnLineOut( x(i+m), y(j+n), z(k+o), &
                                                    x(i),   y(j),   z(k) )
@@ -165,8 +178,18 @@ contains
                   neary = yPr(j+n) + t * ( y(j) - y(j+n) )
                   nearz = zPr(k+o) + t * ( z(k) - z(k+o) )
                   distvec = [nearx - x(i), neary - y(j), nearz - z(k)]
+                  if (norm2(distvec)<dist) then
+                    write(*,'(a)',advance="no") '.'
+                    if (norm2(distvec)<(dxmin*dymin*dzmin)**(1._knd/3)/20) then
+                      write(*,*) "Warning, inconsistent processing of geometry, point",i,j,k,"dir",dir
+                      write(*,*) norm2(distvec),dist,(dxmin*dymin*dzmin)**(1._knd/3)/20
+                      call SB%Closest(nearx ,neary, nearz, x(i), y(j), z(k))
+                  
+                      distvec = [nearx - x(i), neary - y(j), nearz - z(k)]
+                    end if
+                  end if
                 end if
-                
+
                 p%xi = i
                 p%yj = j
                 p%zk = k
@@ -210,9 +233,10 @@ contains
                     end if
                     
                 end select
-
+                
+                !$omp critical
                 call AddWMPointUVW(p, component, dir)
-              
+                !$omp end critical
               end if
 
             end do
@@ -222,6 +246,7 @@ contains
         end do
        end do
       end do
+
     end subroutine
   
     logical function right_direction(a, b)
@@ -635,6 +660,7 @@ contains
     IBP%xi = xi
     IBP%yj = yj
     IBP%zk = zk
+!HACK: last resort when encountering instabilities near boundaries
 ! call null_point; return
     if (.not. SB%Inside(x,y,z,0._knd)) then
       call null_point
@@ -643,10 +669,12 @@ contains
 
     call SB%ClosestOut(xnear,ynear,znear,x,y,z)
 
-    if (hypot(xnear,hypot(ynear,znear))<=0.1_knd*(dxmin*dymin*dzmin)**(1._knd/3)) then
+    if (norm2([x-xnear,y-ynear,z-znear])<=0.1_knd*(dxmin*dymin*dzmin)**(1._knd/3)) then
       call null_point
       return
     end if
+
+
 
     freexm = all([ ( Utype(xi-i,yj  ,zk  )<=0, i = 1, n_ls ) ])
     freeym = all([ ( Utype(xi  ,yj-i,zk  )<=0, i = 1, n_ls ) ])
@@ -662,9 +690,21 @@ contains
     free1yp = Utype(xi  ,yj+1,zk  )<=0
     free1zp = Utype(xi  ,yj  ,zk+1)<=0
     
+    if ((free1xm.and..not.freexm) .or. &
+        (free1ym.and..not.freeym) .or. &
+        (free1zm.and..not.freezm) .or. &
+        (free1xp.and..not.freexp) .or. &
+        (free1yp.and..not.freeyp) .or. &
+        (free1zp.and..not.freezp)) then
+      call null_point;  return
+    end if
+    
+    if (count(Utype(xi-1:xi+1,yj-1:yj+1,zk-1:zk+1)>0)>11) then
+      call null_point; return
+    end if
+    
     if ((free1xm.and.free1xp) .or. (free1ym.and.free1yp) .or. (free1zm.and.free1zp)) then
-      call null_point
-      return
+      call null_point; return
     end if  
 
     if ( (.not.freexm) .and. (.not.freexp) ) then
@@ -731,11 +771,17 @@ contains
       IBP%distz = tz * (zU(zk+dirz) - zU(zk))
     end if
     
+    if (dirx==0.and.diry==0.and.dirz==0) then
+      call null_point
+      return
+    end if
+    
     IBP%dirx = dirx
     IBP%diry = diry
     IBP%dirz = dirz
 
     IBP%IntPoints = InterpolationPoints(IBP,xU,yU,zU)
+    
      
     IBP%interp = size(IBP%IntPoints)
     
@@ -1283,7 +1329,7 @@ contains
       res = [res, t]
     end if
 
-  end function
+  end function InterpolationPoints
 
   recursive subroutine TVelIBPoint_InterpolationCoefs(IBP,xU,yU,zU)
     type(TVelIBpoint),intent(inout)     :: IBP
@@ -1546,7 +1592,7 @@ contains
   end function
 
 
-   function IB_interpolation_coefs_1st_order(xr,x) result(Coefs)
+  function IB_interpolation_coefs_1st_order(xr,x) result(Coefs)
     real(knd),intent(in)  :: xr,x(0:)
     real(knd) :: Coefs(size(x)-1)
     real(knd) :: A
@@ -2140,7 +2186,8 @@ contains
     type(TScalFlIBPoint) SIBP
     integer i,j,k
 
-
+!     !$omp parallel private(i,j,k,IBP,SIBP)
+    !$omp do collapse(3) schedule(dynamic, 1000) 
     do k = 1,Unz
      do j = 1,Uny
       do i = 1,Unx
@@ -2148,13 +2195,17 @@ contains
         if (Utype(i+1,j,k)<=0.or.Utype(i-1,j,k)<=0.or.Utype(i,j+1,k)<=0&
           .or.Utype(i,j-1,k)<=0.or.Utype(i,j,k+1)<=0.or.Utype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xU(-2:),yPr(-2:),zPr(-2:),Utype,1)
+            !$omp critical
             call  UIBPointsList%add(IBP)
+            !$omp end critical
         end if
        end if
       end do
      end do
     end do
+    !$omp end do nowait
 
+    !$omp do collapse(3) schedule(dynamic, 1000) 
     do k = 1,Vnz
      do j = 1,Vny
       do i = 1,Vnx
@@ -2162,13 +2213,17 @@ contains
         if (Vtype(i+1,j,k)<=0.or.Vtype(i-1,j,k)<=0.or.Vtype(i,j+1,k)<=0&
           .or.Vtype(i,j-1,k)<=0.or.Vtype(i,j,k+1)<=0.or.Vtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yV(-2:),zPr(-2:),Vtype,2)
+            !$omp critical
             call  VIBPointsList%add(IBP)
+            !$omp end critical
         end if
        end if
       end do
      end do
     end do
+    !$omp end do nowait
 
+    !$omp do collapse(3) schedule(dynamic, 1000) 
     do k = 1,Wnz
      do j = 1,Wny
       do i = 1,Wnx
@@ -2176,13 +2231,17 @@ contains
         if (Wtype(i+1,j,k)<=0.or.Wtype(i-1,j,k)<=0.or.Wtype(i,j+1,k)<=0&
           .or.Wtype(i,j-1,k)<=0.or.Wtype(i,j,k+1)<=0.or.Wtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yPr(-2:),zW(-2:),Wtype,3)
+            !$omp critical
             call  WIBPointsList%add(IBP)
+            !$omp end critical
         end if
        end if
       end do
      end do
     end do
+    !$omp end do nowait
 
+    !$omp do collapse(3) schedule(dynamic, 1000) 
     do k = 1,Prnz
      do j = 1,Prny
       do i = 1,Prnx
@@ -2190,12 +2249,16 @@ contains
         if (Prtype(i+1,j,k)<=0.or.Prtype(i-1,j,k)<=0.or.Prtype(i,j+1,k)<=0&
           .or.Prtype(i,j-1,k)<=0.or.Prtype(i,j,k+1)<=0.or.Prtype(i,j,k-1)<=0)  then
             call  Create(SIBP,i,j,k)
+            !$omp critical
             call  ScalFlIBPointsList%add(SIBP)
+            !$omp end critical
         end if
        end if
       end do
      end do
     end do
+    !$omp end do nowait
+!     !$omp end parallel
 
     call MoveIBPointsToArray
 
@@ -2208,15 +2271,15 @@ contains
 
 
   subroutine GetSolidBodiesBC
-
+if (master) write(*,'(a)',advance="no") "I"
     call FindInsideCells
-
+if (master) write(*,'(a)',advance="no") "N"
     call FindNeighbouringCells
-
+if (master) write(*,'(a)',advance="no") "I"
     call InitImBoundaries
-
+if (master) write(*,'(a)',advance="no") "W"
     call GetSolidBodiesWM
-
+if (master) write(*,'(a)') "U"
     call GetSolidBodiesWM_UVW
 
   end subroutine GetSolidBodiesBC

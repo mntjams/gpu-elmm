@@ -8,6 +8,7 @@ module Outputs
   use Endianness
   use FreeUnit
   use VTKFrames
+  use SurfaceFrames
   use StaggeredFrames
   use Output_helpers
 
@@ -53,13 +54,15 @@ module Outputs
   real(knd),allocatable,dimension(:,:) :: ustar,tstar                        !first index differentiates flux from friction number
                                                                              !second index is time
 
-  real(knd),allocatable,dimension(:,:) :: U_time,V_time,W_time,Pr_time,temp_time,moist_time  !position, time
+  real(knd),allocatable,dimension(:,:) :: U_time,V_time,W_time,temp_time,moist_time  !position, time
 
   real(knd),allocatable,dimension(:,:,:) :: scalp_time                        !which scalar, position, time
   real(knd),allocatable,dimension(:,:) :: scalsum_time                        !which scalar, time
 
   real(knd),allocatable,dimension(:,:,:) :: momentum_fluxes_time, momentum_fluxes_sgs_time   !component, position, time
                                                        !components: 1,1; 1,2; 1,3; 2,2; 2,3; 3,3 for 1..6
+  real(knd),allocatable,dimension(:,:,:,:) :: scalar_fluxes_time !component, scalar, position, time
+                                                                 !components x,y,z
 
   type TProbe
     integer :: Ui,Uj,Uk,Vi,Vj,Vk,Wi,Wj,Wk    !grid coordinates of probes in the U,V,W grids
@@ -77,6 +80,9 @@ module Outputs
 
   !for passive scalars
   type(TProbe),allocatable,dimension(:),save :: scalar_probes
+  
+  integer :: time_series_max_length = 1000 !how often save the time series
+  integer :: time_series_step = 0
 
   type TOutputSwitches
     integer :: U = 0
@@ -176,8 +182,31 @@ contains
     end if
   end subroutine
 
+
+
   subroutine AllocateOutputs
-    integer :: k
+#ifdef MPI
+use custom_mpi
+#endif
+use Strings
+    integer :: k, u, io
+integer :: tmp
+
+   call GetEndianness
+
+#if defined(_WIN32) || defined(_WIN64)
+   call system("mkdir "//output_dir)
+#else
+   do k = 1, 1000
+     call system("mkdir -p "//output_dir)
+     open(newunit=u, file=output_dir//"test", status="replace", iostat=io)
+     if (io==0) then
+       close(u, status="delete")
+       exit
+     end if
+     call sleep(1)
+   end do
+#endif
 
 
    if (store%avg_U==0.and.store%avg_U_rms>1) store%avg_U = 1
@@ -248,8 +277,21 @@ contains
    end if
 
 
-   allocate(times(0:max_number_of_time_steps))
+   allocate(times(1:time_series_max_length))
 
+!   open(newunit=tmp,file=output_dir//"probes.txt",status="replace")
+
+!   write(tmp,*) size(probes),size(scalar_probes)
+!   close(tmp)
+#ifdef MPI
+   call MPI_Barrier(mpi_comm, tmp)
+
+!UGLY HACK!
+if (size(probes)<=0.or.size(scalar_probes)<=0) call error_stop("No probes in image " // &
+                                                      itoa(iim)//"-"//itoa(jim)//"-"//itoa(kim), 100+myim )
+
+   call MPI_Barrier(mpi_comm, tmp)
+#endif
    
    do k = 1,size(probes)
      associate(p => probes(k))
@@ -269,11 +311,31 @@ contains
        call GridCoords_U(p%Ui,p%Uj,p%Uk,p%x,p%y,p%z)
        call GridCoords_V(p%Vi,p%Vj,p%Vk,p%x,p%y,p%z)
        call GridCoords_W(p%Wi,p%Wj,p%Wk,p%x,p%y,p%z)
+
+       if (Utype(p%Ui, p%Uj, p%Uk)>0) then
+         do
+           p%Uk = p%Uk + 1
+           if (Utype(p%Ui, p%Uj, p%Uk)<=0 .or. p%Uk>=Unz) exit
+         end do
+       end if
+
+       if (Vtype(p%Vi, p%Vj, p%Vk)>0) then
+         do
+           p%Vk = p%Vk + 1
+           if (Vtype(p%Vi, p%Vj, p%Vk)<=0 .or. p%Vk>=Vnz) exit
+         end do
+       end if
+
+       if (Wtype(p%Wi, p%Wj, p%Wk)>0) then
+         do
+           p%Wk = p%Wk + 1
+           if (Wtype(p%Wi, p%Wj, p%Wk)<=0 .or. p%Wk>=Wnz) exit
+         end do
+       end if
+
      end associate
    end do
    
-   probes = pack(probes, probes%inside)
-
    do k = 1,size(scalar_probes)
      associate(p => scalar_probes(k))
        p%number = k
@@ -288,37 +350,53 @@ contains
        p%i = min(p%i,Prnx)
        p%j = min(p%j,Prny)
        p%k = min(p%k,Prnz)
+
+       if (Prtype(p%i, p%j, p%k)>0) then
+         do
+           p%k = p%k + 1
+           if (Prtype(p%i, p%j, p%k)<=0 .or. p%k>=Prnz) exit
+         end do
+       end if
      end associate
    end do
 
+!   open(newunit=tmp,file=output_dir//"probes.txt",status="old",position="append")
+!   write(tmp,*) count(probes%inside),count(scalar_probes%inside)
+
+   probes = pack(probes, probes%inside)
+
    scalar_probes = pack(scalar_probes, scalar_probes%inside)
+
+!   write(tmp,*) size(probes),size(scalar_probes)
+!   close(tmp)
+
 
    if (size(probes)>0) then
 
-     allocate(U_time(size(probes),0:max_number_of_time_steps), &
-              V_time(size(probes),0:max_number_of_time_steps), &
-              W_time(size(probes),0:max_number_of_time_steps), &
-              Pr_time(size(probes),0:max_number_of_time_steps))
+     allocate(U_time(size(probes),1:time_series_max_length), &
+              V_time(size(probes),1:time_series_max_length), &
+              W_time(size(probes),1:time_series_max_length))
      times = huge(1.0_knd)
      U_time = huge(1.0_knd)
      V_time = huge(1.0_knd)
      W_time = huge(1.0_knd)
-     Pr_time = huge(1.0_knd)
 
      if (store%probes_fluxes==1) then
-       allocate(momentum_fluxes_time(6,size(probes),0:max_number_of_time_steps))
-       momentum_fluxes_time = huge(1.0)
-       allocate(momentum_fluxes_sgs_time(6,size(probes),0:max_number_of_time_steps))
-       momentum_fluxes_sgs_time = huge(1.0)
+       allocate(momentum_fluxes_time(6,size(probes),1:time_series_max_length))
+       momentum_fluxes_time = huge(1.0_knd)
+       allocate(momentum_fluxes_sgs_time(6,size(probes),1:time_series_max_length))
+       momentum_fluxes_sgs_time = huge(1.0_knd)
+       allocate(scalar_fluxes_time(3,1:num_of_scalars,size(probes),1:time_series_max_length))
+       scalar_fluxes_time = huge(1.0_knd)
      end if
 
      if (enable_buoyancy) then
-       allocate(temp_time(size(probes),0:max_number_of_time_steps))
+       allocate(temp_time(size(probes),1:time_series_max_length))
        temp_time = huge(1.0_knd)
      end if
 
      if (enable_moisture) then
-       allocate(moist_time(size(probes),0:max_number_of_time_steps))
+       allocate(moist_time(size(probes),1:time_series_max_length))
        moist_time = huge(1.0_knd)
      end if
 
@@ -326,39 +404,39 @@ contains
 
 
    if (store%delta_time==1) then
-     allocate(delta_time(0:max_number_of_time_steps))
+     allocate(delta_time(1:time_series_max_length))
      delta_time = huge(1.0_knd)
    end if
 
    if (store%tke==1) then
-     allocate(tke(0:max_number_of_time_steps))
+     allocate(tke(1:time_series_max_length))
      tke = huge(1.0_knd)
    end if
 
    if (store%delta_time==1) then
-     allocate(dissip(0:max_number_of_time_steps))
+     allocate(dissip(1:time_series_max_length))
      dissip = huge(1.0_knd)
      dissip(0)=0
    end if
 
    if (wallmodeltype>0.and.(display%ustar==1.or.store%ustar==1)) then
-     allocate(ustar(2,0:max_number_of_time_steps))
+     allocate(ustar(2,1:time_series_max_length))
      ustar = huge(1.0)
    end if
 
    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
-     allocate(tstar(2,0:max_number_of_time_steps))
+     allocate(tstar(2,1:time_series_max_length))
      tstar = huge(1.0)
    end if
 
    if (num_of_scalars>0) then
      if (store%scalsum_time==1.or.store%scaltotsum_time==1) then
-       allocate(scalsum_time(1:num_of_scalars,0:max_number_of_time_steps))
+       allocate(scalsum_time(1:num_of_scalars,1:time_series_max_length))
        scalsum_time = huge(1.0_knd)
      end if
 
      if (size(scalar_probes)>0) then
-       allocate(scalp_time(1:num_of_scalars,1:size(scalar_probes),0:max_number_of_time_steps))
+       allocate(scalp_time(1:num_of_scalars,1:size(scalar_probes),1:time_series_max_length))
        scalp_time = huge(1.0_knd)
     end if
    end if
@@ -456,28 +534,93 @@ contains
 
    end if
 
-
-   call GetEndianness
-
-#if _WIN32 || _WIN64
-   call execute_command_line("mkdir "//trim(output_dir))
-#else
-   call execute_command_line("mkdir -p "//trim(output_dir))
-#endif
-
-   contains 
-     !FIXME: delete this as soon as supported by ifort
-     subroutine execute_command_line(cmd)
-       character(*) :: cmd
-       call system(cmd)
-     end subroutine
   end subroutine AllocateOutputs
 
 
 
 
 
+  subroutine InitTimeSeries
+    character(5) :: prob
+    integer :: k
+    
+    call create(output_dir//"times.unf")
+    
+    do k = 1,size(probes)
 
+      write(prob,"(i0)") probes(k)%number
+
+      call create(output_dir//"Utimep"//trim(prob)//".unf")
+
+      call create(output_dir//"Vtimep"//trim(prob)//".unf")
+
+      call create(output_dir//"Wtimep"//trim(prob)//".unf")
+      
+      if (store%probes_fluxes==1) then
+        call create(output_dir//"stresstimep"//trim(prob)//".unf")
+        
+        call create(output_dir//"sgstresstimep"//trim(prob)//".unf")
+
+        call create(output_dir//"scalfltimep"//trim(prob)//".unf")
+      end if
+
+      if (enable_buoyancy) then
+        call create(output_dir//"temptimep"//trim(prob)//".unf")
+      end if
+
+      if (enable_moisture) then
+        call create(output_dir//"moisttimep"//trim(prob)//".unf")
+      end if
+
+    end do
+
+    do k = 1,size(scalar_probes)
+
+      write(prob,"(i0)") scalar_probes(k)%number
+
+      if (num_of_scalars>0) then
+        call create(output_dir//"scaltimep"//trim(prob)//".unf")
+      end if
+
+    end do
+
+    if (store%delta_time==1) then
+      call create(output_dir//"delta_time.unf")
+    end if
+
+    if (store%tke==1) then
+      call create(output_dir//"tke.unf")
+    end if
+
+    if (store%tke==1.and.store%dissip==1) then
+      call create(output_dir//"dissip.unf")
+    end if
+
+    if (wallmodeltype>0.and.display%ustar==1) then
+      call create(output_dir//"Retau.unf")
+    end if
+
+    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.store%tstar==1) then
+      call create(output_dir//"tflux.unf")
+    end if
+
+
+    if (num_of_scalars>0.and.store%scalsum_time==1) then
+      call create(output_dir//"scalsumtime.unf")
+    end if
+
+    if (num_of_scalars>0.and.store%scaltotsum_time==1) then
+      call create(output_dir//"scaltotsumtime.unf")
+    end if
+    
+  contains
+    subroutine create(fname)
+      character(*) :: fname
+      integer :: unit
+      open(newunit=unit,file=fname,status="replace")
+      close(unit)
+    end subroutine  
+  end subroutine InitTimeSeries
 
 
 
@@ -495,19 +638,30 @@ contains
     real(knd),intent(in) :: dt
     real(knd),intent(in) :: delta
 
+    integer :: step !just a shorter name
+    
     integer :: l,i,j,k
     real(knd) :: S,S2
     real(knd) :: time_weight
     real(knd) :: fl_L, fl_R
     integer, save :: fnum = 0
+    logical, save :: called = .false.
+    
+    if (.not.called) then
+      call InitTimeSeries
+      called = .true.
+    end if
+    
+    time_series_step = time_series_step+1
+    step = time_series_step
 
     ! We compute the subgrid stresses from the eddy viscosity even at the walls
     ! We should not set also TDiff
-    if (wallmodeltype>0.and.store%probes_fluxes==1.and.store%BLprofiles==1) then
+    if (wallmodeltype>0.and.(store%probes_fluxes==1.or.store%BLprofiles==1)) then
       call ComputeViscsWM(U,V,W,Pr,Temperature)
     end if
 
-    times(step)=time
+    times(step) = time
 
     if (store%scalsum_time==1.or.store%scaltotsum_time==1) then
       do l = 1,num_of_scalars
@@ -551,17 +705,6 @@ contains
                              W(p%Wi+1,p%Wj+1,p%Wk),W(p%Wi+1,p%Wj,p%Wk+1), &
                              W(p%Wi,p%Wj+1,p%Wk+1),W(p%Wi+1,p%Wj+1,p%Wk+1))
 
-        Pr_time(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)), &
-                             (p%y-yPr(p%j))/(yPr(p%j+1)-yPr(p%j)), &
-                             (p%z-zPr(p%k))/(zPr(p%k+1)-zPr(p%k)), &
-                              Pr(p%i,p%j,p%k), &
-                              Pr(min(p%i+1,Unx+1),p%j,p%k), &
-                              Pr(p%i,min(p%j+1,Vny+1),p%k), &
-                              Pr(p%i,p%j,min(p%k+1,Wnz+1)), &
-                              Pr(min(p%i+1,Unx+1),min(p%j+1,Vny+1),p%k), &
-                              Pr(min(p%i+1,Unx+1),p%j,min(p%k+1,Wnz+1)), &
-                              Pr(p%i,min(p%j+1,Vny+1),min(p%k+1,Wnz+1)), &
-                              Pr(min(p%i+1,Unx+1),min(p%j+1,Vny+1),min(p%k+1,Wnz+1)))
 
         if (enable_buoyancy) then
           temp_time(k,step)=Trilinint((p%x-xPr(p%i))/(xPr(p%i+1)-xPr(p%i)), &
@@ -610,26 +753,26 @@ contains
 
           fl_L = ( V(p%i+1, p%j, p%k)+V(p%i+1, p%j-1, p%k) - &
                    V(p%i-1, p%j, p%k)+V(p%i-1, p%j-1, p%k) ) / &
-                 (2*(xPr(i+1)-xPr(i-1)))
+                 (2*(xPr(p%i+1)-xPr(p%i-1)))
           fl_R = ( U(p%i, p%j+1, p%k)+U(p%i-1, p%j+1, p%k) - &
                    U(p%i, p%j-1, p%k)+U(p%i-1, p%j-1, p%k) ) / &
-                 (2*(yPr(j+1)-yPr(j-1)))
+                 (2*(yPr(p%j+1)-yPr(p%j-1)))
           momentum_fluxes_sgs_time(2,k,step) = (fl_L + fl_R) / 2
                  
           fl_L = ( W(p%i+1, p%j, p%k)+W(p%i+1, p%j, p%k-1) - &
                    W(p%i-1, p%j, p%k)+W(p%i-1, p%j, p%k-1) ) / &
-                 (2*(xPr(i+1)-xPr(i-1)))
+                 (2*(xPr(p%i+1)-xPr(p%i-1)))
           fl_R = ( U(p%i, p%j, p%k+1)+U(p%i-1, p%j, p%k+1) - &
                    U(p%i, p%j, p%k-1)+U(p%i-1, p%j, p%k-1) ) / &
-                 (2*(zPr(k+1)-zPr(k-1)))
+                 (2*(zPr(p%k+1)-zPr(p%k-1)))
           momentum_fluxes_sgs_time(3,k,step) = (fl_L + fl_R) / 2
                                   
           fl_L = ( W(p%i, p%j+1, p%k)+W(p%i, p%j+1, p%k-1) - &
                    W(p%i, p%j-1, p%k)+W(p%i, p%j-1, p%k-1) ) / &
-                 (2*(yPr(j+1)-yPr(j-1)))
+                 (2*(yPr(p%j+1)-yPr(p%j-1)))
           fl_R = ( V(p%i, p%j, p%k+1)+V(p%i, p%j-1, p%k+1) - &
                    V(p%i, p%j, p%k-1)+V(p%i, p%j-1, p%k-1) ) / &
-                 (2*(zPr(k+1)-zPr(k-1)))
+                 (2*(zPr(p%k+1)-zPr(p%k-1)))
           momentum_fluxes_sgs_time(5,k,step) = (fl_L + fl_R) / 2
                  
           momentum_fluxes_sgs_time(:,k,step) = Viscosity(p%i, p%j, p%k) * &
@@ -667,8 +810,6 @@ contains
     if (store%delta_time==1.and.dt>0) then
       delta_time(step)=delta/dt
     end if
-
-    endstep = step
 
 
 
@@ -725,40 +866,66 @@ contains
         where (Scalar>=store%scalars_intermitency_threshold)  &
           Scalar_intermitency = Scalar_intermitency + time_weight
       end if
+    end if
 
+    if ((averaging==1).and.((time>=timeavg1).and.(time-dt<timeavg2))) then
       if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
         do i=1,num_of_scalars
           call AddScalarAdvVector(Scalar_fl_U_avg(:,:,:,i), &
                                Scalar_fl_V_avg(:,:,:,i), &
                                Scalar_fl_W_avg(:,:,:,i), &
                                Scalar(:,:,:,i), &
-                               U,V,W,time_weight)
+                               U,V,W,time_weight, &
+                               scalar_fluxes_time(:,i,:,step), &
+                               scalar_probes%i, scalar_probes%j, scalar_probes%k)
           call AddScalarDiffVector(Scalar_fl_U_avg(:,:,:,i), &
                                 Scalar_fl_V_avg(:,:,:,i), &
                                 Scalar_fl_W_avg(:,:,:,i), &
-                                Scalar(:,:,:,i),time_weight)
+                                Scalar(:,:,:,i),time_weight, &
+                                scalar_fluxes_time(:,i,:,step), &
+                                scalar_probes%i, scalar_probes%j, scalar_probes%k)
         end do
       end if
-   end if
+    !UGLY HACK, dat pozor aby fungovalo kdyz nejsou alokovana pole!!!!!!!
+    else if (store%probes_fluxes==1) then
+      if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
+        do i=1,num_of_scalars
+          call AddScalarAdvVector(Scalar_fl_U_avg(:,:,:,i), &
+                               Scalar_fl_V_avg(:,:,:,i), &
+                               Scalar_fl_W_avg(:,:,:,i), &
+                               Scalar(:,:,:,i), &
+                               U,V,W,0._knd, &
+                               scalar_fluxes_time(:,i,:,step), &
+                               scalar_probes%i, scalar_probes%j, scalar_probes%k)
+          call AddScalarDiffVector(Scalar_fl_U_avg(:,:,:,i), &
+                                Scalar_fl_V_avg(:,:,:,i), &
+                                Scalar_fl_W_avg(:,:,:,i), &
+                                Scalar(:,:,:,i),0._knd, &
+                                scalar_fluxes_time(:,i,:,step), &
+                                scalar_probes%i, scalar_probes%j, scalar_probes%k)
+        end do
+      end if
+    end if
 
 
-   if (wallmodeltype>0.and.(display%ustar==1.or.store%ustar==1)) then
+    if (wallmodeltype>0.and.(display%ustar==1.or.store%ustar==1)) then
 
-     S = GroundUstar()
+      S = GroundUstar()
 
-     S2 = S*Re
+      S2 = S*Re
 
-     if (display%ustar==1) then
-       if (allocated(Ustar_inlet)) then
-        if (master) write(*,*) "ustar:",S,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
-       else
-        if (master) write(*,*) "ustar:",S,"Re_tau:",S2
-       end if
-     end if
-     if (store%ustar==1) then
-       ustar(:,step)=[ S2 , S ]
-     end if
-   end if
+      if (display%ustar==1) then
+        if (allocated(Ustar_inlet)) then
+         if (master) write(*,*) "ustar:",S,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
+        else
+         if (master) write(*,*) "ustar:",S,"Re_tau:",S2
+        end if
+      end if
+      if (store%ustar==1) then
+        ustar(:,step)=[ S2 , S ]
+      end if
+
+    end if
 
 
     if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
@@ -845,10 +1012,13 @@ contains
 
     call SaveVTKFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
 
+    call SaveSurfaceFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+
     call SaveStaggeredFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
     
-    if (mod(endstep,1000) == 0) then
+    if (time_series_step==time_series_max_length) then
       call OutputTimeSeries
+      time_series_step = 0
     end if
 
   end subroutine OutTstep
@@ -911,60 +1081,58 @@ contains
 
     call newunit(unit)
     
+    open(unit,file=output_dir//"times.unf", &
+         access="stream",status="old",position="append")
+    write(unit) times(1:time_series_step)
+    close(unit)
+
     do k = 1,size(probes)
 
       write(prob,"(i0)") probes(k)%number
 
-      open(unit,file=trim(output_dir)//"Prtimep"//trim(prob)//".txt")
-      do j = 0,endstep
-       write(unit,*) times(j),Pr_time(k,j)
-      end do
+      open(unit,file=output_dir//"Utimep"//trim(prob)//".unf", &
+           access="stream",status="old",position="append")
+      write(unit) U_time(k,1:time_series_step)
       close(unit)
 
-      open(unit,file=trim(output_dir)//"Utimep"//trim(prob)//".txt")
-      do j = 0,endstep
-       write(unit,*) times(j),U_time(k,j)
-      end do
+      open(unit,file=output_dir//"Vtimep"//trim(prob)//".unf", &
+           access="stream",status="old",position="append")
+      write(unit) V_time(k,1:time_series_step)
       close(unit)
 
-      open(unit,file=trim(output_dir)//"Vtimep"//trim(prob)//".txt")
-      do j = 0,endstep
-       write(unit,*) times(j),V_time(k,j)
-      end do
-      close(unit)
-
-      open(unit,file=trim(output_dir)//"Wtimep"//trim(prob)//".txt")
-      do j = 0,endstep
-       write(unit,*) times(j),W_time(k,j)
-      end do
+      open(unit,file=output_dir//"Wtimep"//trim(prob)//".unf", &
+           access="stream",status="old",position="append")
+      write(unit) W_time(k,1:time_series_step)
       close(unit)
       
       if (store%probes_fluxes==1) then
-        open(unit,file=trim(output_dir)//"stresstimep"//trim(prob)//".txt")
-        do j = 0,endstep
-         write(unit,'(7(2x,g13.6))') times(j),momentum_fluxes_time(:,k,j)
-        end do
+        open(unit,file=output_dir//"stresstimep"//trim(prob)//".unf", &
+             access="stream",status="old",position="append")
+        write(unit) momentum_fluxes_time(:,k,1:time_series_step)
         close(unit)
-        open(unit,file=trim(output_dir)//"sgstresstimep"//trim(prob)//".txt")
-        do j = 0,endstep
-         write(unit,'(7(2x,g13.6))') times(j),momentum_fluxes_time(:,k,j)
-        end do
+        
+        open(unit,file=output_dir//"sgstresstimep"//trim(prob)//".unf", &
+             access="stream",status="old",position="append")
+        write(unit) momentum_fluxes_time(:,k,1:time_series_step)
+        close(unit)
+
+        open(unit,file=output_dir//"scalfltimep"//trim(prob)//".unf", &
+             access="stream",status="old",position="append")
+        write(unit) scalar_fluxes_time(:,:,k,1:time_series_step)
         close(unit)
       end if
 
       if (enable_buoyancy) then
-        open(unit,file=trim(output_dir)//"temptimep"//trim(prob)//".txt")
-        do j = 0,endstep
-         write(unit,*) times(j),temp_time(k,j)
-        end do
+        open(unit,file=output_dir//"temptimep"//trim(prob)//".unf", &
+             access="stream",status="old",position="append")
+        write(unit) temp_time(k,1:time_series_step)
         close(unit)
       end if
 
       if (enable_moisture) then
-        open(unit,file=trim(output_dir)//"moisttimep"//trim(prob)//".txt")
-        do j = 0,endstep
-         write(unit,*) times(j),moist_time(k,j)
-        end do
+        open(unit,file=output_dir//"moisttimep"//trim(prob)//".unf", &
+             access="stream",status="old",position="append")
+        write(unit) moist_time(k,1:time_series_step)
         close(unit)
       end if
 
@@ -975,69 +1143,61 @@ contains
       write(prob,"(i0)") scalar_probes(k)%number
 
       if (num_of_scalars>0) then
-        open(unit,file=trim(output_dir)//"scaltimep"//trim(prob)//".txt")
-        do j = 1,endstep
-         write(unit,'(99(g0,tr3))') times(j),scalp_time(:,k,j)
-        end do
+        open(unit,file=output_dir//"scaltimep"//trim(prob)//".unf", &
+             access="stream",status="old",position="append")
+        write(unit) scalp_time(:,k,1:time_series_step)
         close(unit)
       end if
 
     end do
 
     if (store%delta_time==1) then
-      open(unit,file=trim(output_dir)//"delta_time.txt")
-      do j = 1,endstep
-       write(unit,*) times(j),delta_time(j)
-      end do
+      open(unit,file=output_dir//"delta_time.unf", &
+           access="stream",status="old",position="append")
+      write(unit) delta_time(1:time_series_step)
       close(unit)
     end if
 
     if (store%tke==1) then
-      open(unit,file=trim(output_dir)//"tke.txt")
-      do j = 0,endstep
-       write(unit,*) times(j),tke(j)
-      end do
+      open(unit,file=output_dir//"tke.unf", &
+           access="stream",status="old",position="append")
+      write(unit) tke(1:time_series_step)
       close(unit)
     end if
 
     if (store%tke==1.and.store%dissip==1) then
-     open(unit,file=trim(output_dir)//"dissip.txt")
-      do j = 1,endstep
-       write(unit,*) times(j),dissip(j)
-      end do
+      open(unit,file=output_dir//"dissip.unf", &
+           access="stream",status="old",position="append")
+      write(unit) dissip(1:time_series_step)
       close(unit)
     end if
 
     if (wallmodeltype>0.and.display%ustar==1) then
-      open(unit,file=trim(output_dir)//"Retau.txt")
-      do j = 0,endstep
-       write(unit,*) times(j),ustar(:,j)
-      end do
+      open(unit,file=output_dir//"Retau.unf", &
+           access="stream",status="old",position="append")
+      write(unit) ustar(:,1:time_series_step)
       close(unit)
     end if
 
     if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.store%tstar==1) then
-      open(unit,file=trim(output_dir)//"tflux.txt")
-      do j = 0,endstep
-       write(unit,*) times(j),tstar(:,j)
-      end do
+      open(unit,file=output_dir//"tflux.unf", &
+           access="stream",status="old",position="append")
+      write(unit) tstar(:,1:time_series_step)
       close(unit)
     end if
 
 
     if (num_of_scalars>0.and.store%scalsum_time==1) then
-      open(unit,file=trim(output_dir)//"scalsumtime.txt")
-      do j = 1,endstep
-       write(unit,*) times(j),scalsum_time(:,j)
-      end do
+      open(unit,file=output_dir//"scalsumtime.unf", &
+           access="stream",status="old",position="append")
+      write(unit) scalsum_time(:,1:time_series_step)
       close(unit)
     end if
 
     if (num_of_scalars>0.and.store%scaltotsum_time==1) then
-      open(unit,file=trim(output_dir)//"scaltotsumtime.txt")
-      do j = 1,endstep
-       write(unit,*) times(j),sum(scalsum_time(:,j))
-      end do
+      open(unit,file=output_dir//"scaltotsumtime.unf", &
+           access="stream",status="old",position="append")
+      write(unit) sum(scalsum_time(:,1:time_series_step))
       close(unit)
     end if
     
@@ -1055,43 +1215,43 @@ contains
 
     if (store%BLprofiles==1.and.averaging==1) then
 
-       open(unit,file=trim(output_dir)//"profu.txt")
+       open(unit,file=output_dir//"profu.txt")
        do k = 1,Unz
         write(unit,*) zPr(k),profuavg(k)
        end do
        close(unit)
 
-       open(unit,file=trim(output_dir)//"profv.txt")
+       open(unit,file=output_dir//"profv.txt")
        do k = 1,Vnz
         write(unit,*) zPr(k),profvavg(k)
        end do
        close(unit)
 
-       open(unit,file=trim(output_dir)//"profuu.txt")
+       open(unit,file=output_dir//"profuu.txt")
        do k = 1,Unz
         write(unit,*) zPr(k),profuuavg(k)
        end do
        close(unit)
 
-       open(unit,file=trim(output_dir)//"profvv.txt")
+       open(unit,file=output_dir//"profvv.txt")
        do k = 1,Vnz
         write(unit,*) zPr(k),profvvavg(k)
        end do
        close(unit)
 
-       open(unit,file=trim(output_dir)//"profww.txt")
+       open(unit,file=output_dir//"profww.txt")
        do k = 1,Wnz
         write(unit,*) zW(k),profwwavg(k)
        end do
        close(unit)
 
-       open(unit,file=trim(output_dir)//"profuw.txt")
+       open(unit,file=output_dir//"profuw.txt")
        do k = 0,Prnz
         write(unit,*) zW(k),profuwavg(k),profuwsgsavg(k)
        end do
        close(unit)
 
-       open(unit,file=trim(output_dir)//"profvw.txt")
+       open(unit,file=output_dir//"profvw.txt")
        do k = 0,Prnz
         write(unit,*) zW(k),profvwavg(k),profvwsgsavg(k)
        end do
@@ -1099,26 +1259,26 @@ contains
 
        if (enable_buoyancy) then
 
-          open(unit,file=trim(output_dir)//"proftemp.txt")
+          open(unit,file=output_dir//"proftemp.txt")
           do k = 1,Prnz
            write(unit,*) zPr(k),proftempavg(k)
           end do
           close(unit)
 
-          open(unit,file=trim(output_dir)//"proftempfl.txt")
+          open(unit,file=output_dir//"proftempfl.txt")
           do k = 0,Prnz
            write(unit,*) zW(k),proftempflavg(k),proftempflsgsavg(k)
           end do
           close(unit)
 
-          open(unit,file=trim(output_dir)//"proftt.txt")
+          open(unit,file=output_dir//"proftt.txt")
           do k = 1,Prnz
            write(unit,*) zPr(k),profttavg(k)
           end do
           close(unit)
 
           if (allocated(U_avg).and.allocated(V_avg).and.allocated(Temperature_avg)) then
-            open(unit,file=trim(output_dir)//"profRig.txt")
+            open(unit,file=output_dir//"profRig.txt")
             do k = 1,Prnz
              S = 0
              do j = 1,Prny
@@ -1131,7 +1291,7 @@ contains
             end do
             close(unit)
 
-            open(unit,file=trim(output_dir)//"profRf.txt")
+            open(unit,file=output_dir//"profRf.txt")
             do k = 1,Prnz
              S = 0
              S2 = 0
@@ -1163,19 +1323,19 @@ contains
 
        if (enable_moisture) then
 
-          open(unit,file=trim(output_dir)//"profmoist.txt")
+          open(unit,file=output_dir//"profmoist.txt")
           do k = 1,Prnz
            write(unit,*) zPr(k),profmoistavg(k)
           end do
           close(unit)
 
-          open(unit,file=trim(output_dir)//"profmoistfl.txt")
+          open(unit,file=output_dir//"profmoistfl.txt")
           do k = 0,Prnz
            write(unit,*) zW(k),profmoistflavg(k),profmoistflsgsavg(k)
           end do
           close(unit)
 
-          open(unit,file=trim(output_dir)//"profmm.txt")
+          open(unit,file=output_dir//"profmm.txt")
           do k = 1,Prnz
            write(unit,*) zPr(k),profmmavg(k)
           end do
@@ -1186,19 +1346,19 @@ contains
 
        if (num_of_scalars>0) then
 
-          open(unit,file=trim(output_dir)//"profscal.txt")
+          open(unit,file=output_dir//"profscal.txt")
           do k = 1,Prnz
            write(unit,*) zPr(k),(profscalavg(i,k), i = 1,num_of_scalars)
           end do
           close(unit)
 
-          open(unit,file=trim(output_dir)//"profscalfl.txt")
+          open(unit,file=output_dir//"profscalfl.txt")
           do k = 0,Prnz
            write(unit,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i = 1,num_of_scalars)
           end do
           close(unit)
 
-          open(unit,file=trim(output_dir)//"profss.txt")
+          open(unit,file=output_dir//"profss.txt")
           do k = 1,Prnz
            write(unit,*) zPr(k),(profssavg(i,k), i = 1,num_of_scalars)
           end do
@@ -1229,7 +1389,7 @@ contains
 
        call newunit(unit);
 
-       open(unit,file=trim(output_dir)//"out.vtk", &
+       open(unit,file=output_dir//"out.vtk", &
          access='stream',status='replace',form="unformatted",action="write")
 
        write(unit) "# vtk DataFile Version 2.0",lf
@@ -1412,7 +1572,7 @@ contains
 
           call newunit(unit)
 
-          open(unit,file=trim(output_dir)//"scalars.vtk", &
+          open(unit,file=output_dir//"scalars.vtk", &
             access='stream',status='replace',form="unformatted",action="write")
 
           write(unit) "# vtk DataFile Version 2.0",lf
@@ -1457,7 +1617,7 @@ contains
 
           call newunit(unit)
 
-          open(unit,file=trim(output_dir)//"deposition.vtk", &
+          open(unit,file=output_dir//"deposition.vtk", &
             access='stream',status='replace',form="unformatted",action="write")
 
           write(unit) "CLMM output file",lf
@@ -1532,7 +1692,7 @@ contains
 
         call newunit(unit)
 
-        open(unit,file=trim(output_dir)//"avg.vtk", &
+        open(unit,file=output_dir//"avg.vtk", &
           access='stream',status='replace',form="unformatted",action="write")
 
         write(unit) "# vtk DataFile Version 2.0",lf
@@ -1656,10 +1816,10 @@ contains
       end if !store%avg
 
       if (btest(store%avg_U,1)) &
-        call OutputUVW(U,V,W,trim(output_dir)//"Uavg.vtk",trim(output_dir)//"Vavg.vtk",trim(output_dir)//"Wavg.vtk",.true.)
+        call OutputUVW(U,V,W,output_dir//"Uavg.vtk",output_dir//"Vavg.vtk",output_dir//"Wavg.vtk",.true.)
 
       if (btest(store%avg_U_rms,1)) &
-        call OutputUVW(U_r,V_r,W_r,trim(output_dir)//"Urms.vtk",trim(output_dir)//"Vrms.vtk",trim(output_dir)//"Wrms.vtk",.true.)
+        call OutputUVW(U_r,V_r,W_r,output_dir//"Urms.vtk",output_dir//"Vrms.vtk",output_dir//"Wrms.vtk",.true.)
 
     end if !averaging
 
@@ -1676,7 +1836,7 @@ contains
           store%scalars_intermitency==1) &
         .and. num_of_scalars>0) then
        
-      open(newunit=unit,file=trim(output_dir)//"scalars_avg.vtk", &
+      open(newunit=unit,file=output_dir//"scalars_avg.vtk", &
         access='stream',status='replace',form="unformatted",action="write")
 
       write(unit) "# vtk DataFile Version 2.0",lf
@@ -1909,7 +2069,7 @@ contains
 
       call newunit(unit)
 
-      open(unit,file=trim(output_dir)//"Uinterp.txt")
+      open(unit,file=output_dir//"Uinterp.txt")
       do i = 1,size(UIBPoints)
         write(unit,*) "xi,yj,zk",UIBPoints(i)%xi,UIBPoints(i)%yj,UIBPoints(i)%zk
         write(unit,*) "interp",UIBPoints(i)%interp
@@ -1925,7 +2085,7 @@ contains
 
       call newunit(unit)
 
-      open(unit,file=trim(output_dir)//"Vinterp.txt")
+      open(unit,file=output_dir//"Vinterp.txt")
       do i = 1,size(VIBPoints)
         write(unit,*) "xi,yj,zk",VIBPoints(i)%xi,VIBPoints(i)%yj,VIBPoints(i)%zk
         write(unit,*) "interp",VIBPoints(i)%interp
@@ -1941,7 +2101,7 @@ contains
 
       call newunit(unit)
 
-      open(unit,file=trim(output_dir)//"Winterp.txt")
+      open(unit,file=output_dir//"Winterp.txt")
       do i = 1,size(WIBPoints)
         write(unit,*) "xi,yj,zk",WIBPoints(i)%xi,WIBPoints(i)%yj,WIBPoints(i)%zk
         write(unit,*) "interp",WIBPoints(i)%interp
@@ -1957,7 +2117,7 @@ contains
 
       call newunit(unit)
 
-      open(unit,file=trim(output_dir)//"Scinterp.txt")
+      open(unit,file=output_dir//"Scinterp.txt")
       do i = 1,size(ScalFlIBPoints)
         write(unit,*) "xi,yj,zk",ScalFlIBPoints(i)%xi,ScalFlIBPoints(i)%yj,ScalFlIBPoints(i)%zk
         write(unit,*) "interp",ScalFlIBPoints(i)%interp
@@ -1998,7 +2158,9 @@ contains
                              Scalar_fl_W_adv(:,:,:,i), &
                              Scalar_avg(:,:,:,i), &
                              U_avg,V_avg,W_avg, &
-                             1._knd)
+                             1._knd, &
+                             scalar_fluxes_time(:,i,:,1), &
+                             scalar_probes%i, scalar_probes%j, scalar_probes%k)
       end do
 
       Scalar_fl_U_turb = Scalar_fl_U_avg - Scalar_fl_U_adv
@@ -2009,15 +2171,15 @@ contains
       call SaveScalarVTKFluxes(Scalar_fl_U_avg, &
                                Scalar_fl_U_adv, &
                                Scalar_fl_U_turb, &
-                               trim(output_dir)//"scalflu.vtk",xU,yPr,zPr)
+                               output_dir//"scalflu.vtk",xU,yPr,zPr)
       call SaveScalarVTKFluxes(Scalar_fl_V_avg, &
                                Scalar_fl_V_adv, &
                                Scalar_fl_V_turb, &
-                               trim(output_dir)//"scalflv.vtk",xPr,yV,zPr)
+                               output_dir//"scalflv.vtk",xPr,yV,zPr)
       call SaveScalarVTKFluxes(Scalar_fl_W_avg, &
                                Scalar_fl_W_adv, &
                                Scalar_fl_W_turb, &
-                               trim(output_dir)//"scalflw.vtk",xPr,yPr,zW)
+                               output_dir//"scalflw.vtk",xPr,yPr,zW)
 
     end if
 
@@ -2120,7 +2282,7 @@ contains
 
     call OutputScalars(Scalar)
 
-    call OutputUVW(U,V,W,trim(output_dir)//"U.vtk",trim(output_dir)//"V.vtk",trim(output_dir)//"W.vtk")
+    call OutputUVW(U,V,W,output_dir//"U.vtk",output_dir//"V.vtk",output_dir//"W.vtk")
     
     call OutputTimeSeries
 
@@ -2138,9 +2300,16 @@ contains
 
     call FinalizeVTKFrames
 
+    call FinalizeSurfaceFrames
+
     call FinalizeStaggeredFrames
 
     if (master) write(*,*) "saved"
+
+    if (len_trim(scratch_dir)>0) then
+      call CopyFromScratch(output_dir)
+    end if
+
   end subroutine Output
 
 
@@ -2578,7 +2747,7 @@ contains
 
     call newunit(unit)
 
-    open(unit,file=trim(output_dir)//"U2.vtk")
+    open(unit,file=output_dir//"U2.vtk")
     write(unit) "# vtk DataFile Version 2.0",lf
     write(unit) "CLMM output file",lf
     write(unit) "BINARY",lf
@@ -2612,7 +2781,7 @@ contains
     close(unit)
 
 
-    open(unit,file=trim(output_dir)//"V2.vtk")
+    open(unit,file=output_dir//"V2.vtk")
     write(unit) "# vtk DataFile Version 2.0",lf
     write(unit) "CLMM output file",lf
     write(unit) "BINARY",lf
@@ -2646,7 +2815,7 @@ contains
     close(unit)
 
 
-    open(unit,file=trim(output_dir)//"W2.vtk")
+    open(unit,file=output_dir//"W2.vtk")
     write(unit) "# vtk DataFile Version 2.0",lf
     write(unit) "CLMM output file",lf
     write(unit) "BINARY",lf
@@ -2691,7 +2860,7 @@ contains
     if ((time>=timefram1).and.(time<=timefram2+(timefram2-timefram1)/(frames-1))&
         .and.(time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
      if (called==0) then
-      open(101,file=trim(output_dir)//"inletframeinfo.unf",form='unformatted',status='replace',action='write')
+      open(101,file=output_dir//"inletframeinfo.unf",form='unformatted',status='replace',action='write')
       write(101) Prny,Prnz  !for check of consistency of grids before use
       write(101) Vny
       write(101) Wnz
@@ -2744,6 +2913,47 @@ contains
     close(unit)
 
   end subroutine OUTINLETFrame
+
+
+  subroutine CopyFromScratch(out_dir)
+! #ifdef MPI
+!     use custom_mpi
+!     integer :: ie
+! #else
+!     integer, parameter :: nims = 1, myim = 1
+! #endif
+    character(*), intent(in) :: out_dir
+!     character(len(out_dir)) :: final_dir
+!     integer :: i, l
+!     integer, parameter :: par = 8 !number of paralelly copying images
+! 
+!     do i = 1, ceiling(real(nims)/par)
+!       if (myim>(i-1)*par.and.myim<=i*par) then
+!       
+!         l = len_trim(scratch_dir)
+! 
+!         if (l>0) then
+! 
+!           final_dir = out_dir(l+1:)
+! 
+!           !FIXME: change to execute_command_line when more widely supported
+! #if defined(_WIN32) || defined(_WIN64)
+!           call system("mkdir "//trim(final_dir))
+!           call system("Robocopy "//out_dir//"* "//trim(final_dir)//" /E")
+! #else
+!           !Will try 10 times
+!           call system('n=0; until mkdir -p '//trim(final_dir)// &
+!                                 ' || [ "$n" -ge "9" ]; do n=$(($n+1)); done')
+!           call system('n=0; until cp -r '//out_dir//'* '//trim(final_dir)// &
+!                                 ' || [ "$n" -ge "9" ]; do n=$(($n+1)); done')
+! #endif
+!         end if
+!       end if
+! #ifdef MPI
+!       call MPI_Barrier(mpi_comm, ie)
+! #endif
+!     end do
+  end subroutine
 
 
 

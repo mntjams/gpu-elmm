@@ -25,7 +25,7 @@ module Frames_common
 
     logical :: ranges_set = .false.
 
-    character(40) :: base_name
+    character(2512) :: base_name = ""
 
     integer :: unit
 
@@ -33,9 +33,10 @@ module Frames_common
 
     type(c_ptr) :: threadptr
   contains
-    procedure(save_interface), deferred :: save
-    procedure(fill_interface), deferred :: fill
+    procedure(dosave_interface), deferred :: DoSave
+    procedure(fill_interface), deferred :: Fill
     procedure :: SaveTimes => TFrameBase_SaveTimes
+    procedure :: Save => TFrameBase_Save
     procedure :: Wait => TFrameBase_Wait
     procedure :: Finalize => TFrameBase_Finalize
   end type
@@ -49,14 +50,9 @@ module Frames_common
                               Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), &
                               Scalar(-1:,-1:,-1:,1:)
     end subroutine
-    subroutine save_interface(D, time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    subroutine dosave_interface(D)
       import
       class(TFrameBase),target,asynchronous,intent(inout) :: D
-      real(knd),intent(in) :: time
-      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-      real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), Viscosity(-1:,-1:,-1:), &
-                                         Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), &
-                                         Scalar(-1:,-1:,-1:,1:)
     end subroutine
   end interface
 
@@ -92,7 +88,7 @@ contains
   
   subroutine TFrameBase_SaveTimes(D)
     class(TFrameBase),intent(in) :: D
-    character(40) :: file_name
+    character(2512) :: file_name
     integer i
 
     file_name = trim(D%base_name)//"-times.txt"
@@ -105,6 +101,41 @@ contains
     close(D%unit)
 
   end subroutine
+  
+  
+  
+  subroutine TFrameBase_Save(D, time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    class(TFrameBase),target,asynchronous,intent(inout) :: D
+    real(knd),intent(in) :: time
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
+    real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), &
+                                       Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
+                                       Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
+    integer err
+
+    associate(start   => D%frame_times%start,&
+              end     => D%frame_times%end,&
+              nframes => D%frame_times%nframes)
+
+      if ( (time >= start) .and. (time <= end + (end-start)/(nframes-1)) &
+        .and. (time >= start + (D%frame_number+1)*(end-start) / (nframes-1)) ) then
+
+        D%frame_number = D%frame_number + 1
+
+        if (.not.allocated(D%times)) allocate(D%times(D%frame_number:D%frame_number+100))
+
+        call Add(D%times,D%frame_number,time)
+
+        if (D%in_progress) call D%Wait
+
+        call D%Fill(U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+
+        call D%DoSave
+
+      end if
+
+    end associate
+  end subroutine TFrameBase_Save
   
   
   subroutine TFrameBase_Wait(D)

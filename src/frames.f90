@@ -61,7 +61,7 @@ module StaggeredFrames
     character(4)  :: suffix = ".unf"
   contains
      procedure :: Fill => TStaggeredFrameDomain_Fill
-     procedure :: Save => TStaggeredFrameDomain_Save
+     procedure :: DoSave => TStaggeredFrameDomain_DoSave
      procedure :: SetRest => TStaggeredFrameDomain_SetRest
      procedure :: SaveHeader => TStaggeredFrameDomain_SaveHeader
      procedure :: SaveMask => TStaggeredFrameDomain_SaveMask
@@ -370,7 +370,7 @@ contains
     use iso_c_binding, only: c_f_pointer
     type(c_ptr),value :: Dptr
     type(TStaggeredFrameDomain),pointer :: D
-    character(40) :: file_name
+    character(2512) :: file_name
 
     call c_f_pointer(Dptr, D)
 
@@ -388,62 +388,43 @@ contains
 
 
 
-  subroutine TStaggeredFrameDomain_Save(D, time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+  subroutine TStaggeredFrameDomain_DoSave(D)
     use iso_c_binding, only: c_loc, c_funloc
+    use stop_procedures, only: error_stop
     class(TStaggeredFrameDomain),target,asynchronous,intent(inout) :: D
-    real(knd),intent(in) :: time
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), &
-                                       Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
-                                       Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
     integer err
+    
+    err = 1
 
-    associate(start   => D%frame_times%start,&
-              end     => D%frame_times%end,&
-              nframes => D%frame_times%nframes)
+    select type (Dnp => D)
+      type is (TStaggeredFrameDomain)
+        call pthread_create_opaque(Dnp%threadptr, &
+                                   c_funloc(SaveBuffer), &
+                                   c_loc(Dnp), &
+                                   err)
+      class default
+        call error_stop("Error: wrog type of D in TStaggeredFrameDomain_DoSave.")
+    end select
 
-      if ( (time >= start) .and. (time <= end + (end-start)/(nframes-1)) &
-        .and. (time >= start + (D%frame_number+1)*(end-start) / (nframes-1)) ) then
-
-        D%frame_number = D%frame_number + 1
-
-        if (.not.allocated(D%times)) allocate(D%times(D%frame_number:D%frame_number+100))
-
-        call Add(D%times,D%frame_number,time)
-
-        if (D%in_progress) call D%Wait
-
-        call D%Fill(U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
-
-        select type (Dnp => D)
-          type is (TStaggeredFrameDomain)
-            call pthread_create_opaque(Dnp%threadptr, &
-                                       c_funloc(SaveBuffer), &
-                                       c_loc(Dnp), &
-                                       err)
-        end select
-
-        if (err==0) then
-          D%in_progress = .true.
-        else
-          write (*,*) "Error in creating frame thread. Will run again synchronously. Code:",err
-          
-          select type (Dnp => D)
-            type is (TStaggeredFrameDomain)
-            call SaveBuffer(c_loc(Dnp))
-          end select
-        end if
-
-      end if
-
-    end associate
-  end subroutine TStaggeredFrameDomain_Save
+    if (err==0) then
+      D%in_progress = .true.
+    else
+      write (*,*) "Error in creating frame thread. Will run again synchronously. Code:",err
+      
+      select type (Dnp => D)
+        type is (TStaggeredFrameDomain)
+          call SaveBuffer(c_loc(Dnp))
+        class default
+          call error_stop("Error: wrog type of D in TStaggeredFrameDomain_DoSave.")
+      end select
+    end if
+  end subroutine TStaggeredFrameDomain_DoSave
 
 
 
   subroutine TStaggeredFrameDomain_SaveHeader(D)
     class(TStaggeredFrameDomain),intent(in) :: D
-    character(40) :: file_name
+    character(2512) :: file_name
 
     file_name = trim(D%base_name)//"-header"//trim(D%suffix)
 
@@ -475,7 +456,7 @@ contains
     class(TStaggeredFrameDomain),intent(in) :: D
     integer,intent(in) :: Prtype(0:,0:,0:)
     integer,dimension(-2:,-2:,-2:),intent(in) :: Utype, Vtype, Wtype
-    character(40) :: file_name
+    character(2512) :: file_name
 
     file_name = trim(D%base_name)//"-mask"//trim(D%suffix)
 
