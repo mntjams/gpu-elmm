@@ -2,9 +2,6 @@ module TURBINLET
 
   use Parameters
   use ArrayUtilities
-#ifdef MPI
-  use exchange_mpi
-#endif
   use rng_par_zig
   !$ use omp_lib
   
@@ -40,6 +37,10 @@ contains
 
 
  subroutine GetTurbInletXie(dt)
+#ifdef MPI
+   use custom_mpi, only: iim, jim, kim, nxims, nyims, nzims, mpi_co_sum, mpi_co_min
+   use exchange_mpi
+#endif
    real(knd),intent(in) :: dt
    logical,save:: called=.false.
    integer i,j,k
@@ -64,10 +65,16 @@ contains
 
       call InitMeanProfiles
 
+#ifdef MPI
+      filtny = min(max(nint(lturby/dymin),1),ceiling(1._knd*gPrny/3),Prny)
+      filtnz = min(max(nint(lturbz/dzmin),1),ceiling(1._knd*gPrnz/3),Prnz)
 
-      filtnz = min(max(nint(lturbz/dzmin),1),ceiling(1._knd*Prnz/3))
+      filtny = mpi_co_min(filtny)
+      filtnz = mpi_co_min(filtnz)
+#else
       filtny = min(max(nint(lturby/dymin),1),ceiling(1._knd*Prny/3))
-
+      filtnz = min(max(nint(lturbz/dzmin),1),ceiling(1._knd*Prnz/3))
+#endif
 
       bigNy = 2*filtny
       bigNz = 2*filtnz
@@ -418,8 +425,8 @@ contains
     end if
 
     if (windangle/=0) then
-        Uinavg = Uinavg * cos(windangle/180._knd*pi)
         Vinavg = Uinavg * sin(windangle/180._knd*pi)
+        Uinavg = Uinavg * cos(windangle/180._knd*pi)
     end if
 
   end subroutine InitMeanProfiles
@@ -550,7 +557,10 @@ contains
   end subroutine ReadInletFromFile
 
 
-  pure subroutine BoundUin(component,Uin)
+  subroutine BoundUin(component,Uin)
+#ifdef MPI
+    use exchange_mpi, only: exchange_mpi_boundaries_yz
+#endif
     integer,  intent(in)    :: component
     real(knd),intent(inout) :: Uin(-2:,-2:)
     integer :: nx, ny, nz
@@ -568,6 +578,11 @@ contains
       ny = Wny
       nz = Wnz
     end if
+
+#ifdef MPI
+     call exchange_mpi_boundaries_yz(Uin, ny, nz, Btype, &
+                                     -2, -2, 2, 2)
+#endif
 
     if (Btype(Bo)==DIRICHLET) then
       if (component==3) then
@@ -662,6 +677,7 @@ contains
     else if (Btype(No)==PERIODIC) then  !Periodic BC
         Uin(ny+1:ny+2,-1:nz+2) = Uin(1:2,-1:nz+2)
     end if
+
 
   end  subroutine BoundUin
 
