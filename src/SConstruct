@@ -185,7 +185,7 @@ if str(mpi)=='yes':
   objs += env.Object(target=target_dir+'P/custompfft', source='../../PoisFFT/src/custompfft.f90')
 objs += env.Object(target=target_dir+'P/precisions', source='../../PoisFFT/src/precisions.f90')
 objs += env.Object(target=target_dir+'P/parameters', source='../../PoisFFT/src/parameters.f90')
-objs += env.Object(target=target_dir+'P/fft', source='../../PoisFFT/src/fft.f90')
+objs += env.Object(target=target_dir+'P/fft', source='../../PoisFFT/src/fft.f90', F90FLAGS = filter(lambda flag: flag !='-ipo' , env['F90FLAGS']))
 Depends(objs[-1], '../../PoisFFT/src/fft-inc.f90')
 Depends(objs[-1], '../../PoisFFT/src/plan_create.f90')
 Depends(objs[-1], '../../PoisFFT/src/data_allocate.f90')
