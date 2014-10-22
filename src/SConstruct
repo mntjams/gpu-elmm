@@ -28,6 +28,8 @@ if str(prec)=='dp':
 else:
   prec_dir = 'sp/'
   prec_flag = ''
+  
+c_check_flag = ''
 
 
 if str(comp)=='intel':
@@ -36,12 +38,14 @@ if str(comp)=='intel':
   if str(openmp)!='no':
     openmp_flag = ' -openmp -recursive'
   else:
-    openmp_flag = ''
+    openmp_flag = ' -recursive -reentrancy'
 
   if str(fast)=='yes':
    fast_flag = ' -O3 -shared-intel'
+   check_flag = ''
   else:
-   fast_flag = ' -g -debug extended -O0 -shared-intel -check all,noarg_temp_created -traceback -warn all,nounused -fstack-protector -fpe1'
+   fast_flag = ' -O3'#' -g -debug extended -O0 -shared-intel -check all,noarg_temp_created -traceback -warn all,nounused -fstack-protector -fpe1'
+   check_flag = ' -g -check all,noarg_temp_created -traceback'
 
   if str(lto)=='yes':
     lto_flag = ' -ipo'
@@ -67,12 +71,15 @@ else:
     openmp_flag = ' -frecursive'
 
   if str(fast)=='yes':
-    fast_flag = ' -Ofast'# -Warray-temporaries'
+    fast_flag = '  -O5 -ffast-math -fno-protect-parens'# -Warray-temporaries'
+    check_flag = '  -fbacktrace -g'
   else:
-    fast_flag = ' -Wall -Wsurprising -Waliasing -Wimplicit-interface -Wno-unused-dummy-argument -Wno-unused -Wno-aliasing  -Werror -fcheck=all -ffpe-trap=zero,overflow,invalid'
+    fast_flag = ' -O5 -ffast-math -fno-protect-parens'
+    c_check_flag = ' -g -Wall -Wno-unused -Wno-maybe-uninitialized'
+    check_flag = c_check_flag + ' -fbacktrace -Waliasing -Wimplicit-interface -Wsurprising -Wno-unused-dummy-argument -Wno-aliasing  -fcheck=all  -Werror'
 
   if str(sanitize)=='yes':
-    fast_flag += ' -fsanitize=address'# -fsanitize=undefined -fsanitize=address -fsanitize=unreachable -fsanitize=null -fsanitize=signed-integer-overflow'
+    fast_flag += ' -fsanitize=address -fsanitize=undefined -fsanitize=address -fsanitize=unreachable -fsanitize=null -fsanitize=signed-integer-overflow'
     
   if str(lto)=='yes':
     lto_flag = ' -flto'
@@ -81,7 +88,7 @@ else:
 
   env.Replace(F90='gfortran')
   
-  env.Append(F90FLAGS='-cpp -fbacktrace -g -fstack-arrays')
+  env.Append(F90FLAGS='-cpp')#-fstack-arrays
 
   env.Append(LINKFLAGS='-static-libgcc -static-libstdc++ -static-libgfortran')
 
@@ -102,6 +109,7 @@ from_env('PATH')
 from_env('LIBRARY_PATH')
 from_env('LD_LIBRARY_PATH')
 from_env('C_INCLUDE_PATH')
+from_env('CPATH')
 from_env('CPLUS_INCLUDE_PATH')
 from_env('INTEL_LICENSE_FILE')
 
@@ -125,7 +133,10 @@ if prof=="yes":
 else:
   prof_flag=''
   
-env.Append(F90FLAGS= fast_flag + openmp_flag + prof_flag + lto_flag + extra_flag + prec_flag)# + ' -gdwarf-3'
+env.Append(F90FLAGS= fast_flag + openmp_flag + prof_flag + lto_flag + extra_flag + prec_flag + check_flag)
+env.Append(FFLAGS= env['F90FLAGS'])
+env.Append(CFLAGS= ' -O3 '+ openmp_flag + prof_flag + lto_flag + extra_flag + prec_flag + c_check_flag)
+env.Append(CXXFLAGS= ' -O3 ' + openmp_flag + prof_flag + extra_flag + prec_flag + c_check_flag)
   
 env.Append(LINKFLAGS= fast_flag + openmp_flag + prof_flag + lto_flag + extra_flag) # + '-Bdynamic -lpoisfft -lfftw3 -lfftw3f -lfftw3_omp -lfftw3f_omp -Bstatic -lgfortran -lquadmath -lstdc++ -llapack -L/usr/lib/x86_64-linux-uclibc/usr/lib/ -lc -lm -lpthread'  -Wl,--verbose
     
@@ -149,7 +160,7 @@ if str(openmp)!='no':
 if customSB=='yes':
  env.Append(F90FLAGS='-DCUSTOMSB')
  if str(SB)=='':
-   SBfile = ['../custom/emptySB.o']
+   SBfile = ['../custom/emptySB.f90']
  else:
    SBfile = [str(SB)]
 else:
@@ -159,7 +170,7 @@ else:
 if customPB=='yes':
   env.Append(F90FLAGS='-DCUSTOMPB')
   if str(PB)=='':
-    PBfile = ['../custom/emptyPB.o']
+    PBfile = ['../custom/emptyPB.f90']
   else:
     PBfile = [str(PB)]
 else:
