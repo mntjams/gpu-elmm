@@ -12,7 +12,15 @@ module Endianness
   interface BigEnd
     module procedure BigEnd16
     module procedure BigEnd32
+    module procedure BigEnd32_a1
+    module procedure BigEnd32_a2
+    module procedure BigEnd32_a3
+    module procedure BigEnd32_a4
     module procedure BigEnd64
+    module procedure BigEnd64_a1
+    module procedure BigEnd64_a2
+    module procedure BigEnd64_a3
+    module procedure BigEnd64_a4
   end interface
 
   interface SwapB
@@ -23,10 +31,10 @@ module Endianness
   contains
 
     subroutine GetEndianness
-      integer(int8),dimension(4):: bytes !may not work on some processors
+      character(4) :: bytes !may not work on some processors
 
-      bytes=transfer(1_int32,bytes,4)
-      if (bytes(4)==1) then
+      bytes = transfer(1_int32,bytes)
+      if (ichar(bytes(4:4))==1) then
         littleendian=.false.
       else
         littleendian=.true.
@@ -48,11 +56,9 @@ module Endianness
       endif
     end function
     
-    elemental function BigEnd32(x) result(res)
-      real(real32) :: res
+    function BigEnd32(x) result(res)
       real(real32),intent(in) :: x
-      character(4) :: bytes
-      integer(int32) :: t
+      real(real32) :: res
       
       if (.not.littleendian) then
         res = x
@@ -61,11 +67,97 @@ module Endianness
       endif
     end function
     
-    elemental function BigEnd64(x) result(res)
-      real(real64) :: res
+    function BigEnd32_a1(x) result(res)
+      real(real32),intent(in) :: x(:)
+      real(real32) :: res(size(x,1))
+      
+      if (.not.littleendian) then
+        res = x
+      else
+        res = SwapB(x)
+      endif
+    end function
+    
+    function BigEnd32_a2(x) result(res)
+      real(real32),intent(in) :: x(:,:)
+      real(real32) :: res(size(x,1),size(x,2))
+      
+      if (.not.littleendian) then
+        res = x
+      else
+        res = SwapB(x)
+      endif
+    end function
+    
+    function BigEnd32_a3(x) result(res)
+      real(real32),intent(in) :: x(:,:,:)
+      real(real32) :: res(size(x,1),size(x,2),size(x,3))
+      
+      if (.not.littleendian) then
+        res = x
+      else
+        res = SwapB(x)
+      endif
+    end function
+    
+    function BigEnd32_a4(x) result(res)
+      real(real32),intent(in) :: x(:,:,:,:)
+      real(real32) :: res(size(x,1),size(x,2),size(x,3),size(x,4))
+      
+      if (.not.littleendian) then
+        res = x
+      else
+        res = SwapB(x)
+      endif
+    end function
+    
+    function BigEnd64(x) result(res)
       real(real64),intent(in) :: x
-      character(8) :: bytes
-      integer(int64) :: t
+      real(real64) :: res
+      
+      if (.not.littleendian) then
+        res = x
+      else
+        res = SwapB(x)
+      endif
+    end function
+    
+    function BigEnd64_a1(x) result(res)
+      real(real64),intent(in) :: x(:)
+      real(real64) :: res(size(x,1))
+      
+      if (.not.littleendian) then
+        res = x
+      else
+        res = SwapB(x)
+      endif
+    end function
+    
+    function BigEnd64_a2(x) result(res)
+      real(real64),intent(in) :: x(:,:)
+      real(real64) :: res(size(x,1),size(x,2))
+      
+      if (.not.littleendian) then
+        res = x
+      else
+        res = SwapB(x)
+      endif
+    end function
+    
+    function BigEnd64_a3(x) result(res)
+      real(real64),intent(in) :: x(:,:,:)
+      real(real64) :: res(size(x,1),size(x,2),size(x,3))
+      
+      if (.not.littleendian) then
+        res = x
+      else
+        res = SwapB(x)
+      endif
+    end function
+    
+    function BigEnd64_a4(x) result(res)
+      real(real64),intent(in) :: x(:,:,:,:)
+      real(real64) :: res(size(x,1),size(x,2),size(x,3),size(x,4))
       
       if (.not.littleendian) then
         res = x
