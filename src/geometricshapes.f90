@@ -51,7 +51,9 @@ module GeometricShapes
 
   private
 
-  public GeometricShape, Line, Ray, Plane, ConvexPolyhedron, Polyhedron, &
+  public GeometricShape, Line, Ray, Plane, &
+         ConvexPolyhedron, ConvexPolyhedron_FromTopPoints, &
+         Polyhedron, &
          Sphere, Ellipsoid, CylJacket, Cylinder, TerrainPoint, Terrain, &
          Translation, Scaling, LinearTransform, Union, ArrayFromObst
 
@@ -74,7 +76,7 @@ module GeometricShapes
   end type
 
   abstract interface
-     logical function Inside_interface(self,x,y,z,eps)
+    logical function Inside_interface(self,x,y,z,eps)
       import
       class(GeometricShape),intent(in) :: self
       real(knd),intent(in) :: x,y,z
@@ -630,7 +632,7 @@ contains
       ins = self%a*x+self%b*y+self%c*z+self%d >= -eps*sqrt(self%a**2+self%b**2+self%c**2)
     else
       ins = self%a*x+self%b*y+self%c*z+self%d <= eps*sqrt(self%a**2+self%b**2+self%c**2)
-    endif
+    endif  
   end function
 
   subroutine Plane_Closest(self,xnear,ynear,znear,x,y,z)
@@ -668,6 +670,27 @@ contains
     allocate(res%Planes(size(Planes)), source=Planes)
     res%nplanes = size(Planes)
 
+  end function
+
+  
+  function ConvexPolyhedron_FromTopPoints(Points) result(res)
+    !points along the upper flat boundary in the left-hand order (outward normal upwards)
+    type(ConvexPolyhedron) :: res
+    real(knd), intent(in) :: Points(:,:)
+    integer :: i, n
+    
+    n = size(Points,2)
+    
+    allocate(res%Planes(n+1))
+    res%nplanes = n+1
+    
+    do i = 1, n-1
+      res%Planes(i) = Plane(Points(:,i+1), Points(:,i), [Points(1:2,i), Points(3,i)-(gzmax-gzmin)])
+    end do
+    res%Planes(n) = Plane(Points(:,1), Points(:,n), [Points(1:2,n), Points(3,n)-(gzmax-gzmin)])
+    
+    res%Planes(n+1) = Plane(Points(:,1), Points(:,2), Points(:,3))
+    
   end function
   
   logical function ConvexPolyhedron_Inside(self,x,y,z,eps) result(ins)
@@ -1025,45 +1048,6 @@ contains
         return
       end if
           
-!       do i = 1, self%n_ref_points
-!        
-!         ins = &
-!             cgal_polyhedron_inside(self%cgalptr, &
-!                                     x,y,z, &
-!                                     self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
-! 
-!         if (eps>0) then
-!             
-!           if (.not.ins) ins = &
-!               cgal_polyhedron_inside(self%cgalptr, &
-!                                       x-eps,y,z, &
-!                                       self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
-! !           if (.not.ins) ins = &
-! !               cgal_polyhedron_inside(self%cgalptr, &
-! !                                       x+eps,y,z, &
-! !                                       self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
-! !           if (.not.ins) ins = &
-! !               cgal_polyhedron_inside(self%cgalptr, &
-! !                                       x,y-eps,z, &
-! !                                       self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
-! !           if (.not.ins) ins = &
-! !               cgal_polyhedron_inside(self%cgalptr, &
-! !                                       x,y-eps,z, &
-! !                                       self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
-! !           if (.not.ins) ins = &
-! !               cgal_polyhedron_inside(self%cgalptr, &
-! !                                       x,y,z-eps, &
-! !                                       self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
-! !           if (.not.ins) ins = &
-! !               cgal_polyhedron_inside(self%cgalptr, &
-! !                                       x,y,z+eps, &
-! !                                       self%ref(i)%x,self%ref(i)%y,self%ref(i)%z)
-! !                                       
-!         end if
-!         
-!         if (ins) return
-! 
-!       end do
       
       ins = .false.
       
