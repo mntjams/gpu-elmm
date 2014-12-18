@@ -2,7 +2,7 @@ module Outputs
   use Parameters
   use Boundaries
   use Scalars
-  use Wallmodels, only: GroundDeposition, GroundUstar, wallmodeltype
+  use Wallmodels, only: GroundDeposition, GroundUstar, GroundUstarUVW, wallmodeltype
   use ImmersedBoundary
   use Turbinlet, only: Ustar_inlet
   use Endianness
@@ -278,20 +278,6 @@ integer :: tmp
 
 
    allocate(times(1:time_series_max_length))
-
-!   open(newunit=tmp,file=output_dir//"probes.txt",status="replace")
-
-!   write(tmp,*) size(probes),size(scalar_probes)
-!   close(tmp)
-#ifdef MPI
-   call MPI_Barrier(mpi_comm, tmp)
-
-!UGLY HACK!
-if (size(probes)<=0.or.size(scalar_probes)<=0) call error_stop("No probes in image " // &
-                                                      itoa(iim)//"-"//itoa(jim)//"-"//itoa(kim), 100+myim )
-
-   call MPI_Barrier(mpi_comm, tmp)
-#endif
    
    do k = 1,size(probes)
      associate(p => probes(k))
@@ -925,6 +911,21 @@ if (size(probes)<=0.or.size(scalar_probes)<=0) call error_stop("No probes in ima
         ustar(:,step)=[ S2 , S ]
       end if
 
+      S = GroundUstarUVW()
+
+      S2 = S*Re
+
+      if (display%ustar==1) then
+        if (allocated(Ustar_inlet)) then
+         if (master) write(*,*) "ustarUVW:",S,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
+        else
+         if (master) write(*,*) "ustarUVW:",S,"Re_tau:",S2
+        end if
+      end if
+      if (store%ustar==1) then
+        ustar(:,step)=[ S2 , S ]
+      end if
+      
     end if
 
 
