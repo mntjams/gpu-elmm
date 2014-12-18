@@ -10,7 +10,7 @@ module Puffs
   
   private
   
-  public PuffSource, PreparePuffs, DoPuffs, InitPuffSources, enable_puffs
+  public PuffSource, PuffSources, PreparePuffs, DoPuffs, InitPuffSources, enable_puffs
   
   type PuffSource
     real(knd) :: start_time,end_time,period, duration, last_start = -huge(1._knd)
