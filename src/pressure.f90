@@ -303,7 +303,11 @@ contains
     real(knd),intent(in)    :: dt2,dt3
     real(knd) :: Phi_ref,Au,Av,Aw,dxmin2,dymin2,dzmin2,S,p
     integer   :: i,j,k
+#ifdef CHECK_DIVERGENCE
+    logical, parameter :: check_divergence = .true.
+#else
     logical, parameter :: check_divergence = .false.
+#endif
 
 
     Au = dt2/dxmin
