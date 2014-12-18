@@ -5,22 +5,21 @@ module VolumeSourceBody_type
   implicit none
 
   type, extends(Body) :: VolumeSourceBody
-    procedure(temperature_interface),pointer  :: get_temperature_flux => null()
-    procedure(temperature_interface),pointer  :: get_moisture_flux    => null()
-    procedure(scalar_flux_interface),pointer :: get_scalar_flux      => null()
+    procedure(temperature_interface),nopass,pointer :: get_temperature_flux => null()
+    procedure(temperature_interface),nopass,pointer :: get_moisture_flux    => null()
+    procedure(scalar_flux_interface),nopass,pointer :: get_scalar_flux      => null()
+    logical :: variable = .false.
   end type VolumeSourceBody
 
   abstract interface
-    function temperature_interface(self,x,y,z) result(res)
-      import
+    function temperature_interface(x,y,z) result(res)
+      use Kinds
       real(knd) :: res
-      class(VolumeSourceBody),intent(in) :: self
       real(knd),intent(in) :: x,y,z
     end function
-    function scalar_flux_interface(self,x,y,z,num_of_scalar) result(res)
-      import
+    function scalar_flux_interface(x,y,z,num_of_scalar) result(res)
+      use Kinds
       real(knd) :: res
-      class(VolumeSourceBody),intent(in) :: self
       real(knd),intent(in) :: x,y,z
       integer,intent(in) :: num_of_scalar
     end function
@@ -52,14 +51,13 @@ module PlantBody_type
     real(knd) :: albedo = 0.3_knd
     real(knd) :: emmissivity = 0.7_knd
     real(knd) :: evaporative_fraction = 0.6_knd
-    procedure(resistance_interface),pointer  :: get_resistance       => null()
+    procedure(resistance_interface),nopass,pointer  :: get_resistance       => null()
   end type PlantBody
   
   abstract interface
-    function resistance_interface(self,x,y,z) result(res)
-      import
+    function resistance_interface(x,y,z) result(res)
+      use Kinds
       real(knd) :: res
-      class(PlantBody),intent(in) :: self
       real(knd),intent(in) :: x,y,z
     end function
   end interface
@@ -84,7 +82,7 @@ module VolumeSources
   use Parameters
   use Lists
   use Body_class
-  use VolumeSourceBody_type, only: VolumeSourceBody, SourceBodiesList
+  use VolumeSourceBody_type, only: VolumeSourceBody, SourceBodiesList, scalar_flux_interface
   use PlantBody_type, only: PlantBody, PlantBodiesList
 
   implicit none
@@ -124,6 +122,7 @@ module VolumeSources
   type,extends(FluxVolume) :: ScalarFlVolume
     ! <c'w'> = scalar_flux
     !flux = flux
+    procedure(scalar_flux_interface),nopass,pointer :: get_flux => null()
   end type ScalarFlVolume
 
   interface ScalarFlVolume
@@ -161,16 +160,19 @@ module VolumeSources
   !final scalar quantities sources/sinks
   type(TemperatureFlVolume),allocatable :: TemperatureFlVolumes(:)
   type(MoistureFlVolume)   ,allocatable :: MoistureFlVolumes(:)
+  !ScalarFlVolumes do not change in time, get_flux is not associated
   type(ScalarFlVolumesContainer),allocatable :: ScalarFlVolumes(:)
+  !VariableScalarFlVolumes van change in time, get_flux is associated and called each time step
+  type(ScalarFlVolumesContainer),allocatable :: VariableScalarFlVolumes(:)
   
   contains
 
-      subroutine InitVolumeSourceBodies
+    subroutine InitVolumeSourceBodies
 #ifdef CUSTOMPB
-        interface
-          subroutine CustomVolumeSourceBodies
-          end subroutine
-        end interface
+      interface
+        subroutine CustomVolumeSourceBodies
+        end subroutine
+      end interface
 
       call CustomVolumeSourceBodies
 #endif
@@ -206,8 +208,6 @@ module VolumeSources
     
     subroutine InsideCellsToLists
       !find cells inside the canopy and store them in a list
-      logical,allocatable :: InsidePr(:,:,:)
-      
       call PlantBodiesList%for_each(GetUCells)
 
       call PlantBodiesList%for_each(GetVCells)
@@ -216,8 +216,6 @@ module VolumeSources
 
       allocate(ScalarFlVolumesLists(num_of_scalars))
 
-      allocate(InsidePr(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-      
       call SourceBodiesList%for_each(GetOtherCells_VolumeSources)
 
       call PlantBodiesList%for_each(GetOtherCells_Plants)
@@ -297,23 +295,11 @@ module VolumeSources
           type(MoistureFlVolume) :: Melem
           type(ScalarFlVolume) :: Selem
           integer i,j,k,sc
-
-          InsidePr = .false.
           
           do k = 0,Prnz+1
            do j = 0,Prny+1
             do i = 0,Prnx+1
-               InsidePr(i,j,k) = VSB%Inside(xPr(i),yPr(j),zPr(k))
-            end do
-           end do
-          end do
-          
-        
-          do k = 0,Prnz+1
-           do j = 0,Prny+1
-            do i = 0,Prnx+1
-               if (InsidePr(i,j,k)) then
-               
+               if (VSB%Inside(xPr(i),yPr(j),zPr(k))) then
                  Telem%xi = i
                  Telem%yj = j
                  Telem%zk = k
@@ -348,7 +334,15 @@ module VolumeSources
                      Selem%xi = i
                      Selem%yj = j
                      Selem%zk = k
+                     
+                     if (VSB%variable) then
+                       Selem%get_flux => VSB%get_scalar_flux
+                     else
+                       Selem%get_flux => null()
+                     end if
+                     
                      Selem%flux = VSB%get_scalar_flux(xPr(i),yPr(j),zPr(k),sc)
+                     
                      if (Selem%flux/=0) call ScalarFlVolumesLists(sc)%list%add(Selem)
                    end do
                  end if
@@ -366,22 +360,10 @@ module VolumeSources
           type(ScalarFlVolume) :: Selem
           integer i,j,k,sc
           
-
-          InsidePr = .false.
-          
           do k = 0,Prnz+1
            do j = 0,Prny+1
             do i = 0,Prnx+1
-               InsidePr(i,j,k) = PB%Inside(xPr(i),yPr(j),zPr(k))
-            end do
-           end do
-          end do
-          
-        
-          do k = 0,Prnz+1
-           do j = 0,Prny+1
-            do i = 0,Prnx+1
-               if (InsidePr(i,j,k)) then
+               if (PB%Inside(xPr(i),yPr(j),zPr(k))) then
                
                  Telem%xi = i
                  Telem%yj = j
@@ -391,7 +373,7 @@ module VolumeSources
                  Melem%zk = k
                    
                  if (enable_buoyancy .and. enable_radiation) then
-                   if (on_border(i,j,k)) then
+                   if (on_border(PB,i,j,k)) then
                      call GetRadiationFluxes(PB,Telem,Melem,xPr(i),yPr(j),zPr(k))
                    else
                      Telem%flux = 0
@@ -414,15 +396,22 @@ module VolumeSources
 
         
         
-        logical function on_border(xi,yj,zk)
-          integer xi,yj,zk
-          on_border = InsidePr(xi,yj,zk) .and. &
-                      .not. all([InsidePr(xi-1,yj,zk), &
-                                 InsidePr(xi+1,yj,zk), &
-                                 InsidePr(xi,yj-1,zk), &
-                                 InsidePr(xi,yj+1,zk), &
-                                 InsidePr(xi,yj,zk-1), &
-                                 InsidePr(xi,yj,zk+1)])
+        logical function on_border(PB,xi,yj,zk)
+          type(PlantBody), intent(in) :: PB
+          integer, intent(in) :: xi,yj,zk
+          on_border = insPB(PB,xi,yj,zk) .and. &
+                      .not. all([insPB(PB,xi-1,yj,zk), &
+                                 insPB(PB,xi+1,yj,zk), &
+                                 insPB(PB,xi,yj-1,zk), &
+                                 insPB(PB,xi,yj+1,zk), &
+                                 insPB(PB,xi,yj,zk-1), &
+                                 insPB(PB,xi,yj,zk+1)])
+        end function
+        
+        logical function insPB(PB,xi,yj,zk)
+          type(PlantBody), intent(in) :: PB
+          integer, intent(in) :: xi,yj,zk
+          insPB = PB%Inside(xPr(xi),yPr(yj),zPr(zk))
         end function
     end subroutine InsideCellsToLists
 
@@ -529,7 +518,7 @@ module VolumeSources
         end function
       
 
-    end subroutine
+    end subroutine GetRadiationFluxes
 
     
     
@@ -553,7 +542,7 @@ module VolumeSources
     subroutine MovePointsToArray
     !It would be posible call a generic procedure with the list and array
     ! as an argument, but we want the final arrays not polymorphic.
-      integer :: i, j, component
+      integer :: i, inorm, ivar, j, component
 
       allocate(UResistanceVolumes(UResistanceVolumesList%Len()))
       allocate(VResistanceVolumes(VResistanceVolumesList%Len()))
@@ -563,8 +552,11 @@ module VolumeSources
 
       allocate(ScalarFlVolumes(num_of_scalars))
       
+      allocate(VariableScalarFlVolumes(num_of_scalars))
+      
       do j=1,num_of_scalars
-        allocate(ScalarFlVolumes(j)%volumes(ScalarFlVolumesLists(j)%list%Len()))
+        allocate(ScalarFlVolumes(j)%volumes(0))
+        allocate(VariableScalarFlVolumes(j)%volumes(0))
       end do
 
       i = 0
@@ -582,7 +574,8 @@ module VolumeSources
       call MoistureFlVolumesList%for_each(CopyPoint)
 
       do j=1,num_of_scalars
-        i = 0
+        inorm = 0
+        ivar = 0
         call ScalarFlVolumesLists(j)%list%for_each(CopyPoint)
       end do
       
@@ -593,10 +586,9 @@ module VolumeSources
         subroutine CopyPoint(elem)
           class(*) :: elem
 
-          i = i + 1
-
           select type (elem)
             type is (TResistanceVolume)          
+              i = i + 1
               if (component==1) then
                 UResistanceVolumes(i) = elem
               elseif (component==2) then
@@ -605,14 +597,35 @@ module VolumeSources
                 WResistanceVolumes(i) = elem
               endif
             type is (TemperatureFlVolume)
+              i = i + 1
               TemperatureFlVolumes(i) = elem
             type is (MoistureFlVolume)
+              i = i + 1
               MoistureFlVolumes(i) = elem
             type is (ScalarFlVolume)
-              ScalarFlVolumes(j)%volumes(i) = elem
+              if (associated(elem%get_flux)) then
+                call add_element(VariableScalarFlVolumes(j)%volumes, elem)
+              else
+                call add_element(ScalarFlVolumes(j)%volumes, elem)
+              end if
             class default
               call error_stop("Type error in volume source list.")
           end select
+        end subroutine
+        
+        subroutine add_element(a,e)
+          type(ScalarFlVolume),allocatable,intent(inout) :: a(:)
+          type(ScalarFlVolume),intent(in) :: e
+          type(ScalarFlVolume),allocatable :: tmp(:)
+
+          if (.not.allocated(a)) then
+            a = [e]
+          else
+            call move_alloc(a,tmp)
+            allocate(a(size(tmp)+1))
+            a(1:size(tmp)) = tmp
+            a(size(tmp)+1) = e
+          end if
         end subroutine
 
         subroutine SaveFluxes
@@ -726,29 +739,62 @@ module VolumeSources
       end associate
     end subroutine MoistureVolumeSources
 
-    subroutine ScalarVolumeSources(Scalar, sc)
+    subroutine ScalarVolumeSources(Scalar, sc, first_stage)
       real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Scalar
       integer, intent(in) :: sc
+      logical, intent(in) :: first_stage
       integer j
 
       if (allocated(ScalarFlVolumes)) then
         call FluxKernel(Scalar(:,:,:), ScalarFlVolumes(sc)%volumes)
       end if
 
+      if (allocated(VariableScalarFlVolumes)) then
+        if (first_stage) then
+          call VariableFluxKernel(Scalar(:,:,:), VariableScalarFlVolumes(sc)%volumes, sc)
+        else
+          call FluxKernel(Scalar(:,:,:), VariableScalarFlVolumes(sc)%volumes)
+        end if
+      end if
+
     end subroutine ScalarVolumeSources
 
-    subroutine FluxKernel(X,src)
+    subroutine FluxKernel(X, src)
       real(knd),intent(inout) :: X(-1:,-1:,-1:)
-      class(FluxVolume),intent(in) :: src(:)
+      type(ScalarFlVolume),intent(in) :: src(:)
       integer i
       !Assume src is allocated. It must hold if we called MovePointsToArray properly.
-       do i=1,size(src)
-         associate (xi => src(i)%xi, yj => src(i)%yj, zk => src(i)%zk)
-           X(xi,yj,zk) = X(xi,yj,zk) + src(i)%flux
-         end associate
-       end do
+      do i=1,size(src)
+        associate (xi => src(i)%xi, yj => src(i)%yj, zk => src(i)%zk)
+          X(xi,yj,zk) = X(xi,yj,zk) + src(i)%flux
+        end associate
+      end do
 
     end subroutine FluxKernel
+    
+    
+    subroutine VariableFluxKernel(X, src, sc)
+      real(knd),intent(inout) :: X(-1:,-1:,-1:)
+      type(ScalarFlVolume),intent(inout) :: src(:)
+      integer, intent(in) :: sc
+      integer i
+      !Assume src is allocated. It must hold if we called MovePointsToArray properly.
+      !Assume get_flux is associated. It must hold if we called MovePointsToArray properly.
+      do i=1,size(src)
+        associate (xp => xPr(src(i)%xi), &
+                   yp => yPr(src(i)%yj), &
+                   zp => zPr(src(i)%zk))
+          src(i)%flux = src(i)%get_flux(xp, yp, zp, sc)
+        end associate
+      end do
+      
+      do i=1,size(src)
+        associate (xi => src(i)%xi, yj => src(i)%yj, zk => src(i)%zk)
+          X(xi,yj,zk) = X(xi,yj,zk) + src(i)%flux
+        end associate
+      end do
+
+    end subroutine VariableFluxKernel
     
     
     

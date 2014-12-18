@@ -276,7 +276,7 @@ contains
         use VolumeSources, only: ScalarVolumeSources
         integer :: i
 
-        call ScalarVolumeSources(Scalar_adv(:,:,:,sc), sc)
+        call ScalarVolumeSources(Scalar_adv(:,:,:,sc), sc, RK_stage==1)
 
         call DoPuffs(Scalar_adv(:,:,:,sc), sc)
 
