@@ -179,8 +179,10 @@ contains
                   nearz = zPr(k+o) + t * ( z(k) - z(k+o) )
                   distvec = [nearx - x(i), neary - y(j), nearz - z(k)]
                   if (norm2(distvec)<dist) then
-                    write(*,'(a)',advance="no") '.'
+                    !Potentially problematic
+                    !write(*,'(a)',advance="no") '.'
                     if (norm2(distvec)<(dxmin*dymin*dzmin)**(1._knd/3)/20) then
+                      !Really problematic
                       write(*,*) "Warning, inconsistent processing of geometry, point",i,j,k,"dir",dir
                       write(*,*) norm2(distvec),dist,(dxmin*dymin*dzmin)**(1._knd/3)/20
                       call SB%Closest(nearx ,neary, nearz, x(i), y(j), z(k))
