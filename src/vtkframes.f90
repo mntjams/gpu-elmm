@@ -96,11 +96,13 @@ contains
   subroutine InitVTKFrames
     integer :: i
   
-    FrameDomains = pack(FrameDomains, InDomain(FrameDomains))
-    
-    do i=1, size(FrameDomains)
-      call FrameDomains(i)%SetRest(num_of_scalars)
-    end do
+    if (allocated(FrameDomains)) then
+      FrameDomains = pack(FrameDomains, InDomain(FrameDomains))
+      
+      do i=1, size(FrameDomains)
+        call FrameDomains(i)%SetRest(num_of_scalars)
+      end do
+    end if
   
   end subroutine
 
