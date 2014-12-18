@@ -56,6 +56,9 @@ program CLMM
   time_step = 0
 
   call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
+  
+  init_phase = .false.
+  run_phase = .true.
 
   call system_clock(count_rate = timer_rate)
 

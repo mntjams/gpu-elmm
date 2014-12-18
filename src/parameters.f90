@@ -51,12 +51,11 @@ module Parameters
   integer :: Wnx,Wny,Wnz     !dimensions of grid for velocity component W
 
   integer :: Prnx,Prny,Prnz  !dimensions of grid for pressure
-
+  
   !relevant for MPI
   integer :: gPrnx, gPrny, gPrnz !global grid dimensions
   integer :: offset_to_global_x = 0, offset_to_global_y = 0, offset_to_global_z = 0
   integer :: gPrns(3), offsets_to_global(3) = 0
-  !relevant for MPI
   
 
   integer   :: max_number_of_time_steps    !maximum number of time steps
@@ -174,6 +173,8 @@ module Parameters
   integer,parameter :: PointSource=1,LineSource=2,AreaSource=3,VolumeSource=4
 
   integer(c_int), bind(C,name="debuglevel") :: debuglevel = 0 !amount of information to write out
+  
+  logical :: init_phase = .true., run_phase = .false.
   
   character(:), allocatable :: output_dir, image_input_dir
   character(2048) :: scratch_dir = ""
