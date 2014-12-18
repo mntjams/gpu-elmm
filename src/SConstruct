@@ -11,6 +11,8 @@ dir = ARGUMENTS.get('dir','')
 customSB = ARGUMENTS.get('customSB','')
 SB = ARGUMENTS.get('SB','')
 customPB = ARGUMENTS.get('customPB','')
+customPuff = ARGUMENTS.get('customPuff','')
+customConfig = ARGUMENTS.get('customConfig','')
 PB = ARGUMENTS.get('PB','')
 extra = ARGUMENTS.get('extra','')
 cgal = ARGUMENTS.get('cgal','')
@@ -176,6 +178,11 @@ if customPB=='yes':
 else:
   PBfile=[]
   
+if customPuff=='yes':
+  env.Append(F90FLAGS='-DCUSTOM_PUFF_SOURCES')
+  
+if customConfig=='yes':
+  env.Append(F90FLAGS='-DCUSTOM_CONFIG')
 
 #May be used to compile PoisFFT directly, adjust the correct path.
 Mkdir(target_dir+'/P/')
@@ -187,15 +194,14 @@ objs += env.Object(target=target_dir+'P/precisions', source='../../PoisFFT/src/p
 objs += env.Object(target=target_dir+'P/parameters', source='../../PoisFFT/src/parameters.f90')
 objs += env.Object(target=target_dir+'P/fft', source='../../PoisFFT/src/fft.f90', F90FLAGS = filter(lambda flag: flag !='-ipo' , env['F90FLAGS']))
 Depends(objs[-1], '../../PoisFFT/src/fft-inc.f90')
-Depends(objs[-1], '../../PoisFFT/src/plan_create.f90')
-Depends(objs[-1], '../../PoisFFT/src/data_allocate.f90')
-Depends(objs[-1], '../../PoisFFT/src/plan_create_many.f90')
-Depends(objs[-1], '../../PoisFFT/src/data_allocate_many.f90')
+Depends(objs[-1], '../../PoisFFT/src/plan_new-inc.f90')
+Depends(objs[-1], '../../PoisFFT/src/allocate_fftw-inc.f90')
 Depends(objs[-1], objs[0])
 Depends(objs[-1], objs[2])
 Depends(objs[-1], objs[3])
 objs += env.Object(target=target_dir+'P/poisfft', source='../../PoisFFT/src/poisfft.f90')
 Depends(objs[-1], '../../PoisFFT/src/poisfft-inc.f90')
+Depends(objs[-1], '../../PoisFFT/src/poisfft-solvers-inc.f90')
 Depends(objs[-1], '../../PoisFFT/src/loop_nest_3d.f90')
 Depends(objs[-1], objs[3])
 objs += env.Object(target=target_dir+'P/main', source='../../PoisFFT/src/main.f90')
