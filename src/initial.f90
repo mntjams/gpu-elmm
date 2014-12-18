@@ -31,10 +31,14 @@ module Initial
   implicit none
 
   private
-  public  ReadConfiguration, InitialConditions, InitBoundaryConditions
+  public  ReadConfiguration, InitialConditions, InitBoundaryConditions, probes_file, scalar_probes_file
 
   real(knd) x0,y0,z0 !domain boundaries, will become xU(0), yV(0), zW(0)
   real(knd) lx,ly,lz !domain extents
+
+  character(80) :: probes_file = ""
+  character(80) :: scalar_probes_file = ""
+
 
 contains
 
@@ -49,9 +53,6 @@ contains
    real(knd) mgepsinnerGS
    integer   i,io,io2,itmp
    integer numframeslices
-
-   character(80), save :: probes_file = ""
-   character(80), save :: scalar_probes_file = ""
 
    character(len = 1024) :: command_line,msg
    integer :: exenamelength
@@ -79,8 +80,13 @@ contains
    end interface
 
    interface
-     subroutine CustomConfiguration
+
+     subroutine CustomConfiguration_First
      end subroutine
+
+     subroutine CustomConfiguration_Last
+     end subroutine
+
    end interface
 
    image_input_dir = "input/"
@@ -102,6 +108,9 @@ contains
    !NOTE: it is parsed one more time lower in this subroutine
    call parse_command_line
 
+#ifdef CUSTOM_CONFIG
+   call CustomConfiguration_First
+#endif
 
    open(unit,file="main.conf",status="old",action="read")
    call get(CFL)
@@ -819,7 +828,7 @@ contains
    end if
 
 #ifdef CUSTOM_CONFIG
-   call CustomConfiguration
+   call CustomConfiguration_Last
 #endif
 
    if (master) write(*,*) "set"
