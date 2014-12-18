@@ -196,7 +196,11 @@ contains
     else if (suffix=='.off') then
       call ReadOff(filename)
     else if (suffix=='.xyz'.or.suffix=='.elv') then
-        call ReadTerrain(filename)
+      call ReadTerrain(filename)
+    else if (suffix=='.ltop') then
+      call ReadTopPoints(filename,.false.)
+    else if (suffix=='.rtop') then
+      call ReadTopPoints(filename,.true.)
     else
       write(*,*) "Unknown file format "//suffix
       call error_stop
@@ -225,11 +229,98 @@ contains
       !assume z0 the same as for the lower boundary
       call AddSolidBody(SolidBody(Polyhedron(filename), z0 = z0B))
     else
-      write(*,*) "Error, file ",filename," does not exist."
-      call error_stop
+      call error_stop("Error, file "//filename//" does not exist.")
     end if
 
   end subroutine ReadOff
+  
+  
+  subroutine ReadTopPoints(filename, right)
+    character(*),intent(in) :: filename
+    logical, intent(in) :: right
+    logical :: ex, body_opened
+    real(knd), allocatable :: points(:,:)
+    integer :: u, stat
+
+    inquire(file=filename,exist=ex)
+
+    if (ex) then
+      
+      open(newunit=u, file=filename)
+      
+      body_opened = .false.
+      do
+        call next_line(stat)
+        if (stat>0) exit
+      end do
+      
+      close(u)
+    else
+      call error_stop("Error, file "//filename//" does not exist.")
+    end if
+
+  contains
+    subroutine next_line(stat)
+      integer, intent(out) :: stat
+      character(1024) :: line
+      integer :: io
+      
+      read(u,'(a)', iostat=io) line
+      
+      if (io/=0) then
+        if (body_opened) call close_body
+        stat = 1
+        return
+      end if
+      
+      if (len_trim(line)==0) then  
+        if (body_opened) call close_body
+        return
+      end if
+        
+      call next_point(line, stat)
+    end subroutine
+    
+    subroutine next_point(line, stat)
+      character(*), intent(in) :: line
+      integer, intent(out) :: stat
+      real(knd) :: point(3)
+      real(knd), allocatable :: tmp(:,:)
+      integer :: io
+      
+      read(line,*,iostat=io) point
+      if (io/=0) then
+        stat = 2
+        return
+      end if
+     
+      if (.not.body_opened) then
+        body_opened = .true.
+        allocate(points(3,1))
+      else
+        tmp = points
+        deallocate(points)
+        allocate(points(3,size(tmp,2)+1))
+        points(:,1:size(tmp,2)) = tmp
+      end if
+      points(:,size(points,2)) = point
+      
+      stat = 0
+    end subroutine
+    
+    subroutine close_body
+      !assume z0 the same as for the lower boundary
+      if (right) then
+        call AddSolidBody(SolidBody(ConvexPolyhedron_FromTopPoints(points), z0 = z0B))
+      else
+        call AddSolidBody(SolidBody(ConvexPolyhedron_FromTopPoints(points(:,size(points,2):1:-1)), z0 = z0B))
+      end if
+
+      deallocate(points)
+      body_opened = .false.
+    end subroutine
+
+  end subroutine ReadTopPoints
   
   
   
@@ -244,10 +335,10 @@ contains
       if (len_trim(displacement_file)>0) then
         call AddSolidBody(SolidBody(Terrain(uniform_map(filename), &
                                             uniform_map(trim(roughness_file), default = z0B), &
-                                            uniform_map(trim(displacement_file)))))
+                                            uniform_map(trim(displacement_file), default = 0._knd))))
       else
         call AddSolidBody(SolidBody(Terrain(uniform_map(trim(filename)), &
-                                            uniform_map(trim(roughness_file), default = 0._knd))))
+                                            uniform_map(trim(roughness_file), default = z0B))))
       end if
     else
       call AddSolidBody(SolidBody(Terrain(uniform_map(filename), z0 = z0B)))
