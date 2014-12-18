@@ -111,7 +111,7 @@ module Wallmodels
          AddWMPoint, AddWMPointUVW, &
          MoveWMPointsToArray, GetOutsideBoundariesWM, InitWMMasks, &
          ComputeViscsWM, ComputeUVWFluxesWM, DivergenceWM, &
-         InitTempFl, GroundDeposition, GroundUstar, wallmodeltype
+         InitTempFl, GroundDeposition, GroundUstar, GroundUstarUVW, wallmodeltype
 #ifdef __HMPP
   public hmppWMpoint,WMPtoHMPP
 #endif
@@ -124,7 +124,7 @@ module Wallmodels
 
   type(WMPointList) :: WMPointsList
 
-  type(WMPointUVW), dimension(:), allocatable, public :: &
+  type(WMPointUVW), dimension(:), allocatable, public, target :: &
       UxmWMpoints, UxpWMpoints, UymWMpoints, UypWMpoints, UzmWMpoints, UzpWMPoints, &
       VxmWMpoints, VxpWMpoints, VymWMpoints, VypWMpoints, VzmWMpoints, VzpWMpoints, &
       WxmWMpoints, WxpWMpoints, WymWMpoints, WypWMpoints, WzmWMpoints, WzpWMpoints
@@ -138,6 +138,12 @@ module Wallmodels
   logical(slog),dimension(:,:,:),allocatable,public :: Wflx_mask, Wfly_mask, Wflz_mask
 
   integer :: wallmodeltype
+  
+  type point_container
+    type(WMPointUVW), dimension(:), pointer :: points
+  end type
+  
+  type(point_container) :: WMPointsUVW(6,3)
 
 contains
 
@@ -285,7 +291,29 @@ contains
     call helper(WypWMPsL, WypWMpoints)
     call helper(WzmWMPsL, WzmWMpoints)
     call helper(WzpWMPsL, WzpWMpoints)
+    
+    
+    WMPointsUVW(1,1)%points => UxmWMpoints
+    WMPointsUVW(2,1)%points => UxpWMpoints
+    WMPointsUVW(3,1)%points => UymWMpoints
+    WMPointsUVW(4,1)%points => UypWMpoints
+    WMPointsUVW(5,1)%points => UzmWMpoints
+    WMPointsUVW(6,1)%points => UzpWMpoints
 
+    WMPointsUVW(1,2)%points => VxmWMpoints
+    WMPointsUVW(2,2)%points => VxpWMpoints
+    WMPointsUVW(3,2)%points => VymWMpoints
+    WMPointsUVW(4,2)%points => VypWMpoints
+    WMPointsUVW(5,2)%points => VzmWMpoints
+    WMPointsUVW(6,2)%points => VzpWMpoints
+
+    WMPointsUVW(1,3)%points => WxmWMpoints
+    WMPointsUVW(2,3)%points => WxpWMpoints
+    WMPointsUVW(3,3)%points => WymWMpoints
+    WMPointsUVW(4,3)%points => WypWMpoints
+    WMPointsUVW(5,3)%points => WzmWMpoints
+    WMPointsUVW(6,3)%points => WzpWMpoints
+    
   contains
     subroutine helper(l, arr)
       type(WMPointUVWList), intent(inout) :: l
@@ -987,7 +1015,7 @@ contains
 
     !under z0 the whole concept of rougness parameter breaks down
     !if in the laminar region for flat boundary layer also treat as flat and possibly laminar
-    if (dist<=z0*2_knd .or. dist_plus<yplcrit*1.5_knd) then
+    if (dist<=z0*2_knd .or. dist_plus<yplcrit*1.1_knd) then
       if (Re>0) then
         call WMFlatUstar(ustar,vel,dist)
       else
@@ -1541,7 +1569,7 @@ contains
       if (norm2(dist)<(dxmin*dymin*dzmin)**(1._knd/3)/20) then
         write(*,*) "ijk",xi,yj,zk
         write(*,*) "dist",dist
-        call error_stop("Error, WM point cannot be exactly on the wall!")
+        call error_stop("Error, WM point can not be exactly on the wall!")
       end if
 
       vel(1) = (U(xi,yj,zk)+U(xi-1,yj,zk))/2._knd
@@ -1648,16 +1676,18 @@ contains
     subroutine fluxes(points, component, direction)
       type(WMPointUVW), intent(inout), target :: points(:)
       integer, intent(in) :: component, direction
-      integer i,j,xi,yj,zk
-      real(knd) dist(3), vel(3), wallvel(3), tan_vect(3), mag
+      integer point,j,xi,yj,zk
+      real(knd) dist(3), vel(3), wallvel(3), tan_vect(3), mag, drec(6)
       type(WMPointUVW), pointer :: p
       real(knd), parameter :: eps = 0.0001_knd
+      
+      drec = [1/dxmin, 1/dxmin, 1/dymin, 1/dymin, 1/dzmin, 1/dzmin]
 
-      !$omp parallel do private(i,xi,yj,zk,dist,vel,wallvel,tan_vect,p,mag)
-      do i = 1,size(points)
+      !$omp parallel do private(point,xi,yj,zk,dist,vel,wallvel,tan_vect,p,mag)
+      do point = 1,size(points)
 
 !         associate (p => points(i))  NOTE: ASSOCIATE supported only in OpenMP 4
-          p => points(i)
+          p => points(point)
           xi = p%xi
           yj = p%yj
           zk = p%zk
@@ -1667,7 +1697,7 @@ contains
           if (norm2(dist)<(dxmin*dymin*dzmin)**(1._knd/3)/20) then
             write(*,*) "ijk",xi,yj,zk
             write(*,*) "dist",dist
-            call error_stop("Error, WM point UVW cannot be exactly on the wall!")
+            call error_stop("Error, WM point UVW can not be exactly on the wall!")
           end if
 
           vel = local_velocity(U,V,W,component,xi,yj,zk)
@@ -1705,7 +1735,7 @@ contains
 
            if (mag>eps) then
 
-             p%flux = tan_vect(component) / mag * p%ustar**2
+             p%flux = (tan_vect(component) / mag) * p%ustar**2 * drec(direction)
 
              if (mod(direction,2)==1) p%flux = - p%flux
 
@@ -1732,39 +1762,39 @@ contains
 
     select case (component)
       case (1)
-        vel(1) =   U(xi, yj, zk)
-        vel(2) = ( V(xi-1,yj,  zk) + &
+        vel(1) =   U(xi,  yj,  zk)
+        vel(2) = ( V(xi+1,yj,  zk) + &
                    V(xi,  yj,  zk) + &
-                   V(xi-1,yj+1,zk) + &
-                   V(xi,  yj+1,zk) &
+                   V(xi+1,yj-1,zk) + &
+                   V(xi,  yj-1,zk) &
                  ) / 4._knd
-        vel(3) = ( W(xi-1,yj, zk  ) + &
+        vel(3) = ( W(xi+1,yj, zk  ) + &
                    W(xi,  yj, zk  ) + &
-                   W(xi-1,yj, zk+1) + &
-                   W(xi,  yj, zk+1) &
+                   W(xi+1,yj, zk-1) + &
+                   W(xi,  yj, zk-1) &
                  ) / 4._knd
       case (2)
-        vel(1) = ( U(xi  ,yj-1,zk) + &
+        vel(1) = ( U(xi  ,yj+1,zk) + &
                    U(xi,  yj,  zk) + &
-                   U(xi+1,yj-1,zk) + &
-                   U(xi+1,yj,  zk) &
+                   U(xi-1,yj+1,zk) + &
+                   U(xi-1,yj,  zk) &
                  ) / 4._knd
         vel(2) =   V(xi, yj, zk)
-        vel(3) = ( W(xi, yj-1,zk  ) + &
+        vel(3) = ( W(xi, yj+1,zk  ) + &
                    W(xi, yj,  zk  ) + &
-                   W(xi, yj-1,zk+1) + &
-                   W(xi, yj,  zk+1) &
+                   W(xi, yj+1,zk-1) + &
+                   W(xi, yj,  zk-1) &
                  ) / 4._knd
       case (3)
-        vel(1) = ( U(xi  ,yj, zk-1) + &
+        vel(1) = ( U(xi  ,yj, zk+1) + &
                    U(xi,  yj, zk  ) + &
-                   U(xi+1,yj, zk-1) + &
-                   U(xi+1,yj, zk  ) &
+                   U(xi-1,yj, zk+1) + &
+                   U(xi-1,yj, zk  ) &
                  ) / 4._knd
-        vel(2) = ( V(xi, yj,  zk-1) + &
+        vel(2) = ( V(xi, yj,  zk+1) + &
                    V(xi, yj,  zk  ) + &
-                   V(xi, yj+1,zk-1) + &
-                   V(xi, yj+1,zk  ) &
+                   V(xi, yj-1,zk+1) + &
+                   V(xi, yj-1,zk  ) &
                  ) / 4._knd
         vel(3) =   W(xi, yj, zk)
     end select
@@ -1778,6 +1808,31 @@ contains
       GroundUstar = 0
     end if
   end function GroundUstar
+
+
+  real(knd) function GroundUstarUVW() result(res)
+    integer :: i, j, n
+
+    if (any(WMPoints%zk == 1)) then
+      res = 0
+      n = 0
+      do j = 1,3
+        do i = 1,6
+          associate(p => WMPointsUVW(i,j))
+            n = n +  count(p%points%zk == 1)
+            res = res + sum(p%points%ustar, mask = (p%points%zk == 1))
+          end associate
+        end do
+      end do
+      if (n>0) then
+        res = res / n
+      else
+        res = 0
+      end if
+    else
+      res = 0
+    end if
+  end function GroundUstarUVW
 
 
 
