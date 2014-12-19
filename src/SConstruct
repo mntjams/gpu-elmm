@@ -155,7 +155,7 @@ if str(mpi)=='yes':
   env.Append(LIBS = ['pfft','pfftf','fftw3_mpi','fftw3f_mpi'])
 
 #instead of openblas, any blas and lapack can be used.
-env.Append(LIBS = ['openblas','fftw3','fftw3f','pthread','stdc++'])
+env.Append(LIBS = ['blas','lapack','fftw3','fftw3f','pthread','stdc++'])
 if str(openmp)!='no':
   env.Append(LIBS = ['fftw3_omp','fftw3f_omp'])
 
