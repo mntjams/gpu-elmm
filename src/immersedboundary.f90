@@ -701,7 +701,7 @@ contains
       call null_point;  return
     end if
     
-    if (count(Utype(xi-1:xi+1,yj-1:yj+1,zk-1:zk+1)>0)>11) then
+    if (count(Utype(xi-1:xi+1,yj-1:yj+1,zk-1:zk+1)>0)>21) then
       call null_point; return
     end if
     
