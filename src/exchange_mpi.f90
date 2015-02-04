@@ -1,5 +1,5 @@
 module exchange_mpi
-  use custom_mpi, only: mpi_comm, w_rank, e_rank, s_rank, n_rank, b_rank, t_rank, &
+  use custom_mpi, only: global_comm, w_rank, e_rank, s_rank, n_rank, b_rank, t_rank, &
                         nxims, nyims, nzims, mpi_knd, mpi_status_size, iim, jim, kim
   use Kinds
   
@@ -203,7 +203,7 @@ contains
       real(knd), intent(in) :: a(:,:,:)
       integer, intent(in) :: to
 
-      call MPI_Send(a, size(a) , MPI_KND, to, tag, mpi_comm, ierr)
+      call MPI_Send(a, size(a) , MPI_KND, to, tag, global_comm, ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -211,7 +211,7 @@ contains
       real(knd), intent(out) :: a(:,:,:)
       integer, intent(in) :: from
 
-      call MPI_Recv(a, size(a) , MPI_KND, from, tag, mpi_comm, status, ierr)
+      call MPI_Recv(a, size(a) , MPI_KND, from, tag, global_comm, status, ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -415,7 +415,7 @@ contains
       real(knd), intent(in) :: a(:,:)
       integer, intent(in) :: to
 
-      call MPI_Send(a, size(a) , MPI_KND, to, 1, mpi_comm, ierr)
+      call MPI_Send(a, size(a) , MPI_KND, to, 1, global_comm, ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -423,7 +423,7 @@ contains
       real(knd), intent(out) :: a(:,:)
       integer, intent(in) :: from
 
-      call MPI_Recv(a, size(a) , MPI_KND, from, 1, mpi_comm, status, ierr)
+      call MPI_Recv(a, size(a) , MPI_KND, from, 1, global_comm, status, ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -625,7 +625,7 @@ contains
       real(knd), intent(in) :: a(:,:)
       integer, intent(in) :: to
 
-      call MPI_Send(a, size(a) , MPI_KND, to, tag, mpi_comm, ierr)
+      call MPI_Send(a, size(a) , MPI_KND, to, tag, global_comm, ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -634,7 +634,7 @@ contains
       real(knd) :: tmp(size(a,1),size(a,2))
       integer, intent(in) :: from
 
-      call MPI_Recv(tmp, size(a) , MPI_KND, from, tag, mpi_comm, status, ierr)
+      call MPI_Recv(tmp, size(a) , MPI_KND, from, tag, global_comm, status, ierr)
       if (ierr/=0) stop "error sending MPI message."
       a = a + tmp
     end subroutine
@@ -820,8 +820,8 @@ contains
     subroutine send(a,to)
       real(knd), intent(in) :: a(:,:)
       integer, intent(in) :: to
-      !Must be mpi_comm, for `to` and `from` derived from `x_rank` to be valid!
-      call MPI_Send(a, size(a) , MPI_KND, to, tag, mpi_comm, ierr)
+      !Must be global_comm, for `to` and `from` derived from `x_rank` to be valid!
+      call MPI_Send(a, size(a) , MPI_KND, to, tag, global_comm, ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -829,7 +829,7 @@ contains
       real(knd), intent(out) :: a(:,:)
       integer, intent(in) :: from
 
-      call MPI_Recv(a, size(a) , MPI_KND, from, tag, mpi_comm, status, ierr)
+      call MPI_Recv(a, size(a) , MPI_KND, from, tag, global_comm, status, ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     

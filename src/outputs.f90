@@ -2951,7 +2951,7 @@ integer :: tmp
 !         end if
 !       end if
 ! #ifdef MPI
-!       call MPI_Barrier(mpi_comm, ie)
+!       call MPI_Barrier(global_comm, ie)
 ! #endif
 !     end do
   end subroutine

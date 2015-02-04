@@ -13,7 +13,7 @@ module custom_mpi
   integer :: myim, myrank, iim, jim, kim
   integer :: w_im, e_im, s_im, n_im, b_im, t_im
   integer :: w_rank, e_rank, s_rank, n_rank, b_rank, t_rank
-  integer :: mpi_comm, poisfft_comm, cart_comm
+  integer :: global_comm, poisfft_comm, cart_comm
   integer :: comm_plane_yz = -1, comm_plane_xz = -1, comm_plane_xy = -1
   integer :: comm_row_x = -1, comm_row_y = -1, comm_row_z = -1
   integer :: cart_comm_dim = -1
@@ -50,7 +50,7 @@ contains
  
   integer function mpi_this_image() result(res)
     integer ie
-    call MPI_Comm_rank(mpi_comm, res, ie)
+    call MPI_Comm_rank(global_comm, res, ie)
     res = res + 1
     if (ie/=0) call error_stop("MPI_Comm_rank ERROR")
   end function
@@ -58,7 +58,7 @@ contains
 
   integer function mpi_num_images() result(res)
     integer ie
-    call MPI_Comm_size(mpi_comm, res, ie)  
+    call MPI_Comm_size(global_comm, res, ie)  
     if (ie/=0) call error_stop("MPI_Comm_size ERROR")
   end function
 
@@ -157,7 +157,7 @@ contains
       MPI_knd = MPI_DOUBLE_PRECISION
     end if
     
-    mpi_comm = MPI_COMM_WORLD
+    global_comm = MPI_COMM_WORLD
 
     call MPI_Init(ie)
     if (ie/=0) call error_stop("Error in MPI_Init")
@@ -214,7 +214,7 @@ contains
     if (npxyz(1)/=1) call error_stop("The number of images in x direction must be one.")
     
     !Create the 3D Cartesian communicator "cart_comm" for use in CLMM
-    call MPI_Cart_create(mpi_comm, 3, int(npxyz(3:1:-1)), &
+    call MPI_Cart_create(global_comm, 3, int(npxyz(3:1:-1)), &
                          [.false.,.false.,.false.], &
                          .false., cart_comm, ie)
     if (ie/=0) call error_stop("Error calling MPI_Cart_create.")
@@ -222,7 +222,7 @@ contains
     !creates a 2D! Cartesian communicator "poisfft_comm"
     !2D because of the PFFT library
     !the dimnsions in the poisfft_comm are z,y
-    call PoisFFT_InitMPIGrid(mpi_comm, npxyz(3:2:-1), poisfft_comm, ie)
+    call PoisFFT_InitMPIGrid(global_comm, npxyz(3:2:-1), poisfft_comm, ie)
     !This uses the 3D communicator, slower, but necessary for 3D decomposition
 !     poisfft_comm = cart_comm
     
@@ -241,12 +241,12 @@ contains
     call PoisFFT_LocalGridSize(3,ng,cart_comm,nxyz,off,nxyz2,nsxyz2)
     if (any(nxyz/=nxyz2).or.any(off/=nsxyz2)) call error_stop(40)
     
-    call MPI_Barrier(mpi_comm, ie)
+    call MPI_Barrier(global_comm, ie)
     if (ie/=0) call error_stop("Error in MPI Barrier.")
     
     write(*,*) iim,jim,kim, "nxyz:", nxyz
     
-    call MPI_Barrier(mpi_comm, ie)
+    call MPI_Barrier(global_comm, ie)
     if (ie/=0) call error_stop("Error in MPI Barrier.")
     
     if (mpi_co_any(any(nxyz<=0))) then
@@ -325,7 +325,7 @@ contains
   
   subroutine finalize_custom_mpi
     integer :: ie
-    call MPI_Barrier(mpi_comm, ie)
+    call MPI_Barrier(global_comm, ie)
     if (ie/=0) call error_stop("Error when waiting before finalizing MPI.")
     call MPI_Finalize(ie)
     if (ie/=0) call error_stop("Error finalizing MPI.")
@@ -444,7 +444,7 @@ contains
     real(real32),intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_MIN, mpi_comm)
+    res = mpi_co_reduce(x, MPI_MIN, global_comm)
   end function
 
   function mpi_co_min_64(x) result(res)
@@ -452,7 +452,7 @@ contains
     real(real64),intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_MIN, mpi_comm)
+    res = mpi_co_reduce(x, MPI_MIN, global_comm)
   end function
 
   function mpi_co_min_int(x) result(res)
@@ -460,7 +460,7 @@ contains
     integer,intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_MIN, mpi_comm)
+    res = mpi_co_reduce(x, MPI_MIN, global_comm)
   end function
 
   function mpi_co_max_32(x) result(res)
@@ -468,7 +468,7 @@ contains
     real(real32),intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_MAX, mpi_comm)
+    res = mpi_co_reduce(x, MPI_MAX, global_comm)
   end function
 
   function mpi_co_max_64(x) result(res)
@@ -476,7 +476,7 @@ contains
     real(real64),intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_MAX, mpi_comm)
+    res = mpi_co_reduce(x, MPI_MAX, global_comm)
   end function
 
   function mpi_co_sum_32(x) result(res)
@@ -484,7 +484,7 @@ contains
     real(real32),intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_SUM, mpi_comm)
+    res = mpi_co_reduce(x, MPI_SUM, global_comm)
   end function
 
   function mpi_co_sum_64(x) result(res)
@@ -492,7 +492,7 @@ contains
     real(real64),intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_SUM, mpi_comm)
+    res = mpi_co_reduce(x, MPI_SUM, global_comm)
   end function
 
   function mpi_co_sum_32_comm(x, comm) result(res)
@@ -518,7 +518,7 @@ contains
     logical,intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_LOR, mpi_comm)
+    res = mpi_co_reduce(x, MPI_LOR, global_comm)
   end function
 
 
@@ -527,7 +527,7 @@ contains
     logical,intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_LAND, mpi_comm)
+    res = mpi_co_reduce(x, MPI_LAND, global_comm)
   end function
 
 
