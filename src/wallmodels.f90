@@ -34,6 +34,7 @@ module WMPoint_types
 
     real(knd) :: temperature = 0
     real(knd) :: temperature_flux = 0
+    logical :: prescribed_temperature = .false.
 
     real(knd) :: moisture_flux = 0
 
@@ -74,7 +75,8 @@ module WMPoint_types
 
     real(knd) :: temperature = 0
     real(knd) :: temperature_flux = 0
-
+    logical :: prescribed_temperature = .false.
+        
   end type WMpointUVW
 
 end module
@@ -724,6 +726,14 @@ contains
 
              p%z0 = z0B
 
+             if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==WALL_FLUX) then
+               p%temperature_flux = sideTemp(Bo)
+             end if
+
+             if (TempBtype(Bo)==DIRICHLET.or.TempBtype(Bo)==WALL_DIRICHLET) then
+               p%temperature = sideTemp(Bo)
+             end if
+
              call AddWMPointUVW(p, component, Bo)
 
            end if
@@ -751,6 +761,15 @@ contains
              end if
 
              p%z0 = z0T
+             
+             if (TempBtype(To)==CONSTFLUX.or.TempBtype(To)==WALL_FLUX) then
+               p%temperature_flux = sideTemp(To)
+             end if
+
+             if (TempBtype(To)==DIRICHLET.or.TempBtype(To)==WALL_DIRICHLET) then
+               p%temperature = sideTemp(To)
+             end if
+             
              call AddWMPointUVW(p, component, To)
            end if
          end do
@@ -1396,26 +1415,57 @@ contains
     real(knd),intent(in)    :: distvect(3),uvect(3)
     real(knd) vect(3),vel,dist
 
-    dist = sqrt(sum(distvect**2))
+    dist = norm2(distvect)
 
     vect = uvect - dot_product(uvect,distvect) * distvect / dist**2  !tangential part
 
-    vel = sqrt(sum(vect**2))
+    vel = norm2(vect)
+
+    if (vel/=0) then
+      call WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_flux,Re,temperature_ref,grav_acc)
+      
+      if (ustar<0) ustar = 0
+      
+      if (ustar*ustar*dist/vel>1._knd/Re) then
+        visc = ustar*ustar*dist/vel
+      else if (Re>0) then
+        visc = 1._knd/Re
+      else
+        visc = 0
+      end if
+    else
+      ustar = 0
+      if (Re>0) then
+        visc = 1._knd/Re
+      else
+        visc = 0
+      end if
+    end if
+    
+
+  end subroutine WM_MO_FLUX
+
+
+
+  pure subroutine WM_MO_FluxStress(ustar,temperature_flux,z0,distvect,uvect,tan_vect)
+    real(knd),intent(inout) :: ustar
+    real(knd),intent(in)    :: z0,temperature_flux
+    real(knd),intent(in)    :: distvect(3),uvect(3)
+    real(knd),intent(out)   :: tan_vect(3)
+    real(knd) vel,dist
+
+    call vel_and_dist(tan_vect, dist, uvect, [0._knd,0._knd,0._knd], distvect)
+
+    vel = norm2(tan_vect)
 
     if (vel/=0) then
       call WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_flux,Re,temperature_ref,grav_acc)
       if (ustar<0) ustar = 0
-    end if
-
-    if (vel>0.and.ustar*ustar*dist/vel>1._knd/Re) then
-      visc = ustar*ustar*dist/vel
-    else if (Re>0) then
-      visc = 1._knd/Re
     else
-      visc = 0
+      ustar = 0
     end if
 
-  end subroutine WM_MO_FLUX
+  end subroutine WM_MO_FluxStress
 
 
 
@@ -1446,6 +1496,25 @@ contains
     end if
 
   end subroutine WM_MO_DIRICHLET
+
+
+  pure subroutine WM_MO_DirichletStress(ustar,temperature_flux,z0,tempdif,distvect,uvect,tan_vect)
+    real(knd),intent(inout) :: ustar,temperature_flux
+    real(knd),intent(in)    :: z0
+    real(knd),intent(in)    :: tempdif ! temperature difference surface - nearest point
+    real(knd),intent(in)    :: distvect(3),uvect(3)
+    real(knd),intent(out)   :: tan_vect(3)
+    real(knd) vel,dist
+
+    call vel_and_dist(tan_vect, dist, uvect, [0._knd,0._knd,0._knd], distvect)
+
+    vel = sqrt(sum(tan_vect**2))
+
+    call WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,tempdif)
+
+    if (ustar<0) ustar = 0
+
+  end subroutine WM_MO_DirichletStress
 
 
 
@@ -1487,12 +1556,29 @@ contains
 
   subroutine InitTempFL(Temperature)
     real(knd),intent(in) :: Temperature(-1:,-1:,-1:)
-    integer i
+    integer :: i, j, k
+    type(WMPointUVW), pointer :: pts(:)
 
     if (enable_buoyancy.and.TempBtype(Bo)==DIRICHLET) then
-      do i = 1,size(WMPoints)
-        if (WMPoints(i)%zk==1) WMPoints(i)%temperature_flux = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&
+      do i = 1, size(WMPoints)
+        if (WMPoints(i)%zk==1) then
+          WMPoints(i)%temperature_flux = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&
                        (temperature(WMPoints(i)%xi,WMPoints(i)%yj,1) - temperature(WMPoints(i)%xi,WMPoints(i)%yj,0))
+          WMPoints(i)%prescribed_temperature = .true.
+        end if   
+      end do
+      
+      do k = 1, size(WMPointsUVW,2)
+        do j = 1, size(WMPointsUVW,1)
+          pts => WMPointsUVW(j,k)%points
+          do i = 1, size(pts)
+            if (pts(i)%zk==1) then
+              pts(i)%temperature_flux = -TDiff(pts(i)%xi,pts(i)%yj,1)*&
+                           (temperature(pts(i)%xi,pts(i)%yj,1) - temperature(pts(i)%xi,pts(i)%yj,0))
+              pts(i)%prescribed_temperature = .true.
+            end if   
+          end do
+        end do
       end do
     end if
 
@@ -1581,8 +1667,11 @@ contains
 
       if (WMPoints(i)%z0>0) then
 
-         if (enable_buoyancy .and. WMPoints(i)%temperature>0) then
+         if (enable_buoyancy .and. WMPoints(i)%prescribed_temperature) then
 
+#ifdef CUSTOM_SURFACE_TEMPERATURE
+           WMPoints(i)%temperature = SurfaceTemperature(xPr(xi), yPr(yj), zPr(zk), time)
+#endif
            tdif = WMPoints(i)%temperature - Temperature(xi,yj,zk)
 
            call WM_MO_DIRICHLET(visc, WMPoints(i)%ustar, &
@@ -1645,44 +1734,43 @@ contains
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
 
 
-
-
     if (enable_buoyancy.and. TempBtype(Bo)==DIRICHLET) call Bound_temperature_flux(BsideTFLArr)
 
-    call fluxes(UxmWMpoints, 1, MINUSX)
-    call fluxes(UxpWMpoints, 1, PLUSX)
-    call fluxes(UymWMpoints, 1, MINUSY)
-    call fluxes(UypWMpoints, 1, PLUSY)
-    call fluxes(UzmWMpoints, 1, MINUSZ)
-    call fluxes(UzpWMpoints, 1, PLUSZ)
+    call fluxes(UxmWMpoints, 1, MINUSX, xU, yPr, zPr)
+    call fluxes(UxpWMpoints, 1, PLUSX,  xU, yPr, zPr)
+    call fluxes(UymWMpoints, 1, MINUSY, xU, yPr, zPr)
+    call fluxes(UypWMpoints, 1, PLUSY,  xU, yPr, zPr)
+    call fluxes(UzmWMpoints, 1, MINUSZ, xU, yPr, zPr)
+    call fluxes(UzpWMpoints, 1, PLUSZ,  xU, yPr, zPr)
 
-    call fluxes(VxmWMpoints, 2, MINUSX)
-    call fluxes(VxpWMpoints, 2, PLUSX)
-    call fluxes(VymWMpoints, 2, MINUSY)
-    call fluxes(VypWMpoints, 2, PLUSY)
-    call fluxes(VzmWMpoints, 2, MINUSZ)
-    call fluxes(VzpWMpoints, 2, PLUSZ)
+    call fluxes(VxmWMpoints, 2, MINUSX, xPr, yV, zPr)
+    call fluxes(VxpWMpoints, 2, PLUSX,  xPr, yV, zPr)
+    call fluxes(VymWMpoints, 2, MINUSY, xPr, yV, zPr)
+    call fluxes(VypWMpoints, 2, PLUSY,  xPr, yV, zPr)
+    call fluxes(VzmWMpoints, 2, MINUSZ, xPr, yV, zPr)
+    call fluxes(VzpWMpoints, 2, PLUSZ,  xPr, yV, zPr)
 
-    call fluxes(WxmWMpoints, 3, MINUSX)
-    call fluxes(WxpWMpoints, 3, PLUSX)
-    call fluxes(WymWMpoints, 3, MINUSY)
-    call fluxes(WypWMpoints, 3, PLUSY)
-    call fluxes(WzmWMpoints, 3, MINUSZ)
-    call fluxes(WzpWMpoints, 3, PLUSZ)
+    call fluxes(WxmWMpoints, 3, MINUSX, xPr, yPr, zW)
+    call fluxes(WxpWMpoints, 3, PLUSX,  xPr, yPr, zW)
+    call fluxes(WymWMpoints, 3, MINUSY, xPr, yPr, zW)
+    call fluxes(WypWMpoints, 3, PLUSY,  xPr, yPr, zW)
+    call fluxes(WzmWMpoints, 3, MINUSZ, xPr, yPr, zW)
+    call fluxes(WzpWMpoints, 3, PLUSZ,  xPr, yPr, zW)
 
 
   contains
 
-    subroutine fluxes(points, component, direction)
+    subroutine fluxes(points, component, direction, x, y, z)
       type(WMPointUVW), intent(inout), target :: points(:)
       integer, intent(in) :: component, direction
+      real(knd), intent(in) :: x(:), y(:), z(:)
       integer point,j,xi,yj,zk
-      real(knd) dist(3), vel(3), wallvel(3), tan_vect(3), mag, drec(6)
+      real(knd) dist(3), vel(3), wallvel(3), tan_vect(3), mag, drec(6), temp
       type(WMPointUVW), pointer :: p
       real(knd), parameter :: eps = 0.0001_knd
       
       drec = [1/dxmin, 1/dxmin, 1/dymin, 1/dymin, 1/dzmin, 1/dzmin]
-
+      
       !$omp parallel do private(point,xi,yj,zk,dist,vel,wallvel,tan_vect,p,mag)
       do point = 1,size(points)
 
@@ -1705,14 +1793,27 @@ contains
           wallvel = [p%wallu, p%wallv, p%wallw]
 
           if (p%z0>0) then
-!TODO: The temperature flux is always 0 now in momentum points, so no stability effect here!
-             if (enable_buoyancy .and. p%temperature>0) then
 
-               call error_stop("Not implemented!")
+             if (enable_buoyancy .and. p%prescribed_temperature) then
+             
+#ifdef CUSTOM_SURFACE_TEMPERATURE
+               p%temperature = SurfaceTemperature(x(xi)+dist(1), &
+                                                  y(yj)+dist(2), &
+                                                  z(zk)+dist(3), &
+                                                  time)
+#endif
+               
+               temp = local_value(Temperature, component, xi, yj, zk)
+
+               call WM_MO_DirichletStress(p%ustar, p%temperature_flux, &
+                                          p%z0, temp-p%temperature, &
+                                          dist, vel, tan_vect)
 
              else if (enable_buoyancy .and. p%temperature_flux>0) then
+!TODO: The temperature flux is always 0 now in momentum points, so no stability effect here!
 
-               call error_stop("Not implemented!")
+               call WM_MO_FluxStress(p%ustar, p%temperature_flux, &
+                                     p%z0, dist, vel, tan_vect)
 
              else
 
@@ -1753,6 +1854,22 @@ contains
     end subroutine
 
   end subroutine ComputeUVWFluxesWM
+
+
+  pure function local_value(C,component,xi,yj,zk) result(val)
+    real(knd) :: val
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: C
+    integer, intent(in) :: component, xi, yj, zk
+
+    select case (component)
+      case (1)
+        val =  (C(xi+1,yj,  zk  ) + C(xi,yj,zk)) / 2
+      case (2)
+        val =  (C(xi,  yj+1,zk  ) + C(xi,yj,zk)) / 2
+      case (3)
+        val =  (C(xi,  yj,  zk+1) + C(xi,yj,zk)) / 2
+    end select
+  end function
 
 
   pure function local_velocity(U,V,W,component,xi,yj,zk) result(vel)
@@ -1872,12 +1989,21 @@ contains
 
 
 
-  pure real(knd) function SurfTemperature(x,y,t)
-   real(knd),intent(in):: x,y
+#if CUSTOM_SURFACE_TEMPERATURE
+  real(knd) function SurfaceTemperature(x,y,z,t)
+   real(knd),intent(in):: x,y,z
    real(TIM),intent(in):: t
-
-   SurfTemperature = sideTemp(Bo)  ! Needs bet to allow time evolution somehow
+   interface
+     function CustomSurfaceTemperature(x,y,z,t) result(res)
+       use Kinds
+       real(knd) :: res
+       real(knd), intent(in) :: x, y, z
+       real(tim), intent(in) :: t
+     end function
+   end interface
+   SurfaceTemperature = CustomSurfaceTemperature(x,y,z,t)
   end function
+#endif
 
 
  end module Wallmodels
