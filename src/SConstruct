@@ -56,8 +56,6 @@ if str(comp)=='intel':
 
   env.Append(F90FLAGS='-cpp -standard-semantics -heap-arrays 200')
 
-  env.Append(LIBPATH = ['/usr/local/poisfft_intel/','/usr/local/openblas-intel/lib/'])
-
   env.Append(F90PATH = [target_dir,target_dir+'/P/'])
 
   if str(diag)=='yes':
@@ -92,7 +90,7 @@ else:
   
   env.Append(F90FLAGS='-cpp')#-fstack-arrays
 
-  env.Append(LINKFLAGS='-static-libgcc -static-libstdc++ -static-libgfortran')
+  #env.Append(LINKFLAGS='-static-libgcc -static-libstdc++ -static-libgfortran')
 
   #env.Append(LIBPATH = ['/usr/local/poisfft_gcc/'])
 
