@@ -6,9 +6,6 @@ module Pressure
 #ifdef __HMPP
   use HMPP_codelets
 #endif
-#ifdef MPI
-  use custom_mpi
-#endif
 
   implicit none
 
@@ -22,19 +19,19 @@ module Pressure
 contains
 
 
-  subroutine PressureCorrection(U,V,W,Pr,Q,coef)                       !Pressure correction
-    real(knd),dimension(-2:,-2:,-2:),intent(inout)    :: U,V,W !Phi is computed in Poisson eq. with div of U in RHS
-    real(knd),dimension(1:,1:,1:),intent(inout)       :: Pr    !Depend ing on active projection method Phi becomes new pressure
-    real(knd),dimension(:,:,:),allocatable,intent(in) :: Q     !or is added to last pressure
-    real(knd),intent(in) :: coef
+  subroutine PressureCorrection(U,V,W,Pr,Q,coef)                    !Pressure correction
+    real(knd), dimension(-2:,-2:,-2:), intent(inout)     :: U, V, W !Phi is computed in Poisson eq. with div of U in RHS
+    real(knd), dimension(1:,1:,1:), intent(inout)        :: Pr      !Depend ing on active projection method Phi becomes new pressure
+    real(knd), dimension(:,:,:), allocatable, intent(in) :: Q       !or is added to last pressure
+    real(knd), intent(in) :: coef
                                                            !U,V,W velocity field for correction
-    real(knd),save,allocatable :: Phi(:,:,:), RHS(:,:,:)   !Pr pressure
+    real(knd), save, allocatable :: Phi(:,:,:), RHS(:,:,:) !Pr pressure
                                                            !coef cofficient from Runge Kutta, Q mass sources from immersed boundary
     real(TIM) dt2,dt3                                      !RHS right hand side of eq. with divergence of U
                                                            !Phi computed pseudopressure, saved as first guess for next time
     real(knd) :: divergence,uncompatibility
     character(70) :: str
-    integer,save :: called = 0
+    integer, save :: called = 0
     integer(DBL), save :: trate
     integer(DBL), save :: time1, time2, time3, time4
     integer(DBL), save :: timem1, timem2, timem3, timem4
@@ -150,7 +147,7 @@ contains
 
 #ifdef __HMPP
   subroutine GetPrFromGPU(Pr)
-    real(knd),dimension(1:,1:,1:),intent(in) :: Pr
+    real(knd), dimension(1:,1:,1:), intent(in) :: Pr
     !$hmpp <tsteps> delegatedstore, args[PostPoisson::Pr]
   end subroutine GetPrFromGPU
 #endif
@@ -160,13 +157,16 @@ contains
 
 
   subroutine PrePoisson(U,V,W,Q,RHS,dt2,uncompatibility)
-    real(knd),intent(inout) :: U(-2:,-2:,-2:)
-    real(knd),intent(inout) :: V(-2:,-2:,-2:)
-    real(knd),intent(inout) :: W(-2:,-2:,-2:)
-    real(knd),intent(out)   :: RHS(0:,0:,0:)
-    real(knd),allocatable,intent(in) :: Q(:,:,:)
-    real(knd),intent(out)   :: uncompatibility
-    real(knd),intent(in)    :: dt2
+#ifdef MPI
+    use custom_mpi
+#endif
+    real(knd), intent(inout) :: U(-2:,-2:,-2:)
+    real(knd), intent(inout) :: V(-2:,-2:,-2:)
+    real(knd), intent(inout) :: W(-2:,-2:,-2:)
+    real(knd), intent(out)   :: RHS(0:,0:,0:)
+    real(knd), allocatable, intent(in) :: Q(:,:,:)
+    real(knd), intent(out)   :: uncompatibility
+    real(knd), intent(in)    :: dt2
     real(knd) :: S,S2
     integer   :: i,j,k
 
@@ -283,8 +283,11 @@ contains
 
   subroutine PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3)
 #ifdef MPI
-    use custom_mpi
-    
+    use custom_mpi, only: kim, nzims, &
+                          mpi_co_max, mpi_co_sum, &
+                          comm_plane_xy, comm_row_z, &
+                          MPI_KND
+
     interface
       subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
         import
@@ -292,15 +295,16 @@ contains
         INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
       end subroutine
     end interface
+
     integer :: ie
 #endif
-    real(knd),intent(inout) :: U(-2:,-2:,-2:)
-    real(knd),intent(inout) :: V(-2:,-2:,-2:)
-    real(knd),intent(inout) :: W(-2:,-2:,-2:)
-    real(knd),intent(inout) :: Pr(1:,1:,1:)
-    real(knd),allocatable,intent(in) :: Q(:,:,:)
-    real(knd),intent(inout) :: Phi(0:,0:,0:)
-    real(knd),intent(in)    :: dt2,dt3
+    real(knd), intent(inout) :: U(-2:,-2:,-2:)
+    real(knd), intent(inout) :: V(-2:,-2:,-2:)
+    real(knd), intent(inout) :: W(-2:,-2:,-2:)
+    real(knd), intent(inout) :: Pr(1:,1:,1:)
+    real(knd), allocatable, intent(in) :: Q(:,:,:)
+    real(knd), intent(inout) :: Phi(0:,0:,0:)
+    real(knd), intent(in)    :: dt2,dt3
     real(knd) :: Phi_ref,Au,Av,Aw,dxmin2,dymin2,dzmin2,S,p
     integer   :: i,j,k
 #ifdef CHECK_DIVERGENCE
