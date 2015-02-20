@@ -17,6 +17,7 @@ PB = ARGUMENTS.get('PB','')
 extra = ARGUMENTS.get('extra','')
 cgal = ARGUMENTS.get('cgal','')
 mpi = ARGUMENTS.get('mpi','')
+cray = ARGUMENTS.get('cray','')
 
 extra_flag = ' ' + str(extra)
 
@@ -97,6 +98,9 @@ else:
   env.Append(F90PATH = [target_dir,target_dir+'/P/'])#,'/usr/local/poisfft_gcc/']
   
   env.Append(FORTRANMODDIRPREFIX = '-J')
+
+if cray=='yes':
+  env.Replace(ENV=os.environ)
   
   
 def from_env(s):
@@ -152,19 +156,23 @@ if str(mpi)=='yes':
   env.Append(CXXFLAGS=' -DMPI')
   env.Append(LIBS = ['pfft','pfftf','fftw3_mpi','fftw3f_mpi'])
 
-#instead of openblas, any blas and lapack can be used.
-env.Append(LIBS = ['blas','lapack','fftw3','fftw3f','pthread','stdc++'])
+if cray!='yes':
+  #if necessary change for lopenblas, lmkl_xx or equivalent and include their dependencies
+  env.Append(LIBS = ['blas','lapack'])
+
+env.Append(LIBS = ['fftw3','fftw3f','pthread','stdc++'])
+
 if str(openmp)!='no':
   env.Append(LIBS = ['fftw3_omp','fftw3f_omp'])
 
 if customSB=='yes':
- env.Append(F90FLAGS='-DCUSTOMSB')
- if str(SB)=='':
-   SBfile = ['../custom/emptySB.f90']
- else:
-   SBfile = [str(SB)]
+  env.Append(F90FLAGS='-DCUSTOMSB')
+  if str(SB)=='':
+     SBfile = ['../custom/emptySB.f90']
+  else:
+    SBfile = [str(SB)]
 else:
- SBfile=[]
+  SBfile=[]
    
    
 if customPB=='yes':
@@ -181,6 +189,10 @@ if customPuff=='yes':
   
 if customConfig=='yes':
   env.Append(F90FLAGS='-DCUSTOM_CONFIG')
+
+if cray=='yes':
+  env.Replace(CC='cc', CXX='CC', F90='ftn')
+  env.Replace(LINK='ftn')
 
 #May be used to compile PoisFFT directly, adjust the correct path.
 Mkdir(target_dir+'/P/')
