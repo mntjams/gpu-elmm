@@ -1273,11 +1273,12 @@ contains
           stat = 1
           return
         end if
+
         if (ch==str(1:1)) then
-print *,"'"//ch//"'", "'"//str//"'"
           call check(str(2:), stat)
           if (stat == 0) return
         end if
+
       end do
     end subroutine
 
@@ -1289,12 +1290,12 @@ print *,"'"//ch//"'", "'"//str//"'"
 
       stat = 1
       i = 0
-print *,"check:'"//str//"'"
+
       do
         i = i + 1
 
         read(unit, iostat=io) ch
-print *,i,ch
+
         if (io/=0) return
 
         if (ch/=str(i:i)) return
