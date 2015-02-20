@@ -227,7 +227,11 @@ objs += env.Object(target=target_dir+'stop',           source='stop.f90')
 objs += env.Object(target=target_dir+'lapack',         source='lapack.f')
 objs += env.Object(target=target_dir+'strings',        source='strings.f90')
 objs += env.Object(target=target_dir+'lists',          source='lists.f90')
-objs += env.Object(target=target_dir+'alternate_ieee_isnan', source='alternate_ieee_isnan.f90', F90FLAGS = filter(lambda flag: flag !='-flto',filter(lambda flag: flag !='-Ofast' , env['F90FLAGS'])))
+objs += env.Object(target=target_dir+'alternate_ieee_isnan', source='alternate_ieee_isnan.f90',
+                   F90FLAGS = filter(lambda flag: not ( flag.startswith('-O') or
+                                                       flag.startswith('-flto') or
+                                                       flag.startswith('-ffast-math') )
+                                     , env['F90FLAGS']))
 objs += env.Object(target=target_dir+'endianness',     source='endianness.f90')
 objs += env.Object(target=target_dir+'freeunit',       source='freeunit.f90')
 objs += env.Object(target=target_dir+'arrayutilities', source='arrayutilities.f90')
