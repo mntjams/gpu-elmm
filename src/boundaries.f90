@@ -746,7 +746,7 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(No)==NOSLIP .or. (component==2.and.Btype(So)==FREESLIP) .or. &
+    else if (Btype(No)==NOSLIP .or. (component==2.and.Btype(No)==FREESLIP) .or. &
              (Btype(No)==DIRICHLET.and.regime==interm)) then
       if (component==2) then
         do k = 1, nz

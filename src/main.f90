@@ -15,10 +15,13 @@ program CLMM
 
 
 
-  real(knd),allocatable:: U(:,:,:),V(:,:,:),W(:,:,:),Pr(:,:,:)
-  real(knd),allocatable,dimension(:,:,:) :: Temperature !If buoyancy enabled then liquid potential temperature, othrewise potential temperature.
-  real(knd),allocatable,dimension(:,:,:) :: Moisture !Total specific humidity q_t.
-  real(knd),allocatable,dimension(:,:,:,:) :: Scalar  !last index is a number of scalar (because of paging)
+  real(knd), allocatable, dimension(:,:,:)   :: U           !Velocity component in x direction -- horizontal
+  real(knd), allocatable, dimension(:,:,:)   :: V           !Velocity component in y direction -- horizontal
+  real(knd), allocatable, dimension(:,:,:)   :: W           !Velocity component in z direction -- vertical
+  real(knd), allocatable, dimension(:,:,:)   :: Pr          !Pressure (kinematic pressure with possible subgrid TKE part)
+  real(knd), allocatable, dimension(:,:,:)   :: Temperature !If buoyancy enabled then liquid potential temperature, othrewise potential temperature.
+  real(knd), allocatable, dimension(:,:,:)   :: Moisture    !Total specific humidity q_t.
+  real(knd), allocatable, dimension(:,:,:,:) :: Scalar      !last index is a number of scalar (because of paging)
 
   real(knd) :: delta = 0
 
@@ -71,9 +74,6 @@ program CLMM
       call system_clock(count = time_steps_timer_count_1)
 
       if (master) then
-!         write (*,*) "-----------"
-!         write (*,*)
-!         write (*,*)
         write (*,*) "tstep:",time_step
       end if
 
@@ -96,7 +96,6 @@ program CLMM
         time_step_time = real(time_steps_timer_count_2 - time_steps_timer_count_1, knd) / &
           real(timer_rate, knd)
         time_steps_time = time_steps_time + time_step_time
-!         print *,"time step wall clock time", time_step_time
       end if
 
       if ((steady==1) .and. (delta<eps)) then
@@ -109,7 +108,7 @@ program CLMM
         exit
       endif
 
-      if (time_step>=3 .and. dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/10._knd)) then
+      if (time_step>=3 .and. dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/30._knd)) then
         if (master) write (*,*) "Solution diverged."
         exit
       endif
