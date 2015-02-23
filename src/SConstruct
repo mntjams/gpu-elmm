@@ -158,7 +158,8 @@ if str(mpi)=='yes':
   env.Append(LIBS = ['pfft','pfftf','fftw3_mpi','fftw3f_mpi'])
 
 if cray!='yes':
-  #if necessary pass lopenblas, lmkl_xx or equivalent and include their dependencies in lapack_blas
+  #if necessary pass openblas, mkl_xx or equivalent (and include their dependencies) 
+  # in the `lapack_blas` argument
   if len(lapack_blas) > 0:
     env.Append(LIBS = lapack_blas.split(' '))
   else:
