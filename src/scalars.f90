@@ -5,10 +5,6 @@ module Scalars
  use Boundaries
  use ScalarBoundaries
  use TILING, only: tilenx, tileny, tilenz
-#ifdef __HMPP
- use HMPP_Codelets
- use HMPP_Scalars
-#endif
 
 implicit none
   private

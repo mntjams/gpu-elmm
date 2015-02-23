@@ -183,27 +183,6 @@ module Parameters
   real(KND) :: time_steps_time = 0
   real(KND) :: poisson_solver_time = 0
 
-! #ifdef __HMPP
- integer :: GPU = 0   !If the GPU is allocated
-
- type hmppWMpoint   !points in which we apply wall model
-
-  integer   :: xi
-  integer   :: yj
-  integer   :: zk
-
-  real(knd) :: distx
-  real(knd) :: disty
-  real(knd) :: distz
-
-  real(knd) :: z0=0
-  real(knd) :: ustar=1
-  real(knd) :: temp=0
-  real(knd) :: temperature_flux=0
-
- endtype hmppWMpoint
-! #endif
-
 end module Parameters
 
 

@@ -114,9 +114,6 @@ module Wallmodels
          MoveWMPointsToArray, GetOutsideBoundariesWM, InitWMMasks, &
          ComputeViscsWM, ComputeUVWFluxesWM, DivergenceWM, &
          InitTempFl, GroundDeposition, GroundUstar, GroundUstarUVW, wallmodeltype
-#ifdef __HMPP
-  public hmppWMpoint,WMPtoHMPP
-#endif
 
   integer, parameter, public :: MINUSX = 1, PLUSX = 2, MINUSY = 3, PLUSY = 4, MINUSZ = 5, PLUSZ = 6
 
@@ -149,26 +146,6 @@ module Wallmodels
 
 contains
 
-#ifdef __HMPP
-  elemental subroutine WMPtoHMPP(ToWMP,FromWMP)
-    type(hmppWMPoint),intent(out) :: ToWMP
-    type(WMPoint),intent(in)  :: FromWMP
-
-    ToWMP%xi = FromWMP%xi
-    ToWMP%yj = FromWMP%yj
-    ToWMP%zk = FromWMP%zk
-
-    ToWMP%distx = FromWMP%distx
-    ToWMP%disty = FromWMP%disty
-    ToWMP%distz = FromWMP%distz
-
-    ToWMP%z0     = FromWMP%z0
-    ToWMP%ustar  = FromWMP%ustar
-    ToWMP%temperature   = FromWMP%temperature
-    ToWMP%temperature_flux = FromWMP%temperature_flux
-
-  end subroutine WMPtoHMPP
-#endif
 
 
   elemental subroutine ComputeAreaFactor(p)

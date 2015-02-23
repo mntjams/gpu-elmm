@@ -49,10 +49,10 @@ contains
    use VTKFrames, only: TFrameFlags, &
                               TFrameDomain,  AddDomain
    use PoisFFT, only: PoisFFT_NeumannStag, PoisFFT_Periodic
-   integer   lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter,minGPUlevel
-   real(knd) mgepsinnerGS
-   integer   i,io,io2,itmp
-   integer numframeslices
+   integer ::  lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
+   real(knd) :: mgepsinnerGS
+   integer ::  i,io,io2,itmp
+   integer :: numframeslices
 
    character(len = 1024) :: command_line,msg
    integer :: exenamelength
@@ -512,8 +512,6 @@ contains
      call get(mgnpost)
      call get(mgmaxinnerGSiter)
      call get(mgepsinnerGS)
-     read(unit,fmt='(/)',iostat = io)
-     read(unit,*,iostat = io) minGPUlevel
      close(unit)
 
      if (poissmet==3.or.poissmet==4) then
@@ -522,7 +520,7 @@ contains
                            lmgncgc = mgncgc,lmgnpre = mgnpre,lmgnpost = mgnpost,&
                            lmgmaxinnerGSiter = mgmaxinnerGSiter,lmgepsinnerGS = mgepsinnerGS)
        else
-        call SetMGParams(llmg = lmg,lminmglevel = minmglevel,lminGPUlevel = minGPUlevel,&
+        call SetMGParams(llmg = lmg,lminmglevel = minmglevel,&
                            lbnx = bnx,lbny = bny,lbnz = bnz,&
                            lmgncgc = mgncgc,lmgnpre = mgnpre,lmgnpost = mgnpost,&
                            lmgmaxinnerGSiter = mgmaxinnerGSiter,lmgepsinnerGS = mgepsinnerGS)

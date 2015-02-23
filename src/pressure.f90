@@ -3,18 +3,12 @@ module Pressure
   use Parameters
   use Boundaries
   use PoissonSolvers
-#ifdef __HMPP
-  use HMPP_codelets
-#endif
 
   implicit none
 
   private
   public PressureCorrection
 
-#ifdef __HMPP
-  public GetPrFromGPU
-#endif
 
 contains
 
@@ -59,29 +53,9 @@ contains
       dt3 = 0
     end if
 
-#ifdef __HMPP
-    if (GPU>0) then !If GPU already allocated. typically bot the case on first call.
 
-      !$hmpp <tsteps> advancedload, args[PrePoisson::dt2,PrePoisson::correctcompatibility]
-
-      !$hmpp <tsteps> PrePoisson callsite, args[*].noupdate=true
-      call PrePoisson_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,correctcompatibility,&
-                          Btype,sideU,&
-                          dt2,dxmin,dymin,dzmin,&
-                          Uin,Vin,Win,U,V,W,RHS,uncompatibility,divergence)
-
-      if (correctcompatibility==1) then
-        !$hmpp <tsteps> delegatedstore, args[PrePoisson::uncompatibility]
-      end if
-      if (debugparam>1.and.called>1) call system_clock(count=timem1)
-      !$hmpp <tsteps> delegatedstore, args[PrePoisson::divergence,PrePoisson::RHS]
-      if (debugparam>1.and.called>1) call system_clock(count=timem2)
-    else
-      call PrePoisson(U,V,W,RHS,dt2,uncompatibility)
-    end if
-#else
     call PrePoisson(U,V,W,Q,RHS,dt2,uncompatibility)
-#endif
+
 
     if (debugparam>1.and.called>1) call system_clock(count=time2)
 
@@ -116,41 +90,16 @@ contains
      if (master) write(*,*) "ET of part 2", real(time3-time2)/real(trate)
     endif
 
-#ifdef __HMPP
-    if (GPU>0) then
-      if (debugparam>1.and.called>1) call system_clock(count=timem3)
-      !$hmpp <tsteps> advancedload, args[PostPoisson::dt3,PostPoisson::Phi]
-      if (debugparam>1.and.called>1) then
-       call system_clock(count=timem4)
-       if (master) write(*,*) "ET of part 4", real((timem4-timem3)+(timem2-timem1))/real(trate)
-      endif
 
-      !$hmpp <tsteps> PostPoisson callsite, args[*].noupdate=true
-      call PostPoisson_GPU(Unx,Uny,Unz,Vnx,Vny,Vnz,Wnx,Wny,Wnz,Prnx,Prny,Prnz,&
-                           Btype,sideU,&
-                           dt2,dt3,dxmin,dymin,dzmin,&
-                           Uin,Vin,Win,U,V,W,Pr,Phi)
-    else
-      call PostPoisson(U,V,W,Pr,Phi,dt2,dt3)
-    end if
-#else
     call PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3)
-#endif
+
+
     if (debugparam>1.and.called>1) then
      call system_clock(count=time4)
      if (master) write(*,*) "ET of part 3", real((time4-time1)-(time3-time2))/real(trate)
     endif
     
   end subroutine PressureCorrection
-
-
-
-#ifdef __HMPP
-  subroutine GetPrFromGPU(Pr)
-    real(knd), dimension(1:,1:,1:), intent(in) :: Pr
-    !$hmpp <tsteps> delegatedstore, args[PostPoisson::Pr]
-  end subroutine GetPrFromGPU
-#endif
 
 
 

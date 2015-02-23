@@ -2,9 +2,10 @@ program CLMM
 
   use Parameters
   use Initial
-  use TSteps, only: TMarchRK3, TSteps_Deallocate
-  use Scalars, only: Scalars_Deallocate
-  use Outputs, only: AllocateOutputs, OutTStep, Output
+  use TimeSteps,  only: TMarchRK3
+  use Dynamics,   only: Dynamics_Deallocate
+  use Scalars,    only: Scalars_Deallocate
+  use Outputs,    only: AllocateOutputs, OutTStep, Output
   use Endianness, only: GetEndianness
 #ifdef MPI
   use custom_mpi
@@ -120,12 +121,7 @@ program CLMM
   if (master) write(*,*) "Total wall clock time for time steps", time_steps_time
   if (master) write(*,*) "Wall clock time for poisson solver", poisson_solver_time
 
-#ifdef __HMPP
-  call GetDataFromGPU(.true.,.true.,.true.,.true.,enable_buoyancy,&
-                      U,     V,     W,     Pr,    Temperature)
-#endif
-
-  call TSteps_Deallocate
+  call Dynamics_Deallocate
   call Scalars_Deallocate
 
   if (master) write (*,*) "Saving results..."
@@ -139,61 +135,63 @@ program CLMM
 #ifdef MPI
   call finalize_custom_mpi
 #endif
-  contains
 
 
-   subroutine AllocateGlobals
-
-     allocate(U(-2:Unx+3,-2:Uny+3,-2:Unz+3))
-     allocate(V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
-     allocate(W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-     allocate(Pr(1:Unx+1,1:Vny+1,1:Wnz+1))
-
-     U = 0
-     V = 0
-     W = 0
-     Pr = 0
+contains
 
 
-     if (enable_buoyancy) then
-       allocate(Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-       Temperature = 0
-     else
-       allocate(Temperature(0,0,0))
-     endif
+  subroutine AllocateGlobals
 
-     if (enable_moisture) then
-       allocate(Moisture(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-       Moisture = 0
-     else
-       allocate(Moisture(0,0,0))
-     endif
+    allocate(U(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+    allocate(V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+    allocate(W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+    allocate(Pr(1:Unx+1,1:Vny+1,1:Wnz+1))
 
-     if (num_of_scalars>0) then
-       allocate(Scalar(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
-       Scalar = 0
-     else
-       allocate(Scalar(0,0,0,0))
-     endif
+    U = 0
+    V = 0
+    W = 0
+    Pr = 0
 
 
-     allocate(Viscosity(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+    if (enable_buoyancy) then
+      allocate(Temperature(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+      Temperature = 0
+    else
+      allocate(Temperature(0,0,0))
+    endif
 
-     if (enable_buoyancy .or. &
-         enable_moisture .or. &
-         num_of_scalars>0)      then
+    if (enable_moisture) then
+      allocate(Moisture(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+      Moisture = 0
+    else
+      allocate(Moisture(0,0,0))
+    endif
 
-       allocate(TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-       TDiff = 0
-
-     else
-       allocate(TDiff(0,0,0))
-     endif
-
-   end subroutine AllocateGlobals
+    if (num_of_scalars>0) then
+      allocate(Scalar(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+      Scalar = 0
+    else
+      allocate(Scalar(0,0,0,0))
+    endif
 
 
-   subroutine DeallocateGlobals
+    allocate(Viscosity(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+
+    if (enable_buoyancy .or. &
+        enable_moisture .or. &
+        num_of_scalars>0)      then
+
+      allocate(TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+      TDiff = 0
+
+    else
+      allocate(TDiff(0,0,0))
+    endif
+
+  end subroutine AllocateGlobals
+
+
+  subroutine DeallocateGlobals
     !To assist memory leak checking because some compilers do not
     !deallocate main program and module variables automatically
     !(in F2008 they have the SAVE attribute).
@@ -221,7 +219,7 @@ program CLMM
     if (allocated(BsideMFlArr)) deallocate(BsideMFlArr)
 
 
-   end subroutine
+  end subroutine
 
 
 end program CLMM
