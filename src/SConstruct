@@ -18,6 +18,7 @@ extra = ARGUMENTS.get('extra','')
 cgal = ARGUMENTS.get('cgal','')
 mpi = ARGUMENTS.get('mpi','')
 cray = ARGUMENTS.get('cray','')
+lapack_blas = ARGUMENTS.get('lapack_blas','')
 
 extra_flag = ' ' + str(extra)
 
@@ -157,8 +158,11 @@ if str(mpi)=='yes':
   env.Append(LIBS = ['pfft','pfftf','fftw3_mpi','fftw3f_mpi'])
 
 if cray!='yes':
-  #if necessary change for lopenblas, lmkl_xx or equivalent and include their dependencies
-  env.Append(LIBS = ['blas','lapack'])
+  #if necessary pass lopenblas, lmkl_xx or equivalent and include their dependencies in lapack_blas
+  if len(lapack_blas) > 0:
+    env.Append(LIBS = lapack_blas.split(' '))
+  else:
+    env.Append(LIBS = ['blas','lapack'])
 
 env.Append(LIBS = ['fftw3','fftw3f','pthread','stdc++'])
 
