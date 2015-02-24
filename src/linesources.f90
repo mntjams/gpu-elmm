@@ -5,6 +5,10 @@ module LineSources
   
   implicit none
 
+  public :: ScalarLineSource, ScalarLineSources, InitLineSources
+
+  private
+
   type :: ScalarLineSource
     integer   :: scalar_number
     real(knd) :: start(3), end(3)
