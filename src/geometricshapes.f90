@@ -1096,12 +1096,7 @@ contains
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in) :: eps
 
-    if ((self%xc-x)**2+(self%yc-y)**2+(self%zc-z)**2<=(self%r+eps)**2) then
-     ins = .true.
-    else
-     ins = .false.
-    endif
-
+    ins = (self%xc-x)**2 + (self%yc-y)**2 + (self%zc-z)**2 <= (self%r+eps)**2
   end function
 
   subroutine Sphere_Closest(self,xnear,ynear,znear,x,y,z)
@@ -1273,11 +1268,7 @@ contains
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in) :: eps
 
-    if (LineDist(x,y,z,self%xc,self%yc,self%zc,self%a,self%b,self%c)<=self%r+eps) then
-     ins = .true.
-    else
-     ins = .false.
-    endif
+    ins = LineDist(x,y,z,self%xc,self%yc,self%zc,self%a,self%b,self%c) <= self%r+eps
   end function
 
   subroutine CylJacket_Closest(self,xnear,ynear,znear,x,y,z)
