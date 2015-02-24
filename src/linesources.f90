@@ -7,14 +7,14 @@ module LineSources
 
   type :: ScalarLineSource
     integer   :: scalar_number
-    real(knd) :: start(3),end(3)
+    real(knd) :: start(3), end(3)
     real(knd) :: flux !total flux in unit/time_unit, distribuion is uniform
     integer   :: number_of_points = 10000 !number of virtual point sources
   contains
     procedure :: point_sources
   end type
   
-  type(ScalarLineSource),allocatable :: ScalarLineSources(:)
+  type(ScalarLineSource), allocatable :: ScalarLineSources(:)
 
   
   !TODO: line sources with nonuniform intensity could be useful, use a similar (or extended?)
@@ -26,9 +26,9 @@ module LineSources
       use Boundaries
       use ArrayUtilities
       type(ScalarFlVolumesContainer) :: res
-      class(ScalarLineSource),intent(in) :: self
+      class(ScalarLineSource), intent(in) :: self
       real(knd) :: rpos(3), flux_per_point
-      integer :: ipos(3),last_ipos(3)
+      integer :: ipos(3), last_ipos(3)
       integer i
       
       res%scalar_number = self%scalar_number
@@ -39,7 +39,7 @@ module LineSources
       
       flux_per_point = self%flux * dist(self%end, self%start) / self%number_of_points
 
-      do i = 0,self%number_of_points-1
+      do i = 0, self%number_of_points-1
         rpos = self%start + ((i+1/2._knd)*(self%end-self%start))/self%number_of_points
         
         if (InDomain(rpos)) then
@@ -47,9 +47,11 @@ module LineSources
           call GridCoords(ipos,rpos)
 
           if (all(ipos==last_ipos)) then
+
             associate(vs => res%volumes)
               vs(size(vs))%flux = vs(size(vs))%flux + flux_per_point / volumePr(ipos)
             end associate
+
           else
             res%volumes = [res%volumes , &
                            ScalarFlVolume(ipos, flux_per_point / volumePr(ipos))]
@@ -72,7 +74,7 @@ module LineSources
         
       else if (num_of_scalars>0) then
       
-        do i=1,size(ScalarLineSources)
+        do i = 1, size(ScalarLineSources)
           points = ScalarLineSources(i)%point_sources()
           if (.not.empty(points)) call Add(ScalarFlVolumes,points)
         end do
@@ -81,10 +83,10 @@ module LineSources
       
     contains
       logical function empty(src)
-        type(ScalarFlVolumesContainer),intent(in) :: src
+        type(ScalarFlVolumesContainer), intent(in) :: src
         empty = .not.allocated(src%volumes)
         if (.not.empty) empty = size(src%volumes)==0
       end function
     end subroutine
     
-end module
+end module LineSources
