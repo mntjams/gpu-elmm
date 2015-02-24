@@ -13,7 +13,7 @@ module PointSources
     procedure :: point_source
   end type
   
-  type(ScalarPointSource),allocatable :: ScalarPointSources(:)
+  type(ScalarPointSource), allocatable :: ScalarPointSources(:)
   
   contains
 
@@ -21,7 +21,7 @@ module PointSources
       use Boundaries
       use ArrayUtilities
       type(ScalarFlVolumesContainer) :: res
-      class(ScalarPointSource),intent(in) :: self
+      class(ScalarPointSource), intent(in) :: self
       real(knd) :: rpos(3)
       integer :: ipos(3)
       
@@ -59,10 +59,10 @@ module PointSources
       
     contains
       logical function empty(src)
-        type(ScalarFlVolumesContainer),intent(in) :: src
+        type(ScalarFlVolumesContainer), intent(in) :: src
         empty = .not.allocated(src%volumes)
         if (.not.empty) empty = size(src%volumes)==0
       end function
     end subroutine
     
-end module
+end module PointSources
