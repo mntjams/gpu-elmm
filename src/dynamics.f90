@@ -379,9 +379,9 @@ contains
       do j = 1, Prny
         do i = 1, Prnx
           !For scalar advection the sum proved to be necessary when the flow is not aligned to grid.
-          p = max(abs(U(i,j,k)/dxU(i)),abs(U(i-1,j,k)/dxU(i-1)))
-          p = p + max(abs(V(i,j,k)/dyV(j)),abs(V(i,j-1,k)/dyV(j-1)))
-          p = p + max(abs(W(i,j,k)/dzW(k)),abs(W(i,j,k-1)/dzW(k-1)))
+          p =     max( abs(U(i,j,k)), abs(U(i-1,j,k)) ) / dxmin
+          p = p + max( abs(V(i,j,k)), abs(V(i,j-1,k)) ) / dymin
+          p = p + max( abs(W(i,j,k)), abs(W(i,j,k-1)) ) / dzmin
           
           m = max(m,p)
           if (ieee_is_nan(p)) nan = .true.
@@ -393,9 +393,9 @@ contains
     if (nan) then
       dt = tiny(dt)
     else if (m>0) then
-      dt = min(CFL/m, max(dxmin,dymin,dzmin)/Uref)
+      dt = min(CFL/m, min(dxmin,dymin,dzmin)/Uref)
     else
-      dt = dxmin / Uref
+      dt = min(dxmin,dymin,dzmin) / Uref
     endif
 
     if (steady/=1 .and. dt+time>end_time)  dt = end_time-time
@@ -1566,7 +1566,7 @@ contains
       !$omp end do
       !$omp end parallel
       S = max(Su,Sv,Sw)
-      write (*,*) "CN ",l,S
+      write (*,*) "CN ", l, S
 
       if (S<=epsCN) exit
     end do
