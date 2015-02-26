@@ -43,6 +43,7 @@ module custom_mpi
     module procedure mpi_co_sum_32_comm
     module procedure mpi_co_sum_64
     module procedure mpi_co_sum_64_comm
+    module procedure mpi_co_sum_int
   end interface
 
 contains
@@ -477,6 +478,14 @@ contains
     integer ie
     
     res = mpi_co_reduce(x, MPI_MAX, global_comm)
+  end function
+
+  function mpi_co_sum_int(x) result(res)
+    integer :: res
+    integer,intent(in) :: x
+    integer ie
+    
+    res = mpi_co_reduce(x, MPI_SUM, global_comm)
   end function
 
   function mpi_co_sum_32(x) result(res)

@@ -1,27 +1,28 @@
 module Initial
 
-  use PARAMETERS
+  use Parameters
   use ArrayUtilities, only: avg
-  use LIMITERS, only: limparam, limitertype
-  use MULTIGRID, only: SetMGParams
-  use MULTIGRID2d, only: SetMGParams2d
+  use Limiters, only: limparam, limitertype
+  use Multigrid, only: SetMGParams
+  use Multigrid2d, only: SetMGParams2d
   use Pressure
-  use BOUNDARIES
+  use Boundaries
   use ScalarBoundaries
-  use OUTPUTS, only: store, display, probes, scalar_probes, ReadProbes
-  use SCALARS
+  use Outputs, only: store, display, probes, scalar_probes, ReadProbes
+  use Scalars
   use Filters, only: filtertype, filter_ratios
   use Subgrid
-  use TURBINLET, only: GetTurbulentInlet, GetInletFromFile, TLag, Lturby, Lturbz, Ustar_inlet, relative_stress, &
+  use Turbinlet, only: GetTurbulentInlet, GetInletFromFile, TLag, Lturby, Lturbz, Ustar_inlet, relative_stress, &
                Ustar_surf_inlet, stress_gradient_inlet, U_ref_inlet, z_ref_inlet, z0_inlet, power_exponent_inlet
   use SolarRadiation, only: InitSolarRadiation
   use SolidBodies, only: obstacles_file, roughness_file, displacement_file, InitSolidBodies
   use ImmersedBoundary, only: GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
   use VolumeSources!, only: InitVolumeSources, InitVolumeSourceBodies, ScalarFlVolume, ScalarFlVolumesContainer
+  use AreaSources, only: InitAreaSources
   use LineSources, only: InitLineSources
   use PointSources, only: InitPointSources
-  use WALLMODELS
-  use TILING, only: tilesize,InitTiles
+  use Wallmodels
+  use Tiling, only: tilesize,InitTiles
   use FreeUnit, only: newunit
   use Puffs, only: InitPuffSources
 #ifdef MPI
@@ -491,6 +492,8 @@ contains
       end if
    end if
 
+   call get_area_sources("area_sources.conf")
+
    if (num_of_scalars>0) then
       open(unit, file="point_sources.conf",status="old",action="read",iostat=io)
       
@@ -956,6 +959,7 @@ contains
        end if
      end subroutine
 
+
      subroutine get_line_sources
         use Strings, only: itoa
         use LineSources, only: ScalarLineSource, ScalarLineSources
@@ -1085,7 +1089,136 @@ contains
        end if
      end subroutine read_staggered_frames
 
- end subroutine ReadConfiguration
+  end subroutine ReadConfiguration
+
+
+
+
+
+
+  subroutine get_area_sources(fname)
+    use Strings
+    use ParseTrees
+    use GeometricShapes2D
+    use AreaSources
+    character(*), intent(in) :: fname
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: i, stat
+
+    if (num_of_scalars==0) return
+
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+      if (allocated(tree)) then
+        do i = 1, size(tree)
+          call get_area_source(tree(i))
+        end do
+      end if
+
+    else
+      write(*,*) "Error parsing file " // trim(fname)
+      call error_stop
+    end if
+
+  contains
+
+    subroutine get_area_source(obj)
+      type(ScalarAreaSource) :: res
+      type(tree_object), intent(in) :: obj
+      integer :: scnum
+      real(knd) :: flux
+      class(GeometricShape2D), allocatable :: shp
+      integer :: j
+
+      if (downcase(obj%name)=='area_source') then
+        if (allocated(obj%fields%array)) then
+          associate(fields => obj%fields%array)
+            do j = 1, size(fields)
+              if (downcase(fields(j)%name)=='scalar_number') then
+                read(fields(j)%value, *) scnum
+              else if (downcase(fields(j)%name)=='flux') then
+                read(fields(j)%value, *) flux
+              else if (downcase(fields(j)%name)=='geometric_shape') then
+                if (fields(j)%is_object .and. associated(fields(j)%object_value)) then
+                  call get_geometric_shape(shp, fields(j)%object_value)
+                else 
+                  write(*,*) "Invalid geometric shape for area source in " // fname
+                  call error_stop
+                end if
+              end if
+            end do
+          end associate
+        else
+          write(*,*) "No fields in the AreaSource object in " // trim(fname)
+          call error_stop
+        end if
+
+        call add_element(ScalarAreaSources, ScalarAreaSource(shp, scnum, flux))
+
+      else
+        write(*,*) "Unknown object type " // downcase(obj%name) // " in " // trim(fname)
+        call error_stop
+      end if
+    end subroutine
+
+    subroutine get_geometric_shape(res, obj)
+      class(GeometricShape2D), allocatable :: res
+      type(tree_object), intent(in) :: obj
+      real(knd) :: xc, yc, r
+      integer :: j
+
+      if (downcase(obj%name)=='circle') then
+        if (allocated(obj%fields%array)) then
+          associate(fields => obj%fields%array)
+            do j = 1, size(fields)
+              if (downcase(fields(j)%name)=='xc') then
+                read(fields(j)%value, *) xc
+              else if (downcase(fields(j)%name)=='yc') then
+                read(fields(j)%value, *) yc
+              else if (downcase(fields(j)%name)=='r') then
+                read(fields(j)%value, *) r
+              end if
+            end do
+          end associate
+        else
+          write(*,*) "No fields in the Circle object in " // trim(fname)
+          call error_stop
+        end if
+
+        allocate(res, source = Circle(xc, yc, r))
+
+      else
+        write(*,*) "Invalid geometric shape for area source in " // fname
+        write(*,*) "Supported variants: Circle"
+        call error_stop
+      end if
+
+    end subroutine
+
+    subroutine add_element(a,e)
+      type(ScalarAreaSource),allocatable,intent(inout) :: a(:)
+      type(ScalarAreaSource),intent(in) :: e
+      type(ScalarAreaSource),allocatable :: tmp(:)
+
+      if (.not.allocated(a)) then
+        a = [e]
+      else
+        call move_alloc(a,tmp)
+        allocate(a(size(tmp)+1))
+        a(1:size(tmp)) = tmp
+        a(size(tmp)+1) = e
+      end if
+    end subroutine
+  end subroutine get_area_sources
+
+
+
 
 
   subroutine ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
@@ -2218,6 +2351,9 @@ contains
    call InitVolumeSources
 
    !add arrays of the line source points
+   call InitAreaSources
+
+   !add arrays of the line source points
    call InitLineSources
 
    !add arrays of the point source points
@@ -2361,7 +2497,7 @@ contains
 #ifdef MPI
     use custom_mpi
 #endif
-    integer :: i, n, clock
+    integer :: i
     integer(int32),dimension(:),allocatable :: seed
     integer :: nt
     

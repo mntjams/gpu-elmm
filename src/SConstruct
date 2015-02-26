@@ -73,7 +73,7 @@ else:
     openmp_flag = ' -frecursive'
 
   if str(fast)=='yes':
-    fast_flag = '  -O5 -ffast-math -fno-protect-parens'# -Warray-temporaries'
+    fast_flag = '  -O5 -ffast-math -fno-protect-parens'
     check_flag = '  -fbacktrace -g'
   else:
     fast_flag = ' -O5 -ffast-math -fno-protect-parens'
@@ -248,6 +248,7 @@ objs += env.Object(target=target_dir+'multigrid2d',    source='multigrid2d.f90')
 objs += env.Object(target=target_dir+'solarradiation', source='solarradiation.f90')
 objs += env.Object(target=target_dir+'wallmodels',     source='wallmodels.f90', F90FLAGS = filter(lambda flag: flag !='-flto' , env['F90FLAGS']))
 objs += env.Object(target=target_dir+'volumesources',  source='volumesources.f90')
+objs += env.Object(target=target_dir+'areasources',    source='areasources.f90')
 objs += env.Object(target=target_dir+'linesources',    source='linesources.f90')
 objs += env.Object(target=target_dir+'pointsources',   source='pointsources.f90')
 objs += env.Object(target=target_dir+'puffs',          source='puffs.f90')
@@ -268,6 +269,7 @@ else:
 
 objs += env.Object(target=target_dir+'elevationmodels',source='elevationmodels.f90')
 objs += env.Object(target=target_dir+'geometricshapes',source='geometricshapes.f90')
+objs += env.Object(target=target_dir+'geometricshapes2d',     source='geometricshapes2d.f90')
 objs += env.Object(target=target_dir+'solidbodies',    source='solidbodies.f90')
 objs += env.Object(target=target_dir+'immersedboundary',source='immersedboundary.f90')
 objs += env.Object(target=target_dir+'turbinlet',      source='turbinlet.f90')
