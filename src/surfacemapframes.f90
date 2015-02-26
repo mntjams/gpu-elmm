@@ -238,7 +238,7 @@ print *,"SaveSurfaceFrames",i
     real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), Viscosity(-1:,-1:,-1:), &
                                        Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), &
                                        Scalar(-1:,-1:,-1:,1:)
-    integer :: i,j,k,l
+    integer :: i,j,l
     integer :: mini,maxi,minj,maxj
 
     mini = D%minPri
@@ -360,9 +360,9 @@ print *,"SaveSurfaceFrames",i
         do j = minj, maxj
           do i = mini, maxi
             if (D%k(i,j)>0) then
-              D%ScalarFl(i,j,k,1) = real(ScalarVerticalFlux(i,j,D%k(i,j),sum(Scalar,4),W) , real32)
+              D%ScalarFl(i,j,1,1) = real(ScalarVerticalFlux(i,j,D%k(i,j),sum(Scalar,4),W) , real32)
             else
-              D%ScalarFl(i,j,k,1) = -huge(1._real32)
+              D%ScalarFl(i,j,1,1) = -huge(1._real32)
             end if
           end do
         end do
