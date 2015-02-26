@@ -1115,6 +1115,7 @@ contains
     call parse_file(tree, fname, stat)
 
     if (stat==0) then
+
       if (allocated(tree)) then
         do i = 1, size(tree)
           call get_area_source(tree(i))
@@ -1122,8 +1123,10 @@ contains
       end if
 
     else
-      write(*,*) "Error parsing file " // trim(fname)
+
+      write(*,*) "Error parsing file " // fname
       call error_stop
+
     end if
 
   contains
@@ -1131,15 +1134,19 @@ contains
     subroutine get_area_source(obj)
       type(ScalarAreaSource) :: res
       type(tree_object), intent(in) :: obj
-      integer :: scnum
-      real(knd) :: flux
       class(GeometricShape2D), allocatable :: shp
+      real(knd) :: flux
+      integer :: scnum
       integer :: j
 
       if (downcase(obj%name)=='area_source') then
+
         if (allocated(obj%fields%array)) then
+
           associate(fields => obj%fields%array)
+
             do j = 1, size(fields)
+
               if (downcase(fields(j)%name)=='scalar_number') then
                 read(fields(j)%value, *) scnum
               else if (downcase(fields(j)%name)=='flux') then
@@ -1152,17 +1159,22 @@ contains
                   call error_stop
                 end if
               end if
+
             end do
+
           end associate
+
         else
-          write(*,*) "No fields in the AreaSource object in " // trim(fname)
+
+          write(*,*) "No fields in the AreaSource object in " // fname
           call error_stop
+
         end if
 
         call add_element(ScalarAreaSources, ScalarAreaSource(shp, scnum, flux))
 
       else
-        write(*,*) "Unknown object type " // downcase(obj%name) // " in " // trim(fname)
+        write(*,*) "Unknown object type " // downcase(obj%name) // " in " // fname
         call error_stop
       end if
     end subroutine
@@ -1174,9 +1186,13 @@ contains
       integer :: j
 
       if (downcase(obj%name)=='circle') then
+
         if (allocated(obj%fields%array)) then
+
           associate(fields => obj%fields%array)
+
             do j = 1, size(fields)
+
               if (downcase(fields(j)%name)=='xc') then
                 read(fields(j)%value, *) xc
               else if (downcase(fields(j)%name)=='yc') then
@@ -1184,27 +1200,34 @@ contains
               else if (downcase(fields(j)%name)=='r') then
                 read(fields(j)%value, *) r
               end if
+
             end do
+
           end associate
+
         else
-          write(*,*) "No fields in the Circle object in " // trim(fname)
+
+          write(*,*) "No fields in the Circle object in " // fname
           call error_stop
+
         end if
 
         allocate(res, source = Circle(xc, yc, r))
 
       else
+
         write(*,*) "Invalid geometric shape for area source in " // fname
         write(*,*) "Supported variants: Circle"
         call error_stop
+
       end if
 
     end subroutine
 
     subroutine add_element(a,e)
-      type(ScalarAreaSource),allocatable,intent(inout) :: a(:)
-      type(ScalarAreaSource),intent(in) :: e
-      type(ScalarAreaSource),allocatable :: tmp(:)
+      type(ScalarAreaSource), allocatable, intent(inout) :: a(:)
+      type(ScalarAreaSource), intent(in) :: e
+      type(ScalarAreaSource), allocatable :: tmp(:)
 
       if (.not.allocated(a)) then
         a = [e]
@@ -1215,6 +1238,7 @@ contains
         a(size(tmp)+1) = e
       end if
     end subroutine
+
   end subroutine get_area_sources
 
 
