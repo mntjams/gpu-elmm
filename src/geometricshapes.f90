@@ -1685,6 +1685,7 @@ contains
     
     if (present(z0_map)) then
       rough = .true.
+      z0_l = -1
     else if (present(z0)) then
       z0_l = z0
       rough = .true.
