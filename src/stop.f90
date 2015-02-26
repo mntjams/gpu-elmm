@@ -18,10 +18,9 @@ module Stop_procedures
 contains
     
   subroutine error_stop_null
-    integer ie
     
 #ifdef MPI
-    call MPI_abort(MPI_COMM_WORLD,1,ie)
+    call abort_mpi(1)
 #endif
     stop
   end subroutine
@@ -29,14 +28,13 @@ contains
 
   subroutine error_stop_int(n)
     integer,intent(in) :: n
-    integer ie
     
     if (master) then
       write(*,'(g0)') "ERROR",n
     end if
     
 #ifdef MPI
-    call MPI_abort(MPI_COMM_WORLD,n,ie)
+    call abort_mpi(n)
 #endif
     stop
   end subroutine
@@ -44,13 +42,12 @@ contains
 
   subroutine error_stop_char(ch)
     character(*),intent(in) :: ch
-    integer ie
     
     if (master) then
       write(*,'(g0)') ch
     end if
 #ifdef MPI
-    call MPI_abort(MPI_COMM_WORLD,1,ie)
+    call abort_mpi(1)
 #endif
     stop
   end subroutine
@@ -59,16 +56,25 @@ contains
   subroutine error_stop_char_int(ch,n)
     character(*),intent(in) :: ch
     integer,intent(in) :: n
-    integer ie
     
     if (master) then
       write(*,'(g0,1x,g0)') ch,n
     end if
 #ifdef MPI
-    call MPI_abort(MPI_COMM_WORLD,n,ie)
+    call abort_mpi(n)
 #endif
     stop
   end subroutine
+
+#ifdef MPI
+  subroutine abort_mpi(n)
+    integer, intent(in) :: n
+    integer :: ie
+
+    call MPI_abort(MPI_COMM_WORLD,n,ie)
+
+  end subroutine
+#endif
 
 end module
 
