@@ -238,7 +238,7 @@ print *,"SaveSurfaceFrames",i
     real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), Viscosity(-1:,-1:,-1:), &
                                        Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), &
                                        Scalar(-1:,-1:,-1:,1:)
-    integer :: i,j,k,l,m
+    integer :: i,j,k,l
     integer :: mini,maxi,minj,maxj
 
     mini = D%minPri

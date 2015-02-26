@@ -357,8 +357,7 @@ module VolumeSources
           type(PlantBody) :: PB
           type(TemperatureFlVolume) :: Telem
           type(MoistureFlVolume) :: Melem
-          type(ScalarFlVolume) :: Selem
-          integer i,j,k,sc
+          integer :: i, j, k
           
           do k = 0,Prnz+1
            do j = 0,Prny+1
@@ -743,7 +742,6 @@ module VolumeSources
       real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Scalar
       integer, intent(in) :: sc
       logical, intent(in) :: first_stage
-      integer j
 
       if (allocated(ScalarFlVolumes)) then
         call FluxKernel(Scalar(:,:,:), ScalarFlVolumes(sc)%volumes)
@@ -803,7 +801,7 @@ module VolumeSources
       type(ScalarFlVolumesContainer),intent(inout) :: l(:)
       type(ScalarFlVolumesContainer),intent(in)    :: r
       type(ScalarFlVolume),allocatable :: tmp(:)
-      integer i
+
       associate (sn => r%scalar_number)
         if (size(r%volumes)>0) then
           !NOTE: the shorter version problematic in gfortran4.8 and ifort 14

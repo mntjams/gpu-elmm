@@ -329,7 +329,7 @@ contains
     integer,allocatable,dimension(:),save :: ige,ipivot,work2
     real(knd),allocatable,dimension(:),save :: xge,bge,work,R,C,ferr,berr
     real(knd),allocatable,dimension(:,:),save :: age,af
-    real(knd) :: Ap,rcond
+    real(knd) :: Ap
     integer,save :: nx,nz,nulx,nulz,nxyz,called = 0
 
     if (called==0) then

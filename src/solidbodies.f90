@@ -327,7 +327,6 @@ contains
   subroutine ReadTerrain(filename)
     use ElevationModels, only: uniform_map
     character(*), intent(in) :: filename
-    logical :: ex
 
     !assume z0 the same as for the lower boundary if not specified otherwise
     

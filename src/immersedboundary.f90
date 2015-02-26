@@ -637,7 +637,7 @@ contains
     integer,intent(in)                          :: component
 
     type(SolidBody),pointer :: SB
-    integer :: dirx,diry,dirz,n1,n2,nx,ny,nz
+    integer :: dirx,diry,dirz
     real(knd) :: x,y,z
     real(knd) :: x2,y2,z2
     real(knd) :: xnear,ynear,znear
@@ -646,8 +646,6 @@ contains
     logical :: freexp,freeyp,freezp
     logical :: free1xm,free1ym,free1zm
     logical :: free1xp,free1yp,free1zp
-    real(knd) :: distxm, distym, distzm
-    real(knd) :: distxp, distyp, distzp
     integer :: i
 
     !real coordinates of the IB forcing point

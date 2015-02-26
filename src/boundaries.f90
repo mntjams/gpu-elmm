@@ -1182,15 +1182,9 @@ implicit none
 
 
   subroutine ConstantInlet
-    !Dirichlet inlet condition
-    !Uin must be allocated beforehand
-    integer j,k
-
 
     Uin = Uinlet * cos(windangle/180._knd*pi)
-
-    Vin =  Uinlet * sin(windangle/180._knd*pi)
-
+    Vin = Uinlet * sin(windangle/180._knd*pi)
     Win = 0
 
   end subroutine

@@ -604,7 +604,6 @@ contains
     use ArrayUtilities, only: cross_product
     type(Plane) :: res
     real(real32),intent(in) :: point1(3), point2(3), point3(3)
-    real(real32) :: vec(3)
     
     res = Plane_Init_3xv3_knd(real(point1, knd), &
                               real(point2, knd), &
@@ -616,7 +615,6 @@ contains
     use ArrayUtilities, only: cross_product
     type(Plane) :: res
     real(real64),intent(in) :: point1(3), point2(3), point3(3)
-    real(real64) :: vec(3)
     
     res = Plane_Init_3xv3_knd(real(point1, knd), &
                               real(point2, knd), &
@@ -998,10 +996,6 @@ contains
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in) :: eps
     real(knd) :: xn, yn, zn
-    integer :: i
-    
-    !it is probably better to use one fixed reference point, 
-    !because test segment aligned with probable walls could cause problems
 
     if (self%in_bbox(x,y,z,eps)) then
          
@@ -2392,7 +2386,6 @@ contains
     integer :: unit, io
     integer :: ipoint, ipolyhedron
     integer :: npoints, npolyhedra
-    type(ConvexPolyhedron) :: poly
     type(ConvexPolyhedron),allocatable :: items(:)
     real(knd),allocatable :: points(:,:)
     character(180) :: line

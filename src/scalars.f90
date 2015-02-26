@@ -79,7 +79,7 @@ contains
                 temperature_flux_profile, moisture_flux_profile)
     use RK3
     use VolumeSources, only: ScalarVolumeSources
-    use Puffs, only: DoPuffs, PreparePuffs, enable_puffs
+    use Puffs, only: DoPuffs, PreparePuffs
     real(knd), contiguous, intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd), contiguous, intent(inout) :: Temperature(-1:,-1:,-1:),Moisture(-1:,-1:,-1:)
     real(knd), contiguous, intent(inout) :: Scalar(-1:,-1:,-1:,1:)
@@ -87,11 +87,8 @@ contains
     real(knd), contiguous, intent(out)   :: temperature_flux_profile(:)
     real(knd), contiguous, intent(out)   :: moisture_flux_profile(:)
     integer,  intent(in)                 :: RK_stage
-
-
     integer :: sc
     integer,save :: called = 0
-    logical,save :: released=.false.
 
 
     if (called==0) then
@@ -1046,12 +1043,12 @@ contains
     real(knd),contiguous,intent(inout) :: ScV(:,:,:)
     real(knd),contiguous,intent(inout) :: ScW(:,:,:)
     real(knd),contiguous,intent(in)    :: Scal(-1:,-1:,-1:)
-    real(knd),contiguous,intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),contiguous,intent(in)    :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd),intent(in) :: weight
     real(knd),intent(out) :: probes_flux(:,:) !component, position
     integer,intent(in) :: px(:), py(:), pz(:)
-    integer i,j,k,probe
-    real(knd) vel,SL,SR,FLUX
+    integer :: i, j, k, probe
+    real(knd) :: SL, SR
     real(knd),parameter ::eps = 1e-8
 
     if (.not.allocated(SLOPE)) then

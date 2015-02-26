@@ -1055,7 +1055,7 @@ contains
     real(knd),intent(inout) :: ustar
     real(knd),intent(in)    :: z0
     real(knd),intent(in)    :: distvect(3), uvect(3), walluvect(3)
-    real(knd) vect(3), vel, dist
+    real(knd) :: vel, dist
 
     call WMRoughStress(ustar,z0,distvect,uvect,walluvect,vel,dist)
 
@@ -1614,7 +1614,7 @@ contains
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
     real(knd),dimension(1:,1:,1:),   intent(in) :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
-    integer i,j,xi,yj,zk
+    integer i, xi, yj, zk
     real(knd) tdif
     real(knd) dist(3), vel(3), wallvel(3), prgrad(3)
     real(knd) visc
@@ -1741,7 +1741,7 @@ contains
       type(WMPointUVW), intent(inout), target :: points(:)
       integer, intent(in) :: component, direction
       real(knd), intent(in) :: x(:), y(:), z(:)
-      integer point,j,xi,yj,zk
+      integer :: point, xi, yj, zk
       real(knd) dist(3), vel(3), wallvel(3), tan_vect(3), mag, drec(6), temp
       type(WMPointUVW), pointer :: p
       real(knd), parameter :: eps = 0.0001_knd

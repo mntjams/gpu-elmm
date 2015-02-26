@@ -111,7 +111,6 @@ contains
     real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), &
                                        Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
                                        Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
-    integer err
 
     associate(start   => D%frame_times%start,&
               end     => D%frame_times%end,&

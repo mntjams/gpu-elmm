@@ -325,7 +325,7 @@ contains
     real(knd),contiguous,intent(in) :: Pr(1:,1:,1:), Viscosity(-1:,-1:,-1:), &
                                        Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), &
                                        Scalar(-1:,-1:,-1:,1:)
-    integer :: i,j,k,l,m
+    integer :: i,j,k,l
     integer :: mini,maxi,minj,maxj,mink,maxk
 
     mini = D%minPri
@@ -514,7 +514,6 @@ contains
     character(70) :: str
     character(8) ::  scalname
     integer :: mini, maxi, minj, maxj, mink, maxk
-    integer :: unit
     integer :: sc
 
     scalname = "scalar00"

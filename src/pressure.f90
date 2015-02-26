@@ -23,12 +23,10 @@ contains
                                                            !coef cofficient from Runge Kutta, Q mass sources from immersed boundary
     real(TIM) dt2,dt3                                      !RHS right hand side of eq. with divergence of U
                                                            !Phi computed pseudopressure, saved as first guess for next time
-    real(knd) :: divergence,uncompatibility
-    character(70) :: str
+    real(knd) :: uncompatibility
     integer, save :: called = 0
     integer(DBL), save :: trate
     integer(DBL), save :: time1, time2, time3, time4
-    integer(DBL), save :: timem1, timem2, timem3, timem4
 #ifdef MPI
     correctcompatibility = 0
 #else
@@ -116,7 +114,7 @@ contains
     real(knd), allocatable, intent(in) :: Q(:,:,:)
     real(knd), intent(out)   :: uncompatibility
     real(knd), intent(in)    :: dt2
-    real(knd) :: S,S2
+    real(knd) :: S
     integer   :: i,j,k
 
 !     !$omp parallel

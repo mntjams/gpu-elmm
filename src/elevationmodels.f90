@@ -229,7 +229,6 @@ contains
     type(uniform_map) :: res
     character(*), intent(in) :: filename
     real(knd), optional, intent(in) :: default
-    real(knd) :: def_loc
     
     if (filename(len(filename)-2:) == "xyz") then
       res = uniform_map_XYZ(filename)

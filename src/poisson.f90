@@ -20,7 +20,6 @@ contains
     type(PoisFFT_Solver),save :: Solver
     real(knd),dimension(0:,0:,0:),intent(inout) :: Phi
     real(knd),dimension(0:,0:,0:),intent(in) :: RHS
-    integer i
     logical, save :: called = .false.
 #ifdef POIS_SOLVER_TIME
     integer(DBL), save :: trate
@@ -77,8 +76,8 @@ contains
     real(knd),dimension(0:,0:,0:),intent(inout) :: Phi
     real(knd),dimension(0:,0:,0:),intent(in) :: RHS
     integer,save :: called=0
-    integer nx,ny,nz,i,j,k,l,blockit
-    real(knd) S,P,Ap
+    integer :: nx,ny,nz,i,j,k,l
+    real(knd) :: S,P,Ap
     real(knd),dimension(:),allocatable,save :: Aw,Ae,As,An,Ab,At
 
 
@@ -114,7 +113,6 @@ contains
       S=0
 #ifdef MPI
       call Bound_Phi(Phi)
-print *,Phi(1,1,1),Phi(1,1,nz+1)
 #endif
       !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
       !$OMP DO

@@ -578,7 +578,7 @@ contains
     use Wallmodels
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: U,V,W
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U2,V2,W2
-    real(knd) :: Ap, recdxmin2, recdymin2, recdzmin2
+    real(knd) :: recdxmin2, recdymin2, recdzmin2
     integer :: i,j,k,bi,bj,bk
     integer, parameter :: narr = 6
        

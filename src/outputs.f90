@@ -191,7 +191,6 @@ use custom_mpi
 #endif
 use Strings
     integer :: k, u, io
-integer :: tmp
 
    call GetEndianness
 
@@ -637,7 +636,6 @@ integer :: tmp
     real(knd) :: S,S2
     real(knd) :: time_weight
     real(knd) :: fl_L, fl_R
-    integer, save :: fnum = 0
     logical, save :: called = .false.
     
     if (.not.called) then
@@ -1132,8 +1130,7 @@ integer :: tmp
 
   subroutine OutputTimeSeries
     character(5) :: prob
-    real(knd) :: S,S2,nom,denom
-    integer :: i,j,k,unit
+    integer :: k,unit
 
     call newunit(unit)
     
@@ -1263,7 +1260,6 @@ integer :: tmp
   
 
   subroutine OutputProfiles
-    character(5) :: prob
     real(knd) :: S,S2,nom,denom
     integer :: i,j,k,unit
 
@@ -1735,8 +1731,7 @@ integer :: tmp
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Temperature
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Moisture
     character(70) :: str
-    character(8) ::  scalname="scalar00"
-    integer i,j,k,l,unit
+    integer i,j,k,unit
     real(real32),allocatable :: tmp(:,:,:,:), sc_tmp(:,:,:)
 
     if (averaging==1) then
@@ -2369,7 +2364,6 @@ integer :: tmp
     real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Scalar(-1:,-1:,-1:,:)
-    integer i
 
     call BoundU(1,U,Uin)
     call BoundU(2,V,Vin)
@@ -2419,7 +2413,7 @@ integer :: tmp
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     real(knd) :: S
     real(knd),allocatable,save ::fp(:),ht(:),gp(:)
-    integer   :: i,j,k,l,n
+    integer   :: i,j,k,n
     integer,save :: called = 0
 
     if (called==0) then
@@ -2508,8 +2502,6 @@ integer :: tmp
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Moisture
     real(knd),dimension(-1:,-1:,-1:,1:),contiguous,intent(in) :: Scalar
-    real(knd) :: S
-    integer   :: i,j,k,l,n
 
     
     if (enable_buoyancy) call TemperatureFluxSGSProfile(W,Temperature)
@@ -2523,7 +2515,7 @@ integer :: tmp
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
     real(knd) :: S
-    integer   :: i,j,k,l,n
+    integer   :: i,j,k,n
     !proftempfl is computed directly during advection step
 
     !$omp parallel do private(i,j,k,n,S)
@@ -2560,7 +2552,7 @@ integer :: tmp
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Moisture
     real(knd) :: S
-    integer   :: i,j,k,l,n
+    integer   :: i,j,k,n
     !profmoistfl is computed directly during advection step
 
     !$omp parallel do private(i,j,k,n,S)

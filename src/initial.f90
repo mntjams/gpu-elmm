@@ -1132,7 +1132,6 @@ contains
   contains
 
     subroutine get_area_source(obj)
-      type(ScalarAreaSource) :: res
       type(tree_object), intent(in) :: obj
       class(GeometricShape2D), allocatable :: shp
       real(knd) :: flux

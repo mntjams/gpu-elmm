@@ -443,9 +443,8 @@ contains
     integer,allocatable,dimension(:),save :: ige,ipivot,work2
     real(knd),allocatable,dimension(:),save :: xge,bge,work,R,C,ferr,berr
     real(knd),allocatable,dimension(:,:),save :: age,af
-    real(knd) :: Ap,rcond
+    real(knd) :: Ap
     integer,save :: nx,ny,nz,nulx,nuly,nulz,nxyz,called = 0
-    character(1),save :: equed
 
     if (called==0) then
      nx = CoefMG(level)%nx
@@ -1048,8 +1047,8 @@ contains
   subroutine PoissMG(Phi,RHS)        !Solves Poisson equation using Successive over-relaxation
     real(knd),dimension(0:,0:,0:),intent(inout) :: Phi
     real(knd),dimension(1:,1:,1:),intent(in) :: RHS
-    integer :: i,j,k,l,nx,ny,nz,sx,sy,sz
-    real(knd) :: mgeps,R,Phiref
+    integer :: l,nx,ny,nz,sx,sy,sz
+    real(knd) :: mgeps,R
     integer,save :: called = 0
 
     mgeps = epsPoisson
