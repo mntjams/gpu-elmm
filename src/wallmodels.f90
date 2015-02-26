@@ -1843,7 +1843,7 @@ contains
         val =  (C(xi+1,yj,  zk  ) + C(xi,yj,zk)) / 2
       case (2)
         val =  (C(xi,  yj+1,zk  ) + C(xi,yj,zk)) / 2
-      case (3)
+      case default
         val =  (C(xi,  yj,  zk+1) + C(xi,yj,zk)) / 2
     end select
   end function
@@ -1879,7 +1879,7 @@ contains
                    W(xi, yj+1,zk-1) + &
                    W(xi, yj,  zk-1) &
                  ) / 4._knd
-      case (3)
+      case default
         vel(1) = ( U(xi  ,yj, zk+1) + &
                    U(xi,  yj, zk  ) + &
                    U(xi-1,yj, zk+1) + &
