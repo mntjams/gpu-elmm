@@ -48,7 +48,7 @@ if str(comp)=='intel':
    fast_flag = ' -O3 -shared-intel'
    check_flag = ''
   else:
-   fast_flag = ' -O3'#' -g -debug extended -O0 -shared-intel -check all,noarg_temp_created -traceback -warn all,nounused -fstack-protector -fpe1'
+   fast_flag = ' -O3'
    check_flag = ' -g -check all,noarg_temp_created -traceback'
 
   if str(lto)=='yes':
@@ -90,13 +90,9 @@ else:
 
   env.Replace(F90='gfortran')
   
-  env.Append(F90FLAGS='-cpp')#-fstack-arrays
+  env.Append(F90FLAGS='-cpp')
 
-  #env.Append(LINKFLAGS='-static-libgcc -static-libstdc++ -static-libgfortran')
-
-  #env.Append(LIBPATH = ['/usr/local/poisfft_gcc/'])
-
-  env.Append(F90PATH = [target_dir,target_dir+'/P/'])#,'/usr/local/poisfft_gcc/']
+  env.Append(F90PATH = [target_dir,target_dir+'/P/'])
   
   env.Append(FORTRANMODDIRPREFIX = '-J')
 
