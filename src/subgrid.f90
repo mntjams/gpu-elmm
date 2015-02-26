@@ -205,129 +205,79 @@ module Subgrid
 
     subroutine SGS_Vreman(U,V,W,filter_ratio)   !Vreman subgrid model (Physics of Fluids, 2004)
       use Tiling, only: tilenx, tileny, tilenz
-      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-      real(knd),intent(in) :: filter_ratio
-      integer i,j,k,bi,bj,bk,ii,jj
-      real(knd) :: aa,bb
-      real(knd),dimension(1:3,1:3) ::a,b
-      real(knd) :: dx2,dy2,dz2
+      real(knd), dimension(-2:,-2:,-2:), intent(in) :: U, V, W
+      real(knd), intent(in) :: filter_ratio
+      real(knd) :: aa, bb
+      real(knd), dimension(1:3,1:3) :: a, b
+      real(knd) :: dx2, dy2, dz2
       real(knd),parameter ::c = 0.05
       integer,parameter :: narr = 4
       real(knd) :: c2
+      integer :: i, j, k, bi, bj, bk, ii, jj
 
       c2 = c * filter_ratio**2
 
-      if (gridtype==uniformgrid) then
+      dx2 = dxmin**2
+      dy2 = dymin**2
+      dz2 = dzmin**2
 
 
-       dx2 = dxmin**2
-       dy2 = dymin**2
-       dz2 = dzmin**2
+      !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) !collapse(3)
+      do bk = 1, Prnz, tilenz(narr)
+       do bj = 1, Prny, tileny(narr)
+        do bi = 1, Prnx, tilenx(narr)
+         do k = bk, min(bk+tilenz(narr)-1,Prnz)
+          do j = bj, min(bj+tileny(narr)-1,Prny)
+           do i = bi, min(bi+tilenx(narr)-1,Prnx)
+            a(1,1) = (U(i,j,k)-U(i-1,j,k))/dxmin
+            a(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._knd*dymin)
+            a(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._knd*dzmin)
 
-       !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) !collapse(3)
-       do bk = 1,Prnz,tilenz(narr)
-        do bj = 1,Prny,tileny(narr)
-         do bi = 1,Prnx,tilenx(narr)
-          do k = bk,min(bk+tilenz(narr)-1,Prnz)
-           do j = bj,min(bj+tileny(narr)-1,Prny)
-            do i = bi,min(bi+tilenx(narr)-1,Prnx)
-             a(1,1) = (U(i,j,k)-U(i-1,j,k))/dxmin
-             a(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._knd*dymin)
-             a(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._knd*dzmin)
+            a(2,2) = (V(i,j,k)-V(i,j-1,k))/dymin
+            a(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(4._knd*dxmin)
+            a(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(4._knd*dzmin)
 
-             a(2,2) = (V(i,j,k)-V(i,j-1,k))/dymin
-             a(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(4._knd*dxmin)
-             a(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(4._knd*dzmin)
+            a(3,3) = (W(i,j,k)-W(i,j,k-1))/dzmin
+            a(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4._knd*dxmin)
+            a(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4._knd*dymin)
 
-             a(3,3) = (W(i,j,k)-W(i,j,k-1))/dzmin
-             a(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4._knd*dxmin)
-             a(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4._knd*dymin)
-
-             do jj = 1,3
-              do ii = 1,3
-               b(ii,jj) = dx2*a(1,ii)*a(1,jj)+&
-                        dy2*a(2,ii)*a(2,jj)+&
-                        dz2*a(3,ii)*a(3,jj)
-              end do
+            do jj = 1, 3
+             do ii = 1, 3
+              b(ii,jj) = dx2 * a(1,ii) * a(1,jj) + &
+                         dy2 * a(2,ii) * a(2,jj) + &
+                         dz2 * a(3,ii) * a(3,jj)
              end do
-
-             bb=          b(1,1)*b(2,2)-b(1,2)**2
-             bb = bb+b(1,1)*b(3,3)-b(1,3)**2
-             bb = bb+b(2,2)*b(3,3)-b(2,3)**2
-
-             aa = 0
-
-             do jj = 1,3
-              do ii = 1,3
-               aa = aa+(a(ii,jj)**2)
-              end do
-             end do
-
-
-             if (abs(aa)>1e-5.and.bb>0)  then
-               Viscosity(i,j,k) = c2 * sqrt(bb/aa)
-             else
-               Viscosity(i,j,k) = 0
-             end if
-
-             if (Re>0)  Viscosity(i,j,k) = Viscosity(i,j,k)+1._knd/Re
-
             end do
+
+            bb =      b(1,1)*b(2,2) - b(1,2)**2
+            bb = bb + b(1,1)*b(3,3) - b(1,3)**2
+            bb = bb + b(2,2)*b(3,3) - b(2,3)**2
+
+            aa = 0
+
+            do jj = 1, 3
+             do ii = 1, 3
+              aa = aa + (a(ii,jj)**2)
+             end do
+            end do
+
+
+            if (abs(aa)>1e-5.and.bb>0)  then
+              Viscosity(i,j,k) = c2 * sqrt(bb/aa)
+            else
+              Viscosity(i,j,k) = 0
+            end if
+
+            if (Re>0)  Viscosity(i,j,k) = Viscosity(i,j,k)+1._knd/Re
+
            end do
           end do
          end do
         end do
        end do
-       !$omp end parallel do
+      end do
+      !$omp end parallel do
 
-      else !general grid
-
-       !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) !collapse(3)
-       do bk = 1,Prnz,tilenz(narr)
-        do bj = 1,Prny,tileny(narr)
-         do bi = 1,Prnx,tilenx(narr)
-          do k = bk,min(bk+tilenz(narr)-1,Prnz)
-           do j = bj,min(bj+tileny(narr)-1,Prny)
-            do i = bi,min(bi+tilenx(narr)-1,Prnx)
-             a(1,1) = (U(i,j,k)-U(i-1,j,k))/dxPr(i)
-             a(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(2._knd*(dyV(j)+dyV(j-1)))
-             a(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(2._knd*(dzW(k)+dzW(k-1)))
-             a(2,2) = (V(i,j,k)-V(i,j-1,k))/dyPr(j)
-             a(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(2._knd*(dxU(i)+dxU(i-1)))
-             a(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(2._knd*(dzW(k)+dzW(k-1)))
-             a(3,3) = (W(i,j,k)-W(i,j,k-1))/dzPr(k)
-             a(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(2._knd*(dxU(i)+dxU(i-1)))
-             a(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(2._knd*(dyV(j)+dyV(j-1)))
-
-
-             forall(jj = 1:3,ii = 1:3)
-              b(ii,jj) = (dxPr(i))**2*a(1,ii)*a(1,jj)+&
-                             (dyPr(j))**2*a(2,ii)*a(2,jj)+&
-                             (dzPr(k))**2*a(3,ii)*a(3,jj)
-             endforall
-
-             bb=   b(1,1)*b(2,2)-b(1,2)**2
-             bb = bb+b(1,1)*b(3,3)-b(1,3)**2
-             bb = bb+b(2,2)*b(3,3)-b(2,3)**2
-
-             Viscosity(i,j,k) = 0._knd
-
-
-             aa = sum(a(:,:)**2)
-
-             if (abs(aa)>1e-5.and.bb>0) Viscosity(i,j,k) = c2 * sqrt(bb/aa)
-
-             if (Re>0)  Viscosity(i,j,k) = Viscosity(i,j,k)+1._knd/Re
-
-            end do
-           end do
-          end do
-         end do
-        end do
-       end do
-       !$omp end parallel do
-
-      end if !general grid
     endsubroutine SGS_Vreman
 
 
@@ -337,25 +287,25 @@ module Subgrid
     subroutine SGS_Sigma(U,V,W,filter_ratio)
       !from Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
       use Tiling, only: tilenx, tileny, tilenz
-      real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-      real(knd),intent(in) :: filter_ratio
-      real(knd),parameter :: Csig = 1.35_knd
-      integer,parameter   :: narr = 4
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(in) :: filter_ratio
+      real(knd), parameter :: Csig = 1.35_knd
+      integer, parameter   :: narr = 4
       integer   :: i,j,k,bi,bj,bk
       real(knd) :: width, C, D, g(3,3), s1, s2, s3
-      integer,parameter :: sigma_knd = knd
+      integer, parameter :: sigma_knd = knd
 
       width = filter_ratio * (dxmin*dymin*dzmin)**(1._knd/3._knd)
       C = (Csig*width)**2
 
       !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk) schedule(runtime)
       ! !collapse(3)
-      do bk = 1,Prnz,tilenz(narr)
-       do bj = 1,Prny,tileny(narr)
-        do bi = 1,Prnx,tilenx(narr)
-         do k = bk,min(bk+tilenz(narr)-1,Prnz)
-          do j = bj,min(bj+tileny(narr)-1,Prny)
-           do i = bi,min(bi+tilenx(narr)-1,Prnx)
+      do bk = 1, Prnz, tilenz(narr)
+       do bj = 1, Prny, tileny(narr)
+        do bi = 1, Prnx, tilenx(narr)
+         do k = bk, min(bk+tilenz(narr)-1,Prnz)
+          do j = bj, min(bj+tileny(narr)-1,Prny)
+           do i = bi ,min(bi+tilenx(narr)-1,Prnx)
 
             call GradientTensorUG(g,i,j,k)
 
@@ -369,7 +319,7 @@ module Subgrid
 
             Viscosity(i,j,k) = C * D
 
-            if (Re>0)  Viscosity(i,j,k) = Viscosity(i,j,k)+1._knd/Re
+            if (Re>0)  Viscosity(i,j,k) = Viscosity(i,j,k) + 1._knd/Re
 
            end do
           end do
@@ -385,17 +335,17 @@ module Subgrid
         real(knd),intent(out) :: g(3,3)
         integer,intent(in) :: i,j,k
 
-        g(1,1) = (U(i,j,k)-U(i-1,j,k))/dxmin
-        g(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._knd*dymin)
-        g(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._knd*dzmin)
+        g(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
+        g(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) / (4._knd*dymin)
+        g(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) / (4._knd*dzmin)
 
-        g(2,2) = (V(i,j,k)-V(i,j-1,k))/dymin
-        g(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(4._knd*dxmin)
-        g(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(4._knd*dzmin)
+        g(2,2) = (V(i,j,k)-V(i,j-1,k)) / dymin
+        g(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) / (4._knd*dxmin)
+        g(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) / (4._knd*dzmin)
 
-        g(3,3) = (W(i,j,k)-W(i,j,k-1))/dzmin
-        g(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4._knd*dxmin)
-        g(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4._knd*dymin)
+        g(3,3) = (W(i,j,k)-W(i,j,k-1)) / dzmin
+        g(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) / (4._knd*dxmin)
+        g(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) / (4._knd*dymin)
       end subroutine GradientTensorUG
 
 
@@ -448,12 +398,12 @@ module Subgrid
         real(sigma_knd),intent(in) :: A(3,3)
         real(sigma_knd) :: res
 
-        res =   A(1,1)*A(2,2)*A(3,3)  &
-              - A(1,1)*A(2,3)*A(3,2)  &
-              - A(1,2)*A(2,1)*A(3,3)  &
-              + A(1,2)*A(2,3)*A(3,1)  &
-              + A(1,3)*A(2,1)*A(3,2)  &
-              - A(1,3)*A(2,2)*A(3,1)
+        res =   A(1,1) * A(2,2) * A(3,3)  &
+              - A(1,1) * A(2,3) * A(3,2)  &
+              - A(1,2) * A(2,1) * A(3,3)  &
+              + A(1,2) * A(2,3) * A(3,1)  &
+              + A(1,3) * A(2,1) * A(3,2)  &
+              - A(1,3) * A(2,2) * A(3,1)
       end function det3x3
 
     end subroutine SGS_Sigma
