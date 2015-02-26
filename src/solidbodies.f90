@@ -275,6 +275,7 @@ contains
       
       if (len_trim(line)==0) then  
         if (body_opened) call close_body
+        stat = 3
         return
       end if
         
