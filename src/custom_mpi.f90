@@ -23,6 +23,8 @@ module custom_mpi
   interface mpi_co_reduce
     module procedure mpi_co_reduce_32
     module procedure mpi_co_reduce_64
+    module procedure mpi_co_reduce_32_1d
+    module procedure mpi_co_reduce_64_1d
     module procedure mpi_co_reduce_logical
     module procedure mpi_co_reduce_int
   end interface
@@ -41,8 +43,10 @@ module custom_mpi
   interface mpi_co_sum
     module procedure mpi_co_sum_32
     module procedure mpi_co_sum_32_comm
+    module procedure mpi_co_sum_32_comm_1d
     module procedure mpi_co_sum_64
     module procedure mpi_co_sum_64_comm
+    module procedure mpi_co_sum_64_comm_1d
     module procedure mpi_co_sum_int
   end interface
 
@@ -400,6 +404,46 @@ contains
     if (ie/=0) call error_stop("Error in mpi_co_reduce_64.")
   end function
 
+  function mpi_co_reduce_32_1d(x,op,comm) result(res)
+    real(real32) :: res
+    real(real32),intent(in) :: x(:)
+    integer, intent(in) :: op, comm
+    integer ie
+    
+    interface
+      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+        import
+        real(real32) :: SENDBUF, RECVBUF
+        integer :: COUNT, DATATYPE, OP, COMM, IERROR
+      end subroutine
+    end interface
+    
+    call MPI_AllReduce(x, res, &
+                       count=size(x), datatype=MPI_KND, op=op, &
+                       comm=comm, ierror=ie)
+    if (ie/=0) call error_stop("Error in mpi_co_reduce_32.")
+  end function
+
+  function mpi_co_reduce_64_1d(x,op,comm) result(res)
+    real(real64) :: res
+    real(real64),intent(in) :: x(:)
+    integer, intent(in) :: op, comm
+    integer ie
+    
+    interface
+      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+        import
+        real(real64) :: SENDBUF, RECVBUF
+        integer :: COUNT, DATATYPE, OP, COMM, IERROR
+      end subroutine
+    end interface
+    
+    call MPI_AllReduce(x, res, &
+                       count=size(x), datatype=MPI_KND, op=op, &
+                       comm=comm, ierror=ie)
+    if (ie/=0) call error_stop("Error in mpi_co_reduce_64.")
+  end function
+
   function mpi_co_reduce_logical(x,op,comm) result(res)
     logical :: res
     logical,intent(in) :: x
@@ -516,6 +560,24 @@ contains
   function mpi_co_sum_64_comm(x, comm) result(res)
     real(real64) :: res
     real(real64),intent(in) :: x
+    integer, intent(in) :: comm
+    integer ie
+    
+    res = mpi_co_reduce(x, MPI_SUM, comm)
+  end function
+
+  function mpi_co_sum_32_comm_1d(x, comm) result(res)
+    real(real32) :: res
+    real(real32),intent(in) :: x(:)
+    integer, intent(in) :: comm
+    integer ie
+    
+    res = mpi_co_reduce(x, MPI_SUM, comm)
+  end function
+
+  function mpi_co_sum_64_comm_1d(x, comm) result(res)
+    real(real64) :: res
+    real(real64),intent(in) :: x(:)
     integer, intent(in) :: comm
     integer ie
     

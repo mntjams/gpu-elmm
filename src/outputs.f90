@@ -20,17 +20,25 @@ module Outputs
          OutTStep, Output, AllocateOutputs, ReadProbes,  &
           proftempfl, profmoistfl, profuw, profvw, profuwsgs, profvwsgs
 
-  real(knd),dimension(:),allocatable :: profuavg,profuavg2,profvavg,profvavg2,profuuavg,profvvavg,profwwavg, &
-                                         profU,profV,profuu,profvv,profww,proftauavg,proftau,proftausgs,proftausgsavg, &
-                                         proftemp,proftempfl,proftempavg,proftempavg2,proftempflavg, &
-                                         proftempflsgs,proftempflsgsavg,proftt,profttavg, &
-                                         profmoist,profmoistfl,profmoistavg,profmoistavg2,profmoistflavg, &
-                                         profmoistflsgs,profmoistflsgsavg,profmm,profmmavg, &
-                                         profuw,profuwavg,profuwsgs,profuwsgsavg, &
-                                         profvw,profvwavg,profvwsgs,profvwsgsavg
+  real(knd), dimension(:), allocatable :: profuavg, profuavg2, profvavg, profvavg2, profuuavg, profvvavg, profwwavg, &
+                                          profU, profV, profuu, profvv, profww, &
+                                          profuusgs, profvvsgs, profwwsgs, proftkesgs, &
+                                          profuusgsavg, profvvsgsavg, profwwsgsavg, proftkesgsavg, &
+                                          proftemp, proftempfl, proftempavg, proftempavg2, proftempflavg, &
+                                          proftempflsgs, proftempflsgsavg, proftt, profttavg, profttsgsavg, &
+                                          profmoist, profmoistfl, profmoistavg, profmoistavg2, profmoistflavg, &
+                                          profmoistflsgs, profmoistflsgsavg, profmm, profmmavg, profmmsgsavg, &
+                                          profuw, profuwavg, profuwsgs, profuwsgsavg, &
+                                          profvw, profvwavg, profvwsgs, profvwsgsavg
 
-  real(knd),dimension(:,:),allocatable ::profscal,profscalfl,profscalavg,profscalavg2,profscalflavg, &  !which scalar, height
-                                         profscalflsgs,profscalflsgsavg,profss,profssavg
+  real(knd), dimension(:,:), allocatable :: profscal, profscalfl, profscalavg, profscalavg2, profscalflavg, &  !which scalar, height
+                                            profscalflsgs, profscalflsgsavg, profss, profssavg, profsssgsavg
+                                         
+  real(knd), dimension(:), allocatable :: n_all_Pr, n_free_Pr, n_free_U, n_free_V, n_free_W, &
+                                          n_free_PrW, n_free_UW, n_free_VW, n_free_UW_sgs, n_free_VW_sgs
+                                          
+  real(knd) :: n_free_PrW_surf
+
 
   real(knd),allocatable :: U_avg(:,:,:),V_avg(:,:,:),W_avg(:,:,:) !<u>
   real(knd),allocatable :: UU_prime(:,:,:),VV_prime(:,:,:),WW_prime(:,:,:) !<uu>, <u'u'> must be computed before saving
@@ -82,7 +90,7 @@ module Outputs
   !for passive scalars
   type(TProbe),allocatable,dimension(:),save :: scalar_probes
   
-  integer :: time_series_max_length = 1000 !how often save the time series
+  integer :: time_series_max_length = 10000 !how often save the time series
   integer :: time_series_step = 0
 
   type TOutputSwitches
@@ -187,9 +195,10 @@ contains
 
   subroutine AllocateOutputs
 #ifdef MPI
-use custom_mpi
+    use custom_mpi
 #endif
-use Strings
+    use Strings
+    use Wallmodels
     integer :: k, u, io
 
    call GetEndianness
@@ -434,21 +443,23 @@ use Strings
    end if
 
    if (store%BLprofiles==1.and.averaging==1) then
-     allocate(profU(0:Unz+1),profV(0:Vnz+1),profUavg(0:Unz+1),profVavg(0:Vnz+1),profUavg2(0:Unz+1),profVavg2(0:Vnz+1))
-     allocate(profuuavg(1:Unz),profvvavg(1:Vnz),profwwavg(0:Wnz),profuu(1:Unz),profvv(1:Vnz),profww(0:Wnz))
-     allocate(profuw(0:Prnz),profuwavg(0:Prnz),profuwsgs(0:Prnz),profuwsgsavg(0:Prnz))
-     allocate(profvw(0:Prnz),profvwavg(0:Prnz),profvwsgs(0:Prnz),profvwsgsavg(0:Prnz))
+     allocate(profU(0:Unz+1), profV(0:Vnz+1), profUavg(0:Unz+1), profVavg(0:Vnz+1), profUavg2(0:Unz+1), profVavg2(0:Vnz+1))
+     allocate(profuuavg(1:Unz), profvvavg(1:Vnz), profwwavg(0:Prnz), profuu(1:Unz), profvv(1:Vnz), profww(0:Prnz))
+     allocate(profuusgsavg(1:Unz), profvvsgsavg(1:Vnz), profwwsgsavg(0:Prnz), profuusgs(1:Unz), profvvsgs(1:Vnz), profwwsgs(0:Prnz))
+     allocate(profuw(0:Prnz), profuwavg(0:Prnz), profuwsgs(0:Prnz), profuwsgsavg(0:Prnz))
+     allocate(profvw(0:Prnz), profvwavg(0:Prnz), profvwsgs(0:Prnz), profvwsgsavg(0:Prnz))
+     allocate(proftkesgs(1:Prnz), proftkesgsavg(1:Prnz))
 
-     allocate(proftemp(1:Prnz),proftempfl(0:Prnz),proftempavg(1:Prnz),proftempavg2(1:Prnz),proftempflavg(0:Prnz))
-     allocate(proftempflsgs(0:Prnz),proftempflsgsavg(0:Prnz),proftt(1:Prnz),profttavg(1:Prnz))
+     allocate(proftemp(1:Prnz), proftempfl(0:Prnz), proftempavg(1:Prnz), proftempavg2(1:Prnz), proftempflavg(0:Prnz))
+     allocate(proftempflsgs(0:Prnz), proftempflsgsavg(0:Prnz), proftt(1:Prnz), profttavg(1:Prnz), profttsgsavg(1:Prnz))
 
-     allocate(profmoist(1:Prnz),profmoistfl(0:Prnz),profmoistavg(1:Prnz),profmoistavg2(1:Prnz),profmoistflavg(0:Prnz))
-     allocate(profmoistflsgs(0:Prnz),profmoistflsgsavg(0:Prnz),profmm(1:Prnz),profmmavg(1:Prnz))
+     allocate(profmoist(1:Prnz), profmoistfl(0:Prnz), profmoistavg(1:Prnz), profmoistavg2(1:Prnz), profmoistflavg(0:Prnz))
+     allocate(profmoistflsgs(0:Prnz), profmoistflsgsavg(0:Prnz), profmm(1:Prnz), profmmavg(1:Prnz), profmmsgsavg(1:Prnz))
 
-     allocate(profscal(num_of_scalars,1:Prnz),profscalfl(num_of_scalars,0:Prnz),profscalavg(num_of_scalars,1:Prnz))
-     allocate(profscalavg2(num_of_scalars,1:Prnz),profscalflavg(num_of_scalars,0:Prnz))
-     allocate(profscalflsgs(num_of_scalars,0:Prnz),profscalflsgsavg(num_of_scalars,0:Prnz))
-     allocate(profss(num_of_scalars,1:Prnz),profssavg(num_of_scalars,1:Prnz))
+     allocate(profscal(num_of_scalars,1:Prnz), profscalfl(num_of_scalars,0:Prnz), profscalavg(num_of_scalars,1:Prnz))
+     allocate(profscalavg2(num_of_scalars,1:Prnz), profscalflavg(num_of_scalars,0:Prnz))
+     allocate(profscalflsgs(num_of_scalars,0:Prnz), profscalflsgsavg(num_of_scalars,0:Prnz))
+     allocate(profss(num_of_scalars,1:Prnz), profssavg(num_of_scalars,1:Prnz), profsssgsavg(num_of_scalars,1:Prnz))
 
      profU = 0
      profV = 0
@@ -462,6 +473,14 @@ use Strings
      profuuavg = 0
      profvvavg = 0
      profwwavg = 0
+     profuusgs = 0
+     profvvsgs = 0
+     profwwsgs = 0
+     profuusgsavg = 0
+     profvvsgsavg = 0
+     profwwsgsavg = 0
+     proftkesgs = 0
+     proftkesgsavg = 0
      profuw = 0
      profvw = 0
      profuwavg = 0
@@ -480,6 +499,7 @@ use Strings
      proftempflsgsavg = 0
      proftt = 0
      profttavg = 0
+     profttsgsavg = 0
 
      profmoist = 0
      profmoistavg = 0
@@ -490,6 +510,7 @@ use Strings
      profmoistflsgsavg = 0
      profmm = 0
      profmmavg = 0
+     profmmsgsavg = 0
 
      if (num_of_scalars>0) then
        profscal = 0
@@ -501,24 +522,90 @@ use Strings
        profscalflsgsavg = 0
        profss = 0
        profssavg = 0
+       profsssgsavg = 0
      end if
+     
+     allocate(n_free_U(0:Unz+1))
+     allocate(n_free_V(0:Vnz+1))
+     allocate(n_free_W(0:Prnz))
+     allocate(n_free_Pr(0:Prnz+1))
+     allocate(n_all_Pr(0:Prnz+1))
+     allocate(n_free_PrW(0:Prnz))
+     allocate(n_free_UW(0:Prnz))
+     allocate(n_free_VW(0:Prnz))
+     allocate(n_free_UW_sgs(0:Prnz))
+     allocate(n_free_VW_sgs(0:Prnz))
+     do k = 0, Unz+1
+       n_free_U(k) = count(Utype(1:Unx,1:Uny,k) <= 0)
+     end do
+     do k = 0, Vnz+1
+       n_free_V = count(Vtype(1:Vnx,1:Vny,k) <= 0)
+     end do
+     do k = 0, Prnz+1
+       n_free_Pr = count(Prtype(1:Prnx,1:Prny,k) <= 0)
+     end do
+     do k = 0, Prnz+1
+       n_all_Pr(k) = Prnx * Prny
+     end do
+     do k = 0, Prnz
+       n_free_PrW(k) = count(Prtype(1:Prnx,1:Prny,k+1) <= 0 .or. Prtype(1:Prnx,1:Prny,k) <= 0)
+     end do
+     do k = 0, Prnz
+       n_free_UW(k) = count((Utype(1:Unx,1:Uny,k+1)<=0.or.Utype(1:Unx,1:Uny,k)<=0) .and. &
+                         (Wtype(2:Unx+1,1:Uny,k)<=0.or.Wtype(1:Unx,1:Uny,k)<=0))
+     end do
+     do k = 0, Prnz
+       n_free_VW(k) = count((Vtype(1:Vnx,1:Vny,k+1)<=0.or.Vtype(1:Vnx,1:Vny,k)<=0) .and. &
+                         (Wtype(1:Vnx,2:Vny+1,k)<=0.or.Wtype(1:Vnx,1:Vny,k)<=0))
+     end do
+     do k = 0, Prnz
+       n_free_UW_sgs(k) = count((Utype(1:Unx,1:Uny,k+1)<=0.or.Utype(1:Unx,1:Uny,k)<=0) .and. &
+                         (Wtype(2:Unx+1,1:Uny,k)<=0.or.Wtype(1:Unx,1:Uny,k)<=0))
+     end do
+     do k = 0, Prnz
+       n_free_VW_sgs(k) = count((Vtype(1:Vnx,1:Vny,k+1)<=0.or.Vtype(1:Vnx,1:Vny,k)<=0))
+     end do
+     
+#ifdef MPI
+     if (nzim==1) then
+#endif
+     n_free_PrW_surf = 0
+     do k = 1, size(WMPoints)
+      if (WMPoints(k)%zk==1.and.Prtype(WMPoints(k)%xi,WMPoints(k)%yj,1)<=0) then
+        n_free_PrW_surf = n_free_PrW_surf + 1
+      end if
+     end do
+#ifdef MPI
+     endif
+     
+     n_free_U = mpi_co_sum(n_free_U, comm = comm_plane_xy)
+     n_free_V = mpi_co_sum(n_free_V, comm = comm_plane_xy)
+     n_free_W = mpi_co_sum(n_free_W, comm = comm_plane_xy)
+     n_free_PrW = mpi_co_sum(n_free_PrW, comm = comm_plane_xy)
+     n_free_PrW_surf = mpi_co_sum(n_free_PrW_surf, comm = comm_plane_xy)
+     n_free_UW = mpi_co_sum(n_free_UW, comm = comm_plane_xy)
+     n_free_VW = mpi_co_sum(n_free_VW, comm = comm_plane_xy)
+     n_free_UW_sgs = mpi_co_sum(n_free_UW_sgs, comm = comm_plane_xy)
+     n_free_VW_sgs = mpi_co_sum(n_free_VW_sgs, comm = comm_plane_xy)
+#endif
+
      
    else
    
      if (Btype(To)==AUTOMATICFLUX) then
-       allocate(profuw(0:Prnz),profuwsgs(0:Prnz))
-       allocate(profvw(0:Prnz),profvwsgs(0:Prnz))
+       allocate(profuw(0:Prnz), profuwsgs(0:Prnz))
+       allocate(profvw(0:Prnz), profvwsgs(0:Prnz))
      end if
      
      if (TempBtype(To)==AUTOMATICFLUX) then
-       allocate(proftempfl(0:Prnz),proftempflsgs(0:Prnz))
+       allocate(proftempfl(0:Prnz), proftempflsgs(0:Prnz))
      else
        !to avoid the necessity of an allocatable dummy argument
        allocate(proftempfl(0))
      end if
 
      if (MoistBtype(To)==AUTOMATICFLUX) then
-       allocate(profmoistfl(0:Prnz),profmoistflsgs(0:Prnz))
+       allocate(profmoistfl(0:Prnz), profmoistflsgs(0:Prnz))
      else
        !to avoid the necessity of an allocatable dummy argument
        allocate(profmoistfl(0))
@@ -839,7 +926,7 @@ use Strings
         VW_prime = VW_prime + (V(1:Prnx,0:Prny-1,1:Prnz)+V(1:Prnx,1:Prny,1:Prnz)) * &
                               (W(1:Prnx,1:Prny,0:Prnz-1)+W(1:Prnx,1:Prny,1:Prnz)) * &
                               time_weight / 4
-        call AddSubgridRMS(UU_prime,VV_prime,WW_prime,UV_prime,UW_prime,VW_prime,U,V,W,time_weight)
+        call AddSubgridStresses(UU_prime,VV_prime,WW_prime,UV_prime,UW_prime,VW_prime,U,V,W,time_weight)
       end if
 
       if (store%avg_Pr==1) then
@@ -1000,6 +1087,9 @@ use Strings
        profuuavg = profuuavg + profuu * time_weight
        profvvavg = profvvavg + profvv * time_weight
        profwwavg = profwwavg + profww * time_weight
+       profuusgsavg = profuusgsavg + profuusgs * time_weight
+       profvvsgsavg = profvvsgsavg + profvvsgs * time_weight
+       profwwsgsavg = profwwsgsavg + profwwsgs * time_weight
 
        if (enable_buoyancy) then
          proftempavg = proftempavg + proftemp * time_weight
@@ -1039,8 +1129,8 @@ use Strings
   end subroutine OutTstep
 
 
-  subroutine AddSubgridRMS(UU, VV, WW, UV, UW, VW, &
-                           U, V, W, weight)
+  subroutine AddSubgridStresses(UU, VV, WW, UV, UW, VW, &
+                                U, V, W, weight)
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU, VV, WW
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV, UW, VW
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U, V, W
@@ -1125,7 +1215,7 @@ use Strings
     end do
     !$omp end do nowait
     !$omp end parallel
-  end subroutine AddSubgridRMS
+  end subroutine AddSubgridStresses
 
 
   subroutine OutputTimeSeries
@@ -1266,162 +1356,257 @@ use Strings
     call newunit(unit)
 
     if (store%BLprofiles==1.and.averaging==1) then
+print *, 1
+      call ReduceProfile(profuavg, n_free_U)
+print *, 2
+      call ReduceProfile(profvavg, n_free_V)
+print *, 3
+      call ReduceProfile(profuuavg, n_free_U(1:Unz))
+print *, 4
+      call ReduceProfile(profvvavg, n_free_V(1:Vnz))
+print *, 5
+      call ReduceProfile(profwwavg, n_free_W(0:Prnz))
+print *, 6
+      call ReduceProfile(profuusgsavg, n_free_U(1:Unz))
+print *, 7
+      call ReduceProfile(profvvsgsavg, n_free_V(1:Vnz))
+print *, 8
+      call ReduceProfile(profwwsgsavg, n_free_W(0:Prnz))
+print *, 9
+      call ReduceProfile(proftkesgsavg, n_free_Pr(1:Prnz))
+print *, 10
+      call ReduceProfile(profuw, n_free_UW)
+print *, 11
+      call ReduceProfile(profvw, n_free_VW)
+print *, 12
+      call ReduceProfile(profuwsgs, n_free_UW_sgs)
+print *, 13
+      call ReduceProfile(profvwsgs, n_free_VW_sgs)
+      
+      if (enable_buoyancy) then
+print *, 14
+        call ReduceProfile(proftemp, n_free_Pr(1:Prnz))
+print *, 15
+        call ReduceProfile(proftempfl, n_all_Pr(0:Prnz))
+print *, 16
+        call ReduceProfile(proftempflsgs, n_free_PrW(0:Prnz))
+print *, 17
+        call ReduceProfile(proftt, n_free_Pr(1:Prnz))
+print *, 18
+        call ReduceProfile(profttsgsavg, n_free_Pr(1:Prnz))
+      end if
+      
+      if (enable_moisture) then
+        call ReduceProfile(profmoist, n_free_Pr(1:Prnz))
+        call ReduceProfile(profmoistfl, n_all_Pr(0:Prnz))
+        call ReduceProfile(profmoistflsgs, n_free_PrW(0:Prnz))
+        call ReduceProfile(profmm, n_free_Pr(1:Prnz))
+        call ReduceProfile(profmmsgsavg, n_free_Pr(1:Prnz))
+      end if
+        
+      do i = 1, num_of_scalars
+        call ReduceProfile(profscal(i,:), n_free_Pr(1:Prnz))
+        call ReduceProfile(profscalfl(i,:), n_all_Pr(0:Prnz))
+        call ReduceProfile(profscalflsgs(i,:), n_free_PrW(0:Prnz))
+        call ReduceProfile(profss(i,:), n_free_Pr(1:Prnz))
+        call ReduceProfile(profsssgsavg(i,:), n_free_Pr(1:Prnz))
+      end do
+        
+#ifdef MPI
+      if (nxim==1.and.nyim==1) then
+#endif
 
-       open(unit,file=output_dir//"profu.txt")
-       do k = 1,Unz
-        write(unit,*) zPr(k),profuavg(k)
-       end do
-       close(unit)
+        profuuavg = profuuavg - profuavg(1:Unz)**2
+        profvvavg = profvvavg - profvavg(1:Vnz)**2
+        
+        profuusgsavg = profuusgsavg + 2 * proftkesgsavg / 3
+        profvvsgsavg = profvvsgsavg + 2 * proftkesgsavg / 3
+        profwwsgsavg(1:Prnz-1) = profwwsgsavg(1:Prnz-1) + 2 * ((proftkesgsavg(1:Prnz-1)+proftkesgsavg(2:Prnz))/2) / 3
 
-       open(unit,file=output_dir//"profv.txt")
-       do k = 1,Vnz
-        write(unit,*) zPr(k),profvavg(k)
-       end do
-       close(unit)
+        open(unit,file=output_dir//"profu.txt")
+        do k = 1,Unz !Unz == Vnz
+         write(unit,*) zPr(k), profuavg(k), profvavg(k)
+        end do
+        close(unit)
 
-       open(unit,file=output_dir//"profuu.txt")
-       do k = 1,Unz
-        write(unit,*) zPr(k),profuuavg(k)
-       end do
-       close(unit)
+        open(unit,file=output_dir//"profuu.txt")
+        do k = 1,Unz
+         write(unit,*) zPr(k), profuuavg(k), profuusgsavg(k)
+        end do
+        close(unit)
 
-       open(unit,file=output_dir//"profvv.txt")
-       do k = 1,Vnz
-        write(unit,*) zPr(k),profvvavg(k)
-       end do
-       close(unit)
+        open(unit,file=output_dir//"profvv.txt")
+        do k = 1,Vnz
+         write(unit,*) zPr(k), profvvavg(k), profvvsgsavg(k)
+        end do
+        close(unit)
 
-       open(unit,file=output_dir//"profww.txt")
-       do k = 1,Wnz
-        write(unit,*) zW(k),profwwavg(k)
-       end do
-       close(unit)
+        open(unit,file=output_dir//"profww.txt")
+        do k = 1,Wnz
+         write(unit,*) zW(k), profwwavg(k), profwwsgsavg(k)
+        end do
+        close(unit)
 
-       open(unit,file=output_dir//"profuw.txt")
-       do k = 0,Prnz
-        write(unit,*) zW(k),profuwavg(k),profuwsgsavg(k)
-       end do
-       close(unit)
+        open(unit,file=output_dir//"proftke.txt")
+        do k = 1,Prnz
+         write(unit,*) zPr(k), (profuuavg(k)+profvvavg(k)+(profwwavg(k-1)+profwwavg(k))/2) / 2, &
+                               proftkesgsavg(k)
+        end do
+        close(unit)
 
-       open(unit,file=output_dir//"profvw.txt")
-       do k = 0,Prnz
-        write(unit,*) zW(k),profvwavg(k),profvwsgsavg(k)
-       end do
-       close(unit)
+        open(unit,file=output_dir//"profuw.txt")
+        do k = 0,Prnz
+         write(unit,*) zW(k), profuwavg(k), profuwsgsavg(k)
+        end do
+        close(unit)
 
-       if (enable_buoyancy) then
+        open(unit,file=output_dir//"profvw.txt")
+        do k = 0,Prnz
+         write(unit,*) zW(k), profvwavg(k), profvwsgsavg(k)
+        end do
+        close(unit)
 
-          open(unit,file=output_dir//"proftemp.txt")
-          do k = 1,Prnz
-           write(unit,*) zPr(k),proftempavg(k)
-          end do
-          close(unit)
+        if (enable_buoyancy) then
 
-          open(unit,file=output_dir//"proftempfl.txt")
-          do k = 0,Prnz
-           write(unit,*) zW(k),proftempflavg(k),proftempflsgsavg(k)
-          end do
-          close(unit)
+           open(unit,file=output_dir//"proftemp.txt")
+           do k = 1,Prnz
+            write(unit,*) zPr(k), proftempavg(k)
+           end do
+           close(unit)
 
-          open(unit,file=output_dir//"proftt.txt")
-          do k = 1,Prnz
-           write(unit,*) zPr(k),profttavg(k)
-          end do
-          close(unit)
+           open(unit,file=output_dir//"proftempfl.txt")
+           do k = 0,Prnz
+            write(unit,*) zW(k), proftempflavg(k), proftempflsgsavg(k)
+           end do
+           close(unit)
 
-          if (allocated(U_avg).and.allocated(V_avg).and.allocated(Temperature_avg)) then
-            open(unit,file=output_dir//"profRig.txt")
-            do k = 1,Prnz
-             S = 0
-             do j = 1,Prny
-              do i = 1,Prnx
-               S = S + Rig(i,j,k,U_avg,V_avg,Temperature_avg)
+           !Niewstadt, Mason, Moeng, Schumann, 1993 - LES of CBL: A Comparison of Four Computer Codes 
+           profttsgsavg(1:Prnz) = ((proftempflsgsavg(0:Prnz-1)+proftempflsgsavg(1:Prnz))/2)**2 / &
+                                    (0.67_knd**4 * (proftkesgsavg(1:Prnz)))
+     
+           open(unit,file=output_dir//"proftt.txt")
+           do k = 1,Prnz
+            write(unit,*) zPr(k), profttavg(k), profttsgsavg(k)
+           end do
+           close(unit)
+
+           if (allocated(U_avg).and.allocated(V_avg).and.allocated(Temperature_avg)) then
+             open(unit,file=output_dir//"profRig.txt")
+             do k = 1,Prnz
+              S = 0
+              do j = 1,Prny
+               do i = 1,Prnx
+                S = S + Rig(i,j,k,U_avg,V_avg,Temperature_avg)
+               end do
               end do
+              S = S / (Prnx*Prny)
+              write(unit,*) zPr(k),S
              end do
-             S = S / (Prnx*Prny)
-             write(unit,*) zPr(k),S
-            end do
-            close(unit)
+             close(unit)
 
-            open(unit,file=output_dir//"profRf.txt")
-            do k = 1,Prnz
-             S = 0
-             S2 = 0
-             do j = 1,Prny
-              do i = 1,Prnx
-               S = S + (U_avg(i,j,k+1)+U_avg(i-1,j,k+1)-U_avg(i,j,k-1)-U_avg(i-1,j,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
-               S2 = S2+(V_avg(i,j,k+1)+V_avg(i,j-1,k+1)-V_avg(i,j,k-1)-V_avg(i,j-1,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
+             open(unit,file=output_dir//"profRf.txt")
+             do k = 1,Prnz
+              S = 0
+              S2 = 0
+              do j = 1,Prny
+               do i = 1,Prnx
+                S = S + (U_avg(i,j,k+1)+U_avg(i-1,j,k+1)-U_avg(i,j,k-1)-U_avg(i-1,j,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
+                S2 = S2+(V_avg(i,j,k+1)+V_avg(i,j-1,k+1)-V_avg(i,j,k-1)-V_avg(i,j-1,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
+               end do
               end do
+
+              S = S / (Prnx*Prny)
+              S2 = S2/(Prnx*Prny)
+              nom=(grav_acc/temperature_ref)*(proftempflavg(k)+proftempflsgsavg(k))
+              denom=((profuwavg(k)+profuwsgsavg(k))*S + (profvwavg(k)+profvwsgsavg(k))*S2)
+
+              if (abs(denom)>1E-5_knd*abs(nom).and.abs(nom)>epsilon(1._knd)) then
+                S = nom/denom
+              else
+                S = 100000._knd*sign(1.0_knd,nom)*sign(1.0_knd,denom)
+              end if
+
+              write(unit,*) zPr(k),S
              end do
+             close(unit)
+           end if !allocated avgs
 
-             S = S / (Prnx*Prny)
-             S2 = S2/(Prnx*Prny)
-             nom=(grav_acc/temperature_ref)*(proftempflavg(k)+proftempflsgsavg(k))
-             denom=((profuwavg(k)+profuwsgsavg(k))*S + (profvwavg(k)+profvwsgsavg(k))*S2)
-
-             if (abs(denom)>1E-5_knd*abs(nom).and.abs(nom)>epsilon(1._knd)) then
-               S = nom/denom
-             else
-               S = 100000._knd*sign(1.0_knd,nom)*sign(1.0_knd,denom)
-             end if
-
-             write(unit,*) zPr(k),S
-            end do
-            close(unit)
-          end if !allocated avgs
-
-       end if !enable_buoyancy == 1
+        end if !enable_buoyancy == 1
 
 
-       if (enable_moisture) then
+        if (enable_moisture) then
 
-          open(unit,file=output_dir//"profmoist.txt")
-          do k = 1,Prnz
-           write(unit,*) zPr(k),profmoistavg(k)
-          end do
-          close(unit)
+           open(unit,file=output_dir//"profmoist.txt")
+           do k = 1,Prnz
+            write(unit,*) zPr(k), profmoistavg(k)
+           end do
+           close(unit)
 
-          open(unit,file=output_dir//"profmoistfl.txt")
-          do k = 0,Prnz
-           write(unit,*) zW(k),profmoistflavg(k),profmoistflsgsavg(k)
-          end do
-          close(unit)
+           open(unit,file=output_dir//"profmoistfl.txt")
+           do k = 0,Prnz
+            write(unit,*) zW(k), profmoistflavg(k), profmoistflsgsavg(k)
+           end do
+           close(unit)
 
-          open(unit,file=output_dir//"profmm.txt")
-          do k = 1,Prnz
-           write(unit,*) zPr(k),profmmavg(k)
-          end do
-          close(unit)
+           !see profttsgsavg above
+           profmmsgsavg = ((profmoistflsgsavg(0:Prnz-1)+profmoistflsgsavg(0:Prnz))/2)**2 / (0.67_knd**4 * (proftkesgsavg(k)))
+     
+           open(unit,file=output_dir//"profmm.txt")
+           do k = 1,Prnz
+            write(unit,*) zPr(k), profmmavg(k), profmmsgsavg(k)
+           end do
+           close(unit)
 
-       end if !enable_moisture == 1
+        end if !enable_moisture == 1
 
 
-       if (num_of_scalars>0) then
+        if (num_of_scalars>0) then
 
-          open(unit,file=output_dir//"profscal.txt")
-          do k = 1,Prnz
-           write(unit,*) zPr(k),(profscalavg(i,k), i = 1,num_of_scalars)
-          end do
-          close(unit)
+           open(unit,file=output_dir//"profscal.txt")
+           do k = 1,Prnz
+            write(unit,*) zPr(k), (profscalavg(i,k), i = 1,num_of_scalars)
+           end do
+           close(unit)
 
-          open(unit,file=output_dir//"profscalfl.txt")
-          do k = 0,Prnz
-           write(unit,*) zW(k),(profscalflavg(i,k),profscalflsgsavg(i,k), i = 1,num_of_scalars)
-          end do
-          close(unit)
+           open(unit,file=output_dir//"profscalfl.txt")
+           do k = 0,Prnz
+            write(unit,*) zW(k), (profscalflavg(i,k), profscalflsgsavg(i,k), i = 1,num_of_scalars)
+           end do
+           close(unit)
 
-          open(unit,file=output_dir//"profss.txt")
-          do k = 1,Prnz
-           write(unit,*) zPr(k),(profssavg(i,k), i = 1,num_of_scalars)
-          end do
-          close(unit)
+           !see profttsgsavg above
+           profsssgsavg(i,:) = ((profscalflavg(i,0:Prnz-1)+profscalflavg(i,0:Prnz))/2)**2 / (0.67_knd**4 * (proftkesgsavg(k)))
+           
+           open(unit,file=output_dir//"profss.txt")
+           do k = 1,Prnz
+            write(unit,*) zPr(k), (profssavg(i,k), i = 1,num_of_scalars)
+           end do
+           close(unit)
 
-       end if !num_of_scalars>0
+        end if !num_of_scalars>0
+       
+#ifdef MPI
+      end if
+#endif
 
     end if !store%BLprofiles
 
   end subroutine OutputProfiles
 
+  
+  
+  subroutine ReduceProfile(prof, n_free)
+    real(knd), intent(inout) :: prof(:)
+    real(knd), intent(in)    :: n_free(:)
+  
+#ifdef MPI
+    call sum_to_master_horizontal(prof)
+#endif
+    prof = prof / n_free
+  
+  end subroutine
+  
+  
 
 
 
@@ -2410,86 +2595,110 @@ use Strings
 
 
   subroutine StressProfiles(U,V,W)
+    use Filters, only: filtertype, filter_ratios
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    real(knd) :: S
-    real(knd),allocatable,save ::fp(:),ht(:),gp(:)
-    integer   :: i,j,k,n
-    integer,save :: called = 0
+    integer   :: i,j,k
+    real(knd) :: S, width
+    real(knd), parameter :: Ck = 0.1 !model constant for the sgs_tke eddy viscosity sgs model
 
-    if (called==0) then
-      allocate(fp(0:Prnx+1),ht(0:Prnz+1),gp(0:Prny+1))
-      !$omp parallel workshare
-      forall (i = 0:Prnx+1)      fp(i)=(xU(i)-xPr(i))/(xPr(i+1)-xPr(i))
-      forall (k = 0:Prnz+1)      ht(k)=(zW(k)-zPr(k))/(zPr(k+1)-zPr(k))
-      forall (j = 0:Prny+1)      gp(j)=(yV(j)-yPr(j))/(yPr(j+1)-yPr(j))
-      !$omp end parallel workshare
-      called = 1
-    end if
+    width = filter_ratios(filtertype) * (dxmin*dymin*dzmin)**(1._knd/3._knd)
+    
+    !$omp parallel private(i,j,k,S)
+    !$omp do
+    do k = 1,Prnz
+      S = 0
+      do j = 1,Prny
+       do i = 1,Prnx
+         if (Prtype(i,j,k)<=0) then
+           S = S + ( (Viscosity(i,j,k) - 1/Re) / (Ck * width) )**2
+         end if
+       end do
+      end do
+      proftkesgs(k) = S
+    end do
+    !$omp end do nowait
 
-    !$omp parallel private(i,j,k,n,S)
     !$omp do
     do k = 0,Prnz
       S = 0
-      n = 0
       do j = 1,Uny
        do i = 1,Unx
          if ((Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0).and.(Wtype(i+1,j,k)<=0.or.Wtype(i,j,k)<=0)) then
-           S = S + ((ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))-((1-ht(k))*profU(k)+ht(k)*profU(k+1))) * &
-                   (fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k))
-           n = n + 1
+           S = S + (U(i,j,k+1) + U(i,j,k)) * (W(i+1,j,k) + W(i,j,k)) / 4
          end if
        end do
       end do
-      profuw(k) = S / max(n,1)
+      profuw(k) = S
     end do
     !$omp end do nowait
 
     !$omp do
     do k = 0,Prnz
       S = 0
-      n = 0
       do j = 1,Vny
        do i = 1,Vnx
          if ((Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0).and.(Wtype(i,j+1,k)<=0.or.Wtype(i,j,k)<=0)) then
-           S = S + (ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)-(ht(k)*profV(k+1)+(1-ht(k))*profV(k))) * &
-                   (gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k))
-           n = n + 1
+           S = S + (V(i,j,k+1) + V(i,j,k)) * (W(i,j+1,k) + W(i,j,k)) / 4
          end if
        end do
       end do
-      profvw(k) = S / max(n,1)
+      profvw(k) = S
     end do
     !$omp end do nowait
 
     !$omp do
     do k = 0,Prnz
       S = 0
-      n = 0
       do j = 1,Uny
        do i = 1,Unx
          if (Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0) then
-           S = S-0.25_knd*(Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(U(i,j,k+1)-U(i,j,k))/dzW(k)
-           n = n + 1
+           S = S - (Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k)) * (U(i,j,k+1)-U(i,j,k)) / dzmin / 4
          end if
        end do
       end do
-      profuwsgs(k) = S / max(n,1)
+      profuwsgs(k) = S
     end do
     !$omp end do nowait
 
     !$omp do
-    do k = 0,Prnz
+    do k = 1,Unz
       S = 0
-      n = 0
-      do j = 1,Vny
-       do i = 1,Vnx
-         if (Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0) then
-           S = S-0.25_knd*(Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k))*(V(i,j,k+1)-V(i,j,k))/dzW(k)
-           n = n + 1
+      do j = 1,Uny
+       do i = 1,Unx
+         if (Utype(i,j,k)<=0) then
+           S = S - (Viscosity(i,j,k+1)+Viscosity(i,j,k)) * (U(i+1,j,k)-U(i-1,j,k)) / dxmin / 4
          end if
        end do
       end do
-      profvwsgs(k) = S / max(n,1)
+      profuusgs(k) = S
+    end do
+    !$omp end do nowait
+
+    !$omp do
+    do k = 1,Vnz
+      S = 0
+      do j = 1,Vny
+       do i = 1,Vnx
+         if (Vtype(i,j,k)<=0) then
+           S = S - (Viscosity(i,j+1,k)+Viscosity(i,j,k)) * (V(i,j+1,k)-V(i,j-1,k)) / dymin / 4
+         end if
+       end do
+      end do
+      profvvsgs(k) = S
+    end do
+    !$omp end do nowait
+
+    !$omp do
+    do k = 0,Wnz
+      S = 0
+      do j = 1,Wny
+       do i = 1,Wnx
+         if (Wtype(i,j,k)<=0) then
+           S = S - (Viscosity(i,j,k+1)+Viscosity(i,j,k)) * (W(i,j,k+1)-W(i,j,k-1)) / dzmin / 4
+         end if
+       end do
+      end do
+      profwwsgs(k) = S
     end do
     !$omp end do nowait
     !$omp end parallel
@@ -2515,59 +2724,59 @@ use Strings
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
     real(knd) :: S
-    integer   :: i,j,k,n
+    integer   :: i,j,k
     !proftempfl is computed directly during advection step
 
-    !$omp parallel do private(i,j,k,n,S)
+    !$omp parallel do private(i,j,k,S)
     do k = 1,Prnz
       S = 0
-      n = 0
       do j = 1,Prny
        do i = 1,Prnx
          if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-           S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Temperature(i,j,k+1)-Temperature(i,j,k)))/dzW(k)
-           n = n + 1
+           S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Temperature(i,j,k+1)-Temperature(i,j,k))) / dzmin
          end if
        end do
       end do
-      proftempflsgs(k) = S / max(n,1)
+      proftempflsgs(k) = S
     end do
     !$omp end parallel do
     
+#ifdef MPI
+     if (nzim==1) then
+#endif
     S = 0
-    n = 0
-    !$omp parallel do private(i) reduction(+:n,S)
+    !$omp parallel do private(i) reduction(+:S)
     do i = 1, size(WMPoints)
       if (WMPoints(i)%zk==1.and.Prtype(WMPoints(i)%xi,WMPoints(i)%yj,1)<=0) then
         S = S + WMPoints(i)%temperature_flux
-        n = n + 1
       end if
     end do
     !$omp end parallel do
-    
-    proftempflsgs(0) = S / max(n,1)
+    proftempflsgs(0) = S
+#ifdef MPI
+    endif
+#endif    
+
   end subroutine
 
   subroutine MoistureFluxSGSProfile(W,Moisture)
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Moisture
     real(knd) :: S
-    integer   :: i,j,k,n
+    integer   :: i,j,k
     !profmoistfl is computed directly during advection step
 
-    !$omp parallel do private(i,j,k,n,S)
+    !$omp parallel do private(i,j,k,S)
     do k = 0,Prnz
       S = 0
-      n = 0
       do j = 1,Prny
        do i = 1,Prnx
          if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-           S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Moisture(i,j,k+1)-Moisture(i,j,k)))/dzW(k)
-           n = n + 1
+           S = S - (0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k)) * (Moisture(i,j,k+1)-Moisture(i,j,k))) / dzmin
          end if
        end do
       end do
-      profmoistflsgs(k) = S / max(n,1)
+      profmoistflsgs(k) = S
     end do
     !$omp end parallel do
   end subroutine
@@ -2576,42 +2785,38 @@ use Strings
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
     real(knd),dimension(-1:,-1:,-1:,1:),contiguous,intent(in) :: Scalar
     real(knd) :: S
-    integer   :: i,j,k,l,n
+    integer   :: i,j,k,l
 
+    !$omp parallel private(i,j,k,S)
     do l = 1,num_of_scalars
-      !$omp parallel private(i,j,k,n,S)
       !$omp do
       do k = 0,Prnz
         S = 0
-        n = 0
         do j = 1,Prny
          do i = 1,Prnx
            if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-            S = S + 0.5_knd*(Scalar(i,j,k+1,l)+Scalar(i,j,k,l))*(W(i,j,k))
-            n = n + 1
+            S = S + 0.5_knd * (Scalar(i,j,k+1,l)+Scalar(i,j,k,l)) * (W(i,j,k))
            end if
          end do
         end do
-        profscalfl(l,k) = S / max(n,1)
+        profscalfl(l,k) = S
       end do
       !$omp end do nowait
       !$omp do
       do k = 0,Prnz
         S = 0
-        n = 0
         do j = 1,Prny
          do i = 1,Prnx
            if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-             S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Scalar(i,j,k+1,l)-Scalar(i,j,k,l)))/dzW(k)
-             n = n + 1
+             S = S - (0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k)) * (Scalar(i,j,k+1,l)-Scalar(i,j,k,l))) / dzmin
            end if
          end do
         end do
-        profscalflsgs(l,k) = S / max(n,1)
+        profscalflsgs(l,k) = S
       end do
       !$omp end do
-      !$omp end parallel
     end do
+    !$omp end parallel
   end subroutine
 
   
@@ -2623,222 +2828,181 @@ use Strings
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Moisture
     real(knd),dimension(-1:,-1:,-1:,1:),contiguous,intent(in) :: Scalar
     real(knd) :: S
-    integer   :: i,j,k,l,n
+    integer   :: i,j,k,l
 
-    !$omp parallel private(i,j,k,n,S)
+    !$omp parallel private(i,j,k,S)
     !$omp do
     do k = 0,Unz+1
       S = 0
-      n = 0
       do j = 1,Uny
        do i = 1,Unx
          if (Utype(i,j,k)<=0) then
            S = S + U(i,j,k)
-           n = n + 1
          end if
        end do
       end do
-      profU(k) = S / max(n,1)
+      profU(k) = S
     end do
     !$omp end do nowait
 
     !$omp do
     do k = 1,Vnz+1
       S = 0
-      n = 0
       do j = 1,Vny
        do i = 1,Vnx
          if (Vtype(i,j,k)<=0) then
            S = S + V(i,j,k)
-           n = n + 1
          end if
        end do
       end do
-      profV(k) = S / max(n,1)
+      profV(k) = S
     end do
     !$omp end do nowait
-    !$omp end parallel
 
     if (size(Temperature)>0) then
-      !$omp parallel do private(i,j,k,n,S)
+      !$omp do
       do k = 1,Prnz
         S = 0
-        n = 0
         do j = 1,Prny
          do i = 1,Prnx
            if (Prtype(i,j,k)<=0) then
              S = S + Temperature(i,j,k)
-             n = n + 1
            end if
          end do
         end do
-        proftemp(k) = S / max(n,1)
+        proftemp(k) = S
       end do
-      !$omp end parallel do
+      !$omp end do
     end if
 
     if (size(Moisture)>0) then
-      !$omp parallel do private(i,j,k,n,S)
+      !$omp do
       do k = 1,Prnz
         S = 0
-        n = 0
         do j = 1,Prny
          do i = 1,Prnx
            if (Prtype(i,j,k)<=0) then
              S = S + Moisture(i,j,k)
-             n = n + 1
            end if
          end do
         end do
-        profmoist(k) = S / max(n,1)
+        profmoist(k) = S
       end do
-      !$omp end parallel do
+      !$omp end do
     end if
 
     if (size(Scalar)>0) then
       do l = 1,num_of_scalars
-        !$omp parallel do private(i,j,k,n,S)
+        !$omp do
         do k = 1,Prnz
           S = 0
-          n = 0
           do j = 1,Prny
            do i = 1,Prnx
              if (Prtype(i,j,k)<=0) then
                S = S + Scalar(i,j,k,l)
-               n = n + 1
              end if
            end do
           end do
-          profscal(l,k) = S / max(n,1)
+          profscal(l,k) = S
         end do
-        !$omp end parallel do
+        !$omp end do
       end do
     end if
 
-    !$omp parallel private(i,j,k,n,S)
     !$omp do
     do k = 1,Unz
       S = 0
-      n = 0
       do j = 1,Uny
        do i = 1,Unx
          if (Utype(i,j,k)<=0) then
-           S = S + (U(i,j,k)-profU(k))**2
-           n = n + 1
+           S = S + (U(i,j,k))**2
          end if
        end do
       end do
-      profuu(k) = S / max(n,1)
+      profuu(k) = S
     end do
     !$omp end do nowait
 
     !$omp do
     do k = 1,Vnz
       S = 0
-      n = 0
       do j = 1,Vny
        do i = 1,Vnx
          if (Vtype(i,j,k)<=0) then
-          S = S + (V(i,j,k)-profV(k))**2
-          n = n + 1
+          S = S + (V(i,j,k))**2
          end if
        end do
       end do
-      profvv(k) = S / max(n,1)
+      profvv(k) = S
     end do
     !$omp end do nowait
 
     !$omp do
     do k = 0,Wnz
       S = 0
-      n = 0
       do j = 1,Wny
        do i = 1,Wnx
          if (Wtype(i,j,k)<=0) then
            S = S + (W(i,j,k))**2
-           n = n + 1
          end if
        end do
       end do
-      profww(k) = S / max(n,1)
+      profww(k) = S
     end do
     !$omp end do
-    !$omp end parallel
 
     if (enable_buoyancy) then
-      !$omp parallel do private(i,j,k,n,S)
+      !$omp do
       do k = 1,Prnz
         S = 0
-        n = 0
         do j = 1,Prny
          do i = 1,Prnx
            if (Prtype(i,j,k)<=0) then
-             S = S + (Temperature(i,j,k)-profTemp(k))**2
-             n = n + 1
+             S = S + (Temperature(i,j,k))**2
            end if
          end do
         end do
-        proftt(k) = S / max(n,1)
+        proftt(k) = S
       end do
-      !$omp end parallel do
+      !$omp end do
     end if ! size(Temperature)
 
 
     if (enable_moisture) then
-      !$omp parallel private(i,j,k,n,S)
       !$omp do
       do k = 1,Prnz
         S = 0
-        n = 0
         do j = 1,Prny
          do i = 1,Prnx
            if (Prtype(i,j,k)<=0) then
-             S = S + (Moisture(i,j,k)-profMoist(k))**2
-             n = n + 1
+             S = S + (Moisture(i,j,k))**2
            end if
          end do
         end do
-        profmm(k) = S / max(n,1)
+        profmm(k) = S
       end do
       !$omp end do nowait
 
-      !$omp do
-      do k = 0,Prnz
-        S = 0
-        n = 0
-        do j = 1,Prny
-         do i = 1,Prnx
-           if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-             S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Moisture(i,j,k+1)-Moisture(i,j,k)))/dzW(k)
-             n = n + 1
-           end if
-         end do
-        end do
-        profmoistflsgs(k) = S / max(n,1)
-      end do
-      !$omp end do
-      !$omp end parallel
     end if ! size(Moisture)
 
 
 
     do l = 1,num_of_scalars
-      !$omp parallel do private(i,j,k,n,S)
+      !$omp do
       do k = 1,Prnz
         S = 0
-        n = 0
         do j = 1,Prny
          do i = 1,Prnx
            if (Prtype(i,j,k)<=0) then
-            S = S + (Scalar(i,j,k,l)-profscal(l,k))**2
-            n = n + 1
+            S = S + (Scalar(i,j,k,l))**2
            end if
          end do
         end do
-        profss(l,k) = S / max(n,1)
+        profss(l,k) = S
       end do
-      !$omp end parallel do
+      !$omp end do
     end do
+    !$omp end parallel
 
   end subroutine BLProfiles
 
@@ -3075,6 +3239,7 @@ use Strings
                  a*b*c*vel111
 
   end function TriLinInt
+
 
 
 end module Outputs

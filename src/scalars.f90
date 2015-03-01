@@ -505,10 +505,6 @@ contains
     !$omp end do
   end do
 
-  !$omp workshare
-  temperature_flux_profile = temperature_flux_profile / (Prnx*Prny)
-  !$omp end workshare
-
   !$omp end parallel
 
   contains
