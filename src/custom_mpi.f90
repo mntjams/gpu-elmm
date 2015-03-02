@@ -17,8 +17,10 @@ module custom_mpi
   integer :: comm_plane_yz = -1, comm_plane_xz = -1, comm_plane_xy = -1
   integer :: comm_row_x = -1, comm_row_y = -1, comm_row_z = -1
   integer :: cart_comm_dim = -1
-  integer :: MPI_knd = -huge(1)
+  integer :: MPI_knd = -huge(1), MPI_real32 = -huge(1), MPI_real64 = -huge(1)
   integer, allocatable :: images_grid(:,:,:), ranks_grid(:,:,:)
+  real(real32), pointer :: MPI_IN_PLACE_real32(:)
+  real(real64), pointer :: MPI_IN_PLACE_real64(:)
   
   interface mpi_co_reduce
     module procedure mpi_co_reduce_32
@@ -48,6 +50,11 @@ module custom_mpi
     module procedure mpi_co_sum_64_comm
     module procedure mpi_co_sum_64_comm_1d
     module procedure mpi_co_sum_int
+  end interface
+
+  interface sum_to_master_horizontal
+    module procedure sum_to_master_horizontal_32_1d
+    module procedure sum_to_master_horizontal_64_1d
   end interface
 
 contains
@@ -153,20 +160,40 @@ contains
   
   
   subroutine init_custom_mpi
-    use Kinds, only: knd
+    use Kinds
+    use iso_c_binding
     integer :: ie
   
+    call MPI_Init(ie)
+    if (ie/=0) call error_stop("Error in MPI_Init")
+    
     if (knd == kind(1.)) then
       MPI_knd = MPI_REAL
     else if (knd == kind(1.D0)) then
       MPI_knd = MPI_DOUBLE_PRECISION
     end if
     
+    if (real32 == kind(1.)) then
+      MPI_real32 = MPI_REAL
+    else if (real32 == kind(1.D0)) then
+      MPI_real32 = MPI_DOUBLE_PRECISION
+    else
+      call error_stop("Unknown MPI_Type for real32.")
+    end if
+    
+    if (real64 == kind(1.)) then
+      MPI_real64 = MPI_REAL
+    else if (real64 == kind(1.D0)) then
+      MPI_real64= MPI_DOUBLE_PRECISION
+    else
+      call error_stop("Unknown MPI_Type for real64.")
+    end if
+
+    call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real32, [1])
+    call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real64, [1])
+    
     global_comm = MPI_COMM_WORLD
 
-    call MPI_Init(ie)
-    if (ie/=0) call error_stop("Error in MPI_Init")
-    
     call MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_ARE_FATAL, ie)
     if (ie/=0) call error_stop("Error in MPI_Errhandler_set")
     
@@ -177,7 +204,14 @@ contains
     myrank = myim - 1
 
     master = (myrank==0)
-    
+
+  contains
+
+    type(c_ptr) function my_loc(t)
+      integer, intent(in), target :: t
+      my_loc = c_loc(t)
+    end function
+      
   end subroutine
   
   subroutine init_mpi_grid
@@ -405,16 +439,16 @@ contains
   end function
 
   function mpi_co_reduce_32_1d(x,op,comm) result(res)
-    real(real32) :: res
     real(real32),intent(in) :: x(:)
+    real(real32) :: res(size(x))
     integer, intent(in) :: op, comm
     integer ie
     
     interface
       subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
-        real(real32) :: SENDBUF, RECVBUF
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
+        real(real32) :: SENDBUF(count), RECVBUF(count)
       end subroutine
     end interface
     
@@ -425,16 +459,16 @@ contains
   end function
 
   function mpi_co_reduce_64_1d(x,op,comm) result(res)
-    real(real64) :: res
     real(real64),intent(in) :: x(:)
+    real(real64) :: res(size(x))
     integer, intent(in) :: op, comm
     integer ie
     
     interface
       subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
-        real(real64) :: SENDBUF, RECVBUF
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
+        real(real64) :: SENDBUF(count), RECVBUF(count)
       end subroutine
     end interface
     
@@ -567,8 +601,8 @@ contains
   end function
 
   function mpi_co_sum_32_comm_1d(x, comm) result(res)
-    real(real32) :: res
     real(real32),intent(in) :: x(:)
+    real(real32) :: res(size(x))
     integer, intent(in) :: comm
     integer ie
     
@@ -576,8 +610,8 @@ contains
   end function
 
   function mpi_co_sum_64_comm_1d(x, comm) result(res)
-    real(real64) :: res
     real(real64),intent(in) :: x(:)
+    real(real64) :: res(size(x))
     integer, intent(in) :: comm
     integer ie
     
@@ -601,6 +635,41 @@ contains
     res = mpi_co_reduce(x, MPI_LAND, global_comm)
   end function
 
+  subroutine sum_to_master_horizontal_32_1d(x)
+    real(real32), intent(inout) :: x(:)
+    integer ie
+    interface
+      subroutine MPI_REDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, ROOT, COMM, IERROR)
+        import
+        INTEGER    COUNT, DATATYPE, OP, ROOT, COMM, IERROR
+        real(real32)  SENDBUF(*), RECVBUF(count)
+      end subroutine
+    end interface
+    !sums the values across horizontal plane of images to the master image (iim==1 and jim==1)
+    if (iim==1.and.jim==1) then
+      call MPI_Reduce(MPI_IN_PLACE_real32, x, size(x), MPI_real32, MPI_SUM, 0, comm_plane_xy, ie)
+    else
+      call MPI_Reduce(x, x, size(x), MPI_real32, MPI_SUM, 0, comm_plane_xy, ie)
+    end if
+  end subroutine
+
+  subroutine sum_to_master_horizontal_64_1d(x)
+    real(real64), intent(inout) :: x(:)
+    integer ie
+    interface
+      subroutine MPI_REDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, ROOT, COMM, IERROR)
+        import
+        INTEGER    COUNT, DATATYPE, OP, ROOT, COMM, IERROR
+        real(real64)  SENDBUF(*), RECVBUF(count)
+      end subroutine
+    end interface
+    !sums the values across horizontal plane of images to the master image (iim==1 and jim==1)
+    if (iim==1.and.jim==1) then
+      call MPI_Reduce(MPI_IN_PLACE_real64, x, size(x), MPI_real64, MPI_SUM, 0, comm_plane_xy, ie)
+    else
+      call MPI_Reduce(x, x, size(x), MPI_real64, MPI_SUM, 0, comm_plane_xy, ie)
+    end if
+  end subroutine
 
 end module
 #endif
