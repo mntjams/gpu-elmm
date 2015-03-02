@@ -541,6 +541,9 @@ contains
      do k = 0, Vnz+1
        n_free_V = count(Vtype(1:Vnx,1:Vny,k) <= 0)
      end do
+     do k = 0, Wnz+1
+       n_free_W = count(Vtype(1:Wnx,1:Wny,k) <= 0)
+     end do
      do k = 0, Prnz+1
        n_free_Pr = count(Prtype(1:Prnx,1:Prny,k) <= 0)
      end do
@@ -567,7 +570,7 @@ contains
      end do
      
 #ifdef MPI
-     if (nzim==1) then
+     if (kim==1) then
 #endif
      n_free_PrW_surf = 0
      do k = 1, size(WMPoints)
@@ -1090,6 +1093,7 @@ contains
        profuusgsavg = profuusgsavg + profuusgs * time_weight
        profvvsgsavg = profvvsgsavg + profvvsgs * time_weight
        profwwsgsavg = profwwsgsavg + profwwsgs * time_weight
+       proftkesgsavg = proftkesgsavg + proftkesgs * time_weight
 
        if (enable_buoyancy) then
          proftempavg = proftempavg + proftemp * time_weight
@@ -1350,49 +1354,35 @@ contains
   
 
   subroutine OutputProfiles
-    real(knd) :: S,S2,nom,denom
-    integer :: i,j,k,unit
+#ifdef MPI
+    use custom_mpi, only: iim, jim, kim
+#endif
+    real(knd) :: S, S2, nom, denom
+    integer :: i, j, k, unit, flux_start
 
     call newunit(unit)
 
     if (store%BLprofiles==1.and.averaging==1) then
-print *, 1
+
       call ReduceProfile(profuavg, n_free_U)
-print *, 2
       call ReduceProfile(profvavg, n_free_V)
-print *, 3
       call ReduceProfile(profuuavg, n_free_U(1:Unz))
-print *, 4
       call ReduceProfile(profvvavg, n_free_V(1:Vnz))
-print *, 5
       call ReduceProfile(profwwavg, n_free_W(0:Prnz))
-print *, 6
       call ReduceProfile(profuusgsavg, n_free_U(1:Unz))
-print *, 7
       call ReduceProfile(profvvsgsavg, n_free_V(1:Vnz))
-print *, 8
       call ReduceProfile(profwwsgsavg, n_free_W(0:Prnz))
-print *, 9
       call ReduceProfile(proftkesgsavg, n_free_Pr(1:Prnz))
-print *, 10
       call ReduceProfile(profuw, n_free_UW)
-print *, 11
       call ReduceProfile(profvw, n_free_VW)
-print *, 12
       call ReduceProfile(profuwsgs, n_free_UW_sgs)
-print *, 13
       call ReduceProfile(profvwsgs, n_free_VW_sgs)
       
       if (enable_buoyancy) then
-print *, 14
         call ReduceProfile(proftemp, n_free_Pr(1:Prnz))
-print *, 15
         call ReduceProfile(proftempfl, n_all_Pr(0:Prnz))
-print *, 16
         call ReduceProfile(proftempflsgs, n_free_PrW(0:Prnz))
-print *, 17
         call ReduceProfile(proftt, n_free_Pr(1:Prnz))
-print *, 18
         call ReduceProfile(profttsgsavg, n_free_Pr(1:Prnz))
       end if
       
@@ -1413,7 +1403,14 @@ print *, 18
       end do
         
 #ifdef MPI
-      if (nxim==1.and.nyim==1) then
+      if (iim==1.and.jim==1) then
+        if (kim == 1) then
+          flux_start = 0
+        else
+          flux_start = 1
+        end if
+#else
+        flux_start = 0 
 #endif
 
         profuuavg = profuuavg - profuavg(1:Unz)**2
@@ -1455,13 +1452,13 @@ print *, 18
         close(unit)
 
         open(unit,file=output_dir//"profuw.txt")
-        do k = 0,Prnz
+        do k = flux_start,Prnz
          write(unit,*) zW(k), profuwavg(k), profuwsgsavg(k)
         end do
         close(unit)
 
         open(unit,file=output_dir//"profvw.txt")
-        do k = 0,Prnz
+        do k = flux_start,Prnz
          write(unit,*) zW(k), profvwavg(k), profvwsgsavg(k)
         end do
         close(unit)
@@ -1475,7 +1472,7 @@ print *, 18
            close(unit)
 
            open(unit,file=output_dir//"proftempfl.txt")
-           do k = 0,Prnz
+           do k = flux_start,Prnz
             write(unit,*) zW(k), proftempflavg(k), proftempflsgsavg(k)
            end do
            close(unit)
@@ -1543,13 +1540,14 @@ print *, 18
            close(unit)
 
            open(unit,file=output_dir//"profmoistfl.txt")
-           do k = 0,Prnz
+           do k = flux_start,Prnz
             write(unit,*) zW(k), profmoistflavg(k), profmoistflsgsavg(k)
            end do
            close(unit)
 
            !see profttsgsavg above
-           profmmsgsavg = ((profmoistflsgsavg(0:Prnz-1)+profmoistflsgsavg(0:Prnz))/2)**2 / (0.67_knd**4 * (proftkesgsavg(k)))
+           profmmsgsavg = ((profmoistflsgsavg(0:Prnz-1)+profmoistflsgsavg(1:Prnz))/2)**2 / &
+                          (0.67_knd**4 * (proftkesgsavg(1:Prnz)))
      
            open(unit,file=output_dir//"profmm.txt")
            do k = 1,Prnz
@@ -1569,17 +1567,20 @@ print *, 18
            close(unit)
 
            open(unit,file=output_dir//"profscalfl.txt")
-           do k = 0,Prnz
+           do k = flux_start,Prnz
             write(unit,*) zW(k), (profscalflavg(i,k), profscalflsgsavg(i,k), i = 1,num_of_scalars)
            end do
            close(unit)
 
            !see profttsgsavg above
-           profsssgsavg(i,:) = ((profscalflavg(i,0:Prnz-1)+profscalflavg(i,0:Prnz))/2)**2 / (0.67_knd**4 * (proftkesgsavg(k)))
+           do i = 1, num_of_scalars
+             profsssgsavg(i,:) = ((profscalflavg(i,0:Prnz-1)+profscalflavg(i,1:Prnz))/2)**2 / &
+                                 (0.67_knd**4 * (proftkesgsavg(1:Prnz)))
+           end do
            
            open(unit,file=output_dir//"profss.txt")
            do k = 1,Prnz
-            write(unit,*) zPr(k), (profssavg(i,k), i = 1,num_of_scalars)
+            write(unit,*) zPr(k), (profssavg(i,k), profsssgsavg(i,k), i = 1,num_of_scalars)
            end do
            close(unit)
 
@@ -1596,14 +1597,18 @@ print *, 18
   
   
   subroutine ReduceProfile(prof, n_free)
+#ifdef MPI
+    use custom_mpi
+#endif
     real(knd), intent(inout) :: prof(:)
     real(knd), intent(in)    :: n_free(:)
   
 #ifdef MPI
     call sum_to_master_horizontal(prof)
-#endif
+    if (iim==1.and.jim==1) prof = prof / n_free
+#else
     prof = prof / n_free
-  
+#endif
   end subroutine
   
   
@@ -1619,8 +1624,8 @@ print *, 18
     real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
     character(70) :: str
-    integer i,j,k,unit
     real(real32),allocatable :: tmp(:,:,:,:)
+    integer i,j,k,unit
 
     if (store%out==1) then
 
@@ -2721,6 +2726,9 @@ print *, 18
 
   subroutine TemperatureFluxSGSProfile(W,Temperature)
     use Wallmodels
+#ifdef MPI
+    use custom_mpi, only: kim
+#endif
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
     real(knd) :: S
@@ -2742,7 +2750,7 @@ print *, 18
     !$omp end parallel do
     
 #ifdef MPI
-     if (nzim==1) then
+    if (kim==1) then
 #endif
     S = 0
     !$omp parallel do private(i) reduction(+:S)
