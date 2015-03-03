@@ -2,7 +2,10 @@ module Outputs
   use Parameters
   use Boundaries
   use Scalars
-  use Wallmodels, only: GroundDeposition, GroundUstar, GroundUstarUVW, wallmodeltype
+  use Wallmodels, only: GroundDeposition, &
+                        GroundUstar, GroundUstarUVW, &
+                        GroundTFlux, GroundTFluxUVW, &
+                        wallmodeltype
   use ImmersedBoundary
   use Turbinlet, only: Ustar_inlet
   use Endianness
@@ -58,9 +61,9 @@ module Outputs
 
   real(TIM),allocatable,dimension(:) :: times                                !times of the timesteps
 
-  real(knd),allocatable,dimension(:) :: delta_time,tke,dissip
+  real(knd),allocatable,dimension(:) :: delta_time, tke, dissip
 
-  real(knd),allocatable,dimension(:,:) :: ustar,tstar                        !first index differentiates flux from friction number
+  real(knd),allocatable,dimension(:,:) :: ustar, tstar                        !first index differentiates flux from friction number
                                                                              !second index is time
 
   real(knd),allocatable,dimension(:,:) :: U_time,V_time,W_time,temp_time,moist_time  !position, time
@@ -724,7 +727,7 @@ contains
     integer :: step !just a shorter name
     
     integer :: l,i,j,k
-    real(knd) :: S,S2
+    real(knd) :: S, S2, ground_ustar_Pr, ground_ustar_UVW
     real(knd) :: time_weight
     real(knd) :: fl_L, fl_R
     logical, save :: called = .false.
@@ -1001,50 +1004,55 @@ contains
 
     if (wallmodeltype>0.and.(display%ustar==1.or.store%ustar==1)) then
 
-      S = GroundUstar()
+      ground_ustar_Pr = GroundUstar()
 
-      S2 = S*Re
-
-      if (display%ustar==1) then
-        if (allocated(Ustar_inlet)) then
-         if (master) write(*,*) "ustar:",S,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
-        else
-         if (master) write(*,*) "ustar:",S,"Re_tau:",S2
-        end if
-      end if
-      if (store%ustar==1) then
-        ustar(:,step)=[ S2 , S ]
-      end if
-
-      S = GroundUstarUVW()
-
-      S2 = S*Re
+      S2 = ground_ustar_Pr*Re
 
       if (display%ustar==1) then
         if (allocated(Ustar_inlet)) then
-         if (master) write(*,*) "ustarUVW:",S,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
+         if (master) write(*,'(*(a10,es15.3))') "ustar:",ground_ustar_Pr,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
         else
-         if (master) write(*,*) "ustarUVW:",S,"Re_tau:",S2
+         if (master) write(*,'(*(a10,es15.3))') "ustar:",ground_ustar_Pr,"Re_tau:",S2
+        end if
+      end if
+
+      ground_ustar_UVW = GroundUstarUVW()
+
+      S2 = ground_ustar_UVW*Re
+
+      if (display%ustar==1) then
+        if (allocated(Ustar_inlet)) then
+         if (master) write(*,'(*(a10,es15.3))') "ustarUVW:",ground_ustar_UVW,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
+        else
+         if (master) write(*,'(*(a10,es15.3))') "ustarUVW:",ground_ustar_UVW,"Re_tau:",S2
         end if
       end if
       if (store%ustar==1) then
-        ustar(:,step)=[ S2 , S ]
+        ustar(:,step)=[ S2 , ground_ustar_UVW ]
       end if
       
     end if
 
 
     if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
-     S2 = SUM(BsideTFLArr(1:Prnx,1:Prny))/(Prnx*Prny)
-     S=-S*S2
+     S2 = GroundTFlux()
+     S = - ground_ustar_Pr * S2
 
      if (display%tstar==1) then
-       if (master) write(*,*) "Tstar",S,"tflux", S2
+       if (master) write(*,'(*(a10,es15.3))') "Tstar:", S, "Tflux:", S2
      end if
 
      if (store%tstar==1) then
        tstar(:,step) = [ S2,S ]
      end if
+
+     S2 = GroundTFluxUVW()
+     S = - ground_ustar_UVW * S2
+
+     if (display%tstar==1) then
+       if (master) write(*,'(*(a10,es15.3))') "TstarUVW:" ,S, "Tflux:", S2
+     end if
+
     end if
 
     if ((store%BLprofiles==1 .and. &
@@ -1382,7 +1390,7 @@ contains
       if (enable_buoyancy) then
         call ReduceProfile(proftempavg, n_free_Pr(1:Prnz))
         call ReduceProfile(proftempflavg, n_all_Pr(0:Prnz))
-        call ReduceProfile(proftempflsgsavg, n_free_PrW(0:Prnz))
+        call ReduceProfile(proftempflsgsavg, [n_free_PrW_surf, n_free_PrW(1:Prnz)])
         call ReduceProfile(profttavg, n_free_Pr(1:Prnz))
         call ReduceProfile(profttsgsavg, n_free_Pr(1:Prnz))
       end if

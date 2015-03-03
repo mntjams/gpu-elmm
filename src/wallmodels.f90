@@ -113,7 +113,9 @@ module Wallmodels
          AddWMPoint, AddWMPointUVW, &
          MoveWMPointsToArray, GetOutsideBoundariesWM, InitWMMasks, &
          ComputeViscsWM, ComputeUVWFluxesWM, DivergenceWM, &
-         InitTempFl, GroundDeposition, GroundUstar, GroundUstarUVW, wallmodeltype
+         InitTempFl, GroundDeposition, &
+         GroundUstar, GroundUstarUVW, GroundTFlux, GroundTFluxUVW, &
+         wallmodeltype
 
   integer, parameter, public :: MINUSX = 1, PLUSX = 2, MINUSY = 3, PLUSY = 4, MINUSZ = 5, PLUSZ = 6
 
@@ -1927,6 +1929,40 @@ contains
       res = 0
     end if
   end function GroundUstarUVW
+
+
+  pure real(knd) function GroundTFlux()
+    if (any(WMPoints%zk == 1)) then
+      GroundTFlux = sum(WMPoints%temperature_flux, mask = (WMPoints%zk == 1)) / count(WMPoints%zk == 1)
+    else
+      GroundTFlux = 0
+    end if
+  end function GroundTFlux
+
+
+  real(knd) function GroundTFluxUVW() result(res)
+    integer :: i, j, n
+
+    if (any(WMPoints%zk == 1)) then
+      res = 0
+      n = 0
+      do j = 1,3
+        do i = 1,6
+          associate(p => WMPointsUVW(i,j))
+            n = n +  count(p%points%zk == 1)
+            res = res + sum(p%points%temperature_flux, mask = (p%points%zk == 1))
+          end associate
+        end do
+      end do
+      if (n>0) then
+        res = res / n
+      else
+        res = 0
+      end if
+    else
+      res = 0
+    end if
+  end function GroundTFluxUVW
 
 
 
