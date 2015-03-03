@@ -539,13 +539,13 @@ contains
        n_free_U(k) = count(Utype(1:Unx,1:Uny,k) <= 0)
      end do
      do k = 0, Vnz+1
-       n_free_V = count(Vtype(1:Vnx,1:Vny,k) <= 0)
+       n_free_V(k) = count(Vtype(1:Vnx,1:Vny,k) <= 0)
      end do
      do k = 0, Wnz+1
-       n_free_W = count(Vtype(1:Wnx,1:Wny,k) <= 0)
+       n_free_W(k) = count(Vtype(1:Wnx,1:Wny,k) <= 0)
      end do
      do k = 0, Prnz+1
-       n_free_Pr = count(Prtype(1:Prnx,1:Prny,k) <= 0)
+       n_free_Pr(k) = count(Prtype(1:Prnx,1:Prny,k) <= 0)
      end do
      do k = 0, Prnz+1
        n_all_Pr(k) = Prnx * Prny
@@ -584,6 +584,7 @@ contains
      n_free_U = mpi_co_sum(n_free_U, comm = comm_plane_xy)
      n_free_V = mpi_co_sum(n_free_V, comm = comm_plane_xy)
      n_free_W = mpi_co_sum(n_free_W, comm = comm_plane_xy)
+     n_free_Pr = mpi_co_sum(n_free_Pr, comm = comm_plane_xy)
      n_free_PrW = mpi_co_sum(n_free_PrW, comm = comm_plane_xy)
      n_free_PrW_surf = mpi_co_sum(n_free_PrW_surf, comm = comm_plane_xy)
      n_free_UW = mpi_co_sum(n_free_UW, comm = comm_plane_xy)
@@ -1373,32 +1374,32 @@ contains
       call ReduceProfile(profvvsgsavg, n_free_V(1:Vnz))
       call ReduceProfile(profwwsgsavg, n_free_W(0:Prnz))
       call ReduceProfile(proftkesgsavg, n_free_Pr(1:Prnz))
-      call ReduceProfile(profuw, n_free_UW)
-      call ReduceProfile(profvw, n_free_VW)
-      call ReduceProfile(profuwsgs, n_free_UW_sgs)
-      call ReduceProfile(profvwsgs, n_free_VW_sgs)
+      call ReduceProfile(profuwavg, n_free_UW)
+      call ReduceProfile(profvwavg, n_free_VW)
+      call ReduceProfile(profuwsgsavg, n_free_UW_sgs)
+      call ReduceProfile(profvwsgsavg, n_free_VW_sgs)
       
       if (enable_buoyancy) then
-        call ReduceProfile(proftemp, n_free_Pr(1:Prnz))
-        call ReduceProfile(proftempfl, n_all_Pr(0:Prnz))
-        call ReduceProfile(proftempflsgs, n_free_PrW(0:Prnz))
-        call ReduceProfile(proftt, n_free_Pr(1:Prnz))
+        call ReduceProfile(proftempavg, n_free_Pr(1:Prnz))
+        call ReduceProfile(proftempflavg, n_all_Pr(0:Prnz))
+        call ReduceProfile(proftempflsgsavg, n_free_PrW(0:Prnz))
+        call ReduceProfile(profttavg, n_free_Pr(1:Prnz))
         call ReduceProfile(profttsgsavg, n_free_Pr(1:Prnz))
       end if
       
       if (enable_moisture) then
-        call ReduceProfile(profmoist, n_free_Pr(1:Prnz))
-        call ReduceProfile(profmoistfl, n_all_Pr(0:Prnz))
-        call ReduceProfile(profmoistflsgs, n_free_PrW(0:Prnz))
-        call ReduceProfile(profmm, n_free_Pr(1:Prnz))
+        call ReduceProfile(profmoistavg, n_free_Pr(1:Prnz))
+        call ReduceProfile(profmoistflavg, n_all_Pr(0:Prnz))
+        call ReduceProfile(profmoistflsgsavg, n_free_PrW(0:Prnz))
+        call ReduceProfile(profmmavg, n_free_Pr(1:Prnz))
         call ReduceProfile(profmmsgsavg, n_free_Pr(1:Prnz))
       end if
         
       do i = 1, num_of_scalars
-        call ReduceProfile(profscal(i,:), n_free_Pr(1:Prnz))
-        call ReduceProfile(profscalfl(i,:), n_all_Pr(0:Prnz))
-        call ReduceProfile(profscalflsgs(i,:), n_free_PrW(0:Prnz))
-        call ReduceProfile(profss(i,:), n_free_Pr(1:Prnz))
+        call ReduceProfile(profscalavg(i,:), n_free_Pr(1:Prnz))
+        call ReduceProfile(profscalflavg(i,:), n_all_Pr(0:Prnz))
+        call ReduceProfile(profscalflsgsavg(i,:), n_free_PrW(0:Prnz))
+        call ReduceProfile(profssavg(i,:), n_free_Pr(1:Prnz))
         call ReduceProfile(profsssgsavg(i,:), n_free_Pr(1:Prnz))
       end do
         
