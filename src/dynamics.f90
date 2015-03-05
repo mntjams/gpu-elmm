@@ -698,7 +698,7 @@ contains
     end do
     !$omp end do
 #define comp 3
-#define wrk V2
+#define wrk W2
 #include "wmfluxes-inc.f90"
 #undef wrk
 #undef comp
