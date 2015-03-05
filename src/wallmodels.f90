@@ -1355,7 +1355,7 @@ contains
 
     else
 
-      Rib = -grav_acc*dist*tempdif/(temperature_ref*max(vel**2,1E-6_knd))
+      Rib = grav_acc*dist*tempdif/(temperature_ref*max(vel**2,1E-6_knd))
       zL = 0
       i = 0
       if (Rib>0.34_knd) then
@@ -1375,7 +1375,7 @@ contains
           temperature_flux = 0
         else
           ustar = vel*0.4_knd/(log(dist/z0)-PsiM_MO(zL))
-          temperature_flux = 0.4_knd*ustar*tempdif/(log(dist/z0)-PsiH_MO(zL))
+          temperature_flux = - 0.4_knd*ustar*tempdif/(log(dist/z0)-PsiH_MO(zL))
         end if
       end if
     end if
@@ -1621,7 +1621,6 @@ contains
     real(knd) dist(3), vel(3), wallvel(3), prgrad(3)
     real(knd) visc
 
-
     !$omp parallel do private(i,xi,yj,zk,tdif, vel, wallvel, dist, prgrad, visc)
     do i = 1,size(WMPoints)
 
@@ -1651,7 +1650,7 @@ contains
 #ifdef CUSTOM_SURFACE_TEMPERATURE
            WMPoints(i)%temperature = SurfaceTemperature(xPr(xi), yPr(yj), zPr(zk), time)
 #endif
-           tdif = WMPoints(i)%temperature - Temperature(xi,yj,zk)
+           tdif = Temperature(xi,yj,zk) - WMPoints(i)%temperature
 
            call WM_MO_DIRICHLET(visc, WMPoints(i)%ustar, &
                                 WMPoints(i)%temperature_flux, &
@@ -1697,9 +1696,6 @@ contains
     end do
     !$omp end parallel do
 
-    if (enable_buoyancy.and. TempBtype(Bo)==DIRICHLET) call Bound_temperature_flux(BsideTFLArr)
-
-
   end subroutine ComputeViscsWM
 
 
@@ -1712,8 +1708,6 @@ contains
     real(knd),dimension(1:,1:,1:),   intent(in) :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
 
-
-    if (enable_buoyancy.and. TempBtype(Bo)==DIRICHLET) call Bound_temperature_flux(BsideTFLArr)
 
     call fluxes(UxmWMpoints, 1, MINUSX, xU, yPr, zPr)
     call fluxes(UxpWMpoints, 1, PLUSX,  xU, yPr, zPr)
@@ -1749,7 +1743,7 @@ contains
       real(knd), parameter :: eps = 0.0001_knd
       
       drec = [1/dxmin, 1/dxmin, 1/dymin, 1/dymin, 1/dzmin, 1/dzmin]
-      
+
       !$omp parallel do private(point,xi,yj,zk,dist,vel,wallvel,tan_vect,p,mag)
       do point = 1,size(points)
 
@@ -1912,7 +1906,7 @@ contains
     if (any(WMPoints%zk == 1)) then
       res = 0
       n = 0
-      do j = 1,3
+      do j = 1,2
         do i = 1,6
           associate(p => WMPointsUVW(i,j))
             n = n +  count(p%points%zk == 1)
@@ -1946,7 +1940,7 @@ contains
     if (any(WMPoints%zk == 1)) then
       res = 0
       n = 0
-      do j = 1,3
+      do j = 1,2
         do i = 1,6
           associate(p => WMPointsUVW(i,j))
             n = n +  count(p%points%zk == 1)

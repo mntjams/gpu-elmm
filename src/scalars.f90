@@ -170,8 +170,6 @@ contains
         integer i,j,k
 
 
-        call boundary_procedure(Array)
-
         if (RK_stage>1) then
 
           call assign(Array2, Array_adv)
@@ -216,6 +214,8 @@ contains
         end if
 
         if (btype(To)==NEUMANN_BUFF) call AttenuateTopScalar(Array)
+
+        call boundary_procedure(Array)
 
       end subroutine
 

@@ -1036,7 +1036,7 @@ contains
 
     if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
      S2 = GroundTFlux()
-     S = - ground_ustar_Pr * S2
+     S = - S2 /  ground_ustar_Pr
 
      if (display%tstar==1) then
        if (master) write(*,'(*(a10,es15.3))') "Tstar:", S, "Tflux:", S2
@@ -1047,7 +1047,7 @@ contains
      end if
 
      S2 = GroundTFluxUVW()
-     S = - ground_ustar_UVW * S2
+     S = - S2 / ground_ustar_UVW 
 
      if (display%tstar==1) then
        if (master) write(*,'(*(a10,es15.3))') "TstarUVW:" ,S, "Tflux:", S2
