@@ -530,7 +530,7 @@ contains
      
      allocate(n_free_U(0:Unz+1))
      allocate(n_free_V(0:Vnz+1))
-     allocate(n_free_W(0:Prnz))
+     allocate(n_free_W(0:Wnz+1))
      allocate(n_free_Pr(0:Prnz+1))
      allocate(n_all_Pr(0:Prnz+1))
      allocate(n_free_PrW(0:Prnz))
@@ -545,7 +545,7 @@ contains
        n_free_V(k) = count(Vtype(1:Vnx,1:Vny,k) <= 0)
      end do
      do k = 0, Wnz+1
-       n_free_W(k) = count(Vtype(1:Wnx,1:Wny,k) <= 0)
+       n_free_W(k) = count(Wtype(1:Wnx,1:Wny,k) <= 0)
      end do
      do k = 0, Prnz+1
        n_free_Pr(k) = count(Prtype(1:Prnx,1:Prny,k) <= 0)
@@ -1486,6 +1486,7 @@ contains
            end do
            close(unit)
 
+           profttavg = profttavg - proftempavg**2
            !Niewstadt, Mason, Moeng, Schumann, 1993 - LES of CBL: A Comparison of Four Computer Codes 
            profttsgsavg(1:Prnz) = ((proftempflsgsavg(0:Prnz-1)+proftempflsgsavg(1:Prnz))/2)**2 / &
                                     (0.67_knd**4 * (proftkesgsavg(1:Prnz)))
@@ -1554,6 +1555,7 @@ contains
            end do
            close(unit)
 
+           profmmavg = profmmavg - profmoistavg**2
            !see profttsgsavg above
            profmmsgsavg = ((profmoistflsgsavg(0:Prnz-1)+profmoistflsgsavg(1:Prnz))/2)**2 / &
                           (0.67_knd**4 * (proftkesgsavg(1:Prnz)))
@@ -1581,6 +1583,7 @@ contains
            end do
            close(unit)
 
+           profssavg = profssavg - profscalavg**2
            !see profttsgsavg above
            do i = 1, num_of_scalars
              profsssgsavg(i,:) = ((profscalflavg(i,0:Prnz-1)+profscalflavg(i,1:Prnz))/2)**2 / &
