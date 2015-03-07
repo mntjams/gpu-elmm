@@ -19,6 +19,7 @@ cgal = ARGUMENTS.get('cgal','')
 mpi = ARGUMENTS.get('mpi','')
 cray = ARGUMENTS.get('cray','')
 lapack_blas = ARGUMENTS.get('lapack_blas','')
+missing_pfft_r2r = ARGUMENTS.get('missing_pfft_r2r','')
 
 extra_flag = ' ' + str(extra)
 
@@ -141,6 +142,11 @@ env.Append(CXXFLAGS= ' -O3 ' + openmp_flag + prof_flag + extra_flag + prec_flag 
   
 env.Append(LINKFLAGS= fast_flag + openmp_flag + prof_flag + lto_flag + extra_flag) # + '-Bdynamic -lpoisfft -lfftw3 -lfftw3f -lfftw3_omp -lfftw3f_omp -Bstatic -lgfortran -lquadmath -lstdc++ -llapack -L/usr/lib/x86_64-linux-uclibc/usr/lib/ -lc -lm -lpthread'  -Wl,--verbose
     
+missing_pfft = str(missing_pfft_r2r)=='yes'
+if missing_pfft:
+  env.Append(F90FLAGS=' -DMISSING_PFFT_R2R')
+
+
 env.Append(FORTRANMODDIR = target_dir)
 
 if str(mpi)=='yes':
@@ -199,7 +205,6 @@ if cray=='yes':
 Mkdir(target_dir+'/P/')
 objs = env.Object(target=target_dir+'P/customfftw3', source='../../PoisFFT/src/customfftw3.f90')
 if str(mpi)=='yes':
-  objs += env.Object(target=target_dir+'P/missing_pfft', source='../../PoisFFT/src/missing_pfft.c')
   objs += env.Object(target=target_dir+'P/custompfft', source='../../PoisFFT/src/custompfft.f90')
 objs += env.Object(target=target_dir+'P/precisions', source='../../PoisFFT/src/precisions.f90')
 objs += env.Object(target=target_dir+'P/parameters', source='../../PoisFFT/src/parameters.f90')
@@ -210,6 +215,8 @@ Depends(objs[-1], '../../PoisFFT/src/allocate_fftw-inc.f90')
 Depends(objs[-1], objs[0])
 Depends(objs[-1], objs[2])
 Depends(objs[-1], objs[3])
+if missing_pfft:
+  objs += env.Object(target=target_dir+'P/missing_pfft', source='../../PoisFFT/src/missing_pfft.c')
 objs += env.Object(target=target_dir+'P/poisfft', source='../../PoisFFT/src/poisfft.f90')
 Depends(objs[-1], '../../PoisFFT/src/poisfft-inc.f90')
 Depends(objs[-1], '../../PoisFFT/src/poisfft-solvers-inc.f90')
