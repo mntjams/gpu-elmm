@@ -1538,7 +1538,7 @@ contains
     integer :: i, j, k
     type(WMPointUVW), pointer :: pts(:)
 
-    if (enable_buoyancy.and.TempBtype(Bo)==DIRICHLET) then
+    if (enable_buoyancy.and.TempBtype(Bo)==MO_TEMPERATURE) then
       do i = 1, size(WMPoints)
         if (WMPoints(i)%zk==1) then
           WMPoints(i)%temperature_flux = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&

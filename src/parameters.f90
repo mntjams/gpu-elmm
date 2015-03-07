@@ -161,6 +161,7 @@ module Parameters
 
   integer,parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6, &  !boundary condition types
                         TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10, RADIATION=7, &
+                        MO_TEMPERATURE=10, &
                         NEUMANN_BUFF=8, AUTOMATICFLUX=11, WALL_DIRICHLET=12, WALL_FLUX=13, &
                         MPI_BOUNDS=1000, MPI_BOUNDARY=1000, MPI_PERIODIC=1001
   !inlet types

@@ -428,7 +428,7 @@ contains
      ustar = huge(1.0)
    end if
 
-   if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
+   if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
      allocate(tstar(2,1:time_series_max_length))
      tstar = huge(1.0)
    end if
@@ -1034,7 +1034,7 @@ contains
     end if
 
 
-    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
+    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
      S2 = GroundTFlux()
      S = - S2 /  ground_ustar_Pr
 
