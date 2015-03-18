@@ -907,13 +907,13 @@ contains
     real(knd),intent(inout) :: ustar
     real(knd),intent(in) :: vel,dist
     real(knd),parameter :: eps = 1e-4_knd
-    real(knd),parameter :: yplcrit = 11.225_knd
+    real(knd),parameter :: zpl_lam = 5._knd, zpl_turb = 30._knd
     real(knd) :: ustar2,ustar_lam
     integer i
 
     ustar_lam = sqrt(vel/(dist*Re))
 
-    if ((dist*ustar_lam*Re)<yplcrit) then
+    if ((dist*ustar_lam*Re) < zpl_lam) then
 
       ustar = ustar_lam
 
@@ -924,10 +924,12 @@ contains
         i = i+1
         ustar2 = ustar
 
-        if ((dist*ustar2*Re)<yplcrit) then
+        if ((dist*ustar2*Re) <= zpl_lam) then
           ustar = sqrt(vel/(dist*Re))
+        else if ((dist*ustar2*Re) < zpl_turb) then
+          ustar = vel/(5*log(abs(ustar2*dist*Re))-3.05)
         else
-          ustar = vel/(log(abs(ustar2*dist*Re))/0.41_knd+5.2_knd)
+          ustar = vel/(log(abs(ustar2*dist*Re))/0.4_knd+5.5_knd)
         end if
 
         if  (abs(ustar-ustar2)/abs(ustar)<eps) exit
