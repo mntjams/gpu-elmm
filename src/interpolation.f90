@@ -7,7 +7,7 @@ contains
 
   !*****************************************************************************
   !
-  !! CUBSPL defines an interpolatory cubic spline.
+  !  cubic_spline() defines an interpolatory cubic spline.
   !
   !  Discussion:
   !
@@ -31,7 +31,6 @@ contains
   !    ISBN: 0387953663,
   !    LC: QA1.A647.v27.
   !
-
   subroutine cubic_spline(x, y, c, dydx_1, dydx_n, d2ydx2_1, d2ydx2_n)
 
     real(knd), intent(in) :: x(:), y(:)

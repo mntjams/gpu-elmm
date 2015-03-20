@@ -55,7 +55,7 @@ contains
    integer ::  i,io,io2,itmp
    integer :: numframeslices
 
-   character(len = 1024) :: command_line,msg
+   character(len = 1024) :: command_line, msg
    integer :: exenamelength
    integer :: unit
 
@@ -259,14 +259,19 @@ contains
    close(unit)
 
    open(unit,file="large_scale.conf",status="old",action="read",iostat = io)
-
    if (io==0) then
-     call get(CoriolisParam)
-     if (master) write(*,*) "coriolisparam=",CoriolisParam
-     call get(PrGradientX)
-     if (master) write(*,*) "prgradientx=",PrGradientX
-     call get(PrGradientY)
-     if (master) write(*,*) "prgradienty=",PrGradientY
+
+     call get(Coriolis_parameter)
+     if (master) write(*,*) "Coriolis_parameter=", Coriolis_parameter
+
+     call get(pr_gradient_x)
+     if (master) write(*,*) "pr_gradient_x=", pr_gradient_x
+     enable_pr_gradient_x_uniform = pr_gradient_x /= 0
+
+     call get(pr_gradient_y)
+     if (master) write(*,*) "pr_gradient_y=", pr_gradient_y
+     enable_pr_gradient_y_uniform = pr_gradient_y /= 0
+
      call get(SubsidenceGradient)
      if (master) write(*,*) "SubsidenceGradient=",SubsidenceGradient
      close(unit)
@@ -1241,6 +1246,71 @@ contains
   end subroutine get_area_sources
 
 
+  subroutine get_geostrophic_wind(fname)
+    use Interpolation
+    character(*), intent(in) :: fname
+    character(256) :: line
+    real(knd) :: r3(3)
+    real(knd), allocatable :: z(:), ug(:), vg(:)
+    real(knd), allocatable :: cu(:,:), cv(:,:)
+    integer :: unit, io, n, i, j
+
+    open(newunit=unit,file=fname,status="old",action="read",iostat = io)
+    if (io/=0) return
+
+    n = 0
+    do
+      read(unit,'(a)',iostat=io) line
+      if (io/=0) exit
+      read(line,*,iostat=io) r3
+      if (io/=0) exit
+      n = n + 1
+    end do
+
+    if (n>0) then
+      allocate(z(n), ug(n), vg(n))
+      allocate(cu(0:3,n), cv(0:3,n))
+      do i = 1, n
+        read(unit,'(a)',iostat=io) line
+        read(line, *) z(i), ug(i), vg(i)
+      end do
+    else
+      stop "Geostrophic profile empty."
+    end if
+
+    if (n > 1) then
+      call cubic_spline(z, ug, cu)
+      call cubic_spline(z, vg, cv)
+
+      allocate(pr_gradient_profile_x(1:Prnz))
+      allocate(pr_gradient_profile_y(1:Prnz))
+
+      j = 1
+      do i = 1, Prnz
+        pr_gradient_profile_x(i) =   Coriolis_parameter * cubic_spline_eval(zPr(i), z, cv, j)
+      end do
+
+      j = 1
+      do i = 1, Prnz
+        pr_gradient_profile_y(i) = - Coriolis_parameter * cubic_spline_eval(zPr(i), z, cu, j)
+      end do
+
+      enable_pr_gradient_x_profile = any(pr_gradient_profile_x/=0)
+      enable_pr_gradient_y_profile = any(pr_gradient_profile_y/=0)
+
+    else
+
+      pr_gradient_x =   Coriolis_parameter * vg(1)
+      pr_gradient_y = - Coriolis_parameter * ug(1)
+
+      enable_pr_gradient_x_uniform = pr_gradient_x /= 0
+      enable_pr_gradient_y_uniform = pr_gradient_y /= 0
+
+    end if
+
+  end subroutine
+
+
 
 
 
@@ -1604,89 +1674,6 @@ contains
           end do
          end do
 
-       elseif (tasktype==5) then!temporal mixing layer
-         do k = 1,Unz
-          do j = 1,Uny
-           do i = 1,Unx
-                  y = yPr(j)
-                  if ((abs(y-yPr(Uny/2)))<1.) then
-                   call RANDOM_NUMBER(p)
-                  else
-                   p = 0
-                  end if
-                   x1 = xPr(i)
-                   x2 = xPr(i+1)
-                   y1 = yV(j-1)
-                   y2 = yV(j)
-                   z1 = zW(k-1)
-                   z2 = zW(k)
-                   p = 0
-                     !(20/(pi*pi))*(cos((pi/10)*x1)-cos((pi/10)*x2))*((pi/2)*(z2-z1)-0.8*(cos((pi/2)*z2)-cos((pi/2)*z1)))
-                    !sin(pi*xU(i)/10)*(1+0.8*sin(pi*zPr(k)/2))
-                   x2 = cosh(y2+0.4_knd*p-yPr(Uny/2))
-                   x1 = cosh(y1+0.4_knd*p-yPr(Uny/2))
-                   if (abs(x2-x1)>0.000001_knd) then
-                    U(i,j,k)=(log(x2)-log(x1))/(y2-y1)
-                   else
-                    U(i,j,k) = 0
-                   end if
-                      !Uinlet*tanh(y+0.1*sin(pi*(xU(i)/10)*sin(pi*zPr(k)/10)-yPr(Uny/2)) by mean of integrals
-           end do
-          end do
-         end do
-         do k = 1,Vnz
-          do j = 1,Vny
-           do i = 1,Vnx
-                  y = yV(j)
-                  !if ((abs(y-yPr(Uny/2)))<1.) then
-                  ! call RANDOM_NUMBER(p)
-                  !else
-                   p = sin(2*pi*xPr(i)/10)*(1+0.3*sin(3*pi*zPr(k)/10))*exp(-(yV(j)-yPr(Uny/2))*(yV(j)-yPr(Uny/2)))
-                  !end if
-
-                   V(i,j,k) = 0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_knd*(p-0.5_knd)
-           end do
-          end do
-         end do
-         do k = 1,Wnz
-          do j = 1,Wny
-           do i = 1,Wnx
-                  y = yPr(j)
-                  !if ((abs(y-yPr(Uny/2)))<1.) then
-                  ! call RANDOM_NUMBER(p)
-                  !else
-                   p = cos(2*pi*xPr(i)/10)*(1+0.3*cos(3*pi*zW(k)/10))*exp(-(yPr(j)-yPr(Uny/2))*(yPr(j)-yPr(Uny/2)))
-                  !end if
-
-                   W(i,j,k) = 0.1*p!Uinlet*tanh(y-yPr(Uny/2))+Uinlet*0.1_knd*(p-0.5_knd)
-           end do
-          end do
-         end do
-      !   elseif (tasktype==8) then
-      !    do k = 1,Unz
-      !     do j = 1,Uny
-      !      do i = 1,Unx
-      !             call RANDOM_NUMBER(p)
-      !       U(i,j,k)=-prgradienty/(coriolisparam)*(1+0.1_knd*(p-0.5_knd))
-      !      end do
-      !     end do
-      !    end do
-      !    do k = 1,Vnz
-      !     do j = 1,Vny
-      !      do i = 1,Vnx
-      !               call RANDOM_NUMBER(p)
-      !      V(i,j,k) = prgradientx/(coriolisparam)*(1+0.1_knd*(p-0.5_knd))
-      !      end do
-      !     end do
-      !    end do
-      !    do k = 1,Wnz
-      !     do j = 1,Wny
-      !      do i = 1,Wnx
-      !       W(i,j,k) = 0
-      !      end do
-      !     end do
-      !    end do
-
        elseif (InletType==TurbulentInletType) then
 
          dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Uny,1:Unz)),avg(Vin(1:Vny,1:Vnz)))
@@ -1907,7 +1894,7 @@ contains
          !$omp workshare
          forall(k = 1:Prnz,j = 1:Prny,i = 1:Prnx)
            TDiff(i,j,k) = 1.35*(Viscosity(i,j,k)-1._knd/Re)+(1._knd/(Re*constPrt))
-         endforall
+         end forall
          !$omp end workshare
          !$omp end parallel
 
@@ -2098,7 +2085,7 @@ contains
 
       forall (i=-3:nx+4)
          xU2(i)=(i)*dxmin+x0
-      endforall
+      end forall
 
     end if
 
@@ -2139,7 +2126,7 @@ contains
 
       forall (j=-3:ny+4)
         yV2(j)=(j)*dymin+y0
-      endforall
+      end forall
 
     end if
 
@@ -2180,7 +2167,7 @@ contains
 
        forall (k=-3:nz+4)
          zW2(k)=(k)*dzmin+z0
-       endforall
+       end forall
 
     end if
 
@@ -2210,29 +2197,29 @@ contains
     forall (i=-2:nx+4)
       xPr(i)=(xU(i-1)+xU(i))/2._knd
       dxPr(i) = xU(i)-xU(i-1)
-    endforall
+    end forall
 
     forall (j=-2:ny+4)
       yPr(j)=(yV(j-1)+yV(j))/2._knd
       dyPr(j) = yV(j)-yV(j-1)
-    endforall
+    end forall
 
     forall (k=-2:nz+4)
       zPr(k)=(zW(k-1)+zW(k))/2._knd
       dzPr(k) = zW(k)-zW(k-1)
-    endforall
+    end forall
 
     forall (i=-2:nx+3)
       dxU(i) = xPr(i+1)-xPr(i)
-    endforall
+    end forall
 
     forall (j=-2:ny+3)
       dyV(j) = yPr(j+1)-yPr(j)
-    endforall
+    end forall
 
     forall (k=-2:nz+3)
       dzW(k) = zPr(k+1)-zPr(k)
-    endforall
+    end forall
 
     deallocate(xU2)
     deallocate(yV2)
@@ -2248,6 +2235,10 @@ contains
     Vtype = 0
     Wtype = 0
     Prtype = 0
+
+
+    !Requires grid coordinates
+    call get_geostrophic_wind("geostrophic_wind_profile.conf")
 
 
     allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
