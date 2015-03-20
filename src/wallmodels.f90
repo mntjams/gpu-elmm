@@ -1608,7 +1608,7 @@ contains
     end if
     if (n>0) prgrad(3) = prgrad(3)/n
 
-    prgrad = prgrad + [prgradientx,prgradienty,0._knd]
+    prgrad = prgrad + [pr_gradient_x, pr_gradient_y, 0._knd]
 
   end subroutine WallPrGradient
 

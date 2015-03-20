@@ -1,0 +1,28 @@
+#!/bin/bash
+declare -a arr=("profu.txt"
+		"profuw.txt"
+		"profvw.txt"
+		"proftke.txt"
+		"profuu.txt"
+		"profvv.txt"
+		"profww.txt"
+		"proftemp.txt"
+		"proftempfl.txt"
+		"proftt.txt"
+		"profmoist.txt"
+		"profmoistfl.txt"
+		"profmm.txt"
+		"profscal.txt"
+		"profscalfl.txt"
+		"profss.txt"
+		"profRig.txt"
+		"profRf.txt")
+
+for i in "${arr[@]}"
+do
+  if find */ -name "$i" | grep "/" > /dev/null; then
+    find */ -name "$i" | sort | xargs cat > "$i"
+  fi
+done
+ 
+

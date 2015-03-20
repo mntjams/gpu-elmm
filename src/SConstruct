@@ -234,6 +234,7 @@ objs += env.Object(target=target_dir+'parameters',     source='parameters.f90')
 objs += env.Object(target=target_dir+'rng_par_zig',    source='rng_par_zig.f90')
 objs += env.Object(target=target_dir+'stop',           source='stop.f90')
 objs += env.Object(target=target_dir+'lapack',         source='lapack.f')
+objs += env.Object(target=target_dir+'interpolation',  source='interpolation.f90')
 objs += env.Object(target=target_dir+'strings',        source='strings.f90')
 objs += env.Object(target=target_dir+'lists',          source='lists.f90')
 objs += env.Object(target=target_dir+'alternate_ieee_isnan', source='alternate_ieee_isnan.f90',
