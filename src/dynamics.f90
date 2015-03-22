@@ -552,7 +552,7 @@ contains
 
 
   subroutine SubgridStresses(U,V,W,Pr,Temperature)
-    use Subgrid, only: sgstype, SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma
+    use Subgrid, only: sgstype, SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma, SGS_Sigma_stability
     use ImmersedBoundary, only: ScalFlIBPoints, TIBPoint_Viscosity
     use Filters, only: filtertype, filter_ratios
     use Wallmodels
@@ -576,7 +576,7 @@ contains
     else if (sgstype==VremanModel) then
                       call SGS_Vreman(U,V,W,filter_ratios(filtertype))
     else if (sgstype==StabSubgridModel) then
-                      call SGS_StabSmag(U,V,W,Temperature,filter_ratios(filtertype))
+                      call SGS_Sigma_stability(U,V,W,filter_ratios(filtertype))
     else
       if (Re>0) then
         Viscosity = 1._knd/Re
