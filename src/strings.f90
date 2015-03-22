@@ -181,14 +181,17 @@ contains
     class(tree_object) :: obj
     integer :: i
 
-    do i = 1, size(obj%fields%array)
-      associate(field => obj%fields%array(i))
-        if (associated(field%object_value)) then
-          call field%object_value%finalize
-          deallocate(field%object_value)
-        end if
-      end associate
-    end do
+    if (allocated(obj%fields%array)) then
+      do i = 1, size(obj%fields%array)
+        associate(field => obj%fields%array(i))
+          if (associated(field%object_value)) then
+            call field%object_value%finalize
+            deallocate(field%object_value)
+          end if
+        end associate
+      end do
+      deallocate(obj%fields%array)
+    end if
   end subroutine
 
   subroutine to_array(ch_list, ch_array)
@@ -252,7 +255,8 @@ contains
       allocate(tree(size(tmp)+1))
       tree(:size(tmp)) = tmp
 
-      tree(:size(tmp)+1) = object
+      tree(size(tmp)+1) = object
+      call object%finalize
 
       if (pos > size(tokens)) exit
     end do
