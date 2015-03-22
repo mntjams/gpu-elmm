@@ -562,6 +562,9 @@ contains
    else
      if (master) write(*,*) "No output.conf found, defaults will be used."
    end if
+   
+   
+   call get_profiles("profiles.conf")
 
    !probes_file and scalar_probes_file read from command line
    if (probes_file == "" .and. scalar_probes_file == "") then
@@ -1266,7 +1269,9 @@ contains
       if (io/=0) exit
       n = n + 1
     end do
-
+    
+    rewind(unit)
+    
     if (n>0) then
       allocate(z(n), ug(n), vg(n))
       allocate(cu(0:3,n), cv(0:3,n))
@@ -1308,11 +1313,152 @@ contains
 
     end if
 
-  end subroutine
+  end subroutine get_geostrophic_wind
 
 
+  subroutine get_profiles(fname)
+    use Strings
+    use ParseTrees
+    use Outputs, only: profiles_config, enable_profiles
+    
+    character(*), intent(in) :: fname
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: i, stat
 
+    inquire(file=fname, exist=ex)
 
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+
+      if (allocated(tree)) then
+        do i = 1, size(tree)
+          call get_profile(tree(i))
+        end do
+      end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+    
+  contains
+  
+    subroutine get_profile(obj)
+      type(tree_object), intent(in) :: obj
+      integer :: j
+      real(knd) :: rval
+
+      if (downcase(obj%name)=='average_profiles') then
+
+        if (allocated(obj%fields%array)) then
+
+          associate(fields => obj%fields%array)
+
+            do j = 1, size(fields)
+              read(fields(j)%value, *) rval
+             
+              select case (downcase(fields(j)%name))
+                case ('start')
+                  profiles_config%average_start = rval
+                case ('end')
+                  profiles_config%average_end = rval
+              end select
+
+            end do
+
+          end associate
+
+        else
+
+          write(*,*) "No fields in the profile object in " // fname
+          call error_stop
+
+        end if
+
+        enable_profiles = .true.
+
+      else if (downcase(obj%name)=='instantaneous_profiles') then
+
+        if (allocated(obj%fields%array)) then
+
+          associate(fields => obj%fields%array)
+
+            do j = 1, size(fields)
+
+              read(fields(j)%value, *) rval
+              
+              select case (downcase(fields(j)%name))
+                case ('start')
+                  profiles_config%instant_start = rval
+                case ('end')
+                  profiles_config%instant_end = rval
+                case ('interval')
+                  profiles_config%instant_interval = rval
+              end select
+
+            end do
+
+          end associate
+
+        else
+
+          write(*,*) "No fields in the profile object in " // fname
+          call error_stop
+
+        end if
+
+        enable_profiles = .true.
+
+      else if (downcase(obj%name)=='running_average_profiles') then
+
+        if (allocated(obj%fields%array)) then
+
+          associate(fields => obj%fields%array)
+
+            do j = 1, size(fields)
+
+              read(fields(j)%value, *) rval
+              
+              select case (downcase(fields(j)%name))
+                case ('start')
+                  profiles_config%running_start = rval
+                case ('end')
+                  profiles_config%running_end = rval
+                case ('interval')
+                  profiles_config%running_interval = rval
+              end select
+
+            end do
+
+          end associate
+          
+        else
+
+          write(*,*) "No fields in the profile object in " // fname
+          call error_stop
+
+        end if
+
+        enable_profiles = .true.
+
+      else
+        write(*,*) "Unknown object type " // downcase(obj%name) // " in " // fname
+        call error_stop
+      end if
+    end subroutine
+
+    
+  end subroutine get_profiles
+  
+  
+  
+  
 
   subroutine ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
     use Endianness

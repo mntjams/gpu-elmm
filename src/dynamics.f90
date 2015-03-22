@@ -149,7 +149,7 @@ contains
   
   subroutine StressBoundaryFlux(U2, V2, dt)
     use ArrayUtilities,only: add
-    use Outputs,only: profuw,profvw, profuwsgs, profvwsgs
+    use Outputs,only: current_profiles
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U2, V2
     real(knd), intent(in) :: dt
     real(knd) :: flux
@@ -159,11 +159,11 @@ contains
       first = min(Prnz*5/6,Prnz-5)
       last = Prnz-5
       
-      flux = sum(profuw(first:last)) + sum(profuwsgs(first:last))
+      flux = sum(current_profiles%uw(first:last)) + sum(current_profiles%uwsgs(first:last))
       flux = flux / (last-first+1)
       call add(U2(:,:,Unz), -dt*flux/dzPr(Unz))
       
-      flux = sum(profvw(first:last)) + sum(profvwsgs(first:last))
+      flux = sum(current_profiles%vw(first:last)) + sum(current_profiles%vwsgs(first:last))
       flux = flux / (last-first+1)
       call add(V2(:,:,Vnz), -dt*flux/dzPr(Vnz))
     end if
