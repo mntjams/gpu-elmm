@@ -144,6 +144,7 @@ contains
       c(2,i) = g * c(2,i-1) + 3 * ( c(3,i) * c(4,i+1) + c(3,i+1) * c(4,i) )
       c(4,i) = g * c(3,i-1) + 2 * ( c(3,i) + c(3,i+1))
     end do
+
   !
   !  Construct the last equation from the second boundary condition, of
   !  the form
@@ -155,27 +156,23 @@ contains
   !  right for it at this point.
   !
     if ( bcn == 1 ) then
-      call back_solve
-      return
-    end if
 
-    if ( bcn > 1 ) then  
+      continue
+
+    else if ( bcn > 1 ) then
+
       c(2,n) = 3 * c(4,n) + c(3,n) / 2 * c(2,n)
       c(4,n) = 2
       g = -1 / c(4,n-1)
       c(4,n) = c(4,n) - c(3,n-1) / c(4,n-1)
       c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
 
-      call back_solve
-      return
+    else if ( n /= 3 .or. bc1 /= 0 ) then
 
-    end if
-
-  !
-  !  Not-a-knot and 3 <= N, and either 3 < N or also not-a-knot
-  !  at left end point.
-  !
-    if ( n /= 3 .or. bc1 /= 0 ) then
+      !
+      !  Not-a-knot and 3 <= N, and either 3 < N or also not-a-knot
+      !  at left end point.
+      !
       g = c(3,n-1) + c(3,n)
       c(2,n) = ( ( c(3,n) + 2 * g ) * c(4,n) * c(3,n-1) + c(3,n)**2 &
         * ( c(1,n-1) - c(1,n-2) ) / c(3,n-1) ) / g
@@ -184,18 +181,19 @@ contains
       c(4,n) = c(4,n) + g * c(3,n-1)
       c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
 
-      call back_solve
-      return
+    else
+
+      !
+      !  N = 3 and not-a-knot also at left.
+      !
+      c(2,n) = 2 * c(4,n)
+      c(4,n) = 1
+      g = -1 / c(4,n-1)
+      c(4,n) = c(4,n) - c(3,n-1) / c(4,n-1)
+      c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
 
     end if
-  !
-  !  N = 3 and not-a-knot also at left.
-  !
-    c(2,n) = 2 * c(4,n)
-    c(4,n) = 1
-    g = -1 / c(4,n-1)
-    c(4,n) = c(4,n) - c(3,n-1) / c(4,n-1)
-    c(2,n) = ( g * c(2,n-1) + c(2,n) ) / c(4,n)
+
     call back_solve
 
   contains
