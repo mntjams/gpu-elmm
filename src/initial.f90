@@ -1127,6 +1127,7 @@ contains
       if (allocated(tree)) then
         do i = 1, size(tree)
           call get_area_source(tree(i))
+          call tree(i)%finalize
         end do
       end if
 
@@ -1225,6 +1226,8 @@ contains
 
         write(*,*) "Invalid geometric shape for area source in " // fname
         write(*,*) "Supported variants: Circle"
+        write(*,*) "Received:", obj%name
+
         call error_stop
 
       end if
@@ -1337,6 +1340,7 @@ contains
       if (allocated(tree)) then
         do i = 1, size(tree)
           call get_profile(tree(i))
+          call tree(i)%finalize
         end do
       end if
 
