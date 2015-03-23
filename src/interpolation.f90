@@ -32,7 +32,6 @@ contains
   !    LC: QA1.A647.v27.
   !
   subroutine cubic_spline(x, y, c, dydx_1, dydx_n, d2ydx2_1, d2ydx2_n)
-
     real(knd), intent(in) :: x(:), y(:)
     real(knd), intent(out) :: c(:,:)
     real(knd), intent(in), optional :: dydx_1, dydx_n, d2ydx2_1, d2ydx2_n
