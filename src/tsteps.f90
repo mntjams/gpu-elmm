@@ -3,8 +3,8 @@ module TimeSteps
   use Parameters
   use Dynamics
   use Boundaries, only: BoundU,Bound_Q
-  use Pressure !it exports PressureCorrection and GetPrFromGPU
-  use Outputs, only: store,display,proftempfl,profmoistfl
+  use Pressure, only: PressureCorrection
+  use Outputs, only: store, display, current_profiles
   use Scalars, only: ScalarRK3
   use Turbinlet, only: GetTurbulentInlet, GetInletFromFile
 
@@ -82,11 +82,21 @@ contains
       call SubgridStresses(U, V, W, Pr, Temperature)
 
 
-      call Convection(U, V, W, U2, V2, W2, Ustar, Vstar, Wstar, Temperature, Moisture, RK_beta, RK_rho, RK_stage, dt)
+      call Convection(U, V, W, &
+                      U2, V2, W2, &
+                      Ustar, Vstar, Wstar, &
+                      Temperature, Moisture, &
+                      RK_beta, RK_rho, RK_stage, dt)
 
-      call ScalarRK3(U, V, W, Temperature, Moisture, Scalar, RK_stage, dt, proftempfl, profmoistfl)
+      call ScalarRK3(U, V, W, &
+                     Temperature, Moisture, Scalar, &
+                     RK_stage, dt, &
+                     current_profiles%tempfl, current_profiles%moistfl)
 
-      call OtherTerms(U, V, W, U2, V2, W2, Pr, 2*RK_alpha(RK_stage)*dt)
+      call OtherTerms(U, V, W, &
+                      U2, V2, W2, &
+                      Pr, &
+                      2*RK_alpha(RK_stage)*dt)
 
 
       if ((Btype(To) ==FreeSlipBuff) .and. (Prnz>15))  then

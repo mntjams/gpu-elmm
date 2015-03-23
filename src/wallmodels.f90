@@ -1,6 +1,6 @@
 module Sort
   use iso_c_binding
-
+#define pure 
   implicit none
 
   interface
@@ -113,7 +113,9 @@ module Wallmodels
          AddWMPoint, AddWMPointUVW, &
          MoveWMPointsToArray, GetOutsideBoundariesWM, InitWMMasks, &
          ComputeViscsWM, ComputeUVWFluxesWM, DivergenceWM, &
-         InitTempFl, GroundDeposition, GroundUstar, GroundUstarUVW, wallmodeltype
+         InitTempFl, GroundDeposition, &
+         GroundUstar, GroundUstarUVW, GroundTFlux, GroundTFluxUVW, &
+         wallmodeltype
 
   integer, parameter, public :: MINUSX = 1, PLUSX = 2, MINUSY = 3, PLUSY = 4, MINUSZ = 5, PLUSZ = 6
 
@@ -905,13 +907,13 @@ contains
     real(knd),intent(inout) :: ustar
     real(knd),intent(in) :: vel,dist
     real(knd),parameter :: eps = 1e-4_knd
-    real(knd),parameter :: yplcrit = 11.225_knd
-    real(knd) :: ustar2,ustar_lam
-    integer i
+    real(knd),parameter :: zpl_lam = 5._knd, zpl_turb = 30._knd
+    real(knd) :: ustar2, ustar_lam, z_pl
+    integer :: i
 
     ustar_lam = sqrt(vel/(dist*Re))
 
-    if ((dist*ustar_lam*Re)<yplcrit) then
+    if ((dist*ustar_lam*Re) < zpl_lam) then
 
       ustar = ustar_lam
 
@@ -922,10 +924,17 @@ contains
         i = i+1
         ustar2 = ustar
 
-        if ((dist*ustar2*Re)<yplcrit) then
+        z_pl = dist*ustar2*Re
+
+        if (z_pl <= zpl_lam) then
+          !viscous sublayer
           ustar = sqrt(vel/(dist*Re))
+        else if (z_pl < zpl_turb) then
+          !buffer layer
+          ustar = vel / (5*log(z_pl)-3.05)
         else
-          ustar = vel/(log(abs(ustar2*dist*Re))/0.41_knd+5.2_knd)
+          !logarithmic layer
+          ustar = vel / (log(z_pl)/0.4_knd + 5.5_knd)
         end if
 
         if  (abs(ustar-ustar2)/abs(ustar)<eps) exit
@@ -1240,10 +1249,10 @@ contains
     real(knd) x
 
     if (zeta<0) then
-     x = (1-15._knd*zeta)**(1/4._knd)
-     PsiM_MO = log(((1+x**2)/2._knd)*((1+x)/2._knd)**2)-2._knd*atan(x)+pi/2
+      x = (1-15._knd*zeta)**(1/4._knd)
+      PsiM_MO = log(((1+x**2)/2._knd)*((1+x)/2._knd)**2)-2._knd*atan(x)+pi/2
     else
-     PsiM_MO = -4.8_knd*zeta !GABLS recommend ation
+      PsiM_MO = - 4.8_knd * zeta
     end if
   end function PsiM_MO
 
@@ -1253,12 +1262,40 @@ contains
     real(knd) x
 
     if (zeta<0) then
-     x = (1-15._knd*zeta)**(1/4._knd)
-     PsiH_MO = 2._knd*log((1+x**2)/2._knd)
+      x = (1-15._knd*zeta)**(1/4._knd)
+      PsiH_MO = 2._knd*log((1+x**2)/2._knd)
     else
-     PsiH_MO = -7.8_knd*zeta !GABLS recommend ation
+      PsiH_MO = - 7.8_knd * zeta
     end if
   end function PsiH_MO
+
+
+  pure real(knd) function PsiM_MO_mod(zeta) result(res)
+    real(knd),intent(in):: zeta
+    real(knd) :: x
+    !For L defined without k!
+    if (zeta<0) then
+      x = (1-6._knd*zeta)**(1/4._knd)
+      res = log(((1+x**2)/2._knd)*((1+x)/2._knd)**2)-2._knd*atan(x)+pi/2
+    else
+      !Zilitinkevich, Esau - 2006
+      res = - 3 * zeta**(5._knd/6._knd) 
+    end if
+  end function PsiM_MO_mod
+
+
+  pure real(knd) function PsiH_MO_mod(zeta) result(res)
+    real(knd),intent(in):: zeta
+    real(knd) x
+    !For L defined without k!
+    if (zeta<0) then
+      x = (1-6._knd*zeta)**(1/4._knd)
+      res = 2._knd*log((1+x**2)/2._knd)
+    else
+      !Zilitinkevich, Esau - 2006
+      res = - 2.5_knd * zeta**(4._knd/5._knd)
+    end if
+  end function PsiH_MO_mod
 
 
   pure real(knd) function Obukhov_zL(ustar,temperature_flux,tempref,g,z)
@@ -1332,50 +1369,51 @@ contains
   pure subroutine WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,tempdif)
     real(knd),intent(inout) :: ustar,temperature_flux
     real(knd),intent(in) :: vel,dist,z0,tempdif
-    real(knd),parameter :: eps = 1e-3
-    real(knd),parameter :: yplcrit = 11.225
-    real(knd) :: zL,zL0,Rib
+    real(knd),parameter :: eps = 1e-3_knd
+    real(knd),parameter :: yplcrit = 11.225_knd
+    real(knd),parameter :: k_U = 0.4_knd
+    real(knd),parameter :: k_T = 0.47_knd
+    real(knd) :: zL, zL0, psi_m, psi_h
     integer i
 
     call WMRoughUstar(ustar,vel,dist,z0)
 
     if (dist<=z0) then
 
-      if (Re>0) then
-       if ((dist*ustar*Re)<yplcrit) then
-         ustar = sqrt(vel/(dist*Re))
-       else
-         ustar = vel/(log(abs(ustar*dist*Re))/0.4_knd+5.2_knd)
-       end if
-      else
-       ustar = 0
-      end if
+      temperature_flux = - (1/(Re*Prandtl)) * tempdif / dist
 
     else
+       psi_m = 0
+       psi_h = 0
+       zL0 = -10000._knd
+    
+! if (debuglevel==1) print *, "ustar_n", ustar, "tflux_n", temperature_flux
 
-      Rib = -grav_acc*dist*tempdif/(temperature_ref*max(vel**2,1E-6_knd))
-      zL = 0
-      i = 0
-      if (Rib>0.34_knd) then
-                          ustar = 0
-                          temperature_flux = 0
-      else
-        do
-          i = i+1
-          zL0 = zL
-          zL = Rib*(log(dist/z0)-PsiM_MO(zl))**2/(log(dist/z0)-PsiH_MO(zl))
-          if  (abs(zL-zL0)/max(abs(zL),1.e-3_knd)<eps) exit
-          if (i>=50.or.zL>100) exit
-        end do
-
-        if (i>=50.or.zL>100) then
-          ustar = 0
-          temperature_flux = 0
-        else
-          ustar = vel*0.4_knd/(log(dist/z0)-PsiM_MO(zL))
-          temperature_flux = 0.4_knd*ustar*tempdif/(log(dist/z0)-PsiH_MO(zL))
-        end if
-      end if
+       i = 0
+       do
+         i = i+1
+         
+         !L does not contain the Karman constant!
+         zL =  - dist * grav_acc * temperature_flux / (temperature_ref * ustar**3)
+         
+         psi_m = PsiM_MO_mod(zL)
+         psi_h = PsiH_MO_mod(zL)
+         
+         ustar = vel * k_U / (log(dist/z0) - psi_m)
+         temperature_flux = - tempdif * ustar * k_T / (log(dist/z0) - psi_h)
+         
+         if  (i>1 .and. abs(zL-zL0)/max(abs(zL),1.e-4_knd)<eps) exit
+         if (i>=50.or.zL>10000) exit
+                 
+         zl0 = zL
+       end do
+! if (debuglevel==1) print *,i, "z/L",zL, &
+!   "RiB",grav_acc*tempdif/(vel**2 * dist), &
+!   "Rf", -(grav_acc/temperature_ref) * temperature_flux / (ustar**2 * vel / dist)
+       if (i>=50.or.zL>10000) then
+         ustar = sqrt(vel/(dist*Re))
+         temperature_flux = - (1/(Re*Prandtl)) * tempdif / dist
+       end if
     end if
   end subroutine WM_MO_DIRICHLET_ustar_tfl
 
@@ -1536,7 +1574,7 @@ contains
     integer :: i, j, k
     type(WMPointUVW), pointer :: pts(:)
 
-    if (enable_buoyancy.and.TempBtype(Bo)==DIRICHLET) then
+    if (enable_buoyancy.and.TempBtype(Bo)==MO_TEMPERATURE) then
       do i = 1, size(WMPoints)
         if (WMPoints(i)%zk==1) then
           WMPoints(i)%temperature_flux = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&
@@ -1604,7 +1642,7 @@ contains
     end if
     if (n>0) prgrad(3) = prgrad(3)/n
 
-    prgrad = prgrad + [prgradientx,prgradienty,0._knd]
+    prgrad = prgrad + [pr_gradient_x, pr_gradient_y, 0._knd]
 
   end subroutine WallPrGradient
 
@@ -1618,7 +1656,6 @@ contains
     real(knd) tdif
     real(knd) dist(3), vel(3), wallvel(3), prgrad(3)
     real(knd) visc
-
 
     !$omp parallel do private(i,xi,yj,zk,tdif, vel, wallvel, dist, prgrad, visc)
     do i = 1,size(WMPoints)
@@ -1645,16 +1682,16 @@ contains
       if (WMPoints(i)%z0>0) then
 
          if (enable_buoyancy .and. WMPoints(i)%prescribed_temperature) then
-
+if (xi==1.and.yj==1.and.zk==1) debuglevel =1
 #ifdef CUSTOM_SURFACE_TEMPERATURE
            WMPoints(i)%temperature = SurfaceTemperature(xPr(xi), yPr(yj), zPr(zk), time)
 #endif
-           tdif = WMPoints(i)%temperature - Temperature(xi,yj,zk)
+           tdif = Temperature(xi,yj,zk) - WMPoints(i)%temperature
 
            call WM_MO_DIRICHLET(visc, WMPoints(i)%ustar, &
                                 WMPoints(i)%temperature_flux, &
                                 WMPoints(i)%z0, tdif, dist, vel)
-
+debuglevel = 0
          else if (enable_buoyancy .and. WMPoints(i)%temperature_flux>0) then
 
            call WM_MO_FLUX(visc, WMPoints(i)%ustar, WMPoints(i)%temperature_flux, &
@@ -1695,9 +1732,6 @@ contains
     end do
     !$omp end parallel do
 
-    if (enable_buoyancy.and. TempBtype(Bo)==DIRICHLET) call Bound_temperature_flux(BsideTFLArr)
-
-
   end subroutine ComputeViscsWM
 
 
@@ -1710,8 +1744,6 @@ contains
     real(knd),dimension(1:,1:,1:),   intent(in) :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
 
-
-    if (enable_buoyancy.and. TempBtype(Bo)==DIRICHLET) call Bound_temperature_flux(BsideTFLArr)
 
     call fluxes(UxmWMpoints, 1, MINUSX, xU, yPr, zPr)
     call fluxes(UxpWMpoints, 1, PLUSX,  xU, yPr, zPr)
@@ -1747,7 +1779,7 @@ contains
       real(knd), parameter :: eps = 0.0001_knd
       
       drec = [1/dxmin, 1/dxmin, 1/dymin, 1/dymin, 1/dzmin, 1/dzmin]
-      
+
       !$omp parallel do private(point,xi,yj,zk,dist,vel,wallvel,tan_vect,p,mag)
       do point = 1,size(points)
 
@@ -1910,7 +1942,7 @@ contains
     if (any(WMPoints%zk == 1)) then
       res = 0
       n = 0
-      do j = 1,3
+      do j = 1,2
         do i = 1,6
           associate(p => WMPointsUVW(i,j))
             n = n +  count(p%points%zk == 1)
@@ -1927,6 +1959,40 @@ contains
       res = 0
     end if
   end function GroundUstarUVW
+
+
+  pure real(knd) function GroundTFlux()
+    if (any(WMPoints%zk == 1)) then
+      GroundTFlux = sum(WMPoints%temperature_flux, mask = (WMPoints%zk == 1)) / count(WMPoints%zk == 1)
+    else
+      GroundTFlux = 0
+    end if
+  end function GroundTFlux
+
+
+  real(knd) function GroundTFluxUVW() result(res)
+    integer :: i, j, n
+
+    if (any(WMPoints%zk == 1)) then
+      res = 0
+      n = 0
+      do j = 1,2
+        do i = 1,6
+          associate(p => WMPointsUVW(i,j))
+            n = n +  count(p%points%zk == 1)
+            res = res + sum(p%points%temperature_flux, mask = (p%points%zk == 1))
+          end associate
+        end do
+      end do
+      if (n>0) then
+        res = res / n
+      else
+        res = 0
+      end if
+    else
+      res = 0
+    end if
+  end function GroundTFluxUVW
 
 
 

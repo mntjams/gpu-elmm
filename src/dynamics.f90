@@ -70,33 +70,77 @@ contains
     Az = - coef / dzmin
 
     !$omp parallel
+    if (enable_pr_gradient_x_profile) then
+       !$omp do
+      do k = 1, Unz
+        do j = 1, Uny
+          do i = 1, Unx
+            U(i,j,k) = U(i,j,k) + A * pr_gradient_profile_x(k)
+          end do
+        end do
+      end do
+      !$omp end do
+    else if (enable_pr_gradient_x_uniform) then
+      !$omp do
+      do k = 1, Unz
+        do j = 1, Uny
+          do i = 1, Unx
+            U(i,j,k) = U(i,j,k) + A * pr_gradient_x
+          end do
+        end do
+      end do
+      !$omp end do
+    end if
+
+    if (enable_pr_gradient_y_profile) then
+      !$omp do
+      do k = 1, Vnz
+        do j = 1, Vny
+          do i = 1, Vnx
+            V(i,j,k) = V(i,j,k) + A * pr_gradient_profile_y(k)
+          end do
+        end do
+      end do
+      !$omp end do
+    else if (enable_pr_gradient_y_uniform) then
+      !$omp do
+      do k = 1, Vnz
+        do j = 1, Vny
+          do i = 1, Vnx
+            V(i,j,k) = V(i,j,k) + A * pr_gradient_y
+          end do
+        end do
+      end do
+      !$omp end do
+    end if
+
     !$omp do
     do k = 1, Unz
       do j = 1, Uny
         do i = 1, Unx
-          U(i,j,k) = U(i,j,k)+Ax * (Pr(i+1,j,k)-Pr(i,j,k)) + A * prgradientx
-        enddo
-      enddo
-    enddo
-    !$omp enddo nowait
+          U(i,j,k) = U(i,j,k) + Ax * (Pr(i+1,j,k)-Pr(i,j,k))
+        end do
+      end do
+    end do
+    !$omp end do nowait
     !$omp do
     do k = 1, Vnz
       do j = 1, Vny
         do i = 1, Vnx
-          V(i,j,k) = V(i,j,k)+Ay * (Pr(i,j+1,k)-Pr(i,j,k)) + A * prgradienty
-        enddo
-      enddo
-    enddo
-    !$omp enddo nowait
+          V(i,j,k) = V(i,j,k) + Ay * (Pr(i,j+1,k)-Pr(i,j,k))
+        end do
+      end do
+    end do
+    !$omp end do nowait
     !$omp do
     do k = 1, Wnz
       do j = 1, Wny
         do i = 1, Wnx
           W(i,j,k) = W(i,j,k) + Az * (Pr(i,j,k+1)-Pr(i,j,k))
-        enddo
-      enddo
-    enddo
-    !$omp enddo nowait
+        end do
+      end do
+    end do
+    !$omp end do nowait
     !$omp end parallel
   end subroutine PressureGrad
 
@@ -105,7 +149,7 @@ contains
   
   subroutine StressBoundaryFlux(U2, V2, dt)
     use ArrayUtilities,only: add
-    use Outputs,only: profuw,profvw, profuwsgs, profvwsgs
+    use Outputs,only: current_profiles
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U2, V2
     real(knd), intent(in) :: dt
     real(knd) :: flux
@@ -115,11 +159,11 @@ contains
       first = min(Prnz*5/6,Prnz-5)
       last = Prnz-5
       
-      flux = sum(profuw(first:last)) + sum(profuwsgs(first:last))
+      flux = sum(current_profiles%uw(first:last)) + sum(current_profiles%uwsgs(first:last))
       flux = flux / (last-first+1)
       call add(U2(:,:,Unz), -dt*flux/dzPr(Unz))
       
-      flux = sum(profvw(first:last)) + sum(profvwsgs(first:last))
+      flux = sum(current_profiles%vw(first:last)) + sum(current_profiles%vwsgs(first:last))
       flux = flux / (last-first+1)
       call add(V2(:,:,Vnz), -dt*flux/dzPr(Vnz))
     end if
@@ -153,27 +197,27 @@ contains
         do j = 1, Uny
           do i = 1, Unx
             U2(i,j,k) = Ustar(i,j,k) * rho(RK_stage) * dt
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
       !$omp end do nowait
       !$omp do
       do k = 1, Vnz
         do j = 1, Vny
           do i = 1, Vnx
             V2(i,j,k) = Vstar(i,j,k) * rho(RK_stage) * dt
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
       !$omp end do nowait
       !$omp do
       do k = 1, Wnz
         do j = 1, Wny
           do i = 1, Wnx
             W2(i,j,k) = Wstar(i,j,k) * rho(RK_stage) * dt
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
       !$omp end do
       !$omp end parallel
     else
@@ -183,27 +227,27 @@ contains
         do j = 1, Uny
           do i = 1, Unx
             Ustar(i,j,k) = 0
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
       !$omp end do nowait
       !$omp do
       do k = 1, Vnz
         do j = 1, Vny
           do i = 1, Vnx
             Vstar(i,j,k) = 0
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
       !$omp end do nowait
       !$omp do
       do k = 1, Wnz
         do j = 1, Wny
           do i = 1, Wnx
             Wstar(i,j,k) = 0
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
       !$omp end do nowait
 
       !$omp do
@@ -211,30 +255,30 @@ contains
         do j = 1, Uny
           do i = 1, Unx
             U2(i,j,k) = 0
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
       !$omp end do nowait
       !$omp do
       do k = 1, Vnz
         do j = 1, Vny
           do i = 1, Vnx
             V2(i,j,k) = 0
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
       !$omp end do nowait
       !$omp do
       do k = 1, Wnz
         do j = 1, Wny
           do i = 1, Wnx
             W2(i,j,k) = 0
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
       !$omp end do
       !$omp end parallel
-    endif
+    end if
 
     if (convmet>0) then
 
@@ -256,35 +300,35 @@ contains
         do j = 1, Uny
           do i = 1, Unx
             Ustar(i,j,k) = 0
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
       !$omp end do nowait
       !$omp do
       do k = 1, Vnz
         do j = 1, Vny
           do i = 1, Vnx
             Vstar(i,j,k) = 0
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
       !$omp end do nowait
       !$omp do
       do k = 1, Wnz
         do j = 1, Wny
           do i = 1, Wnx
             Wstar(i,j,k) = 0
-          enddo
-        enddo
-      enddo
+          end do
+        end do
+      end do
       !$omp end do
       !$omp end parallel
 
-    endif
+    end if
 
     call FilterUstar    
 
-    if (abs(coriolisparam)>tiny(1._knd)) call CoriolisForce(Ustar, Vstar, U, V)
+    if (abs(Coriolis_parameter)>tiny(1._knd)) call CoriolisForce(Ustar, Vstar, U, V)
 
     if (enable_buoyancy) call BuoyancyForce(Wstar, Temperature, Moisture)
 
@@ -301,27 +345,27 @@ contains
       do j = 1, Uny
         do i = 1, Unx
           U2(i,j,k) = U2(i,j,k)  +  Ustar(i,j,k) * beta(RK_stage) * dt
-        enddo
-      enddo
-    enddo
+        end do
+      end do
+    end do
     !$omp end do nowait
     !$omp do
     do k = 1, Vnz
       do j = 1, Vny
         do i = 1, Vnx
           V2(i,j,k) = V2(i,j,k)  +  Vstar(i,j,k) * beta(RK_stage) * dt
-        enddo
-      enddo
-    enddo
+        end do
+      end do
+    end do
     !$omp end do nowait
     !$omp do
     do k = 1, Wnz
       do j = 1, Wny
         do i = 1, Wnx
           W2(i,j,k) = W2(i,j,k)  +  Wstar(i,j,k) * beta(RK_stage) * dt
-        enddo
-      enddo
-    enddo
+        end do
+      end do
+    end do
     !$omp end do
     !$omp end parallel
 
@@ -385,9 +429,9 @@ contains
           
           m = max(m,p)
           if (ieee_is_nan(p)) nan = .true.
-        enddo
-      enddo
-    enddo
+        end do
+      end do
+    end do
     !$omp end parallel do
 
     if (nan) then
@@ -396,7 +440,7 @@ contains
       dt = min(CFL/m, min(dxmin,dymin,dzmin)/Uref)
     else
       dt = min(dxmin,dymin,dzmin) / Uref
-    endif
+    end if
 
     if (steady/=1 .and. dt+time>end_time)  dt = end_time-time
     
@@ -476,14 +520,14 @@ contains
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U2, V2
     integer :: i,j,k
 
-    if (coriolisparam>0) then
+    if (abs(Coriolis_parameter)>0) then
     !$omp parallel private(i,j,k)
     !$omp do
       do k = 1, Unz
         do j = 1, Uny
           do i = 1, Unx
             U2(i,j,k) = U2(i,j,k) + &
-                  coriolisparam*(V(i,j-1,k)+V(i+1,j-1,k)+V(i,j,k)+V(i+1,j,k))/4._knd
+                  Coriolis_parameter * (V(i,j-1,k)+V(i+1,j-1,k)+V(i,j,k)+V(i+1,j,k))/4._knd
           end do
         end do
       end do
@@ -494,7 +538,7 @@ contains
         do j = 1, Vny
           do i = 1, Vnx
             V2(i,j,k) = V2(i,j,k) - &
-                  coriolisparam*(U(i-1,j,k)+U(i-1,j+1,k)+U(i,j,k)+U(i,j+1,k))/4._knd
+                  Coriolis_parameter * (U(i-1,j,k)+U(i-1,j+1,k)+U(i,j,k)+U(i,j+1,k))/4._knd
           end do
         end do
       end do
@@ -508,7 +552,7 @@ contains
 
 
   subroutine SubgridStresses(U,V,W,Pr,Temperature)
-    use Subgrid, only: sgstype, SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma
+    use Subgrid, only: sgstype, SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma, SGS_Sigma_stability
     use ImmersedBoundary, only: ScalFlIBPoints, TIBPoint_Viscosity
     use Filters, only: filtertype, filter_ratios
     use Wallmodels
@@ -532,7 +576,7 @@ contains
     else if (sgstype==VremanModel) then
                       call SGS_Vreman(U,V,W,filter_ratios(filtertype))
     else if (sgstype==StabSubgridModel) then
-                      call SGS_StabSmag(U,V,W,Temperature,filter_ratios(filtertype))
+                      call SGS_Sigma_stability(U,V,W,filter_ratios(filtertype))
     else
       if (Re>0) then
         Viscosity = 1._knd/Re
@@ -698,7 +742,7 @@ contains
     end do
     !$omp end do
 #define comp 3
-#define wrk V2
+#define wrk W2
 #include "wmfluxes-inc.f90"
 #undef wrk
 #undef comp
