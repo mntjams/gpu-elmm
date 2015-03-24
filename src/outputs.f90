@@ -1014,10 +1014,7 @@ contains
       call StressProfiles(U,V,W)
     end if
 
-    if (enable_profiles .and. &
-         (averaging==1 .and. &
-         ( time>=timeavg1 .and. &
-         time<=timeavg2))) then
+    if (enable_profiles) then
 
       call FluxSGSProfiles(W,Temperature,Moisture,Scalar)
 
