@@ -384,13 +384,16 @@ contains
            do k = 1,Prnz
              if (k==1) then
                num = (grav_acc/temperature_ref) * (p%temp(2)-p%temp(1)) / (dzmin)
-               denom = hypot(p%u(2), p%v(2) ) / (2*dzmin)
+               denom = (p%u(2) / (2*dzmin))**2 + &
+                       (p%v(2) / (2*dzmin))**2
              else if (k==Prnz) then
                num = (grav_acc/temperature_ref) * (p%temp(k)-p%temp(k-1)) / (dzmin)
-               denom = hypot(p%u(k)-p%u(k-1), p%v(k)-p%v(k-1) ) / (dzmin)
+               denom = ((p%u(k)-p%u(k-1)) / (dzmin))**2 + &
+                       ((p%v(k)-p%v(k-1)) / (dzmin))**2
              else
                num = (grav_acc/temperature_ref) * (p%temp(k+1)-p%temp(k-1)) / (2*dzmin)
-               denom = hypot(p%u(k+1)-p%u(k-1), p%v(k+1)-p%v(k-1) ) / (2*dzmin)
+               denom = ((p%u(k+1)-p%u(k-1)) / (2*dzmin))**2 + &
+                       ((p%v(k+1)-p%v(k-1)) / (2*dzmin))**2
              end if
              
              if (abs(denom)>1E-5_knd*abs(num) .and. abs(denom)>epsilon(1._knd)) then
