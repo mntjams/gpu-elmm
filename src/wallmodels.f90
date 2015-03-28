@@ -908,8 +908,8 @@ contains
     real(knd),intent(in) :: vel,dist
     real(knd),parameter :: eps = 1e-4_knd
     real(knd),parameter :: zpl_lam = 5._knd, zpl_turb = 30._knd
-    real(knd) :: ustar2,ustar_lam
-    integer i
+    real(knd) :: ustar2, ustar_lam, z_pl
+    integer :: i
 
     ustar_lam = sqrt(vel/(dist*Re))
 
@@ -924,12 +924,17 @@ contains
         i = i+1
         ustar2 = ustar
 
-        if ((dist*ustar2*Re) <= zpl_lam) then
+        z_pl = dist*ustar2*Re
+
+        if (z_pl <= zpl_lam) then
+          !viscous sublayer
           ustar = sqrt(vel/(dist*Re))
-        else if ((dist*ustar2*Re) < zpl_turb) then
-          ustar = vel/(5*log(abs(ustar2*dist*Re))-3.05)
+        else if (z_pl < zpl_turb) then
+          !buffer layer
+          ustar = vel / (5*log(z_pl)-3.05)
         else
-          ustar = vel/(log(abs(ustar2*dist*Re))/0.4_knd+5.5_knd)
+          !logarithmic layer
+          ustar = vel / (log(z_pl)/0.4_knd + 5.5_knd)
         end if
 
         if  (abs(ustar-ustar2)/abs(ustar)<eps) exit
