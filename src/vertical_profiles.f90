@@ -99,10 +99,11 @@ contains
     class(InstantaneousProfiles), intent(inout) :: self
     type(Profiles), intent(in) :: profs
     real(tim), intent(in) :: time, dt
-    
-    if ( (time >= self%start) .and. (time <= self%end + self%interval) &
-      .and. (time >= self%start + (self%nth)*self%interval) ) then
-      
+
+    if ( (time-dt >= self%start + (self%nth-1)*self%interval) .and. &
+         (time <= self%start + (self%nth-1)*self%interval ) .and. &
+         (time <= self%end)) then
+
       self%profs = profs
       
       call self%Save
