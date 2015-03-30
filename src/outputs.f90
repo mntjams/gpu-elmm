@@ -14,6 +14,8 @@ module Outputs
   use SurfaceFrames
   use StaggeredFrames
   use Output_helpers
+  use VerticalProfiles
+  
 
   implicit none
  
@@ -21,27 +23,21 @@ module Outputs
   private
   public store, display, probes, scalar_probes,  &
          OutTStep, Output, AllocateOutputs, ReadProbes,  &
-          proftempfl, profmoistfl, profuw, profvw, profuwsgs, profvwsgs
-
-  real(knd), dimension(:), allocatable :: profuavg, profuavg2, profvavg, profvavg2, profuuavg, profvvavg, profwwavg, &
-                                          profU, profV, profuu, profvv, profww, &
-                                          profuusgs, profvvsgs, profwwsgs, proftkesgs, &
-                                          profuusgsavg, profvvsgsavg, profwwsgsavg, proftkesgsavg, &
-                                          proftemp, proftempfl, proftempavg, proftempavg2, proftempflavg, &
-                                          proftempflsgs, proftempflsgsavg, proftt, profttavg, profttsgsavg, &
-                                          profmoist, profmoistfl, profmoistavg, profmoistavg2, profmoistflavg, &
-                                          profmoistflsgs, profmoistflsgsavg, profmm, profmmavg, profmmsgsavg, &
-                                          profuw, profuwavg, profuwsgs, profuwsgsavg, &
-                                          profvw, profvwavg, profvwsgs, profvwsgsavg
-
-  real(knd), dimension(:,:), allocatable :: profscal, profscalfl, profscalavg, profscalavg2, profscalflavg, &  !which scalar, height
-                                            profscalflsgs, profscalflsgsavg, profss, profssavg, profsssgsavg
-                                         
-  real(knd), dimension(:), allocatable :: n_all_Pr, n_free_Pr, n_free_U, n_free_V, n_free_W, &
-                                          n_free_PrW, n_free_UW, n_free_VW, n_free_UW_sgs, n_free_VW_sgs
-                                          
-  real(knd) :: n_free_PrW_surf
-
+         current_profiles, profiles_config, enable_profiles
+         
+  type ProfileSwitches
+    real(knd) :: average_start = 0, average_end = -1
+    real(knd) :: instant_start = 0, instant_end = -1, instant_interval = huge(1)
+    real(knd) :: running_start = 0, running_end = -1, running_interval = huge(1)
+  end type
+  
+  type(ProfileSwitches) :: profiles_config
+  logical :: enable_profiles = .false.
+  
+  type(Profiles) :: current_profiles
+  type(TimeAveragedProfiles), allocatable :: average_profiles
+  type(InstantaneousProfiles), allocatable :: instant_profiles
+  type(TimeAveragedProfiles), allocatable :: running_average_profiles(:)
 
   real(knd),allocatable :: U_avg(:,:,:),V_avg(:,:,:),W_avg(:,:,:) !<u>
   real(knd),allocatable :: UU_prime(:,:,:),VV_prime(:,:,:),WW_prime(:,:,:) !<uu>, <u'u'> must be computed before saving
@@ -428,7 +424,7 @@ contains
      ustar = huge(1.0)
    end if
 
-   if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
+   if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
      allocate(tstar(2,1:time_series_max_length))
      tstar = huge(1.0)
    end if
@@ -445,89 +441,47 @@ contains
     end if
    end if
 
-   if (store%BLprofiles==1.and.averaging==1) then
-     allocate(profU(0:Unz+1), profV(0:Vnz+1), profUavg(0:Unz+1), profVavg(0:Vnz+1), profUavg2(0:Unz+1), profVavg2(0:Vnz+1))
-     allocate(profuuavg(1:Unz), profvvavg(1:Vnz), profwwavg(0:Prnz), profuu(1:Unz), profvv(1:Vnz), profww(0:Prnz))
-     allocate(profuusgsavg(1:Unz), profvvsgsavg(1:Vnz), profwwsgsavg(0:Prnz), profuusgs(1:Unz), profvvsgs(1:Vnz), profwwsgs(0:Prnz))
-     allocate(profuw(0:Prnz), profuwavg(0:Prnz), profuwsgs(0:Prnz), profuwsgsavg(0:Prnz))
-     allocate(profvw(0:Prnz), profvwavg(0:Prnz), profvwsgs(0:Prnz), profvwsgsavg(0:Prnz))
-     allocate(proftkesgs(1:Prnz), proftkesgsavg(1:Prnz))
+   if (enable_profiles) then
 
-     allocate(proftemp(1:Prnz), proftempfl(0:Prnz), proftempavg(1:Prnz), proftempavg2(1:Prnz), proftempflavg(0:Prnz))
-     allocate(proftempflsgs(0:Prnz), proftempflsgsavg(0:Prnz), proftt(1:Prnz), profttavg(1:Prnz), profttsgsavg(1:Prnz))
-
-     allocate(profmoist(1:Prnz), profmoistfl(0:Prnz), profmoistavg(1:Prnz), profmoistavg2(1:Prnz), profmoistflavg(0:Prnz))
-     allocate(profmoistflsgs(0:Prnz), profmoistflsgsavg(0:Prnz), profmm(1:Prnz), profmmavg(1:Prnz), profmmsgsavg(1:Prnz))
-
-     allocate(profscal(num_of_scalars,1:Prnz), profscalfl(num_of_scalars,0:Prnz), profscalavg(num_of_scalars,1:Prnz))
-     allocate(profscalavg2(num_of_scalars,1:Prnz), profscalflavg(num_of_scalars,0:Prnz))
-     allocate(profscalflsgs(num_of_scalars,0:Prnz), profscalflsgsavg(num_of_scalars,0:Prnz))
-     allocate(profss(num_of_scalars,1:Prnz), profssavg(num_of_scalars,1:Prnz), profsssgsavg(num_of_scalars,1:Prnz))
-
-     profU = 0
-     profV = 0
-     profUavg = 0
-     profVavg = 0
-     profUavg2 = 0
-     profVavg2 = 0
-     profuu = 0
-     profvv = 0
-     profww = 0
-     profuuavg = 0
-     profvvavg = 0
-     profwwavg = 0
-     profuusgs = 0
-     profvvsgs = 0
-     profwwsgs = 0
-     profuusgsavg = 0
-     profvvsgsavg = 0
-     profwwsgsavg = 0
-     proftkesgs = 0
-     proftkesgsavg = 0
-     profuw = 0
-     profvw = 0
-     profuwavg = 0
-     profvwavg = 0
-     profuwsgs = 0
-     profvwsgs = 0
-     profuwsgsavg = 0
-     profvwsgsavg = 0
-
-     proftemp = 0
-     proftempavg = 0
-     proftempavg2 = 0
-     proftempfl = 0
-     proftempflavg = 0
-     proftempflsgs = 0
-     proftempflsgsavg = 0
-     proftt = 0
-     profttavg = 0
-     profttsgsavg = 0
-
-     profmoist = 0
-     profmoistavg = 0
-     profmoistavg2 = 0
-     profmoistfl = 0
-     profmoistflavg = 0
-     profmoistflsgs = 0
-     profmoistflsgsavg = 0
-     profmm = 0
-     profmmavg = 0
-     profmmsgsavg = 0
-
-     if (num_of_scalars>0) then
-       profscal = 0
-       profscalavg = 0
-       profscalavg2 = 0
-       profscalfl = 0
-       profscalflavg = 0
-       profscalflsgs = 0
-       profscalflsgsavg = 0
-       profss = 0
-       profssavg = 0
-       profsssgsavg = 0
-     end if
+     call current_profiles%allocate
      
+     profiles_config%average_end = min(profiles_config%average_end, end_time)
+     profiles_config%running_end = min(profiles_config%running_end, end_time)
+     profiles_config%instant_end = min(profiles_config%instant_end, end_time)
+     
+     profiles_config%average_start = max(profiles_config%average_start, start_time)
+     profiles_config%running_start = max(profiles_config%running_start, start_time)
+     profiles_config%instant_start = max(profiles_config%instant_start, start_time)
+     
+     if (profiles_config%average_end > profiles_config%average_start) then
+       average_profiles = TimeAveragedProfiles(profiles_config%average_start, &
+                                               profiles_config%average_end, &
+                                               "average_profiles/")
+     end if
+   
+     if (profiles_config%running_end > profiles_config%running_start .and. &
+         profiles_config%running_interval > 0) then
+         
+       allocate(running_average_profiles( &
+                  ceiling( (profiles_config%running_end - profiles_config%running_start) / &
+                           profiles_config%running_interval)))
+       do k = 1, size(running_average_profiles)
+          running_average_profiles(k) = &
+            TimeAveragedProfiles(profiles_config%running_start + (k-1)*profiles_config%running_interval, &
+                                 profiles_config%running_start + k*profiles_config%running_interval, &
+                                 "average_profiles-"//itoa(k)//"/")
+       end do
+       
+     end if
+   
+     if (profiles_config%instant_end > profiles_config%instant_start) then
+       instant_profiles = &
+         InstantaneousProfiles(profiles_config%instant_start, &
+                               profiles_config%instant_end, &
+                               profiles_config%instant_interval, &
+                               "instant_profiles/")
+     end if
+   
      allocate(n_free_U(0:Unz+1))
      allocate(n_free_V(0:Vnz+1))
      allocate(n_free_W(0:Wnz+1))
@@ -575,12 +529,12 @@ contains
 #ifdef MPI
      if (kim==1) then
 #endif
-     n_free_PrW_surf = 0
-     do k = 1, size(WMPoints)
-      if (WMPoints(k)%zk==1.and.Prtype(WMPoints(k)%xi,WMPoints(k)%yj,1)<=0) then
-        n_free_PrW_surf = n_free_PrW_surf + 1
-      end if
-     end do
+       n_free_PrW_surf = 0
+       do k = 1, size(WMPoints)
+        if (WMPoints(k)%zk==1.and.Prtype(WMPoints(k)%xi,WMPoints(k)%yj,1)<=0) then
+          n_free_PrW_surf = n_free_PrW_surf + 1
+        end if
+       end do
 #ifdef MPI
      endif
      
@@ -600,22 +554,22 @@ contains
    else
    
      if (Btype(To)==AUTOMATICFLUX) then
-       allocate(profuw(0:Prnz), profuwsgs(0:Prnz))
-       allocate(profvw(0:Prnz), profvwsgs(0:Prnz))
+       allocate(current_profiles%uw(0:Prnz), current_profiles%uwsgs(0:Prnz))
+       allocate(current_profiles%vw(0:Prnz), current_profiles%vwsgs(0:Prnz))
      end if
      
      if (TempBtype(To)==AUTOMATICFLUX) then
-       allocate(proftempfl(0:Prnz), proftempflsgs(0:Prnz))
+       allocate(current_profiles%tempfl(0:Prnz), current_profiles%tempflsgs(0:Prnz))
      else
        !to avoid the necessity of an allocatable dummy argument
-       allocate(proftempfl(0))
+       allocate(current_profiles%tempfl(0))
      end if
 
      if (MoistBtype(To)==AUTOMATICFLUX) then
-       allocate(profmoistfl(0:Prnz), profmoistflsgs(0:Prnz))
+       allocate(current_profiles%moistfl(0:Prnz), current_profiles%moistflsgs(0:Prnz))
      else
        !to avoid the necessity of an allocatable dummy argument
-       allocate(profmoistfl(0))
+       allocate(current_profiles%moistfl(0))
      end if
 
    end if
@@ -742,7 +696,7 @@ contains
 
     ! We compute the subgrid stresses from the eddy viscosity even at the walls
     ! We should not set also TDiff
-    if (wallmodeltype>0.and.(store%probes_fluxes==1.or.store%BLprofiles==1)) then
+    if (wallmodeltype>0.and.(store%probes_fluxes==1.or.enable_profiles)) then
       call ComputeViscsWM(U,V,W,Pr,Temperature)
     end if
 
@@ -1034,7 +988,7 @@ contains
     end if
 
 
-    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.(display%tstar==1.or.store%tstar==1)) then
+    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
      S2 = GroundTFlux()
      S = - S2 /  ground_ustar_Pr
 
@@ -1055,15 +1009,12 @@ contains
 
     end if
 
-    if ((store%BLprofiles==1 .and. &
-         (averaging==1 .and. &
-         ( time>=timeavg1 .and. &
-         time<=timeavg2))) .or. &
+    if ((enable_profiles) .or. &
        Btype(To)==AUTOMATICFLUX) then
       call StressProfiles(U,V,W)
     end if
 
-    if (store%BLprofiles==1 .and. &
+    if (enable_profiles .and. &
          (averaging==1 .and. &
          ( time>=timeavg1 .and. &
          time<=timeavg2))) then
@@ -1085,47 +1036,19 @@ contains
 
     end if
 
-    if (store%BLprofiles==1) then
-      if ((averaging==1).and.((time>=timeavg1).and.(time<=timeavg2))) then
+    if (enable_profiles) then
+      call BLProfiles(U,V,W,Temperature,Moisture,Scalar)
+      
+      if (allocated(average_profiles)) call average_profiles%TimeStep(current_profiles, time, dt)
 
-       call BLProfiles(U,V,W,Temperature,Moisture,Scalar)
-
-       profuavg = profuavg + profu * time_weight
-       profvavg = profvavg + profv * time_weight
-       profuwavg = profuwavg + profuw * time_weight
-       profuwsgsavg = profuwsgsavg + profuwsgs * time_weight
-       profvwavg = profvwavg + profvw * time_weight
-       profvwsgsavg = profvwsgsavg + profvwsgs * time_weight
-       profuuavg = profuuavg + profuu * time_weight
-       profvvavg = profvvavg + profvv * time_weight
-       profwwavg = profwwavg + profww * time_weight
-       profuusgsavg = profuusgsavg + profuusgs * time_weight
-       profvvsgsavg = profvvsgsavg + profvvsgs * time_weight
-       profwwsgsavg = profwwsgsavg + profwwsgs * time_weight
-       proftkesgsavg = proftkesgsavg + proftkesgs * time_weight
-
-       if (enable_buoyancy) then
-         proftempavg = proftempavg + proftemp * time_weight
-         proftempflavg = proftempflavg + proftempfl * time_weight
-         proftempflsgsavg = proftempflsgsavg + proftempflsgs * time_weight
-         profttavg = profttavg + proftt * time_weight
-       end if
-
-       if (enable_buoyancy) then
-         profmoistavg = profmoistavg + profmoist * time_weight
-         profmoistflavg = profmoistflavg + profmoistfl * time_weight
-         profmoistflsgsavg = profmoistflsgsavg + profmoistflsgs * time_weight
-         profmmavg = profmmavg + profmm * time_weight
-       end if
-
-       if (num_of_scalars>0) then
-         profscalavg = profscalavg + profscal * time_weight
-         profscalflavg = profscalflavg + profscalfl * time_weight
-         profscalflsgsavg = profscalflsgsavg + profscalflsgs * time_weight
-         profssavg = profssavg + profss * time_weight
-       end if
-     end if
-  end if
+      if (allocated(instant_profiles)) call instant_profiles%TimeStep(current_profiles, time, dt)
+      
+      if (allocated(running_average_profiles)) then
+        do i = 1, size(running_average_profiles)
+          call running_average_profiles(i)%TimeStep(current_profiles, time, dt)
+        end do
+      end if
+    end if
 
 
     call SaveVTKFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
@@ -1366,262 +1289,22 @@ contains
 #ifdef MPI
     use custom_mpi, only: iim, jim, kim
 #endif
-    real(knd) :: S, S2, nom, denom
-    integer :: i, j, k, unit, flux_start
+    integer :: i
 
-    call newunit(unit)
 
-    if (store%BLprofiles==1.and.averaging==1) then
+    if (enable_profiles) then
 
-      call ReduceProfile(profuavg, n_free_U)
-      call ReduceProfile(profvavg, n_free_V)
-      call ReduceProfile(profuuavg, n_free_U(1:Unz))
-      call ReduceProfile(profvvavg, n_free_V(1:Vnz))
-      call ReduceProfile(profwwavg, n_free_W(0:Prnz))
-      call ReduceProfile(profuusgsavg, n_free_U(1:Unz))
-      call ReduceProfile(profvvsgsavg, n_free_V(1:Vnz))
-      call ReduceProfile(profwwsgsavg, n_free_W(0:Prnz))
-      call ReduceProfile(proftkesgsavg, n_free_Pr(1:Prnz))
-      call ReduceProfile(profuwavg, n_free_UW)
-      call ReduceProfile(profvwavg, n_free_VW)
-      call ReduceProfile(profuwsgsavg, n_free_UW_sgs)
-      call ReduceProfile(profvwsgsavg, n_free_VW_sgs)
+      if (allocated(average_profiles)) call average_profiles%ForceSave
       
-      if (enable_buoyancy) then
-        call ReduceProfile(proftempavg, n_free_Pr(1:Prnz))
-        call ReduceProfile(proftempflavg, n_all_Pr(0:Prnz))
-        call ReduceProfile(proftempflsgsavg, [n_free_PrW_surf, n_free_PrW(1:Prnz)])
-        call ReduceProfile(profttavg, n_free_Pr(1:Prnz))
-        call ReduceProfile(profttsgsavg, n_free_Pr(1:Prnz))
+      if (allocated(running_average_profiles)) then
+        do i = 1, size(running_average_profiles)
+          call running_average_profiles(i)%ForceSave
+        end do
       end if
-      
-      if (enable_moisture) then
-        call ReduceProfile(profmoistavg, n_free_Pr(1:Prnz))
-        call ReduceProfile(profmoistflavg, n_all_Pr(0:Prnz))
-        call ReduceProfile(profmoistflsgsavg, n_free_PrW(0:Prnz))
-        call ReduceProfile(profmmavg, n_free_Pr(1:Prnz))
-        call ReduceProfile(profmmsgsavg, n_free_Pr(1:Prnz))
-      end if
-        
-      do i = 1, num_of_scalars
-        call ReduceProfile(profscalavg(i,:), n_free_Pr(1:Prnz))
-        call ReduceProfile(profscalflavg(i,:), n_all_Pr(0:Prnz))
-        call ReduceProfile(profscalflsgsavg(i,:), n_free_PrW(0:Prnz))
-        call ReduceProfile(profssavg(i,:), n_free_Pr(1:Prnz))
-        call ReduceProfile(profsssgsavg(i,:), n_free_Pr(1:Prnz))
-      end do
-        
-#ifdef MPI
-      if (iim==1.and.jim==1) then
-        if (kim == 1) then
-          flux_start = 0
-        else
-          flux_start = 1
-        end if
-#else
-        flux_start = 0 
-#endif
 
-        profuuavg = profuuavg - profuavg(1:Unz)**2
-        profvvavg = profvvavg - profvavg(1:Vnz)**2
-        
-        profuusgsavg = profuusgsavg + 2 * proftkesgsavg / 3
-        profvvsgsavg = profvvsgsavg + 2 * proftkesgsavg / 3
-        profwwsgsavg(1:Prnz-1) = profwwsgsavg(1:Prnz-1) + 2 * ((proftkesgsavg(1:Prnz-1)+proftkesgsavg(2:Prnz))/2) / 3
-
-        open(unit,file=output_dir//"profu.txt")
-        do k = 1,Unz !Unz == Vnz
-         write(unit,*) zPr(k), profuavg(k), profvavg(k)
-        end do
-        close(unit)
-
-        open(unit,file=output_dir//"profuu.txt")
-        do k = 1,Unz
-         write(unit,*) zPr(k), profuuavg(k), profuusgsavg(k)
-        end do
-        close(unit)
-
-        open(unit,file=output_dir//"profvv.txt")
-        do k = 1,Vnz
-         write(unit,*) zPr(k), profvvavg(k), profvvsgsavg(k)
-        end do
-        close(unit)
-
-        open(unit,file=output_dir//"profww.txt")
-        do k = 1,Wnz
-         write(unit,*) zW(k), profwwavg(k), profwwsgsavg(k)
-        end do
-        close(unit)
-
-        open(unit,file=output_dir//"proftke.txt")
-        do k = 1,Prnz
-         write(unit,*) zPr(k), (profuuavg(k)+profvvavg(k)+(profwwavg(k-1)+profwwavg(k))/2) / 2, &
-                               proftkesgsavg(k)
-        end do
-        close(unit)
-
-        open(unit,file=output_dir//"profuw.txt")
-        do k = flux_start,Prnz
-         write(unit,*) zW(k), profuwavg(k), profuwsgsavg(k)
-        end do
-        close(unit)
-
-        open(unit,file=output_dir//"profvw.txt")
-        do k = flux_start,Prnz
-         write(unit,*) zW(k), profvwavg(k), profvwsgsavg(k)
-        end do
-        close(unit)
-
-        if (enable_buoyancy) then
-
-           open(unit,file=output_dir//"proftemp.txt")
-           do k = 1,Prnz
-            write(unit,*) zPr(k), proftempavg(k)
-           end do
-           close(unit)
-
-           open(unit,file=output_dir//"proftempfl.txt")
-           do k = flux_start,Prnz
-            write(unit,*) zW(k), proftempflavg(k), proftempflsgsavg(k)
-           end do
-           close(unit)
-
-           profttavg = profttavg - proftempavg**2
-           !Niewstadt, Mason, Moeng, Schumann, 1993 - LES of CBL: A Comparison of Four Computer Codes 
-           profttsgsavg(1:Prnz) = ((proftempflsgsavg(0:Prnz-1)+proftempflsgsavg(1:Prnz))/2)**2 / &
-                                    (0.67_knd**4 * (proftkesgsavg(1:Prnz)))
-     
-           open(unit,file=output_dir//"proftt.txt")
-           do k = 1,Prnz
-            write(unit,*) zPr(k), profttavg(k), profttsgsavg(k)
-           end do
-           close(unit)
-
-           if (allocated(U_avg).and.allocated(V_avg).and.allocated(Temperature_avg)) then
-             open(unit,file=output_dir//"profRig.txt")
-             do k = 1,Prnz
-              S = 0
-              do j = 1,Prny
-               do i = 1,Prnx
-                S = S + Rig(i,j,k,U_avg,V_avg,Temperature_avg)
-               end do
-              end do
-              S = S / (Prnx*Prny)
-              write(unit,*) zPr(k),S
-             end do
-             close(unit)
-
-             open(unit,file=output_dir//"profRf.txt")
-             do k = 1,Prnz
-              S = 0
-              S2 = 0
-              do j = 1,Prny
-               do i = 1,Prnx
-                S = S + (U_avg(i,j,k+1)+U_avg(i-1,j,k+1)-U_avg(i,j,k-1)-U_avg(i-1,j,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
-                S2 = S2+(V_avg(i,j,k+1)+V_avg(i,j-1,k+1)-V_avg(i,j,k-1)-V_avg(i,j-1,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
-               end do
-              end do
-
-              S = S / (Prnx*Prny)
-              S2 = S2/(Prnx*Prny)
-              nom=(grav_acc/temperature_ref)*(proftempflavg(k)+proftempflsgsavg(k))
-              denom=((profuwavg(k)+profuwsgsavg(k))*S + (profvwavg(k)+profvwsgsavg(k))*S2)
-
-              if (abs(denom)>1E-5_knd*abs(nom).and.abs(nom)>epsilon(1._knd)) then
-                S = nom/denom
-              else
-                S = 100000._knd*sign(1.0_knd,nom)*sign(1.0_knd,denom)
-              end if
-
-              write(unit,*) zPr(k),S
-             end do
-             close(unit)
-           end if !allocated avgs
-
-        end if !enable_buoyancy == 1
-
-
-        if (enable_moisture) then
-
-           open(unit,file=output_dir//"profmoist.txt")
-           do k = 1,Prnz
-            write(unit,*) zPr(k), profmoistavg(k)
-           end do
-           close(unit)
-
-           open(unit,file=output_dir//"profmoistfl.txt")
-           do k = flux_start,Prnz
-            write(unit,*) zW(k), profmoistflavg(k), profmoistflsgsavg(k)
-           end do
-           close(unit)
-
-           profmmavg = profmmavg - profmoistavg**2
-           !see profttsgsavg above
-           profmmsgsavg = ((profmoistflsgsavg(0:Prnz-1)+profmoistflsgsavg(1:Prnz))/2)**2 / &
-                          (0.67_knd**4 * (proftkesgsavg(1:Prnz)))
-     
-           open(unit,file=output_dir//"profmm.txt")
-           do k = 1,Prnz
-            write(unit,*) zPr(k), profmmavg(k), profmmsgsavg(k)
-           end do
-           close(unit)
-
-        end if !enable_moisture == 1
-
-
-        if (num_of_scalars>0) then
-
-           open(unit,file=output_dir//"profscal.txt")
-           do k = 1,Prnz
-            write(unit,*) zPr(k), (profscalavg(i,k), i = 1,num_of_scalars)
-           end do
-           close(unit)
-
-           open(unit,file=output_dir//"profscalfl.txt")
-           do k = flux_start,Prnz
-            write(unit,*) zW(k), (profscalflavg(i,k), profscalflsgsavg(i,k), i = 1,num_of_scalars)
-           end do
-           close(unit)
-
-           profssavg = profssavg - profscalavg**2
-           !see profttsgsavg above
-           do i = 1, num_of_scalars
-             profsssgsavg(i,:) = ((profscalflavg(i,0:Prnz-1)+profscalflavg(i,1:Prnz))/2)**2 / &
-                                 (0.67_knd**4 * (proftkesgsavg(1:Prnz)))
-           end do
-           
-           open(unit,file=output_dir//"profss.txt")
-           do k = 1,Prnz
-            write(unit,*) zPr(k), (profssavg(i,k), profsssgsavg(i,k), i = 1,num_of_scalars)
-           end do
-           close(unit)
-
-        end if !num_of_scalars>0
-       
-#ifdef MPI
-      end if
-#endif
-
-    end if !store%BLprofiles
+    end if
 
   end subroutine OutputProfiles
-
-  
-  
-  subroutine ReduceProfile(prof, n_free)
-#ifdef MPI
-    use custom_mpi
-#endif
-    real(knd), intent(inout) :: prof(:)
-    real(knd), intent(in)    :: n_free(:)
-  
-#ifdef MPI
-    call sum_to_master_horizontal(prof)
-    if (iim==1.and.jim==1) prof = prof / n_free
-#else
-    prof = prof / n_free
-#endif
-  end subroutine
   
   
 
@@ -2587,11 +2270,11 @@ contains
       
       call OutputScalarStats(Scalar_avg,Scalar_max,Scalar_intermitency)
 
-      call OutputProfiles
-
       call OutputAvgFluxes
 
     end if
+
+    call OutputProfiles
 
     call FinalizeVTKFrames
 
@@ -2631,7 +2314,7 @@ contains
          end if
        end do
       end do
-      proftkesgs(k) = S
+      current_profiles%tkesgs(k) = S
     end do
     !$omp end do nowait
 
@@ -2645,7 +2328,7 @@ contains
          end if
        end do
       end do
-      profuw(k) = S
+      current_profiles%uw(k) = S
     end do
     !$omp end do nowait
 
@@ -2659,7 +2342,7 @@ contains
          end if
        end do
       end do
-      profvw(k) = S
+      current_profiles%vw(k) = S
     end do
     !$omp end do nowait
 
@@ -2673,7 +2356,7 @@ contains
          end if
        end do
       end do
-      profuwsgs(k) = S
+      current_profiles%uwsgs(k) = S
     end do
     !$omp end do nowait
 
@@ -2687,7 +2370,7 @@ contains
          end if
        end do
       end do
-      profuusgs(k) = S
+      current_profiles%uusgs(k) = S
     end do
     !$omp end do nowait
 
@@ -2701,7 +2384,7 @@ contains
          end if
        end do
       end do
-      profvvsgs(k) = S
+      current_profiles%vvsgs(k) = S
     end do
     !$omp end do nowait
 
@@ -2715,7 +2398,7 @@ contains
          end if
        end do
       end do
-      profwwsgs(k) = S
+      current_profiles%wwsgs(k) = S
     end do
     !$omp end do nowait
     !$omp end parallel
@@ -2745,7 +2428,7 @@ contains
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
     real(knd) :: S
     integer   :: i,j,k
-    !proftempfl is computed directly during advection step
+    !current_profiles%tempfl is computed directly during advection step
 
     !$omp parallel do private(i,j,k,S)
     do k = 1,Prnz
@@ -2757,7 +2440,7 @@ contains
          end if
        end do
       end do
-      proftempflsgs(k) = S
+      current_profiles%tempflsgs(k) = S
     end do
     !$omp end parallel do
     
@@ -2772,7 +2455,7 @@ contains
       end if
     end do
     !$omp end parallel do
-    proftempflsgs(0) = S
+    current_profiles%tempflsgs(0) = S
 #ifdef MPI
     endif
 #endif    
@@ -2784,7 +2467,7 @@ contains
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Moisture
     real(knd) :: S
     integer   :: i,j,k
-    !profmoistfl is computed directly during advection step
+    !current_profiles%moistfl is computed directly during advection step
 
     !$omp parallel do private(i,j,k,S)
     do k = 0,Prnz
@@ -2796,7 +2479,7 @@ contains
          end if
        end do
       end do
-      profmoistflsgs(k) = S
+      current_profiles%moistflsgs(k) = S
     end do
     !$omp end parallel do
   end subroutine
@@ -2819,7 +2502,7 @@ contains
            end if
          end do
         end do
-        profscalfl(l,k) = S
+        current_profiles%scalfl(l,k) = S
       end do
       !$omp end do nowait
       !$omp do
@@ -2832,7 +2515,7 @@ contains
            end if
          end do
         end do
-        profscalflsgs(l,k) = S
+        current_profiles%scalflsgs(l,k) = S
       end do
       !$omp end do
     end do
@@ -2861,7 +2544,7 @@ contains
          end if
        end do
       end do
-      profU(k) = S
+      current_profiles%u(k) = S
     end do
     !$omp end do nowait
 
@@ -2875,7 +2558,7 @@ contains
          end if
        end do
       end do
-      profV(k) = S
+      current_profiles%v(k) = S
     end do
     !$omp end do nowait
 
@@ -2890,7 +2573,7 @@ contains
            end if
          end do
         end do
-        proftemp(k) = S
+        current_profiles%temp(k) = S
       end do
       !$omp end do
     end if
@@ -2906,7 +2589,7 @@ contains
            end if
          end do
         end do
-        profmoist(k) = S
+        current_profiles%moist(k) = S
       end do
       !$omp end do
     end if
@@ -2923,7 +2606,7 @@ contains
              end if
            end do
           end do
-          profscal(l,k) = S
+          current_profiles%scal(l,k) = S
         end do
         !$omp end do
       end do
@@ -2939,7 +2622,7 @@ contains
          end if
        end do
       end do
-      profuu(k) = S
+      current_profiles%uu(k) = S
     end do
     !$omp end do nowait
 
@@ -2953,7 +2636,7 @@ contains
          end if
        end do
       end do
-      profvv(k) = S
+      current_profiles%vv(k) = S
     end do
     !$omp end do nowait
 
@@ -2967,7 +2650,7 @@ contains
          end if
        end do
       end do
-      profww(k) = S
+      current_profiles%ww(k) = S
     end do
     !$omp end do
 
@@ -2982,7 +2665,7 @@ contains
            end if
          end do
         end do
-        proftt(k) = S
+        current_profiles%tt(k) = S
       end do
       !$omp end do
     end if ! size(Temperature)
@@ -2999,7 +2682,7 @@ contains
            end if
          end do
         end do
-        profmm(k) = S
+        current_profiles%mm(k) = S
       end do
       !$omp end do nowait
 
@@ -3018,7 +2701,7 @@ contains
            end if
          end do
         end do
-        profss(l,k) = S
+        current_profiles%ss(l,k) = S
       end do
       !$omp end do
     end do

@@ -84,3 +84,33 @@ contains
   end function Vorticity
 
 end module
+
+
+
+module Directories
+  use Parameters, only: output_dir
+  
+  implicit none
+  
+contains
+  
+  subroutine create_directory(dir)
+    character(*), intent(in) :: dir
+    integer :: k, io, u
+    
+#if defined(_WIN32) || defined(_WIN64)
+   call system("mkdir "//dir)
+#else
+   do k = 1, 1000
+     call system("mkdir -p "//dir)
+     open(newunit=u, file=dir//"test", status="replace", iostat=io)
+     if (io==0) then
+       close(u, status="delete")
+       exit
+     end if
+     call sleep(1)
+   end do
+#endif
+  end subroutine
+end module
+

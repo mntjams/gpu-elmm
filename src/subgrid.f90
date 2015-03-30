@@ -6,7 +6,7 @@ module Subgrid
   implicit none
 
   private
-  public :: SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma, sgstype
+  public :: SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma, SGS_Sigma_stability, sgstype
 
   real(knd),parameter :: CSmag = 0.1_knd
 
@@ -407,5 +407,174 @@ module Subgrid
       end function det3x3
 
     end subroutine SGS_Sigma
+    
+    
+    
+    
+    subroutine SGS_Sigma_stability(U,V,W,filter_ratio)
+      !from Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
+      use Tiling, only: tilenx, tileny, tilenz
+      use Outputs, only: enable_profiles, current_profiles
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(in) :: filter_ratio
+      real(knd), parameter :: Csig = 1.35_knd
+      integer, parameter   :: narr = 4
+      integer   :: i,j,k,bi,bj,bk
+      real(knd) :: width, C, Pr_sgs, D, g(3,3), s1, s2, s3
+      integer, parameter :: sigma_knd = knd
+      
+      logical :: enable_stability_correction
+      enable_stability_correction = enable_buoyancy .and. enable_profiles
+      
+
+      width = filter_ratio * (dxmin*dymin*dzmin)**(1._knd/3._knd)
+
+      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk,C) schedule(runtime)
+      ! !collapse(3)
+      do bk = 1, Prnz, tilenz(narr)
+       do bj = 1, Prny, tileny(narr)
+        do bi = 1, Prnx, tilenx(narr)
+         do k = bk, min(bk+tilenz(narr)-1,Prnz)
+         
+          if (enable_stability_correction) then
+            call stability_correction_L_MO(k, width, C, Pr_sgs)
+            C = (C * Csig * width)**2
+          else
+            C = (Csig*width)**2
+          end if
+            
+          do j = bj, min(bj+tileny(narr)-1,Prny)
+           do i = bi ,min(bi+tilenx(narr)-1,Prnx)
+
+            call GradientTensorUG(g,i,j,k)
+
+            call Sigmas(s1,s2,s3,g)
+
+            if (s1>0) then
+              D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
+            else
+              D = 0
+            end if
+
+            Viscosity(i,j,k) = C * D
+
+            if (Re>0)  then
+              TDiff(i,j,k) = Viscosity(i,j,k) / Pr_sgs + 1 / (Re*Prandtl)
+              Viscosity(i,j,k) = Viscosity(i,j,k) + 1 / Re
+            else
+              TDiff(i,j,k) = Viscosity(i,j,k) / Pr_sgs
+            end if
+           end do
+          end do
+         end do
+        end do
+       end do
+      end do
+      !$omp end parallel do
+
+    contains
+
+      pure subroutine GradientTensorUG(g,i,j,k)
+        real(knd),intent(out) :: g(3,3)
+        integer,intent(in) :: i,j,k
+
+        g(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
+        g(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) / (4._knd*dymin)
+        g(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) / (4._knd*dzmin)
+
+        g(2,2) = (V(i,j,k)-V(i,j-1,k)) / dymin
+        g(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) / (4._knd*dxmin)
+        g(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) / (4._knd*dzmin)
+
+        g(3,3) = (W(i,j,k)-W(i,j,k-1)) / dzmin
+        g(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) / (4._knd*dxmin)
+        g(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) / (4._knd*dymin)
+      end subroutine GradientTensorUG
+
+
+      pure subroutine Sigmas(s1,s2,s3,grads)
+        !from Hasan, Basser, Parker, Alexander, http://dx.doi.org/10.1006/jmre.2001.2400
+        !via Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
+        use ieee_arithmetic
+
+        real(knd),intent(out) :: s1,s2,s3
+        real(knd),intent(in)  :: grads(3,3)
+
+        real(sigma_knd) :: trG2, i1, i2, i3, a1, a2, a3, c, G(3,3)
+
+        G = real( matmul(transpose(grads),grads) ,sigma_knd)
+
+        trG2 = dot_product(G(:,1),G(:,1)) +&
+               dot_product(G(:,2),G(:,2)) +&
+               dot_product(G(:,3),G(:,3))
+
+        i1 = G(1,1) + G(2,2) + G(3,3)
+
+        i2 = (i1**2 - trG2)
+        i2 = i2 / 2
+
+        i3 = det3x3(G)
+
+        a1 = max((i1**2)/9 - i2/3,0._sigma_knd)
+
+        a2 = (i1**3)/27 - i1*i2/6 +i3/2
+
+        !This requires no FPE trapping is in progress!
+        c =  a2 / sqrt(a1**3)
+
+        !If c is NaN let it be 1.
+        c = max(-1._sigma_knd, min(1._sigma_knd,c))
+        a3 = acos(c) / 3
+
+        c = 2*sqrt(a1)
+
+        s1 = real( sqrt( i1/3 + c*cos(a3) ) , knd )
+
+        s2 = real( sqrt( max( i1/3 - c*cos(pi/3 + a3) , 0._sigma_knd ) ) , knd)
+
+        s3 = real( sqrt( max( i1/3 - c*cos(pi/3 - a3) , 0._sigma_knd ) ) , knd)
+
+      end subroutine Sigmas
+
+
+      pure function det3x3(A) result (res)
+        real(sigma_knd),intent(in) :: A(3,3)
+        real(sigma_knd) :: res
+
+        res =   A(1,1) * A(2,2) * A(3,3)  &
+              - A(1,1) * A(2,3) * A(3,2)  &
+              - A(1,2) * A(2,1) * A(3,3)  &
+              + A(1,2) * A(2,3) * A(3,1)  &
+              + A(1,3) * A(2,1) * A(3,2)  &
+              - A(1,3) * A(2,2) * A(3,1)
+      end function det3x3
+      
+      subroutine stability_correction_L_MO(k, width, C, Pr_sgs)
+        real(knd), intent(out) :: C, Pr_sgs
+        integer, intent(in) :: k
+        real(knd), intent(in) :: width
+        real(knd) :: tempfl, momfl, L, wL
+        
+        tempfl = (current_profiles%tempfl(k)+current_profiles%tempfl(k-1) + &
+             current_profiles%tempflsgs(k)+current_profiles%tempflsgs(k-1))/2
+        if (tempfl < 0) then
+          momfl = sqrt((current_profiles%uw(k) + &
+                        current_profiles%uwsgs(k-1))**2 + &
+                       (current_profiles%vw(k) + &
+                        current_profiles%vwsgs(k-1))**2 )
+          L = - momfl**(3._knd/2._knd) * temperature_ref / &
+               ( 0.4_knd* grav_acc * tempfl)
+          wL = width / L
+          C = 1 / (1 + wL)
+          !own fit of graph in Zeid et al. 2010, JFM 665
+          Pr_sgs = 0.5 + 0.85 * (1+tanh(log(1.2_knd*wL)))/2
+!           print '(i4,1x,f8.3,1x,f8.3)', k, res, width/L
+        else
+          C = 1
+          Pr_sgs = 0.5
+        end if
+      end subroutine
+
+    end subroutine SGS_Sigma_stability
 
 end module Subgrid

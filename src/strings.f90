@@ -172,24 +172,39 @@ module ParseTrees
     character(char_len) :: name
     type(tree_object_fields) :: fields
   contains
+    procedure :: move_from => tree_object_move
     procedure :: finalize => tree_object_finalize
   end type
 
 contains
 
   recursive subroutine tree_object_finalize(obj)
-    class(tree_object) :: obj
+    class(tree_object), intent(inout) :: obj
     integer :: i
 
-    do i = 1, size(obj%fields%array)
-      associate(field => obj%fields%array(i))
-        if (associated(field%object_value)) then
-          call field%object_value%finalize
-          deallocate(field%object_value)
-        end if
-      end associate
-    end do
+    if (allocated(obj%fields%array)) then
+      do i = 1, size(obj%fields%array)
+        associate(field => obj%fields%array(i))
+          if (associated(field%object_value)) then
+            call field%object_value%finalize
+            deallocate(field%object_value)
+          end if
+        end associate
+      end do
+      deallocate(obj%fields%array)
+    end if
   end subroutine
+
+
+  recursive subroutine tree_object_move(lhs, rhs)
+    !shallow copy
+    class(tree_object), intent(out)   :: lhs
+    type(tree_object), intent(inout) :: rhs
+    
+    lhs%name = rhs%name
+    call move_alloc(rhs%fields%array, lhs%fields%array)
+  end subroutine
+
 
   subroutine to_array(ch_list, ch_array)
     type(str_list) :: ch_list
@@ -252,7 +267,7 @@ contains
       allocate(tree(size(tmp)+1))
       tree(:size(tmp)) = tmp
 
-      tree(:size(tmp)+1) = object
+      call tree(size(tmp)+1)%move_from(object)
 
       if (pos > size(tokens)) exit
     end do
