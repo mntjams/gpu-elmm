@@ -456,7 +456,7 @@ contains
           allocate(scalsrcx(partdistrib),scalsrcy(partdistrib),scalsrcz(partdistrib))
           allocate(scalsrci(partdistrib),scalsrcj(partdistrib),scalsrck(partdistrib))
 
-          do i = 1,partdistrib
+          do i = 1, partdistrib
             call get(partdiam(i))
             call get(partrho(i))
             call get(percdistrib(i))
@@ -471,7 +471,7 @@ contains
           allocate(scalsrcx(num_of_scalars),scalsrcy(num_of_scalars),scalsrcz(num_of_scalars))
           allocate(scalsrci(num_of_scalars),scalsrcj(num_of_scalars),scalsrck(num_of_scalars))
 
-          do i = 1,num_of_scalars
+          do i = 1, num_of_scalars
             call get(partdiam(i))
             call get(partrho(i))
             call get(percdistrib(i))
@@ -575,7 +575,7 @@ contains
 
        allocate(probes(number_of_probes))
 
-       do i = 1,number_of_probes
+       do i = 1, number_of_probes
          call get(probes(i)%x, probes(i)%y, probes(i)%z)
        end do
 
@@ -772,7 +772,7 @@ contains
    end if
 
    !Btype might get overwritten by MPI procedures
-   do i = We,To
+   do i = We, To
      if (Btype(i)==PERIODIC) then
         PoissonBtype(i) = PoisFFT_PERIODIC
      else
@@ -976,7 +976,7 @@ contains
 
         call get(n)
         allocate(ScalarLineSources(0))
-        do i=1,n
+        do i = 1, n
           read(unit,fmt=*)
           call get(src%scalar_number)
           if (src%scalar_number<0) call error_stop("Error: Scalar number of line source "//itoa(i)//" negative.")
@@ -998,7 +998,7 @@ contains
 
         call get(n)
         allocate(ScalarPointSources(0))
-        do i=1,n
+        do i = 1, n
           read(unit,fmt=*)
           call get(src%scalar_number)
           if (src%scalar_number<0) call error_stop("Error: Scalar number of point source "//itoa(i)//" negative.")
@@ -1046,7 +1046,7 @@ contains
 
            call get(numframeslices)
 
-           do i = 1,numframeslices
+           do i = 1, numframeslices
              call get(dimension)
              call get(direction)
              call get(position)
@@ -1068,7 +1068,7 @@ contains
        if (io==0) then
          call get(num_staggered_domains)
 
-         do i = 1,num_staggered_domains
+         do i = 1, num_staggered_domains
            read(unit,fmt=*)
            call get(domain_label)
            call get(range%min%x,range%max%x)
@@ -1530,7 +1530,7 @@ contains
 
     if (file_stat/=0) call error_stop("Error opening "//image_input_dir//"scalars_in.vtk")
 
-    do i = 1,num_of_scalars
+    do i = 1, num_of_scalars
       write(scalnum,"(I2.2)") i
       call skip_to("SCALARS scalar"//scalnum//" float",stat)
       call skip_line
@@ -1726,100 +1726,87 @@ contains
 
        if (tasktype==2) then
          U(1:Unx,1:Uny,1:Unz) = 0
-         do k = 1,Unz
-          do j = 1,Uny
-           do i = 1,Unx
-            !if (Utype(i,j,k)<=0) then
-                  !call RANDOM_NUMBER(p)
+         do k = 1, Unz
+          do j = 1, Uny
+           do i = 1, Unx
                   x = xU(i)
                   y = yPr(j)
                   z = zPr(k)
-                  U(i,j,k)=-2*pi*y!*(1+0.1*(p-0.5))!-Uinlet*cos(z)*sin(x)*cos(y)!
-              !0.5_knd*(p-0.5_knd)z
-             !else
-             !  V(i,j,k) = 0
-            !end if
+                  U(i,j,k) = -cos(pi*x)*sin(pi*z)
            end do
           end do
          end do
-         do k = 1,Vnz
-          do j = 1,Vny
-           do i = 1,Vnx
-                  !call RANDOM_NUMBER(p)
+         do k = 1, Vnz
+          do j = 1, Vny
+           do i = 1, Vnx
                   x = xPr(i)
                   y = yV(j)
                   z = zPr(k)
-                  V(i,j,k) = 2*pi*x!*(1+0.1*(p-0.5))!0
+                  V(i,j,k) = 0
            end do
           end do
          end do
-         do k = 1,Wnz
-          do j = 1,Wny
-           do i = 1,Wnx
+         do k = 1, Wnz
+          do j = 1, Wny
+           do i = 1, Wnx
                   x = xPr(i)
                   y = yPr(j)
                   z = zW(k)
-                  W(i,j,k) = 0
+                  W(i,j,k) = sin(pi*x)*cos(pi*z)
            end do
           end do
          end do
-         do k = 1,Prnz
-          do j = 1,Prny
-           do i = 1,Prnx
+         do k = 1, Prnz
+          do j = 1, Prny
+           do i = 1, Prnx
                   x = xPr(i)
                   y = yPr(j)
                   z = zPr(k)
-                  Pr(i,j,k) = 0!(Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(x))+cos(2*(y)))-2)
+                  Pr(i,j,k) = -(1._knd/4._knd)*((cos(2*pi*z)+cos(2*pi*x)))
            end do
           end do
          end do
 
        elseif (tasktype==3) then
          U(1:Unx,1:Uny,1:Unz) = 0
-         do k = 1,Unz
-          do j = 1,Uny
-           do i = 1,Unx
-            !if (Utype(i,j,k)<=0) then
-                  !call RANDOM_NUMBER(p)
+         do k = 1, Unz
+          do j = 1, Uny
+           do i = 1, Unx
+
                   x = xU(i)
                   y = yPr(j)
                   z = zPr(k)
-                  U(i,j,k) = Uinlet*sin(x)*cos(z)*cos(-y)!*(1+0.1*(p-0.5))!-Uinlet*cos(z)*sin(x)*cos(y)!
-              !0.5_knd*(p-0.5_knd)z
-             !else
-             !  V(i,j,k) = 0
-            !end if
+                  U(i,j,k) = Uinlet*sin(x)*cos(z)*cos(-y)
            end do
           end do
          end do
-         do k = 1,Vnz
-          do j = 1,Vny
-           do i = 1,Vnx
-                  !call RANDOM_NUMBER(p)
+         do k = 1, Vnz
+          do j = 1, Vny
+           do i = 1, Vnx
                   x = xPr(i)
                   y = yV(j)
                   z = zPr(k)
-                  V(i,j,k) = 0!*(1+0.1*(p-0.5))!0
+                  V(i,j,k) = 0
            end do
           end do
          end do
-         do k = 1,Wnz
-          do j = 1,Wny
-           do i = 1,Wnx
+         do k = 1, Wnz
+          do j = 1, Wny
+           do i = 1, Wnx
                   x = xPr(i)
                   y = yPr(j)
                   z = zW(k)
-                  W(i,j,k)=-Uinlet*cos(x)*sin(z)*cos(-y)!Uinlet*sin(z)*cos(x)*cos(y)!
+                  W(i,j,k) = -Uinlet*cos(x)*sin(z)*cos(-y)
            end do
           end do
          end do
-         do k = 1,Prnz
-          do j = 1,Prny
-           do i = 1,Prnx
+         do k = 1, Prnz
+          do j = 1, Prny
+           do i = 1, Prnx
                   x = xPr(i)
                   y = yPr(j)
                   z = zPr(k)
-                  Pr(i,j,k)=(Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)!(Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(x))+cos(2*(y)))-2)
+                  Pr(i,j,k) = (Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
            end do
           end do
          end do
@@ -1828,14 +1815,14 @@ contains
 
          dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Uny,1:Unz)),avg(Vin(1:Vny,1:Vnz)))
 
-         do i = 1,Prnx
+         do i = 1, Prnx
            
            call GetTurbulentInlet(dt)
            
            !$omp parallel private(j,k)
            !$omp do collapse(2)
-           do k = 1,Unz
-            do j = 1,Uny
+           do k = 1, Unz
+            do j = 1, Uny
               if (Utype(i,j,k)<=0) then
                  U(i,j,k) = Uin(j,k)
               else
@@ -1845,8 +1832,8 @@ contains
            end do
            !$omp end do nowait
            !$omp do collapse(2)
-           do k = 1,Vnz
-            do j = 1,Vny
+           do k = 1, Vnz
+            do j = 1, Vny
               if (Vtype(i,j,k)<=0) then
                  V(i,j,k) = Vin(j,k)
               else
@@ -1856,8 +1843,8 @@ contains
            end do
            !$omp end do nowait
            !$omp do collapse(2)
-           do k = 1,Wnz
-            do j = 1,Wny
+           do k = 1, Wnz
+            do j = 1, Wny
               if (Wtype(i,j,k)<=0) then
                  W(i,j,k) = Win(j,k)
               else
@@ -1873,9 +1860,9 @@ contains
 
          !$omp parallel private(i,j,k)
          !$omp do collapse(3)
-         do k = 1,Unz
-          do j = 1,Uny
-           do i = 1,Unx
+         do k = 1, Unz
+          do j = 1, Uny
+           do i = 1, Unx
             if (Utype(i,j,k)<=0) then
                U(i,j,k) = Uin(j,k)
              else
@@ -1886,9 +1873,9 @@ contains
          end do
          !$omp end do nowait
          !$omp do collapse(3)
-         do k = 1,Vnz
-          do j = 1,Vny
-           do i = 1,Vnx
+         do k = 1, Vnz
+          do j = 1, Vny
+           do i = 1, Vnx
             if (Vtype(i,j,k)<=0) then
                V(i,j,k) = Vin(j,k)
              else
@@ -1899,9 +1886,9 @@ contains
          end do
          !$omp end do nowait
          !$omp do collapse(3)
-         do k = 1,Wnz
-          do j = 1,Wny
-           do i = 1,Wnx
+         do k = 1, Wnz
+          do j = 1, Wny
+           do i = 1, Wnx
             if (Wtype(i,j,k)<=0) then
                W(i,j,k) = Win(j,k)
              else
@@ -1926,9 +1913,9 @@ contains
 
        if (enable_buoyancy.and.tasktype==2) then
 
-         do k = 0,Prnz+1
-          do j = 0,Prny+1
-           do i = 0,Prnx+1
+         do k = 0, Prnz+1
+          do j = 0, Prny+1
+           do i = 0, Prnx+1
             x = xPr(i)
             y = yPr(j)
             z = zPr(k)
@@ -1943,9 +1930,9 @@ contains
 
        elseif (enable_buoyancy.and.tasktype==3) then
 
-         do k = 0,Prnz+1
-          do j = 0,Prny+1
-           do i = 0,Prnx+1
+         do k = 0, Prnz+1
+          do j = 0, Prny+1
+           do i = 0, Prnx+1
             x = xPr(i)
             y = yPr(j)
             z = zPr(k)
@@ -2059,7 +2046,7 @@ contains
          call BoundMoisture(Moisture)
        end if
 
-       do i = 1,num_of_scalars
+       do i = 1, num_of_scalars
          call BoundScalar(Scalar(:,:,:,i))
        end do
 
@@ -2102,7 +2089,7 @@ contains
       call newunit(unit)
 
       open(unit,file="xgrid.txt")
-      j=-1
+      j = -1
       do
         read (unit,*,iostat = io) P
         if (io==0) then
@@ -2132,7 +2119,7 @@ contains
       call newunit(unit)
 
       open(unit,file="ygrid.txt")
-      j=-1
+      j = -1
       do
         read (unit,*,iostat = io) P
         if (io==0) then
@@ -2162,7 +2149,7 @@ contains
       call newunit(unit)
 
       open(unit,file="zgrid.txt")
-      j=-1
+      j = -1
       do
         read (unit,*,iostat = io) P
         if (io==0) then
@@ -2203,28 +2190,28 @@ contains
       call newunit(unit)
 
       open(unit,file="xgrid.txt")
-      do j = 0,nx
+      do j = 0, nx
         if (master) write(*,*) j
         read(unit,*) xU2(j)
       end do
       close(unit)
 
       if (Btype(We)==PERIODIC) then
-        do j=-1,-3,-1
+        do j = -1, -3, -1
           xU2(j) = xU2(0)-(xU2(nx)-xU2(nx+j))
         end do
       else
-        do j=-1,-3,-1
+        do j = -1, -3, -1
           xU2(j) = xU2(0)-(xU2(0-j)-xU2(0))
         end do
       end if
 
       if (Btype(Ea)==PERIODIC) then
-        do j = nx+1,nx+4
+        do j = nx+1, nx+4
           xU2(j) = xU2(nx)+(xU2(j-nx)-xU2(0))
         end do
       else
-        do j = nx+1,nx+4
+        do j = nx+1, nx+4
           xU2(j) = xU2(nx)+(xU2(nx)-xU2(nx-(j-nx)))
         end do
       end if
@@ -2245,27 +2232,27 @@ contains
       call newunit(unit)
 
       open(unit,file="ygrid.txt")
-      do j = 0,ny
+      do j = 0, ny
         read(unit,*) yV2(j)
       end do
       close(unit)
 
       if (Btype(So)==PERIODIC) then
-        do j=-1,-3,-1
+        do j = -1, -3, -1
           yV2(j) = yV2(0)-(yV2(ny)-yV2(ny+j))
         end do
       else
-        do j=-1,-3,-1
+        do j = -1, -3, -1
           yV2(j) = yV2(0)-(yV2(0-j)-yV2(0))
         end do
       end if
 
       if (Btype(No)==PERIODIC) then
-        do j = ny+1,ny+4
+        do j = ny+1, ny+4
           yV2(j) = yV2(ny)+(yV2(j-ny)-yV2(0))
         end do
       else
-        do j = ny+1,ny+4
+        do j = ny+1, ny+4
           yV2(j) = yV2(ny)+(yV2(ny)-yV2(ny-(j-ny)))
         end do
       end if
@@ -2286,27 +2273,27 @@ contains
       call newunit(unit)
 
       open(unit,file="zgrid.txt")
-      do j = 0,nz
+      do j = 0, nz
         read(unit,*) zW2(j)
       end do
       close(unit)
 
       if (Btype(Bo)==PERIODIC) then
-        do j=-1,-3,-1
+        do j = -1, -3, -1
           zW2(j) = zW2(0)-(zW2(nz)-zW2(nz+j))
         end do
       else
-        do j=-1,-3,-1
+        do j = -1, -3, -1
           zW2(j) = zW2(0)-(zW2(0-j)-zW2(0))
         end do
       end if
 
       if (Btype(To)==PERIODIC) then
-        do j = nz+1,nz+4
+        do j = nz+1, nz+4
           zW2(j) = zW2(nz)+(zW2(j-nz)-zW2(0))
         end do
       else
-        do j = nz+1,nz+4
+        do j = nz+1, nz+4
           zW2(j) = zW2(nz)+(zW2(nz)-zW2(nz-(j-nz)))
         end do
       end if
@@ -2540,9 +2527,9 @@ contains
     integer i,j,k,n
 
     !$omp parallel do reduction(+:nUnull)
-    do k = 1,Unz
-     do j = 1,Uny
-      do i = 1,Unx
+    do k = 1, Unz
+     do j = 1, Uny
+      do i = 1, Unx
        if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
            .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
            .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  nUnull = nUnull+1
@@ -2555,9 +2542,9 @@ contains
 
     n = 0
 
-    do k = 1,Unz
-     do j = 1,Uny
-      do i = 1,Unx
+    do k = 1, Unz
+     do j = 1, Uny
+      do i = 1, Unx
        if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
            .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
            .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  then
@@ -2573,9 +2560,9 @@ contains
     nVnull = 0
 
     !$omp parallel do reduction(+:nVnull)
-    do k = 1,Vnz
-     do j = 1,Vny
-      do i = 1,Vnx
+    do k = 1, Vnz
+     do j = 1, Vny
+      do i = 1, Vnx
        if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
            .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
            .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  nVnull = nVnull+1
@@ -2588,9 +2575,9 @@ contains
 
     n = 0
 
-    do k = 1,Vnz
-     do j = 1,Vny
-      do i = 1,Vnx
+    do k = 1, Vnz
+     do j = 1, Vny
+      do i = 1, Vnx
        if (Vtype(i,j,k)>0.and.Vtype(i,j,k+1)>0.and.Vtype(i,j,k-1)>0&
            .and.Vtype(i,j-1,k)>0.and.Vtype(i,j+1,k)>0&
            .and.Vtype(i-1,j,k)>0.and.Vtype(i+1,j,k)>0)  then
@@ -2606,9 +2593,9 @@ contains
     nWnull = 0
 
     !$omp parallel do reduction(+:nWnull)
-    do k = 1,Wnz
-     do j = 1,Wny
-      do i = 1,Wnx
+    do k = 1, Wnz
+     do j = 1, Wny
+      do i = 1, Wnx
        if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
            .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
            .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  nWnull = nWnull+1
@@ -2622,9 +2609,9 @@ contains
     n = 0
 
 
-    do k = 1,Wnz
-     do j = 1,Wny
-      do i = 1,Wnx
+    do k = 1, Wnz
+     do j = 1, Wny
+      do i = 1, Wnx
        if (Wtype(i,j,k)>0.and.Wtype(i,j,k+1)>0.and.Wtype(i,j,k-1)>0&
            .and.Wtype(i,j-1,k)>0.and.Wtype(i,j+1,k)>0&
            .and.Wtype(i-1,j,k)>0.and.Wtype(i+1,j,k)>0)  then
