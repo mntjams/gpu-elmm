@@ -20,6 +20,9 @@ contains
 
   subroutine TMarchRK3(U, V, W, Pr, Temperature, Moisture, Scalar, dt, delta)
     use RK3
+#ifdef MPI
+    use custom_mpi
+#endif
     real(knd), allocatable, intent(inout) :: U(:,:,:), V(:,:,:) ,W(:,:,:), Pr(:,:,:)
     real(knd), allocatable, intent(inout) :: Temperature(:,:,:), Moisture(:,:,:), Scalar(:,:,:,:)
     real(knd), intent(out) :: dt, delta
@@ -132,7 +135,6 @@ contains
 
       if (RK_stage==1) delta = 0
 
-#ifdef DEBUG
       if ( debuglevel>0 .or. steady==1 ) then
 
         if (Unx*Uny*Unz > 0) &
@@ -144,8 +146,13 @@ contains
         if (Wnx*Wny*Wnz > 0) &
           delta = delta + sum(abs(W(1:Wnx,1:Wny,1:Wnz) - W2(1:Wnx,1:Wny,1:Wnz))) / (Wnx*Wny*Wnz)
 
-      end if
+        if (RK_stage==RK_stages) then
+#ifdef MPI
+          delta = mpi_co_sum(delta)
 #endif
+          if (master) write(*,*) "delta",delta
+        end if
+      end if
 
       call exchange_alloc(U, U2)
       call exchange_alloc(V, V2)
