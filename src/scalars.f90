@@ -1768,9 +1768,9 @@ contains
       !$omp end parallel
 
     else
-      !$omp workshare
+      !$omp parallel workshare
       forall(i=0:Prnx+1) Sc(i,:,:) = ScalarIn(:,:)
-      !$omp end workshare
+      !$omp end parallel workshare
     end if
 
   end subroutine InitScalar
