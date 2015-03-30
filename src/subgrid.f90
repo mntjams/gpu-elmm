@@ -6,7 +6,7 @@ module Subgrid
   implicit none
 
   private
-  public :: SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma, SGS_Sigma_stability, sgstype
+  public :: sgstype, SubgridModel
 
   real(knd),parameter :: CSmag = 0.1_knd
 
@@ -576,5 +576,29 @@ module Subgrid
       end subroutine
 
     end subroutine SGS_Sigma_stability
+    
+    
+    
+    subroutine SubgridModel(U, V, W)
+      !dispatch of subgrid models
+      use Filters, only: filtertype, filter_ratios
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      
+      if (sgstype==SmagorinskyModel) then
+                        call SGS_Smag(U,V,W,filter_ratios(filtertype))
+      else if (sgstype==SigmaModel) then
+                        call SGS_Sigma(U,V,W,filter_ratios(filtertype))
+      else if (sgstype==VremanModel) then
+                        call SGS_Vreman(U,V,W,filter_ratios(filtertype))
+      else if (sgstype==StabSubgridModel) then
+                        call SGS_Sigma_stability(U,V,W,filter_ratios(filtertype))
+      else
+        if (Re>0) then
+          Viscosity = 1._knd/Re
+        else
+          Viscosity = 0
+        end if
+      end if
+    end subroutine
 
 end module Subgrid

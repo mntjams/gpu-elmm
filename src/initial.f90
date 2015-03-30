@@ -2005,21 +2005,7 @@ contains
 
        call PressureCorrection(U,V,W,Pr,Q,1._knd)
 
-       if (sgstype==SubgridModel) then
-                         call SGS_Smag(U,V,W,2._knd)
-       elseif (sgstype==SigmaModel) then
-                         call SGS_Sigma(U,V,W,2._knd)
-       elseif (sgstype==VremanModel) then
-                         call SGS_Vreman(U,V,W,2._knd)
-       elseif (sgstype==StabSubgridModel) then
-                         call SGS_StabSmag(U,V,W,Temperature,2._knd)
-       else
-         if (Re>0) then
-           Viscosity = 1._knd/Re
-         else
-           Viscosity = 0
-         end if
-       end if
+       call SubgridModel(U, V, W)
 
        call BoundViscosity(Viscosity)
 
