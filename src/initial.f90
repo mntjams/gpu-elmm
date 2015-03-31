@@ -1143,6 +1143,7 @@ contains
     subroutine get_area_source(obj)
       type(tree_object), intent(in) :: obj
       class(GeometricShape2D), allocatable :: shp
+      type(ScalarAreaSource) :: src
       real(knd) :: flux
       integer :: scnum
       integer :: j
@@ -1179,7 +1180,8 @@ contains
 
         end if
 
-        call add_element(ScalarAreaSources, ScalarAreaSource(shp, scnum, flux))
+        src = ScalarAreaSource(shp, scnum, flux)
+        call add_element(ScalarAreaSources, src)
 
       else
         write(*,*) "Unknown object type " // downcase(obj%name) // " in " // fname
@@ -1236,17 +1238,28 @@ contains
 
     subroutine add_element(a,e)
       type(ScalarAreaSource), allocatable, intent(inout) :: a(:)
-      type(ScalarAreaSource), intent(in) :: e
+      type(ScalarAreaSource), intent(inout) :: e
       type(ScalarAreaSource), allocatable :: tmp(:)
+      integer :: n
 
       if (.not.allocated(a)) then
         a = [e]
       else
+        n = size(a)
         call move_alloc(a,tmp)
-        allocate(a(size(tmp)+1))
-        a(1:size(tmp)) = tmp
-        a(size(tmp)+1) = e
+        allocate(a(n+1))
+
+        call assign(a(1:n), tmp)
+        call assign(a(n+1), e)
       end if
+    end subroutine
+    
+    elemental subroutine assign(l, r)
+      type(ScalarAreaSource), intent(out) :: l
+      type(ScalarAreaSource), intent(inout) :: r
+      l%flux = r%flux
+      l%scalar_number = r%scalar_number
+      call move_alloc(r%GeometricShape, l%GeometricShape)
     end subroutine
 
   end subroutine get_area_sources
