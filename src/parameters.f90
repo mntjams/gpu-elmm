@@ -189,8 +189,8 @@ module Parameters
   character(2048) :: scratch_dir = ""
 
   integer(dbl) :: timer_rate
-  real(KND) :: time_steps_time = 0
-  real(KND) :: poisson_solver_time = 0
+  real(knd) :: time_steps_time = 0
+  real(knd) :: poisson_solver_time = 0
 
 end module Parameters
 
