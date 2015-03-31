@@ -162,11 +162,11 @@ contains
                        scalar_type, btype, &
                        boundary_procedure, extra_procedure, &
                        flux_profile)
-        real(knd),dimension(-1:,-1:,-1:),contiguous,intent(inout) :: Array,Array2,Array_adv
-        integer,intent(in) :: scalar_type, btype(6)
+        real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Array, Array2, Array_adv
+        integer, intent(in) :: scalar_type, btype(6)
         procedure(boundary_interface) :: boundary_procedure
         procedure(extra_interface) :: extra_procedure
-        real(knd),intent(out),contiguous,optional :: flux_profile(0:)
+        real(knd), intent(out), contiguous, optional :: flux_profile(0:)
         integer i,j,k
 
 
@@ -177,15 +177,11 @@ contains
 
         else
 
-          call set(Array2,0._knd)
+          call set(Array2, 0._knd)
 
         end if
 
-        if (present(flux_profile)) then
-          call AdvScalar(Array_adv,Array,U,V,W,SubsidenceProfile,flux_profile)
-        else
-          call AdvScalar(Array_adv,Array,U,V,W,SubsidenceProfile)
-        end if
+        call AdvScalar(Array_adv, Array, U, V, W, dt, SubsidenceProfile, flux_profile)
 
         !$omp parallel do private(i,j,k)
         do k=0,Prnz+1
@@ -287,10 +283,11 @@ contains
 
 
 
-  subroutine AdvScalar(SCAL2,SCAL,U,V,W,SubsidenceProfile,temperature_flux_profile)
+  subroutine AdvScalar(SCAL2,SCAL,U,V,W,dt,SubsidenceProfile,temperature_flux_profile)
   real(knd),contiguous,intent(out) :: Scal2(-1:,-1:,-1:)
   real(knd),contiguous,intent(in)  :: Scal(-1:,-1:,-1:)
   real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  real(knd),           intent(in)  :: dt
   real(knd),contiguous,intent(in)  :: SubsidenceProfile(0:)
   real(knd),contiguous,intent(out),optional :: temperature_flux_profile(0:)
   real(knd),allocatable,save :: SubsidenceProfileLoc(:),temperature_flux_profileLoc(:)
@@ -306,11 +303,11 @@ contains
       SubsidenceProfileLoc = 0
     end if
 
-    if (gridtype==uniformgrid) then
-      call KAPPASCALARUG(SCAL2,SCAL,U,V,W,SubsidenceProfileLoc,temperature_flux_profileLoc)
-    else
-      call KAPPASCALARGG(SCAL2,SCAL,U,V,W,SubsidenceProfileLoc,temperature_flux_profileLoc)
-    end if
+#ifdef MODIFIED_KAPPA
+    call KappaScalar_mod_delta(SCAL2,SCAL,U,V,W,dt,SubsidenceProfileLoc,temperature_flux_profileLoc)
+#else
+    call KappaScalar(SCAL2,SCAL,U,V,W,SubsidenceProfileLoc,temperature_flux_profileLoc)
+#endif
 
     if (present(temperature_flux_profile)) then
       if (size(temperature_flux_profile)==size(temperature_flux_profileLoc)) &
@@ -353,607 +350,631 @@ contains
 
 
 
-  subroutine KAPPASCALARUG(SCAL2,SCAL,U,V,W,SubsidenceProfile,temperature_flux_profile) !Kappa scheme with flux limiter
-  real(knd),contiguous,intent(out) :: Scal2(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
-  real(knd),contiguous,intent(in)  :: Scal(-1:,-1:,-1:) !Hunsdorfer et al. 1995, JCP
-  real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-  real(knd),contiguous,intent(in)  :: SubsidenceProfile(0:)
-  real(knd),contiguous,intent(out) :: temperature_flux_profile(0:)
-  integer i,j,k,l
-  real(knd) Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
-  real(knd) vel,SL,SR,FLUX
-  real(knd),parameter ::eps = 1e-8
+  subroutine KappaScalar(SCAL2,SCAL,U,V,W,SubsidenceProfile,temperature_flux_profile)
+    !Kappa scheme with flux limiter
+    !Hunsdorfer et al. 1995, JCP
+    real(knd),contiguous,intent(out) :: Scal2(-1:,-1:,-1:) 
+    real(knd),contiguous,intent(in)  :: Scal(-1:,-1:,-1:)
+    real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd),contiguous,intent(in)  :: SubsidenceProfile(0:)
+    real(knd),contiguous,intent(out) :: temperature_flux_profile(0:)
+    integer i,j,k,l
+    real(knd) Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
+    real(knd) vel,SL,SR,FLUX
+    real(knd),parameter ::eps = 1e-8
 
-  if (.not.allocated(SLOPE)) then
-    allocate(SLOPE(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-  end if
+    if (.not.allocated(SLOPE)) then
+      allocate(SLOPE(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+    end if
 
-  Ax = 1 / dxmin
-  Ay = 1 / dymin
-  Az = 1 / dzmin
-
-
-  call set(SCAL2,0._knd)
-  call set(SLOPE,0._knd)
-
-  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
-  !$omp do schedule(runtime)
-  do k = 1,Prnz
-   do j = 1,Prny
-    do i = 0,Prnx
-     if (U(i,j,k)>0) then
-      SR = (SCAL(i+1,j,k)-SCAL(i,j,k))
-      SL = (SCAL(i,j,k)-SCAL(i-1,j,k))
-     else
-      SR = (SCAL(i,j,k)-SCAL(i+1,j,k))
-      SL = (SCAL(i+1,j,k)-SCAL(i+2,j,k))
-     end if
-     SLOPE(i,j,k) = FLUXLIMITER((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
-    end do
-   end do
-  end do
-  !$omp end do
-
-  !$omp do schedule(runtime)
-  do k = 1,Prnz
-   do j = 1,Prny
-    do i = 0,Prnx
-      if (Scflx_mask(i,j,k)) then
-        if (U(i,j,k)>0) then
-         FLUX = U(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i-1,j,k))*SLOPE(i,j,k)/2._knd)
-        else
-         FLUX = U(i,j,k)*(SCAL(i+1,j,k)+(SCAL(i+1,j,k)-SCAL(i+2,j,k))*SLOPE(i,j,k)/2._knd)
-        end if
-
-        SCAL2(i,j,k) = SCAL2(i,j,k) - Ax*FLUX
-        SCAL2(i+1,j,k) = SCAL2(i+1,j,k) + Ax*FLUX
-      end if
-    end do
-   end do
-  end do
-  !$omp end do nowait
-  !$omp end parallel
+    Ax = 1 / dxmin
+    Ay = 1 / dymin
+    Az = 1 / dzmin
 
 
-  call set(SLOPE,0._knd)
+    call set(SCAL2,0._knd)
+    call set(SLOPE,0._knd)
 
-  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
-  !$omp do schedule(runtime)
-  do k = 1,Prnz
-   do j = 0,Prny
-    do i = 1,Prnx
-     if (V(i,j,k)>0) then
-      SR = (SCAL(i,j+1,k)-SCAL(i,j,k))
-      SL = (SCAL(i,j,k)-SCAL(i,j-1,k))
-     else
-      SR = (SCAL(i,j,k)-SCAL(i,j+1,k))
-      SL = (SCAL(i,j+1,k)-SCAL(i,j+2,k))
-     end if
-     SLOPE(i,j,k) = FLUXLIMITER((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
-    end do
-   end do
-  end do
-  !$omp end do
-
-
-  !$omp do schedule(runtime)
-  do k = 1,Prnz
-   do j = 0,Prny
-    do i = 1,Prnx
-      if (Scfly_mask(i,j,k)) then
-        if (V(i,j,k)>0) then
-         FLUX = V(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j-1,k))*SLOPE(i,j,k)/2._knd)
-        else
-         FLUX = V(i,j,k)*(SCAL(i,j+1,k)+(SCAL(i,j+1,k)-SCAL(i,j+2,k))*SLOPE(i,j,k)/2._knd)
-        end if
-
-        SCAL2(i,j,k) = SCAL2(i,j,k) - Ay*FLUX
-        SCAL2(i,j+1,k) = SCAL2(i,j+1,k) + Ay*FLUX
-      end if
-    end do
-   end do
-  end do
-  !$omp end do nowait
-  !$omp end parallel
-
-
-  call set(SLOPE ,0._knd)
-
-  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
-  !$omp do schedule(runtime)
-  do k = 0,Prnz
-   do j = 1,Prny
-    do i = 1,Prnx
-     if (W(i,j,k)>0) then
-      SR = (SCAL(i,j,k+1)-SCAL(i,j,k))
-      SL = (SCAL(i,j,k)-SCAL(i,j,k-1))
-     else
-      SR = (SCAL(i,j,k)-SCAL(i,j,k+1))
-      SL = (SCAL(i,j,k+1)-SCAL(i,j,k+2))
-     end if
-     SLOPE(i,j,k) = FLUXLIMITER((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
-    end do
-   end do
-  end do
-  !$omp end do nowait
-  !$omp end parallel
-
-  call set(temperature_flux_profile,0._knd)
-
-  !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
-  do l=0,1  !odd-even separation to avoid a race condition
-    !$omp do reduction(+:temperature_flux_profile) schedule(runtime)
-    do k = 0+l,Prnz,2
+    !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
+    !$omp do schedule(runtime)
+    do k = 1,Prnz
      do j = 1,Prny
-      do i = 1,Prnx
-        if (Scflz_mask(i,j,k)) then
-          vel = W(i,j,k) - SubsidenceProfile(k)
-          if (vel>0) then
-           FLUX = vel*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._knd)
+      do i = 0,Prnx
+       if (U(i,j,k)>0) then
+        SR = (SCAL(i+1,j,k)-SCAL(i,j,k))
+        SL = (SCAL(i,j,k)-SCAL(i-1,j,k))
+       else
+        SR = (SCAL(i,j,k)-SCAL(i+1,j,k))
+        SL = (SCAL(i+1,j,k)-SCAL(i+2,j,k))
+       end if
+       SLOPE(i,j,k) = FluxLimiter((SR+eps*sign(1._knd,SL)) / (SL+eps*sign(1._knd,SL)))
+      end do
+     end do
+    end do
+    !$omp end do
+
+    !$omp do schedule(runtime)
+    do k = 1,Prnz
+     do j = 1,Prny
+      do i = 0,Prnx
+        if (Scflx_mask(i,j,k)) then
+          if (U(i,j,k)>0) then
+           FLUX = U(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i-1,j,k))*SLOPE(i,j,k)/2._knd)
           else
-           FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._knd)
+           FLUX = U(i,j,k)*(SCAL(i+1,j,k)+(SCAL(i+1,j,k)-SCAL(i+2,j,k))*SLOPE(i,j,k)/2._knd)
           end if
 
-          if (abs(vel)>=1e-6) temperature_flux_profile(k) = temperature_flux_profile(k) + FLUX/vel*W(i,j,k)
-
-          SCAL2(i,j,k) = SCAL2(i,j,k) - Az*FLUX
-          SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + Az*FLUX
+          SCAL2(i,j,k) = SCAL2(i,j,k) - Ax*FLUX
+          SCAL2(i+1,j,k) = SCAL2(i+1,j,k) + Ax*FLUX
         end if
       end do
      end do
     end do
-    !$omp end do
-  end do
-
-  !$omp end parallel
-
-  contains
-
-    real(knd) pure function  FluxLimiter(r)
-      real(knd),intent(in) :: r
-      FluxLimiter=max(0._knd,min(2._knd*r,min(2._knd,(1+2._knd*r)/3._knd)))
-    end function
-
-  endsubroutine KAPPASCALARUG
+    !$omp end do nowait
+    !$omp end parallel
 
 
+    call set(SLOPE,0._knd)
 
-  subroutine KAPPASCALARGG(SCAL2,SCAL,U,V,W,SubsidenceProfile,temperature_flux_profile) !Kappa scheme with flux limiter
-  real(knd),contiguous,intent(out) :: Scal2(-1:,-1:,-1:)                                   !Hunsdorfer et al. 1995, JCP
-  real(knd),contiguous,intent(in)  :: Scal(-1:,-1:,-1:)
-  real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-  real(knd),contiguous,intent(in)  :: SubsidenceProfile(0:)
-  real(knd),contiguous,intent(out) :: temperature_flux_profile(0:)
-  integer i,j,k,l
-  real(knd) vel,SL,SR,FLUX
-  real(knd),parameter::eps = 1e-8
-
-  if (.not.allocated(SLOPE)) then
-    allocate(SLOPE(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-  end if
-
-  !$omp parallel private(i,j,k,vel,SL,SR,FLUX)
-
-  !$omp workshare
-  SCAL2 = 0
-  SLOPE = 0
-  !$omp end workshare
-  !$omp do
-  do k = 1,Prnz
-   do j = 1,Prny
-    do i = 0,Prnx
-     if (U(i,j,k)>0) then
-      SR = (SCAL(i+1,j,k)-SCAL(i,j,k))/dxU(i)
-      SL = (SCAL(i,j,k)-SCAL(i-1,j,k))/dxU(i-1)
-     else
-      SR = (SCAL(i,j,k)-SCAL(i+1,j,k))/dxU(i)
-      SL = (SCAL(i+1,j,k)-SCAL(i+2,j,k))/dxU(i-1)
-     end if
-     SLOPE(i,j,k) = FLUXLIMITER((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
-    end do
-   end do
-  end do
-  !$omp end do
-
-
-  !$omp do
-  do k = 1,Prnz
-   do j = 1,Prny
-    do i = 0,Prnx
-     if (U(i,j,k)>0) then
-      FLUX = U(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i-1,j,k))*SLOPE(i,j,k)/2._knd)
-     else
-      FLUX = U(i,j,k)*(SCAL(i+1,j,k)+(SCAL(i+1,j,k)-SCAL(i+2,j,k))*SLOPE(i,j,k)/2._knd)
-     end if
-     SCAL2(i,j,k) = SCAL2(i,j,k) - FLUX/dxPr(i)
-     SCAL2(i+1,j,k) = SCAL2(i+1,j,k) + FLUX/dxPr(i+1)
-    end do
-   end do
-  end do
-  !$omp end do nowait
-
-
-  !$omp workshare
-  SLOPE = 0
-  !$omp end workshare
-  !$omp do
-  do k = 1,Prnz
-   do j = 0,Prny
-    do i = 1,Prnx
-     if (V(i,j,k)>0) then
-      SR = (SCAL(i,j+1,k)-SCAL(i,j,k))/dyV(j)
-      SL = (SCAL(i,j,k)-SCAL(i,j-1,k))/dyV(j-1)
-     else
-      SR = (SCAL(i,j,k)-SCAL(i,j+1,k))/dyV(j)
-      SL = (SCAL(i,j+1,k)-SCAL(i,j+2,k))/dyV(j-1)
-     end if
-     SLOPE(i,j,k) = FLUXLIMITER((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
-    end do
-   end do
-  end do
-  !$omp end do
-
-
-  !$omp do
-  do k = 1,Prnz
-   do j = 0,Prny
-    do i = 1,Prnx
-     if (V(i,j,k)>0) then
-      FLUX = V(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j-1,k))*SLOPE(i,j,k)/2._knd)
-     else
-      FLUX = V(i,j,k)*(SCAL(i,j+1,k)+(SCAL(i,j+1,k)-SCAL(i,j+2,k))*SLOPE(i,j,k)/2._knd)
-     end if
-
-     SCAL2(i,j,k) = SCAL2(i,j,k) - FLUX/dyPr(j)
-     SCAL2(i,j+1,k) = SCAL2(i,j+1,k) + FLUX/dyPr(j+1)
-    end do
-   end do
-  end do
-  !$omp end do nowait
-
-
-  !$omp workshare
-  SLOPE = 0
-  !$omp end workshare
-  !$omp do
-  do k = 0,Prnz
-   do j = 1,Prny
-    do i = 1,Prnx
-     if (W(i,j,k)>0) then
-      SR = (SCAL(i,j,k+1)-SCAL(i,j,k))/dzW(k)
-      SL = (SCAL(i,j,k)-SCAL(i,j,k-1))/dzW(k-1)
-     else
-      SR = (SCAL(i,j,k)-SCAL(i,j,k+1))/dzW(k)
-      SL = (SCAL(i,j,k+1)-SCAL(i,j,k+2))/dzW(k-1)
-     end if
-     SLOPE(i,j,k) = FLUXLIMITER((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
-    end do
-   end do
-  end do
-  !$omp end do nowait
-
-  !$omp workshare
-  temperature_flux_profile = 0
-  !$omp end workshare
-
-  do l=0,1  !odd-even separation to avoid a race condition
-    !$omp do reduction(+:temperature_flux_profile)
-    do j = 1,Prny  !loop order due to avoid race condition
-     do k = 0,Prnz
+    !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
+    !$omp do schedule(runtime)
+    do k = 1,Prnz
+     do j = 0,Prny
       do i = 1,Prnx
-
-       vel = W(i,j,k) - SubsidenceProfile(k)
-
-       if (vel>0) then
-        FLUX = vel*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._knd)
+       if (V(i,j,k)>0) then
+        SR = (SCAL(i,j+1,k)-SCAL(i,j,k))
+        SL = (SCAL(i,j,k)-SCAL(i,j-1,k))
        else
-        FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._knd)
+        SR = (SCAL(i,j,k)-SCAL(i,j+1,k))
+        SL = (SCAL(i,j+1,k)-SCAL(i,j+2,k))
        end if
-
-       if (abs(vel)>=1e-6) temperature_flux_profile(k) = temperature_flux_profile(k+1) + FLUX/vel*W(i,j,k)
-
-       SCAL2(i,j,k) = SCAL2(i,j,k) - FLUX/dzPr(k)
-       SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + FLUX/dzPr(k+1)
+       SLOPE(i,j,k) = FluxLimiter((SR+eps*sign(1._knd,SL)) / (SL+eps*sign(1._knd,SL)))
       end do
      end do
     end do
     !$omp end do
-  end do
 
-  !$omp workshare
-  temperature_flux_profile = temperature_flux_profile/(Prnx * Prny)
-  !$omp end workshare
 
-  !$omp end parallel
+    !$omp do schedule(runtime)
+    do k = 1,Prnz
+     do j = 0,Prny
+      do i = 1,Prnx
+        if (Scfly_mask(i,j,k)) then
+          if (V(i,j,k)>0) then
+           FLUX = V(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j-1,k))*SLOPE(i,j,k)/2._knd)
+          else
+           FLUX = V(i,j,k)*(SCAL(i,j+1,k)+(SCAL(i,j+1,k)-SCAL(i,j+2,k))*SLOPE(i,j,k)/2._knd)
+          end if
+
+          SCAL2(i,j,k) = SCAL2(i,j,k) - Ay*FLUX
+          SCAL2(i,j+1,k) = SCAL2(i,j+1,k) + Ay*FLUX
+        end if
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp end parallel
+
+
+    call set(SLOPE ,0._knd)
+
+    !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
+    !$omp do schedule(runtime)
+    do k = 0,Prnz
+     do j = 1,Prny
+      do i = 1,Prnx
+       if (W(i,j,k)>0) then
+        SR = (SCAL(i,j,k+1)-SCAL(i,j,k))
+        SL = (SCAL(i,j,k)-SCAL(i,j,k-1))
+       else
+        SR = (SCAL(i,j,k)-SCAL(i,j,k+1))
+        SL = (SCAL(i,j,k+1)-SCAL(i,j,k+2))
+       end if
+       SLOPE(i,j,k) = FluxLimiter((SR+eps*sign(1._knd,SL)) / (SL+eps*sign(1._knd,SL)))
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp end parallel
+
+    call set(temperature_flux_profile,0._knd)
+
+    !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
+    do l=0,1  !odd-even separation to avoid a race condition
+      !$omp do reduction(+:temperature_flux_profile) schedule(runtime)
+      do k = 0+l,Prnz,2
+       do j = 1,Prny
+        do i = 1,Prnx
+          if (Scflz_mask(i,j,k)) then
+            vel = W(i,j,k) - SubsidenceProfile(k)
+            if (vel>0) then
+             FLUX = vel*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._knd)
+            else
+             FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._knd)
+            end if
+
+            temperature_flux_profile(k) = temperature_flux_profile(k) + FLUX
+
+            SCAL2(i,j,k) = SCAL2(i,j,k) - Az*FLUX
+            SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + Az*FLUX
+          end if
+        end do
+       end do
+      end do
+      !$omp end do
+    end do
+    !$omp end parallel
 
   contains
 
     real(knd) pure function  FluxLimiter(r)
       real(knd),intent(in) :: r
-      FluxLimiter=max(0._knd,min(2._knd*r,min(2._knd,(1+2._knd*r)/3._knd)))
+
+      FluxLimiter = max(0._knd, &
+                        min(2._knd*r, &
+                            min(2._knd, &
+                                (1+2._knd*r)/3._knd) ) )
     end function
 
-  endsubroutine KAPPASCALARGG
+  endsubroutine KappaScalar
 
 
 
 
-  subroutine DIFFSCALAR(SCAL2,SCAL,sctype,boundary_procedure,coef)
-  real(knd),contiguous,intent(in)    :: Scal(-1:,-1:,-1:)
-  real(knd),contiguous,intent(inout) :: Scal2(-1:,-1:,-1:)
-  real(knd),intent(in) :: coef
-  integer,intent(in) :: sctype
-  procedure(boundary_interface) :: boundary_procedure
-  integer nx,ny,nz,i,j,k,bi,bj,bk,l
-  real(knd) p,S
-  real(knd) A,Ax,Ay,Az
-  integer,parameter :: narr = 3, narr2 = 5
+  subroutine KappaScalar_mod_delta(SCAL2,SCAL,U,V,W,dt,SubsidenceProfile,temperature_flux_profile) 
+    !Kappa scheme with flux limiter
+    !Hunsdorfer et al. 1995, JCP
+    !delta modified for smaller Courant numbers according to Hunsdorfer et al.
+    real(knd),contiguous,intent(out) :: Scal2(-1:,-1:,-1:)
+    real(knd),contiguous,intent(in)  :: Scal(-1:,-1:,-1:)
+    real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    real(knd),            intent(in) :: dt
+    real(knd),contiguous,intent(in)  :: SubsidenceProfile(0:)
+    real(knd),contiguous,intent(out) :: temperature_flux_profile(0:)
+    integer i,j,k,l
+    real(knd) Ax,Ay,Az              !Auxiliary variables to store muliplication constants for efficiency
+    real(knd) vel,SL,SR,FLUX
+    real(knd),parameter ::eps = 1e-8
 
-  if (.not.allocated(Scal3)) then
-    allocate(Scal3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-    allocate(Ap(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-  end if
-
-  nx = Prnx
-  ny = Prny
-  nz = Prnz
-
-
-  if (Re>0) then
-
-
-   A = coef
-   Ax = 1._knd/(dxmin**2)
-   Ay = 1._knd/(dymin**2)
-   Az = 1._knd/(dzmin**2)
-
-   !$omp parallel private (i,j,k,bi,bj,bk)
-
-   !initital value using forward Euler
-   if (gridtype==uniformgrid) then
-     !$omp do schedule(runtime) !collapse(3)
-     do bk = 1,Prnz,tilenz(narr)
-      do bj = 1,Prny,tileny(narr)
-       do bi = 1,Prnx,tilenx(narr)
-        do k = bk,min(bk+tilenz(narr)-1,Prnz)
-         do j = bj,min(bj+tileny(narr)-1,Prny)
-          do i = bi,min(bi+tilenx(narr)-1,Prnx)
-            if (Prtype(i,j,k)<=0) then
-              SCAL3(i,j,k) = ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))-&
-                (TDiff(i,j,k)+TDiff(i-1,j,k))*(SCAL(i,j,k)-SCAL(i-1,j,k)))*Ax
-
-              SCAL3(i,j,k) = SCAL3(i,j,k) +&
-                ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))-&
-                (TDiff(i,j,k)+TDiff(i,j-1,k))*(SCAL(i,j,k)-SCAL(i,j-1,k)))*Ay
-
-              SCAL3(i,j,k) = SCAL3(i,j,k) +&
-                ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))-&
-                (TDiff(i,j,k)+TDiff(i,j,k-1))*(SCAL(i,j,k)-SCAL(i,j,k-1)))*Az
-            else
-              SCAL3(i,j,k) = 0
-            end if
-          end do
-         end do
-        end do
-       end do
-      end do
-     end do
-     !$omp end do
-   else
-     !$omp do schedule(runtime) !collapse(3)
-     do bk = 1,Prnz,tilenz(narr)
-      do bj = 1,Prny,tileny(narr)
-       do bi = 1,Prnx,tilenx(narr)
-        do k = bk,min(bk+tilenz(narr)-1,Prnz)
-         do j = bj,min(bj+tileny(narr)-1,Prny)
-          do i = bi,min(bi+tilenx(narr)-1,Prnx)
-            SCAL3(i,j,k) = (((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))/dxU(i)-&
-              (TDiff(i,j,k)+TDiff(i-1,j,k))*(SCAL(i,j,k)-SCAL(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
-             ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))/dyV(j)-&
-              (TDiff(i,j,k)+TDiff(i,j-1,k))*(SCAL(i,j,k)-SCAL(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
-             ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))/dzW(k)-&
-              (TDiff(i,j,k)+TDiff(i,j,k-1))*(SCAL(i,j,k)-SCAL(i,j,k-1))/dzW(k-1))/(dzPr(k)))
-          end do
-         end do
-        end do
-       end do
-      end do
-     end do
-     !$omp end do
-   end if
-   !$omp end parallel
-
-   Ax = 1._knd/(4._knd*dxmin**2)
-   Ay = 1._knd/(4._knd*dymin**2)
-   Az = 1._knd/(4._knd*dzmin**2)
-
-   !SCAL2 = SCAL + SCAL3 * A
-   call assign(SCAL2,SCAL)
-   call add_multiplied(SCAL2,SCAL3,A)
-
-   call boundary_procedure(SCAL2)
-
-   call Scalar_ImmersedBoundaries(SCAL2)
-   call Scalar_ImmersedBoundaries(SCAL3)
-
-   !$omp parallel private(i,j,k,bi,bj,bk)
-   if (gridtype==uniformgrid) then
-    !$omp do schedule(runtime) !collapse(3)
-    do bk = 1,Prnz,tilenz(narr)
-     do bj = 1,Prny,tileny(narr)
-      do bi = 1,Prnx,tilenx(narr)
-       do k = bk,min(bk+tilenz(narr)-1,Prnz)
-        do j = bj,min(bj+tileny(narr)-1,Prny)
-         do i = bi,min(bi+tilenx(narr)-1,Prnx)
-           Ap(i,j,k) = 1._knd/(1._knd/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))+&
-                                (TDiff(i,j,k)+TDiff(i-1,j,k)))*Ax+&
-                                ((TDiff(i,j+1,k)+TDiff(i,j,k))+&
-                                (TDiff(i,j,k)+TDiff(i,j-1,k)))*Ay+&
-                                ((TDiff(i,j,k+1)+TDiff(i,j,k))+&
-                                (TDiff(i,j,k)+TDiff(i,j,k-1)))*Az))
-         end do
-        end do
-       end do
-      end do
-     end do
-    end do
-    !$omp end do
-   else
-    !$omp do schedule(runtime) !collapse(3)
-    do bk = 1,Prnz,tilenz(narr)
-     do bj = 1,Prny,tileny(narr)
-      do bi = 1,Prnx,tilenx(narr)
-       do k = bk,min(bk+tilenz(narr)-1,Prnz)
-        do j = bj,min(bj+tileny(narr)-1,Prny)
-         do i = bi,min(bi+tilenx(narr)-1,Prnx)
-           Ap(i,j,k) = 1._knd/(1._knd/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))/dxU(i)+&
-                                (TDiff(i,j,k)+TDiff(i-1,j,k))/dxU(i-1))/(4._knd*dxPr(i))+&
-                                ((TDiff(i,j+1,k)+TDiff(i,j,k))/dyV(j)+&
-                                (TDiff(i,j,k)+TDiff(i,j-1,k))/dyV(j-1))/(4._knd*dyPr(j))+&
-                                ((TDiff(i,j,k+1)+TDiff(i,j,k))/dzW(k)+&
-                                (TDiff(i,j,k)+TDiff(i,j,k-1))/dzW(k-1))/(4._knd*dzPr(k))))
-         end do
-        end do
-       end do
-      end do
-     end do
-    end do
-    !$omp end do
-   end if
-   !$omp end parallel
-
-   do l = 1,maxCNiter
-    S = 0
-    call boundary_procedure(SCAL2)
-
-    if (gridtype==uniformgrid) then
-     !$omp parallel private(i,j,k,p) reduction(max:S)
-     !$omp do schedule(runtime) !collapse(3)
-     do bk = 1,Prnz,tilenz(narr2)
-      do bj = 1,Prny,tileny(narr2)
-       do bi = 1,Prnx,tilenx(narr2)
-        do k = bk,min(bk+tilenz(narr2)-1,Prnz)
-         do j = bj,min(bj+tileny(narr2)-1,Prny)
-          do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Prnx),2
-            if (Prtype(i,j,k)<=0) then
-              p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._knd+&
-               ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
-                (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
-               ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
-                (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
-               ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
-                (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
-               )
-               p = p*Ap(i,j,k)
-               S = max(S,abs(p-SCAL2(i,j,k)))
-               SCAL2(i,j,k) = p
-            end if
-          end do
-         end do
-        end do
-       end do
-      end do
-     end do
-     !$omp end do
-     !$omp do schedule(runtime) !collapse(3)
-     do bk = 1,Prnz,tilenz(narr2)
-      do bj = 1,Prny,tileny(narr2)
-       do bi = 1,Prnx,tilenx(narr2)
-        do k = bk,min(bk+tilenz(narr2)-1,Prnz)
-         do j = bj,min(bj+tileny(narr2)-1,Prny)
-          do i = bi+mod(bi+j+k,2),min(bi+tilenx(narr2)-1,Prnx),2
-            if (Prtype(i,j,k)<=0) then
-              p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._knd+&
-               ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
-                (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
-               ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
-                (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
-               ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
-                (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
-               )
-               p = p*Ap(i,j,k)
-               S = max(S,abs(p-SCAL2(i,j,k)))
-               SCAL2(i,j,k) = p
-            end if
-          end do
-         end do
-        end do
-       end do
-      end do
-     end do
-     !$omp end do
-     !$omp endparallel
-    else
-     !$omp parallel private(i,j,k,p) reduction(max:S)
-     !$omp do schedule(runtime) !collapse(3)
-     do bk = 1,Prnz,tilenz(narr2)
-      do bj = 1,Prny,tileny(narr2)
-       do bi = 1,Prnx,tilenx(narr2)
-        do k = bk,min(bk+tilenz(narr2)-1,Prnz)
-         do j = bj,min(bj+tileny(narr2)-1,Prny)
-          do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Prnx),2
-            p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)+&
-             ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
-              (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
-             ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))/dyV(j)-&
-              (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
-             ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))/dzW(k)-&
-              (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1))/dzW(k-1))/(dzPr(k))&
-             )/4._knd
-             p = p*Ap(i,j,k)
-             S = max(S,abs(p-SCAL2(i,j,k)))
-             SCAL2(i,j,k) = p
-          end do
-         end do
-        end do
-       end do
-      end do
-     end do
-     !$omp end do
-     !$omp do schedule(runtime) !collapse(3)
-     do bk = 1,Prnz,tilenz(narr2)
-      do bj = 1,Prny,tileny(narr2)
-       do bi = 1,Prnx,tilenx(narr2)
-        do k = bk,min(bk+tilenz(narr2)-1,Prnz)
-         do j = bj,min(bj+tileny(narr2)-1,Prny)
-          do i = bi+mod(bi+j+k,2),min(bi+tilenx(narr2)-1,Prnx),2
-            p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)+&
-             ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
-              (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
-             ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))/dyV(j)-&
-              (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
-             ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))/dzW(k)-&
-              (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1))/dzW(k-1))/(dzPr(k))&
-             )/4._knd
-             p = p*Ap(i,j,k)
-             S = max(S,abs(p-SCAL2(i,j,k)))
-             SCAL2(i,j,k) = p
-          end do
-         end do
-        end do
-       end do
-      end do
-     end do
-     !$omp end do
-     !$omp endparallel
+    if (.not.allocated(SLOPE)) then
+      allocate(SLOPE(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
     end if
-    write (*,*) "CNscalar ",l,S
-    if (S<=epsCN) exit
-   end do
+
+    Ax = 1 / dxmin
+    Ay = 1 / dymin
+    Az = 1 / dzmin
 
 
-  else
+    call set(SCAL2,0._knd)
+    call set(SLOPE,0._knd)
+
+    !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
+    !$omp do schedule(runtime)
+    do k = 1,Prnz
+     do j = 1,Prny
+      do i = 0,Prnx
+       if (U(i,j,k)>0) then
+        SR = (SCAL(i+1,j,k)-SCAL(i,j,k))
+        SL = (SCAL(i,j,k)-SCAL(i-1,j,k))
+       else
+        SR = (SCAL(i,j,k)-SCAL(i+1,j,k))
+        SL = (SCAL(i+1,j,k)-SCAL(i+2,j,k))
+       end if
+       SLOPE(i,j,k) = FluxLimiter((SR+eps*sign(1._knd,SL)) / (SL+eps*sign(1._knd,SL)), &
+                                  abs(U(i,j,k)) * dt / dxmin)
+      end do
+     end do
+    end do
+    !$omp end do
+
+    !$omp do schedule(runtime)
+    do k = 1,Prnz
+     do j = 1,Prny
+      do i = 0,Prnx
+        if (Scflx_mask(i,j,k)) then
+          if (U(i,j,k)>0) then
+           FLUX = U(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i-1,j,k))*SLOPE(i,j,k)/2._knd)
+          else
+           FLUX = U(i,j,k)*(SCAL(i+1,j,k)+(SCAL(i+1,j,k)-SCAL(i+2,j,k))*SLOPE(i,j,k)/2._knd)
+          end if
+
+          SCAL2(i,j,k) = SCAL2(i,j,k) - Ax*FLUX
+          SCAL2(i+1,j,k) = SCAL2(i+1,j,k) + Ax*FLUX
+        end if
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp end parallel
 
 
-   call assign(SCAL2,SCAL)
+    call set(SLOPE,0._knd)
 
-   call boundary_procedure(SCAL2)
+    !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
+    !$omp do schedule(runtime)
+    do k = 1,Prnz
+     do j = 0,Prny
+      do i = 1,Prnx
+       if (V(i,j,k)>0) then
+        SR = (SCAL(i,j+1,k)-SCAL(i,j,k))
+        SL = (SCAL(i,j,k)-SCAL(i,j-1,k))
+       else
+        SR = (SCAL(i,j,k)-SCAL(i,j+1,k))
+        SL = (SCAL(i,j+1,k)-SCAL(i,j+2,k))
+       end if
+       SLOPE(i,j,k) = FluxLimiter((SR+eps*sign(1._knd,SL)) / (SL+eps*sign(1._knd,SL)), &
+                                  abs(V(i,j,k)) * dt / dymin)
+      end do
+     end do
+    end do
+    !$omp end do
 
-   call Scalar_ImmersedBoundaries(Scal2)
+
+    !$omp do schedule(runtime)
+    do k = 1,Prnz
+     do j = 0,Prny
+      do i = 1,Prnx
+        if (Scfly_mask(i,j,k)) then
+          if (V(i,j,k)>0) then
+           FLUX = V(i,j,k)*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j-1,k))*SLOPE(i,j,k)/2._knd)
+          else
+           FLUX = V(i,j,k)*(SCAL(i,j+1,k)+(SCAL(i,j+1,k)-SCAL(i,j+2,k))*SLOPE(i,j,k)/2._knd)
+          end if
+
+          SCAL2(i,j,k) = SCAL2(i,j,k) - Ay*FLUX
+          SCAL2(i,j+1,k) = SCAL2(i,j+1,k) + Ay*FLUX
+        end if
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp end parallel
 
 
-  end if
-  endsubroutine DIFFSCALAR
+    call set(SLOPE ,0._knd)
+
+    !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
+    !$omp do schedule(runtime)
+    do k = 0,Prnz
+     do j = 1,Prny
+      do i = 1,Prnx
+       if (W(i,j,k)>0) then
+        SR = (SCAL(i,j,k+1)-SCAL(i,j,k))
+        SL = (SCAL(i,j,k)-SCAL(i,j,k-1))
+       else
+        SR = (SCAL(i,j,k)-SCAL(i,j,k+1))
+        SL = (SCAL(i,j,k+1)-SCAL(i,j,k+2))
+       end if
+       SLOPE(i,j,k) = FluxLimiter((SR+eps*sign(1._knd,SL)) / (SL+eps*sign(1._knd,SL)), &
+                                  abs(W(i,j,k)) * dt / dzmin)
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp end parallel
+
+    call set(temperature_flux_profile,0._knd)
+
+    !$omp parallel private(i,j,k,l,vel,SL,SR,FLUX) shared(SLOPE,SCAL,SCAL2,temperature_flux_profile)
+    do l=0,1  !odd-even separation to avoid a race condition
+      !$omp do reduction(+:temperature_flux_profile) schedule(runtime)
+      do k = 0+l,Prnz,2
+       do j = 1,Prny
+        do i = 1,Prnx
+          if (Scflz_mask(i,j,k)) then
+            vel = W(i,j,k) - SubsidenceProfile(k)
+            if (vel>0) then
+             FLUX = vel*(SCAL(i,j,k)+(SCAL(i,j,k)-SCAL(i,j,k-1))*SLOPE(i,j,k)/2._knd)
+            else
+             FLUX = vel*(SCAL(i,j,k+1)+(SCAL(i,j,k+1)-SCAL(i,j,k+2))*SLOPE(i,j,k)/2._knd)
+            end if
+
+            temperature_flux_profile(k) = temperature_flux_profile(k) + FLUX
+
+            SCAL2(i,j,k) = SCAL2(i,j,k) - Az*FLUX
+            SCAL2(i,j,k+1) = SCAL2(i,j,k+1) + Az*FLUX
+          end if
+        end do
+       end do
+      end do
+      !$omp end do
+    end do
+    !$omp end parallel
+
+  contains
+
+    real(knd) pure function  FluxLimiter(r, C)
+      real(knd),intent(in) :: r !slope ratio
+      real(knd),intent(in) :: C !Courant number
+      real(knd), parameter :: eps = 1e-6_knd
+
+      FluxLimiter = max(0._knd, &
+                        min(2._knd*r, &
+                            min(2._knd * max(1._knd, (1._knd-C)/(C+eps)), &
+                                (1+2._knd*r)/3._knd) ) )
+    end function
+
+  endsubroutine KappaScalar_mod_delta
+
+
+
+
+  subroutine DiffScalar(SCAL2,SCAL,sctype,boundary_procedure,coef)
+    real(knd),contiguous,intent(in)    :: Scal(-1:,-1:,-1:)
+    real(knd),contiguous,intent(inout) :: Scal2(-1:,-1:,-1:)
+    real(knd),intent(in) :: coef
+    integer,intent(in) :: sctype
+    procedure(boundary_interface) :: boundary_procedure
+    integer nx,ny,nz,i,j,k,bi,bj,bk,l
+    real(knd) p,S
+    real(knd) A,Ax,Ay,Az
+    integer,parameter :: narr = 3, narr2 = 5
+
+    if (.not.allocated(Scal3)) then
+      allocate(Scal3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+      allocate(Ap(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+    end if
+
+    nx = Prnx
+    ny = Prny
+    nz = Prnz
+
+
+    if (Re>0) then
+
+
+     A = coef
+     Ax = 1._knd/(dxmin**2)
+     Ay = 1._knd/(dymin**2)
+     Az = 1._knd/(dzmin**2)
+
+     !$omp parallel private (i,j,k,bi,bj,bk)
+
+     !initital value using forward Euler
+     if (gridtype==uniformgrid) then
+       !$omp do schedule(runtime) !collapse(3)
+       do bk = 1,Prnz,tilenz(narr)
+        do bj = 1,Prny,tileny(narr)
+         do bi = 1,Prnx,tilenx(narr)
+          do k = bk,min(bk+tilenz(narr)-1,Prnz)
+           do j = bj,min(bj+tileny(narr)-1,Prny)
+            do i = bi,min(bi+tilenx(narr)-1,Prnx)
+              if (Prtype(i,j,k)<=0) then
+                SCAL3(i,j,k) = ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))-&
+                  (TDiff(i,j,k)+TDiff(i-1,j,k))*(SCAL(i,j,k)-SCAL(i-1,j,k)))*Ax
+
+                SCAL3(i,j,k) = SCAL3(i,j,k) +&
+                  ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))-&
+                  (TDiff(i,j,k)+TDiff(i,j-1,k))*(SCAL(i,j,k)-SCAL(i,j-1,k)))*Ay
+
+                SCAL3(i,j,k) = SCAL3(i,j,k) +&
+                  ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))-&
+                  (TDiff(i,j,k)+TDiff(i,j,k-1))*(SCAL(i,j,k)-SCAL(i,j,k-1)))*Az
+              else
+                SCAL3(i,j,k) = 0
+              end if
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+     else
+       !$omp do schedule(runtime) !collapse(3)
+       do bk = 1,Prnz,tilenz(narr)
+        do bj = 1,Prny,tileny(narr)
+         do bi = 1,Prnx,tilenx(narr)
+          do k = bk,min(bk+tilenz(narr)-1,Prnz)
+           do j = bj,min(bj+tileny(narr)-1,Prny)
+            do i = bi,min(bi+tilenx(narr)-1,Prnx)
+              SCAL3(i,j,k) = (((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL(i+1,j,k)-SCAL(i,j,k))/dxU(i)-&
+                (TDiff(i,j,k)+TDiff(i-1,j,k))*(SCAL(i,j,k)-SCAL(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
+               ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL(i,j+1,k)-SCAL(i,j,k))/dyV(j)-&
+                (TDiff(i,j,k)+TDiff(i,j-1,k))*(SCAL(i,j,k)-SCAL(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
+               ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL(i,j,k+1)-SCAL(i,j,k))/dzW(k)-&
+                (TDiff(i,j,k)+TDiff(i,j,k-1))*(SCAL(i,j,k)-SCAL(i,j,k-1))/dzW(k-1))/(dzPr(k)))
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+     end if
+     !$omp end parallel
+
+     Ax = 1._knd/(4._knd*dxmin**2)
+     Ay = 1._knd/(4._knd*dymin**2)
+     Az = 1._knd/(4._knd*dzmin**2)
+
+     !SCAL2 = SCAL + SCAL3 * A
+     call assign(SCAL2,SCAL)
+     call add_multiplied(SCAL2,SCAL3,A)
+
+     call boundary_procedure(SCAL2)
+
+     call Scalar_ImmersedBoundaries(SCAL2)
+     call Scalar_ImmersedBoundaries(SCAL3)
+
+     !$omp parallel private(i,j,k,bi,bj,bk)
+     if (gridtype==uniformgrid) then
+      !$omp do schedule(runtime) !collapse(3)
+      do bk = 1,Prnz,tilenz(narr)
+       do bj = 1,Prny,tileny(narr)
+        do bi = 1,Prnx,tilenx(narr)
+         do k = bk,min(bk+tilenz(narr)-1,Prnz)
+          do j = bj,min(bj+tileny(narr)-1,Prny)
+           do i = bi,min(bi+tilenx(narr)-1,Prnx)
+             Ap(i,j,k) = 1._knd/(1._knd/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))+&
+                                  (TDiff(i,j,k)+TDiff(i-1,j,k)))*Ax+&
+                                  ((TDiff(i,j+1,k)+TDiff(i,j,k))+&
+                                  (TDiff(i,j,k)+TDiff(i,j-1,k)))*Ay+&
+                                  ((TDiff(i,j,k+1)+TDiff(i,j,k))+&
+                                  (TDiff(i,j,k)+TDiff(i,j,k-1)))*Az))
+           end do
+          end do
+         end do
+        end do
+       end do
+      end do
+      !$omp end do
+     else
+      !$omp do schedule(runtime) !collapse(3)
+      do bk = 1,Prnz,tilenz(narr)
+       do bj = 1,Prny,tileny(narr)
+        do bi = 1,Prnx,tilenx(narr)
+         do k = bk,min(bk+tilenz(narr)-1,Prnz)
+          do j = bj,min(bj+tileny(narr)-1,Prny)
+           do i = bi,min(bi+tilenx(narr)-1,Prnx)
+             Ap(i,j,k) = 1._knd/(1._knd/A+(((TDiff(i+1,j,k)+TDiff(i,j,k))/dxU(i)+&
+                                  (TDiff(i,j,k)+TDiff(i-1,j,k))/dxU(i-1))/(4._knd*dxPr(i))+&
+                                  ((TDiff(i,j+1,k)+TDiff(i,j,k))/dyV(j)+&
+                                  (TDiff(i,j,k)+TDiff(i,j-1,k))/dyV(j-1))/(4._knd*dyPr(j))+&
+                                  ((TDiff(i,j,k+1)+TDiff(i,j,k))/dzW(k)+&
+                                  (TDiff(i,j,k)+TDiff(i,j,k-1))/dzW(k-1))/(4._knd*dzPr(k))))
+           end do
+          end do
+         end do
+        end do
+       end do
+      end do
+      !$omp end do
+     end if
+     !$omp end parallel
+
+     do l = 1,maxCNiter
+      S = 0
+      call boundary_procedure(SCAL2)
+
+      if (gridtype==uniformgrid) then
+       !$omp parallel private(i,j,k,p) reduction(max:S)
+       !$omp do schedule(runtime) !collapse(3)
+       do bk = 1,Prnz,tilenz(narr2)
+        do bj = 1,Prny,tileny(narr2)
+         do bi = 1,Prnx,tilenx(narr2)
+          do k = bk,min(bk+tilenz(narr2)-1,Prnz)
+           do j = bj,min(bj+tileny(narr2)-1,Prny)
+            do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Prnx),2
+              if (Prtype(i,j,k)<=0) then
+                p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._knd+&
+                 ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
+                  (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
+                 ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
+                  (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
+                 ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
+                  (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
+                 )
+                 p = p*Ap(i,j,k)
+                 S = max(S,abs(p-SCAL2(i,j,k)))
+                 SCAL2(i,j,k) = p
+              end if
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+       !$omp do schedule(runtime) !collapse(3)
+       do bk = 1,Prnz,tilenz(narr2)
+        do bj = 1,Prny,tileny(narr2)
+         do bi = 1,Prnx,tilenx(narr2)
+          do k = bk,min(bk+tilenz(narr2)-1,Prnz)
+           do j = bj,min(bj+tileny(narr2)-1,Prny)
+            do i = bi+mod(bi+j+k,2),min(bi+tilenx(narr2)-1,Prnx),2
+              if (Prtype(i,j,k)<=0) then
+                p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)/4._knd+&
+                 ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))-&
+                  (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k)))*Ax+&
+                 ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))-&
+                  (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k)))*Ay+&
+                 ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))-&
+                  (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1)))*Az&
+                 )
+                 p = p*Ap(i,j,k)
+                 S = max(S,abs(p-SCAL2(i,j,k)))
+                 SCAL2(i,j,k) = p
+              end if
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+       !$omp endparallel
+      else
+       !$omp parallel private(i,j,k,p) reduction(max:S)
+       !$omp do schedule(runtime) !collapse(3)
+       do bk = 1,Prnz,tilenz(narr2)
+        do bj = 1,Prny,tileny(narr2)
+         do bi = 1,Prnx,tilenx(narr2)
+          do k = bk,min(bk+tilenz(narr2)-1,Prnz)
+           do j = bj,min(bj+tileny(narr2)-1,Prny)
+            do i = bi+mod(bi+j+k-1,2),min(bi+tilenx(narr2)-1,Prnx),2
+              p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)+&
+               ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
+                (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
+               ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))/dyV(j)-&
+                (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
+               ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))/dzW(k)-&
+                (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1))/dzW(k-1))/(dzPr(k))&
+               )/4._knd
+               p = p*Ap(i,j,k)
+               S = max(S,abs(p-SCAL2(i,j,k)))
+               SCAL2(i,j,k) = p
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+       !$omp do schedule(runtime) !collapse(3)
+       do bk = 1,Prnz,tilenz(narr2)
+        do bj = 1,Prny,tileny(narr2)
+         do bi = 1,Prnx,tilenx(narr2)
+          do k = bk,min(bk+tilenz(narr2)-1,Prnz)
+           do j = bj,min(bj+tileny(narr2)-1,Prny)
+            do i = bi+mod(bi+j+k,2),min(bi+tilenx(narr2)-1,Prnx),2
+              p = (SCAL(i,j,k)/A)+(SCAL3(i,j,k)+&
+               ((TDiff(i+1,j,k)+TDiff(i,j,k))*(SCAL2(i+1,j,k))/dxU(i)-&
+                (TDiff(i,j,k)+TDiff(i-1,j,k))*(-SCAL2(i-1,j,k))/dxU(i-1))/(dxPr(i))+&
+               ((TDiff(i,j+1,k)+TDiff(i,j,k))*(SCAL2(i,j+1,k))/dyV(j)-&
+                (TDiff(i,j,k)+TDiff(i,j-1,k))*(-SCAL2(i,j-1,k))/dyV(j-1))/(dyPr(j))+&
+               ((TDiff(i,j,k+1)+TDiff(i,j,k))*(SCAL2(i,j,k+1))/dzW(k)-&
+                (TDiff(i,j,k)+TDiff(i,j,k-1))*(-SCAL2(i,j,k-1))/dzW(k-1))/(dzPr(k))&
+               )/4._knd
+               p = p*Ap(i,j,k)
+               S = max(S,abs(p-SCAL2(i,j,k)))
+               SCAL2(i,j,k) = p
+            end do
+           end do
+          end do
+         end do
+        end do
+       end do
+       !$omp end do
+       !$omp endparallel
+      end if
+      write (*,*) "CNscalar ",l,S
+      if (S<=epsCN) exit
+     end do
+
+
+    else
+
+
+     call assign(SCAL2,SCAL)
+
+     call boundary_procedure(SCAL2)
+
+     call Scalar_ImmersedBoundaries(Scal2)
+
+
+    end if
+  endsubroutine DiffScalar
 
 
 
@@ -1066,7 +1087,7 @@ contains
         SR = (SCAL(i,j,k)-SCAL(i+1,j,k))
         SL = (SCAL(i+1,j,k)-SCAL(i+2,j,k))
        end if
-       SLOPE(i,j,k) = FLUXLIMITER((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
+       SLOPE(i,j,k) = FluxLimiter((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
       end do
      end do
     end do
@@ -1116,7 +1137,7 @@ contains
         SR = (SCAL(i,j,k)-SCAL(i,j+1,k))
         SL = (SCAL(i,j+1,k)-SCAL(i,j+2,k))
        end if
-       SLOPE(i,j,k) = FLUXLIMITER((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
+       SLOPE(i,j,k) = FluxLimiter((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
       end do
      end do
     end do
@@ -1168,7 +1189,7 @@ contains
         SR = (SCAL(i,j,k)-SCAL(i,j,k+1))
         SL = (SCAL(i,j,k+1)-SCAL(i,j,k+2))
        end if
-       SLOPE(i,j,k) = FLUXLIMITER((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
+       SLOPE(i,j,k) = FluxLimiter((SR+eps*sign(1._knd,SL))/(SL+eps*sign(1._knd,SL)))
       end do
      end do
     end do
