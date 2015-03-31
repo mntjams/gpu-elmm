@@ -8,7 +8,7 @@ module Filters
 
   public filtertype, filter_ratios, Filter
 
-  integer filtertype
+  integer :: filtertype = 1
 
   real(knd), parameter :: filter_ratios(0:1) = [ 1.0_knd, 2._knd]
 

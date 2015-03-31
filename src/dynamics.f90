@@ -552,9 +552,8 @@ contains
 
 
   subroutine SubgridStresses(U,V,W,Pr,Temperature)
-    use Subgrid, only: sgstype, SGS_Smag, SGS_StabSmag, SGS_Vreman, SGS_Sigma, SGS_Sigma_stability
+    use Subgrid, only: SubgridModel, sgstype
     use ImmersedBoundary, only: ScalFlIBPoints, TIBPoint_Viscosity
-    use Filters, only: filtertype, filter_ratios
     use Wallmodels
     use Scalars, only: ComputeTDiff
 
@@ -568,29 +567,10 @@ contains
                       !resulting Viscosity intentionally overwritten
                       call ComputeViscsWM(U,V,W,Pr,Temperature)
     end if
+    
 
-    if (sgstype==SubgridModel) then
-                      call SGS_Smag(U,V,W,filter_ratios(filtertype))
-    else if (sgstype==SigmaModel) then
-                      call SGS_Sigma(U,V,W,filter_ratios(filtertype))
-    else if (sgstype==VremanModel) then
-                      call SGS_Vreman(U,V,W,filter_ratios(filtertype))
-    else if (sgstype==StabSubgridModel) then
-                      call SGS_Sigma_stability(U,V,W,filter_ratios(filtertype))
-    else
-      if (Re>0) then
-        Viscosity = 1._knd/Re
-      else
-        Viscosity = 0
-      end if
-    end if
+    call SubgridModel(U,V,W)
 
-
-    if (debuglevel>0) then
-    write(*,*) "NUt", sum(Viscosity(1:Prnx,1:Prny,1:Prnz))/(Prnx*Prny*Prnz)
-    write(*,*) "maxNUt", maxval(Viscosity(1:Prnx,1:Prny,1:Prnz))
-    write(*,*) "minNUt", minval(Viscosity(1:Prnx,1:Prny,1:Prnz))
-    end if
 
     if (wallmodeltype>0) then
                     call ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
