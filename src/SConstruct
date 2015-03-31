@@ -13,6 +13,7 @@ SB = ARGUMENTS.get('SB','')
 customPB = ARGUMENTS.get('customPB','')
 customPuff = ARGUMENTS.get('customPuff','')
 customConfig = ARGUMENTS.get('customConfig','')
+customSurfaceTemperature = ARGUMENTS.get('customSurfaceTemperature','')
 PB = ARGUMENTS.get('PB','')
 extra = ARGUMENTS.get('extra','')
 cgal = ARGUMENTS.get('cgal','')
@@ -197,6 +198,9 @@ if customPuff=='yes':
   
 if customConfig=='yes':
   env.Append(F90FLAGS='-DCUSTOM_CONFIG')
+
+if customSurfaceTemperature=='yes':
+  env.Append(F90FLAGS='-DCUSTOM_SURFACE_TEMPERATURE')
 
 if cray=='yes':
   env.Replace(CC='cc', CXX='CC', F90='ftn')
