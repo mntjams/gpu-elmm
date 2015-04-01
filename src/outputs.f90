@@ -2358,6 +2358,20 @@ contains
     !$omp end do nowait
 
     !$omp do
+    do k = 0,Prnz
+      S = 0
+      do j = 1,Vny
+       do i = 1,Vnx
+         if (Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0) then
+           S = S - (Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k)) * (V(i,j,k+1)-V(i,j,k)) / dzmin / 4
+         end if
+       end do
+      end do
+      current_profiles%vwsgs(k) = S
+    end do
+    !$omp end do nowait
+
+    !$omp do
     do k = 1,Unz
       S = 0
       do j = 1,Uny
