@@ -30,6 +30,7 @@ module WMPoint_types
     real(knd) :: area_factor ![m^-1] area of the solid wall divided by the volume of the cell(xi,yj,zk)
 
     real(knd) :: z0 = 0
+    real(knd) :: z0H = 0
     real(knd) :: ustar = 1
 
     real(knd) :: temperature = 0
@@ -67,6 +68,7 @@ module WMPoint_types
     real(knd) :: distz
 
     real(knd) :: z0 = 0
+    real(knd) :: z0H = 0
     real(knd) :: ustar = 1
 
     real(knd) :: wallu = 0
@@ -144,7 +146,7 @@ module Wallmodels
     type(WMPointUVW), dimension(:), pointer :: points
   end type
   
-  type(point_container) :: WMPointsUVW(6,3)
+  type(point_container), public :: WMPointsUVW(6,3)
 
 contains
 
@@ -437,6 +439,7 @@ contains
            WMP%ustar = 1
 
            WMP%z0 = z0W
+           WMP%z0H = WMP%z0
            call AddWMPoint(WMP)
          end if
        end do
@@ -456,6 +459,7 @@ contains
            WMP%ustar = 1
 
            WMP%z0 = z0E
+           WMP%z0H = WMP%z0
            call AddWMPoint(WMP)
          end if
        end do
@@ -481,6 +485,7 @@ contains
            end if
 
            WMP%z0 = z0S
+           WMP%z0H = WMP%z0
            call AddWMPoint(WMP)
          end if
        end do
@@ -506,6 +511,7 @@ contains
            end if
 
            WMP%z0 = z0N
+           WMP%z0H = WMP%z0
            call AddWMPoint(WMP)
          end if
        end do
@@ -532,6 +538,7 @@ contains
            end if
 
            WMP%z0 = z0B
+           WMP%z0H = WMP%z0
 
            if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==WALL_FLUX) then
              WMP%temperature_flux = sideTemp(Bo)
@@ -568,6 +575,7 @@ contains
            end if
 
            WMP%z0 = z0T
+           WMP%z0H = WMP%z0
            call AddWMPoint(WMP)
          end if
        end do
@@ -609,6 +617,7 @@ contains
              p%ustar = 1
 
              p%z0 = z0W
+             p%z0H = p%z0
              call AddWMPointUVW(p, component, We)
            end if
          end do
@@ -628,6 +637,7 @@ contains
              p%ustar = 1
 
              p%z0 = z0E
+             p%z0H = p%z0
              call AddWMPointUVW(p, component, Ea)
            end if
          end do
@@ -653,6 +663,7 @@ contains
              end if
 
              p%z0 = z0S
+             p%z0H = p%z0
              call AddWMPointUVW(p, component, So)
            end if
          end do
@@ -678,6 +689,7 @@ contains
              end if
 
              p%z0 = z0N
+             p%z0H = p%z0
              call AddWMPointUVW(p, component, No)
            end if
          end do
@@ -704,6 +716,7 @@ contains
              end if
 
              p%z0 = z0B
+             p%z0H = p%z0
 
              if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==WALL_FLUX) then
                p%temperature_flux = sideTemp(Bo)
@@ -740,6 +753,7 @@ contains
              end if
 
              p%z0 = z0T
+             p%z0H = p%z0
              
              if (TempBtype(To)==CONSTFLUX.or.TempBtype(To)==WALL_FLUX) then
                p%temperature_flux = sideTemp(To)
@@ -1366,9 +1380,9 @@ contains
 
 
 
-  pure subroutine WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,tempdif)
+  pure subroutine WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,z0H,tempdif)
     real(knd),intent(inout) :: ustar,temperature_flux
-    real(knd),intent(in) :: vel,dist,z0,tempdif
+    real(knd),intent(in) :: vel,dist,z0,z0H,tempdif
     real(knd),parameter :: eps = 1e-3_knd
     real(knd),parameter :: yplcrit = 11.225_knd
     real(knd),parameter :: k_U = 0.4_knd
@@ -1400,7 +1414,7 @@ contains
          psi_h = PsiH_MO_mod(zL)
          
          ustar = vel * k_U / (log(dist/z0) - psi_m)
-         temperature_flux = - tempdif * ustar * k_T / (log(dist/z0) - psi_h)
+         temperature_flux = - tempdif * ustar * k_T / (log(dist/z0H) - psi_h)
          
          if  (i>1 .and. abs(zL-zL0)/max(abs(zL),1.e-4_knd)<eps) exit
          if (i>=50.or.zL>10000) exit
@@ -1484,10 +1498,10 @@ contains
 
 
 
-  pure subroutine WM_MO_DIRICHLET(visc,ustar,temperature_flux,z0,tempdif,distvect,uvect)
+  pure subroutine WM_MO_DIRICHLET(visc,ustar,temperature_flux,z0,z0H,tempdif,distvect,uvect)
     real(knd),intent(out)   :: visc
     real(knd),intent(inout) :: ustar,temperature_flux
-    real(knd),intent(in)    :: z0
+    real(knd),intent(in)    :: z0,z0H
     real(knd),intent(in)    :: tempdif ! temperature difference surface - nearest point
     real(knd),intent(in)    :: distvect(3),uvect(3)
     real(knd) vect(3),vel,dist
@@ -1498,7 +1512,7 @@ contains
 
     vel = sqrt(sum(vect**2))
 
-    call WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,tempdif)
+    call WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,z0H,tempdif)
 
     if (ustar<0) ustar = 0
 
@@ -1513,9 +1527,9 @@ contains
   end subroutine WM_MO_DIRICHLET
 
 
-  pure subroutine WM_MO_DirichletStress(ustar,temperature_flux,z0,tempdif,distvect,uvect,tan_vect)
+  pure subroutine WM_MO_DirichletStress(ustar,temperature_flux,z0,z0H,tempdif,distvect,uvect,tan_vect)
     real(knd),intent(inout) :: ustar,temperature_flux
-    real(knd),intent(in)    :: z0
+    real(knd),intent(in)    :: z0,z0H
     real(knd),intent(in)    :: tempdif ! temperature difference surface - nearest point
     real(knd),intent(in)    :: distvect(3),uvect(3)
     real(knd),intent(out)   :: tan_vect(3)
@@ -1525,7 +1539,7 @@ contains
 
     vel = sqrt(sum(tan_vect**2))
 
-    call WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,tempdif)
+    call WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,z0H,tempdif)
 
     if (ustar<0) ustar = 0
 
@@ -1690,7 +1704,7 @@ if (xi==1.and.yj==1.and.zk==1) debuglevel =1
 
            call WM_MO_DIRICHLET(visc, WMPoints(i)%ustar, &
                                 WMPoints(i)%temperature_flux, &
-                                WMPoints(i)%z0, tdif, dist, vel)
+                                WMPoints(i)%z0, WMPoints(i)%z0H, tdif, dist, vel)
 debuglevel = 0
          else if (enable_buoyancy .and. WMPoints(i)%temperature_flux>0) then
 
@@ -1815,7 +1829,7 @@ debuglevel = 0
                temp = local_value(Temperature, component, xi, yj, zk)
 
                call WM_MO_DirichletStress(p%ustar, p%temperature_flux, &
-                                          p%z0, temp-p%temperature, &
+                                          p%z0, p%z0H, temp-p%temperature, &
                                           dist, vel, tan_vect)
 
              else if (enable_buoyancy .and. p%temperature_flux>0) then
