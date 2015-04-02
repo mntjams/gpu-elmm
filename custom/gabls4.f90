@@ -7,8 +7,7 @@ module Custom_gabls4
   logical :: initialized = .false.
   
   integer :: last = 1
-  real(knd) :: last_time = -huge(1._knd)
-  real(knd) :: last_temp
+  real(knd) :: surf_temp
   
   real(knd), allocatable :: coefs(:,:), table(:,:)
   
@@ -58,6 +57,14 @@ contains
 end module
 
 
+subroutine CustomTimeStepProcedure
+  use Custom_gabls4
+  use Parameters
+  
+  surf_temp = cubic_spline_eval(time, table(:,1), coefs, last)
+end subroutine
+
+
 function CustomSurfaceTemperature(x,y,z,t) result(res)
    use Kinds
    use Custom_gabls4
@@ -68,19 +75,7 @@ function CustomSurfaceTemperature(x,y,z,t) result(res)
    real(knd), intent(in) :: x, y, z
    real(tim), intent(in) :: t
    
-   !$ stop "CustomSurfaceTemperature not thread safe (yet?)"   
-   if (t==last_time) then
-     res = last_time
-   else
-
-     if (.not.initialized) call initialize
-     
-     res =  cubic_spline_eval(t, table(:,1), coefs, last)
-     
-     last_time = t
-     last_temp = res
-     
-   end if
+   res = surf_temp
 
 end function
 
