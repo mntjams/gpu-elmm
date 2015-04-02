@@ -42,13 +42,13 @@ contains
 
   end subroutine
     
-  subroutine initialize
+  subroutine initialize_surface_temp
   
     call read_table("input/Tg.txt")
 
     allocate(coefs(0:3,size(table,1)))
  
-    call cubic_spline(table(:,1), table(:,2), coefs)
+    call linear_interpolation(table(:,1), table(:,2), coefs)
     
     initialized = .true.
   
@@ -60,7 +60,7 @@ end module
 subroutine CustomTimeStepProcedure
   use Custom_gabls4
   use Parameters
-  
+
   surf_temp = cubic_spline_eval(time, table(:,1), coefs, last)
 end subroutine
 
@@ -79,6 +79,43 @@ function CustomSurfaceTemperature(x,y,z,t) result(res)
 
 end function
 
+subroutine CustomConfiguration_first
+end subroutine
+
+subroutine CustomConfiguration_last
+  use Kinds
+  use Scalars
+  use Custom_gabls4
+  
+  implicit none
+  
+  integer :: n, u, i, io
+  real(knd), allocatable :: theta(:,:)
+  character(80) :: line
+  
+  call initialize_surface_temp
+  
+  open(newunit=u, file="input/theta_profile.txt", status="old", action="read")
+  n = 0
+  do
+    read(u,'(a)',iostat=io) line
+    if (io/=0) exit
+    n = n + 1
+  end do
+
+  allocate(theta(n,2))
+
+  rewind(u)
+  
+  do i = 1, n
+    read(u,'(a)',iostat=io) line
+    read(line, *) theta(i,:)
+  end do
+
+  close(u)
+  
+  call move_alloc(theta, TemperatureProfile%points)
+end subroutine
 
 subroutine  CustomSolidBodies
 end subroutine  CustomSolidBodies
