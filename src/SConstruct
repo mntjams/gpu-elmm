@@ -13,6 +13,7 @@ SB = ARGUMENTS.get('SB','')
 customPB = ARGUMENTS.get('customPB','')
 customPuff = ARGUMENTS.get('customPuff','')
 customConfig = ARGUMENTS.get('customConfig','')
+customBoundaryConditions = ARGUMENTS.get('customBoundaryConditions','')
 customSurfaceTemperature = ARGUMENTS.get('customSurfaceTemperature','')
 customTimeStepProcedure = ARGUMENTS.get('customTimeStepProcedure','')
 PB = ARGUMENTS.get('PB','')
@@ -199,6 +200,9 @@ if customPuff=='yes':
   
 if customConfig=='yes':
   env.Append(F90FLAGS='-DCUSTOM_CONFIG')
+
+if customBoundaryConditions=='yes':
+  env.Append(F90FLAGS='-DCUSTOM_BOUNDARY_CONDITIONS')
 
 if customSurfaceTemperature=='yes':
   env.Append(F90FLAGS='-DCUSTOM_SURFACE_TEMPERATURE')

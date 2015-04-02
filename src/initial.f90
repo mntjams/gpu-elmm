@@ -2087,6 +2087,13 @@ contains
     integer   :: unit, io
     
     type(spline_coefs) :: geostrophic_wind
+    
+#ifdef CUSTOM_BOUNDARY_CONDITIONS
+    interface
+      subroutine CustomBoundaryConditions
+      end subroutine
+    end interface
+#endif
 
     call init_random_seed
 
@@ -2528,8 +2535,12 @@ contains
    !filter out frames outside the domain
    call InitVTKFrames
    call InitSurfaceFrames
+   
+#ifdef CUSTOM_BOUNDARY_CONDITIONS
+   call CustomBoundaryConditions
+#endif
 
-    if (master) write (*,*) "set"
+   if (master) write (*,*) "set"
     
   contains
   
