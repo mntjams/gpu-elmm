@@ -30,6 +30,7 @@ implicit none
 
 
   type TScalarProfile
+    real(knd), allocatable :: points(:,:)
     type(TScalarProfileSection), allocatable :: sections(:)
     integer   :: randomize
     real(knd) :: randomizeTop
@@ -1706,6 +1707,7 @@ contains
 
 
   subroutine InitScalarProfile(ScalarIn, ScalarProfile, default_value)
+    use Interpolation
     real(knd), contiguous, intent(inout) :: ScalarIn(-1:,-1:)
     type(TScalarProfile), intent(inout) :: ScalarProfile
     real(knd), intent(in) :: default_value
@@ -1713,74 +1715,89 @@ contains
     integer   :: section, nSections, s
     integer   :: i, j, k
     real(knd) :: temp
-
-    nSections = size(ScalarProfile%Sections)
-
-    if (nSections > 0) then
-
-       if (size(ScalarProfile%Sections)>0) then
-         if (ScalarProfile%Sections(1)%jump<=0) ScalarProfile%Sections(1)%jump = default_value
-       end if
-
-      ScalarProfile%Sections(1)%height = ScalarProfile%Sections(1)%top
-
-      do i = 2, nSections
-        if (ScalarProfile%Sections(i)%top < ScalarProfile%Sections(i-1)%top) &
-          ScalarProfile%Sections(i)%top = ScalarProfile%Sections(i-1)%top
-
-        ScalarProfile%Sections(i)%height = ScalarProfile%Sections(i)%top - ScalarProfile%Sections(i-1)%top
-      end do
-
-      if (ScalarProfile%Sections(nSections)%top < zW(Prnz+2) ) &
-          ScalarProfile%Sections(nSections)%top = zW(Prnz+2)
-
-      section = 1
-
+    real(knd), allocatable :: coefs(:,:)
+    
+    if (allocated(ScalarProfile%points)) then
+    
+      allocate(coefs(0:3,size(ScalarProfile%points,1)))
+      call linear_interpolation(ScalarProfile%points(:,1), ScalarProfile%points(:,2), coefs)
+      
+      i = 0
       do k = -1, Prnz+2
-        do while (zPr(k) > ScalarProfile%Sections(section)%top) !should be safe, because last top is adjusted above
-          section = section + 1
-        end do
-        SectionToUse(k) = section
+        ScalarIn(:,k) = linear_interpolation_eval(zPr(k), ScalarProfile%points(:,1), coefs, i)
       end do
-
+        
     else
 
-      SectionToUse = 0
+      nSections = size(ScalarProfile%Sections)
 
-    end if
+      if (nSections > 0) then
 
-    do k = -1, Prnz+2
+         if (size(ScalarProfile%Sections)>0) then
+           if (ScalarProfile%Sections(1)%jump<=0) ScalarProfile%Sections(1)%jump = default_value
+         end if
 
-      s = SectionToUse(k)
+        ScalarProfile%Sections(1)%height = ScalarProfile%Sections(1)%top
 
-      if (s==0) then
+        do i = 2, nSections
+          if (ScalarProfile%Sections(i)%top < ScalarProfile%Sections(i-1)%top) &
+            ScalarProfile%Sections(i)%top = ScalarProfile%Sections(i-1)%top
 
-        temp = default_value
+          ScalarProfile%Sections(i)%height = ScalarProfile%Sections(i)%top - ScalarProfile%Sections(i-1)%top
+        end do
+
+        if (ScalarProfile%Sections(nSections)%top < zW(Prnz+2) ) &
+            ScalarProfile%Sections(nSections)%top = zW(Prnz+2)
+
+        section = 1
+
+        do k = -1, Prnz+2
+          do while (zPr(k) > ScalarProfile%Sections(section)%top) !should be safe, because last top is adjusted above
+            section = section + 1
+          end do
+          SectionToUse(k) = section
+        end do
 
       else
 
-        temp = 0
-
-        do i = 1, s-1
-          temp = temp + ScalarProfile%Sections(i)%jump
-          temp = temp + ScalarProfile%Sections(i)%height * ScalarProfile%Sections(i)%gradient
-        end do
-
-        temp = temp + ScalarProfile%Sections(s)%jump
-
-        if (s>1) then
-          temp = temp + (zPr(k) - ScalarProfile%Sections(s-1)%top) * ScalarProfile%Sections(s)%gradient
-        else
-          temp = temp + zPr(k) * ScalarProfile%Sections(s)%gradient
-        end if
+        SectionToUse = 0
 
       end if
 
-      do j = -1, Prny+2
-          ScalarIn(j,k) = temp
-      end do
+      do k = -1, Prnz+2
 
-    end do
+        s = SectionToUse(k)
+
+        if (s==0) then
+
+          temp = default_value
+
+        else
+
+          temp = 0
+
+          do i = 1, s-1
+            temp = temp + ScalarProfile%Sections(i)%jump
+            temp = temp + ScalarProfile%Sections(i)%height * ScalarProfile%Sections(i)%gradient
+          end do
+
+          temp = temp + ScalarProfile%Sections(s)%jump
+
+          if (s>1) then
+            temp = temp + (zPr(k) - ScalarProfile%Sections(s-1)%top) * ScalarProfile%Sections(s)%gradient
+          else
+            temp = temp + zPr(k) * ScalarProfile%Sections(s)%gradient
+          end if
+
+        end if
+
+        do j = -1, Prny+2
+            ScalarIn(j,k) = temp
+        end do
+
+      end do
+    
+    end if
   end subroutine InitScalarProfile
 
 

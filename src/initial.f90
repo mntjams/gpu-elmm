@@ -40,6 +40,11 @@ module Initial
   character(80) :: probes_file = ""
   character(80) :: scalar_probes_file = ""
 
+  type spline_coefs
+    real(knd), allocatable :: z(:)
+    real(knd), allocatable :: cu(:,:), cv(:,:)
+  end type
+    
 
 contains
 
@@ -1265,13 +1270,13 @@ contains
   end subroutine get_area_sources
 
 
-  subroutine get_geostrophic_wind(fname)
+  subroutine get_geostrophic_wind(fname, g)
     use Interpolation
     character(*), intent(in) :: fname
+    type(spline_coefs), intent(out) :: g
     character(256) :: line
     real(knd) :: r3(3)
-    real(knd), allocatable :: z(:), ug(:), vg(:)
-    real(knd), allocatable :: cu(:,:), cv(:,:)
+    real(knd), allocatable :: ug(:), vg(:)
     integer :: unit, io, n, i, j
 
     open(newunit=unit,file=fname,status="old",action="read",iostat = io)
@@ -1289,31 +1294,31 @@ contains
     rewind(unit)
     
     if (n>0) then
-      allocate(z(n), ug(n), vg(n))
-      allocate(cu(0:3,n), cv(0:3,n))
+      allocate(g%z(n), ug(n), vg(n))
+      allocate(g%cu(0:1,n), g%cv(0:1,n))
       do i = 1, n
         read(unit,'(a)',iostat=io) line
-        read(line, *) z(i), ug(i), vg(i)
+        read(line, *) g%z(i), ug(i), vg(i)
       end do
     else
       stop "Geostrophic profile empty."
     end if
 
     if (n > 1) then
-      call cubic_spline(z, ug, cu)
-      call cubic_spline(z, vg, cv)
+      call linear_interpolation(g%z, ug, g%cu)
+      call linear_interpolation(g%z, vg, g%cv)
 
       allocate(pr_gradient_profile_x(1:Prnz))
       allocate(pr_gradient_profile_y(1:Prnz))
 
       j = 1
       do i = 1, Prnz
-        pr_gradient_profile_x(i) =   Coriolis_parameter * cubic_spline_eval(zPr(i), z, cv, j)
+        pr_gradient_profile_x(i) =   Coriolis_parameter * linear_interpolation_eval(zPr(i), g%z, g%cv, j)
       end do
 
       j = 1
       do i = 1, Prnz
-        pr_gradient_profile_y(i) = - Coriolis_parameter * cubic_spline_eval(zPr(i), z, cu, j)
+        pr_gradient_profile_y(i) = - Coriolis_parameter * linear_interpolation_eval(zPr(i), g%z, g%cu, j)
       end do
 
       enable_pr_gradient_x_profile = any(pr_gradient_profile_x/=0)
@@ -1328,6 +1333,7 @@ contains
       enable_pr_gradient_y_uniform = pr_gradient_y /= 0
 
     end if
+    
 
   end subroutine get_geostrophic_wind
 
@@ -2072,10 +2078,15 @@ contains
   subroutine InitBoundaryConditions
     use VTKFrames, only: InitVTKFrames
     use SurfaceFrames, only: InitSurfaceFrames
-    real(knd),allocatable:: xU2(:),yV2(:),zW2(:)
-    integer i,j,k,nx,ny,nz,nxup,nxdown,nyup,nydown,nzup,nzdown,io
-    real(knd) P,dt
-    integer unit
+    
+    real(knd), allocatable:: xU2(:), yV2(:), zW2(:)
+    integer   :: i, j, k
+    integer   :: nx, ny, nz
+    integer   :: nxup, nxdown, nyup, nydown, nzup, nzdown
+    real(knd) :: P, dt
+    integer   :: unit, io
+    
+    type(spline_coefs) :: geostrophic_wind
 
     call init_random_seed
 
@@ -2374,7 +2385,7 @@ contains
 
 
     !Requires grid coordinates
-    call get_geostrophic_wind("geostrophic_wind_profile.conf")
+    call get_geostrophic_wind("geostrophic_wind_profile.conf", geostrophic_wind)
 
 
     allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
@@ -2404,6 +2415,8 @@ contains
         call GetTurbulentInlet(dt)
       case (FromFileInletType)
         call GetInletFromFile(start_time)
+      case (GeostrophicInletType)
+        call GeostrophicWindInlet(geostrophic_wind)
       case default
         call ConstantInlet
     endselect
@@ -2517,6 +2530,30 @@ contains
    call InitSurfaceFrames
 
     if (master) write (*,*) "set"
+    
+  contains
+  
+    subroutine GeostrophicWindInlet(g)
+      use Interpolation
+      type(spline_coefs), intent(in) :: g
+      real(knd) :: ug, vg
+      integer :: j, k
+      
+      Win = 0
+      
+      j = 0
+      do k = -2, Unz+3
+        ug = linear_interpolation_eval(zPr(k), g%z, g%cu, j)
+        Uin(:,k) = ug
+      end do
+      
+      j = 0
+      do k = -2, Vnz+3
+        vg = linear_interpolation_eval(zPr(k), g%z, g%cv, j)
+        Vin(:,k) = vg
+      end do
+    end subroutine
+    
   end subroutine InitBoundaryConditions
 
 

@@ -174,7 +174,8 @@ module Parameters
                         MPI_BOUNDS=1000, MPI_BOUNDARY=1000, MPI_PERIODIC=1001
   !inlet types
   integer, parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
-                        ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5
+                        ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5, &
+                        GeostrophicInletType=6
   !inlet profile types
   integer, parameter :: CONSTPROF=1, LOGPROF=2, POWERPROF=3 
   integer, parameter :: GENERALGRID=1, UNIFORMGRID=2
