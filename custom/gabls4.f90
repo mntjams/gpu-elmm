@@ -117,5 +117,23 @@ subroutine CustomConfiguration_last
   call move_alloc(theta, TemperatureProfile%points)
 end subroutine
 
+subroutine CustomBoundaryConditions
+  use Wallmodels
+  
+  implicit none
+  
+  integer :: i, j
+  
+  WMPoints%z0 = 0.01
+  WMPoints%z0H = 0.001
+  
+  do j = 1, 3
+    do i = 1, 6
+      WMPointsUVW(i,j)%points%z0 = 0.01
+      WMPointsUVW(i,j)%points%z0H = 0.001
+    end do
+  end do
+end subroutine
+
 subroutine  CustomSolidBodies
 end subroutine  CustomSolidBodies
