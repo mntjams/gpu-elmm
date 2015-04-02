@@ -14,6 +14,7 @@ customPB = ARGUMENTS.get('customPB','')
 customPuff = ARGUMENTS.get('customPuff','')
 customConfig = ARGUMENTS.get('customConfig','')
 customSurfaceTemperature = ARGUMENTS.get('customSurfaceTemperature','')
+customTimeStepProcedure = ARGUMENTS.get('customTimeStepProcedure','')
 PB = ARGUMENTS.get('PB','')
 extra = ARGUMENTS.get('extra','')
 cgal = ARGUMENTS.get('cgal','')
@@ -201,6 +202,9 @@ if customConfig=='yes':
 
 if customSurfaceTemperature=='yes':
   env.Append(F90FLAGS='-DCUSTOM_SURFACE_TEMPERATURE')
+
+if customTimeStepProcedure=='yes':
+  env.Append(F90FLAGS='-DCUSTOM_TIMESTEP_PROCEDURE')
 
 if cray=='yes':
   env.Replace(CC='cc', CXX='CC', F90='ftn')

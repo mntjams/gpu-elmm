@@ -32,6 +32,12 @@ contains
     integer(int64), save :: trate
     integer(int64), save :: time1, time2
 
+#ifdef  CUSTOM_TIMESTEP_PROCEDURE
+    interface
+      subroutine CustomTimeStepProcedure
+      end subroutine
+    end interface
+#endif
 
     if (called==0) then
       called = 1
@@ -75,6 +81,10 @@ contains
 
 
     if (master) write (*,'(a,f12.6,a,es12.4)') " time: ", time," dt: ", dt
+    
+#ifdef  CUSTOM_TIMESTEP_PROCEDURE
+    call CustomTimeStepProcedure
+#endif
 
 
     do RK_stage = 1, RK_stages
