@@ -46,6 +46,8 @@ contains
   
     call read_table("input/Tg.txt")
 
+    table = table * (1000.0_knd/651._knd)**0.2854_knd
+
     allocate(coefs(0:3,size(table,1)))
  
     call linear_interpolation(table(:,1), table(:,2), coefs)
