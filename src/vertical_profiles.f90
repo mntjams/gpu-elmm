@@ -100,15 +100,16 @@ contains
     type(Profiles), intent(in) :: profs
     real(tim), intent(in) :: time, dt
 
-    if ( (time-dt >= self%start + (self%nth-1)*self%interval) .and. &
-         (time <= self%start + (self%nth-1)*self%interval ) .and. &
+   if ( (time-dt < self%start + (self%nth-1)*self%interval) .and. &
+         (time >= self%start + (self%nth-1)*self%interval ) .and. &
          (time <= self%end)) then
-
+         
       self%profs = profs
       
       call self%Save
       self%nth = self%nth + 1
     end if
+
   end subroutine
   
   
