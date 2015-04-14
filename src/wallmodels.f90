@@ -1401,8 +1401,6 @@ contains
        psi_h = 0
        zL0 = -10000._knd
     
-! if (debuglevel==1) print *, "ustar_n", ustar, "tflux_n", temperature_flux
-
        i = 0
        do
          i = i+1
@@ -1421,9 +1419,7 @@ contains
                  
          zl0 = zL
        end do
-! if (debuglevel==1) print *,i, "z/L",zL, &
-!   "RiB",grav_acc*tempdif/(vel**2 * dist), &
-!   "Rf", -(grav_acc/temperature_ref) * temperature_flux / (ustar**2 * vel / dist)
+
        if (i>=50.or.zL>10000) then
          ustar = sqrt(vel/(dist*Re))
          temperature_flux = - (1/(Re*Prandtl)) * tempdif / dist
