@@ -376,9 +376,6 @@ end module Custom_gabls4
 subroutine CustomTimeStepOutput
   use Custom_gabls4
   use Parameters
-#ifdef MPI  
-  use Custom_mpi
-#endif
   use Outputs
   
   implicit none
