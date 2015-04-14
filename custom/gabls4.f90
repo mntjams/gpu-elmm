@@ -3,7 +3,9 @@ module Custom_gabls4
   use Interpolation
   use Parameters
 #ifdef MPI  
-  use Custom_mpi
+  use Custom_mpi, only: iim, jim, kim, nzims, &
+                        comm_row_z, sum_to_master_horizontal, &
+                        MPI_INTEGER, MPI_KND
 #endif
   
   implicit none
