@@ -686,6 +686,13 @@ contains
     real(knd) :: fl_L, fl_R
     logical, save :: called = .false.
     
+#ifdef CUSTOM_OUTPUT
+    interface
+      subroutine CustomTimeStepOutput
+      end subroutine
+    end interface   
+#endif
+
     if (.not.called) then
       call InitTimeSeries
       called = .true.
@@ -1058,6 +1065,10 @@ contains
       call OutputTimeSeries
       time_series_step = 0
     end if
+    
+#ifdef CUSTOM_OUTPUT
+    call CustomTimeStepOutput
+#endif
 
   end subroutine OutTstep
 
@@ -2246,6 +2257,13 @@ contains
     real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Scalar(-1:,-1:,-1:,:)
+    
+#ifdef CUSTOM_OUTPUT
+    interface
+      subroutine CustomOutput
+      end subroutine
+    end interface
+#endif
 
     call BoundU(1,U,Uin)
     call BoundU(2,V,Vin)
@@ -2278,6 +2296,10 @@ contains
     call FinalizeSurfaceFrames
 
     call FinalizeStaggeredFrames
+    
+#ifdef CUSTOM_OUTPUT
+    call CustomOutput
+#endif
 
     if (master) write(*,*) "saved"
 
