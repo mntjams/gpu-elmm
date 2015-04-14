@@ -54,7 +54,7 @@ program CLMM
   call AllocateOutputs
 
   if (master) write (*,*) "Setting up initial conditions..."
-  call InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
+  call InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,dt)
 
   time = start_time
   time_step = 0

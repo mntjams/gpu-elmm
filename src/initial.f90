@@ -840,6 +840,7 @@ contains
    else
                           Wnz = Prnz-1
    end if
+   
 
 #ifdef CUSTOM_CONFIG
    call CustomConfiguration_Last
@@ -1704,16 +1705,24 @@ contains
 
 
 
-  subroutine InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
+  subroutine InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,dt)
     real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
     real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
     real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
+    real(knd), intent(out) :: dt
     integer i,j,k
     real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
     real(knd),allocatable :: Q(:,:,:)
-    real(knd) :: dt
 
+    if (abs(Uinlet)>0) then
+      dt = min(abs(dxmin/Uinlet), abs(dymin/Uinlet), abs(dzmin/Uinlet))
+    else if (abs(Uref)>0) then
+      dt = min(abs(dxmin/Uref), abs(dymin/Uref), abs(dzmin/Uref))
+    else
+      dt = dxmin
+    end if
+        
     Pr(1:Prnx,1:Prny,1:Prnz) = 0
 
     U = huge(1._knd)/2
@@ -2414,11 +2423,6 @@ contains
       case (ParabolicInletType)
         call ParabolicInlet
       case (TurbulentInletType)
-        if (Abs(Uinlet)>0) then
-          dt = Abs(dxmin/Uinlet)
-        else
-          dt = dxmin
-        end if
         call GetTurbulentInlet(dt)
       case (FromFileInletType)
         call GetInletFromFile(start_time)
