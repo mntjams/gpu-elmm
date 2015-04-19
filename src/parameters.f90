@@ -54,6 +54,10 @@ module Parameters
   
   !relevant for MPI
   integer :: gPrnx, gPrny, gPrnz !global grid dimensions
+  integer :: gUnx, gUny, gUnz
+  integer :: gVnx, gVny, gVnz
+  integer :: gWnx, gWny, gWnz
+  
   integer :: offset_to_global_x = 0, offset_to_global_y = 0, offset_to_global_z = 0
   integer :: gPrns(3), offsets_to_global(3) = 0
   

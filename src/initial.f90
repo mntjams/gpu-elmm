@@ -740,11 +740,10 @@ contains
      lz = dzmin
    end if
 
-#ifdef MPI
-  gPrnx = Prnx
-  gPrny = Prny
-  gPrnz = Prnz  
-#endif
+   !can be overwritten after MPI decomposition
+   gPrnx = Prnx
+   gPrny = Prny
+   gPrnz = Prnz   
 
 
    if (master) then
@@ -840,6 +839,32 @@ contains
    else
                           Wnz = Prnz-1
    end if
+   
+#ifdef MPI
+   gUnx = mpi_co_sum(Unx, comm_row_x)
+   gUny = mpi_co_sum(Uny, comm_row_y)
+   gUnz = mpi_co_sum(Unz, comm_row_z)
+   
+   gVnx = mpi_co_sum(Vnx, comm_row_x)
+   gVny = mpi_co_sum(Vny, comm_row_y)
+   gVnz = mpi_co_sum(Vnz, comm_row_z)
+   
+   gWnx = mpi_co_sum(Wnx, comm_row_x)
+   gWny = mpi_co_sum(Wny, comm_row_y)
+   gWnz = mpi_co_sum(Wnz, comm_row_z)
+#else
+   gUnx = Unx
+   gUny = Uny
+   gUnz = Unz
+   
+   gVnx = Vnx
+   gVny = Vny
+   gVnz = Vnz
+   
+   gWnx = Wnx
+   gWny = Wny
+   gWnz = Wnz 
+#endif
    
 
 #ifdef CUSTOM_CONFIG
