@@ -50,6 +50,7 @@ module custom_mpi
     module procedure mpi_co_sum_64_comm
     module procedure mpi_co_sum_64_comm_1d
     module procedure mpi_co_sum_int
+    module procedure mpi_co_sum_int_comm
   end interface
 
   interface sum_to_master_horizontal
@@ -564,6 +565,15 @@ contains
     integer ie
     
     res = mpi_co_reduce(x, MPI_SUM, global_comm)
+  end function
+
+  function mpi_co_sum_int_comm(x, comm) result(res)
+    integer :: res
+    integer,intent(in) :: x
+    integer, intent(in) :: comm
+    integer ie
+    
+    res = mpi_co_reduce(x, MPI_SUM, comm)
   end function
 
   function mpi_co_sum_32(x) result(res)
