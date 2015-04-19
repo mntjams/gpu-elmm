@@ -628,6 +628,7 @@ subroutine CustomConfiguration_last
   use Custom_gabls4
   use Frames_common
   use VTKFrames
+  use Sponge, only: enable_top_sponge, top_sponge_bottom
   
   implicit none
   
@@ -661,6 +662,9 @@ subroutine CustomConfiguration_last
   call AddDomain(TFrameDomain('3d', &
                3, 1, 0.0_knd, &
                TFrameTimes(3600._knd, 82800._knd, 12), TFrameFlags(U=1, Pr=1, temperature=1)))
+               
+  enable_top_sponge = .true.
+  top_sponge_bottom = 600
   
 end subroutine
 
