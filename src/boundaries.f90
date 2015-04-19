@@ -608,7 +608,7 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(Ea)==NEUMANN.or.Btype(Ea)==OUTLETBUFF.or.(component/=1.and.Btype(Ea)==FREESLIP)) then   !Neumann outlet
+    else if (Btype(Ea)==NEUMANN.or.(component/=1.and.Btype(Ea)==FREESLIP)) then   !Neumann outlet
       do k = 1, nz
        do j = 1, ny
         U(nx+1,j,k)=U(nx,j,k)
@@ -865,7 +865,6 @@ implicit none
       end if
     else if (Btype(To)==NOSLIP .or. &
              (component==3.and.(Btype(To)==FREESLIP .or. &
-                                Btype(To)==FREESLIPBUFF .or. &
                                 Btype(To)==AUTOMATICFLUX)) .or. &
              (Btype(To)==DIRICHLET.and.regime==interm) ) then
       if (component==3) then
@@ -887,7 +886,6 @@ implicit none
       end if
     else if (Btype(To)==NEUMANN .or. &
              (component/=3.and.(Btype(To)==FREESLIP .or. &
-                                Btype(To)==FREESLIPBUFF.or. &
                                 Btype(To)==AUTOMATICFLUX))) then
       do j = -2, ny+3
        do i = -2, nx+3                       !Neumann inlet
