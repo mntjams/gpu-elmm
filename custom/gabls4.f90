@@ -41,13 +41,13 @@ module Custom_gabls4
 
 #endif
 
-  integer, parameter :: h2 = 1, h3 = 2, h9 = 3, h10 = 4, h15 = 5, &
-                        h18 = 6, h23 = 7, h25 = 8, h30 = 9, h33 = 10, &
-                        h38 = 11, h42 = 12
-  real(knd), parameter :: z(12) = [2._knd, 3.3_knd, 8.8_knd, 10._knd, 15.43_knd, &
+  integer, parameter :: h2 = 1, h3 = 2, h7 = 3, h9 = 4, h10 = 5, h15 = 6, &
+                        h18 = 7, h23 = 8, h25 = 9, h30 = 10, h33 = 11, &
+                        h38 = 12, h42 = 13
+  real(knd), parameter :: z(13) = [2._knd, 3.3_knd, 7.03_knd, 8.8_knd, 10._knd, 15.43_knd, &
                                    17.9_knd, 22.79_knd, 25.3_knd, 30.15_knd, 32.7_knd, &
                                    37.51_knd, 41.9_knd]
-  integer :: zk(12), zwk(12)
+  integer :: zk(13), zwk(13)
   
   character(:), allocatable :: gabls_series_dir
   
@@ -72,6 +72,10 @@ module Custom_gabls4
                                                    vw15, &
                                                    Tw15, &
                                                    tke15, &
+                                                   uw7, &
+                                                   vw7, &
+                                                   Tw7, &
+                                                   tke7, &
                                                    t18, &
                                                    u18, &
                                                    v18, &
@@ -247,6 +251,10 @@ contains
       call create("v9.unf")
       call create("u10.unf")
       call create("v10.unf")
+      call create("uw7.unf")
+      call create("vw7.unf")
+      call create("Tw7.unf")
+      call create("tke7.unf")
       call create("uw15.unf")
       call create("vw15.unf")
       call create("Tw15.unf")
@@ -328,6 +336,10 @@ contains
     call save(v9, "v9.unf")
     call save(u10, "u10.unf")
     call save(v10, "v10.unf")
+    call save(uw7, "uw7.unf")
+    call save(vw7, "vw7.unf")
+    call save(Tw7, "Tw7.unf")
+    call save(tke7, "tke7.unf")
     call save(uw15, "uw15.unf")
     call save(vw15, "vw15.unf")
     call save(Tw15, "Tw15.unf")
@@ -491,6 +503,14 @@ subroutine CustomTimeStepOutput
 
     u10(step) = interp(z(h10), zk(h10), up)
     v10(step) = interp(z(h10), zk(h10), vp)
+
+    uw7(step) = interpw(z(h7), zwk(h7), uw)
+    vw7(step) = interpw(z(h7), zwk(h7), vw)
+    Tw7(step) = interpw(z(h7), zwk(h7), tempfl)
+    tke7(step) = ( interp(z(h7), zk(h7), uu) + &
+                    interp(z(h7), zk(h7), vv) + &
+                    interpw(z(h7), zwk(h7), ww)) / 2 + &
+                  interp(z(h7), zk(h7), tkesgs)
 
     uw15(step) = interpw(z(h15), zwk(h15), uw)
     vw15(step) = interpw(z(h15), zwk(h15), vw)
