@@ -4,7 +4,7 @@ module Scalars
  use Wallmodels
  use Boundaries
  use ScalarBoundaries
- use Sponge, only: enable_top_sponge, SpongeTopScalar
+ use Sponge, only: enable_top_sponge_scalar, SpongeTopScalar
  use Tiling, only: tilenx, tileny, tilenz
 
 implicit none
@@ -211,7 +211,7 @@ contains
           call assign(Array, Array2)
         end if
 
-        if (enable_top_sponge) call SpongeTopScalar(Array)
+        if (enable_top_sponge_scalar) call SpongeTopScalar(Array)
 
         call boundary_procedure(Array)
 

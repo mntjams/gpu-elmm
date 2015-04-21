@@ -648,7 +648,7 @@ subroutine CustomConfiguration_last
   use Custom_gabls4
   use Frames_common
   use VTKFrames
-  use Sponge, only: enable_top_sponge, top_sponge_bottom
+  use Sponge, only: enable_top_sponge, top_sponge_bottom, sponge_to_profiles
   
   implicit none
   
@@ -685,11 +685,15 @@ subroutine CustomConfiguration_last
                
   enable_top_sponge = .true.
   top_sponge_bottom = 600
+
+  sponge_to_profiles = .true.
   
 end subroutine
 
 subroutine CustomBoundaryConditions
+  use Parameters
   use Wallmodels
+  use Sponge, only: U_sponge_avg, V_sponge_avg, W_sponge_avg
   
   implicit none
   
@@ -704,6 +708,10 @@ subroutine CustomBoundaryConditions
       WMPointsUVW(i,j)%points%z0H = 0.001
     end do
   end do
+
+  U_sponge_avg = Uin(1,1:Unz)
+  V_sponge_avg = Vin(1,1:Vnz)
+  W_sponge_avg = Win(1,1:Wnz)
 end subroutine
 
 subroutine  CustomSolidBodies
