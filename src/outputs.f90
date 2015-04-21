@@ -640,7 +640,7 @@ contains
       call create(output_dir//"Retau.unf")
     end if
 
-    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.store%tstar==1) then
+    if (wallmodeltype>0.and.enable_buoyancy.and.allocated(tstar).and.store%tstar==1) then
       call create(output_dir//"tflux.unf")
     end if
 
