@@ -1259,14 +1259,14 @@ contains
       close(unit)
     end if
 
-    if (wallmodeltype>0.and.display%ustar==1) then
+    if (wallmodeltype>0.and.store%ustar==1) then
       open(unit,file=output_dir//"Retau.unf", &
            access="stream",status="old",position="append")
       write(unit) ustar(:,1:time_series_step)
       close(unit)
     end if
 
-    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.store%tstar==1) then
+    if (wallmodeltype>0.and.enable_buoyancy.and.allocated(tstar).and.store%tstar==1) then
       open(unit,file=output_dir//"tflux.unf", &
            access="stream",status="old",position="append")
       write(unit) tstar(:,1:time_series_step)
