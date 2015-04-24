@@ -636,7 +636,7 @@ contains
       call create(output_dir//"dissip.unf")
     end if
 
-    if (wallmodeltype>0.and.display%ustar==1) then
+    if (wallmodeltype>0.and.store%ustar==1) then
       call create(output_dir//"Retau.unf")
     end if
 
