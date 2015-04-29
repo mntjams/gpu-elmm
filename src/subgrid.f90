@@ -413,6 +413,9 @@ module Subgrid
     
     subroutine SGS_Sigma_stability(U,V,W,filter_ratio)
       !from Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
+#ifdef MPI
+      use custom_mpi
+#endif
       use Tiling, only: tilenx, tileny, tilenz
       use Outputs, only: enable_profiles, current_profiles
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
@@ -422,14 +425,27 @@ module Subgrid
       integer   :: i,j,k,bi,bj,bk
       real(knd) :: width, C, Pr_sgs, D, g(3,3), s1, s2, s3
       integer, parameter :: sigma_knd = knd
+
+      real(knd) :: tempfl_p(0:Prnz), momfl_p(0:Prnz)
       
       logical :: enable_stability_correction
       enable_stability_correction = enable_buoyancy .and. enable_profiles
-      
+
+      if (enable_stability_correction) then
+        tempfl_p = current_profiles%tempfl + current_profiles%tempflsgs
+        momfl_p = sqrt((current_profiles%uw + current_profiles%uwsgs)**2 + &
+                       (current_profiles%vw + current_profiles%vwsgs)**2)
+#ifdef MPI
+        tempfl_p = mpi_co_sum(tempfl_p, comm=comm_plane_xy)
+        momfl_p = mpi_co_sum(momfl_p, comm=comm_plane_xy)
+#endif
+        tempfl_p = tempfl_p / (gPrnx*gPrny)
+        momfl_p = momfl_p / (gPrnx*gPrny)
+      end if      
 
       width = filter_ratio * (dxmin*dymin*dzmin)**(1._knd/3._knd)
 
-      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk,C) schedule(runtime)
+      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk,C,Pr_sgs) schedule(runtime)
       ! !collapse(3)
       do bk = 1, Prnz, tilenz(narr)
        do bj = 1, Prny, tileny(narr)
@@ -555,13 +571,9 @@ module Subgrid
         real(knd), intent(in) :: width
         real(knd) :: tempfl, momfl, L, wL
         
-        tempfl = (current_profiles%tempfl(k)+current_profiles%tempfl(k-1) + &
-             current_profiles%tempflsgs(k)+current_profiles%tempflsgs(k-1))/2
-        if (tempfl < 0) then
-          momfl = sqrt((current_profiles%uw(k) + &
-                        current_profiles%uwsgs(k-1))**2 + &
-                       (current_profiles%vw(k) + &
-                        current_profiles%vwsgs(k-1))**2 )
+        tempfl = (tempfl_p(k) + tempfl_p(k-1))/2
+        momfl = (momfl_p(k) + momfl_p(k-1)) / 2
+        if (tempfl < 0 .and. momfl < 0) then
           L = - momfl**(3._knd/2._knd) * temperature_ref / &
                ( 0.4_knd* grav_acc * tempfl)
           wL = width / L
