@@ -505,7 +505,7 @@ contains
        n_free_Pr(k) = count(Prtype(1:Prnx,1:Prny,k) <= 0)
      end do
      do k = 0, Prnz+1
-       n_all_Pr(k) = Prnx * Prny
+       n_all_Pr(k) = gPrnx * gPrny
      end do
      do k = 0, Prnz
        n_free_PrW(k) = count(Prtype(1:Prnx,1:Prny,k+1) <= 0 .or. Prtype(1:Prnx,1:Prny,k) <= 0)
