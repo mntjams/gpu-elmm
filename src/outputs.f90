@@ -1284,7 +1284,7 @@ contains
     if (num_of_scalars>0.and.store%scaltotsum_time==1) then
       open(unit,file=output_dir//"scaltotsumtime.unf", &
            access="stream",status="old",position="append")
-      write(unit) sum(scalsum_time(:,1:time_series_step))
+      write(unit) sum(scalsum_time(:,1:time_series_step), dim=1)
       close(unit)
     end if
     
