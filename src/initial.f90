@@ -40,6 +40,11 @@ module Initial
   character(80) :: probes_file = ""
   character(80) :: scalar_probes_file = ""
 
+  type spline_coefs
+    real(knd), allocatable :: z(:)
+    real(knd), allocatable :: cu(:,:), cv(:,:)
+  end type
+    
 
 contains
 
@@ -735,11 +740,10 @@ contains
      lz = dzmin
    end if
 
-#ifdef MPI
-  gPrnx = Prnx
-  gPrny = Prny
-  gPrnz = Prnz  
-#endif
+   !can be overwritten after MPI decomposition
+   gPrnx = Prnx
+   gPrny = Prny
+   gPrnz = Prnz   
 
 
    if (master) then
@@ -835,6 +839,33 @@ contains
    else
                           Wnz = Prnz-1
    end if
+   
+#ifdef MPI
+   gUnx = mpi_co_sum(Unx, comm_row_x)
+   gUny = mpi_co_sum(Uny, comm_row_y)
+   gUnz = mpi_co_sum(Unz, comm_row_z)
+   
+   gVnx = mpi_co_sum(Vnx, comm_row_x)
+   gVny = mpi_co_sum(Vny, comm_row_y)
+   gVnz = mpi_co_sum(Vnz, comm_row_z)
+   
+   gWnx = mpi_co_sum(Wnx, comm_row_x)
+   gWny = mpi_co_sum(Wny, comm_row_y)
+   gWnz = mpi_co_sum(Wnz, comm_row_z)
+#else
+   gUnx = Unx
+   gUny = Uny
+   gUnz = Unz
+   
+   gVnx = Vnx
+   gVny = Vny
+   gVnz = Vnz
+   
+   gWnx = Wnx
+   gWny = Wny
+   gWnz = Wnz 
+#endif
+   
 
 #ifdef CUSTOM_CONFIG
    call CustomConfiguration_Last
@@ -1265,13 +1296,13 @@ contains
   end subroutine get_area_sources
 
 
-  subroutine get_geostrophic_wind(fname)
+  subroutine get_geostrophic_wind(fname, g)
     use Interpolation
     character(*), intent(in) :: fname
+    type(spline_coefs), intent(out) :: g
     character(256) :: line
     real(knd) :: r3(3)
-    real(knd), allocatable :: z(:), ug(:), vg(:)
-    real(knd), allocatable :: cu(:,:), cv(:,:)
+    real(knd), allocatable :: ug(:), vg(:)
     integer :: unit, io, n, i, j
 
     open(newunit=unit,file=fname,status="old",action="read",iostat = io)
@@ -1289,31 +1320,31 @@ contains
     rewind(unit)
     
     if (n>0) then
-      allocate(z(n), ug(n), vg(n))
-      allocate(cu(0:3,n), cv(0:3,n))
+      allocate(g%z(n), ug(n), vg(n))
+      allocate(g%cu(0:1,n), g%cv(0:1,n))
       do i = 1, n
         read(unit,'(a)',iostat=io) line
-        read(line, *) z(i), ug(i), vg(i)
+        read(line, *) g%z(i), ug(i), vg(i)
       end do
     else
       stop "Geostrophic profile empty."
     end if
 
     if (n > 1) then
-      call cubic_spline(z, ug, cu)
-      call cubic_spline(z, vg, cv)
+      call linear_interpolation(g%z, ug, g%cu)
+      call linear_interpolation(g%z, vg, g%cv)
 
       allocate(pr_gradient_profile_x(1:Prnz))
       allocate(pr_gradient_profile_y(1:Prnz))
 
       j = 1
       do i = 1, Prnz
-        pr_gradient_profile_x(i) =   Coriolis_parameter * cubic_spline_eval(zPr(i), z, cv, j)
+        pr_gradient_profile_x(i) =   Coriolis_parameter * linear_interpolation_eval(zPr(i), g%z, g%cv, j)
       end do
 
       j = 1
       do i = 1, Prnz
-        pr_gradient_profile_y(i) = - Coriolis_parameter * cubic_spline_eval(zPr(i), z, cu, j)
+        pr_gradient_profile_y(i) = - Coriolis_parameter * linear_interpolation_eval(zPr(i), g%z, g%cu, j)
       end do
 
       enable_pr_gradient_x_profile = any(pr_gradient_profile_x/=0)
@@ -1328,6 +1359,7 @@ contains
       enable_pr_gradient_y_uniform = pr_gradient_y /= 0
 
     end if
+    
 
   end subroutine get_geostrophic_wind
 
@@ -1698,16 +1730,24 @@ contains
 
 
 
-  subroutine InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
+  subroutine InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,dt)
     real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
     real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
     real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
+    real(knd), intent(out) :: dt
     integer i,j,k
     real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
     real(knd),allocatable :: Q(:,:,:)
-    real(knd) :: dt
 
+    if (abs(Uinlet)>0) then
+      dt = min(abs(dxmin/Uinlet), abs(dymin/Uinlet), abs(dzmin/Uinlet))
+    else if (abs(Uref)>0) then
+      dt = min(abs(dxmin/Uref), abs(dymin/Uref), abs(dzmin/Uref))
+    else
+      dt = dxmin
+    end if
+        
     Pr(1:Prnx,1:Prny,1:Prnz) = 0
 
     U = huge(1._knd)/2
@@ -2072,10 +2112,22 @@ contains
   subroutine InitBoundaryConditions
     use VTKFrames, only: InitVTKFrames
     use SurfaceFrames, only: InitSurfaceFrames
-    real(knd),allocatable:: xU2(:),yV2(:),zW2(:)
-    integer i,j,k,nx,ny,nz,nxup,nxdown,nyup,nydown,nzup,nzdown,io
-    real(knd) P,dt
-    integer unit
+    
+    real(knd), allocatable:: xU2(:), yV2(:), zW2(:)
+    integer   :: i, j, k
+    integer   :: nx, ny, nz
+    integer   :: nxup, nxdown, nyup, nydown, nzup, nzdown
+    real(knd) :: P, dt
+    integer   :: unit, io
+    
+    type(spline_coefs) :: geostrophic_wind
+    
+#ifdef CUSTOM_BOUNDARY_CONDITIONS
+    interface
+      subroutine CustomBoundaryConditions
+      end subroutine
+    end interface
+#endif
 
     call init_random_seed
 
@@ -2374,7 +2426,7 @@ contains
 
 
     !Requires grid coordinates
-    call get_geostrophic_wind("geostrophic_wind_profile.conf")
+    call get_geostrophic_wind("geostrophic_wind_profile.conf", geostrophic_wind)
 
 
     allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
@@ -2396,14 +2448,11 @@ contains
       case (ParabolicInletType)
         call ParabolicInlet
       case (TurbulentInletType)
-        if (Abs(Uinlet)>0) then
-          dt = Abs(dxmin/Uinlet)
-        else
-          dt = dxmin
-        end if
         call GetTurbulentInlet(dt)
       case (FromFileInletType)
         call GetInletFromFile(start_time)
+      case (GeostrophicInletType)
+        call GeostrophicWindInlet(geostrophic_wind)
       case default
         call ConstantInlet
     endselect
@@ -2515,8 +2564,36 @@ contains
    !filter out frames outside the domain
    call InitVTKFrames
    call InitSurfaceFrames
+   
+#ifdef CUSTOM_BOUNDARY_CONDITIONS
+   call CustomBoundaryConditions
+#endif
 
-    if (master) write (*,*) "set"
+   if (master) write (*,*) "set"
+    
+  contains
+  
+    subroutine GeostrophicWindInlet(g)
+      use Interpolation
+      type(spline_coefs), intent(in) :: g
+      real(knd) :: ug, vg
+      integer :: j, k
+      
+      Win = 0
+      
+      j = 0
+      do k = -2, Unz+3
+        ug = linear_interpolation_eval(zPr(k), g%z, g%cu, j)
+        Uin(:,k) = ug
+      end do
+      
+      j = 0
+      do k = -2, Vnz+3
+        vg = linear_interpolation_eval(zPr(k), g%z, g%cv, j)
+        Vin(:,k) = vg
+      end do
+    end subroutine
+    
   end subroutine InitBoundaryConditions
 
 

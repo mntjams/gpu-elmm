@@ -2,11 +2,12 @@ module TimeSteps
 
   use Parameters
   use Dynamics
-  use Boundaries, only: BoundU,Bound_Q
+  use Boundaries, only: BoundU, Bound_Q
   use Pressure, only: PressureCorrection
-  use Outputs, only: store, display, current_profiles
+  use Outputs, only: current_profiles
   use Scalars, only: ScalarRK3
   use Turbinlet, only: GetTurbulentInlet, GetInletFromFile
+  use Sponge, only: enable_top_sponge, enable_out_sponge, SpongeTop, SpongeOut
 
   implicit none
 
@@ -32,6 +33,12 @@ contains
     integer(int64), save :: trate
     integer(int64), save :: time1, time2
 
+#ifdef  CUSTOM_TIMESTEP_PROCEDURE
+    interface
+      subroutine CustomTimeStepProcedure
+      end subroutine
+    end interface
+#endif
 
     if (called==0) then
       called = 1
@@ -75,6 +82,10 @@ contains
 
 
     if (master) write (*,'(a,f12.6,a,es12.4)') " time: ", time," dt: ", dt
+    
+#ifdef  CUSTOM_TIMESTEP_PROCEDURE
+    call CustomTimeStepProcedure
+#endif
 
 
     do RK_stage = 1, RK_stages
@@ -102,14 +113,14 @@ contains
                       2*RK_alpha(RK_stage)*dt)
 
 
-      if ((Btype(To) ==FreeSlipBuff) .and. (Prnz>15))  then
+      if (enable_top_sponge)  then
 
-          call AttenuateTop(U2, V2, W2)
+          call SpongeTop(U2, V2, W2)
       end if
 
-      if ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) then
+      if (enable_out_sponge) then
 
-          call AttenuateOut(U2, V2, W2, temperature)
+          call SpongeOut(U2, V2, W2, temperature)
       end if
 
 
@@ -160,9 +171,9 @@ contains
 
 
 
-      if ((Btype(Ea) ==OutletBuff) .and. (Prnx>15)) then
+      if (enable_out_sponge) then
 
-        call AttenuateOut(U, V, W, temperature)
+        call SpongeOut(U, V, W, temperature)
 
       end if
 
@@ -440,269 +451,6 @@ contains
   end subroutine IBMassSources
 
 
-  subroutine AttenuateTop(U, V, W)
-    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U, V, W
-    integer   :: i, j, k, bufn, mini, maxi, maxUi
-    real(knd) :: ze, zs, zb, p
-    real(knd), dimension(:), allocatable :: DF, avg
-
-    if (Btype(We)==DIRICHLET.or.Btype(We)==TURBULENTINLET.or.Btype(We)==INLETFROMFILE) then
-      mini = min(5, Unx)
-    else
-      mini = 1
-    end if
-
-    if (Btype(Ea)==DIRICHLET.or.Btype(We)==TURBULENTINLET.or.Btype(We)==OUTLETBUFF) then
-      maxi = max(1, Prnx-5)
-      maxUi = max(1, Unx-5)
-    else
-      maxi = Prnx
-      maxUi = Unx
-    end if
-
-    bufn = max(5, Prnz/4)
-    zs = zW(Prnz-bufn)
-    ze = zW(Prnz)
-
-    allocate(DF(  min(Unz, Vnz, Wnz) - bufn  :  max(Unz, Vnz, Wnz)))
-    allocate(avg( min(Unz, Vnz, Wnz) - bufn  :  max(Unz, Vnz, Wnz)))
-
-
-
-    do k = Unz - bufn, Unz
-      avg(k) = 0
-    end do
-
-    !$omp parallel private(i, j, k, p, zb)
-    
-    !$omp do
-    do k = Unz - bufn, Unz
-      p = 0
-
-      do j = 1, Uny
-        do i = mini, maxUi
-          p = p + U(i,j,k)
-        end do
-      end do
-      avg(k) = p
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = Unz - bufn, Unz
-      avg(k) = avg(k) / ((maxUi-mini+1)*Uny)
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = Unz - bufn, Unz
-      zb=(zPr(k)-zs) / (ze-zs)
-      DF(k) = DampF(zb)
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = Unz - bufn, Unz
-      do j = -1, Uny + 1
-        do i = -1, Unx + 1
-          U(i,j,k) = avg(k) + DF(k) * (U(i,j,k) - avg(k))
-        end do
-      end do
-    end do
-    !$omp end do
-
-
-    !$omp do
-    do k = Vnz - bufn, Vnz
-      avg(k) = 0
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = Vnz - bufn, Vnz
-      p = 0
-
-      do j = 1, Vny
-        do i = mini, maxi
-          p = p + V(i,j,k)
-        end do
-      end do
-      avg(k) = p
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = Vnz - bufn, Vnz
-      avg(k) = avg(k) / ((maxi-mini+1)*Vny)
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = Vnz - bufn, Vnz
-      zb = (zPr(k)-zs) / (ze-zs)
-      DF(k) = DampF(zb)
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = Vnz - bufn, Vnz
-      do j = -1, Vny + 1
-        do i = -1, Vnx + 1
-          V(i,j,k) = avg(k) + DF(k) * (V(i,j,k) - avg(k))
-        end do
-      end do
-    end do
-    !$omp end do
-
-
-    !$omp do
-    do k = Wnz - bufn, Wnz
-      avg(k) = 0
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = Wnz - bufn, Wnz
-      p = 0
-
-      do j = 1, Wny
-        do i = mini, maxi
-          p = p + W(i,j,k)
-        end do
-      end do
-      avg(k) = p
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = Wnz - bufn, Wnz
-      avg(k) = avg(k) / ((maxi-mini+1)*Wny)
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = Wnz - bufn, Wnz
-      zb = (zW(k)-zs) / (ze-zs)
-      DF(k) = DampF(zb)
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = Wnz - bufn, Wnz
-      do j = -1, Wny + 1
-        do i = -1, Wnx + 1
-          W(i,j,k) = avg(k) + DF(k) * (W(i,j,k) - avg(k))
-        end do
-      end do
-    end do
-    !$omp end do
-    
-    !$omp end parallel
-
-  end subroutine AttenuateTop
-
-
-
-  subroutine AttenuateOut(U, V, W, temperature)
-    real(knd), contiguous, intent(inout), dimension(-2:,-2:,-2:) :: U, V, W
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: temperature
-    integer   :: i, j, k, bufn
-    real(knd) :: p, xe, xs, xb, DF
-
-    bufn = min(max(10, Prnx/8), Prnx/2)
-    xs = xU(Prnx - bufn)
-    xe = xU(Prnx)
-
-    !$omp parallel private(i, j, k, p, xb, DF)
-
-    !$omp do
-    do k = 1, Unz
-      do j = 1, Uny
-        p = 0
-        do i = 2*Unx/3, Unx - 4
-          p = p + U(i,j,k)
-        end do
-        p = p / (Unx - 4 - 2*Unx/3 + 1)
-        do i = Unx - bufn, Unx + 1
-          xb = (xU(i)-xs) / (xe-xs)
-          DF = DampF(xb)
-          U(i,j,k) = p + DF * (U(i,j,k) - p)
-        end do
-      end do
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = 1, Vnz
-      do j = 1, Vny
-        p = 0
-        do i = 2*Vnx/3, Vnx - 4
-          p = p + V(i,j,k)
-        end do
-        p = p / (Vnx - 4 - 2*Vnx/3 + 1)
-        do i = Vnx-bufn, Vnx + 1
-          xb = (xPr(i)-xs) / (xe-xs)
-          DF = DampF(xb)
-          V(i,j,k) = p + DF * (V(i,j,k) - p)
-        end do
-      end do
-    end do
-    !$omp end do
-
-    !$omp do
-    do k = 1, Wnz
-      do j = 1, Wny
-        p = 0
-        do i = 2*Wnx/3, Wnx - 4
-          p = p + W(i,j,k)
-        end do
-        p = p / (Wnx - 4 - 2*Wnx/3 + 1)
-        do i = Wnx - bufn, Wnx + 1
-          xb = (xPr(i)-xs) / (xe-xs)
-          DF = DampF(xb)
-          W(i,j,k) = p + DF * (W(i,j,k) - p)
-        end do
-      end do
-    end do
-    !$omp end do
-
-    if (enable_buoyancy) then
-      !$omp do
-      do k = 1, Prnz
-        do j = 1, Prny
-          p = 0
-          do i = 2*Prnx/3, Prnx-4
-            p = p + temperature(i,j,k)
-          end do
-          p = p / (Prnx - 4 - 2*Prnx/3 + 1)
-          do i = Prnx - bufn, Prnx + 1
-            xb = (xPr(i)-xs) / (xe-xs)
-            DF = DampF(xb)
-            temperature(i,j,k) = p + DF * (temperature(i,j,k) - p)
-          end do
-        end do
-      end do
-      !$omp end do
-    end if
-    !$omp end parallel
-
-  end subroutine AttenuateOut
-
-
-
-  pure function DampF(x)
-    real(knd) :: DampF
-    real(knd), intent(in) :: x
-
-    if (x<=0) then
-      DampF = 1
-    else if (x>=1) then
-      DampF = 0
-    else
-      DampF = (1 - 0.04_knd*x**2) * &
-              ( 1 - (1 - exp(10._knd*x**2)) / (1 - exp(10._knd)) )
-    end if
-  end function Dampf
 
 
   subroutine NullInterior(U, V, W)

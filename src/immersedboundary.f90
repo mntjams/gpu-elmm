@@ -98,6 +98,8 @@ contains
               end if
           end select
           
+          p%z0H = p%z0
+          
           !$omp critical
           call AddWMPoint(p)
           !$omp end critical
@@ -235,6 +237,8 @@ contains
                     end if
                     
                 end select
+                
+                p%z0H = p%z0
                 
                 !$omp critical
                 call AddWMPointUVW(p, component, dir)

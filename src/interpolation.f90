@@ -292,5 +292,57 @@ contains
     res = c(0,i) + h * (c(1,i) + h * (c(2,i) + h * c(3,i)))
 
   end function cubic_spline_eval
+  
+
+  
+  
+  subroutine linear_interpolation(x, y, c)
+    real(knd), intent(in) :: x(:), y(:)
+    real(knd), intent(out) :: c(0:,:)
+    integer :: i
+    
+    c(0, :) = y
+    do i = 1, size(x)-1
+      c(1, i) = (y(i+1)-y(i)) / (x(i+1)-x(i))
+    end do
+    c(1,size(x)) = 0
+  end subroutine
+  
+  function linear_interpolation_eval(x, xs, c, i) result(res)
+    real(knd) :: res
+    real(knd), intent(in) :: x
+    real(knd), intent(in) :: xs(:)
+    real(knd), intent(in) :: c(0:,:)
+    integer, intent(inout) :: i
+    real(knd) :: h
+    integer :: n
+
+    n = size(xs)
+    i = min(max(1, i), n-1)
+
+    if (x<xs(1)) then
+      res = c(0, 1)
+      return
+    end if
+
+    if (x>xs(n)) then
+      res = c(0, n)
+      return
+    end if
+
+    !if (x < xs(i))
+    do while (x < xs(i))
+      i = i - 1
+    end do
+
+    !if (x > xs(i+1))
+    do while (x > xs(i+1))
+      i = i + 1
+    end do
+
+    h = x - xs(i)
+    res = c(0,i) + h * c(1,i)
+
+  end function
 
 end module

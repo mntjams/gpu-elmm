@@ -54,6 +54,10 @@ module Parameters
   
   !relevant for MPI
   integer :: gPrnx, gPrny, gPrnz !global grid dimensions
+  integer :: gUnx, gUny, gUnz
+  integer :: gVnx, gVny, gVnz
+  integer :: gWnx, gWny, gWnz
+  
   integer :: offset_to_global_x = 0, offset_to_global_y = 0, offset_to_global_z = 0
   integer :: gPrns(3), offsets_to_global(3) = 0
   
@@ -168,13 +172,14 @@ module Parameters
                        ScalarTypePassive = 3
 
   integer, parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6, &  !boundary condition types
-                        TURBULENTINLET=7, FREESLIPBUFF=8, OUTLETBUFF=9, INLETFROMFILE=10, RADIATION=7, &
+                        TURBULENTINLET=7, INLETFROMFILE=10, RADIATION=7, &
                         MO_TEMPERATURE=10, &
-                        NEUMANN_BUFF=8, AUTOMATICFLUX=11, WALL_DIRICHLET=12, WALL_FLUX=13, &
+                        AUTOMATICFLUX=11, WALL_DIRICHLET=12, WALL_FLUX=13, &
                         MPI_BOUNDS=1000, MPI_BOUNDARY=1000, MPI_PERIODIC=1001
   !inlet types
   integer, parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
-                        ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5
+                        ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5, &
+                        GeostrophicInletType=6
   !inlet profile types
   integer, parameter :: CONSTPROF=1, LOGPROF=2, POWERPROF=3 
   integer, parameter :: GENERALGRID=1, UNIFORMGRID=2
@@ -189,8 +194,8 @@ module Parameters
   character(2048) :: scratch_dir = ""
 
   integer(dbl) :: timer_rate
-  real(KND) :: time_steps_time = 0
-  real(KND) :: poisson_solver_time = 0
+  real(knd) :: time_steps_time = 0
+  real(knd) :: poisson_solver_time = 0
 
 end module Parameters
 

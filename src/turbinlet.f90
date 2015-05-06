@@ -618,14 +618,14 @@ contains
       end  if
     else if (Btype(To)==PERIODIC) then
         Uin(1:ny,nz+1:nz+2) = Uin(1:ny,nz-1:nz)
-    else if (Btype(To)==NOSLIP.or.(component==3.and.(Btype(To)==FREESLIP.or.Btype(To)==FREESLIPBUFF))) then
+    else if (Btype(To)==NOSLIP.or.(component==3.and.(Btype(To)==FREESLIP))) then
       if (component==3) then
         Uin(1:ny,nz+1) = 0
         Uin(1:ny,nz+2)=-Uin(1:ny,nz)
       else
         Uin(1:ny,nz+1:nz+2)=-Uin(1:ny,nz:nz-1:-1)
       end if
-    else if (Btype(To)==NEUMANN.or.(component/=3.and.(Btype(To)==FREESLIP.or.Btype(To)==FREESLIPBUFF))) then
+    else if (Btype(To)==NEUMANN.or.(component/=3.and.(Btype(To)==FREESLIP))) then
         Uin(1:ny,nz+1) = Uin(1:ny,nz)
         Uin(1:ny,nz+2) = Uin(1:ny,nz)
     else if (Btype(To)==PERIODIC) then

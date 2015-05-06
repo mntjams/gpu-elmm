@@ -13,6 +13,10 @@ SB = ARGUMENTS.get('SB','')
 customPB = ARGUMENTS.get('customPB','')
 customPuff = ARGUMENTS.get('customPuff','')
 customConfig = ARGUMENTS.get('customConfig','')
+customBoundaryConditions = ARGUMENTS.get('customBoundaryConditions','')
+customSurfaceTemperature = ARGUMENTS.get('customSurfaceTemperature','')
+customTimeStepProcedure = ARGUMENTS.get('customTimeStepProcedure','')
+customOutput = ARGUMENTS.get('customOutput','')
 PB = ARGUMENTS.get('PB','')
 extra = ARGUMENTS.get('extra','')
 cgal = ARGUMENTS.get('cgal','')
@@ -198,6 +202,18 @@ if customPuff=='yes':
 if customConfig=='yes':
   env.Append(F90FLAGS='-DCUSTOM_CONFIG')
 
+if customBoundaryConditions=='yes':
+  env.Append(F90FLAGS='-DCUSTOM_BOUNDARY_CONDITIONS')
+
+if customSurfaceTemperature=='yes':
+  env.Append(F90FLAGS='-DCUSTOM_SURFACE_TEMPERATURE')
+
+if customTimeStepProcedure=='yes':
+  env.Append(F90FLAGS='-DCUSTOM_TIMESTEP_PROCEDURE')
+
+if customTimeStepProcedure=='yes':
+  env.Append(F90FLAGS='-DCUSTOM_OUTPUT')
+
 if cray=='yes':
   env.Replace(CC='cc', CXX='CC', F90='ftn')
   env.Replace(LINK='ftn')
@@ -296,6 +312,7 @@ objs += env.Object(target=target_dir+'poisson',        source='poisson.f90')
 objs += env.Object(target=target_dir+'pressure',       source='pressure.f90')
 objs += env.Object(target=target_dir+'initial',        source='initial.f90')
 objs += env.Object(target=target_dir+'cds',            source='cds.f90')
+objs += env.Object(target=target_dir+'sponge',       source='sponge.f90')
 objs += env.Object(target=target_dir+'dynamics',       source='dynamics.f90')
 objs += env.Object(target=target_dir+'tsteps',         source='tsteps.f90')
 objs += env.Object(target=target_dir+'main',           source='main.f90')

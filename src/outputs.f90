@@ -505,7 +505,7 @@ contains
        n_free_Pr(k) = count(Prtype(1:Prnx,1:Prny,k) <= 0)
      end do
      do k = 0, Prnz+1
-       n_all_Pr(k) = Prnx * Prny
+       n_all_Pr(k) = gPrnx * gPrny
      end do
      do k = 0, Prnz
        n_free_PrW(k) = count(Prtype(1:Prnx,1:Prny,k+1) <= 0 .or. Prtype(1:Prnx,1:Prny,k) <= 0)
@@ -636,11 +636,11 @@ contains
       call create(output_dir//"dissip.unf")
     end if
 
-    if (wallmodeltype>0.and.display%ustar==1) then
+    if (wallmodeltype>0.and.store%ustar==1) then
       call create(output_dir//"Retau.unf")
     end if
 
-    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.store%tstar==1) then
+    if (wallmodeltype>0.and.enable_buoyancy.and.allocated(tstar).and.store%tstar==1) then
       call create(output_dir//"tflux.unf")
     end if
 
@@ -686,6 +686,13 @@ contains
     real(knd) :: fl_L, fl_R
     logical, save :: called = .false.
     
+#ifdef CUSTOM_OUTPUT
+    interface
+      subroutine CustomTimeStepOutput
+      end subroutine
+    end interface   
+#endif
+
     if (.not.called) then
       call InitTimeSeries
       called = .true.
@@ -1058,6 +1065,10 @@ contains
       call OutputTimeSeries
       time_series_step = 0
     end if
+    
+#ifdef CUSTOM_OUTPUT
+    call CustomTimeStepOutput
+#endif
 
   end subroutine OutTstep
 
@@ -1248,14 +1259,14 @@ contains
       close(unit)
     end if
 
-    if (wallmodeltype>0.and.display%ustar==1) then
+    if (wallmodeltype>0.and.store%ustar==1) then
       open(unit,file=output_dir//"Retau.unf", &
            access="stream",status="old",position="append")
       write(unit) ustar(:,1:time_series_step)
       close(unit)
     end if
 
-    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==DIRICHLET.and.store%tstar==1) then
+    if (wallmodeltype>0.and.enable_buoyancy.and.allocated(tstar).and.store%tstar==1) then
       open(unit,file=output_dir//"tflux.unf", &
            access="stream",status="old",position="append")
       write(unit) tstar(:,1:time_series_step)
@@ -1273,7 +1284,7 @@ contains
     if (num_of_scalars>0.and.store%scaltotsum_time==1) then
       open(unit,file=output_dir//"scaltotsumtime.unf", &
            access="stream",status="old",position="append")
-      write(unit) sum(scalsum_time(:,1:time_series_step))
+      write(unit) sum(scalsum_time(:,1:time_series_step), dim=1)
       close(unit)
     end if
     
@@ -2246,6 +2257,13 @@ contains
     real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Scalar(-1:,-1:,-1:,:)
+    
+#ifdef CUSTOM_OUTPUT
+    interface
+      subroutine CustomOutput
+      end subroutine
+    end interface
+#endif
 
     call BoundU(1,U,Uin)
     call BoundU(2,V,Vin)
@@ -2278,6 +2296,10 @@ contains
     call FinalizeSurfaceFrames
 
     call FinalizeStaggeredFrames
+    
+#ifdef CUSTOM_OUTPUT
+    call CustomOutput
+#endif
 
     if (master) write(*,*) "saved"
 
@@ -2354,6 +2376,20 @@ contains
        end do
       end do
       current_profiles%uwsgs(k) = S
+    end do
+    !$omp end do nowait
+
+    !$omp do
+    do k = 0,Prnz
+      S = 0
+      do j = 1,Vny
+       do i = 1,Vnx
+         if (Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0) then
+           S = S - (Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k)) * (V(i,j,k+1)-V(i,j,k)) / dzmin / 4
+         end if
+       end do
+      end do
+      current_profiles%vwsgs(k) = S
     end do
     !$omp end do nowait
 
