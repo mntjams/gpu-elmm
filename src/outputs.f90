@@ -47,6 +47,8 @@ module Outputs
   real(knd),allocatable :: Moisture_avg(:,:,:) !<q>
   real(knd),allocatable :: Scalar_avg(:,:,:,:) !<c>
 
+  real(knd),allocatable :: Scalar_variance(:,:,:,:)
+
   real(knd),allocatable :: Scalar_max(:,:,:,:)
 
   real(knd),allocatable :: Scalar_intermitency(:,:,:,:)
@@ -105,6 +107,7 @@ module Outputs
 
     integer :: scalars = 1
     integer :: scalars_avg = 1
+    integer :: scalars_variance = 0
     integer :: scalars_max = 0
     integer :: scalars_intermitency = 0
     
@@ -267,6 +270,13 @@ contains
      allocate(Scalar_avg(0,0,0,0))
    end if
    
+   if (num_of_scalars>0.and.store%scalars_variance==1) then
+     allocate(Scalar_variance(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+     Scalar_variance = 0
+   else
+     allocate(Scalar_variance(0,0,0,0))
+   end if
+
    if (num_of_scalars>0.and.store%scalars_max==1) then
      allocate(Scalar_max(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
      Scalar_max = 0
@@ -913,8 +923,8 @@ contains
         Scalar_avg = Scalar_avg + Scalar * time_weight
       end if
 
-      if (num_of_scalars>0.and.store%scalars_max==1) then
-        Scalar_max = max(Scalar_max, Scalar)
+      if (num_of_scalars>0.and.store%scalars_variance==1) then
+        Scalar_variance = Scalar_variance + Scalar**2 * time_weight
       end if
 
       if (num_of_scalars>0.and.store%scalars_intermitency==1) then
@@ -1810,10 +1820,13 @@ contains
 
   end subroutine OutputAvg
 
-  subroutine OutputScalarStats(S_avg,S_max,S_int)
-    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: S_avg,S_max,S_int
+  subroutine OutputScalarStats(S_avg, S_var, S_max, S_int)
+    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: S_avg, S_max, S_int
+    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(inout) :: S_var
     character(70) :: str
-    integer unit
+    integer :: unit
+
+    if (store%scalars_variance==1) S_var = S_var - S_avg**2
     
     if (averaging==1.and. &
          (store%scalars_avg==1.or. &
@@ -1849,6 +1862,10 @@ contains
 
       if (store%scalars_avg==1) then
         call aux(S_avg,'_avg')
+      end if
+      
+      if (store%scalars_variance==1) then
+        call aux(S_var,'_variance')
       end if
       
       if (store%scalars_max==1) then
@@ -2283,7 +2300,7 @@ contains
                      Pr_avg, Temperature_avg, Moisture_avg, &
                      UU_prime, VV_prime, WW_prime, UV_prime, UW_prime, VW_prime)
       
-      call OutputScalarStats(Scalar_avg,Scalar_max,Scalar_intermitency)
+      call OutputScalarStats(Scalar_avg,Scalar_variance,Scalar_max,Scalar_intermitency)
 
       call OutputAvgFluxes
 
