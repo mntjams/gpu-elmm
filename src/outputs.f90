@@ -95,11 +95,11 @@ module Outputs
   integer :: time_series_step = 0
 
   type TOutputSwitches
-    integer :: U = 0
+    integer :: U = 1
     integer :: U_interp = 0
-    integer :: V = 0
+    integer :: V = 1
     integer :: V_interp = 0
-    integer :: W = 0
+    integer :: W = 1
     integer :: W_interp = 0
 
     integer :: out = 1
@@ -118,7 +118,7 @@ module Outputs
 
     integer :: out_U = 1
     integer :: out_vorticity = 0
-    integer :: out_Pr = 0
+    integer :: out_Pr = 1
     integer :: out_Prtype = 0
     integer :: out_lambda2 = 0
     integer :: out_temperature = 1
