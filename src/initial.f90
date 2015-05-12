@@ -1526,9 +1526,9 @@ contains
 
     allocate(buffer(Prnx,Prny,Prnz))
 
-    open(newunit=unit,file=image_input_dir//"in.vtk",access="stream",status="old",action="read",iostat=file_stat)
+    open(newunit=unit,file=image_input_dir//"out.vtk",access="stream",status="old",action="read",iostat=file_stat)
 
-    if (file_stat/=0) call error_stop("Error opening "//image_input_dir//"in.vtk")
+    if (file_stat/=0) call error_stop("Error opening "//image_input_dir//"out.vtk")
 
     call skip_to("SCALARS p float",stat)
     if (stat/=0) then
@@ -1545,7 +1545,7 @@ contains
       call skip_to("SCALARS temperature float",stat)
       if (stat/=0) then
         call error_stop("No temperature field found in the initial conditions file " // &
-                        image_input_dir // "in.vtk")
+                        image_input_dir // "out.vtk")
       else
         call skip_line
         call skip_line
@@ -1558,7 +1558,7 @@ contains
       call skip_to("SCALARS moisture float",stat)
       if (stat/=0) then
         call error_stop("No moisture field found in the initial conditions file " // &
-                        image_input_dir // "in.vtk")
+                        image_input_dir // "out.vtk")
       else
         call skip_line
         call skip_line
@@ -1571,9 +1571,9 @@ contains
 
 
 
-    open(newunit=unit,file=image_input_dir//"scalars_in.vtk",access="stream",status="old",action="read",iostat=file_stat)
+    open(newunit=unit,file=image_input_dir//"scalars.vtk",access="stream",status="old",action="read",iostat=file_stat)
 
-    if (file_stat/=0) call error_stop("Error opening "//image_input_dir//"scalars_in.vtk")
+    if (file_stat/=0) call error_stop("Error opening "//image_input_dir//"scalars.vtk")
 
     do i = 1, num_of_scalars
       write(scalnum,"(I2.2)") i
@@ -1581,7 +1581,7 @@ contains
       call skip_line
       if (stat/=0) then
         call error_stop("scalar"//scalnum//" field not found in the initial conditions file " // &
-                        image_input_dir // "in.vtk")
+                        image_input_dir // "scalars.vtk")
       else
         call skip_line
         read(unit) buffer
@@ -1595,13 +1595,13 @@ contains
     deallocate(buffer)
 
 
-    inquire(file=image_input_dir//"Uin.vtk", exist=exU(1))
-    inquire(file=image_input_dir//"Vin.vtk", exist=exU(2))
-    inquire(file=image_input_dir//"Win.vtk", exist=exU(3))
+    inquire(file=image_input_dir//"U.vtk", exist=exU(1))
+    inquire(file=image_input_dir//"V.vtk", exist=exU(2))
+    inquire(file=image_input_dir//"W.vtk", exist=exU(3))
     
     if (all(exU)) then
     
-      open(newunit=unit,file=image_input_dir//"Uin.vtk",access="stream",status="old",action="read")
+      open(newunit=unit,file=image_input_dir//"U.vtk",access="stream",status="old",action="read")
       call skip_to("SCALARS U float",stat)
       call skip_line
       call skip_line
@@ -1611,7 +1611,7 @@ contains
       deallocate(buffer)
       close(unit)
 
-      open(newunit=unit,file=image_input_dir//"Vin.vtk",access="stream",status="old",action="read")
+      open(newunit=unit,file=image_input_dir//"V.vtk",access="stream",status="old",action="read")
       call skip_to("SCALARS V float",stat)
       call skip_line
       call skip_line
@@ -1621,7 +1621,7 @@ contains
       deallocate(buffer)
       close(unit)
 
-      open(newunit=unit,file=image_input_dir//"Win.vtk",access="stream",status="old",action="read")
+      open(newunit=unit,file=image_input_dir//"W.vtk",access="stream",status="old",action="read")
       call skip_to("SCALARS W float",stat)
       call skip_line
       call skip_line
@@ -1633,7 +1633,7 @@ contains
       
     else
     
-      open(newunit=unit,file=image_input_dir//"in.vtk",access="stream",status="old",action="read")
+      open(newunit=unit,file=image_input_dir//"out.vtk",access="stream",status="old",action="read")
       call skip_to("VECTORS u float",stat)
       call skip_line
       allocate(UVWbuffer(3, 1:Prnx, 1:Prny, 1:Prnz))
