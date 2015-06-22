@@ -51,6 +51,7 @@ program CLMM
   if (master) write (*,*) "Allocating arrays..."
   call AllocateGlobals
 
+  if (master) write (*,*) "Preparing output data and files..."
   call AllocateOutputs
 
   if (master) write (*,*) "Setting up initial conditions..."

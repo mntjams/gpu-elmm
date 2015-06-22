@@ -205,6 +205,8 @@ contains
 
    call GetEndianness
 
+   if (master) write(*,*) "  ...creating output directories."
+
 #if defined(_WIN32) || defined(_WIN64)
    call system("mkdir "//output_dir)
 #else
@@ -221,6 +223,8 @@ contains
 
 
    if (store%avg_U==0.and.store%avg_UU_prime>1) store%avg_U = 1
+
+   if (master) write(*,*) "  ...allocating arrays for 3D statistics."
 
    if (averaging==1) then
      if (store%avg_U>0) then
@@ -300,9 +304,8 @@ contains
      Scalar_fl_W_avg = 0
    end if
 
+   if (master) write(*,*) "  ...preparing probes."
 
-   allocate(times(1:time_series_max_length))
-   
    do k = 1,size(probes)
      associate(p => probes(k))
        p%number = k
@@ -380,8 +383,9 @@ contains
 !   write(tmp,*) size(probes),size(scalar_probes)
 !   close(tmp)
 
-
    if (size(probes)>0) then
+
+     if (master) write(*,*) "  ...allocating probe time series."
 
      allocate(U_time(size(probes),1:time_series_max_length), &
               V_time(size(probes),1:time_series_max_length), &
@@ -412,6 +416,10 @@ contains
 
    end if
 
+   if (master) write(*,*) "  ...allocating global time series."
+
+   allocate(times(1:time_series_max_length))
+   
 
    if (store%delta_time==1) then
      allocate(delta_time(1:time_series_max_length))
@@ -451,8 +459,12 @@ contains
     end if
    end if
 
+   if (master) write(*,*) "  ...preparing profiles."
+
    if (enable_profiles) then
 
+     allocate(times(1:time_series_max_length))
+   
      call current_profiles%allocate
      
      profiles_config%average_end = min(profiles_config%average_end, end_time)
