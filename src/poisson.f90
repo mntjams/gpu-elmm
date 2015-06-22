@@ -13,8 +13,8 @@ contains
 #else
     use PoisFFT, PoisFFT_Solver => PoisFFT_Solver3D_SP
 #endif
-#ifdef MPI
-    use custom_mpi
+#ifdef PAR
+    use custom_par
 #endif
 
     type(PoisFFT_Solver),save :: Solver
@@ -28,7 +28,7 @@ contains
 
 
     if (.not.called) then
-#ifdef MPI
+#ifdef PAR
       Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
                                [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
                                PoissonBtype, &
@@ -67,9 +67,9 @@ contains
 
 
   subroutine PoissSOR(Phi,RHS) 
-#ifdef MPI
+#ifdef PAR
     use Boundaries
-    use custom_mpi
+    use custom_par
 #endif
     !Solves Poisson equation using Successive over-relaxation
 
@@ -111,7 +111,7 @@ contains
     do while (l<=maxPoissoniter.and.S>epsPoisson)
       l=l+1
       S=0
-#ifdef MPI
+#ifdef PAR
       call Bound_Phi(Phi)
 #endif
       !$OMP PARALLEL PRIVATE(i,j,k,p) REDUCTION(max:S)
@@ -231,8 +231,8 @@ contains
       p=abs(maxval(Phi(1:nx,1:ny,1:nz)))
       if (p>0) S=S/p
       
-#ifdef MPI
-      S = mpi_co_max(S)
+#ifdef PAR
+      S = par_co_max(S)
 #endif
 
       if (MOD(l,10)==0)  write (*,*) "   Poisson iter: ",l,S

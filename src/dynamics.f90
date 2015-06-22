@@ -407,8 +407,8 @@ contains
 
   subroutine TimeStepLength(U, V, W, dt)
     use ieee_arithmetic
-#ifdef MPI
-    use custom_mpi
+#ifdef PAR
+    use custom_par
 #endif
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)  :: U,V,W
     real(tim), intent(out) :: dt
@@ -444,8 +444,8 @@ contains
 
     if (steady/=1 .and. dt+time>end_time)  dt = end_time-time
     
-#ifdef MPI
-    dt = mpi_co_min(dt)
+#ifdef PAR
+    dt = par_co_min(dt)
 #endif
 
   endsubroutine TimeStepLength

@@ -1,7 +1,7 @@
 module ScalarBoundaries
   use Parameters
-#ifdef MPI
-  use exchange_mpi
+#ifdef PAR
+  use exchange_par
 #endif
 
   implicit none
@@ -27,8 +27,8 @@ contains
     ny = Prny
     nz = Prnz
 
-#ifdef MPI
-    call exchange_Sc_x(arr,btype)
+#ifdef PAR
+    call par_exchange_Sc_x(arr,btype)
 #endif
     
     if (btype(We)==DIRICHLET) then
@@ -112,8 +112,8 @@ contains
       end do
     end if
 
-#ifdef MPI
-    call exchange_Sc_y(arr,btype)
+#ifdef PAR
+    call par_exchange_Sc_y(arr,btype)
 #endif
     
     if (btype(So)==DIRICHLET) then
@@ -192,8 +192,8 @@ contains
       end do
     end if
 
-#ifdef MPI
-    call exchange_Sc_z(arr,btype)
+#ifdef PAR
+    call par_exchange_Sc_z(arr,btype)
 #endif
     
     if (btype(Bo)==DIRICHLET) then
@@ -311,8 +311,8 @@ contains
     ny = Prny
     nz = Prnz
     
-#ifdef MPI
-    call exchange_Sc_x(Nu, Btype)
+#ifdef PAR
+    call par_exchange_Sc_x(Nu, Btype)
 #endif
 
     if (Btype(Ea)==PERIODIC) then
@@ -331,8 +331,8 @@ contains
       end do
     end if
 
-#ifdef MPI
-    call exchange_Sc_y(Nu, Btype)
+#ifdef PAR
+    call par_exchange_Sc_y(Nu, Btype)
 #endif
 
     if (Btype(No)==PERIODIC) then
@@ -351,8 +351,8 @@ contains
       end do
     end if
     
-#ifdef MPI
-    call exchange_Sc_z(Nu, Btype)
+#ifdef PAR
+    call par_exchange_Sc_z(Nu, Btype)
 #endif
 
     if (Btype(To)==PERIODIC) then

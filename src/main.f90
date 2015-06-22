@@ -7,9 +7,8 @@ program CLMM
   use Scalars,    only: Scalars_Deallocate
   use Outputs,    only: AllocateOutputs, OutTStep, Output
   use Endianness, only: GetEndianness
-#ifdef MPI
-  use custom_mpi
-#endif
+  use custom_par
+
 
   implicit none
 
@@ -36,24 +35,28 @@ program CLMM
 
   call GetEndianness
 
-#ifdef MPI
-  call init_custom_mpi
-#endif
 
+  call par_init
+
+  call par_sync_all
   if (master) write (*,*) "Reading parameters..."
   call ReadConfiguration
 
 
+  call par_sync_all
   if (master) write (*,*) "Setting up boundary conditions..."
   call InitBoundaryConditions
 
 
+  call par_sync_all
   if (master) write (*,*) "Allocating arrays..."
   call AllocateGlobals
 
+  call par_sync_all
   if (master) write (*,*) "Preparing output data and files..."
   call AllocateOutputs
 
+  call par_sync_all
   if (master) write (*,*) "Setting up initial conditions..."
   call InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,dt)
 
@@ -69,6 +72,7 @@ program CLMM
 
   if (end_time > start_time) then
 
+    call par_sync_all
     if (master) write (*,*) "Computing..."
 
     do time_step = 1, max_number_of_time_steps
@@ -119,23 +123,27 @@ program CLMM
 
   endif
 
+  call par_sync_all
   if (master) write(*,*) "Total wall clock time for time steps", time_steps_time
   if (master) write(*,*) "Wall clock time for poisson solver", poisson_solver_time
 
   call Dynamics_Deallocate
   call Scalars_Deallocate
 
+  call par_sync_all
   if (master) write (*,*) "Saving results..."
 
 
   call Output(U,V,W,Pr,Temperature,Moisture,Scalar)
 
 
+  call par_sync_all
+  if (master) write(*,*) "saved"
+
   call DeallocateGlobals
-  
-#ifdef MPI
-  call finalize_custom_mpi
-#endif
+
+  call par_finalize
+
 
 
 contains

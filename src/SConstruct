@@ -159,9 +159,9 @@ if str(mpi)=='yes':
   env.Replace(F90 = 'mpif90')
   env.Replace(CC = 'mpicc')
   env.Replace(CXX = 'mpic++')
-  env.Append(F90FLAGS=' -DMPI')
-  env.Append(CFLAGS=' -DMPI')
-  env.Append(CXXFLAGS=' -DMPI')
+  env.Append(F90FLAGS=' -DMPI -DPAR')
+  env.Append(CFLAGS=' -DMPI -DPAR')
+  env.Append(CXXFLAGS=' -DMPI -DPAR')
   env.Append(LIBS = ['pfft','pfftf','fftw3_mpi','fftw3f_mpi'])
 
 if cray!='yes':
@@ -244,7 +244,8 @@ objs += env.Object(target=target_dir+'P/main', source='../../PoisFFT/src/main.f9
 if str(mpi)=='yes':
   objs += env.Object(target=target_dir+'custom_mpi',        source='custom_mpi.f90')
   objs += env.Object(target=target_dir+'exchange_mpi',      source='exchange_mpi.f90')
-
+else:
+  objs += env.Object(target=target_dir+'dummy_par',        source='dummy_par.f90') 
 
 objs += env.Object(target=target_dir+'parameters',     source='parameters.f90')
 objs += env.Object(target=target_dir+'rng_par_zig',    source='rng_par_zig.f90')

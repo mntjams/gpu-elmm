@@ -27,7 +27,7 @@ contains
     integer, save :: called = 0
     integer(DBL), save :: trate
     integer(DBL), save :: time1, time2, time3, time4
-#ifdef MPI
+#ifdef PAR
     correctcompatibility = 0
 #else
     correctcompatibility = 0
@@ -104,8 +104,8 @@ contains
 
 
   subroutine PrePoisson(U,V,W,Q,RHS,dt2,uncompatibility)
-#ifdef MPI
-    use custom_mpi
+#ifdef PAR
+    use custom_par
 #endif
     real(knd), intent(inout) :: U(-2:,-2:,-2:)
     real(knd), intent(inout) :: V(-2:,-2:,-2:)
@@ -141,13 +141,13 @@ contains
       end do
       !$omp end parallel do
 
-#ifdef MPI
+#ifdef PAR
       if (abs(windangle-90)<1.or.abs(windangle+90)<1) then
         S=S*dymin/(gPrnx*gPrnz)
 
         uncompatibility = S
 
-        uncompatibility = mpi_co_sum(uncompatibility)
+        uncompatibility = par_co_sum(uncompatibility)
 
         if (correctcompatibility==1.and.jim==nyims) then
           !$omp parallel workshare
@@ -159,7 +159,7 @@ contains
 
         uncompatibility = S
 
-        uncompatibility = mpi_co_sum(uncompatibility)
+        uncompatibility = par_co_sum(uncompatibility)
 
         if (correctcompatibility==1.and.iim==nxims) then
           !$omp parallel workshare
@@ -229,21 +229,10 @@ contains
 
 
   subroutine PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3)
-#ifdef MPI
-    use custom_mpi, only: kim, nzims, &
-                          mpi_co_max, mpi_co_sum, &
-                          comm_plane_xy, comm_row_z, &
-                          MPI_KND
-
-    interface
-      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
-        import
-        real(knd) ::  BUFFER
-        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
-      end subroutine
-    end interface
-
-    integer :: ie
+#ifdef PAR
+    use custom_par, only: kim, nzims, &
+                          par_co_max, par_co_sum, par_broadcast_from_top, &
+                          comm_plane_xy, comm_row_z
 #endif
     real(knd), intent(inout) :: U(-2:,-2:,-2:)
     real(knd), intent(inout) :: V(-2:,-2:,-2:)
@@ -327,19 +316,18 @@ contains
       !$omp end do
     end if
 
-#ifdef MPI
+#ifdef PAR
     !images in top plane compute the reference pressure
     if (kim==nzims) then
       !$omp workshare
       Phi_ref = sum(Pr(1:Prnx,1:Prny,Prnz))
       !$omp end workshare
-      Phi_ref = mpi_co_sum(Phi_ref, comm = comm_plane_xy)
+      Phi_ref = par_co_sum(Phi_ref, comm = comm_plane_xy)
       Phi_ref = Phi_ref / (gPrnx * gPrny)
     end if
 
     !all kim==nzims broadcast to images with smaller kim
-    call MPI_Bcast(Phi_ref, 1, MPI_KND, nzims-1, comm_row_z, ie)
-    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+    call par_broadcast_from_top(Phi_ref)
 
 #else
     !$omp workshare
@@ -394,8 +382,8 @@ contains
         end do
         !$omp end parallel do
       end if
-#ifdef MPI
-      S = mpi_co_max(S)
+#ifdef PAR
+      S = par_co_max(S)
 #endif
       
       if (master) write(*,*) "max divergence:", S

@@ -1,7 +1,7 @@
 module Boundaries
   use Parameters
-#ifdef MPI
-  use exchange_mpi
+#ifdef PAR
+  use exchange_par
 #endif
 
 implicit none
@@ -461,8 +461,8 @@ implicit none
     
     
     
-#ifdef MPI
-    call exchange_U_x(U, nx, ny, nz)
+#ifdef PAR
+    call par_exchange_U_x(U, nx, ny, nz)
 #endif
     !$omp sections
     !$omp section
@@ -666,8 +666,8 @@ implicit none
     !$omp end sections
     !$omp end parallel
     
-#ifdef MPI    
-    call exchange_U_y(U, nx, ny, nz)
+#ifdef PAR    
+    call par_exchange_U_y(U, nx, ny, nz)
 #endif
     !$omp sections
     !$omp section
@@ -784,8 +784,8 @@ implicit none
     end if
     !$omp end sections
 
-#ifdef MPI
-    call exchange_U_z(U, nx, ny, nz)
+#ifdef PAR
+    call par_exchange_U_z(U, nx, ny, nz)
 #endif
     !$omp sections
     !$omp section
@@ -917,8 +917,8 @@ implicit none
     ny = Prny
     nz = Prnz
 
-#ifdef MPI
-    call exchange_mpi_boundaries(Phi, nx, ny, nz, Btype, 0, 1)
+#ifdef PAR
+    call par_exchange_boundaries(Phi, nx, ny, nz, Btype, 0, 1)
 #endif
     
     if (Btype(We)==PERIODIC) then
@@ -1015,8 +1015,8 @@ implicit none
     ny=Prny
     nz=Prnz
     
-#ifdef MPI
-    call exchange_Pr(Pr)
+#ifdef PAR
+    call par_exchange_Pr(Pr)
 #endif
 
     if (Btype(We)==PERIODIC) then
@@ -1073,8 +1073,8 @@ implicit none
     ny = Prny
     nz = Prnz
 
-#ifdef MPI
-    call exchange_Q(Phi)
+#ifdef PAR
+    call par_exchange_Q(Phi)
 #endif
 
     !The above filled the buffers, but we have to add

@@ -85,8 +85,8 @@ contains
 
 
   subroutine cgal_polyhedron_read(ptree, fname)
-#ifdef MPI
-    use custom_mpi, only: master
+#ifdef PAR
+    use custom_par, only: master
 #endif
     type(c_ptr),intent(out) :: ptree
     character(*),intent(in) :: fname
@@ -94,7 +94,7 @@ contains
     integer :: imaster
     
     imaster = 0
-#ifdef MPI
+#ifdef PAR
     if (master)  imaster = 1
 #endif
 

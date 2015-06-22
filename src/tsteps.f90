@@ -21,8 +21,8 @@ contains
 
   subroutine TMarchRK3(U, V, W, Pr, Temperature, Moisture, Scalar, dt, delta)
     use RK3
-#ifdef MPI
-    use custom_mpi
+#ifdef PAR
+    use custom_par
 #endif
     real(knd), allocatable, intent(inout) :: U(:,:,:), V(:,:,:) ,W(:,:,:), Pr(:,:,:)
     real(knd), allocatable, intent(inout) :: Temperature(:,:,:), Moisture(:,:,:), Scalar(:,:,:,:)
@@ -158,8 +158,8 @@ contains
           delta = delta + sum(abs(W(1:Wnx,1:Wny,1:Wnz) - W2(1:Wnx,1:Wny,1:Wnz))) / (Wnx*Wny*Wnz)
 
         if (RK_stage==RK_stages) then
-#ifdef MPI
-          delta = mpi_co_sum(delta)
+#ifdef PAR
+          delta = par_co_sum(delta)
 #endif
           if (master) write(*,*) "delta",delta
         end if

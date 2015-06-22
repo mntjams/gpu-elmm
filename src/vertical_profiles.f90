@@ -241,8 +241,8 @@ contains
   
   subroutine Profiles_Save(p, dir, nth)
     use FreeUnit
-#ifdef MPI
-    use custom_mpi, only: iim, jim, kim
+#ifdef PAR
+    use custom_par, only: iim, jim, kim
 #endif
     class(Profiles), intent(inout) :: p
     character(*), intent(in) :: dir
@@ -295,7 +295,7 @@ contains
       call ReduceProfile(p%ss(i,:),        n_free_Pr(1:Prnz))
     end do
       
-#ifdef MPI
+#ifdef PAR
     if (iim==1.and.jim==1) then
       if (kim == 1) then
         flux_start = 0
@@ -487,7 +487,7 @@ contains
 
       end if !num_of_scalars>0
      
-#ifdef MPI
+#ifdef PAR
     end if
 #endif
 
@@ -539,14 +539,14 @@ contains
   
   
   subroutine ReduceProfile(prof, n_free)
-#ifdef MPI
-    use custom_mpi
+#ifdef PAR
+    use custom_par
 #endif
     real(knd), intent(inout) :: prof(:)
     real(knd), intent(in)    :: n_free(:)
   
-#ifdef MPI
-    call sum_to_master_horizontal(prof)
+#ifdef PAR
+    call par_sum_to_master_horizontal(prof)
     if (iim==1.and.jim==1) prof = prof / n_free
 #else
     prof = prof / n_free

@@ -1,4 +1,5 @@
 module Stop_procedures
+  use iso_fortran_env, only: error_unit
 #ifdef MPI
   use mpi
 #endif
@@ -6,7 +7,11 @@ module Stop_procedures
   
   public master, error_stop
 
+#ifdef PAR
   logical :: master = .true.
+#else
+  logical, parameter :: master = .true.
+#endif
 
   interface error_stop
     module procedure error_stop_null
@@ -28,10 +33,8 @@ contains
 
   subroutine error_stop_int(n)
     integer,intent(in) :: n
-    
-    if (master) then
-      write(*,'(g0)') "ERROR",n
-    end if
+
+    write(error_unit,'(*(g0))') "CLMM Abort: ", n
     
 #ifdef MPI
     call abort_mpi(n)
@@ -42,10 +45,9 @@ contains
 
   subroutine error_stop_char(ch)
     character(*),intent(in) :: ch
-    
-    if (master) then
-      write(*,'(g0)') ch
-    end if
+
+    write(error_unit,'(*(g0))') "CLMM Abort: ", ch
+
 #ifdef MPI
     call abort_mpi(1)
 #endif
@@ -57,9 +59,8 @@ contains
     character(*),intent(in) :: ch
     integer,intent(in) :: n
     
-    if (master) then
-      write(*,'(g0,1x,g0)') ch,n
-    end if
+    write(error_unit,'(2g0,1x,g0)') "CLMM Abort: ", ch, n
+
 #ifdef MPI
     call abort_mpi(n)
 #endif

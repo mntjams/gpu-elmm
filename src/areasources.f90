@@ -40,8 +40,8 @@ contains
   function point_sources(self) result(res)
     use Boundaries
     use ArrayUtilities
-#ifdef MPI
-    use custom_mpi
+#ifdef PAR
+    use custom_par
 #endif
     type(ScalarFlVolumesContainer) :: res
     class(ScalarAreaSource), intent(in) :: self
@@ -71,8 +71,8 @@ contains
     end do
 
     n_total = size(res%volumes)
-#ifdef MPI
-    n_total = mpi_co_sum(n_total)
+#ifdef PAR
+    n_total = par_co_sum(n_total)
 #endif
     if (n_total>0) res%volumes%flux = res%volumes%flux / n_total
   end function

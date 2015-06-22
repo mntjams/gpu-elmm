@@ -52,7 +52,7 @@ module Parameters
 
   integer :: Prnx, Prny, Prnz  !dimensions of grid for pressure
   
-  !relevant for MPI
+  !relevant for distributed parallelism
   integer :: gPrnx, gPrny, gPrnz !global grid dimensions
   integer :: gUnx, gUny, gUnz
   integer :: gVnx, gVny, gVnz

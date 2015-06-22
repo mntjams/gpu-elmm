@@ -2,8 +2,8 @@ module Custom_gabls4
   use Kinds
   use Interpolation
   use Parameters
-#ifdef MPI  
-  use Custom_mpi, only: iim, jim, kim, nzims, &
+#ifdef PAR  
+  use custom_par, only: iim, jim, kim, nzims, &
                         comm_row_z, sum_to_master_horizontal, &
                         MPI_INTEGER, MPI_KND
 #endif
@@ -19,7 +19,7 @@ module Custom_gabls4
   
   real(knd), allocatable, dimension(:) :: temp, tempfl, up, vp, uu, vv, ww, uw, vw, tkesgs
   
-#ifdef MPI
+#ifdef PAR
   real(knd), allocatable, dimension(:) :: u_part, v_part, uu_part, vv_part, ww_part, tkesgs_part
   integer, allocatable, dimension(:) :: ns_z, offs_z
   
@@ -177,7 +177,7 @@ contains
   subroutine init_series   
     integer :: i, k
     
-#ifdef MPI    
+#ifdef PAR    
     integer :: ierr
       
     if (master) then
@@ -400,7 +400,7 @@ subroutine CustomTimeStepOutput
   
   gabls_series_step = gabls_series_step + 1
 
-#ifdef MPI
+#ifdef PAR
   if (kim==1) then
     temp = current_profiles%temp(1:Prnz)
     tempfl = current_profiles%tempfl(1:Prnz)
@@ -579,7 +579,7 @@ subroutine CustomTimeStepOutput
       tke_last = tke_k
     end do
 
-#ifdef MPI
+#ifdef PAR
   end if
 #endif
 

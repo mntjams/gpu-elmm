@@ -25,8 +25,8 @@ module Initial
   use Tiling, only: tilesize,InitTiles
   use FreeUnit, only: newunit
   use Puffs, only: InitPuffSources
-#ifdef MPI
-  use custom_mpi
+#ifdef PAR
+  use custom_par
 #endif
 
   implicit none
@@ -799,10 +799,10 @@ contains
    end if
 
 
-#ifdef MPI
-   call init_mpi_grid
+#ifdef PAR
+   call par_init_grid
    
-   call init_mpi_boundaries
+   call par_init_boundaries
    
    x0 = x0 + offset_to_global_x * dxmin
    y0 = y0 + offset_to_global_y * dymin
@@ -840,18 +840,18 @@ contains
                           Wnz = Prnz-1
    end if
    
-#ifdef MPI
-   gUnx = mpi_co_sum(Unx, comm_row_x)
-   gUny = mpi_co_sum(Uny, comm_row_y)
-   gUnz = mpi_co_sum(Unz, comm_row_z)
+#ifdef PAR
+   gUnx = par_co_sum(Unx, comm_row_x)
+   gUny = par_co_sum(Uny, comm_row_y)
+   gUnz = par_co_sum(Unz, comm_row_z)
    
-   gVnx = mpi_co_sum(Vnx, comm_row_x)
-   gVny = mpi_co_sum(Vny, comm_row_y)
-   gVnz = mpi_co_sum(Vnz, comm_row_z)
+   gVnx = par_co_sum(Vnx, comm_row_x)
+   gVny = par_co_sum(Vny, comm_row_y)
+   gVnz = par_co_sum(Vnz, comm_row_z)
    
-   gWnx = mpi_co_sum(Wnx, comm_row_x)
-   gWny = mpi_co_sum(Wny, comm_row_y)
-   gWnz = mpi_co_sum(Wnz, comm_row_z)
+   gWnx = par_co_sum(Wnx, comm_row_x)
+   gWny = par_co_sum(Wny, comm_row_y)
+   gWnz = par_co_sum(Wnz, comm_row_z)
 #else
    gUnx = Unx
    gUny = Uny
@@ -975,12 +975,12 @@ contains
      end subroutine
 
      subroutine parse_command_line
-#ifdef MPI
-       use custom_mpi
+#ifdef PAR
+       use custom_par
 #endif
        namelist /cmd/ tilesize, debugparam, debuglevel, windangle, projectiontype, &
                        Prnx, Prny, Prnz,&
-#ifdef MPI
+#ifdef PAR
                        npxyz, &
 #endif
                        obstacles_file, probes_file, scalar_probes_file, scratch_dir
@@ -1511,8 +1511,8 @@ contains
 
   subroutine ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
     use Endianness
-#ifdef MPI
-    use exchange_mpi
+#ifdef PAR
+    use exchange_par
 #endif
     real(knd), intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd), intent(inout) :: Pr(1:,1:,1:)
@@ -1653,10 +1653,10 @@ contains
       W(1:Prnx,1:Prny,1:Prnz) = real(UVWbuffer(3,1:Prnx,1:Prny,1:Prnz),knd)
       W(0:Prnx-1,1:Prny,1:Prnz) = W(0:Prnx-1,1:Prny,1:Prnz) + W(1:Prnx,1:Prny,1:Prnz)
 
-#ifdef MPI
-      call exchange_U_x(U, Unx, Uny, Unz)
-      call exchange_U_y(V, Vnx, Vny, Vnz)
-      call exchange_U_z(W, Wnx, Wny, Wnz)
+#ifdef PAR
+      call par_exchange_U_x(U, Unx, Uny, Unz)
+      call par_exchange_U_y(V, Vnx, Vny, Vnz)
+      call par_exchange_U_z(W, Wnx, Wny, Wnz)
 #endif
       if (Btype(Ea)>=MPI_BOUNDS.or.Btype(Ea)==PERIODIC) U(Prnx,1:Prny,1:Prnz) = U(Prnx,1:Prny,1:Prnz) + U(0,1:Prny,1:Prnz)
       if (Btype(No)>=MPI_BOUNDS.or.Btype(No)==PERIODIC) V(1:Prnx,Prny,1:Prnz) = V(1:Prnx,Prny,1:Prnz) + V(1:Prnx,0,1:Prnz)
@@ -2721,8 +2721,8 @@ contains
   subroutine init_random_seed()
     use rng_par_zig
     !$ use omp_lib
-#ifdef MPI
-    use custom_mpi
+#ifdef PAR
+    use custom_par
 #endif
     integer :: i
     integer(int32),dimension(:),allocatable :: seed
@@ -2735,7 +2735,7 @@ contains
     
     allocate(seed(nt))
 
-#ifdef MPI
+#ifdef PAR
     seed = [( 1000 * i + myrank, i=1,size(seed) )]
 #else
     seed = [( 1000 * i, i=1,size(seed) )]

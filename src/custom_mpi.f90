@@ -1,12 +1,22 @@
-#ifdef MPI
 module custom_mpi
-  use Kinds
   use mpi
+  use Kinds
+
+  integer :: MPI_knd = -huge(1), MPI_real32 = -huge(1), MPI_real64 = -huge(1)
+  real(real32), pointer :: MPI_IN_PLACE_real32(:)
+  real(real64), pointer :: MPI_IN_PLACE_real64(:)
+
+end module
+
+module custom_par
+  use Kinds
+  use custom_mpi
   use stop_procedures
   
   implicit none
 
-  
+  private :: MPI_knd, MPI_real32, MPI_real64, MPI_IN_PLACE_real32, MPI_IN_PLACE_real64  
+
   integer :: nims, npx = -1, npy = -1, npz = -1
   integer :: npxyz(3) = -1, pxyz(3)
   integer :: nxims, nyims, nzims
@@ -17,45 +27,47 @@ module custom_mpi
   integer :: comm_plane_yz = -1, comm_plane_xz = -1, comm_plane_xy = -1
   integer :: comm_row_x = -1, comm_row_y = -1, comm_row_z = -1
   integer :: cart_comm_dim = -1
-  integer :: MPI_knd = -huge(1), MPI_real32 = -huge(1), MPI_real64 = -huge(1)
   integer, allocatable :: images_grid(:,:,:), ranks_grid(:,:,:)
-  real(real32), pointer :: MPI_IN_PLACE_real32(:)
-  real(real64), pointer :: MPI_IN_PLACE_real64(:)
   
-  interface mpi_co_reduce
-    module procedure mpi_co_reduce_32
-    module procedure mpi_co_reduce_64
-    module procedure mpi_co_reduce_32_1d
-    module procedure mpi_co_reduce_64_1d
-    module procedure mpi_co_reduce_logical
-    module procedure mpi_co_reduce_int
+  interface par_co_reduce
+    module procedure par_co_reduce_32
+    module procedure par_co_reduce_64
+    module procedure par_co_reduce_32_1d
+    module procedure par_co_reduce_64_1d
+    module procedure par_co_reduce_logical
+    module procedure par_co_reduce_int
   end interface
   
-  interface mpi_co_min
-    module procedure mpi_co_min_32
-    module procedure mpi_co_min_64
-    module procedure mpi_co_min_int
+  interface par_co_min
+    module procedure par_co_min_32
+    module procedure par_co_min_64
+    module procedure par_co_min_int
   end interface
   
-  interface mpi_co_max
-    module procedure mpi_co_max_32
-    module procedure mpi_co_max_64
+  interface par_co_max
+    module procedure par_co_max_32
+    module procedure par_co_max_64
   end interface
   
-  interface mpi_co_sum
-    module procedure mpi_co_sum_32
-    module procedure mpi_co_sum_32_comm
-    module procedure mpi_co_sum_32_comm_1d
-    module procedure mpi_co_sum_64
-    module procedure mpi_co_sum_64_comm
-    module procedure mpi_co_sum_64_comm_1d
-    module procedure mpi_co_sum_int
-    module procedure mpi_co_sum_int_comm
+  interface par_co_sum
+    module procedure par_co_sum_32
+    module procedure par_co_sum_32_comm
+    module procedure par_co_sum_32_comm_1d
+    module procedure par_co_sum_64
+    module procedure par_co_sum_64_comm
+    module procedure par_co_sum_64_comm_1d
+    module procedure par_co_sum_int
+    module procedure par_co_sum_int_comm
   end interface
 
-  interface sum_to_master_horizontal
-    module procedure sum_to_master_horizontal_32_1d
-    module procedure sum_to_master_horizontal_64_1d
+  interface par_sum_to_master_horizontal
+    module procedure par_sum_to_master_horizontal_32_1d
+    module procedure par_sum_to_master_horizontal_64_1d
+  end interface
+
+  interface par_broadcast_from_top
+    module procedure par_broadcast_from_top_real32
+    module procedure par_broadcast_from_top_real64
   end interface
 
 contains
@@ -67,7 +79,7 @@ contains
   end subroutine
 
  
-  integer function mpi_this_image() result(res)
+  integer function par_this_image() result(res)
     integer ie
     call MPI_Comm_rank(global_comm, res, ie)
     res = res + 1
@@ -75,14 +87,14 @@ contains
   end function
   
 
-  integer function mpi_num_images() result(res)
+  integer function par_num_images() result(res)
     integer ie
     call MPI_Comm_size(global_comm, res, ie)  
     if (ie/=0) call error_stop("MPI_Comm_size ERROR")
   end function
 
   
-  integer function mpi_image_index(sub) result(res)
+  integer function par_image_index(sub) result(res)
     integer, intent(in) :: sub(3)
     integer ie
     
@@ -96,7 +108,7 @@ contains
   end function
   
 
-  subroutine get_image_coords()
+  subroutine par_get_image_coords()
     integer :: ie
     integer :: i, j, k
     
@@ -112,36 +124,36 @@ contains
     write(*,*) myim, "coords:",iim,jim,kim
     
     if (iim>1) then
-      w_im = mpi_image_index([iim-1, jim, kim])
+      w_im = par_image_index([iim-1, jim, kim])
     else
-      w_im = mpi_image_index([nxims, jim, kim])
+      w_im = par_image_index([nxims, jim, kim])
     end if
     if (iim<nxims) then
-      e_im = mpi_image_index([iim+1, jim, kim])
+      e_im = par_image_index([iim+1, jim, kim])
     else
-      e_im = mpi_image_index([1, jim, kim])
+      e_im = par_image_index([1, jim, kim])
     end if
     
     if (jim>1) then
-      s_im = mpi_image_index([iim, jim-1, kim])
+      s_im = par_image_index([iim, jim-1, kim])
     else
-      s_im = mpi_image_index([iim, nyims, kim])
+      s_im = par_image_index([iim, nyims, kim])
     end if
     if (jim<nyims) then
-      n_im = mpi_image_index([iim, jim+1, kim])
+      n_im = par_image_index([iim, jim+1, kim])
     else
-      n_im = mpi_image_index([iim, 1, kim])
+      n_im = par_image_index([iim, 1, kim])
     end if
 
     if (kim>1) then
-      b_im = mpi_image_index([iim, jim, kim-1])
+      b_im = par_image_index([iim, jim, kim-1])
     else
-      b_im = mpi_image_index([iim, jim, nzims])
+      b_im = par_image_index([iim, jim, nzims])
     end if
     if (kim<nzims) then
-      t_im = mpi_image_index([iim, jim, kim+1])
+      t_im = par_image_index([iim, jim, kim+1])
     else
-      t_im = mpi_image_index([iim, jim, 1])
+      t_im = par_image_index([iim, jim, 1])
     end if
     
     w_rank = w_im - 1
@@ -155,7 +167,7 @@ contains
     do k = 1, nzims
       do j = 1, nyims
         do i = 1, nxims
-          images_grid(i,j,k) = mpi_image_index([i, j, k])
+          images_grid(i,j,k) = par_image_index([i, j, k])
         end do
       end do
     end do
@@ -166,7 +178,7 @@ contains
 
   
   
-  subroutine init_custom_mpi
+  subroutine par_init
     use Kinds
     use iso_c_binding
     integer :: ie
@@ -204,9 +216,9 @@ contains
     call MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_ARE_FATAL, ie)
     if (ie/=0) call error_stop("Error in MPI_Errhandler_set")
     
-    nims = mpi_num_images()
+    nims = par_num_images()
 
-    myim = mpi_this_image()
+    myim = par_this_image()
     
     myrank = myim - 1
 
@@ -221,7 +233,7 @@ contains
       
   end subroutine
   
-  subroutine init_mpi_grid
+  subroutine par_init_grid
     use PoisFFT
     use iso_c_binding
     use Parameters, only: gPrnx, gPrny, gPrnz, gPrns, Prnx, Prny, Prnz, &
@@ -272,9 +284,9 @@ contains
     !This uses the 3D communicator, slower, but necessary for 3D decomposition
 !     poisfft_comm = cart_comm
     
-    call init_sub_comms
+    call par_init_sub_comms
     
-    call get_image_coords
+    call par_get_image_coords
     
     gPrnx = Prnx
     gPrny = Prny
@@ -295,7 +307,7 @@ contains
     call MPI_Barrier(global_comm, ie)
     if (ie/=0) call error_stop("Error in MPI Barrier.")
     
-    if (mpi_co_any(any(nxyz<=0))) then
+    if (par_co_any(any(nxyz<=0))) then
       call error_stop("Zero or negative grid size on one or more images. Try different process grid.")
     end if
     
@@ -320,7 +332,7 @@ contains
   end subroutine
 
   
-  subroutine init_mpi_boundaries
+  subroutine par_init_boundaries
     use Parameters
     
     call helper(Btype)
@@ -369,7 +381,7 @@ contains
     
   end subroutine
   
-  subroutine finalize_custom_mpi
+  subroutine par_finalize
     integer :: ie
     call MPI_Barrier(global_comm, ie)
     if (ie/=0) call error_stop("Error when waiting before finalizing MPI.")
@@ -379,7 +391,7 @@ contains
   
   
   
-  subroutine init_sub_comms
+  subroutine par_init_sub_comms
     integer :: ie
   
     !note the order of the dimensions is reversed
@@ -405,7 +417,7 @@ contains
   end subroutine
   
   
-  function mpi_co_reduce_32(x,op,comm) result(res)
+  function par_co_reduce_32(x,op,comm) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
     integer, intent(in) :: op, comm
@@ -422,10 +434,10 @@ contains
     call MPI_AllReduce(x, res, &
                        count=1, datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
-    if (ie/=0) call error_stop("Error in mpi_co_reduce_32.")
+    if (ie/=0) call error_stop("Error in par_co_reduce_32.")
   end function
 
-  function mpi_co_reduce_64(x,op,comm) result(res)
+  function par_co_reduce_64(x,op,comm) result(res)
     real(real64) :: res
     real(real64),intent(in) :: x
     integer, intent(in) :: op, comm
@@ -442,10 +454,10 @@ contains
     call MPI_AllReduce(x, res, &
                        count=1, datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
-    if (ie/=0) call error_stop("Error in mpi_co_reduce_64.")
+    if (ie/=0) call error_stop("Error in par_co_reduce_64.")
   end function
 
-  function mpi_co_reduce_32_1d(x,op,comm) result(res)
+  function par_co_reduce_32_1d(x,op,comm) result(res)
     real(real32),intent(in) :: x(:)
     real(real32) :: res(size(x))
     integer, intent(in) :: op, comm
@@ -462,10 +474,10 @@ contains
     call MPI_AllReduce(x, res, &
                        count=size(x), datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
-    if (ie/=0) call error_stop("Error in mpi_co_reduce_32.")
+    if (ie/=0) call error_stop("Error in par_co_reduce_32.")
   end function
 
-  function mpi_co_reduce_64_1d(x,op,comm) result(res)
+  function par_co_reduce_64_1d(x,op,comm) result(res)
     real(real64),intent(in) :: x(:)
     real(real64) :: res(size(x))
     integer, intent(in) :: op, comm
@@ -482,10 +494,10 @@ contains
     call MPI_AllReduce(x, res, &
                        count=size(x), datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
-    if (ie/=0) call error_stop("Error in mpi_co_reduce_64.")
+    if (ie/=0) call error_stop("Error in par_co_reduce_64.")
   end function
 
-  function mpi_co_reduce_logical(x,op,comm) result(res)
+  function par_co_reduce_logical(x,op,comm) result(res)
     logical :: res
     logical,intent(in) :: x
     integer, intent(in) :: op, comm
@@ -502,10 +514,10 @@ contains
     call MPI_AllReduce(x, res, &
                        count=1, datatype=MPI_LOGICAL, op=op, &
                        comm=comm, ierror=ie)
-    if (ie/=0) call error_stop("Error in mpi_co_reduce_logical.")
+    if (ie/=0) call error_stop("Error in par_co_reduce_logical.")
   end function
 
-  function mpi_co_reduce_int(x,op,comm) result(res)
+  function par_co_reduce_int(x,op,comm) result(res)
     integer :: res
     integer,intent(in) :: x
     integer, intent(in) :: op, comm
@@ -522,136 +534,136 @@ contains
     call MPI_AllReduce(x, res, &
                        count=1, datatype=MPI_INTEGER, op=op, &
                        comm=comm, ierror=ie)
-    if (ie/=0) call error_stop("Error in mpi_co_reduce_logical.")
+    if (ie/=0) call error_stop("Error in par_co_reduce_logical.")
   end function
 
-  function mpi_co_min_32(x) result(res)
+  function par_co_min_32(x) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_MIN, global_comm)
+    res = par_co_reduce(x, MPI_MIN, global_comm)
   end function
 
-  function mpi_co_min_64(x) result(res)
+  function par_co_min_64(x) result(res)
     real(real64) :: res
     real(real64),intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_MIN, global_comm)
+    res = par_co_reduce(x, MPI_MIN, global_comm)
   end function
 
-  function mpi_co_min_int(x) result(res)
+  function par_co_min_int(x) result(res)
     integer :: res
     integer,intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_MIN, global_comm)
+    res = par_co_reduce(x, MPI_MIN, global_comm)
   end function
 
-  function mpi_co_max_32(x) result(res)
+  function par_co_max_32(x) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_MAX, global_comm)
+    res = par_co_reduce(x, MPI_MAX, global_comm)
   end function
 
-  function mpi_co_max_64(x) result(res)
+  function par_co_max_64(x) result(res)
     real(real64) :: res
     real(real64),intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_MAX, global_comm)
+    res = par_co_reduce(x, MPI_MAX, global_comm)
   end function
 
-  function mpi_co_sum_int(x) result(res)
+  function par_co_sum_int(x) result(res)
     integer :: res
     integer,intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_SUM, global_comm)
+    res = par_co_reduce(x, MPI_SUM, global_comm)
   end function
 
-  function mpi_co_sum_int_comm(x, comm) result(res)
+  function par_co_sum_int_comm(x, comm) result(res)
     integer :: res
     integer,intent(in) :: x
     integer, intent(in) :: comm
     integer ie
     
-    res = mpi_co_reduce(x, MPI_SUM, comm)
+    res = par_co_reduce(x, MPI_SUM, comm)
   end function
 
-  function mpi_co_sum_32(x) result(res)
+  function par_co_sum_32(x) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_SUM, global_comm)
+    res = par_co_reduce(x, MPI_SUM, global_comm)
   end function
 
-  function mpi_co_sum_64(x) result(res)
+  function par_co_sum_64(x) result(res)
     real(real64) :: res
     real(real64),intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_SUM, global_comm)
+    res = par_co_reduce(x, MPI_SUM, global_comm)
   end function
 
-  function mpi_co_sum_32_comm(x, comm) result(res)
+  function par_co_sum_32_comm(x, comm) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
     integer, intent(in) :: comm
     integer ie
     
-    res = mpi_co_reduce(x, MPI_SUM, comm)
+    res = par_co_reduce(x, MPI_SUM, comm)
   end function
 
-  function mpi_co_sum_64_comm(x, comm) result(res)
+  function par_co_sum_64_comm(x, comm) result(res)
     real(real64) :: res
     real(real64),intent(in) :: x
     integer, intent(in) :: comm
     integer ie
     
-    res = mpi_co_reduce(x, MPI_SUM, comm)
+    res = par_co_reduce(x, MPI_SUM, comm)
   end function
 
-  function mpi_co_sum_32_comm_1d(x, comm) result(res)
+  function par_co_sum_32_comm_1d(x, comm) result(res)
     real(real32),intent(in) :: x(:)
     real(real32) :: res(size(x))
     integer, intent(in) :: comm
     integer ie
     
-    res = mpi_co_reduce(x, MPI_SUM, comm)
+    res = par_co_reduce(x, MPI_SUM, comm)
   end function
 
-  function mpi_co_sum_64_comm_1d(x, comm) result(res)
+  function par_co_sum_64_comm_1d(x, comm) result(res)
     real(real64),intent(in) :: x(:)
     real(real64) :: res(size(x))
     integer, intent(in) :: comm
     integer ie
     
-    res = mpi_co_reduce(x, MPI_SUM, comm)
+    res = par_co_reduce(x, MPI_SUM, comm)
   end function
 
-  function mpi_co_any(x) result(res)
+  function par_co_any(x) result(res)
     logical :: res
     logical,intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_LOR, global_comm)
+    res = par_co_reduce(x, MPI_LOR, global_comm)
   end function
 
 
-  function mpi_co_all(x) result(res)
+  function par_co_all(x) result(res)
     logical :: res
     logical,intent(in) :: x
     integer ie
     
-    res = mpi_co_reduce(x, MPI_LAND, global_comm)
+    res = par_co_reduce(x, MPI_LAND, global_comm)
   end function
 
-  subroutine sum_to_master_horizontal_32_1d(x)
+  subroutine par_sum_to_master_horizontal_32_1d(x)
     real(real32), intent(inout) :: x(:)
     integer ie
     interface
@@ -669,7 +681,7 @@ contains
     end if
   end subroutine
 
-  subroutine sum_to_master_horizontal_64_1d(x)
+  subroutine par_sum_to_master_horizontal_64_1d(x)
     real(real64), intent(inout) :: x(:)
     integer ie
     interface
@@ -687,5 +699,34 @@ contains
     end if
   end subroutine
 
+  subroutine par_broadcast_from_top_real32(x)
+    real(real32), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real32) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real32, nzims-1, comm_row_z, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_top_real64(x)
+    real(real64), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real64) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real64, nzims-1, comm_row_z, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
 end module
-#endif

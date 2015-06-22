@@ -37,9 +37,9 @@ contains
 
 
  subroutine GetTurbInletXie(dt)
-#ifdef MPI
-   use custom_mpi, only: iim, jim, kim, nxims, nyims, nzims, mpi_co_sum, mpi_co_min
-   use exchange_mpi
+#ifdef PAR
+   use custom_par, only: iim, jim, kim, nxims, nyims, nzims, par_co_sum, par_co_min
+   use exchange_par
 #endif
    real(knd),intent(in) :: dt
    logical,save:: called=.false.
@@ -53,7 +53,7 @@ contains
    real(knd),allocatable,dimension(:,:,:),save :: bfilt !filter coefficients (ii,jj,kk,kz)
    integer :: tid
    
-#ifdef MPI
+#ifdef PAR
    !should not happen for 2D decomposition in X and Y
    if (.not.(iim==1.or.iim==nxims)) return
    if (nxims>1.and.iim==nxims.and.Btype(Ea)/=TurbulentInletType) return
@@ -65,12 +65,12 @@ contains
 
       call InitMeanProfiles
 
-#ifdef MPI
+#ifdef PAR
       filtny = min(max(nint(lturby/dymin),1),ceiling(1._knd*gPrny/3),Prny)
       filtnz = min(max(nint(lturbz/dzmin),1),ceiling(1._knd*gPrnz/3),Prnz)
 
-      filtny = mpi_co_min(filtny)
-      filtnz = mpi_co_min(filtnz)
+      filtny = par_co_min(filtny)
+      filtnz = par_co_min(filtnz)
 #else
       filtny = min(max(nint(lturby/dymin),1),ceiling(1._knd*Prny/3))
       filtnz = min(max(nint(lturbz/dzmin),1),ceiling(1._knd*Prnz/3))
@@ -142,13 +142,13 @@ contains
         !$omp end  parallel workshare
       end if
 
-#ifdef MPI
+#ifdef PAR
       do i=1,2
-        call exchange_mpi_boundaries_yz(Ru(:,:,i), Prny, Prnz, Btype, &
+        call par_exchange_boundaries_yz(Ru(:,:,i), Prny, Prnz, Btype, &
                                         -bigNy+1, -bigNz+1, bigNy, bigNz)
-        call exchange_mpi_boundaries_yz(Rv(:,:,i), Prny, Prnz, Btype, &
+        call par_exchange_boundaries_yz(Rv(:,:,i), Prny, Prnz, Btype, &
                                         -bigNy+1, -bigNz+1, bigNy, bigNz)
-        call exchange_mpi_boundaries_yz(Rw(:,:,i), Prny, Prnz, Btype, &
+        call par_exchange_boundaries_yz(Rw(:,:,i), Prny, Prnz, Btype, &
                                         -bigNy+1, -bigNz+1, bigNy, bigNz)
       end do
 #endif
@@ -192,8 +192,8 @@ contains
       compat = sum(Uinavg(1:Prny,1:Prnz))
       !$omp end  workshare
       !$omp end  parallel
-#ifdef MPI
-     compat = mpi_co_sum(compat)
+#ifdef PAR
+     compat = par_co_sum(compat)
 #endif
 
       called=.true.
@@ -244,10 +244,10 @@ contains
 
    !$omp workshare
    p = sum(Uin(1:Prny,1:Prnz)) 
-#ifdef MPI
+#ifdef PAR
    !$omp workshare
    !$omp single
-   p = mpi_co_sum(p)
+   p = par_co_sum(p)
    !$omp single
    !$omp workshare
 #endif
@@ -322,13 +322,13 @@ contains
    end if
    !$omp end parallel
 
-#ifdef MPI
+#ifdef PAR
    do i=1,2
-     call exchange_mpi_boundaries_yz(Ru(:,:,i), Prny, Prnz, Btype, &
+     call par_exchange_boundaries_yz(Ru(:,:,i), Prny, Prnz, Btype, &
                                      -bigNy+1, -bigNz+1, bigNy, bigNz)
-     call exchange_mpi_boundaries_yz(Rv(:,:,i), Prny, Prnz, Btype, &
+     call par_exchange_boundaries_yz(Rv(:,:,i), Prny, Prnz, Btype, &
                                      -bigNy+1, -bigNz+1, bigNy, bigNz)
-     call exchange_mpi_boundaries_yz(Rw(:,:,i), Prny, Prnz, Btype, &
+     call par_exchange_boundaries_yz(Rw(:,:,i), Prny, Prnz, Btype, &
                                      -bigNy+1, -bigNz+1, bigNy, bigNz)
    end do
 #endif
@@ -558,8 +558,8 @@ contains
 
 
   subroutine BoundUin(component,Uin)
-#ifdef MPI
-    use exchange_mpi, only: exchange_mpi_boundaries_yz
+#ifdef PAR
+    use exchange_par, only: par_exchange_boundaries_yz
 #endif
     integer,  intent(in)    :: component
     real(knd),intent(inout) :: Uin(-2:,-2:)
@@ -579,8 +579,8 @@ contains
       nz = Wnz
     end if
 
-#ifdef MPI
-     call exchange_mpi_boundaries_yz(Uin, ny, nz, Btype, &
+#ifdef PAR
+     call par_exchange_boundaries_yz(Uin, ny, nz, Btype, &
                                      -2, -2, 2, 2)
 #endif
 

@@ -1,8 +1,8 @@
 module Sponge
 
   use Parameters
-#ifdef MPI
-    use custom_mpi
+#ifdef PAR
+    use custom_par
 #endif
 
   implicit none
@@ -94,8 +94,8 @@ contains
           avg(k) = p
         end do
         
-#ifdef MPI
-        avg = mpi_co_sum(avg, comm_plane_xy)
+#ifdef PAR
+        avg = par_co_sum(avg, comm_plane_xy)
 #endif
 
         !$omp do
@@ -140,8 +140,8 @@ contains
           avg(k) = p
         end do
 
-#ifdef MPI
-        avg = mpi_co_sum(avg, comm_plane_xy)
+#ifdef PAR
+        avg = par_co_sum(avg, comm_plane_xy)
 #endif
 
         !$omp do
@@ -186,8 +186,8 @@ contains
           avg(k) = p
         end do
 
-#ifdef MPI
-        avg = mpi_co_sum(avg, comm_plane_xy)
+#ifdef PAR
+        avg = par_co_sum(avg, comm_plane_xy)
 #endif
 
         !$omp do
@@ -253,8 +253,8 @@ contains
       end do
       !$omp end do
 
-#ifdef MPI
-        avg = mpi_co_sum(avg, comm_plane_xy)
+#ifdef PAR
+        avg = par_co_sum(avg, comm_plane_xy)
 #endif
 
       !$omp do

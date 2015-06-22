@@ -413,8 +413,8 @@ module Subgrid
     
     subroutine SGS_Sigma_stability(U,V,W,filter_ratio)
       !from Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
-#ifdef MPI
-      use custom_mpi
+#ifdef PAR
+      use custom_par
 #endif
       use Tiling, only: tilenx, tileny, tilenz
       use Outputs, only: enable_profiles, current_profiles
@@ -435,9 +435,9 @@ module Subgrid
         tempfl_p = current_profiles%tempfl + current_profiles%tempflsgs
         momfl_p = sqrt((current_profiles%uw + current_profiles%uwsgs)**2 + &
                        (current_profiles%vw + current_profiles%vwsgs)**2)
-#ifdef MPI
-        tempfl_p = mpi_co_sum(tempfl_p, comm=comm_plane_xy)
-        momfl_p = mpi_co_sum(momfl_p, comm=comm_plane_xy)
+#ifdef PAR
+        tempfl_p = par_co_sum(tempfl_p, comm=comm_plane_xy)
+        momfl_p = par_co_sum(momfl_p, comm=comm_plane_xy)
 #endif
         tempfl_p = tempfl_p / (gPrnx*gPrny)
         momfl_p = momfl_p / (gPrnx*gPrny)

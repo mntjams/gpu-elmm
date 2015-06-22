@@ -196,15 +196,14 @@ contains
 
 
   subroutine AllocateOutputs
-#ifdef MPI
-    use custom_mpi
-#endif
+    use custom_par
     use Strings
     use Wallmodels
     integer :: k, u, io
 
    call GetEndianness
 
+   call par_sync_all
    if (master) write(*,*) "  ...creating output directories."
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -224,6 +223,7 @@ contains
 
    if (store%avg_U==0.and.store%avg_UU_prime>1) store%avg_U = 1
 
+   call par_sync_all
    if (master) write(*,*) "  ...allocating arrays for 3D statistics."
 
    if (averaging==1) then
@@ -304,6 +304,7 @@ contains
      Scalar_fl_W_avg = 0
    end if
 
+   call par_sync_all
    if (master) write(*,*) "  ...preparing probes."
 
    do k = 1,size(probes)
@@ -385,6 +386,7 @@ contains
 
    if (size(probes)>0) then
 
+     call par_sync_all
      if (master) write(*,*) "  ...allocating probe time series."
 
      allocate(U_time(size(probes),1:time_series_max_length), &
@@ -416,6 +418,7 @@ contains
 
    end if
 
+   call par_sync_all
    if (master) write(*,*) "  ...allocating global time series."
 
    allocate(times(1:time_series_max_length))
@@ -459,6 +462,7 @@ contains
     end if
    end if
 
+   call par_sync_all
    if (master) write(*,*) "  ...preparing profiles."
 
    if (enable_profiles) then
@@ -548,28 +552,26 @@ contains
        n_free_VW_sgs(k) = count((Vtype(1:Vnx,1:Vny,k+1)<=0.or.Vtype(1:Vnx,1:Vny,k)<=0))
      end do
      
-#ifdef MPI
      if (kim==1) then
-#endif
        n_free_PrW_surf = 0
        do k = 1, size(WMPoints)
         if (WMPoints(k)%zk==1.and.Prtype(WMPoints(k)%xi,WMPoints(k)%yj,1)<=0) then
           n_free_PrW_surf = n_free_PrW_surf + 1
         end if
        end do
-#ifdef MPI
      endif
-     
-     n_free_U = mpi_co_sum(n_free_U, comm = comm_plane_xy)
-     n_free_V = mpi_co_sum(n_free_V, comm = comm_plane_xy)
-     n_free_W = mpi_co_sum(n_free_W, comm = comm_plane_xy)
-     n_free_Pr = mpi_co_sum(n_free_Pr, comm = comm_plane_xy)
-     n_free_PrW = mpi_co_sum(n_free_PrW, comm = comm_plane_xy)
-     n_free_PrW_surf = mpi_co_sum(n_free_PrW_surf, comm = comm_plane_xy)
-     n_free_UW = mpi_co_sum(n_free_UW, comm = comm_plane_xy)
-     n_free_VW = mpi_co_sum(n_free_VW, comm = comm_plane_xy)
-     n_free_UW_sgs = mpi_co_sum(n_free_UW_sgs, comm = comm_plane_xy)
-     n_free_VW_sgs = mpi_co_sum(n_free_VW_sgs, comm = comm_plane_xy)
+
+#ifdef PAR
+     n_free_U = par_co_sum(n_free_U, comm = comm_plane_xy)
+     n_free_V = par_co_sum(n_free_V, comm = comm_plane_xy)
+     n_free_W = par_co_sum(n_free_W, comm = comm_plane_xy)
+     n_free_Pr = par_co_sum(n_free_Pr, comm = comm_plane_xy)
+     n_free_PrW = par_co_sum(n_free_PrW, comm = comm_plane_xy)
+     n_free_PrW_surf = par_co_sum(n_free_PrW_surf, comm = comm_plane_xy)
+     n_free_UW = par_co_sum(n_free_UW, comm = comm_plane_xy)
+     n_free_VW = par_co_sum(n_free_VW, comm = comm_plane_xy)
+     n_free_UW_sgs = par_co_sum(n_free_UW_sgs, comm = comm_plane_xy)
+     n_free_VW_sgs = par_co_sum(n_free_VW_sgs, comm = comm_plane_xy)
 #endif
 
      
@@ -1316,9 +1318,6 @@ contains
   
 
   subroutine OutputProfiles
-#ifdef MPI
-    use custom_mpi, only: iim, jim, kim
-#endif
     integer :: i
 
 
@@ -2330,8 +2329,6 @@ contains
     call CustomOutput
 #endif
 
-    if (master) write(*,*) "saved"
-
     if (len_trim(scratch_dir)>0) then
       call CopyFromScratch(output_dir)
     end if
@@ -2483,9 +2480,9 @@ contains
 
   subroutine TemperatureFluxSGSProfile(W,Temperature)
     use Wallmodels
-#ifdef MPI
-    use custom_mpi, only: kim
-#endif
+
+    use custom_par, only: kim
+
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
     real(knd) :: S
@@ -2506,21 +2503,19 @@ contains
     end do
     !$omp end parallel do
     
-#ifdef MPI
+
     if (kim==1) then
-#endif
-    S = 0
-    !$omp parallel do private(i) reduction(+:S)
-    do i = 1, size(WMPoints)
-      if (WMPoints(i)%zk==1.and.Prtype(WMPoints(i)%xi,WMPoints(i)%yj,1)<=0) then
-        S = S + WMPoints(i)%temperature_flux
-      end if
-    end do
-    !$omp end parallel do
-    current_profiles%tempflsgs(0) = S
-#ifdef MPI
+      S = 0
+      !$omp parallel do private(i) reduction(+:S)
+      do i = 1, size(WMPoints)
+        if (WMPoints(i)%zk==1.and.Prtype(WMPoints(i)%xi,WMPoints(i)%yj,1)<=0) then
+          S = S + WMPoints(i)%temperature_flux
+        end if
+      end do
+      !$omp end parallel do
+      current_profiles%tempflsgs(0) = S
     endif
-#endif    
+   
 
   end subroutine
 
@@ -2950,8 +2945,8 @@ contains
 
 
   subroutine CopyFromScratch(out_dir)
-! #ifdef MPI
-!     use custom_mpi
+! #ifdef PAR
+!     use custom_par
 !     integer :: ie
 ! #else
 !     integer, parameter :: nims = 1, myim = 1
@@ -2983,7 +2978,7 @@ contains
 ! #endif
 !         end if
 !       end if
-! #ifdef MPI
+! #ifdef PAR
 !       call MPI_Barrier(global_comm, ie)
 ! #endif
 !     end do
