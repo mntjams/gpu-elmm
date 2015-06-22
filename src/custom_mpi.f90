@@ -60,6 +60,12 @@ module custom_mpi
 
 contains
 
+  subroutine par_sync_all()
+    integer ie
+    call MPI_Barrier(global_comm, ie)
+    if (ie/=0) call error_stop("Error in MPI Barrier.")
+  end subroutine
+
  
   integer function mpi_this_image() result(res)
     integer ie
