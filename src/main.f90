@@ -38,26 +38,21 @@ program CLMM
 
   call par_init
 
-  call par_sync_all
-  if (master) write (*,*) "Reading parameters..."
+  call par_sync_out("Reading parameters...")
   call ReadConfiguration
 
 
-  call par_sync_all
-  if (master) write (*,*) "Setting up boundary conditions..."
+  call par_sync_out("Setting up boundary conditions...")
   call InitBoundaryConditions
 
 
-  call par_sync_all
-  if (master) write (*,*) "Allocating arrays..."
+  call par_sync_out("Allocating arrays...")
   call AllocateGlobals
 
-  call par_sync_all
-  if (master) write (*,*) "Preparing output data and files..."
+  call par_sync_out("Preparing output data and files...")
   call AllocateOutputs
 
-  call par_sync_all
-  if (master) write (*,*) "Setting up initial conditions..."
+  call par_sync_out("Setting up initial conditions...")
   call InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,dt)
 
   time = start_time
@@ -72,8 +67,7 @@ program CLMM
 
   if (end_time > start_time) then
 
-    call par_sync_all
-    if (master) write (*,*) "Computing..."
+    call par_sync_out("Computing...")
 
     do time_step = 1, max_number_of_time_steps
 
@@ -124,21 +118,20 @@ program CLMM
   endif
 
   call par_sync_all
-  if (master) write(*,*) "Total wall clock time for time steps", time_steps_time
-  if (master) write(*,*) "Wall clock time for poisson solver", poisson_solver_time
+  if (master .and. time_steps_time>0) write(*,*) "Total wall clock time for time steps", time_steps_time
+  if (master .and. poisson_solver_time>0) write(*,*) "Wall clock time for poisson solver", poisson_solver_time
+  call par_sync_all
 
   call Dynamics_Deallocate
   call Scalars_Deallocate
 
-  call par_sync_all
-  if (master) write (*,*) "Saving results..."
+  call par_sync_out("Saving results...")
 
 
   call Output(U,V,W,Pr,Temperature,Moisture,Scalar)
 
 
-  call par_sync_all
-  if (master) write(*,*) "saved"
+  call par_sync_out("saved.")
 
   call DeallocateGlobals
 
