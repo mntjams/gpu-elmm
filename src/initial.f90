@@ -458,31 +458,21 @@ contains
        if (partdistrib>0) then
 
           allocate(partdiam(partdistrib),partrho(partdistrib),percdistrib(partdistrib))
-          allocate(scalsrcx(partdistrib),scalsrcy(partdistrib),scalsrcz(partdistrib))
-          allocate(scalsrci(partdistrib),scalsrcj(partdistrib),scalsrck(partdistrib))
 
           do i = 1, partdistrib
             call get(partdiam(i))
             call get(partrho(i))
             call get(percdistrib(i))
-            call get(scalsrcx(i))
-            call get(scalsrcy(i))
-            call get(scalsrcz(i))
           end do
 
        else
 
           allocate(partdiam(num_of_scalars),partrho(num_of_scalars),percdistrib(num_of_scalars))
-          allocate(scalsrcx(num_of_scalars),scalsrcy(num_of_scalars),scalsrcz(num_of_scalars))
-          allocate(scalsrci(num_of_scalars),scalsrcj(num_of_scalars),scalsrck(num_of_scalars))
 
           do i = 1, num_of_scalars
             call get(partdiam(i))
             call get(partrho(i))
             call get(percdistrib(i))
-            call get(scalsrcx(i))
-            call get(scalsrcy(i))
-            call get(scalsrcz(i))
           end do
        end if
      end if
@@ -1740,6 +1730,8 @@ contains
     real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
     real(knd),allocatable :: Q(:,:,:)
 
+    call par_sync_out("  ...setting initial dummy values.")
+
     if (abs(Uinlet)>0) then
       dt = min(abs(dxmin/Uinlet), abs(dymin/Uinlet), abs(dzmin/Uinlet))
     else if (abs(Uref)>0) then
@@ -1759,7 +1751,9 @@ contains
 
     if (initcondsfromfile==1) then
 
-       call ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
+      call par_sync_out("  ...reading initial conditions from input files.")
+
+      call ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
 
        if (Re>0) then
          Viscosity = 1._knd/Re
@@ -1776,6 +1770,8 @@ contains
        call Bound_Pr(Pr)
 
     else   !init conditions not from file
+
+       call par_sync_out("  ...computing initial conditions.")
 
        if (tasktype==2) then
          U(1:Unx,1:Uny,1:Unz) = 0
@@ -1866,6 +1862,8 @@ contains
 
        elseif (InletType==TurbulentInletType) then
 
+         call par_sync_out("  ...computing turbulent initial conditions.")
+
          dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Uny,1:Unz)),avg(Vin(1:Vny,1:Vnz)))
 
          do i = 1, Prnx
@@ -1910,6 +1908,8 @@ contains
          end do
 
        else
+
+         call par_sync_out("  ...setting initial conditions.")
 
          !$omp parallel private(i,j,k)
          !$omp do collapse(3)
@@ -1957,6 +1957,7 @@ contains
 
 
        if (num_of_scalars>0) then
+         call par_sync_out("  ...setting initial scalar values.")
          !$omp parallel
          !$omp workshare
          SCALAR(1:Prnx,1:Prny,1:Prnz,:) = 0
@@ -1965,6 +1966,7 @@ contains
        end if
 
        if (enable_buoyancy.and.tasktype==2) then
+         call par_sync_out("  ...setting initial temperature values.")
 
          do k = 0, Prnz+1
           do j = 0, Prny+1
@@ -1982,6 +1984,7 @@ contains
          end do
 
        elseif (enable_buoyancy.and.tasktype==3) then
+         call par_sync_out("  ...setting initial temperature values.")
 
          do k = 0, Prnz+1
           do j = 0, Prny+1
@@ -1996,6 +1999,7 @@ contains
          end do
 
        elseif (enable_buoyancy) then
+         call par_sync_out("  ...setting initial temperature values.")
 
          call InitScalarProfile(TempIn,TemperatureProfile,temperature_ref)
 
@@ -2004,6 +2008,7 @@ contains
        end if !buoyancy and tasktype
 
        if (enable_moisture) then
+         call par_sync_out("  ...setting initial moisture values.")
 
          call InitScalarProfile(MoistIn,MoistureProfile,moisture_ref)
 
@@ -2012,11 +2017,13 @@ contains
        end if
 
        if (enable_buoyancy) then
+         call par_sync_out("  ...setting hydrostatic pressure.")
 
          call InitHydrostaticPressure(Pr,Temperature,Moisture)
 
        end if
 
+       call par_sync_out("  ...setting initial viscosity and diffusivity.")
 
        if (Re>0) then
          !$omp parallel
@@ -2043,28 +2050,30 @@ contains
          !$omp end parallel
        end if  !Re>0
 
-!        !$omp parallel
-!        !$omp sections
-!        !$omp section
-       call BoundU(1,U,Uin)
-!        !$omp section
-       call BoundU(2,V,Vin)
-!        !$omp section
-       call BoundU(3,W,Win)
-!        !$omp section
-       call Bound_Pr(Pr)
-!        !$omp end sections
-!        !$omp end parallel
+       call par_sync_out("  ...setting ghost cell values.")
 
+       call BoundU(1,U,Uin)
+
+       call BoundU(2,V,Vin)
+
+       call BoundU(3,W,Win)
+
+       call Bound_Pr(Pr)
+
+
+       call par_sync_out("  ...computing pressure correction.")
        call PressureCorrection(U,V,W,Pr,Q,1._knd)
 
+       call par_sync_out("  ...computing initial eddy viscosity.")
        call SubgridModel(U, V, W)
 
+       call par_sync_out("  ...setting viscosity in ghost cells.")
        call BoundViscosity(Viscosity)
 
        if (enable_buoyancy.or. &
            enable_moisture.or. &
            num_of_scalars>0)     then
+         call par_sync_out("  ...setting subgrid diffusivity.")
 
          !$omp parallel
          !$omp workshare
@@ -2078,29 +2087,37 @@ contains
        end if
 
        if (enable_buoyancy) then
+         call par_sync_out("  ...setting temperature in ghost cells.")
          call BoundTemperature(Temperature)
        end if
 
        if (enable_moisture) then
+         call par_sync_out("  ...setting moisture in ghost cells.")
          call BoundMoisture(Moisture)
        end if
 
+       if (num_of_scalars>0)  call par_sync_out("  ...setting scalars in ghost cells.")
        do i = 1, num_of_scalars
          call BoundScalar(Scalar(:,:,:,i))
        end do
 
+       call par_sync_out("  ...setting initial temperature flux.")
        call InitTempFl(Temperature)
 
        if (wallmodeltype>0) then
+                      call par_sync_out("  ...computing wall model in scalar points.")
                       call ComputeViscsWM(U,V,W,Pr,Temperature)
+                      call par_sync_out("  ...computing wall model in velocity points.")
                       call ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
        end if
 
+       call par_sync_out("  ...setting viscosity in ghost cells.")
        call BoundViscosity(Viscosity)
 
     end if !init conditions not from file
 
-    if (master) write(*,*) "set"
+    call par_sync_out("initial conditions set.")
+
 
   end subroutine InitialConditions
 
@@ -2129,7 +2146,14 @@ contains
     end interface
 #endif
 
+
+    call par_sync_out("  ...initializing random seed.")
+
     call init_random_seed
+
+
+    call par_sync_out("  ...computing grid coordinates.")
+
 
     nx = Prnx-1
     ny = Prny-1
@@ -2413,6 +2437,8 @@ contains
     deallocate(yV2)
     deallocate(zW2)
 
+    call par_sync_out("  ...creating grid cell type arrays.")
+
 
     allocate(Utype(-2:Unx+3,-2:Uny+3,-2:Unz+3))
     allocate(Vtype(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
@@ -2425,8 +2451,13 @@ contains
     Prtype = 0
 
 
+    call par_sync_out("  ...reading geostrophic wind.")
+
     !Requires grid coordinates
     call get_geostrophic_wind("geostrophic_wind_profile.conf", geostrophic_wind)
+
+
+    call par_sync_out("  ...getting inlet conditions.")
 
 
     allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
@@ -2459,6 +2490,9 @@ contains
 
 
     if (enable_buoyancy) then
+       
+       call par_sync_out("  ...setting boundary temperature and temperature flux.")
+
        if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==DIRICHLET) then
 
          allocate(BsideTFlArr(-1:Prnx+2,-1:Prny+2))
@@ -2484,6 +2518,9 @@ contains
 
 
     if (enable_moisture) then
+
+       call par_sync_out("  ...setting boundary moisture and moisture flux.")
+
        if (MoistBtype(Bo)==CONSTFLUX.or.MoistBtype(Bo)==DIRICHLET) then
 
          allocate(BsideMFlArr(-1:Prnx+2,-1:Prny+2))
@@ -2508,68 +2545,84 @@ contains
     if (.not.allocated(BsideMFlArr))  allocate(BsideMFlArr(0,0))
 
 
+    call par_sync_out("  ...initializing subsidence profile.")
     call InitSubsidenceProfile
 
+    call par_sync_out("  ...initializing thread tiles.")
+    call InitTiles(Prnx,Prny,Prnz)
 
-   if (num_of_scalars>0.and.scalsourcetype==pointsource) then
-        call GridCoords(scalsrci(:),scalsrcj(:),scalsrck(:),scalsrcx(:),scalsrcy(:),scalsrcz(:))
-   end if
+    if (enable_radiation) then
+      call par_sync_out("  ...solar radiation.")
+      call InitSolarRadiation
+    end if
 
-   call InitTiles(Prnx,Prny,Prnz)
-
-   call InitSolarRadiation
-
+    call par_sync_out("  ...preparing solid bodies.")
    !prepare the geometry of the solid bodies
-   call InitSolidBodies
+    call InitSolidBodies
 
-   !prepare the geometry of the plant bodies
-   call InitVolumeSourceBodies
+    call par_sync_out("  ...volume source bodies.")
+    !prepare the geometry of the plant bodies
+    call InitVolumeSourceBodies
 
-   !create actual immersed boundary and wall model points, i.m. points end up in an array
-   call GetSolidBodiesBC
+    call par_sync_out("  ...preparing solid bodies boundary conditions.")
+    !create actual immersed boundary and wall model points, i.m. points end up in an array
+    call GetSolidBodiesBC
 
-   !add also the wall model points from domain boundaries to the list
-   call GetOutsideBoundariesWM(num_of_scalars)
+    call par_sync_out("  ...getting outside boundaries wall model points.")
+    !add also the wall model points from domain boundaries to the list
+    call GetOutsideBoundariesWM(num_of_scalars)
 
-   !create arrays of w.m. points from the list
-   call MoveWMPointsToArray
+    call par_sync_out("  ...creating wall model points arrays.")
+    !create arrays of w.m. points from the list
+    call MoveWMPointsToArray
 
-   !creates masks for computation of diffusive fluxes
-   call InitWMMasks
+    call par_sync_out("  ...creating wall model mask arrays.")
+    !creates masks for computation of diffusive fluxes
+    call InitWMMasks
 
-   if (enable_radiation) then
-     !compute the radiation balance and prepare the wall fluxes 
-     call InitIBPFluxes
-     !set the immersed boundary values for fluxes
-!      call SetIBPFluxes
-   end if
+    if (enable_radiation) then
+       call par_sync_out("  ...computing initial radiation balance.")
+      !compute the radiation balance and prepare the wall fluxes 
+      call InitIBPFluxes
+      !set the immersed boundary values for fluxes
+ !      call SetIBPFluxes
+    end if
 
-   call SetNullifiedPoints
+    call par_sync_out("  ...setting nullified points.")
+    call SetNullifiedPoints
 
-   !create actual arrays of the source points
-   call InitVolumeSources
+    call par_sync_out("  ...getting volume scalar sources.")
+    !create actual arrays of the source points
+    call InitVolumeSources
 
-   !add arrays of the line source points
-   call InitAreaSources
+    call par_sync_out("  ...getting area scalar sources.")
+    !add arrays of the line source points
+    call InitAreaSources
 
-   !add arrays of the line source points
-   call InitLineSources
+    call par_sync_out("  ...getting line scalar sources.")
+    !add arrays of the line source points
+    call InitLineSources
 
-   !add arrays of the point source points
-   call InitPointSources
+    call par_sync_out("  ...getting point scalar sources.")
+    !add arrays of the point source points
+    call InitPointSources
 
-   !add puff sources, each containing one or more points
-   call InitPuffSources
-   
-   !filter out frames outside the domain
-   call InitVTKFrames
-   call InitSurfaceFrames
+    call par_sync_out("  ...getting puff scalar sources.")
+    !add puff sources, each containing one or more points
+    call InitPuffSources
+    
+    !filter out frames outside the domain
+    call par_sync_out("  ...preparing VTK frames.")
+    call InitVTKFrames
+    call par_sync_out("  ...preparing constant height frames.")
+    call InitSurfaceFrames
    
 #ifdef CUSTOM_BOUNDARY_CONDITIONS
-   call CustomBoundaryConditions
+    call par_sync_out("  ...executing custom boundary conditions.")
+    call CustomBoundaryConditions
 #endif
 
-   if (master) write (*,*) "set"
+        call par_sync_out("boundary conditions set.")
     
   contains
   

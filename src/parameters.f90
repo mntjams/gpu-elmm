@@ -92,11 +92,7 @@ module Parameters
 
   real(knd) :: windangle = 0
 
-  real(knd), dimension(:), allocatable :: scalsrcx, scalsrcy, scalsrcz
-
   real(knd) :: totalscalsource
-
-  integer, dimension(:), allocatable :: scalsrci, scalsrcj, scalsrck
 
   integer :: scalsourcetype
 
