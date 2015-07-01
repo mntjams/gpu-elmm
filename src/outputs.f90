@@ -203,8 +203,7 @@ contains
 
    call GetEndianness
 
-   call par_sync_all
-   if (master) write(*,*) "  ...creating output directories."
+   call par_sync_out("  ...creating output directories.")
 
 #if defined(_WIN32) || defined(_WIN64)
    call system("mkdir "//output_dir)
@@ -223,8 +222,7 @@ contains
 
    if (store%avg_U==0.and.store%avg_UU_prime>1) store%avg_U = 1
 
-   call par_sync_all
-   if (master) write(*,*) "  ...allocating arrays for 3D statistics."
+   call par_sync_out("  ...allocating arrays for 3D statistics.")
 
    if (averaging==1) then
      if (store%avg_U>0) then
@@ -304,8 +302,8 @@ contains
      Scalar_fl_W_avg = 0
    end if
 
-   call par_sync_all
-   if (master) write(*,*) "  ...preparing probes."
+   
+   call par_sync_out("  ...preparing probes.")
 
    do k = 1,size(probes)
      associate(p => probes(k))
@@ -374,25 +372,19 @@ contains
      end associate
    end do
 
-!   open(newunit=tmp,file=output_dir//"probes.txt",status="old",position="append")
-!   write(tmp,*) count(probes%inside),count(scalar_probes%inside)
 
    probes = pack(probes, probes%inside)
 
    scalar_probes = pack(scalar_probes, scalar_probes%inside)
 
-!   write(tmp,*) size(probes),size(scalar_probes)
-!   close(tmp)
+     
+   call par_sync_out("  ...allocating probe time series.")
 
    if (size(probes)>0) then
-
-     call par_sync_all
-     if (master) write(*,*) "  ...allocating probe time series."
 
      allocate(U_time(size(probes),1:time_series_max_length), &
               V_time(size(probes),1:time_series_max_length), &
               W_time(size(probes),1:time_series_max_length))
-     times = huge(1.0_knd)
      U_time = huge(1.0_knd)
      V_time = huge(1.0_knd)
      W_time = huge(1.0_knd)
@@ -418,11 +410,10 @@ contains
 
    end if
 
-   call par_sync_all
-   if (master) write(*,*) "  ...allocating global time series."
+   call par_sync_out("  ...allocating global time series.")
 
    allocate(times(1:time_series_max_length))
-   
+   times = huge(1.0_knd)   
 
    if (store%delta_time==1) then
      allocate(delta_time(1:time_series_max_length))
@@ -462,10 +453,9 @@ contains
     end if
    end if
 
-   call par_sync_all
-   if (master) write(*,*) "  ...preparing profiles."
-
    if (enable_profiles) then
+
+     call par_sync_out("  ...preparing profiles.")
 
      allocate(times(1:time_series_max_length))
    
