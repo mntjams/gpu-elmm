@@ -2275,7 +2275,7 @@ contains
 
 
   subroutine GetSolidBodiesBC
-if (master) write(*,'(a)',advance="no") "I"
+if (master) write(*,'(a)',advance="no") "      ...I"
     call FindInsideCells
 if (master) write(*,'(a)',advance="no") "N"
     call FindNeighbouringCells
