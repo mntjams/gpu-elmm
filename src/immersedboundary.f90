@@ -2275,15 +2275,21 @@ contains
 
 
   subroutine GetSolidBodiesBC
-if (master) write(*,'(a)',advance="no") "      ...I"
+    use custom_par, only: par_sync_out
+    
+    call par_sync_out("      ...finding cells inside solid bodies.")
     call FindInsideCells
-if (master) write(*,'(a)',advance="no") "N"
+
+    call par_sync_out("      ...finding cells neighbouring solid bodies.")
     call FindNeighbouringCells
-if (master) write(*,'(a)',advance="no") "I"
+
+    call par_sync_out("      ...preparing immersed boundary interpolations.")
     call InitImBoundaries
-if (master) write(*,'(a)',advance="no") "W"
+
+    call par_sync_out("      ...preparing wall model scalar points.")
     call GetSolidBodiesWM
-if (master) write(*,'(a)') "U"
+
+    call par_sync_out("      ...preparing wall model velocity points.")
     call GetSolidBodiesWM_UVW
 
   end subroutine GetSolidBodiesBC
