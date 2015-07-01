@@ -78,6 +78,13 @@ contains
     if (ie/=0) call error_stop("Error in MPI Barrier.")
   end subroutine
 
+  subroutine par_sync_out(str)
+    character(*), intent(in) :: str
+    call par_sync_all()
+    if (master) write(*,*) str
+    call par_sync_all()
+  end subroutine
+
  
   integer function par_this_image() result(res)
     integer ie

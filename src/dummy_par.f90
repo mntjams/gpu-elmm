@@ -23,4 +23,9 @@ contains
     
   end subroutine
 
+  subroutine par_sync_out(str)
+    character(*), intent(in) :: str
+    write(*,*) str
+  end subroutine
+
 end module
