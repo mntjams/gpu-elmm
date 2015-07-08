@@ -2345,7 +2345,7 @@ contains
       do j = 1,Prny
        do i = 1,Prnx
          if (Prtype(i,j,k)<=0) then
-           S = S + ( (Viscosity(i,j,k) - 1/Re) / (Ck * width) )**2
+           S = S + ( (Viscosity(i,j,k) - molecular_viscosity) / (Ck * width) )**2
          end if
        end do
       end do
@@ -2373,7 +2373,7 @@ contains
       do j = 1,Vny
        do i = 1,Vnx
          if ((Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0).and.(Wtype(i,j+1,k)<=0.or.Wtype(i,j,k)<=0)) then
-           S = S + (V(i,j,k+1) + V(i,j,k)) * (W(i,j+1,k) + W(i,j,k)) / 4
+           S = S + ((V(i,j,k+1) + V(i,j,k))/2 - molecular_viscosity) * (W(i,j+1,k) + W(i,j,k)) / 2
          end if
        end do
       end do
@@ -2387,7 +2387,12 @@ contains
       do j = 1,Uny
        do i = 1,Unx
          if (Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0) then
-           S = S - (Viscosity(i+1,j,k+1)+Viscosity(i+1,j,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k)) * (U(i,j,k+1)-U(i,j,k)) / dzmin / 4
+           S = S - ( (Viscosity(i+1,j,k+1) + &
+                      Viscosity(i+1,j,k) + &
+                      Viscosity(i,j,k+1) + &
+                      Viscosity(i,j,k)) / 4 &
+                     - molecular_viscosity) * &
+                   (U(i,j,k+1)-U(i,j,k)) / dzmin
          end if
        end do
       end do
@@ -2401,7 +2406,12 @@ contains
       do j = 1,Vny
        do i = 1,Vnx
          if (Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0) then
-           S = S - (Viscosity(i,j+1,k+1)+Viscosity(i,j+1,k)+Viscosity(i,j,k+1)+Viscosity(i,j,k)) * (V(i,j,k+1)-V(i,j,k)) / dzmin / 4
+           S = S - ( (Viscosity(i,j+1,k+1) + &
+                      Viscosity(i,j+1,k) + &
+                      Viscosity(i,j,k+1) + &
+                      Viscosity(i,j,k)) / 4 &
+                     - molecular_viscosity) * &
+                   (V(i,j,k+1)-V(i,j,k)) / dzmin
          end if
        end do
       end do
@@ -2415,7 +2425,8 @@ contains
       do j = 1,Uny
        do i = 1,Unx
          if (Utype(i,j,k)<=0) then
-           S = S - (Viscosity(i,j,k+1)+Viscosity(i,j,k)) * (U(i+1,j,k)-U(i-1,j,k)) / dxmin / 4
+           S = S - ((Viscosity(i,j,k+1)+Viscosity(i,j,k)) / 2 - molecular_viscosity) &
+                   * (U(i+1,j,k)-U(i-1,j,k)) / dxmin / 2
          end if
        end do
       end do
@@ -2429,7 +2440,8 @@ contains
       do j = 1,Vny
        do i = 1,Vnx
          if (Vtype(i,j,k)<=0) then
-           S = S - (Viscosity(i,j+1,k)+Viscosity(i,j,k)) * (V(i,j+1,k)-V(i,j-1,k)) / dymin / 4
+           S = S - ((Viscosity(i,j+1,k)+Viscosity(i,j,k)) / 2 - molecular_viscosity) &
+                   * (V(i,j+1,k)-V(i,j-1,k)) / dymin / 2
          end if
        end do
       end do
@@ -2443,7 +2455,8 @@ contains
       do j = 1,Wny
        do i = 1,Wnx
          if (Wtype(i,j,k)<=0) then
-           S = S - (Viscosity(i,j,k+1)+Viscosity(i,j,k)) * (W(i,j,k+1)-W(i,j,k-1)) / dzmin / 4
+           S = S - ((Viscosity(i,j,k+1)+Viscosity(i,j,k)) / 2 - molecular_viscosity) &
+                   * (W(i,j,k+1)-W(i,j,k-1)) / dzmin / 2
          end if
        end do
       end do

@@ -70,6 +70,7 @@ module Parameters
 
 
   real(knd) :: Re = 70000, Prandtl = 0.7!1/molecular viscosity, viscosity/thermal diffusivity
+  real(knd) :: molecular_viscosity = 1._knd / 70000
 
 
   real(knd) :: pr_gradient_x = 0, pr_gradient_y = 0

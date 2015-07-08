@@ -134,6 +134,13 @@ contains
    call get(timeavg2)
    call get(Re)
    if (master) write(*,*) "Re=",Re
+
+   if (Re > 0) then
+     molecular_viscosity = 1 / Re
+   else
+     molecular_viscosity = 0
+   end if
+
    call get(start_time)
    if (master) write(*,*) "start_time=",start_time
    call get(end_time)
@@ -1721,6 +1728,8 @@ contains
 
 
   subroutine InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,dt)
+    use custom_par
+    use ArrayUtilities
     real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
     real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
@@ -1755,14 +1764,11 @@ contains
 
       call ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
 
-       if (Re>0) then
-         Viscosity = 1._knd/Re
-       else
-         Viscosity = 0
-       end if
+       Viscosity = molecular_viscosity
+
        if (enable_buoyancy.or. &
            enable_moisture.or. &
-           num_of_scalars>0)        TDiff = 1._knd/(Re*Prandtl)
+           num_of_scalars>0)        TDiff = molecular_viscosity / Prandtl
 
        call BoundU(1,U,Uin)
        call BoundU(2,V,Vin)
@@ -2025,30 +2031,16 @@ contains
 
        call par_sync_out("  ...setting initial viscosity and diffusivity.")
 
-       if (Re>0) then
-         !$omp parallel
-         !$omp workshare
-         Viscosity = 1._knd/Re
-         !$omp end workshare
-         !$omp end parallel
-       else
-         !$omp parallel
-         !$omp workshare
-         Viscosity = 0
-         !$omp end workshare
-         !$omp end parallel
-       end if
+       call set(Viscosity, molecular_viscosity)
 
-       if (Re>0 .and.&
-             (enable_buoyancy.or. &
-              enable_moisture.or. &
-              num_of_scalars>0))     then
-         !$omp parallel
-         !$omp workshare
-         TDiff = 1._knd/(Re*Prandtl)
-         !$omp end workshare
-         !$omp end parallel
-       end if  !Re>0
+       if (molecular_viscosity > 0 .and. &
+             (enable_buoyancy .or. &
+              enable_moisture .or. &
+              num_of_scalars > 0))     then
+
+         call set(TDiff, molecular_viscosity / Prandtl)
+
+       end if
 
        call par_sync_out("  ...setting ghost cell values.")
 
@@ -2075,13 +2067,16 @@ contains
            num_of_scalars>0)     then
          call par_sync_out("  ...setting subgrid diffusivity.")
 
-         !$omp parallel
-         !$omp workshare
-         forall(k = 1:Prnz,j = 1:Prny,i = 1:Prnx)
-           TDiff(i,j,k) = 1.35*(Viscosity(i,j,k)-1._knd/Re)+(1._knd/(Re*constPrt))
-         end forall
-         !$omp end workshare
-         !$omp end parallel
+         !$omp parallel do private(i,j,k)
+         do k = 1, Prnz
+           do j = 1, Prny
+             do i = 1, Prnx
+               TDiff(i,j,k) = (Viscosity(i,j,k) - molecular_viscosity) / constPr_sgs + &
+                              molecular_viscosity / Prandtl
+             end do
+           end do
+         end do
+         !$omp end parallel do
 
          call BoundViscosity(TDiff)
        end if
@@ -2129,6 +2124,7 @@ contains
   subroutine InitBoundaryConditions
     use VTKFrames, only: InitVTKFrames
     use SurfaceFrames, only: InitSurfaceFrames
+    use custom_par
     
     real(knd), allocatable:: xU2(:), yV2(:), zW2(:)
     integer   :: i, j, k

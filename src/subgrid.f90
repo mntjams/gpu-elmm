@@ -29,8 +29,8 @@ module Subgrid
        end do
       end do
       !$omp end parallel do
-      if (Re>0) then
-        call add(Viscosity,1._knd/Re)
+      if (molecular_viscosity > 0) then
+        call add(Viscosity, molecular_viscosity)
       end if
 
     endsubroutine SGS_Smag
@@ -84,9 +84,9 @@ module Subgrid
         end do
        end do
       end do
-      if (Re>0) then
-        Viscosity  = Viscosity  + 1._knd/Re
-        TDiff = TDiff + 1._knd/(Re*Prandtl)
+      if (Re > 0) then
+        Viscosity  = Viscosity  + molecular_viscosity
+        TDiff = TDiff + molecular_viscosity / Prandtl
       end if
     endsubroutine SGS_StabSmag
 
@@ -263,12 +263,10 @@ module Subgrid
 
 
             if (abs(aa)>1e-5.and.bb>0)  then
-              Viscosity(i,j,k) = c2 * sqrt(bb/aa)
+              Viscosity(i,j,k) = c2 * sqrt(bb/aa) + molecular_viscosity
             else
-              Viscosity(i,j,k) = 0
+              Viscosity(i,j,k) = molecular_viscosity
             end if
-
-            if (Re>0)  Viscosity(i,j,k) = Viscosity(i,j,k)+1._knd/Re
 
            end do
           end do
@@ -317,9 +315,7 @@ module Subgrid
               D = 0
             end if
 
-            Viscosity(i,j,k) = C * D
-
-            if (Re>0)  Viscosity(i,j,k) = Viscosity(i,j,k) + 1._knd/Re
+            Viscosity(i,j,k) = C * D + molecular_viscosity
 
            end do
           end do
@@ -474,12 +470,9 @@ module Subgrid
 
             Viscosity(i,j,k) = C * D
 
-            if (Re>0)  then
-              TDiff(i,j,k) = Viscosity(i,j,k) / Pr_sgs + 1 / (Re*Prandtl)
-              Viscosity(i,j,k) = Viscosity(i,j,k) + 1 / Re
-            else
-              TDiff(i,j,k) = Viscosity(i,j,k) / Pr_sgs
-            end if
+            TDiff(i,j,k) = Viscosity(i,j,k) / Pr_sgs + molecular_viscosity / Prandtl
+            Viscosity(i,j,k) = Viscosity(i,j,k) + molecular_viscosity
+
            end do
           end do
          end do
@@ -605,11 +598,9 @@ module Subgrid
       else if (sgstype==StabSubgridModel) then
                         call SGS_Sigma_stability(U,V,W,filter_ratios(filtertype))
       else
-        if (Re>0) then
-          Viscosity = 1._knd/Re
-        else
-          Viscosity = 0
-        end if
+
+        Viscosity = molecular_viscosity
+
       end if
     end subroutine
 
