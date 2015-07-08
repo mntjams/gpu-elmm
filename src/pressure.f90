@@ -45,11 +45,7 @@ contains
     if (debugparam>1.and.called>1) call system_clock(count=time1)
 
     dt2 = coef
-    if (Re>0)  then
-      dt3 = coef / (2._TIM*Re)
-    else
-      dt3 = 0
-    end if
+    dt3 = coef / 2
 
 
     call PrePoisson(U,V,W,Q,RHS,dt2,uncompatibility)
@@ -304,12 +300,12 @@ contains
        do j=1,Prny
         do i=1,Prnx
           Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k) - &
-                       dt3*(((Phi(i+1,j,k)-Phi(i,j,k)) - &
-                             (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
-                            ((Phi(i,j+1,k)-Phi(i,j,k)) - &
-                             (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
-                            ((Phi(i,j,k+1)-Phi(i,j,k)) - &
-                             (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
+                       Viscosity(i,j,k) * (((Phi(i+1,j,k)-Phi(i,j,k)) - &
+                                           (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
+                                          ((Phi(i,j+1,k)-Phi(i,j,k)) - &
+                                           (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
+                                          ((Phi(i,j,k+1)-Phi(i,j,k)) - &
+                                           (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
         end do
        end do
       end do

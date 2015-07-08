@@ -69,8 +69,8 @@ module Parameters
   real(knd) :: dxmin, dymin, dzmin, CFL, Uref  !minimum grid spacing, dimensions of the domain
 
 
-  real(knd) :: Re = 70000, Prandtl = 0.7!1/molecular viscosity, viscosity/thermal diffusivity
   real(knd) :: molecular_viscosity = 1._knd / 70000
+  real(knd) :: molecular_diffusivity = 1._knd / 70000 / 0.7 !default Prandtl number 0.7
 
 
   real(knd) :: pr_gradient_x = 0, pr_gradient_y = 0

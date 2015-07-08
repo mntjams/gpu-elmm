@@ -244,7 +244,7 @@ contains
 
         !semi-implicit diffusion
 
-        Re_gt_0: if (Re>0) then
+        Re_gt_0: if (molecular_viscosity > 0) then
 
           !Diffusion using Crank Nicolson
           !first approximation using forward Euler

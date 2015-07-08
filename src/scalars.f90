@@ -1602,7 +1602,7 @@ contains
       do k = 1, Prnz
         do j = 1, Prny
           do i = 1, Prnx
-            TDiff(i,j,k) = (Viscosity(i,j,k) - molecular_viscosity) / Pr_sgs + (molecular_viscosity / Prandtl)
+            TDiff(i,j,k) = (Viscosity(i,j,k) - molecular_viscosity) / Pr_sgs + molecular_diffusivity
           end do
         end do
       end do

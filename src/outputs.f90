@@ -981,7 +981,11 @@ contains
 
       ground_ustar_Pr = GroundUstar()
 
-      S2 = ground_ustar_Pr*Re
+      if (molecular_viscosity > 0) then
+        S2 = ground_ustar_Pr / molecular_viscosity
+      else
+        S2 = 0
+      end if
 
       if (display%ustar==1) then
         if (allocated(Ustar_inlet)) then
@@ -993,7 +997,11 @@ contains
 
       ground_ustar_UVW = GroundUstarUVW()
 
-      S2 = ground_ustar_UVW*Re
+      if (molecular_viscosity > 0) then
+        S2 = ground_ustar_UVW / molecular_viscosity
+      else
+        S2 = 0
+      end if
 
       if (display%ustar==1) then
         if (allocated(Ustar_inlet)) then
@@ -1111,8 +1119,10 @@ contains
       do j=1,Uny
         do i=1,Unx
           UU(i,j,k) =  UU(i,j,k) + &
-                        Ax * (Viscosity(i+1,j,k)*(U(i+1,j,k)-U(i,j,k)) + &
-                              Viscosity(i,j,k)*(U(i,j,k)-U(i-1,j,k)))
+                        Ax * (  (Viscosity(i+1,j,k) - molecular_viscosity) &
+                                 * (U(i+1,j,k)-U(i,j,k)) &
+                              + (Viscosity(i,j,k) - molecular_viscosity) &
+                                 * (U(i,j,k)-U(i-1,j,k)))
         end do
       end do
     end do
@@ -1122,8 +1132,10 @@ contains
       do j=1,Vny
         do i=1,Vnx
           VV(i,j,k) = VV(i,j,k) + &
-                       Ay * (Viscosity(i,j+1,k)*(V(i,j+1,k)-V(i,j,k)) + &
-                             Viscosity(i,j,k)*(V(i,j,k)-V(i,j-1,k)))
+                       Ay * (  (Viscosity(i,j+1,k) - molecular_viscosity) &
+                                * (V(i,j+1,k)-V(i,j,k)) &
+                             + (Viscosity(i,j,k) - molecular_viscosity) &
+                                * (V(i,j,k)-V(i,j-1,k)))
         end do
       end do
     end do
@@ -1133,8 +1145,10 @@ contains
       do j=1,Wny
         do i=1,Wnx
           WW(i,j,k) = WW(i,j,k) + &
-                       Az * (Viscosity(i,j,k+1)*(W(i,j,k+1)-W(i,j,k)) + &
-                             Viscosity(i,j,k)*(W(i,j,k)-W(i,j,k-1)))
+                       Az * (  (Viscosity(i,j,k+1) - molecular_viscosity) &
+                                * (W(i,j,k+1)-W(i,j,k)) &
+                             + (Viscosity(i,j,k) - molecular_viscosity) &
+                                * (W(i,j,k)-W(i,j,k-1)))
         end do
       end do
     end do
@@ -1143,7 +1157,7 @@ contains
     do k=1,Prnz
       do j=1,Prny
         do i=1,Prnx
-          UV(i,j,k) = UV(i,j,k) + Viscosity(i,j,k) * &
+          UV(i,j,k) = UV(i,j,k) + (Viscosity(i,j,k) - molecular_viscosity) * &
                           (Ay2 * (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) + &
                            Ax2 * (V(i+1,j,k)-V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)))
         end do
@@ -1154,7 +1168,7 @@ contains
     do k=1,Prnz
       do j=1,Prny
         do i=1,Prnx
-          UW(i,j,k) = UW(i,j,k) + Viscosity(i,j,k) * &
+          UW(i,j,k) = UW(i,j,k) + (Viscosity(i,j,k) - molecular_viscosity) * &
                           (Az2 * (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) + &
                            Ax2 * (W(i+1,j,k)-W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)))
         end do
@@ -1165,7 +1179,7 @@ contains
     do k=1,Prnz
       do j=1,Prny
         do i=1,Prnx
-          VW(i,j,k) = VW(i,j,k) + Viscosity(i,j,k) * &
+          VW(i,j,k) = VW(i,j,k) + (Viscosity(i,j,k) - molecular_viscosity) * &
                           (Az2 * (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) + &
                            Ay2 * (W(i,j+1,k)-W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)))
         end do
@@ -2498,7 +2512,8 @@ contains
       do j = 1,Prny
        do i = 1,Prnx
          if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-           S = S-(0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k))*(Temperature(i,j,k+1)-Temperature(i,j,k))) / dzmin
+           S = S - ( ( (TDiff(i,j,k+1)+TDiff(i,j,k)) / 2 - molecular_diffusivity) &
+                    * (Temperature(i,j,k+1)-Temperature(i,j,k))) / dzmin
          end if
        end do
       end do
@@ -2535,7 +2550,8 @@ contains
       do j = 1,Prny
        do i = 1,Prnx
          if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-           S = S - (0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k)) * (Moisture(i,j,k+1)-Moisture(i,j,k))) / dzmin
+           S = S - ( ( (TDiff(i,j,k+1)+TDiff(i,j,k)) / 2 - molecular_diffusivity) &
+                    * (Moisture(i,j,k+1)-Moisture(i,j,k))) / dzmin
          end if
        end do
       end do
@@ -2571,7 +2587,8 @@ contains
         do j = 1,Prny
          do i = 1,Prnx
            if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
-             S = S - (0.5_knd*(TDiff(i,j,k+1)+TDiff(i,j,k)) * (Scalar(i,j,k+1,l)-Scalar(i,j,k,l))) / dzmin
+             S = S - ( ( (TDiff(i,j,k+1)+TDiff(i,j,k)) / 2 - molecular_diffusivity) &
+                      * (Scalar(i,j,k+1,l)-Scalar(i,j,k,l))) / dzmin
            end if
          end do
         end do

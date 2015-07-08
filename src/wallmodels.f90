@@ -925,9 +925,14 @@ contains
     real(knd) :: ustar2, ustar_lam, z_pl
     integer :: i
 
-    ustar_lam = sqrt(vel/(dist*Re))
+    if (molecular_viscosity <= 0) then
+      ustar = 0
+      return
+    end if
 
-    if ((dist*ustar_lam*Re) < zpl_lam) then
+    ustar_lam = sqrt(molecular_viscosity * vel / dist)
+
+    if ((dist * ustar_lam / molecular_viscosity) < zpl_lam) then
 
       ustar = ustar_lam
 
@@ -938,11 +943,11 @@ contains
         i = i+1
         ustar2 = ustar
 
-        z_pl = dist*ustar2*Re
+        z_pl = dist * ustar2 / molecular_viscosity
 
         if (z_pl <= zpl_lam) then
           !viscous sublayer
-          ustar = sqrt(vel/(dist*Re))
+          ustar = sqrt(molecular_viscosity * vel / dist)
         else if (z_pl < zpl_turb) then
           !buffer layer
           ustar = vel / (5*log(z_pl)-3.05)
@@ -996,21 +1001,29 @@ contains
     real(knd),intent(in)    :: distvect(3), uvect(3), walluvect(3)
     real(knd) :: vel, dist
 
+    if (molecular_viscosity<=0) then
+      ustar = 0
+      visc = 0
+      return
+    end if
+
     call WMFlatStress(ustar,distvect,uvect,walluvect,vel,dist)
 
     if (vel>0) then
 
-     if (dist*ustar*Re>1) then
+     if (dist*ustar/molecular_viscosity>1) then
+
        visc = ustar**2 * dist/vel
-     else if (Re>0) then
-       visc = 1._knd/Re
+
      else
-       visc = 0
+
+       visc = molecular_viscosity
+
      end if
 
-    else if (Re>0) then
+    else if (molecular_viscosity > 0) then
 
-      visc = 1._knd/Re
+      visc = molecular_viscosity
 
     else
 
@@ -1030,12 +1043,12 @@ contains
     real(knd),parameter  :: yplcrit = 11.225_knd
     real(knd) :: dist_plus
 
-    dist_plus = sqrt(dist * Re * vel)
+    dist_plus = sqrt(dist * vel / molecular_viscosity)
 
     !under z0 the whole concept of rougness parameter breaks down
     !if in the laminar region for flat boundary layer also treat as flat and possibly laminar
     if (dist<=z0*2_knd .or. dist_plus<yplcrit*1.1_knd) then
-      if (Re>0) then
+      if (molecular_viscosity > 0) then
         call WMFlatUstar(ustar,vel,dist)
       else
         ustar = 0
@@ -1082,10 +1095,10 @@ contains
 
     call WMRoughStress(ustar,z0,distvect,uvect,walluvect,vel,dist)
 
-    if (vel>0 .and. ustar**2 * dist/vel>1._knd/Re) then
+    if (vel>0 .and. ustar**2 * dist/vel > molecular_viscosity) then
       visc = ustar**2 * dist/vel
-    else if (Re>0) then
-      visc = 1._knd/Re
+    else if (molecular_viscosity > 0) then
+      visc = molecular_viscosity
     else
       visc = 0
     end if
@@ -1119,9 +1132,9 @@ contains
     integer,parameter :: maxiter = 30
 
     !u/u_* = z * u_* / nu  +  dp/dx * z**2 / (2 * u_*)
-    ustar_lam = sqrt(abs((1._knd/(dist*Re)) * (vel - dist**2 * prgrad/2) ))
+    ustar_lam = sqrt(abs((molecular_viscosity/dist) * (vel - dist**2 * prgrad/2) ))
 
-    if ((dist*ustar_lam*Re)<yplcrit) then
+    if ((dist*ustar_lam / molecular_viscosity)<yplcrit) then
 
       ustar = ustar_lam
 
@@ -1172,7 +1185,7 @@ contains
          real(knd) a,b,c,D
          !u/u_* = dp/dx * z / (k (u_*)**2)  + (1/k) * ln(z * u_* / nu) + B
 
-         a = log(ustar*dist*Re)/0.41_knd + 5.2_knd
+         a = log(ustar*dist / molecular_viscosity) / 0.41_knd + 5.2_knd
          b = - vel
          c = prgrad * dist / 0.41
          !function to find root of is f(ustar) = a*ustar**2 + b*ustar + c
@@ -1219,18 +1232,17 @@ contains
     if (ustar<0) ustar = 0
 
     if (vel>0) then
-
-     if (dist*ustar*Re>1) then
-       visc = ustar**2 * dist/vel
-     else if (Re>0) then
-       visc = 1._knd/Re
-     else
+     if (molecular_viscosity <= 0) then
        visc = 0
+     else if (dist*ustar / molecular_viscosity > 1) then
+       visc = ustar**2 * dist/vel
+     else
+       visc = molecular_viscosity
      end if
 
-    else if (Re>0) then
+    else if (molecular_viscosity > 0) then
 
-      visc = 1._knd/Re
+      visc = molecular_viscosity
 
     else
 
@@ -1320,25 +1332,23 @@ contains
 
 
 
-  pure subroutine WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_flux,Re,temperature_ref,grav_acc)
-    implicit none
-
+  pure subroutine WM_MO_Flux_ustar(vel,dist,ustar,z0,temperature_flux,temperature_ref,grav_acc)
     real(knd),intent(inout) :: ustar
     real(knd),parameter  :: eps = 1e-3
     real(knd),parameter  :: yplcrit = 11.225_knd
     real(knd),intent(in) :: vel,dist,z0,temperature_flux
-    real(knd),intent(in) :: Re,temperature_ref,grav_acc
+    real(knd),intent(in) :: temperature_ref,grav_acc
     real(knd) ustar2,zL,zL2,Psi
     integer i
 
     if (dist<=z0) then
 
-     if (Re>0) then
+     if (molecular_viscosity > 0) then
 
-      if ((dist*ustar*Re)<yplcrit) then
-        ustar = sqrt(vel/(dist*Re))
+      if ((dist*ustar/molecular_viscosity) < yplcrit) then
+        ustar = sqrt(molecular_viscosity * vel / dist)
       else
-        ustar = vel/(log(abs(ustar*dist*Re))/0.4_knd+5.2_knd)
+        ustar = vel / ( log(abs(ustar*dist/molecular_viscosity)) / 0.4_knd + 5.2_knd )
       end if
      else
        ustar = 0
@@ -1354,7 +1364,7 @@ contains
       i = i+1
       ustar2 = ustar
 
-      ustar = ustar+(max(vel*0.4_knd/(log(max((dist/z0)-Psi,1E-5))),0._knd)-ustar)/2
+      ustar = ustar + (max(vel*0.4_knd/(log(max((dist/z0)-Psi,1E-5))), 0._knd) - ustar) / 2
 
       if (ustar<1E-4) then
        zL = -10000
@@ -1376,11 +1386,11 @@ contains
 
     end if
 
-  end subroutine WM_MO_FLUX_ustar
+  end subroutine WM_MO_Flux_ustar
 
 
 
-  pure subroutine WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,z0H,tempdif)
+  pure subroutine WM_MO_Dirichlet_ustar_tfl(ustar,temperature_flux,vel,dist,z0,z0H,tempdif)
     real(knd),intent(inout) :: ustar,temperature_flux
     real(knd),intent(in) :: vel,dist,z0,z0H,tempdif
     real(knd),parameter :: eps = 1e-3_knd
@@ -1394,7 +1404,7 @@ contains
 
     if (dist<=z0) then
 
-      temperature_flux = - (1/(Re*Prandtl)) * tempdif / dist
+      temperature_flux = - molecular_diffusivity * tempdif / dist
 
     else
        psi_m = 0
@@ -1421,11 +1431,11 @@ contains
        end do
 
        if (i>=50.or.zL>10000) then
-         ustar = sqrt(vel/(dist*Re))
-         temperature_flux = - (1/(Re*Prandtl)) * tempdif / dist
+         ustar = sqrt(molecular_viscosity * vel / dist)
+         temperature_flux = - molecular_diffusivity * tempdif / dist
        end if
     end if
-  end subroutine WM_MO_DIRICHLET_ustar_tfl
+  end subroutine WM_MO_Dirichlet_ustar_tfl
 
 
 
@@ -1447,21 +1457,21 @@ contains
     vel = norm2(vect)
 
     if (vel/=0) then
-      call WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_flux,Re,temperature_ref,grav_acc)
+      call WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_flux,temperature_ref,grav_acc)
       
       if (ustar<0) ustar = 0
       
-      if (ustar*ustar*dist/vel>1._knd/Re) then
+      if (ustar*ustar*dist/vel > molecular_viscosity) then
         visc = ustar*ustar*dist/vel
-      else if (Re>0) then
-        visc = 1._knd/Re
+      else if (molecular_viscosity > 0) then
+        visc = molecular_viscosity
       else
         visc = 0
       end if
     else
       ustar = 0
-      if (Re>0) then
-        visc = 1._knd/Re
+      if (molecular_viscosity > 0) then
+        visc = molecular_viscosity
       else
         visc = 0
       end if
@@ -1484,7 +1494,7 @@ contains
     vel = norm2(tan_vect)
 
     if (vel/=0) then
-      call WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_flux,Re,temperature_ref,grav_acc)
+      call WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_flux,temperature_ref,grav_acc)
       if (ustar<0) ustar = 0
     else
       ustar = 0
@@ -1494,7 +1504,7 @@ contains
 
 
 
-  pure subroutine WM_MO_DIRICHLET(visc,ustar,temperature_flux,z0,z0H,tempdif,distvect,uvect)
+  pure subroutine WM_MO_Dirichlet(visc,ustar,temperature_flux,z0,z0H,tempdif,distvect,uvect)
     real(knd),intent(out)   :: visc
     real(knd),intent(inout) :: ustar,temperature_flux
     real(knd),intent(in)    :: z0,z0H
@@ -1508,19 +1518,19 @@ contains
 
     vel = sqrt(sum(vect**2))
 
-    call WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,z0H,tempdif)
+    call WM_MO_Dirichlet_ustar_tfl(ustar,temperature_flux,vel,dist,z0,z0H,tempdif)
 
     if (ustar<0) ustar = 0
 
     if ((vel>0.or.temperature_flux/=0)) then
-      visc = max(ustar*ustar*dist/vel,1._knd/Re)
-    else if (Re>0) then
-      visc = 1._knd/Re
+      visc = max(ustar*ustar*dist/vel, molecular_viscosity)
+    else if (molecular_viscosity > 0) then
+      visc = molecular_viscosity
     else
       visc = 0
     end if
 
-  end subroutine WM_MO_DIRICHLET
+  end subroutine WM_MO_Dirichlet
 
 
   pure subroutine WM_MO_DirichletStress(ustar,temperature_flux,z0,z0H,tempdif,distvect,uvect,tan_vect)
@@ -1535,7 +1545,7 @@ contains
 
     vel = sqrt(sum(tan_vect**2))
 
-    call WM_MO_DIRICHLET_ustar_tfl(ustar,temperature_flux,vel,dist,z0,z0H,tempdif)
+    call WM_MO_Dirichlet_ustar_tfl(ustar,temperature_flux,vel,dist,z0,z0H,tempdif)
 
     if (ustar<0) ustar = 0
 
@@ -1698,7 +1708,7 @@ if (xi==1.and.yj==1.and.zk==1) debuglevel =1
 #endif
            tdif = Temperature(xi,yj,zk) - WMPoints(i)%temperature
 
-           call WM_MO_DIRICHLET(visc, WMPoints(i)%ustar, &
+           call WM_MO_Dirichlet(visc, WMPoints(i)%ustar, &
                                 WMPoints(i)%temperature_flux, &
                                 WMPoints(i)%z0, WMPoints(i)%z0H, tdif, dist, vel)
 debuglevel = 0
@@ -1716,7 +1726,7 @@ debuglevel = 0
 
        else
 
-         if (Re<=0) then
+         if (molecular_viscosity <= 0) then
            call error_stop("The wall model requires positive viscosity or roughness length.")
          end if
 
@@ -1842,7 +1852,7 @@ debuglevel = 0
 
           else
 
-             if (Re<=0) then
+             if (molecular_viscosity <= 0) then
                call error_stop("The wall model requires positive viscosity or roughness length.")
              end if
 

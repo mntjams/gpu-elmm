@@ -75,6 +75,8 @@ contains
    integer :: dimension,direction
    real(knd) :: position
 
+   real(knd) :: Re = 70000, Prandtl = 0.7!1/molecular viscosity, viscosity/thermal diffusivity
+
    namelist /obstacles/ obstacles_file, roughness_file, displacement_file
 
    interface get
@@ -134,13 +136,6 @@ contains
    call get(timeavg2)
    call get(Re)
    if (master) write(*,*) "Re=",Re
-
-   if (Re > 0) then
-     molecular_viscosity = 1 / Re
-   else
-     molecular_viscosity = 0
-   end if
-
    call get(start_time)
    if (master) write(*,*) "start_time=",start_time
    call get(end_time)
@@ -721,6 +716,17 @@ contains
        call error_stop("Error: Both Z boundary conditions must be periodic or not periodic.")
 
    end if
+
+
+
+   if (Re > 0) then
+     molecular_viscosity = 1 / Re
+   else
+     molecular_viscosity = 0
+   end if
+
+   molecular_diffusivity = molecular_viscosity / Prandtl
+
 
    dxmin = lx/(Prnx)
    dymin = ly/(Prny)
@@ -1768,7 +1774,7 @@ contains
 
        if (enable_buoyancy.or. &
            enable_moisture.or. &
-           num_of_scalars>0)        TDiff = molecular_viscosity / Prandtl
+           num_of_scalars>0)        TDiff = molecular_diffusivity
 
        call BoundU(1,U,Uin)
        call BoundU(2,V,Vin)
@@ -2038,7 +2044,7 @@ contains
               enable_moisture .or. &
               num_of_scalars > 0))     then
 
-         call set(TDiff, molecular_viscosity / Prandtl)
+         call set(TDiff, molecular_diffusivity)
 
        end if
 
@@ -2072,7 +2078,7 @@ contains
            do j = 1, Prny
              do i = 1, Prnx
                TDiff(i,j,k) = (Viscosity(i,j,k) - molecular_viscosity) / constPr_sgs + &
-                              molecular_viscosity / Prandtl
+                              molecular_diffusivity
              end do
            end do
          end do

@@ -84,9 +84,9 @@ module Subgrid
         end do
        end do
       end do
-      if (Re > 0) then
+      if (molecular_viscosity > 0) then
         Viscosity  = Viscosity  + molecular_viscosity
-        TDiff = TDiff + molecular_viscosity / Prandtl
+        TDiff = TDiff + molecular_diffusivity
       end if
     endsubroutine SGS_StabSmag
 
@@ -470,7 +470,7 @@ module Subgrid
 
             Viscosity(i,j,k) = C * D
 
-            TDiff(i,j,k) = Viscosity(i,j,k) / Pr_sgs + molecular_viscosity / Prandtl
+            TDiff(i,j,k) = Viscosity(i,j,k) / Pr_sgs + molecular_diffusivity
             Viscosity(i,j,k) = Viscosity(i,j,k) + molecular_viscosity
 
            end do
