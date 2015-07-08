@@ -177,7 +177,7 @@ contains
                         Ustar, Vstar, Wstar, &
                         Temperature, Moisture, &
                         beta, rho, RK_stage, dt)
-    use CDS!, only: CDU, CDV, CDW, CDS4U, CDS4V, CDS4W, CDS4_2U, CDS4_2V, CDS4_2W
+    use CDS
     use VolumeSources, only: ResistanceForce
     use VTKArray
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: U, V, W
@@ -290,6 +290,14 @@ contains
         call CD4divU(Ustar,U,V,W)
         call CD4divV(Vstar,U,V,W)
         call CD4divW(Wstar,U,V,W)
+      else if (convmet==5) then
+        call CDUdiv(Ustar,U,V,W)
+        call CDVdiv(Vstar,U,V,W)
+        call CDWdiv(Wstar,U,V,W)
+      else if (convmet==6) then
+        call CDUadv(Ustar,U,V,W)
+        call CDVadv(Vstar,U,V,W)
+        call CDWadv(Wstar,U,V,W)
       end if
 
     else
