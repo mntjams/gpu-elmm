@@ -215,8 +215,10 @@ if customTimeStepProcedure=='yes':
   env.Append(F90FLAGS='-DCUSTOM_OUTPUT')
 
 if cray=='yes':
-  env.Replace(CC='cc', CXX='CC', F90='ftn')
+  env.Replace(CC='cc', CXX='CC', F90='ftn', FORTRAN='ftn')
   env.Replace(LINK='ftn')
+
+env.Replace(FORTRANFLAGS=env['F90FLAGS'])
 
 #May be used to compile PoisFFT directly, adjust the correct path.
 Mkdir(target_dir+'/P/')
