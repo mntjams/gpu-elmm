@@ -143,8 +143,6 @@ module Outputs
     integer :: scaltotsum_time = 0
     integer :: ustar = 1
     integer :: tstar = 1
-
-    integer :: blprofiles = 0
     
     integer :: probes_fluxes = 0
   end type TOutputSwitches
