@@ -455,7 +455,7 @@ contains
 
      call par_sync_out("  ...preparing profiles.")
 
-     allocate(times(1:time_series_max_length))
+     if (.not.allocated(times)) allocate(times(1:time_series_max_length))
    
      call current_profiles%allocate
      
