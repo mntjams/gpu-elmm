@@ -57,15 +57,15 @@ contains
       if (master) write(*,*) "Uncompatibility:",uncompatibility
     end if
 
-    if (poissmet==1) then
+    if (poisson_solver==1) then
 
         call PoissSOR(Phi,RHS)
 
-    else if (poissmet==2) then
+    else if (poisson_solver==2) then
 
         call Poiss_PoisFFT(Phi,RHS)
 
-    else if (poissmet==3) then
+    else if (poisson_solver==3) then
 
         if (Prny==1) then
           call PoissMG2d(Phi,RHS)

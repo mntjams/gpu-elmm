@@ -5,11 +5,12 @@ module Limiters
  implicit none
 
   private
-  public FluxLimiter, Limiter, limitertype, limparam
+  public FluxLimiter, Limiter, limiter_type, limiter_parameter
   
-  integer,parameter:: minmodlim=1,extminmodlim=2,gammalim=3,vanalbadalim=4,vanleerlim=5,superbeelim=6
-  integer,save   :: limitertype
-  real(knd),save :: limparam
+  integer, parameter :: minmodlim = 1, extminmodlim = 2, gammalim = 3, &
+                        vanalbadalim = 4, vanleerlim = 5, superbeelim = 6
+  integer   :: limiter_type
+  real(knd) :: limiter_parameter
 
  contains
 
@@ -18,9 +19,9 @@ module Limiters
     real(knd) K
 
     K=(1+2._knd*r)/3._knd  !assuming kappa=1/3 scheme (Koren, 1993; Hundsdorfer, 1994)
-    if (limparam>0) then
-     FluxLimiter=max(0._knd,min(2._knd*r,min(limparam,K)))
-    elseif (limparam<0) then
+    if (limiter_parameter>0) then
+     FluxLimiter=max(0._knd,min(2._knd*r,min(limiter_parameter,K)))
+    elseif (limiter_parameter<0) then
      FluxLimiter=K
     else
      FluxLimiter=0
@@ -34,43 +35,43 @@ module Limiters
     real(knd) R
     real(knd),parameter:: epsil=0.00001_knd
 
-    if (limitertype==minmodlim) then
+    if (limiter_type==minmodlim) then
      Limiter=MinMod(a,b)
-    elseif (limitertype==extminmodlim) then
+    elseif (limiter_type==extminmodlim) then
      if (.not.present(c)) then
-       Limiter=MinMod(limparam*a,limparam*b,(a+b)/2._knd)
+       Limiter=MinMod(limiter_parameter*a,limiter_parameter*b,(a+b)/2._knd)
      else
-       Limiter=MinMod(limparam*a,limparam*b,c)
+       Limiter=MinMod(limiter_parameter*a,limiter_parameter*b,c)
      endif
-    elseif (limitertype==gammalim) then
+    elseif (limiter_type==gammalim) then
      if (abs(b)>epsil.and.abs(a)>epsil) then
       R=a/b
-      Limiter=b*GAMMAL(R)
+      Limiter=b*GammaLimiter(R)
      else
       Limiter=MinMod(a,b)
      endif
-    elseif (limitertype==vanalbadalim) then
+    elseif (limiter_type==vanalbadalim) then
      if (abs(b)>epsil) then
       R=a/b
       Limiter=b*VanAlbada(R)
      else
       Limiter=MinMod(a,b)
      endif
-    elseif (limitertype==vanleerlim) then
+    elseif (limiter_type==vanleerlim) then
      if (abs(b)>epsil) then
       R=a/b
       Limiter=b*VanLeer(R)
      else
       Limiter=MinMod(a,b)
      endif
-    elseif (limitertype==superbeelim) then
+    elseif (limiter_type==superbeelim) then
      if (abs(b)>epsil) then
       R=a/b
       Limiter=b*SuperBee(R)
      else
       Limiter=MinMod(a,b)
      endif
-    elseif (limitertype==0) then
+    elseif (limiter_type==0) then
      Limiter=0
     else
      Limiter=(a+b)/2._knd
@@ -82,10 +83,13 @@ module Limiters
     Heaviside=(1._knd+SIGN(1._knd,x))/2._knd
   endfunction Heaviside
 
-  elemental real(knd) function GAMMAL(R)
+  elemental real(knd) function GammaLimiter(R)
     real(knd),intent(in):: R
-    GAMMAL=((1-limparam)/limparam)*R*(Heaviside(R) - Heaviside(r-(limparam/(1-limparam)))) + Heaviside(r-(limparam/(1-limparam)))
-  endfunction GAMMAL
+    GammaLimiter =   ((1-limiter_parameter)/limiter_parameter) &
+                   * R                                         &
+                   * (Heaviside(R) - Heaviside(r-(limiter_parameter/(1-limiter_parameter)))) &
+                   + Heaviside(r-(limiter_parameter/(1-limiter_parameter)))
+  endfunction GammaLimiter
 
   elemental real(knd) function VanAlbada(R)
     real(knd),intent(in):: R

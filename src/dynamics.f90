@@ -280,21 +280,21 @@ contains
       !$omp end parallel
     end if
 
-    if (convmet>0) then
+    if (advection_method>0) then
 
-      if (convmet==2) then
+      if (advection_method==2) then
         call CDU(Ustar,U,V,W)
         call CDV(Vstar,U,V,W)
         call CDW(Wstar,U,V,W)
-      else if (convmet==4) then
+      else if (advection_method==4) then
         call CD4divU(Ustar,U,V,W)
         call CD4divV(Vstar,U,V,W)
         call CD4divW(Wstar,U,V,W)
-      else if (convmet==5) then
+      else if (advection_method==5) then
         call CDUdiv(Ustar,U,V,W)
         call CDVdiv(Vstar,U,V,W)
         call CDWdiv(Wstar,U,V,W)
-      else if (convmet==6) then
+      else if (advection_method==6) then
         call CDUadv(Ustar,U,V,W)
         call CDVadv(Vstar,U,V,W)
         call CDWadv(Wstar,U,V,W)

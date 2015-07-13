@@ -2,7 +2,7 @@ module Initial
 
   use Parameters
   use ArrayUtilities, only: avg
-  use Limiters, only: limparam, limitertype
+  use Limiters, only: limiter_parameter, limiter_type
   use Multigrid, only: SetMGParams
   use Multigrid2d, only: SetMGParams2d
   use Pressure
@@ -75,6 +75,8 @@ contains
    integer :: dimension,direction
    real(knd) :: position
 
+   integer :: masssourc
+
    real(knd) :: Re = 70000, Prandtl = 0.7!1/molecular viscosity, viscosity/thermal diffusivity
 
    namelist /obstacles/ obstacles_file, roughness_file, displacement_file
@@ -123,14 +125,17 @@ contains
    open(unit,file="main.conf",status="old",action="read")
    call get(CFL)
    call get(Uref)
-   call get(poissmet)
-   call get(convmet)
-   call get(limitertype)
-   call get(limparam)
+   call get(poisson_solver)
+   call get(advection_method)
+   call get(limiter_type)
+   call get(limiter_parameter)
+
    call get(masssourc)
-!    masssourc = 1 !Seems to be necessary for stability. Caution with scalar fluxes.
+   masssourc = 1 !Seems to be necessary for stability, change with caution.
+   enable_ibm_mass_sources = (masssourc>0)
+
    call get(steady)
-   call get(tasktype)
+   call get(task_type)
    call get(initcondsfromfile)
    call get(timeavg1)
    call get(timeavg2)
@@ -505,7 +510,7 @@ contains
       end if
    end if
 
-   if (poissmet==3.or.poissmet==4.or.poissmet==5) then
+   if (poisson_solver==3.or.poisson_solver==4.or.poisson_solver==5) then
      open(unit,file="mgopts.conf",status="old",action="read")
      call get(lmg)
      call get(minmglevel)
@@ -519,7 +524,7 @@ contains
      call get(mgepsinnerGS)
      close(unit)
 
-     if (poissmet==3.or.poissmet==4) then
+     if (poisson_solver==3.or.poisson_solver==4) then
        if (Prny==1) then
         call SetMGParams2d(llmg = lmg,lminmglevel = minmglevel,lbnx = bnx,lbnz = bnz,&
                            lmgncgc = mgncgc,lmgnpre = mgnpre,lmgnpost = mgnpost,&
@@ -1785,7 +1790,7 @@ contains
 
        call par_sync_out("  ...computing initial conditions.")
 
-       if (tasktype==2) then
+       if (task_type==2) then
          U(1:Unx,1:Uny,1:Unz) = 0
          do k = 1, Unz
           do j = 1, Uny
@@ -1828,7 +1833,7 @@ contains
           end do
          end do
 
-       elseif (tasktype==3) then
+       elseif (task_type==3) then
          U(1:Unx,1:Uny,1:Unz) = 0
          do k = 1, Unz
           do j = 1, Uny
@@ -1964,7 +1969,7 @@ contains
          end do
          !$omp end do
          !$omp end parallel
-       end if  !tasktype
+       end if  !task_type
 
 
 
@@ -1977,7 +1982,7 @@ contains
          !$omp end parallel
        end if
 
-       if (enable_buoyancy.and.tasktype==2) then
+       if (enable_buoyancy.and.task_type==2) then
          call par_sync_out("  ...setting initial temperature values.")
 
          do k = 0, Prnz+1
@@ -1995,7 +2000,7 @@ contains
           end do
          end do
 
-       elseif (enable_buoyancy.and.tasktype==3) then
+       elseif (enable_buoyancy.and.task_type==3) then
          call par_sync_out("  ...setting initial temperature values.")
 
          do k = 0, Prnz+1
@@ -2017,7 +2022,7 @@ contains
 
          call InitScalar(TempIn,TemperatureProfile,Temperature)
 
-       end if !buoyancy and tasktype
+       end if !buoyancy and task_type
 
        if (enable_moisture) then
          call par_sync_out("  ...setting initial moisture values.")

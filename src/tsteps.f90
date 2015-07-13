@@ -64,7 +64,7 @@ contains
       call IBMomentum(U, V, W)
 
 
-      if (masssourc==1) allocate(Q(0:Prnx+1, 0:Prny+1, 0:Prnz+1))
+      if (enable_ibm_mass_sources) allocate(Q(0:Prnx+1, 0:Prny+1, 0:Prnz+1))
 
       if (debugparam>1) call system_clock(count_rate=trate)
     end if
@@ -133,12 +133,12 @@ contains
 
       call IBMomentum(U2, V2, W2)
 
-      if (masssourc==1) then
+      if (enable_ibm_mass_sources) then
           call IBMassSources(Q, U2, V2, W2)
       end if
 
 
-      if (poissmet>0) then
+      if (poisson_solver>0) then
         call PressureCorrection(U2, V2, W2, Pr, Q, 2*RK_alpha(RK_stage)*dt)
       end if
 

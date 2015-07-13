@@ -102,8 +102,15 @@ module Parameters
   real(TIM) :: time
   real(TIM) :: timefram1, timefram2, timeavg1, timeavg2
 
-  integer :: tempmet, poissmet, convmet, masssourc, frames, steady
-  integer :: tasktype, averaging
+  integer :: poisson_solver
+  integer :: advection_method
+  integer :: frames
+  integer :: steady
+  !task type can enable some hard-coded special cases, generally should be left 0
+  integer :: task_type = 0
+  integer :: averaging
+
+  logical :: enable_ibm_mass_sources = .true.
 
   logical :: explicit_diffusion = .true.
 
