@@ -295,6 +295,9 @@ contains
         call CDVdiv(Vstar,U,V,W)
         call CDWdiv(Wstar,U,V,W)
       else if (advection_method==6) then
+        call set(Ustar, 0)
+        call set(Vstar, 0)
+        call set(Wstar, 0)
         call CDUadv(Ustar,U,V,W)
         call CDVadv(Vstar,U,V,W)
         call CDWadv(Wstar,U,V,W)
