@@ -1750,6 +1750,18 @@ contains
     real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
     real(knd),allocatable :: Q(:,:,:)
 
+#ifdef CUSTOM_INITIAL_CONDITIONS
+    interface
+      subroutine CustomInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
+        use Parameters
+        real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+        real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
+        real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
+        real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
+      end subroutine
+    end interface
+#endif
+
     call par_sync_out("  ...setting initial dummy values.")
 
     if (abs(Uinlet)>0) then
@@ -1790,6 +1802,9 @@ contains
 
        call par_sync_out("  ...computing initial conditions.")
 
+#ifdef CUSTOM_INITIAL_CONDITIONS
+       call CustomInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
+#else
        if (task_type==2) then
          U(1:Unx,1:Uny,1:Unz) = 0
          do k = 1, Unz
@@ -1798,7 +1813,7 @@ contains
                   x = xU(i)
                   y = yPr(j)
                   z = zPr(k)
-                  U(i,j,k) = -cos(pi*x)*sin(pi*z)
+                  U(i,j,k) = -cos(pi*x)*sin(pi*y)
            end do
           end do
          end do
@@ -1808,7 +1823,7 @@ contains
                   x = xPr(i)
                   y = yV(j)
                   z = zPr(k)
-                  V(i,j,k) = 0
+                  V(i,j,k) = sin(pi*x)*cos(pi*y)
            end do
           end do
          end do
@@ -1818,7 +1833,7 @@ contains
                   x = xPr(i)
                   y = yPr(j)
                   z = zW(k)
-                  W(i,j,k) = sin(pi*x)*cos(pi*z)
+                  W(i,j,k) = 0
            end do
           end do
          end do
@@ -1828,7 +1843,7 @@ contains
                   x = xPr(i)
                   y = yPr(j)
                   z = zPr(k)
-                  Pr(i,j,k) = -(1._knd/4._knd)*((cos(2*pi*z)+cos(2*pi*x)))
+                  Pr(i,j,k) = -(1._knd/4._knd)*((cos(2*pi*y)+cos(2*pi*x)))
            end do
           end do
          end do
@@ -2032,6 +2047,8 @@ contains
          call InitScalar(MoistIn,MoistureProfile,Moisture)
 
        end if
+#endif
+
 
        if (enable_buoyancy) then
          call par_sync_out("  ...setting hydrostatic pressure.")
