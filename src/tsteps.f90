@@ -192,7 +192,7 @@ contains
 
       if (debugparam>1.and.master) then
         call system_clock(count=time2)
-        write (*,*) "ET of part 1", (time2-time1) / real(trate, int64)
+        write (*,*) "ET of part 1", (time2-time1) / real(trate, dbl)
         time1 = time2
       end if
 

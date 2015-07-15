@@ -119,7 +119,7 @@ program CLMM
 
   call par_sync_all
   if (master .and. time_steps_time>0) write(*,*) "Total wall clock time for time steps", time_steps_time
-  if (master .and. poisson_solver_time>0) write(*,*) "Wall clock time for poisson solver", poisson_solver_time
+  if (master .and. poisson_solver_time>0) write(*,*) "Wall clock time for Poisson solver", poisson_solver_time
   call par_sync_all
 
   call Dynamics_Deallocate

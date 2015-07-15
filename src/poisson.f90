@@ -21,10 +21,10 @@ contains
     real(knd),dimension(0:,0:,0:),intent(inout) :: Phi
     real(knd),dimension(0:,0:,0:),intent(in) :: RHS
     logical, save :: called = .false.
-#ifdef POIS_SOLVER_TIME
-    integer(DBL), save :: trate
-    integer(DBL)       :: t1, t2
-#endif
+
+    integer(int64), save :: trate
+    integer(int64)       :: t1, t2
+
 
 
     if (.not.called) then
@@ -41,24 +41,23 @@ contains
                                PoisFFT_FiniteDifference2)
 #endif
       called = .true.
-#ifdef POIS_SOLVER_TIME
+
       call system_clock(count_rate=trate)
-#endif
+
     end if
 
-#ifdef POIS_SOLVER_TIME
+
     call system_clock(count=t1)
-#endif
+
 
     call Execute(Solver,Phi,RHS)
 
-#ifdef POIS_SOLVER_TIME
+
     call system_clock(count=t2)
     if (master) then
-      poisson_solver_time = poisson_solver_time + real(t2-t1,knd)/real(trate,knd)
-      if (master) write(*,*) "solver cpu time", real(t2-t1)/real(trate)
+      poisson_solver_time = poisson_solver_time + real(t2-t1,dbl)/real(trate,dbl)
+      if (master.and.debugparam>1) write(*,*) "solver cpu time", real(t2-t1)/real(trate)
     end if
-#endif
 
   end subroutine
 

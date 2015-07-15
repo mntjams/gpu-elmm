@@ -25,8 +25,8 @@ contains
                                                            !Phi computed pseudopressure, saved as first guess for next time
     real(knd) :: uncompatibility
     integer, save :: called = 0
-    integer(DBL), save :: trate
-    integer(DBL), save :: time1, time2, time3, time4
+    integer(int64), save :: trate
+    integer(int64), save :: time1, time2, time3, time4
 #ifdef PAR
     correctcompatibility = 0
 #else
