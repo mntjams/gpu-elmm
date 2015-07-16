@@ -1578,26 +1578,27 @@ contains
     close(unit)
 
 
+    if (num_of_scalars > 0) then
+      open(newunit=unit,file=image_input_dir//"scalars.vtk",access="stream",status="old",action="read",iostat=file_stat)
 
-    open(newunit=unit,file=image_input_dir//"scalars.vtk",access="stream",status="old",action="read",iostat=file_stat)
+      if (file_stat/=0) call error_stop("Error opening "//image_input_dir//"scalars.vtk")
 
-    if (file_stat/=0) call error_stop("Error opening "//image_input_dir//"scalars.vtk")
-
-    do i = 1, num_of_scalars
-      write(scalnum,"(I2.2)") i
-      call skip_to("SCALARS scalar"//scalnum//" float",stat)
-      call skip_line
-      if (stat/=0) then
-        call error_stop("scalar"//scalnum//" field not found in the initial conditions file " // &
-                        image_input_dir // "scalars.vtk")
-      else
+      do i = 1, num_of_scalars
+        write(scalnum,"(I2.2)") i
+        call skip_to("SCALARS scalar"//scalnum//" float",stat)
         call skip_line
-        read(unit) buffer
-        Scalar(1:Prnx,1:Prny,1:Prnz,i) =  real(BigEnd(buffer),knd)
-      end if
-    end do
+        if (stat/=0) then
+          call error_stop("scalar"//scalnum//" field not found in the initial conditions file " // &
+                          image_input_dir // "scalars.vtk")
+        else
+          call skip_line
+          read(unit) buffer
+          Scalar(1:Prnx,1:Prny,1:Prnz,i) =  real(BigEnd(buffer),knd)
+        end if
+      end do
 
-    close(unit)
+      close(unit)
+    end if
 
 
     deallocate(buffer)
