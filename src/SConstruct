@@ -133,6 +133,20 @@ try:
 except:
   pass
 
+try:
+  cc = os.environ['CC']
+  if len(fc)>0:
+    env.Replace(CC = cc)
+except:
+  pass
+
+try:
+  cxx = os.environ['CXX']
+  if len(cxx)>0:
+    env.Replace(CXX = cxx)
+except:
+  pass
+
 env.Replace(LINK = env.Dump('F90'))
 
 if prof=="yes":
@@ -255,6 +269,7 @@ else:
 
 objs += env.Object(target=target_dir+'parameters',     source='parameters.f90')
 objs += env.Object(target=target_dir+'rng_par_zig',    source='rng_par_zig.f90')
+objs += env.Object(target=target_dir+'rng_par_zig_c',  source='rng_par_zig_c.c')
 objs += env.Object(target=target_dir+'stop',           source='stop.f90')
 objs += env.Object(target=target_dir+'lapack',         source='lapack.f')
 objs += env.Object(target=target_dir+'interpolation',  source='interpolation.f90')

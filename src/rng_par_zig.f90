@@ -155,6 +155,13 @@ contains
     integer(int32), intent(out)  ::  ival
     integer, intent(in)  ::  kpar
     integer(int32) :: jz, jsr
+    interface
+      function sum_and_overflow(a, b) result(res) bind(C, name="sum_and_overflow")
+        use, intrinsic :: iso_c_binding
+        integer(c_int32_t) :: res
+        integer(c_int32_t), value :: a, b
+      end function
+    end interface
 
     jsr = par_jsr(kpar*par_step)
     jz = jsr
@@ -162,7 +169,8 @@ contains
     jsr = ieor( jsr, ishft( jsr, -17 ) )
     jsr = ieor( jsr, ishft( jsr,   5 ) )
     par_jsr(kpar*par_step) = jsr
-    ival = jz + jsr
+    !ival = jz + jsr causes overflow of signed integer (against standard, undefined behaviour)
+    ival = sum_and_overflow(jz, jsr)
   end subroutine par_shr3
 
 
