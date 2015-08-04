@@ -115,7 +115,7 @@ contains
           end if
         else if (s==' ') then
           if (pos>1) call send
-        else if (s==';') then
+        else if (s=='!') then
           if (pos>1) call send
           exit
         else
