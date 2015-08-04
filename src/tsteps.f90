@@ -253,14 +253,12 @@ contains
           call ImplicitDiffusion_ForwEul(U, V, W, U2, V2, W2, U3, V3, W3, coef)
 
 
-          !$omp parallel sections
-          !$omp section
           call BoundU(1, U3, Uin)
-          !$omp section
+
           call BoundU(2, V3, Vin)
-          !$omp section
+
           call BoundU(3, W3, Win)
-          !$omp end parallel sections
+
           call IBMomentum(U3, V3, W3)
 
           !Performs the diffusion terms
@@ -284,14 +282,13 @@ contains
 
         end if   Re_gt_0
 
-        !$omp parallel sections
-        !$omp section
+
         call BoundU(1, U2, Uin)
-        !$omp section
+
         call BoundU(2, V2, Vin)
-        !$omp section
+
         call BoundU(3, W2, Win)
-        !$omp end parallel sections
+
         call IBMomentum(U2, V2, W2)
 
         if (debuglevel>=2) then  !Compute and output the mean friction in the domain.
