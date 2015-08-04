@@ -1,4 +1,4 @@
-module TURBINLET
+module TurbInlet
 
   use Parameters
   use ArrayUtilities
@@ -193,7 +193,7 @@ contains
       !$omp end  workshare
       !$omp end  parallel
 #ifdef PAR
-     compat = par_co_sum(compat)
+      compat = par_co_sum(compat)
 #endif
 
       called=.true.
@@ -222,8 +222,7 @@ contains
    call set(Uin,0._knd)
    call set(Vin,0._knd)
    call set(Win,0._knd)
-   !$omp parallel private(i,j,k,Ui,Vi,Wi)
-   !$omp do
+   !$omp parallel do private(i,j,k,Ui,Vi,Wi)
    do k = 1, Prnz
     do j = 1, Prny
      Ui = Psiu(j,k,1)
@@ -240,24 +239,29 @@ contains
                            +transform_tensor(6,j,k)*Wi
     end do
    end do
-   !$omp end  do
+   !$omp end parallel do
 
-   !$omp workshare
-   p = sum(Uin(1:Prny,1:Prnz)) 
+   if (Btype(We)==TURBULENTINLET .or. Btype(Ea)==TURBULENTINLET) then
+     !$omp parallel workshare
+     p = sum(Uin(1:Prny,1:Prnz))
+     !$omp end parallel workshare
+   else if (Btype(So)==TURBULENTINLET .or. Btype(No)==TURBULENTINLET) then
+     !$omp parallel workshare
+     p = sum(Vin(1:Prny,1:Prnz))
+     !$omp end parallel workshare
+   end if
+
+   if (Btype(We)==TURBULENTINLET .or. Btype(Ea)==TURBULENTINLET .or. &
+       Btype(So)==TURBULENTINLET .or. Btype(No)==TURBULENTINLET) then
 #ifdef PAR
-   !$omp workshare
-   !$omp single
-   p = par_co_sum(p)
-   !$omp single
-   !$omp workshare
+     p = par_co_sum(p)
 #endif
-   p = compat/p                  !To ensure the compatibility condition.
-   !$omp end  workshare
-   !$omp end  parallel
+     p = compat/p                  !To ensure the compatibility condition.
 
-   call multiply(Uin,p)
-   call multiply(Vin,p)
-   call multiply(Win,p)
+     call multiply(Uin,p)
+     call multiply(Vin,p)
+     call multiply(Win,p)
+   end if
 
 
    call BoundUin(1,Uin)
@@ -685,4 +689,4 @@ contains
 
 
 
-end  module TURBINLET
+end  module TurbInlet
