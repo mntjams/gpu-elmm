@@ -195,7 +195,7 @@ contains
         end do
         !$omp end parallel do
 
-        if (explicit_diffusion) call Scalar_Diffusion(Array_adv, Array)
+        if (explicit_scalar_diffusion) call ScalarDiffusion(Array_adv, Array)
 
         call extra_procedure
 
@@ -203,10 +203,10 @@ contains
 
         call add(Array, Array2)
 
-        if (.not.explicit_diffusion) then
+        if (.not.explicit_scalar_diffusion) then
           call boundary_procedure(Array)
 
-          call DiffScalar(Array2, Array, &
+          call ScalarDiffusionImplicit(Array2, Array, &
                           scalar_type, boundary_procedure, 2._knd*RK_alpha(RK_stage)*dt)
           call assign(Array, Array2)
         end if
@@ -711,7 +711,7 @@ contains
 
 
 
-  subroutine DiffScalar(Scal2, Scal, sctype, boundary_procedure, coef)
+  subroutine ScalarDiffusionImplicit(Scal2, Scal, sctype, boundary_procedure, coef)
     real(knd), contiguous, intent(in)    :: Scal(-1:,-1:,-1:)
     real(knd), contiguous, intent(inout) :: Scal2(-1:,-1:,-1:)
     real(knd), intent(in) :: coef
@@ -989,7 +989,7 @@ contains
 
 
     end if
-  endsubroutine DiffScalar
+  endsubroutine ScalarDiffusionImplicit
 
 
 
@@ -998,7 +998,7 @@ contains
 
 
 
-  subroutine Scalar_Diffusion(Scal2, Scal)
+  subroutine ScalarDiffusion(Scal2, Scal)
     real(knd), contiguous, intent(inout) :: Scal2(-1:,-1:,-1:)
     real(knd), contiguous, intent(in)    :: Scal(-1:,-1:,-1:)
     integer, parameter :: narr = 6
@@ -1043,7 +1043,7 @@ contains
      end do
     end do
     !$omp end parallel do
-  end subroutine Scalar_Diffusion
+  end subroutine ScalarDiffusion
 
 
 

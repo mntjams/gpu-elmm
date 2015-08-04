@@ -113,6 +113,7 @@ module Parameters
   logical :: enable_ibm_mass_sources = .true.
 
   logical :: explicit_diffusion = .true.
+  logical :: explicit_scalar_diffusion = .false.
 
   logical :: enable_buoyancy = .false. !1 if enabled, zero otherwise
   logical :: enable_moisture = .false.
