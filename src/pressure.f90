@@ -300,12 +300,12 @@ contains
        do j=1,Prny
         do i=1,Prnx
           Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k) - &
-                       Viscosity(i,j,k) * (((Phi(i+1,j,k)-Phi(i,j,k)) - &
-                                           (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
-                                          ((Phi(i,j+1,k)-Phi(i,j,k)) - &
-                                           (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
-                                          ((Phi(i,j,k+1)-Phi(i,j,k)) - &
-                                           (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
+                       dt3 * Viscosity(i,j,k) * (((Phi(i+1,j,k)-Phi(i,j,k)) - &
+                                                  (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
+                                                 ((Phi(i,j+1,k)-Phi(i,j,k)) - &
+                                                  (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
+                                                 ((Phi(i,j,k+1)-Phi(i,j,k)) - &
+                                                  (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
         end do
        end do
       end do
