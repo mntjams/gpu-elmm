@@ -712,6 +712,9 @@ contains
 
 
   subroutine ScalarDiffusionImplicit(Scal2, Scal, sctype, boundary_procedure, coef)
+#ifdef PAR
+    use custom_par, only: par_co_max
+#endif
     real(knd), contiguous, intent(in)    :: Scal(-1:,-1:,-1:)
     real(knd), contiguous, intent(inout) :: Scal2(-1:,-1:,-1:)
     real(knd), intent(in) :: coef

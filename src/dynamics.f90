@@ -928,6 +928,9 @@ contains
     use Parameters, nu => Viscosity
     use Wallmodels
     !$ use omp_lib
+#ifdef PAR
+    use custom_par, only: par_co_max
+#endif
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U2, V2, W2, U3, V3, W3
     real(knd), intent(in) :: coef
