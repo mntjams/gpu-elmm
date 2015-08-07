@@ -37,12 +37,12 @@ module CDS
         do k=1,nz
             do j=1,ny
                 do i=1,nx
-                    U2(i,j,k)= - ((Ax*(U(i+1,j,k)+U(i,j,k))*(U(i+1,j,k)+U(i,j,k)) &
-                    -Ax*(U(i,j,k)+U(i-1,j,k))*(U(i,j,k)+U(i-1,j,k))) &
-                    +(Ay*(U(i,j+1,k)+U(i,j,k))*(V(i+1,j,k)+V(i,j,k)) &
-                    -Ay*(U(i,j,k)+U(i,j-1,k))*(V(i+1,j-1,k)+V(i,j-1,k))) &
-                    +(Az*(U(i,j,k+1)+U(i,j,k))*(W(i+1,j,k)+W(i,j,k)) &
-                    -Az*(U(i,j,k)+U(i,j,k-1))*(W(i+1,j,k-1)+W(i,j,k-1))))
+                    U2(i,j,k)= - ((Ax*(U(i+1,j,k) + U(i,j,k)) * (U(i+1,j,k) + U(i,j,k)) &
+                                 - Ax*(U(i,j,k) + U(i-1,j,k)) * (U(i,j,k) + U(i-1,j,k))) &
+                                + (Ay*(U(i,j+1,k) + U(i,j,k)) * (V(i+1,j,k) + V(i,j,k)) &
+                                 - Ay*(U(i,j,k) + U(i,j-1,k)) * (V(i+1,j-1,k) + V(i,j-1,k))) &
+                                + (Az*(U(i,j,k+1) + U(i,j,k)) * (W(i+1,j,k) + W(i,j,k)) &
+                                 - Az*(U(i,j,k) + U(i,j,k-1)) * (W(i+1,j,k-1) + W(i,j,k-1))))
                 end do
             end do
         end do
@@ -61,12 +61,12 @@ module CDS
         do k=1,nz
          do j=1,ny
           do i=1,nx
-           Utmp=( ((fe(i)*U(i+1,j,k)+(1-fe(i))*U(i,j,k))*(fe(i)*U(i+1,j,k)+(1-fe(i))*U(i,j,k))) &
-                      -((fe(i-1)*U(i,j,k)+(1-fe(i-1))*U(i-1,j,k))*(fe(i-1)*U(i,j,k)+(1-fe(i-1))*U(i-1,j,k))))/dxU(i)
-           Utmp=Utmp+( (gn(j)*U(i,j+1,k)+(1-gn(j))*U(i,j,k))*(fp(i)*V(i+1,j,k)+(1-fp(i))*V(i,j,k)) &
-                      -(gn(j-1)*U(i,j,k)+(1-gn(j-1))*U(i,j-1,k))*(fp(i)*V(i+1,j-1,k)+(1-fp(i))*V(i,j-1,k)))/dyPr(j)
-           Utmp=Utmp+( (ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k))*(fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k)) &
-                      -(ht(k-1)*U(i,j,k)+(1-ht(k-1))*U(i,j,k-1))*(fp(i)*W(i+1,j,k-1)+(1-fp(i))*W(i,j,k-1)))/dzPr(k)
+           Utmp=( ((fe(i)*U(i+1,j,k)+(1-fe(i))*U(i,j,k)) * (fe(i)*U(i+1,j,k)+(1-fe(i))*U(i,j,k))) &
+                      -((fe(i-1)*U(i,j,k)+(1-fe(i-1))*U(i-1,j,k)) * (fe(i-1)*U(i,j,k)+(1-fe(i-1))*U(i-1,j,k))))/dxU(i)
+           Utmp=Utmp+( (gn(j)*U(i,j+1,k)+(1-gn(j))*U(i,j,k)) * (fp(i)*V(i+1,j,k)+(1-fp(i))*V(i,j,k)) &
+                      -(gn(j-1)*U(i,j,k)+(1-gn(j-1))*U(i,j-1,k)) * (fp(i)*V(i+1,j-1,k)+(1-fp(i))*V(i,j-1,k)))/dyPr(j)
+           Utmp=Utmp+( (ht(k)*U(i,j,k+1)+(1-ht(k))*U(i,j,k)) * (fp(i)*W(i+1,j,k)+(1-fp(i))*W(i,j,k)) &
+                      -(ht(k-1)*U(i,j,k)+(1-ht(k-1))*U(i,j,k-1)) * (fp(i)*W(i+1,j,k-1)+(1-fp(i))*W(i,j,k-1)))/dzPr(k)
            U2(i,j,k)=-Utmp
           end do
          end do
@@ -102,12 +102,12 @@ module CDS
         do k=1,nz
             do j=1,ny
                 do i=1,nx
-                    V2(i,j,k)= - ((Ay*(V(i,j+1,k)+V(i,j,k))*(V(i,j+1,k)+V(i,j,k)) &
-                    -Ay*(V(i,j,k)+V(i,j-1,k))*(V(i,j,k)+V(i,j-1,k))) &
-                    +(Ax*(V(i+1,j,k)+V(i,j,k))*(U(i,j+1,k)+U(i,j,k)) &
-                    -Ax*(V(i,j,k)+V(i-1,j,k))*(U(i-1,j+1,k)+U(i-1,j,k))) &
-                    +(Az*(V(i,j,k+1)+V(i,j,k))*(W(i,j+1,k)+W(i,j,k)) &
-                    -Az*(V(i,j,k)+V(i,j,k-1))*(W(i,j+1,k-1)+W(i,j,k-1))))
+                    V2(i,j,k)= - ((Ay*(V(i,j+1,k) + V(i,j,k)) * (V(i,j+1,k) + V(i,j,k)) &
+                                  -Ay*(V(i,j,k) + V(i,j-1,k)) * (V(i,j,k) + V(i,j-1,k))) &
+                                 +(Ax*(V(i+1,j,k) + V(i,j,k)) * (U(i,j+1,k) + U(i,j,k)) &
+                                  -Ax*(V(i,j,k) + V(i-1,j,k)) * (U(i-1,j+1,k) + U(i-1,j,k))) &
+                                 +(Az*(V(i,j,k+1) + V(i,j,k)) * (W(i,j+1,k) + W(i,j,k)) &
+                                  -Az*(V(i,j,k) + V(i,j,k-1)) * (W(i,j+1,k-1) + W(i,j,k-1))))
                 end do
             end do
         end do
@@ -126,12 +126,12 @@ module CDS
         do k=1,nz
          do j=1,ny
           do i=1,nx
-           Vtmp=( ((gn(j)*V(i,j+1,k)+(1-gn(j))*V(i,j,k))*(gn(j)*V(i,j+1,k)+(1-gn(j))*V(i,j,k))) &
-                      -((gn(j-1)*V(i,j,k)+(1-gn(j-1))*V(i,j-1,k))*(gn(j-1)*V(i,j,k)+(1-gn(j-1))*V(i,j-1,k))))/dyV(j)
-           Vtmp=Vtmp+( (fe(i)*V(i+1,j,k)+(1-fe(i))*V(i,j,k))*(gp(j)*U(i,j+1,k)+(1-gp(j))*U(i,j,k)) &
-                      -(fe(i-1)*V(i,j,k)+(1-fe(i-1))*V(i-1,j,k))*(gp(j)*U(i-1,j+1,k)+(1-gp(j))*U(i-1,j,k)))/dxPr(i)
-           Vtmp=Vtmp+( (ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k))*(gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k)) &
-                      -(ht(k-1)*V(i,j,k)+(1-ht(k-1))*V(i,j,k-1))*(gp(j)*W(i,j+1,k-1)+(1-gp(j))*W(i,j,k-1)))/dzPr(k)
+           Vtmp=( ((gn(j)*V(i,j+1,k)+(1-gn(j))*V(i,j,k)) * (gn(j)*V(i,j+1,k)+(1-gn(j))*V(i,j,k))) &
+                      -((gn(j-1)*V(i,j,k)+(1-gn(j-1))*V(i,j-1,k)) * (gn(j-1)*V(i,j,k)+(1-gn(j-1))*V(i,j-1,k))))/dyV(j)
+           Vtmp=Vtmp+( (fe(i)*V(i+1,j,k)+(1-fe(i))*V(i,j,k)) * (gp(j)*U(i,j+1,k)+(1-gp(j))*U(i,j,k)) &
+                      -(fe(i-1)*V(i,j,k)+(1-fe(i-1))*V(i-1,j,k)) * (gp(j)*U(i-1,j+1,k)+(1-gp(j))*U(i-1,j,k)))/dxPr(i)
+           Vtmp=Vtmp+( (ht(k)*V(i,j,k+1)+(1-ht(k))*V(i,j,k)) * (gp(j)*W(i,j+1,k)+(1-gp(j))*W(i,j,k)) &
+                      -(ht(k-1)*V(i,j,k)+(1-ht(k-1))*V(i,j,k-1)) * (gp(j)*W(i,j+1,k-1)+(1-gp(j))*W(i,j,k-1)))/dzPr(k)
            V2(i,j,k)=-Vtmp
           end do
          end do
@@ -165,12 +165,12 @@ module CDS
         do k=1,nz
             do j=1,ny
                 do i=1,nx
-                    W2(i,j,k)= - ((Az*(W(i,j,k+1)+W(i,j,k))*(W(i,j,k+1)+W(i,j,k)) &
-                    -Az*(W(i,j,k)+W(i,j,k-1))*(W(i,j,k)+W(i,j,k-1))) &
-                    +(Ay*(W(i,j+1,k)+W(i,j,k))*(V(i,j,k+1)+V(i,j,k)) &
-                    -Ay*(W(i,j,k)+W(i,j-1,k))*(V(i,j-1,k)+V(i,j-1,k+1))) &
-                    +(Ax*(W(i+1,j,k)+W(i,j,k))*(U(i,j,k+1)+U(i,j,k)) &
-                    -Ax*(W(i,j,k)+W(i-1,j,k))*(U(i-1,j,k+1)+U(i-1,j,k))))
+                    W2(i,j,k)= - ((Az*(W(i,j,k+1) + W(i,j,k)) * (W(i,j,k+1) + W(i,j,k)) &
+                                 - Az*(W(i,j,k) + W(i,j,k-1)) * (W(i,j,k) + W(i,j,k-1))) &
+                                + (Ay*(W(i,j+1,k) + W(i,j,k)) * (V(i,j,k+1) + V(i,j,k)) &
+                                 - Ay*(W(i,j,k) + W(i,j-1,k)) * (V(i,j-1,k) + V(i,j-1,k+1))) &
+                                + (Ax*(W(i+1,j,k) + W(i,j,k)) * (U(i,j,k+1) + U(i,j,k)) &
+                                 - Ax*(W(i,j,k) + W(i-1,j,k)) * (U(i-1,j,k+1) + U(i-1,j,k))))
                 end do
             end do
         end do
@@ -189,12 +189,12 @@ module CDS
         do k=1,nz
          do j=1,ny
           do i=1,nx
-           Wtmp=( ((ht(k)*W(i,j,k+1)+(1-ht(k))*W(i,j,k))*(ht(k)*W(i,j,k+1)+(1-ht(k))*W(i,j,k))) &
-                      -((ht(k-1)*W(i,j,k)+(1-ht(k-1))*W(i,j,k-1))*(ht(k-1)*W(i,j,k)+(1-ht(k-1))*W(i,j,k-1))))/dzW(k)
-           Wtmp=Wtmp+( (fe(i)*W(i+1,j,k)+(1-fe(i))*W(i,j,k))*(hp(k)*U(i,j,k+1)+(1-hp(k))*U(i,j,k)) &
-                      -(fe(i-1)*W(i,j,k)+(1-fe(i-1))*W(i-1,j,k))*(hp(k)*U(i-1,j,k+1)+(1-hp(k))*U(i-1,j,k)))/dxPr(i)
-           Wtmp=Wtmp+( (gn(j)*W(i,j+1,k)+(1-gn(j))*W(i,j,k))*(hp(k)*V(i,j,k+1)+(1-hp(k))*V(i,j,k)) &
-                      -(gn(j-1)*W(i,j,k)+(1-gn(j-1))*W(i,j-1,k))*(hp(k)*V(i,j-1,k+1)+(1-hp(k))*V(i,j-1,k)))/dzPr(k)
+           Wtmp=( ((ht(k)*W(i,j,k+1)+(1-ht(k))*W(i,j,k)) * (ht(k)*W(i,j,k+1)+(1-ht(k))*W(i,j,k))) &
+                      -((ht(k-1)*W(i,j,k)+(1-ht(k-1))*W(i,j,k-1)) * (ht(k-1)*W(i,j,k)+(1-ht(k-1))*W(i,j,k-1))))/dzW(k)
+           Wtmp=Wtmp+( (fe(i)*W(i+1,j,k)+(1-fe(i))*W(i,j,k)) * (hp(k)*U(i,j,k+1)+(1-hp(k))*U(i,j,k)) &
+                      -(fe(i-1)*W(i,j,k)+(1-fe(i-1))*W(i-1,j,k)) * (hp(k)*U(i-1,j,k+1)+(1-hp(k))*U(i-1,j,k)))/dxPr(i)
+           Wtmp=Wtmp+( (gn(j)*W(i,j+1,k)+(1-gn(j))*W(i,j,k)) * (hp(k)*V(i,j,k+1)+(1-hp(k))*V(i,j,k)) &
+                      -(gn(j-1)*W(i,j,k)+(1-gn(j-1))*W(i,j-1,k)) * (hp(k)*V(i,j-1,k+1)+(1-hp(k))*V(i,j-1,k)))/dzPr(k)
            W2(i,j,k)=-Wtmp
           end do
          end do
@@ -979,8 +979,8 @@ module CDS
               lk = k-bk+1
               !9/8 Uj_1 - 1/8 Uj_3
               Uint = sum( i_mask4 * U(i-2:i+1,j,k) )
-              UV1(li,lj,lk) = Uint * (U(i-1,j,k)+U(i  ,j,k))
-              UV3(li,lj,lk) = Uint * (U(i-2,j,k)+U(i+1,j,k))
+              UV1(li,lj,lk) = Uint * (U(i-1,j,k) + U(i  ,j,k))
+              UV3(li,lj,lk) = Uint * (U(i-2,j,k) + U(i+1,j,k))
             end do
            end do
           end do
@@ -997,8 +997,8 @@ module CDS
                 dU = dU -    (UV3(li+2,lj,lk) - UV3(li-1,lj,lk))/3
                 U2(i,j,k) = U2(i,j,k) + dU / dxmin
               else if (Utype(i,j,k)<0) then  !near a boundary - 2nd order
-                dU = coef2ord * ((U(i+1,j,k)+U(i  ,j,k)) * (U(i+1,j,k)+U(i  ,j,k)) &
-                                -(U(i  ,j,k)+U(i-1,j,k)) * (U(i  ,j,k)+U(i-1,j,k)))
+                dU = coef2ord * ((U(i+1,j,k) + U(i  ,j,k)) * (U(i+1,j,k) + U(i  ,j,k)) &
+                                -(U(i  ,j,k) + U(i-1,j,k)) * (U(i  ,j,k) + U(i-1,j,k)))
                 U2(i,j,k) = U2(i,j,k) + dU / dxmin
               end if
             end do
@@ -1023,8 +1023,8 @@ module CDS
               lk = k-bk+1
               !9/8 Uj_1 - 1/8 Uj_3
               Vint = sum( i_mask4 * V(i-1:i+2,j,k) )
-              UV1(li,lj,lk) = Vint * (U(i,j  ,k)+U(i,j+1,k))
-              UV3(li,lj,lk) = Vint * (U(i,j-1,k)+U(i,j+2,k))
+              UV1(li,lj,lk) = Vint * (U(i,j  ,k) + U(i,j+1,k))
+              UV3(li,lj,lk) = Vint * (U(i,j-1,k) + U(i,j+2,k))
             end do
            end do
           end do
@@ -1041,8 +1041,8 @@ module CDS
                 dU = dU -    (UV3(li,lj+1,lk) - UV3(li,lj-2,lk))/3
                 U2(i,j,k) = U2(i,j,k) + dU / dymin
               else if (Utype(i,j,k)<0) then  !near a boundary - 2nd order
-                dU = coef2ord * ((U(i,j+1,k)+U(i,j  ,k)) * (V(i+1,j  ,k)+V(i,j  ,k)) &
-                                -(U(i,j  ,k)+U(i,j-1,k)) * (V(i+1,j-1,k)+V(i,j-1,k)))
+                dU = coef2ord * ((U(i,j+1,k) + U(i,j  ,k)) * (V(i+1,j  ,k) + V(i,j  ,k)) &
+                                -(U(i,j  ,k) + U(i,j-1,k)) * (V(i+1,j-1,k) + V(i,j-1,k)))
                 U2(i,j,k) = U2(i,j,k) + dU / dymin
               end if
             end do
@@ -1067,8 +1067,8 @@ module CDS
               lk = k-bk+1
               !9/8 Uj_1 - 1/8 Uj_3
               Wint = sum( i_mask4 * W(i-1:i+2,j,k) )
-              UV1(li,lj,lk) = Wint * (U(i,j,k  )+U(i,j,k+1))
-              UV3(li,lj,lk) = Wint * (U(i,j,k-1)+U(i,j,k+2))
+              UV1(li,lj,lk) = Wint * (U(i,j,k  ) + U(i,j,k+1))
+              UV3(li,lj,lk) = Wint * (U(i,j,k-1) + U(i,j,k+2))
             end do
            end do
           end do
@@ -1085,8 +1085,8 @@ module CDS
                 dU = dU -    (UV3(li,lj,lk+1) - UV3(li,lj,lk-2))/3
                 U2(i,j,k) = U2(i,j,k) + dU / dzmin
               else if (Utype(i,j,k)<0) then  !near a boundary - 2nd order
-                dU = coef2ord * ((U(i,j,k+1)+U(i,j,k  )) * (W(i+1,j,k  )+W(i,j,k  )) &
-                                -(U(i,j,k  )+U(i,j,k-1)) * (W(i+1,j,k-1)+W(i,j,k-1)))
+                dU = coef2ord * ((U(i,j,k+1) + U(i,j,k  )) * (W(i+1,j,k  ) + W(i,j,k  )) &
+                                -(U(i,j,k  ) + U(i,j,k-1)) * (W(i+1,j,k-1) + W(i,j,k-1)))
                 U2(i,j,k) = U2(i,j,k) + dU / dzmin
               end if
             end do
@@ -1143,8 +1143,8 @@ module CDS
               lk = k-bk+1
               !9/8 Uj_1 - 1/8 Uj_3
               Uint = sum( i_mask4 * U(i,j-1:j+2,k) )
-              UV1(li,lj,lk) = Uint * (V(i  ,j,k)+V(i+1,j,k))
-              UV3(li,lj,lk) = Uint * (V(i-1,j,k)+V(i+2,j,k))
+              UV1(li,lj,lk) = Uint * (V(i  ,j,k) + V(i+1,j,k))
+              UV3(li,lj,lk) = Uint * (V(i-1,j,k) + V(i+2,j,k))
             end do
            end do
           end do
@@ -1161,8 +1161,8 @@ module CDS
                 dV = dV -    (UV3(li+1,lj,lk) - UV3(li-2,lj,lk))/3
                 V2(i,j,k) = V2(i,j,k) + dV / dxmin
               else if (Vtype(i,j,k)<0) then  !near a boundary - 2nd order
-                dV = coef2ord * ((V(i+1,j,k)+V(i  ,j,k)) * (U(i  ,j+1,k)+U(i  ,j,k)) &
-                                -(V(i  ,j,k)+V(i-1,j,k))  *(U(i-1,j+1,k)+U(i-1,j,k)))
+                dV = coef2ord * ((V(i+1,j,k) + V(i  ,j,k)) * (U(i  ,j+1,k) + U(i  ,j,k)) &
+                                -(V(i  ,j,k) + V(i-1,j,k))  *(U(i-1,j+1,k) + U(i-1,j,k)))
                 V2(i,j,k) = V2(i,j,k) + dV / dxmin
               end if
             end do
@@ -1187,8 +1187,8 @@ module CDS
               lk = k-bk+1
               !9/8 Uj_1 - 1/8 Uj_3
               Vint = sum( i_mask4 * V(i,j-2:j+1,k) )
-              UV1(li,lj,lk) = Vint * (V(i,j-1,k)+V(i,j  ,k))
-              UV3(li,lj,lk) = Vint * (V(i,j-2,k)+V(i,j+1,k))
+              UV1(li,lj,lk) = Vint * (V(i,j-1,k) + V(i,j  ,k))
+              UV3(li,lj,lk) = Vint * (V(i,j-2,k) + V(i,j+1,k))
             end do
            end do
           end do
@@ -1205,8 +1205,8 @@ module CDS
                 dV = dV -    (UV3(li,lj+2,lk) - UV3(li,lj-1,lk))/3
                 V2(i,j,k) = V2(i,j,k) + dV / dymin
               else if (Vtype(i,j,k)<0) then  !near a boundary - 2nd order
-                dV = coef2ord * ((V(i,j+1,k)+V(i,j  ,k)) * (V(i,j+1,k)+V(i,j  ,k)) &
-                                -(V(i,j  ,k)+V(i,j-1,k)) * (V(i,j  ,k)+V(i,j-1,k)))
+                dV = coef2ord * ((V(i,j+1,k) + V(i,j  ,k)) * (V(i,j+1,k) + V(i,j  ,k)) &
+                                -(V(i,j  ,k) + V(i,j-1,k)) * (V(i,j  ,k) + V(i,j-1,k)))
                 V2(i,j,k) = V2(i,j,k) + dV / dymin
               end if
             end do
@@ -1231,8 +1231,8 @@ module CDS
               lk = k-bk+1
               !9/8 Uj_1 - 1/8 Uj_3
               Wint = sum( i_mask4 * W(i,j-1:j+2,k) )
-              UV1(li,lj,lk) = Wint * (V(i,j,k  )+V(i,j,k+1))
-              UV3(li,lj,lk) = Wint * (V(i,j,k-1)+V(i,j,k+2))
+              UV1(li,lj,lk) = Wint * (V(i,j,k  ) + V(i,j,k+1))
+              UV3(li,lj,lk) = Wint * (V(i,j,k-1) + V(i,j,k+2))
             end do
            end do
           end do
@@ -1249,8 +1249,8 @@ module CDS
                 dV = dV -    (UV3(li,lj,lk+1) - UV3(li,lj,lk-2))/3
                 V2(i,j,k) = V2(i,j,k) + dV / dzmin
               else if (Vtype(i,j,k)<0) then  !near a boundary - 2nd order
-                dV = coef2ord * ((V(i,j,k+1)+V(i,j,k  )) * (W(i,j+1,k  )+W(i,j,k  )) &
-                                -(V(i,j,k  )+V(i,j,k-1)) * (W(i,j+1,k-1)+W(i,j,k-1)))
+                dV = coef2ord * ((V(i,j,k+1) + V(i,j,k  )) * (W(i,j+1,k  ) + W(i,j,k  )) &
+                                -(V(i,j,k  ) + V(i,j,k-1)) * (W(i,j+1,k-1) + W(i,j,k-1)))
                 V2(i,j,k) = V2(i,j,k) + dV / dzmin
               end if
             end do
@@ -1312,8 +1312,8 @@ module CDS
               lk = k-bk+1
               !9/8 Uj_1 - 1/8 Uj_3
               Uint = sum( i_mask4 * U(i,j,k-1:k+2) )
-              UV1(li,lj,lk) = Uint * (W(i  ,j,k)+W(i+1,j,k))
-              UV3(li,lj,lk) = Uint * (W(i-1,j,k)+W(i+2,j,k))
+              UV1(li,lj,lk) = Uint * (W(i  ,j,k) + W(i+1,j,k))
+              UV3(li,lj,lk) = Uint * (W(i-1,j,k) + W(i+2,j,k))
             end do
            end do
           end do
@@ -1330,8 +1330,8 @@ module CDS
                 dW = dW -    (UV3(li+1,lj,lk) - UV3(li-2,lj,lk))/3
                 W2(i,j,k) = W2(i,j,k) + dW / dxmin
               else if (Wtype(i,j,k)<0) then  !near a boundary - 2nd order
-                dW = coef2ord * ((W(i+1,j,k)+W(i  ,j,k)) * (U(i  ,j,k+1)+U(i  ,j,k)) &
-                                -(W(i  ,j,k)+W(i-1,j,k)) * (U(i-1,j,k+1)+U(i-1,j,k)))
+                dW = coef2ord * ((W(i+1,j,k) + W(i  ,j,k)) * (U(i  ,j,k+1) + U(i  ,j,k)) &
+                                -(W(i  ,j,k) + W(i-1,j,k)) * (U(i-1,j,k+1) + U(i-1,j,k)))
                 W2(i,j,k) = W2(i,j,k) + dW / dxmin
               end if
             end do
@@ -1356,8 +1356,8 @@ module CDS
               lk = k-bk+1
               !9/8 Uj_1 - 1/8 Uj_3
               Vint = sum( i_mask4 * V(i,j,k-1:k+2) )
-              UV1(li,lj,lk) = Vint * (W(i,j  ,k)+W(i,j+1,k))
-              UV3(li,lj,lk) = Vint * (W(i,j-1,k)+W(i,j+2,k))
+              UV1(li,lj,lk) = Vint * (W(i,j  ,k) + W(i,j+1,k))
+              UV3(li,lj,lk) = Vint * (W(i,j-1,k) + W(i,j+2,k))
             end do
            end do
           end do
@@ -1374,8 +1374,8 @@ module CDS
                 dW = dW -    (UV3(li,lj+1,lk) - UV3(li,lj-2,lk))/3
                 W2(i,j,k) = W2(i,j,k) + dW / dymin
               else if (Wtype(i,j,k)<0) then  !near a boundary - 2nd order
-                dW = coef2ord * ((W(i,j+1,k)+W(i,j  ,k)) * (V(i,j,k+1)+V(i,j  ,k  )) &
-                                -(W(i,j  ,k)+W(i,j-1,k)) * (V(i,j-1,k)+V(i,j-1,k+1)))
+                dW = coef2ord * ((W(i,j+1,k) + W(i,j  ,k)) * (V(i,j,k+1) + V(i,j  ,k  )) &
+                                -(W(i,j  ,k) + W(i,j-1,k)) * (V(i,j-1,k) + V(i,j-1,k+1)))
                 W2(i,j,k) = W2(i,j,k) + dW / dymin
               end if
             end do
@@ -1400,8 +1400,8 @@ module CDS
               lk = k-bk+1
               !9/8 Uj_1 - 1/8 Uj_3
               Wint = sum( i_mask4 * W(i,j,k-2:k+1) )
-              UV1(li,lj,lk) = Wint * (W(i,j,k-1)+W(i,j,k  ))
-              UV3(li,lj,lk) = Wint * (W(i,j,k-2)+W(i,j,k+1))
+              UV1(li,lj,lk) = Wint * (W(i,j,k-1) + W(i,j,k  ))
+              UV3(li,lj,lk) = Wint * (W(i,j,k-2) + W(i,j,k+1))
             end do
            end do
           end do
@@ -1418,8 +1418,8 @@ module CDS
                 dW = dW -    (UV3(li,lj,lk+2) - UV3(li,lj,lk-1))/3
                 W2(i,j,k) = W2(i,j,k) + dW / dzmin
               else if (Wtype(i,j,k)<0) then  !near a boundary - 2nd order
-                dW = coef2ord * ((W(i,j,k+1)+W(i,j,k  )) * (W(i,j,k+1)+W(i,j,k  )) &
-                                -(W(i,j,k  )+W(i,j,k-1)) * (W(i,j,k  )+W(i,j,k-1)))
+                dW = coef2ord * ((W(i,j,k+1) + W(i,j,k  )) * (W(i,j,k+1) + W(i,j,k  )) &
+                                -(W(i,j,k  ) + W(i,j,k-1)) * (W(i,j,k  ) + W(i,j,k-1)))
                 W2(i,j,k) = W2(i,j,k) + dW / dzmin
               end if
             end do
