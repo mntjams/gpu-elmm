@@ -1600,8 +1600,12 @@ contains
       end do
       !$omp end do
       !$omp end parallel
+
       S = max(Su,Sv,Sw)
-      write (*,*) "CN ", l, S
+#ifdef PAR
+      S = par_co_max(S)
+#endif
+      if (master) write(*,*) "CN ", l, S
 
       if (S<=epsCN) exit
     end do

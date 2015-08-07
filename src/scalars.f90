@@ -973,7 +973,12 @@ contains
         !$omp end do
         !$omp endparallel
        end if
-       write (*,*) "CNscalar ", l, S
+
+#ifdef PAR
+       S = par_co_max(S)
+#endif
+       if (master) write(*,*) "CN scalar", l, S
+
        if (S<=epsCN) exit
      end do
 
