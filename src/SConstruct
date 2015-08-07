@@ -42,6 +42,29 @@ else:
 c_check_flag = ''
 
 
+try:
+  fc = os.environ['FC']
+  if len(fc)>0:
+    env.Replace(F90 = fc, FORTRAN = fc)
+except:
+  pass
+
+try:
+  cc = os.environ['CC']
+  if len(fc)>0:
+    env.Replace(CC = cc)
+except:
+  pass
+
+try:
+  cxx = os.environ['CXX']
+  if len(cxx)>0:
+    env.Replace(CXX = cxx)
+except:
+  pass
+
+
+
 if str(comp)=='intel':
   env = Environment(tools=['default','ifort','intelc'])
   
@@ -123,27 +146,6 @@ from_env('INTEL_LICENSE_FILE')
 #HACK for some computers setting only LD_LIBRARY_PATH
 try:
   env.Append(ENV = {'LIBRARY_PATH' : os.environ['LD_LIBRARY_PATH']})
-except:
-  pass
-
-try:
-  fc = os.environ['FC']
-  if len(fc)>0:
-    env.Replace(F90 = fc, FORTRAN = fc)
-except:
-  pass
-
-try:
-  cc = os.environ['CC']
-  if len(fc)>0:
-    env.Replace(CC = cc)
-except:
-  pass
-
-try:
-  cxx = os.environ['CXX']
-  if len(cxx)>0:
-    env.Replace(CXX = cxx)
 except:
   pass
 
