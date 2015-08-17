@@ -469,9 +469,9 @@ contains
 
   subroutine BuoyancyForce(W, Temperature, Moisture)
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: W
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature,Moisture
-    real(knd) A,A2,temperature_virt
-    integer :: i,j,k
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature, Moisture
+    real(knd) :: A, A2
+    integer :: i, j, k
 
 
     if (enable_moisture) then
@@ -502,6 +502,9 @@ contains
 
       subroutine apply_moist(start)
         integer, intent(in) :: start
+        integer :: i, j, k
+        real(knd) :: temperature_virt
+
         !$omp parallel do private(i,j,k,temperature_virt)
         do k = start, Wnz+1,2
           do j = 1, Wny
@@ -515,10 +518,10 @@ contains
         !$omp end parallel do
       end subroutine
 
-      real(knd) function theta_v(i,j,k)
-        integer :: i,j,k
+      pure real(knd) function theta_v(i, j, k)
+        integer, intent(in) :: i, j, k
 
-        theta_v = Temperature(i,j,k) * (1._knd + 0.61_knd * Moisture(i,j,k))
+        theta_v = Temperature(i, j, k) * (1._knd + 0.61_knd * Moisture(i, j, k))
       end function
   end subroutine BuoyancyForce
 
