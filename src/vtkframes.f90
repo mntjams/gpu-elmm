@@ -666,7 +666,7 @@ contains
                                    c_funloc(SaveBuffers), &
                                    c_loc(Dnp), err)
       class default
-        call error_stop("Error: wrog type of D in TFrameDomain_DoSave.")
+        call error_stop("Error: wrong type of D in TFrameDomain_DoSave.")
     end select
 
     if (err==0) then
