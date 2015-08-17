@@ -41,16 +41,17 @@ contains
    use custom_par, only: iim, jim, kim, nxims, nyims, nzims, par_co_sum, par_co_min
    use exchange_par
 #endif
-   real(knd),intent(in) :: dt
-   logical,save:: called=.false.
-   integer i,j,k
-   integer,save:: filtny,filtnz,bigNy,bigNz
-   real(knd) Ui,Vi,Wi,bysum,bzsum,p
-   real(knd),allocatable,dimension(:):: expsy,expsz
-   real(knd),save:: compat
-   real(knd),allocatable,dimension(:,:,:),save :: Ru,Rv,Rw !arrays of randoms
-   real(knd),allocatable,dimension(:,:,:),save :: Psiu,Psiv,Psiw
-   real(knd),allocatable,dimension(:,:,:),save :: bfilt !filter coefficients (ii,jj,kk,kz)
+   real(knd), intent(in) :: dt
+   logical, save:: called=.false.
+   integer :: i, j, k
+   integer :: jlo, jup, klo, kup
+   integer, save:: filtny, filtnz, bigNy, bigNz
+   real(knd) Ui, Vi, Wi, bysum, bzsum, p
+   real(knd), allocatable, dimension(:):: expsy, expsz
+   real(knd), save:: compat
+   real(knd), allocatable, dimension(:,:,:), save :: Ru, Rv, Rw !arrays of randoms
+   real(knd), allocatable, dimension(:,:,:), save :: Psiu, Psiv, Psiw
+   real(knd), allocatable, dimension(:,:,:), save :: bfilt !filter coefficients (ii,jj,kk,kz)
    integer :: tid
    
 #ifdef PAR
@@ -79,10 +80,15 @@ contains
       bigNy = 2*filtny
       bigNz = 2*filtnz
 
+      jlo = -bigNy+1
+      jup = Prny+bigNy
 
-      allocate(Ru(-bigNy+1:Prny+bigNy,-bigNz+1:Prnz+bigNz,2))
-      allocate(Rv(-bigNy+1:Prny+bigNy,-bigNz+1:Prnz+bigNz,2))
-      allocate(Rw(-bigNy+1:Prny+bigNy,-bigNz+1:Prnz+bigNz,2))
+      klo = -bigNz+1
+      kup = Prnz+bigNz
+
+      allocate(Ru(jlo:jup,klo:kup,2))
+      allocate(Rv(jlo:jup,klo:kup,2))
+      allocate(Rw(jlo:jup,klo:kup,2))
       allocate(Psiu(1:Prny,1:Prnz,1:2))
       allocate(Psiv(1:Prny,1:Prnz,1:2))
       allocate(Psiw(1:Prny,1:Prnz,1:2))
@@ -92,8 +98,8 @@ contains
       !$ tid = omp_get_thread_num()
       
       !$omp do collapse(2)
-      do k = -bigNz+1, Prnz+bigNz
-       do j = -bigNy+1, Prny+bigNy
+      do k = klo, kup
+       do j = jlo, jup
          call rng_norm(Ru(j,k,1), tid)
          call rng_norm(Rv(j,k,1), tid)
          call rng_norm(Rw(j,k,1), tid)
@@ -101,8 +107,8 @@ contains
       end do
 
       !$omp do collapse(2)
-      do k = -bigNz+1, Prnz+bigNz
-       do j = -bigNy+1, Prny+bigNy
+      do k = klo, kup
+       do j = jlo, jup
          call rng_norm(Ru(j,k,2), tid)
          call rng_norm(Rv(j,k,2), tid)
          call rng_norm(Rw(j,k,2), tid)
@@ -114,12 +120,12 @@ contains
 
       if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
         !$omp parallel workshare
-        forall(k = -bigNz+1:Prnz+bigNz,j = -bigNy+1:0)
+        forall(k = klo:kup,j = jlo:0)
            Ru(j,k,1:2) = Ru(j+Prny,k,1:2)
            Rv(j,k,1:2) = Rv(j+Prny,k,1:2)
            Rw(j,k,1:2) = Rw(j+Prny,k,1:2)
         end forall
-        forall(k = -bigNz+1:Prnz+bigNz,j = Prny+1:Prny+bigNy)
+        forall(k = klo:kup,j = Prny+1:jup)
            Ru(j,k,1:2) = Ru(j-Prny,k,1:2)
            Rv(j,k,1:2) = Rv(j-Prny,k,1:2)
            Rw(j,k,1:2) = Rw(j-Prny,k,1:2)
@@ -129,12 +135,12 @@ contains
 
       if  ((Btype(Bo)==PERIODIC).or.(Btype(To)==PERIODIC)) then
         !$omp parallel workshare
-        forall(k = -bigNz+1:0,j = -bigNy+1:Prny+bigNy)
+        forall(k = klo:0,j = jlo:jup)
            Ru(j,k,1:2) = Ru(j,k+Prnz,1:2)
            Rv(j,k,1:2) = Rv(j,k+Prnz,1:2)
            Rw(j,k,1:2) = Rw(j,k+Prnz,1:2)
         end forall
-        forall(k = Prnz+1:Prnz+bigNz,j = -bigNy+1:Prny+bigNy)
+        forall(k = Prnz+1:kup,j = jlo:jup)
            Ru(j,k,1:2) = Ru(j,k-Prnz,1:2)
            Rv(j,k,1:2) = Rv(j,k-Prnz,1:2)
            Rw(j,k,1:2) = Rw(j,k-Prnz,1:2)
@@ -145,11 +151,11 @@ contains
 #ifdef PAR
       do i=1,2
         call par_exchange_boundaries_yz(Ru(:,:,i), Prny, Prnz, Btype, &
-                                        -bigNy+1, -bigNz+1, bigNy, bigNz)
+                                        jlo, klo, bigNy, bigNz)
         call par_exchange_boundaries_yz(Rv(:,:,i), Prny, Prnz, Btype, &
-                                        -bigNy+1, -bigNz+1, bigNy, bigNz)
+                                        jlo, klo, bigNy, bigNz)
         call par_exchange_boundaries_yz(Rw(:,:,i), Prny, Prnz, Btype, &
-                                        -bigNy+1, -bigNz+1, bigNy, bigNz)
+                                        jlo, klo, bigNy, bigNz)
       end do
 #endif
 
@@ -199,6 +205,13 @@ contains
       called=.true.
 
    end if
+
+   jlo = -bigNy+1
+   jup = Prny+bigNy
+
+   klo = -bigNz+1
+   kup = Prnz+bigNz
+
 
    !$omp parallel do private(i,j,k,Ui,Vi,Wi)  
    do k = 1, Prnz
@@ -275,8 +288,8 @@ contains
    !$ tid = omp_get_thread_num()
    
    !$omp do collapse(2) 
-   do k = -bigNz+1, Prnz+bigNz
-    do j = -bigNy+1, Prny+bigNy
+   do k = klo, kup
+    do j = jlo, jup
       call rng_norm(Ru(j,k,2), tid)
       call rng_norm(Rv(j,k,2), tid)
       call rng_norm(Rw(j,k,2), tid)
@@ -285,9 +298,14 @@ contains
    !$omp end do
 
    if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
+     !workaround to a bug in Cray Fortran
+     !$omp single
+     i = Prny+1
+     !$omp end single
+
      !$omp do collapse(2)
-     do k = -bigNz+1, Prnz+bigNz
-       do j = -bigNy+1, 0
+     do k = klo, kup
+       do j = jlo, 0
          Ru(j,k,1:2) = Ru(j+Prny,k,1:2)
          Rv(j,k,1:2) = Rv(j+Prny,k,1:2)
          Rw(j,k,1:2) = Rw(j+Prny,k,1:2)
@@ -295,8 +313,8 @@ contains
      end do
      !$omp end do nowait
      !$omp do collapse(2)
-     do k = -bigNz+1, Prnz+bigNz
-       do j = Prny+1, Prny+bigNy
+     do k = klo, kup
+       do j = i, jup
          Ru(j,k,1:2) = Ru(j-Prny,k,1:2)
          Rv(j,k,1:2) = Rv(j-Prny,k,1:2)
          Rw(j,k,1:2) = Rw(j-Prny,k,1:2)
@@ -306,8 +324,8 @@ contains
    end if
    if  ((Btype(Bo)==PERIODIC).or.(Btype(To)==PERIODIC)) then
      !$omp do collapse(2)
-     do k = -bigNz+1, 0
-       do j = -bigNy+1, Prny+bigNy
+     do k = klo, 0
+       do j = jlo, jup
          Ru(j,k,1:2) = Ru(j,k+Prnz,1:2)
          Rv(j,k,1:2) = Rv(j,k+Prnz,1:2)
          Rw(j,k,1:2) = Rw(j,k+Prnz,1:2)
@@ -315,8 +333,8 @@ contains
      end do
      !$omp end do nowait
      !$omp do collapse(2)
-     do k = Prnz+1, Prnz+bigNz
-       do j = -bigNy+1, Prny+bigNy
+     do k = Prnz+1, kup
+       do j = jlo, jup
          Ru(j,k,1:2) = Ru(j,k-Prnz,1:2)
          Rv(j,k,1:2) = Rv(j,k-Prnz,1:2)
          Rw(j,k,1:2) = Rw(j,k-Prnz,1:2)
@@ -329,11 +347,11 @@ contains
 #ifdef PAR
    do i=1,2
      call par_exchange_boundaries_yz(Ru(:,:,i), Prny, Prnz, Btype, &
-                                     -bigNy+1, -bigNz+1, bigNy, bigNz)
+                                     jlo, klo, bigNy, bigNz)
      call par_exchange_boundaries_yz(Rv(:,:,i), Prny, Prnz, Btype, &
-                                     -bigNy+1, -bigNz+1, bigNy, bigNz)
+                                     jlo, klo, bigNy, bigNz)
      call par_exchange_boundaries_yz(Rw(:,:,i), Prny, Prnz, Btype, &
-                                     -bigNy+1, -bigNz+1, bigNy, bigNz)
+                                     jlo, klo, bigNy, bigNz)
    end do
 #endif
 
