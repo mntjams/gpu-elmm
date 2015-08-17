@@ -1279,7 +1279,7 @@ contains
       type(ScalarAreaSource), allocatable, intent(inout) :: a(:)
       type(ScalarAreaSource), intent(inout) :: e
       type(ScalarAreaSource), allocatable :: tmp(:)
-      integer :: n
+      integer :: i, n
 
       if (.not.allocated(a)) then
         a = [e]
@@ -1288,12 +1288,14 @@ contains
         call move_alloc(a,tmp)
         allocate(a(n+1))
 
-        call assign(a(1:n), tmp)
+        do i = 1, n
+          call assign(a(i), tmp(i))
+        end do
         call assign(a(n+1), e)
       end if
     end subroutine
     
-    elemental subroutine assign(l, r)
+    subroutine assign(l, r)
       type(ScalarAreaSource), intent(out) :: l
       type(ScalarAreaSource), intent(inout) :: r
       l%flux = r%flux
