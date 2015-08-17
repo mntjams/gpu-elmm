@@ -6,6 +6,7 @@
 *.o
 *.bak
 *.hmg
+*.i
 .make.*
 bin/*
 *.dblite
