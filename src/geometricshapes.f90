@@ -2209,10 +2209,10 @@ contains
       call self%items(i)%Closest(xs(i),ys(i),zs(i),x,y,z)
     end do
     
-    associate (j => minloc(hypot(xs,hypot(ys,zs))))
-      xnear = xs(j(1))
-      ynear = ys(j(1))
-      znear = zs(j(1))
+    associate (j => minloc(hypot(xs,hypot(ys,zs)), dim=1))
+      xnear = xs(j)
+      ynear = ys(j)
+      znear = zs(j)
     end associate
   end subroutine
   
@@ -2227,10 +2227,10 @@ contains
       call self%items(i)%Closest(xs(i),ys(i),zs(i),x,y,z)
     end do
     
-    associate (j => minloc(hypot(xs,hypot(ys,zs))))
-      xnear = xs(j(1))
-      ynear = ys(j(1))
-      znear = zs(j(1))
+    associate (j => minloc(hypot(xs,hypot(ys,zs)), dim=1))
+      xnear = xs(j)
+      ynear = ys(j)
+      znear = zs(j)
     end associate
   end subroutine  
   
@@ -2414,15 +2414,16 @@ contains
     
     contains
     
-      subroutine empty_lines(line, sub)
+      subroutine empty_lines(line)
         character(*), intent(out) :: line
-        interface
-          subroutine sub
-          end subroutine
-        end interface
+
         do
           read (unit, '(a)', iostat=io) line
-          if (io/=0) call npoints_error
+          if (io/=0) then
+            write (*,*) "Error reading from file ", filename
+            call error_stop
+          end if
+
           if (len_trim(line)>0) exit
         end do
       end subroutine
@@ -2439,7 +2440,7 @@ contains
       end subroutine
       
       subroutine read_npoints
-        call empty_lines(line, npoints_error)
+        call empty_lines(line)
         call read_npoints_str(line)
         call read_npoints_num(line)
       end subroutine
@@ -2448,8 +2449,8 @@ contains
         character(*), intent(inout) :: line
         line = adjustl(line)
         if (.not.upcase(line(1:7))=='POINTS:') then
-          write (*,*) "Error reading points header in file", filename
-          write (*,*) "Expected 'POINTS:', found:", trim(line)
+          write (*,*) "Error reading points header in file ", filename
+          write (*,*) "Expected 'POINTS:', found: ", trim(line)
           call error_stop
         end if
         line = line(8:)
@@ -2464,7 +2465,7 @@ contains
       end subroutine
       
       subroutine npoints_error
-        write (*,*) "Error reading points header in file", filename
+        write (*,*) "Error reading points header in file ", filename
         call error_stop
       end subroutine
 
@@ -2479,7 +2480,7 @@ contains
       end subroutine
 
       subroutine point_error
-        write (*,*) "Error reading point ",ipoint,"in file", filename
+        write (*,*) "Error reading point ",ipoint,"in file ", filename
         call error_stop
       end subroutine
 
@@ -2511,8 +2512,8 @@ contains
         line = adjustl(line)
         if (.not.upcase(line(1:12))=='POLYHEDRONS:' .and. &
             .not.upcase(line(1:10))=='POLYHEDRA:') then
-          write (*,*) "Error reading polyhedra header in file", filename
-          write (*,*) "Expected 'POLYHEDRA:', found:", trim(line)
+          write (*,*) "Error reading polyhedra header in file ", filename
+          write (*,*) "Expected 'POLYHEDRA:', found: ", trim(line)
           call error_stop
         end if
         ind = index(line(1:12),':')
@@ -2528,7 +2529,7 @@ contains
       end subroutine
       
       subroutine npolyhedra_error
-        write (*,*) "Error reading polyhedra header in file", filename
+        write (*,*) "Error reading polyhedra header in file ", filename
         call error_stop
       end subroutine
 
@@ -2536,7 +2537,7 @@ contains
         type(ConvexPolyhedron), intent(out) :: poly
         type(Plane), allocatable :: planes(:)
 
-        call empty_lines(line, polyhedron_error)
+        call empty_lines(line)
         
         do
           call read_plane(planes, io)
@@ -2549,7 +2550,7 @@ contains
       end subroutine
 
       subroutine polyhedron_error
-        write (*,*) "Error reading polyhedron ",ipolyhedron,"in file", filename
+        write (*,*) "Error reading polyhedron ",ipolyhedron,"in file ", filename
         call error_stop
       end subroutine
       
