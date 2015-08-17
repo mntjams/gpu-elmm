@@ -188,10 +188,25 @@ contains
   subroutine par_init
     use Kinds
     use iso_c_binding
+
     integer :: ie
+    integer :: required, provided
+
+    required = MPI_THREAD_FUNNELED
   
-    call MPI_Init(ie)
+    call MPI_Init_thread(required, provided, ie)
     if (ie/=0) call error_stop("Error in MPI_Init")
+
+    if (provided<required) then
+      write(*,*) "------------------------------"
+      write(*,*) "Error, the provided MPI threading support smaller than required!"
+      write(*,*) "required:", required
+      write(*,*) "provided:", provided
+      write(*,*) "Trying to continue anyway, but a crash is likely and the results will be questionable."
+      write(*,*) "------------------------------"
+
+      call par_sync_all()
+    end if
     
     if (knd == kind(1.)) then
       MPI_knd = MPI_REAL
