@@ -2,9 +2,16 @@ module custom_mpi
   use mpi
   use Kinds
 
-  integer :: MPI_knd = -huge(1), MPI_real32 = -huge(1), MPI_real64 = -huge(1)
-  real(real32), pointer :: MPI_IN_PLACE_real32(:)
-  real(real64), pointer :: MPI_IN_PLACE_real64(:)
+  integer, parameter :: MPI_real32 = MPI_REAL4, MPI_real64 = MPI_REAL8
+
+#ifdef DPREC
+  integer, parameter :: MPI_knd = MPI_real64
+#else
+  integer, parameter :: MPI_knd = MPI_real32
+#endif
+
+  real(real32), pointer, contiguous :: MPI_IN_PLACE_real32(:)
+  real(real64), pointer, contiguous :: MPI_IN_PLACE_real64(:)
 
 end module
 
@@ -206,28 +213,6 @@ contains
       write(*,*) "------------------------------"
 
       call par_sync_all()
-    end if
-    
-    if (knd == kind(1.)) then
-      MPI_knd = MPI_REAL
-    else if (knd == kind(1.D0)) then
-      MPI_knd = MPI_DOUBLE_PRECISION
-    end if
-    
-    if (real32 == kind(1.)) then
-      MPI_real32 = MPI_REAL
-    else if (real32 == kind(1.D0)) then
-      MPI_real32 = MPI_DOUBLE_PRECISION
-    else
-      call error_stop("Unknown MPI_Type for real32.")
-    end if
-    
-    if (real64 == kind(1.)) then
-      MPI_real64 = MPI_REAL
-    else if (real64 == kind(1.D0)) then
-      MPI_real64= MPI_DOUBLE_PRECISION
-    else
-      call error_stop("Unknown MPI_Type for real64.")
     end if
 
     call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real32, [1])
