@@ -41,32 +41,34 @@ else:
   
 c_check_flag = ''
 
+def compiler_executables():
+  try:
+    fc = os.environ['FC']
+    if len(fc)>0:
+      env.Replace(F90 = fc, FORTRAN = fc)
+  except KeyError:
+    pass
 
-try:
-  fc = os.environ['FC']
-  if len(fc)>0:
-    env.Replace(F90 = fc, FORTRAN = fc)
-except:
-  pass
+  try:
+    cc = os.environ['CC']
+    if len(fc)>0:
+      env.Replace(CC = cc)
+  except KeyError:
+    pass
 
-try:
-  cc = os.environ['CC']
-  if len(fc)>0:
-    env.Replace(CC = cc)
-except:
-  pass
-
-try:
-  cxx = os.environ['CXX']
-  if len(cxx)>0:
-    env.Replace(CXX = cxx)
-except:
-  pass
+  try:
+    cxx = os.environ['CXX']
+    if len(cxx)>0:
+      env.Replace(CXX = cxx)
+  except KeyError:
+    pass
 
 
 
 if str(comp)=='intel':
   env = Environment(tools=['default','ifort','intelc'])
+  
+  compiler_executables()
   
   if str(openmp)!='no':
     openmp_flag = ' -openmp -recursive'
@@ -93,8 +95,49 @@ if str(comp)=='intel':
     env.Append(F90FLAGS=' -diag-enable sc1 -diag-enable sc-precise')
     env.Append(LINKFLAGS=' -diag-enable sc1 -diag-enable sc-precise')
    
+elif str(comp)=='cray':
+  env = Environment(CC='cc', CXX='CC', F90='ftn', FORTRAN='ftn', LINK='ftn')
+  
+  compiler_executables()
+  
+  import SCons.Tool
+  import SCons.Defaults
+
+  static_obj, shared_obj = SCons.Tool.createObjBuilders(env)
+  static_obj.add_action('.cc', SCons.Defaults.CXXAction)
+  static_obj.add_emitter('.cc', SCons.Defaults.StaticObjectEmitter)
+  shared_obj.add_emitter('.cc', SCons.Defaults.SharedObjectEmitter)
+     
+  if str(openmp)!='no':
+    openmp_flag = ' -O omp -e R'
+  else:
+    openmp_flag = ' -O noomp -e R'
+
+  if str(fast)=='yes':
+   fast_flag = ' -O3'
+   check_flag = ''
+  else:
+   fast_flag = ' -O3'
+   check_flag = ' -G2 -m 3 -R bdps'
+   
+  if mpi=='yes':
+    fast_flag += ' -h mpi1'
+
+  if str(lto)=='yes':
+    lto_flag = ' -h wp -h pl=' + target_dir + 'ipa'
+  else:
+    lto_flag = ''
+
+  env.Append(F90FLAGS='-e Z')
+
+  env.Append(F90PATH = [target_dir,target_dir+'/P/'])
+
+  env.Append(FORTRANMODDIRPREFIX = '-J')
+   
 else:
   env = Environment()
+  
+  compiler_executables()
  
   if str(openmp)!='no':
     openmp_flag = ' -fopenmp'
@@ -116,8 +159,6 @@ else:
     lto_flag = ' -flto'
   else:
     lto_flag = ''
-
-  env.Replace(F90='gfortran')
   
   env.Append(F90FLAGS='-cpp')
 
@@ -146,8 +187,19 @@ from_env('INTEL_LICENSE_FILE')
 #HACK for some computers setting only LD_LIBRARY_PATH
 try:
   env.Append(ENV = {'LIBRARY_PATH' : os.environ['LD_LIBRARY_PATH']})
-except:
+except KeyError:
   pass
+ 
+if comp=='cray':
+  try:
+    env.Append(F90PATH = env['ENV']['CPATH'])
+  except KeyError:
+    pass
+  try:
+    env.Append(LIBPATH = env['ENV']['LIBRARY_PATH'])
+  except KeyError:
+    pass
+
 
 env.Replace(LINK = env.Dump('F90'))
 
@@ -298,15 +350,15 @@ objs += env.Object(target=target_dir+'linesources',    source='linesources.f90')
 objs += env.Object(target=target_dir+'pointsources',   source='pointsources.f90')
 objs += env.Object(target=target_dir+'puffs',          source='puffs.f90')
 
-if cgal=='no':
-  #Disable support for CGAL. Useful for enabling valgrind.
-  objs += env.Object(target=target_dir+'dummy_cgal_polyhedra',  source='dummy_cgal_polyhedra.f90')
-else:
+if cgal=='yes':
   #Support for CGAL for geometry files reading.
   objs += env.Object(target=target_dir+'cgal_polyhedra_cc',  source='cgal_polyhedra.cc', CXXFLAGS = env['CXXFLAGS'] + '-O3 -std=c++11 -frounding-math')
   objs += env.Object(target=target_dir+'cgal_polyhedra',  source='cgal_polyhedra.f90')
   Depends(objs[-1], 'cgal_polyhedra.cc')
   env.Append(LIBS = ['CGAL','boost_thread','boost_system'])
+else:
+  #Disable support for CGAL. Useful for enabling valgrind.
+  objs += env.Object(target=target_dir+'dummy_cgal_polyhedra',  source='dummy_cgal_polyhedra.f90')
   
 
 
