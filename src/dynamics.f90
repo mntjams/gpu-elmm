@@ -177,7 +177,7 @@ contains
                         Ustar, Vstar, Wstar, &
                         Temperature, Moisture, &
                         beta, rho, RK_stage, dt)
-    use CDS
+    use MomentumAdvection
     use VolumeSources, only: ResistanceForce
     use VTKArray
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: U, V, W
