@@ -2575,7 +2575,7 @@ contains
     call par_sync_out("  ...initializing subsidence profile.")
     call InitSubsidenceProfile
 
-    call par_sync_out("  ...initializing thread tiles.")
+    call par_sync_out("  ...initializing loop tiles.")
     call InitTiles(Prnx,Prny,Prnz)
 
     if (enable_radiation) then
