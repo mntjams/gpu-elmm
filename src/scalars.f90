@@ -747,7 +747,7 @@ contains
 
       !initital value using forward Euler
       if (gridtype==uniformgrid) then
-        !$omp do schedule(runtime) !collapse(3)
+        !$omp do schedule(runtime) collapse(3)
         do bk = 1, Prnz, tilenz(narr)
          do bj = 1, Prny, tileny(narr)
           do bi = 1, Prnx, tilenx(narr)
@@ -776,7 +776,7 @@ contains
         end do
         !$omp end do
       else
-        !$omp do schedule(runtime) !collapse(3)
+        !$omp do schedule(runtime) collapse(3)
         do bk = 1, Prnz, tilenz(narr)
          do bj = 1, Prny, tileny(narr)
           do bi = 1, Prnx, tilenx(narr)
@@ -814,7 +814,7 @@ contains
 
       !$omp parallel private(i,j,k,bi,bj,bk)
       if (gridtype==uniformgrid) then
-       !$omp do schedule(runtime) !collapse(3)
+       !$omp do schedule(runtime) collapse(3)
        do bk = 1, Prnz, tilenz(narr)
         do bj = 1, Prny, tileny(narr)
          do bi = 1, Prnx, tilenx(narr)
@@ -837,7 +837,7 @@ contains
 
      else
 
-       !$omp do schedule(runtime) !collapse(3)
+       !$omp do schedule(runtime) collapse(3)
        do bk = 1, Prnz, tilenz(narr)
         do bj = 1, Prny, tileny(narr)
          do bi = 1, Prnx, tilenx(narr)
@@ -867,7 +867,7 @@ contains
 
        if (gridtype==uniformgrid) then
         !$omp parallel private(i,j,k,p) reduction(max:S)
-        !$omp do schedule(runtime) !collapse(3)
+        !$omp do schedule(runtime) collapse(3)
         do bk = 1, Prnz, tilenz(narr2)
          do bj = 1, Prny, tileny(narr2)
           do bi = 1, Prnx, tilenx(narr2)
@@ -894,7 +894,7 @@ contains
          end do
         end do
         !$omp end do
-        !$omp do schedule(runtime) !collapse(3)
+        !$omp do schedule(runtime) collapse(3)
         do bk = 1, Prnz, tilenz(narr2)
          do bj = 1, Prny, tileny(narr2)
           do bi = 1, Prnx, tilenx(narr2)
@@ -924,7 +924,7 @@ contains
         !$omp endparallel
        else
         !$omp parallel private(i,j,k,p) reduction(max:S)
-        !$omp do schedule(runtime) !collapse(3)
+        !$omp do schedule(runtime) collapse(3)
         do bk = 1, Prnz, tilenz(narr2)
          do bj = 1, Prny, tileny(narr2)
           do bi = 1, Prnx, tilenx(narr2)
@@ -949,7 +949,7 @@ contains
          end do
         end do
         !$omp end do
-        !$omp do schedule(runtime) !collapse(3)
+        !$omp do schedule(runtime) collapse(3)
         do bk = 1, Prnz, tilenz(narr2)
          do bj = 1, Prny, tileny(narr2)
           do bi = 1, Prnx, tilenx(narr2)
@@ -1017,7 +1017,7 @@ contains
     Ay = 1 / (2 * dymin**2)
     Az = 1 / (2 * dzmin**2)
 
-   !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) !collapse(3)
+   !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
     do bk = 1, Prnz, tilenz(narr)
      do bj = 1, Prny, tileny(narr)
       do bi = 1, Prnx, tilenx(narr)

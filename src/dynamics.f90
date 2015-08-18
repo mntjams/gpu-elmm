@@ -625,7 +625,7 @@ contains
     recdzmin2 = 1._knd / dzmin**2
 
     !$omp parallel private(i,j,k,bi,bj,bk)
-    !$omp do schedule(runtime) !collapse(3)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Unz, tilenz(narr)
      do bj = 1, Uny, tileny(narr)
       do bi = 1, Unx, tilenx(narr)
@@ -664,7 +664,7 @@ contains
 #undef comp
 
 
-    !$omp do schedule(runtime) !collapse(3)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Vnz, tilenz(narr)
      do bj = 1, Vny, tileny(narr)
       do bi = 1, Vnx, tilenx(narr)
@@ -703,7 +703,7 @@ contains
 #undef comp
 
 
-    !$omp do schedule(runtime) !collapse(3)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Wnz, tilenz(narr)
      do bj = 1, Wny, tileny(narr)
       do bi = 1, Wnx, tilenx(narr)
@@ -965,7 +965,7 @@ contains
     !$omp parallel private(i,j,k,bi,bj,bk)
 
     !The explicit part, which doesn't have to be changed inside the loop
-    !$omp do schedule(runtime) !collapse(3)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Unz, tilenz(narr)
      do bj = 1, Uny, tileny(narr)
       do bi = 1, Unx, tilenx(narr)
@@ -1001,7 +1001,7 @@ contains
 #define comp 1
 #include "wmfluxes-inc.f90"
 #undef comp
-    !$omp do schedule(runtime) !collapse(3)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Unz, tilenz(narr)
      do bj = 1, Uny, tileny(narr)
       do bi = 1, Unx, tilenx(narr)
@@ -1016,7 +1016,7 @@ contains
      end do
     end do
     !$omp end do nowait
-    !$omp do schedule(runtime) !collapse(3)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Vnz, tilenz(narr)
      do bj = 1, Vny, tileny(narr)
       do bi = 1, Vnx, tilenx(narr)
@@ -1052,7 +1052,7 @@ contains
 #define comp 2
 #include "wmfluxes-inc.f90"
 #undef comp
-    !$omp do schedule(runtime) !collapse(3)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Vnz, tilenz(narr)
      do bj = 1, Vny, tileny(narr)
       do bi = 1, Vnx, tilenx(narr)
@@ -1067,7 +1067,7 @@ contains
      end do
     end do
     !$omp end do
-    !$omp do schedule(runtime) !collapse(3)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Wnz, tilenz(narr)
      do bj = 1, Wny, tileny(narr)
       do bi = 1, Wnx, tilenx(narr)
@@ -1120,7 +1120,7 @@ contains
     !$omp end do
 
     !Auxiliary coefficients to better efficiency in loops
-    !$omp do schedule(runtime) !collapse(3)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Unz, tilenz(narr)
      do bj = 1, Uny, tileny(narr)
       do bi = 1, Unx, tilenx(narr)
@@ -1160,7 +1160,7 @@ contains
     call reciprocal(ApU, 1._knd)
 
     !$omp parallel private(i,j,k,bi,bj,bk)
-    !$omp do schedule(runtime) !collapse(3)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Vnz, tilenz(narr)
      do bj = 1, Vny, tileny(narr)
       do bi = 1, Vnx, tilenx(narr)
@@ -1200,7 +1200,7 @@ contains
     call reciprocal(ApV, 1._knd)
 
     !$omp parallel private(i,j,k,bi,bj,bk,Suavg,Svavg,Swavg)
-    !$omp do schedule(runtime) !collapse(3)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Wnz, tilenz(narr)
      do bj = 1, Wny, tileny(narr)
       do bi = 1, Wnx, tilenx(narr)
@@ -1251,7 +1251,7 @@ contains
       Sv = 0
       Sw = 0
       !$omp parallel private(i,j,k,bi,bj,bk,p) reduction(max:Su,Sv,Sw)
-      !$omp do schedule(runtime) !collapse(3)
+      !$omp do schedule(runtime) collapse(3)
       do bk = 1, Unz, tilenz(narr2)
        do bj = 1, Uny, tileny(narr2)
         do bi = 1, Unx, tilenx(narr2)
@@ -1289,7 +1289,7 @@ contains
 #define comp 1
 #include "wmfluxes-inc.f90"
 #undef comp
-      !$omp do schedule(runtime) !collapse(3)
+      !$omp do schedule(runtime) collapse(3)
       do bk = 1, Unz, tilenz(narr2)
        do bj = 1, Uny, tileny(narr2)
         do bi = 1, Unx, tilenx(narr2)
@@ -1310,7 +1310,7 @@ contains
       end do
       !$omp end do
 
-      !$omp do schedule(runtime) !collapse(3)
+      !$omp do schedule(runtime) collapse(3)
       do bk = 1, Vnz, tilenz(narr2)
        do bj = 1, Vny, tileny(narr2)
         do bi = 1, Vnx, tilenx(narr2)
@@ -1348,7 +1348,7 @@ contains
 #define comp 2
 #include "wmfluxes-inc.f90"
 #undef comp
-      !$omp do schedule(runtime) !collapse(3)
+      !$omp do schedule(runtime) collapse(3)
       do bk = 1, Vnz, tilenz(narr2)
        do bj = 1, Vny, tileny(narr2)
         do bi = 1, Vnx, tilenx(narr2)
@@ -1369,7 +1369,7 @@ contains
       end do
       !$omp end do
          
-      !$omp do schedule(runtime) !collapse(3)
+      !$omp do schedule(runtime) collapse(3)
       do bk = 1, Wnz, tilenz(narr2)
        do bj = 1, Wny, tileny(narr2)
         do bi = 1, Wnx, tilenx(narr2)
@@ -1407,7 +1407,7 @@ contains
 #define comp 3
 #include "wmfluxes-inc.f90"
 #undef comp
-      !$omp do schedule(runtime) !collapse(3)
+      !$omp do schedule(runtime) collapse(3)
       do bk = 1, Wnz, tilenz(narr2)
        do bj = 1, Wny, tileny(narr2)
         do bi = 1, Wnx, tilenx(narr2)
@@ -1429,7 +1429,7 @@ contains
       !$omp end do
 
 
-      !$omp do schedule(runtime) !collapse(3)
+      !$omp do schedule(runtime) collapse(3)
       do bk = 1, Unz, tilenz(narr2)
        do bj = 1, Uny, tileny(narr2)
         do bi = 1, Unx, tilenx(narr2)
@@ -1467,7 +1467,7 @@ contains
 #define comp 1
 #include "wmfluxes-inc.f90"
 #undef comp
-      !$omp do schedule(runtime) !collapse(3)
+      !$omp do schedule(runtime) collapse(3)
       do bk = 1, Unz, tilenz(narr2)
        do bj = 1, Uny, tileny(narr2)
         do bi = 1, Unx, tilenx(narr2)
@@ -1488,7 +1488,7 @@ contains
       end do
       !$omp end do
          
-      !$omp do schedule(runtime) !collapse(3)
+      !$omp do schedule(runtime) collapse(3)
       do bk = 1, Vnz, tilenz(narr2)
        do bj = 1, Vny, tileny(narr2)
         do bi = 1, Vnx, tilenx(narr2)
@@ -1526,7 +1526,7 @@ contains
 #define comp 2
 #include "wmfluxes-inc.f90"
 #undef comp
-      !$omp do schedule(runtime) !collapse(3)
+      !$omp do schedule(runtime) collapse(3)
       do bk = 1, Vnz, tilenz(narr2)
        do bj = 1, Vny, tileny(narr2)
         do bi = 1, Vnx, tilenx(narr2)
@@ -1547,7 +1547,7 @@ contains
       end do
       !$omp end do
          
-      !$omp do schedule(runtime) !collapse(3)
+      !$omp do schedule(runtime) collapse(3)
       do bk = 1, Wnz, tilenz(narr2)
        do bj = 1, Wny, tileny(narr2)
         do bi = 1, Wnx, tilenx(narr2)
@@ -1585,7 +1585,7 @@ contains
 #define comp 3
 #include "wmfluxes-inc.f90"
 #undef comp
-      !$omp do schedule(runtime) !collapse(3)
+      !$omp do schedule(runtime) collapse(3)
       do bk = 1, Wnz, tilenz(narr2)
        do bj = 1, Wny, tileny(narr2)
         do bi = 1, Wnx, tilenx(narr2)
