@@ -12,20 +12,20 @@ contains
 
 
 
-  subroutine CDUdiv(U2,U,V,W)
-    real(knd),contiguous,intent(out) :: U2(-2:,-2:,-2:)
-    real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(knd) :: Ax,Ay,Az
-    integer :: i,j,k
+  subroutine CDUdiv(U2, U, V, W)
+    real(knd), contiguous, intent(out) :: U2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    real(knd) :: Ax, Ay, Az
+    integer :: i, j, k
 
     Ax = 0.25_knd / dxmin
     Ay = 0.25_knd / dymin
     Az = 0.25_knd / dzmin
 
-    !$omp parallel do private(i,j,k)
-    do k=1,Unz
-        do j=1,Uny
-            do i=1,Unx
+    !$omp parallel do private(i, j, k)
+    do k=1, Unz
+        do j=1, Uny
+            do i=1, Unx
                 U2(i,j,k)= - ((Ax*(U(i+1,j,k) + U(i,j,k)) * (U(i+1,j,k) + U(i,j,k)) &
                              - Ax*(U(i,j,k) + U(i-1,j,k)) * (U(i,j,k) + U(i-1,j,k))) &
                             + (Ay*(U(i,j+1,k) + U(i,j,k)) * (V(i+1,j,k) + V(i,j,k)) &
@@ -43,20 +43,20 @@ contains
 
 
 
-  subroutine CDVdiv(V2,U,V,W)
-    real(knd),contiguous,intent(out) :: V2(-2:,-2:,-2:)
-    real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(knd) :: Ax,Ay,Az
-    integer :: i,j,k
+  subroutine CDVdiv(V2, U, V, W)
+    real(knd), contiguous, intent(out) :: V2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    real(knd) :: Ax, Ay, Az
+    integer :: i, j, k
 
     Ax = 0.25_knd / dxmin
     Ay = 0.25_knd / dymin
     Az = 0.25_knd / dzmin
 
-    !$omp parallel do private(i,j,k)
-    do k=1,Vnz
-        do j=1,Vny
-            do i=1,Vnx
+    !$omp parallel do private(i, j, k)
+    do k=1, Vnz
+        do j=1, Vny
+            do i=1, Vnx
                 V2(i,j,k)= - ((Ay*(V(i,j+1,k) + V(i,j,k)) * (V(i,j+1,k) + V(i,j,k)) &
                               -Ay*(V(i,j,k) + V(i,j-1,k)) * (V(i,j,k) + V(i,j-1,k))) &
                              +(Ax*(V(i+1,j,k) + V(i,j,k)) * (U(i,j+1,k) + U(i,j,k)) &
@@ -73,20 +73,20 @@ contains
 
 
 
-  subroutine CDWdiv(W2,U,V,W)
-    real(knd),contiguous,intent(out) :: W2(-2:,-2:,-2:)
-    real(knd),contiguous,intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(knd) :: Ax,Ay,Az
-    integer  :: i,j,k
+  subroutine CDWdiv(W2, U, V, W)
+    real(knd), contiguous, intent(out) :: W2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    real(knd) :: Ax, Ay, Az
+    integer  :: i, j, k
 
     Ax = 0.25_knd / dxmin
     Ay = 0.25_knd / dymin
     Az = 0.25_knd / dzmin
 
-    !$omp parallel do private(i,j,k)
-    do k=1,Wnz
-        do j=1,Wny
-            do i=1,Wnx
+    !$omp parallel do private(i, j, k)
+    do k=1, Wnz
+        do j=1, Wny
+            do i=1, Wnx
                 W2(i,j,k)= - ((Az*(W(i,j,k+1) + W(i,j,k)) * (W(i,j,k+1) + W(i,j,k)) &
                              - Az*(W(i,j,k) + W(i,j,k-1)) * (W(i,j,k) + W(i,j,k-1))) &
                             + (Ay*(W(i,j+1,k) + W(i,j,k)) * (V(i,j,k+1) + V(i,j,k)) &
@@ -109,11 +109,11 @@ contains
 
 
 
-  subroutine CDUadv(U2,U,V,W)
-  real(knd),contiguous,intent(out) :: U2(-2:,-2:,-2:)
-  real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-  integer i,j,k
-  real(knd) Ax,Ay,Az,Vadv,Wadv
+  subroutine CDUadv(U2, U, V, W)
+  real(knd), contiguous, intent(out) :: U2(-2:,-2:,-2:)
+  real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+  integer i, j, k
+  real(knd) Ax, Ay, Az, Vadv, Wadv
 
 
    if (gridtype==UNIFORMGRID) then
@@ -121,10 +121,10 @@ contains
       Ay=0.125/dymin
       Az=0.125/dzmin
 
-      !$omp parallel do private(i,j,k,Vadv,Wadv)
-      do k=1,Unz
-          do j=1,Uny
-              do i=1,Unx
+      !$omp parallel do private(i, j, k, Vadv, Wadv)
+      do k=1, Unz
+          do j=1, Uny
+              do i=1, Unx
                   Vadv = ( V(i,j,k) + V(i+1,j,k) + V(i,j-1,k) + V(i+1,j-1,k) )
                   Wadv = ( W(i,j,k) + W(i+1,j,k) + W(i,j,k-1) + W(i+1,j,k-1) )
                   U2(i,j,k)= U2(i,j,k) &
@@ -143,11 +143,11 @@ contains
 
 
 
-  subroutine CDVadv(V2,U,V,W)
-  real(knd),contiguous,intent(out) :: V2(-2:,-2:,-2:)
-  real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-  integer i,j,k
-  real(knd) Ax,Ay,Az,Uadv,Wadv
+  subroutine CDVadv(V2, U, V, W)
+  real(knd), contiguous, intent(out) :: V2(-2:,-2:,-2:)
+  real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+  integer i, j, k
+  real(knd) Ax, Ay, Az, Uadv, Wadv
 
 
    if (gridtype==UNIFORMGRID) then
@@ -155,10 +155,10 @@ contains
       Ay=0.5/dymin
       Az=0.125/dzmin
 
-      !$omp parallel do private(i,j,k,Uadv,Wadv)
-      do k=1,Vnz
-          do j=1,Vny
-              do i=1,Vnx
+      !$omp parallel do private(i, j, k, Uadv, Wadv)
+      do k=1, Vnz
+          do j=1, Vny
+              do i=1, Vnx
                   Uadv = ( U(i,j,k) + U(i,j+1,k) + U(i-1,j,k) + U(i-1,j+1,k) )
                   Wadv = ( W(i,j,k) + W(i,j+1,k) + W(i,j,k-1) + W(i,j+1,k-1) )
                   V2(i,j,k)= V2(i,j,k) &
@@ -177,11 +177,11 @@ contains
 
 
 
-  subroutine CDWadv(W2,U,V,W)
-  real(knd),contiguous,intent(out) :: W2(-2:,-2:,-2:)
-  real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-  integer i,j,k
-  real(knd) Ax,Ay,Az,Uadv,Vadv
+  subroutine CDWadv(W2, U, V, W)
+  real(knd), contiguous, intent(out) :: W2(-2:,-2:,-2:)
+  real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+  integer i, j, k
+  real(knd) Ax, Ay, Az, Uadv, Vadv
 
 
    if (gridtype==UNIFORMGRID) then
@@ -189,10 +189,10 @@ contains
       Ay=0.125/dymin
       Az=0.5/dzmin
 
-      !$omp parallel do private(i,j,k,Uadv,Vadv)
-      do k=1,Wnz
-          do j=1,Wny
-              do i=1,Wnx
+      !$omp parallel do private(i, j, k, Uadv, Vadv)
+      do k=1, Wnz
+          do j=1, Wny
+              do i=1, Wnx
                   Uadv = ( U(i,j,k) + U(i,j,k+1) + U(i-1,j,k) + U(i-1,j,k+1) )
                   Vadv = ( V(i,j,k) + V(i,j,k+1) + V(i,j-1,k) + V(i,j-1,k+1) )
                   W2(i,j,k)= W2(i,j,k) &
@@ -221,13 +221,13 @@ contains
 
 
 
-  subroutine CDU(U2,U,V,W)
-  real(knd),contiguous,intent(out) :: U2(-2:,-2:,-2:)
-  real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  subroutine CDU(U2, U, V, W)
+  real(knd), contiguous, intent(out) :: U2(-2:,-2:,-2:)
+  real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
 
    U2 = 0
-   call CDUdiv(U2,U,V,W)
-   call CDUadv(U2,U,V,W)
+   call CDUdiv(U2, U, V, W)
+   call CDUadv(U2, U, V, W)
    U2 = U2 / 2
   end subroutine CDU
 
@@ -236,13 +236,13 @@ contains
 
 
 
-  subroutine CDV(V2,U,V,W)
-  real(knd),contiguous,intent(out) :: V2(-2:,-2:,-2:)
-  real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  subroutine CDV(V2, U, V, W)
+  real(knd), contiguous, intent(out) :: V2(-2:,-2:,-2:)
+  real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
 
    V2 = 0
-   call CDVdiv(V2,U,V,W)
-   call CDVadv(V2,U,V,W)
+   call CDVdiv(V2, U, V, W)
+   call CDVadv(V2, U, V, W)
    V2 = V2 / 2
 
   end subroutine CDV
@@ -251,13 +251,13 @@ contains
 
 
 
-  subroutine CDW(W2,U,V,W)
-  real(knd),contiguous,intent(out) :: W2(-2:,-2:,-2:)
-  real(knd),contiguous,intent(in)  :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+  subroutine CDW(W2, U, V, W)
+  real(knd), contiguous, intent(out) :: W2(-2:,-2:,-2:)
+  real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
 
    W2 = 0
-   call CDWdiv(W2,U,V,W)
-   call CDWadv(W2,U,V,W)
+   call CDWdiv(W2, U, V, W)
+   call CDWadv(W2, U, V, W)
    W2 = W2 / 2
 
   end subroutine CDW
@@ -277,24 +277,24 @@ contains
 
 
 
-  subroutine CDS4U(U2,U,V,W)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: U2
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
-    integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
-    integer,parameter :: divcoef = 256
-    integer,parameter :: mask2(2) = [ 8, 8 ]
-    integer   :: i,j,k,l
+  subroutine CDS4U(U2, U, V, W)
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(out) :: U2
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)  :: U, V, W
+    integer, parameter :: mask4(4) = [ -1, 9, 9, -1 ]
+    integer, parameter :: divcoef = 256
+    integer, parameter :: mask2(2) = [ 8, 8 ]
+    integer   :: i, j, k, l
     real(knd) :: flux
 
-    !$omp parallel private(i,j,k,l,flux)
+    !$omp parallel private(i, j, k, l, flux)
     !$omp workshare
     U2 = 0
     !$omp end workshare
 
     !$omp do
-    do k=1,Unz
-      do j=1,Uny
-        do i=1,Unx+1
+    do k=1, Unz
+      do j=1, Uny
+        do i=1, Unx+1
           if (Utype(i-1,j,k)<=0 .and. Utype(i,j,k)<=0) then
 
             flux = ( ( sum(mask4 * U(i-2:i+1,j,k)) )**2 ) / dxmin
@@ -314,9 +314,9 @@ contains
     !$omp end do
 
     !$omp do
-    do k=1,Unz
-      do j=1,Uny+1
-        do i=1,Unx
+    do k=1, Unz
+      do j=1, Uny+1
+        do i=1, Unx
           if (Utype(i,j-1,k)<=0 .and. Utype(i,j,k)<=0) then
 
             flux = ( sum(mask4 * U(i,j-2:j+1,k)) * sum(mask4 * V(i-1:i+2,j-1,k)) ) / dymin
@@ -335,11 +335,11 @@ contains
     end do
     !$omp end do
 
-    do l=1,2
+    do l=1, 2
       !$omp do
-      do k=l,Unz+1,2
-        do j=1,Uny
-          do i=1,Unx
+      do k=l, Unz+1, 2
+        do j=1, Uny
+          do i=1, Unx
             if (Utype(i,j,k-1)<=0 .and. Utype(i,j,k)<=0) then
 
                 flux = ( sum(mask4 * U(i,j,k-2:k+1))) * sum(mask4 * W(i-1:i+2,j,k-1)) / dzmin
@@ -367,24 +367,24 @@ contains
   end subroutine CDS4U
 
 
-  subroutine CDS4V(V2,U,V,W)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: V2
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
-    integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
-    integer,parameter :: divcoef = 256
-    integer,parameter :: mask2(2) = [ 8, 8 ]
-    integer   :: i,j,k,l
+  subroutine CDS4V(V2, U, V, W)
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(out) :: V2
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)  :: U, V, W
+    integer, parameter :: mask4(4) = [ -1, 9, 9, -1 ]
+    integer, parameter :: divcoef = 256
+    integer, parameter :: mask2(2) = [ 8, 8 ]
+    integer   :: i, j, k, l
     real(knd) :: flux
 
-    !$omp parallel private(i,j,k,l,flux)
+    !$omp parallel private(i, j, k, l, flux)
     !$omp workshare
     V2 = 0
     !$omp end workshare
 
     !$omp do
-    do k=1,Vnz
-      do j=1,Vny
-        do i=1,Vnx+1
+    do k=1, Vnz
+      do j=1, Vny
+        do i=1, Vnx+1
           if (Vtype(i-1,j,k)<=0 .and. Vtype(i,j,k)<=0) then
 
             flux = ( sum(mask4 * V(i-2:i+1,j,k)) * sum(mask4 * U(i-1,j-1:j+2,k)) ) / dxmin
@@ -405,9 +405,9 @@ contains
 
 
     !$omp do
-    do k=1,Vnz
-      do j=1,Vny+1
-        do i=1,Vnx
+    do k=1, Vnz
+      do j=1, Vny+1
+        do i=1, Vnx
           if (Vtype(i,j-1,k)<=0 .and. Vtype(i,j,k)<=0) then
 
             flux = ( ( sum(mask4 * V(i,j-2:j+1,k)) )**2 ) / dymin
@@ -426,11 +426,11 @@ contains
     end do
     !$omp end do
 
-    do l=1,2
+    do l=1, 2
       !$omp do
-      do k=l,Vnz+1,2
-        do j=1,Vny
-          do i=1,Vnx
+      do k=l, Vnz+1, 2
+        do j=1, Vny
+          do i=1, Vnx
             if (Vtype(i,j,k-1)<=0 .and. Vtype(i,j,k)<=0) then
 
               flux = ( sum(mask4 * V(i,j,k-2:k+1)) * sum(mask4 * W(i,j-1:j+2,k-1)) ) / dzmin
@@ -458,24 +458,24 @@ contains
   end subroutine CDS4V
 
 
-  subroutine CDS4W(W2,U,V,W)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: W2
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
-    integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
-    integer,parameter :: divcoef = 256
-    integer,parameter :: mask2(2) = [  8, 8 ]
-    integer   :: i,j,k,l
+  subroutine CDS4W(W2, U, V, W)
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(out) :: W2
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)  :: U, V, W
+    integer, parameter :: mask4(4) = [ -1, 9, 9, -1 ]
+    integer, parameter :: divcoef = 256
+    integer, parameter :: mask2(2) = [  8, 8 ]
+    integer   :: i, j, k, l
     real(knd) :: flux
 
-    !$omp parallel private(i,j,k,l,flux)
+    !$omp parallel private(i, j, k, l, flux)
     !$omp workshare
     W2 = 0
     !$omp end workshare
 
     !$omp do
-    do k=1,Wnz
-      do j=1,Wny
-        do i=1,Wnx+1
+    do k=1, Wnz
+      do j=1, Wny
+        do i=1, Wnx+1
           if (Wtype(i-1,j,k)<=0 .and. Wtype(i,j,k)<=0) then
 
             flux = ( sum(mask4 * W(i-2:i+1,j,k)) * sum(mask4 * U(i-1,j,k-1:k+2)) ) / dxmin
@@ -495,9 +495,9 @@ contains
     !$omp end do
 
     !$omp do
-    do k=1,Wnz
-      do j=1,Wny+1
-        do i=1,Wnx
+    do k=1, Wnz
+      do j=1, Wny+1
+        do i=1, Wnx
           if (Wtype(i,j-1,k)<=0 .and. Wtype(i,j,k)<=0) then
 
             flux = ( sum(mask4 * W(i,j-2:j+1,k)) * sum(mask4 * V(i,j-1,k-1:k+2)) ) / dymin
@@ -516,11 +516,11 @@ contains
     end do
     !$omp end do
 
-    do l=1,2
+    do l=1, 2
       !$omp do
-      do k=l,Wnz+1,2
-        do j=1,Wny
-          do i=1,Wnx
+      do k=l, Wnz+1, 2
+        do j=1, Wny
+          do i=1, Wnx
             if (Wtype(i,j,k-1)<=0 .and. Wtype(i,j,k)<=0) then
 
               flux = ( ( sum(mask4 * W(i,j,k-2:k+1)) )**2 ) / dzmin
@@ -563,24 +563,24 @@ contains
 
 
 
-  subroutine CDS4_2U(U2,U,V,W)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: U2
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
-    integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
-    integer,parameter :: divcoef = 256
-    integer,parameter :: mask2(2) = [ 8, 8 ]
-    integer   :: i,j,k,l
+  subroutine CDS4_2U(U2, U,V, W)
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(out) :: U2
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)  :: U, V, W
+    integer, parameter :: mask4(4) = [ -1, 9, 9, -1 ]
+    integer, parameter :: divcoef = 256
+    integer, parameter :: mask2(2) = [ 8, 8 ]
+    integer   :: i, j, k, l
     real(knd) :: flux
 
-    !$omp parallel private(i,j,k,l,flux)
+    !$omp parallel private(i, j, k, l, flux)
     !$omp workshare
     U2 = 0
     !$omp end workshare
 
     !$omp do
-    do k=1,Unz
-      do j=1,Uny
-        do i=1,Unx+1
+    do k=1, Unz
+      do j=1, Uny
+        do i=1, Unx+1
           if (Utype(i-1,j,k)<=0 .and. Utype(i,j,k)<=0) then
 
             flux = ( ( sum(mask4 * U(i-2:i+1,j,k)) )**2 ) / dxmin
@@ -600,9 +600,9 @@ contains
     !$omp end do
 
     !$omp do
-    do k=1,Unz
-      do j=1,Uny+1
-        do i=1,Unx
+    do k=1, Unz
+      do j=1, Uny+1
+        do i=1, Unx
           if (Utype(i,j-1,k)<=0 .and. Utype(i,j,k)<=0) then
 
             flux = ( sum(mask4 * U(i,j-2:j+1,k)) * sum(mask2 * V(i:i+1,j-1,k)) ) / dymin
@@ -621,11 +621,11 @@ contains
     end do
     !$omp end do
 
-    do l=1,2
+    do l=1, 2
       !$omp do
-      do k=l,Unz+1,2
-        do j=1,Uny
-          do i=1,Unx
+      do k=l, Unz+1, 2
+        do j=1, Uny
+          do i=1, Unx
             if (Utype(i,j,k-1)<=0 .and. Utype(i,j,k)<=0) then
 
                 flux = ( sum(mask4 * U(i,j,k-2:k+1))) * sum(mask2 * W(i:i+1,j,k-1)) / dzmin
@@ -653,24 +653,24 @@ contains
   end subroutine CDS4_2U
 
 
-  subroutine CDS4_2V(V2,U,V,W)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: V2
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
-    integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
-    integer,parameter :: divcoef = 256
-    integer,parameter :: mask2(2) = [ 8, 8 ]
-    integer   :: i,j,k,l
+  subroutine CDS4_2V(V2, U, V, W)
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(out) :: V2
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)  :: U, V, W
+    integer, parameter :: mask4(4) = [ -1, 9, 9, -1 ]
+    integer, parameter :: divcoef = 256
+    integer, parameter :: mask2(2) = [ 8, 8 ]
+    integer   :: i, j, k, l
     real(knd) :: flux
 
-    !$omp parallel private(i,j,k,l,flux)
+    !$omp parallel private(i, j, k, l, flux)
     !$omp workshare
     V2 = 0
     !$omp end workshare
 
     !$omp do
-    do k=1,Vnz
-      do j=1,Vny
-        do i=1,Vnx+1
+    do k=1, Vnz
+      do j=1, Vny
+        do i=1, Vnx+1
           if (Vtype(i-1,j,k)<=0 .and. Vtype(i,j,k)<=0) then
 
             flux = ( sum(mask4 * V(i-2:i+1,j,k)) * sum(mask2 * U(i-1,j:j+1,k)) ) / dxmin
@@ -691,9 +691,9 @@ contains
 
 
     !$omp do
-    do k=1,Vnz
-      do j=1,Vny+1
-        do i=1,Vnx
+    do k=1, Vnz
+      do j=1, Vny+1
+        do i=1, Vnx
           if (Vtype(i,j-1,k)<=0 .and. Vtype(i,j,k)<=0) then
 
             flux = ( ( sum(mask4 * V(i,j-2:j+1,k)) )**2 ) / dymin
@@ -712,11 +712,11 @@ contains
     end do
     !$omp end do
 
-    do l=1,2
+    do l=1, 2
       !$omp do
-      do k=l,Vnz+1,2
-        do j=1,Vny
-          do i=1,Vnx
+      do k=l, Vnz+1, 2
+        do j=1, Vny
+          do i=1, Vnx
             if (Vtype(i,j,k-1)<=0 .and. Vtype(i,j,k)<=0) then
 
               flux = ( sum(mask4 * V(i,j,k-2:k+1)) * sum(mask2 * W(i,j:j+1,k-1)) ) / dzmin
@@ -744,24 +744,24 @@ contains
   end subroutine CDS4_2V
 
 
-  subroutine CDS4_2W(W2,U,V,W)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: W2
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
-    integer,parameter :: mask4(4) = [ -1, 9, 9, -1 ]
-    integer,parameter :: divcoef = 256
-    integer,parameter :: mask2(2) = [  8, 8 ]
-    integer   :: i,j,k,l
+  subroutine CDS4_2W(W2, U, V, W)
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(out) :: W2
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)  :: U, V, W
+    integer, parameter :: mask4(4) = [ -1, 9, 9, -1 ]
+    integer, parameter :: divcoef = 256
+    integer, parameter :: mask2(2) = [  8, 8 ]
+    integer   :: i, j, k, l
     real(knd) :: flux
 
-    !$omp parallel private(i,j,k,l,flux)
+    !$omp parallel private(i, j, k, l, flux)
     !$omp workshare
     W2 = 0
     !$omp end workshare
 
     !$omp do
-    do k=1,Wnz
-      do j=1,Wny
-        do i=1,Wnx+1
+    do k=1, Wnz
+      do j=1, Wny
+        do i=1, Wnx+1
           if (Wtype(i-1,j,k)<=0 .and. Wtype(i,j,k)<=0) then
 
             flux = ( sum(mask4 * W(i-2:i+1,j,k)) * sum(mask2 * U(i-1,j,k:k+1)) ) / dxmin
@@ -781,9 +781,9 @@ contains
     !$omp end do
 
     !$omp do
-    do k=1,Wnz
-      do j=1,Wny+1
-        do i=1,Wnx
+    do k=1, Wnz
+      do j=1, Wny+1
+        do i=1, Wnx
           if (Wtype(i,j-1,k)<=0 .and. Wtype(i,j,k)<=0) then
 
             flux = ( sum(mask4 * W(i,j-2:j+1,k)) * sum(mask2 * V(i,j-1,k:k+1)) ) / dymin
@@ -802,11 +802,11 @@ contains
     end do
     !$omp end do
 
-    do l=1,2
+    do l=1, 2
       !$omp do
-      do k=l,Wnz+1,2
-        do j=1,Wny
-          do i=1,Wnx
+      do k=l, Wnz+1, 2
+        do j=1, Wny
+          do i=1, Wnx
             if (Wtype(i,j,k-1)<=0 .and. Wtype(i,j,k)<=0) then
 
               flux = ( ( sum(mask4 * W(i,j,k-2:k+1)) )**2 ) / dzmin
@@ -845,31 +845,31 @@ contains
 
 
 
-  subroutine CD4divU(U2,U,V,W)
+  subroutine CD4divU(U2, U, V, W)
     !Morinishi et al., JCP 143, http://dx.doi.org/10.1006/jcph.1998.5962
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: U2
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
-    integer,parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
-    integer,parameter :: divcoef = 256
-    integer,parameter :: coef2ord = divcoef / 4
-    integer,parameter :: narr = 4
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(out) :: U2
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)  :: U, V, W
+    integer, parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
+    integer, parameter :: divcoef = 256
+    integer, parameter :: coef2ord = divcoef / 4
+    integer, parameter :: narr = 4
     !UV1 and UV3 are sized to fit to the L1 cache, so no stack overflow should be possible
-    real(knd) :: UV1(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
-    real(knd) :: UV3(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
-    integer   :: bi,bj,bk,i,j,k,li,lj,lk
-    real(knd) :: Uint,Vint,Wint,dU
+    real(knd) :: UV1(-1:tilenx(narr)+2, -1:tileny(narr)+2, -1:tilenz(narr)+2)
+    real(knd) :: UV3(-1:tilenx(narr)+2, -1:tileny(narr)+2, -1:tilenz(narr)+2)
+    integer   :: bi, bj, bk, i, j, k, li, lj, lk
+    real(knd) :: Uint, Vint, Wint, dU
 
-    call set(U2,0._knd)
+    call set(U2, 0._knd)
 
-    !$omp parallel private(bi,bj,bk,i,j,k,li,lj,lk,Uint,Vint,Wint,dU,UV1,UV3)
+    !$omp parallel private(bi, bj, bk, i, j, k, li, lj, lk, Uint, Vint, Wint, dU, UV1, UV3)
     !$omp do
-    do bk = 1,Unz,tilenz(narr)
-     do bj = 1,Uny,tileny(narr)
-      do bi = 1,Unx,tilenx(narr)
+    do bk = 1, Unz, tilenz(narr)
+     do bj = 1, Uny, tileny(narr)
+      do bi = 1, Unx, tilenx(narr)
 
-        do k = bk,min(bk+tilenz(narr)-1,Unz)
-         do j = bj,min(bj+tileny(narr)-1,Uny)
-          do i = bi-1,min(bi+tilenx(narr)-1,Unx)+2
+        do k = bk, min(bk+tilenz(narr)-1, Unz)
+         do j = bj, min(bj+tileny(narr)-1, Uny)
+          do i = bi-1, min(bi+tilenx(narr)-1, Unx)+2
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -881,9 +881,9 @@ contains
          end do
         end do
 
-        do k = bk,min(bk+tilenz(narr)-1,Unz)
-         do j = bj,min(bj+tileny(narr)-1,Uny)
-          do i = bi,min(bi+tilenx(narr)-1,Unx)
+        do k = bk, min(bk+tilenz(narr)-1, Unz)
+         do j = bj, min(bj+tileny(narr)-1, Uny)
+          do i = bi, min(bi+tilenx(narr)-1, Unx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -907,13 +907,13 @@ contains
     !$omp end do
 
     !$omp do
-    do bk = 1,Unz,tilenz(narr)
-     do bj = 1,Uny,tileny(narr)
-      do bi = 1,Unx,tilenx(narr)
+    do bk = 1, Unz, tilenz(narr)
+     do bj = 1, Uny, tileny(narr)
+      do bi = 1, Unx, tilenx(narr)
 
-        do k = bk,min(bk+tilenz(narr)-1,Unz)
-         do j = bj-2,min(bj+tileny(narr)-1,Uny)+1
-          do i = bi,min(bi+tilenx(narr)-1,Unx)
+        do k = bk, min(bk+tilenz(narr)-1, Unz)
+         do j = bj-2, min(bj+tileny(narr)-1, Uny)+1
+          do i = bi, min(bi+tilenx(narr)-1, Unx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -925,9 +925,9 @@ contains
          end do
         end do
 
-        do k = bk,min(bk+tilenz(narr)-1,Unz)
-         do j = bj,min(bj+tileny(narr)-1,Uny)
-          do i = bi,min(bi+tilenx(narr)-1,Unx)
+        do k = bk, min(bk+tilenz(narr)-1, Unz)
+         do j = bj, min(bj+tileny(narr)-1, Uny)
+          do i = bi, min(bi+tilenx(narr)-1, Unx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -951,13 +951,13 @@ contains
     !$omp end do
 
     !$omp do
-    do bk = 1,Unz,tilenz(narr)
-     do bj = 1,Uny,tileny(narr)
-      do bi = 1,Unx,tilenx(narr)
+    do bk = 1, Unz, tilenz(narr)
+     do bj = 1, Uny, tileny(narr)
+      do bi = 1, Unx, tilenx(narr)
 
-        do k = bk-2,min(bk+tilenz(narr),Unz)+1
-         do j = bj,min(bj+tileny(narr)-1,Uny)
-          do i = bi,min(bi+tilenx(narr)-1,Unx)
+        do k = bk-2, min(bk+tilenz(narr), Unz)+1
+         do j = bj, min(bj+tileny(narr)-1, Uny)
+          do i = bi, min(bi+tilenx(narr)-1, Unx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -969,9 +969,9 @@ contains
          end do
         end do
 
-        do k = bk,min(bk+tilenz(narr)-1,Unz)
-         do j = bj,min(bj+tileny(narr)-1,Uny)
-          do i = bi,min(bi+tilenx(narr)-1,Unx)
+        do k = bk, min(bk+tilenz(narr)-1, Unz)
+         do j = bj, min(bj+tileny(narr)-1, Uny)
+          do i = bi, min(bi+tilenx(narr)-1, Unx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -995,7 +995,7 @@ contains
     !$omp end do
     !$omp end parallel
 
-    call multiply(U2,-1._knd/divcoef)
+    call multiply(U2, -1._knd/divcoef)
 
   end subroutine CD4divU
 
@@ -1009,31 +1009,31 @@ contains
 
 
 
-  subroutine CD4divV(V2,U,V,W)
+  subroutine CD4divV(V2, U, V, W)
     !Morinishi et al., JCP 143, http://dx.doi.org/10.1006/jcph.1998.5962
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: V2
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
-    integer,parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
-    integer,parameter :: divcoef = 256
-    integer,parameter :: coef2ord = divcoef / 4
-    integer,parameter :: narr = 4
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(out) :: V2
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)  :: U, V, W
+    integer, parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
+    integer, parameter :: divcoef = 256
+    integer, parameter :: coef2ord = divcoef / 4
+    integer, parameter :: narr = 4
     !UV1 and UV3 are sized to fit to the L1 cache, so no stack overflow should be possible
-    real(knd) :: UV1(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
-    real(knd) :: UV3(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
-    integer   :: bi,bj,bk,i,j,k,li,lj,lk
-    real(knd) :: Uint,Vint,Wint,dV
+    real(knd) :: UV1(-1:tilenx(narr)+2, -1:tileny(narr)+2, -1:tilenz(narr)+2)
+    real(knd) :: UV3(-1:tilenx(narr)+2, -1:tileny(narr)+2, -1:tilenz(narr)+2)
+    integer   :: bi, bj, bk, i, j, k, li, lj, lk
+    real(knd) :: Uint, Vint, Wint, dV
 
-    call set(V2,0._knd)
+    call set(V2, 0._knd)
 
-    !$omp parallel private(bi,bj,bk,i,j,k,li,lj,lk,Uint,Vint,Wint,dV,UV1,UV3)
+    !$omp parallel private(bi, bj, bk, i, j, k, li, lj, lk, Uint, Vint, Wint, dV, UV1, UV3)
     !$omp do
-    do bk = 1,Vnz,tilenz(narr)
-     do bj = 1,Vny,tileny(narr)
-      do bi = 1,Vnx,tilenx(narr)
+    do bk = 1, Vnz, tilenz(narr)
+     do bj = 1, Vny, tileny(narr)
+      do bi = 1, Vnx, tilenx(narr)
 
-        do k = bk,min(bk+tilenz(narr)-1,Vnz)
-         do j = bj,min(bj+tileny(narr)-1,Vny)
-          do i = bi-2,min(bi+tilenx(narr)-1,Vnx)+1
+        do k = bk, min(bk+tilenz(narr)-1, Vnz)
+         do j = bj, min(bj+tileny(narr)-1, Vny)
+          do i = bi-2, min(bi+tilenx(narr)-1, Vnx)+1
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -1045,9 +1045,9 @@ contains
          end do
         end do
 
-        do k = bk,min(bk+tilenz(narr)-1,Vnz)
-         do j = bj,min(bj+tileny(narr)-1,Vny)
-          do i = bi,min(bi+tilenx(narr)-1,Vnx)
+        do k = bk, min(bk+tilenz(narr)-1, Vnz)
+         do j = bj, min(bj+tileny(narr)-1, Vny)
+          do i = bi, min(bi+tilenx(narr)-1, Vnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -1071,13 +1071,13 @@ contains
     !$omp end do
 
     !$omp do
-    do bk = 1,Vnz,tilenz(narr)
-     do bj = 1,Vny,tileny(narr)
-      do bi = 1,Vnx,tilenx(narr)
+    do bk = 1, Vnz, tilenz(narr)
+     do bj = 1, Vny, tileny(narr)
+      do bi = 1, Vnx, tilenx(narr)
 
-        do k = bk,min(bk+tilenz(narr)-1,Vnz)
-         do j = bj-1,min(bj+tileny(narr)-1,Vny)+2
-          do i = bi,min(bi+tilenx(narr)-1,Vnx)
+        do k = bk, min(bk+tilenz(narr)-1, Vnz)
+         do j = bj-1, min(bj+tileny(narr)-1, Vny)+2
+          do i = bi, min(bi+tilenx(narr)-1, Vnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -1089,9 +1089,9 @@ contains
          end do
         end do
 
-        do k = bk,min(bk+tilenz(narr)-1,Vnz)
-         do j = bj,min(bj+tileny(narr)-1,Vny)
-          do i = bi,min(bi+tilenx(narr)-1,Vnx)
+        do k = bk, min(bk+tilenz(narr)-1, Vnz)
+         do j = bj, min(bj+tileny(narr)-1, Vny)
+          do i = bi, min(bi+tilenx(narr)-1, Vnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -1115,13 +1115,13 @@ contains
     !$omp end do
 
     !$omp do
-    do bk = 1,Vnz,tilenz(narr)
-     do bj = 1,Vny,tileny(narr)
-      do bi = 1,Vnx,tilenx(narr)
+    do bk = 1, Vnz, tilenz(narr)
+     do bj = 1, Vny, tileny(narr)
+      do bi = 1, Vnx, tilenx(narr)
 
-        do k = bk-2,min(bk+tilenz(narr),Vnz)+1
-         do j = bj,min(bj+tileny(narr)-1,Vny)
-          do i = bi,min(bi+tilenx(narr)-1,Vnx)
+        do k = bk-2, min(bk+tilenz(narr), Vnz)+1
+         do j = bj, min(bj+tileny(narr)-1, Vny)
+          do i = bi, min(bi+tilenx(narr)-1, Vnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -1133,9 +1133,9 @@ contains
          end do
         end do
 
-        do k = bk,min(bk+tilenz(narr)-1,Vnz)
-         do j = bj,min(bj+tileny(narr)-1,Vny)
-          do i = bi,min(bi+tilenx(narr)-1,Vnx)
+        do k = bk, min(bk+tilenz(narr)-1, Vnz)
+         do j = bj, min(bj+tileny(narr)-1, Vny)
+          do i = bi, min(bi+tilenx(narr)-1, Vnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -1159,7 +1159,7 @@ contains
     !$omp end do
     !$omp end parallel
 
-    call multiply(V2,-1._knd/divcoef)
+    call multiply(V2, -1._knd/divcoef)
 
   end subroutine CD4divV
 
@@ -1178,31 +1178,31 @@ contains
 
 
 
-  subroutine CD4divW(W2,U,V,W)
+  subroutine CD4divW(W2, U, V, W)
     !Morinishi et al., JCP 143, http://dx.doi.org/10.1006/jcph.1998.5962
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(out) :: W2
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)  :: U,V,W
-    integer,parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
-    integer,parameter :: divcoef = 256
-    integer,parameter :: coef2ord = divcoef / 4
-    integer,parameter :: narr = 4
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(out) :: W2
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)  :: U, V, W
+    integer, parameter :: i_mask4(4) = [ -1, 9, 9, -1 ]
+    integer, parameter :: divcoef = 256
+    integer, parameter :: coef2ord = divcoef / 4
+    integer, parameter :: narr = 4
     !UV1 and UV3 are sized to fit to the L1 cache, so no stack overflow should be possible
-    real(knd) :: UV1(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
-    real(knd) :: UV3(-1:tilenx(narr)+2,-1:tileny(narr)+2,-1:tilenz(narr)+2)
-    integer   :: bi,bj,bk,i,j,k,li,lj,lk
-    real(knd) :: Uint,Vint,Wint,dW
+    real(knd) :: UV1(-1:tilenx(narr)+2, -1:tileny(narr)+2, -1:tilenz(narr)+2)
+    real(knd) :: UV3(-1:tilenx(narr)+2, -1:tileny(narr)+2, -1:tilenz(narr)+2)
+    integer   :: bi, bj, bk, i, j, k, li, lj, lk
+    real(knd) :: Uint, Vint, Wint, dW
 
-    call set(W2,0._knd)
+    call set(W2, 0._knd)
 
-    !$omp parallel private(bi,bj,bk,i,j,k,li,lj,lk,Uint,Vint,Wint,dW,UV1,UV3)
+    !$omp parallel private(bi, bj, bk, i, j, k, li, lj, lk, Uint, Vint, Wint, dW, UV1, UV3)
     !$omp do
-    do bk = 1,Wnz,tilenz(narr)
-     do bj = 1,Wny,tileny(narr)
-      do bi = 1,Wnx,tilenx(narr)
+    do bk = 1, Wnz, tilenz(narr)
+     do bj = 1, Wny, tileny(narr)
+      do bi = 1, Wnx, tilenx(narr)
 
-        do k = bk,min(bk+tilenz(narr)-1,Wnz)
-         do j = bj,min(bj+tileny(narr)-1,Wny)
-          do i = bi-2,min(bi+tilenx(narr)-1,Wnx)+1
+        do k = bk, min(bk+tilenz(narr)-1, Wnz)
+         do j = bj, min(bj+tileny(narr)-1, Wny)
+          do i = bi-2, min(bi+tilenx(narr)-1, Wnx)+1
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -1214,9 +1214,9 @@ contains
          end do
         end do
 
-        do k = bk,min(bk+tilenz(narr)-1,Wnz)
-         do j = bj,min(bj+tileny(narr)-1,Wny)
-          do i = bi,min(bi+tilenx(narr)-1,Wnx)
+        do k = bk, min(bk+tilenz(narr)-1, Wnz)
+         do j = bj, min(bj+tileny(narr)-1, Wny)
+          do i = bi, min(bi+tilenx(narr)-1, Wnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -1240,13 +1240,13 @@ contains
     !$omp end do
 
     !$omp do
-    do bk = 1,Wnz,tilenz(narr)
-     do bj = 1,Wny,tileny(narr)
-      do bi = 1,Wnx,tilenx(narr)
+    do bk = 1, Wnz, tilenz(narr)
+     do bj = 1, Wny, tileny(narr)
+      do bi = 1, Wnx, tilenx(narr)
 
-        do k = bk,min(bk+tilenz(narr)-1,Wnz)
-         do j = bj-2,min(bj+tileny(narr)-1,Wny)+1
-          do i = bi,min(bi+tilenx(narr)-1,Wnx)
+        do k = bk, min(bk+tilenz(narr)-1, Wnz)
+         do j = bj-2, min(bj+tileny(narr)-1, Wny)+1
+          do i = bi, min(bi+tilenx(narr)-1, Wnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -1258,9 +1258,9 @@ contains
          end do
         end do
 
-        do k = bk,min(bk+tilenz(narr)-1,Wnz)
-         do j = bj,min(bj+tileny(narr)-1,Wny)
-          do i = bi,min(bi+tilenx(narr)-1,Wnx)
+        do k = bk, min(bk+tilenz(narr)-1, Wnz)
+         do j = bj, min(bj+tileny(narr)-1, Wny)
+          do i = bi, min(bi+tilenx(narr)-1, Wnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -1284,13 +1284,13 @@ contains
     !$omp end do
 
     !$omp do
-    do bk = 1,Wnz,tilenz(narr)
-     do bj = 1,Wny,tileny(narr)
-      do bi = 1,Wnx,tilenx(narr)
+    do bk = 1, Wnz, tilenz(narr)
+     do bj = 1, Wny, tileny(narr)
+      do bi = 1, Wnx, tilenx(narr)
 
-        do k = bk-1,min(bk+tilenz(narr)-1,Wnz)+2
-         do j = bj,min(bj+tileny(narr)-1,Wny)
-          do i = bi,min(bi+tilenx(narr)-1,Wnx)
+        do k = bk-1, min(bk+tilenz(narr)-1, Wnz)+2
+         do j = bj, min(bj+tileny(narr)-1, Wny)
+          do i = bi, min(bi+tilenx(narr)-1, Wnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -1302,9 +1302,9 @@ contains
          end do
         end do
 
-        do k = bk,min(bk+tilenz(narr)-1,Wnz)
-         do j = bj,min(bj+tileny(narr)-1,Wny)
-          do i = bi,min(bi+tilenx(narr)-1,Wnx)
+        do k = bk, min(bk+tilenz(narr)-1, Wnz)
+         do j = bj, min(bj+tileny(narr)-1, Wny)
+          do i = bi, min(bi+tilenx(narr)-1, Wnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -1328,7 +1328,7 @@ contains
     !$omp end do
     !$omp end parallel
 
-    call multiply(W2,-1._knd/divcoef)
+    call multiply(W2, -1._knd/divcoef)
 
   end subroutine CD4divW
 
