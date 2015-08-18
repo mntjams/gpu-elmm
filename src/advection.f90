@@ -16,24 +16,31 @@ contains
     real(knd), contiguous, intent(out) :: U2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Az
-    integer :: i, j, k
+    integer :: i, j, k, bi, bj, bk
+    integer, parameter :: narr = 4
 
     Ax = 0.25_knd / dxmin
     Ay = 0.25_knd / dymin
     Az = 0.25_knd / dzmin
 
-    !$omp parallel do private(i, j, k)
-    do k = 1, Unz
-        do j = 1, Uny
-            do i = 1, Unx
+    !$omp parallel do private(i, j, k, bi, bj, bk)
+    do bk = 1, Unz, tilenz(narr)
+      do bj = 1, Uny, tileny(narr)
+        do bi = 1, Unx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1, Unz)
+            do j = bj, min(bj+tileny(narr)-1, Uny)
+              do i = bi, min(bi+tilenx(narr)-1, Unx)
                 U2(i,j,k) = - ((Ax*(U(i+1,j,k) + U(i,j,k)) * (U(i+1,j,k) + U(i,j,k)) &
                               - Ax*(U(i,j,k) + U(i-1,j,k)) * (U(i,j,k) + U(i-1,j,k))) &
                              + (Ay*(U(i,j+1,k) + U(i,j,k)) * (V(i+1,j,k) + V(i,j,k)) &
                               - Ay*(U(i,j,k) + U(i,j-1,k)) * (V(i+1,j-1,k) + V(i,j-1,k))) &
                              + (Az*(U(i,j,k+1) + U(i,j,k)) * (W(i+1,j,k) + W(i,j,k)) &
                               - Az*(U(i,j,k) + U(i,j,k-1)) * (W(i+1,j,k-1) + W(i,j,k-1))))
+              end do
             end do
+          end do
         end do
+      end do
     end do
     !$omp end parallel do
   end subroutine CDUdiv
@@ -47,24 +54,31 @@ contains
     real(knd), contiguous, intent(out) :: V2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Az
-    integer :: i, j, k
+    integer :: i, j, k, bi, bj, bk
+    integer, parameter :: narr = 4
 
     Ax = 0.25_knd / dxmin
     Ay = 0.25_knd / dymin
     Az = 0.25_knd / dzmin
 
-    !$omp parallel do private(i, j, k)
-    do k = 1, Vnz
-        do j = 1, Vny
-            do i = 1, Vnx
+    !$omp parallel do private(i, j, k, bi, bj, bk)
+    do bk = 1, Vnz, tilenz(narr)
+      do bj = 1, Vny, tileny(narr)
+        do bi = 1, Vnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1, Vnz)
+            do j = bj, min(bj+tileny(narr)-1, Vny)
+              do i = bi, min(bi+tilenx(narr)-1, Vnx)
                 V2(i,j,k) = - ((Ay*(V(i,j+1,k) + V(i,j,k)) * (V(i,j+1,k) + V(i,j,k)) &
                                -Ay*(V(i,j,k) + V(i,j-1,k)) * (V(i,j,k) + V(i,j-1,k))) &
                               +(Ax*(V(i+1,j,k) + V(i,j,k)) * (U(i,j+1,k) + U(i,j,k)) &
                                -Ax*(V(i,j,k) + V(i-1,j,k)) * (U(i-1,j+1,k) + U(i-1,j,k))) &
                               +(Az*(V(i,j,k+1) + V(i,j,k)) * (W(i,j+1,k) + W(i,j,k)) &
                                -Az*(V(i,j,k) + V(i,j,k-1)) * (W(i,j+1,k-1) + W(i,j,k-1))))
+              end do
             end do
+          end do
         end do
+      end do
     end do
     !$omp end parallel do
   end subroutine CDVdiv
@@ -77,24 +91,31 @@ contains
     real(knd), contiguous, intent(out) :: W2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Az
-    integer  :: i, j, k
+    integer :: i, j, k, bi, bj, bk
+    integer, parameter :: narr = 4
 
     Ax = 0.25_knd / dxmin
     Ay = 0.25_knd / dymin
     Az = 0.25_knd / dzmin
 
-    !$omp parallel do private(i, j, k)
-    do k = 1, Wnz
-        do j = 1, Wny
-            do i = 1, Wnx
+    !$omp parallel do private(i, j, k, bi, bj, bk)
+    do bk = 1, Wnz, tilenz(narr)
+      do bj = 1, Wny, tileny(narr)
+        do bi = 1, Wnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1, Wnz)
+            do j = bj, min(bj+tileny(narr)-1, Wny)
+              do i = bi, min(bi+tilenx(narr)-1, Wnx)
                 W2(i,j,k) = - ((Az*(W(i,j,k+1) + W(i,j,k)) * (W(i,j,k+1) + W(i,j,k)) &
                               - Az*(W(i,j,k) + W(i,j,k-1)) * (W(i,j,k) + W(i,j,k-1))) &
                              + (Ay*(W(i,j+1,k) + W(i,j,k)) * (V(i,j,k+1) + V(i,j,k)) &
                               - Ay*(W(i,j,k) + W(i,j-1,k)) * (V(i,j-1,k) + V(i,j-1,k+1))) &
                              + (Ax*(W(i+1,j,k) + W(i,j,k)) * (U(i,j,k+1) + U(i,j,k)) &
                               - Ax*(W(i,j,k) + W(i-1,j,k)) * (U(i-1,j,k+1) + U(i-1,j,k))))
+              end do
             end do
+          end do
         end do
+      end do
     end do
     !$omp end parallel do
   end subroutine CDWdiv
@@ -113,24 +134,31 @@ contains
     real(knd), contiguous, intent(out) :: U2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Az, Vadv, Wadv
-    integer :: i, j, k
+    integer :: i, j, k, bi, bj, bk
+    integer, parameter :: narr = 4
 
     Ax = 0.5_knd / dxmin
     Ay = 0.125_knd / dymin
     Az = 0.125_knd / dzmin
 
-    !$omp parallel do private(i, j, k, Vadv, Wadv)
-    do k = 1, Unz
-        do j = 1, Uny
-            do i = 1, Unx
+    !$omp parallel do private(i, j, k, bi, bj, bk)
+    do bk = 1, Unz, tilenz(narr)
+      do bj = 1, Uny, tileny(narr)
+        do bi = 1, Unx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1, Unz)
+            do j = bj, min(bj+tileny(narr)-1, Uny)
+              do i = bi, min(bi+tilenx(narr)-1, Unx)
                 Vadv = ( V(i,j,k) + V(i+1,j,k) + V(i,j-1,k) + V(i+1,j-1,k) )
                 Wadv = ( W(i,j,k) + W(i+1,j,k) + W(i,j,k-1) + W(i+1,j,k-1) )
                 U2(i,j,k) = U2(i,j,k) &
                            - (Ax*(U(i+1,j,k)-U(i-1,j,k)) * U(i,j,k) &
                            +  Ay*(U(i,j+1,k)-U(i,j-1,k)) * Vadv&
                            +  Az*(U(i,j,k+1)-U(i,j,k-1)) * Wadv )
+              end do
             end do
+          end do
         end do
+      end do
     end do
   end subroutine CDUadv
 
@@ -143,24 +171,31 @@ contains
     real(knd), contiguous, intent(out) :: V2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Az, Uadv, Wadv
-    integer :: i, j, k
+    integer :: i, j, k, bi, bj, bk
+    integer, parameter :: narr = 4
 
     Ax = 0.125_knd / dxmin
     Ay = 0.5_knd / dymin
     Az = 0.125_knd / dzmin
 
-    !$omp parallel do private(i, j, k, Uadv, Wadv)
-    do k = 1, Vnz
-        do j = 1, Vny
-            do i = 1, Vnx
+    !$omp parallel do private(i, j, k, bi, bj, bk)
+    do bk = 1, Vnz, tilenz(narr)
+      do bj = 1, Vny, tileny(narr)
+        do bi = 1, Vnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1, Vnz)
+            do j = bj, min(bj+tileny(narr)-1, Vny)
+              do i = bi, min(bi+tilenx(narr)-1, Vnx)
                 Uadv = ( U(i,j,k) + U(i,j+1,k) + U(i-1,j,k) + U(i-1,j+1,k) )
                 Wadv = ( W(i,j,k) + W(i,j+1,k) + W(i,j,k-1) + W(i,j+1,k-1) )
                 V2(i,j,k) = V2(i,j,k) &
                            - (Ax*(V(i+1,j,k)-V(i-1,j,k)) * Uadv&
                            +  Ay*(V(i,j+1,k)-V(i,j-1,k)) * V(i,j,k) &
                            +  Az*(V(i,j,k+1)-V(i,j,k-1)) * Wadv )
+              end do
             end do
+          end do
         end do
+      end do
     end do
     !$omp end parallel do
   end subroutine CDVadv
@@ -173,24 +208,31 @@ contains
     real(knd), contiguous, intent(out) :: W2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Az, Uadv, Vadv
-    integer :: i, j, k
+    integer :: i, j, k, bi, bj, bk
+    integer, parameter :: narr = 4
 
     Ax = 0.125_knd / dxmin
     Ay = 0.125_knd / dymin
     Az = 0.5_knd / dzmin
 
-    !$omp parallel do private(i, j, k, Uadv, Vadv)
-    do k = 1, Wnz
-        do j = 1, Wny
-            do i = 1, Wnx
+    !$omp parallel do private(i, j, k, bi, bj, bk)
+    do bk = 1, Wnz, tilenz(narr)
+      do bj = 1, Wny, tileny(narr)
+        do bi = 1, Wnx, tilenx(narr)
+          do k = bk, min(bk+tilenz(narr)-1, Wnz)
+            do j = bj, min(bj+tileny(narr)-1, Wny)
+              do i = bi, min(bi+tilenx(narr)-1, Wnx)
                 Uadv = ( U(i,j,k) + U(i,j,k+1) + U(i-1,j,k) + U(i-1,j,k+1) )
                 Vadv = ( V(i,j,k) + V(i,j,k+1) + V(i,j-1,k) + V(i,j-1,k+1) )
                 W2(i,j,k) = W2(i,j,k) &
                            - (Ax*(W(i+1,j,k)-W(i-1,j,k)) * Uadv&
                            +  Ay*(W(i,j+1,k)-W(i,j-1,k)) * Vadv&
                            +  Az*(W(i,j,k+1)-W(i,j,k-1)) * W(i,j,k) )
+              end do
             end do
+          end do
         end do
+      end do
     end do
     !$omp end parallel do
   end subroutine CDWadv
