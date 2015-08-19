@@ -1056,6 +1056,110 @@ contains
 
 
 
+  subroutine ScalarDiffusion_nobranch(Scal2, Scal)
+    real(knd), contiguous, intent(inout) :: Scal2(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in)    :: Scal(-1:,-1:,-1:)
+    integer, parameter :: narr = 6
+    integer :: i, j, k, bi, bj, bk
+    integer :: xi, yj, zk
+    real(knd) :: Ax, Ay, Az
+
+    Ax = 1 / (2 * dxmin**2)
+    Ay = 1 / (2 * dymin**2)
+    Az = 1 / (2 * dzmin**2)
+
+    !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
+    do bk = 1, Prnz, tilenz(narr)
+     do bj = 1, Prny, tileny(narr)
+      do bi = 1, Prnx, tilenx(narr)
+       do k = bk, min(bk+tilenz(narr)-1, Prnz)
+        do j = bj, min(bj+tileny(narr)-1, Prny)
+         do i = bi, min(bi+tilenx(narr)-1, Prnx)
+             Scal2(i,j,k) = Scal2(i,j,k) + &
+                     (TDiff(i+1,j,k)+TDiff(i,j,k)) * (Scal(i+1,j,k)-Scal(i,j,k)) * Ax
+             Scal2(i,j,k) = Scal2(i,j,k) - &
+                     (TDiff(i,j,k)+TDiff(i-1,j,k)) * (Scal(i,j,k)-Scal(i-1,j,k)) * Ax
+
+             Scal2(i,j,k) = Scal2(i,j,k) + &
+                     (TDiff(i,j+1,k)+TDiff(i,j,k)) * (Scal(i,j+1,k)-Scal(i,j,k)) * Ay
+             Scal2(i,j,k) = Scal2(i,j,k) - &
+                     (TDiff(i,j,k)+TDiff(i,j-1,k)) * (Scal(i,j,k)-Scal(i,j-1,k)) * Ay
+
+             Scal2(i,j,k) = Scal2(i,j,k) + &
+                     (TDiff(i,j,k+1)+TDiff(i,j,k)) * (Scal(i,j,k+1)-Scal(i,j,k)) * Az
+             Scal2(i,j,k) = Scal2(i,j,k) - &
+                     (TDiff(i,j,k)+TDiff(i,j,k-1)) * (Scal(i,j,k)-Scal(i,j,k-1)) * Az
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end parallel do
+    
+    !$omp parallel private(i, xi, yj, zk)
+    !$omp do
+    do i = 1, size(Scflx_points)
+      xi = Scflx_points(i)%xi
+      yj = Scflx_points(i)%yj
+      zk = Scflx_points(i)%zk
+      Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - &
+                        (TDiff(xi+1,yj,zk)+TDiff(xi,yj,zk)) * (Scal(xi+1,yj,zk)-Scal(xi,yj,zk)) * Ax
+    end do
+    !$omp end do
+    !$omp do
+    do i = 1, size(Scflx_points)
+      xi = Scflx_points(i)%xi
+      yj = Scflx_points(i)%yj
+      zk = Scflx_points(i)%zk
+      Scal2(xi+1,yj,zk) = Scal2(xi+1,yj,zk) + &
+                          (TDiff(xi+1,yj,zk)+TDiff(xi,yj,zk)) * (Scal(xi+1,yj,zk)-Scal(xi,yj,zk)) * Ax
+    end do
+    !$omp end do nowait
+    !$omp do
+    do i = 1, size(Scfly_points)
+      xi = Scfly_points(i)%xi
+      yj = Scfly_points(i)%yj
+      zk = Scfly_points(i)%zk
+      Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - &
+                        (TDiff(xi,yj+1,zk)+TDiff(xi,yj,zk)) * (Scal(xi,yj+1,zk)-Scal(xi,yj,zk)) * Ay
+    end do
+    !$omp end do
+    !$omp do
+    do i = 1, size(Scfly_points)
+      xi = Scfly_points(i)%xi
+      yj = Scfly_points(i)%yj
+      zk = Scfly_points(i)%zk
+      Scal2(xi,yj+1,zk) = Scal2(xi,yj+1,zk) + &
+                          (TDiff(xi,yj+1,zk)+TDiff(xi,yj,zk)) * (Scal(xi,yj+1,zk)-Scal(xi,yj,zk)) * Ay
+    end do
+    !$omp end do nowait
+    !$omp do
+    do i = 1, size(Scflz_points)
+      xi = Scflz_points(i)%xi
+      yj = Scflz_points(i)%yj
+      zk = Scflz_points(i)%zk
+      Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - &
+                        (TDiff(xi,yj,zk+1)+TDiff(xi,yj,zk)) * (Scal(xi,yj,zk+1)-Scal(xi,yj,zk)) * Az
+    end do
+    !$omp end do
+    !$omp do
+    do i = 1, size(Scflz_points)
+      xi = Scflz_points(i)%xi
+      yj = Scflz_points(i)%yj
+      zk = Scflz_points(i)%zk
+      Scal2(xi,yj,zk+1) = Scal2(xi,yj,zk+1) + &
+                          (TDiff(xi,yj,zk+1)+TDiff(xi,yj,zk)) * (Scal(xi,yj,zk+1)-Scal(xi,yj,zk)) * Az
+    end do
+    !$omp end do
+    !$omp end parallel
+  end subroutine ScalarDiffusion_nobranch
+
+
+
+
+
+
   subroutine  Scalar_ImmersedBoundaries(Scal)
     use ImmersedBoundary, only: fl => ScalFlIBPoints, Interpolate => TIBPoint_Interpolate
     real(knd), contiguous :: Scal(-1:,-1:,-1:)

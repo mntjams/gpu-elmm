@@ -17,6 +17,12 @@ end module Sort
 module WMPoint_types
   use Kinds
 
+  type point
+    integer   :: xi
+    integer   :: yj
+    integer   :: zk
+  end type
+
   type WMpoint   !points in which we apply wall model
 
     integer   :: xi
@@ -134,11 +140,13 @@ module Wallmodels
 
   type(WMPoint), dimension(:), allocatable, public :: WMPoints
 
-  logical(slog),dimension(:,:,:),allocatable,public :: Scflx_mask, Scfly_mask, Scflz_mask
+  type(point), dimension(:), allocatable, public :: Scflx_points, Scfly_points, Scflz_points
 
-  logical(slog),dimension(:,:,:),allocatable,public :: Uflx_mask, Ufly_mask, Uflz_mask
-  logical(slog),dimension(:,:,:),allocatable,public :: Vflx_mask, Vfly_mask, Vflz_mask
-  logical(slog),dimension(:,:,:),allocatable,public :: Wflx_mask, Wfly_mask, Wflz_mask
+  logical(slog), dimension(:,:,:), allocatable, public :: Scflx_mask, Scfly_mask, Scflz_mask
+
+  logical(slog), dimension(:,:,:), allocatable, public :: Uflx_mask, Ufly_mask, Uflz_mask
+  logical(slog), dimension(:,:,:), allocatable, public :: Vflx_mask, Vfly_mask, Vflz_mask
+  logical(slog), dimension(:,:,:), allocatable, public :: Wflx_mask, Wfly_mask, Wflz_mask
 
   integer :: wallmodeltype
   
@@ -780,6 +788,7 @@ contains
   
   subroutine InitWMMasks
     integer :: i, j, k
+    integer :: nx, ny, nz
 
     allocate(Scflx_mask(0:Prnx,Prny,Prnz))
     allocate(Scfly_mask(Prnx,0:Prny,Prnz))
@@ -795,6 +804,32 @@ contains
           if (Prtype(i,j,k)>0.or.Prtype(i+1,j,k)>0) Scflx_mask(i,j,k) = .false.
           if (Prtype(i,j,k)>0.or.Prtype(i,j+1,k)>0) Scfly_mask(i,j,k) = .false.
           if (Prtype(i,j,k)>0.or.Prtype(i,j,k+1)>0) Scflz_mask(i,j,k) = .false.
+        end do
+      end do
+    end do
+
+    nx = 0
+    ny = 0
+    nz = 0
+    do k = 1, Prnz
+      do j = 1, Prny
+        do i = 1, Prnx
+          if (Prtype(i,j,k)>0.neqv.Prtype(i+1,j,k)>0) nx = nx + 1
+          if (Prtype(i,j,k)>0.neqv.Prtype(i,j+1,k)>0) ny = ny + 1
+          if (Prtype(i,j,k)>0.neqv.Prtype(i,j,k+1)>0) nz = nz + 1
+        end do
+      end do
+    end do
+
+    allocate(Scflx_points(nx))
+    allocate(Scfly_points(ny))
+    allocate(Scflz_points(nz))
+    do k = 1, Prnz
+      do j = 1, Prny
+        do i = 1, Prnx
+          if (Prtype(i,j,k)>0.neqv.Prtype(i+1,j,k)>0) Scflx_points(i) = point(i,j,k)
+          if (Prtype(i,j,k)>0.neqv.Prtype(i,j+1,k)>0) Scfly_points(i) = point(i,j,k)
+          if (Prtype(i,j,k)>0.neqv.Prtype(i,j,k+1)>0) Scflz_points(i) = point(i,j,k)
         end do
       end do
     end do
