@@ -396,6 +396,6 @@ objs += env.Object(target = target_dir + 'main',               source = 'main.f9
 
 objs = filter(lambda o: str(o)[-4:] != '.mod', objs)
 
-t = env.Program(target = target_dir + 'CLMM', source= objs + SBfile + PBfile)
+t = env.Program(target = target_dir + 'ELMM', source= objs + SBfile + PBfile)
 
 Default(t)
