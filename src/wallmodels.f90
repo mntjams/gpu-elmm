@@ -824,12 +824,24 @@ contains
     allocate(Scflx_points(nx))
     allocate(Scfly_points(ny))
     allocate(Scflz_points(nz))
+    nx = 0
+    ny = 0
+    nz = 0
     do k = 1, Prnz
       do j = 1, Prny
         do i = 1, Prnx
-          if (Prtype(i,j,k)>0.neqv.Prtype(i+1,j,k)>0) Scflx_points(i) = point(i,j,k)
-          if (Prtype(i,j,k)>0.neqv.Prtype(i,j+1,k)>0) Scfly_points(i) = point(i,j,k)
-          if (Prtype(i,j,k)>0.neqv.Prtype(i,j,k+1)>0) Scflz_points(i) = point(i,j,k)
+          if (Prtype(i,j,k)>0.neqv.Prtype(i+1,j,k)>0) then
+            nx = nx + 1
+            Scflx_points(nx) = point(i,j,k)
+          end if
+          if (Prtype(i,j,k)>0.neqv.Prtype(i,j+1,k)>0) then
+            ny = ny + 1
+            Scfly_points(ny) = point(i,j,k)
+          end if
+          if (Prtype(i,j,k)>0.neqv.Prtype(i,j,k+1)>0) then
+            nz = nz + 1
+            Scflz_points(nz) = point(i,j,k)
+          end if
         end do
       end do
     end do
