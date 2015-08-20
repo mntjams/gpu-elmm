@@ -2171,6 +2171,10 @@ contains
     end interface
 #endif
 
+    !Important to have some defined value before the first call to GetTurbInlet.
+    !The value can be quite arbitrary.
+    dt = min(dxmin,dymin,dzmin) / max(Uinlet,Uref)
+
 
     call par_sync_out("  ...initializing random seed.")
 
