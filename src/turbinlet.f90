@@ -383,8 +383,8 @@ contains
   end subroutine InitTurbulenceProfiles
 
   subroutine InitMeanProfiles
-    real(knd) Ustar_prof
-    integer k
+    real(knd) :: Ustar_prof, utmp
+    integer :: k
 
     allocate(Uinavg(-2:Uny+3,-2:Unz+3),Vinavg(-2:Vny+3,-2:Vnz+3),Winavg(-2:Wny+3,-2:Wnz+3))
     Vinavg = 0
@@ -403,15 +403,23 @@ contains
       if (U_ref_inlet/=0.and.z_ref_inlet>0) then
 
         Ustar_prof = U_ref_inlet * Karman / log(z_ref_inlet/z0_inlet)
+
         do k = 1, Prnz
-          Uinavg(:,k) = (Ustar_prof/Karman)*log(zPr(k)/z0_inlet)
+          utmp = (Ustar_prof/Karman)*log(zPr(k)/z0_inlet)
+          if (sign(1._knd,Ustar_prof)*utmp<abs(Ustar_prof)/2) &
+            utmp = (Ustar_prof/2)*zPr(k)/(z0_inlet*1.22)
+          Uinavg(:,k) = utmp
         end do
 
       else
 
-        Uinavg(:,1) = (Ustar_inlet(1)/Karman)*log(zPr(1)/z0_inlet)
+        utmp = (Ustar_inlet(1)/Karman)*log(zPr(1)/z0_inlet)
+        Uinavg(:,1) = utmp
         do k = 2, Prnz
-          Uinavg(:,k) = (Ustar_inlet(k)/Karman)*log(zPr(k)/zPr(k-1)) + Uinavg(:,k-1)
+          utmp = (Ustar_inlet(k)/Karman)*log(zPr(k)/zPr(k-1)) + utmp
+          if (sign(1._knd,Ustar_inlet(1))*utmp<abs(Ustar_inlet(1))/2) &
+            utmp = (Ustar_inlet(1)/2)*zPr(k)/(z0_inlet*1.22)
+          Uinavg(:,k) = utmp
         end do
 
       end  if
