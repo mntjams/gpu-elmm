@@ -1737,7 +1737,7 @@ contains
       if (WMPoints(i)%z0>0) then
 
          if (enable_buoyancy .and. WMPoints(i)%prescribed_temperature) then
-if (xi==1.and.yj==1.and.zk==1) debuglevel =1
+
 #ifdef CUSTOM_SURFACE_TEMPERATURE
            WMPoints(i)%temperature = SurfaceTemperature(xPr(xi), yPr(yj), zPr(zk), time)
 #endif
@@ -1746,7 +1746,7 @@ if (xi==1.and.yj==1.and.zk==1) debuglevel =1
            call WM_MO_Dirichlet(visc, WMPoints(i)%ustar, &
                                 WMPoints(i)%temperature_flux, &
                                 WMPoints(i)%z0, WMPoints(i)%z0H, tdif, dist, vel)
-debuglevel = 0
+
          else if (enable_buoyancy .and. WMPoints(i)%temperature_flux>0) then
 
            call WM_MO_FLUX(visc, WMPoints(i)%ustar, WMPoints(i)%temperature_flux, &
