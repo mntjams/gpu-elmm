@@ -296,8 +296,7 @@ module Subgrid
       width = filter_ratio * (dxmin*dymin*dzmin)**(1._knd/3._knd)
       C = (Csig*width)**2
 
-      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk) schedule(runtime)
-      ! collapse(3)
+      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk) schedule(runtime) collapse(3)
       do bk = 1, Prnz, tilenz(narr)
        do bj = 1, Prny, tileny(narr)
         do bi = 1, Prnx, tilenx(narr)
@@ -441,8 +440,7 @@ module Subgrid
 
       width = filter_ratio * (dxmin*dymin*dzmin)**(1._knd/3._knd)
 
-      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk,C,Pr_sgs) schedule(runtime)
-      ! collapse(3)
+      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk,C,Pr_sgs) schedule(runtime) collapse(3)
       do bk = 1, Prnz, tilenz(narr)
        do bj = 1, Prny, tileny(narr)
         do bi = 1, Prnx, tilenx(narr)
