@@ -9,7 +9,7 @@ module Subgrid
   private
   public :: sgstype, SubgridModel
 
-  real(knd),parameter :: CSmag = 0.1_knd
+  real(knd),parameter :: CSmag = 0.126_knd
 
   integer :: sgstype
 
@@ -291,7 +291,7 @@ module Subgrid
       use Tiling, only: tilenx, tileny, tilenz
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
-      real(knd), parameter :: Csig = 1.35_knd
+      real(knd), parameter :: Csig = 1.15_knd
       integer, parameter   :: narr = 4
       integer   :: i,j,k,bi,bj,bk
       real(knd) :: width, C, D, g(3,3), s1, s2, s3
@@ -419,7 +419,7 @@ module Subgrid
       use Outputs, only: enable_profiles, current_profiles
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
-      real(knd), parameter :: Csig = 1.35_knd
+      real(knd), parameter :: Csig = 1.15_knd
       integer, parameter   :: narr = 4
       integer   :: i,j,k,bi,bj,bk
       real(knd) :: width, C, Pr_sgs, D, g(3,3), s1, s2, s3
