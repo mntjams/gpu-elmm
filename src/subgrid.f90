@@ -2,6 +2,7 @@ module Subgrid
 
   use Parameters
   use Boundaries, only: BoundU
+  use Subgrid_MixedTimeScale, only: SGS_MixedTimeScale
 
   implicit none
 
@@ -11,6 +12,9 @@ module Subgrid
   real(knd),parameter :: CSmag = 0.1_knd
 
   integer :: sgstype
+
+  integer, parameter, public :: SmagorinskyModel=1, SigmaModel=2, VremanModel=3, &
+                                StabSubgridModel=4, MixedTimeScaleModel = 5
 
   contains
 
@@ -571,7 +575,6 @@ module Subgrid
           C = 1 / (1 + wL)
           !own fit of graph in Zeid et al. 2010, JFM 665
           Pr_sgs = 0.5 + 0.85 * (1+tanh(log(1.2_knd*wL)))/2
-!           print '(i4,1x,f8.3,1x,f8.3)', k, res, width/L
         else
           C = 1
           Pr_sgs = 0.5
@@ -595,11 +598,14 @@ module Subgrid
                         call SGS_Vreman(U,V,W,filter_ratios(filtertype))
       else if (sgstype==StabSubgridModel) then
                         call SGS_Sigma_stability(U,V,W,filter_ratios(filtertype))
+      else if (sgstype==MixedTimeScaleModel) then
+                        call SGS_MixedTimeScale(U,V,W)
       else
 
         Viscosity = molecular_viscosity
 
       end if
+
     end subroutine
 
 end module Subgrid

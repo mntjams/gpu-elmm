@@ -376,6 +376,7 @@ objs += env.Object(target = target_dir + 'boundaries',         source = 'boundar
 objs += env.Object(target = target_dir + 'scalarboundaries',   source = 'scalarboundaries.f90')
 objs += env.Object(target = target_dir + 'scalars',            source = 'scalars.f90')
 objs += env.Object(target = target_dir + 'filters',            source = 'filters.f90')
+objs += env.Object(target = target_dir + 'subgrid_mixedtimescale', source = 'subgrid_mixedtimescale.f90')
 objs += env.Object(target = target_dir + 'subgrid',            source = 'subgrid.f90')
 objs += env.Object(target = target_dir + 'pthreadsc',          source = 'pthreads.c')
 objs += env.Object(target = target_dir + 'pthreadsf',          source = 'pthreads.f90')

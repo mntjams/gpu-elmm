@@ -566,7 +566,7 @@ contains
 
 
   subroutine SubgridStresses(U,V,W,Pr,Temperature)
-    use Subgrid, only: SubgridModel, sgstype
+    use Subgrid, only: SubgridModel, sgstype, StabSubgridModel
     use ImmersedBoundary, only: ScalFlIBPoints, TIBPoint_Viscosity
     use Wallmodels
     use Scalars, only: ComputeTDiff

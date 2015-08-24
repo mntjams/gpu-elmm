@@ -188,7 +188,8 @@ module Parameters
   !inlet profile types
   integer, parameter :: CONSTPROF=1, LOGPROF=2, POWERPROF=3 
   integer, parameter :: GENERALGRID=1, UNIFORMGRID=2
-  integer, parameter :: SmagorinskyModel=1, SigmaModel=2, VremanModel=3, StabSubgridModel=4
+
+  !scalar source types
   integer, parameter :: PointSource=1, LineSource=2, AreaSource=3, VolumeSource=4
 
   integer(c_int), bind(C, name="debuglevel") :: debuglevel = 0 !amount of information to write out
