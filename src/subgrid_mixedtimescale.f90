@@ -21,23 +21,24 @@ contains
 
     rec_width = 1 / (dxmin*dymin*dzmin)**(1._knd/3._knd)
 
-    filtertype = 1
     !allocation on assignment on the first call
-    Uf = U
-    Vf = V
-    Wf = W
-    call Filter(Uf, Utype)
-    call Filter(Vf, Vtype)
-    call Filter(Wf, Wtype)
-    filtertype = 0
+    if (.not.allocated(Uf)) then
+      Uf = U
+      Vf = V
+      Wf = W
+    end if
+
+    call FilterTopHat(Uf, U, Utype)
+    call FilterTopHat(Vf, V, Vtype)
+    call FilterTopHat(Wf, W, Wtype)
 
     !$omp parallel do private(k_es, T_s, i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
     do bk = 1, Prnz, tilenz(narr)
       do bj = 1, Prny, tileny(narr)
         do bi = 1, Prnx, tilenx(narr)
-          do k = 1, Prnz
-            do j = 1, Prny
-              do i = 1, Prnx
+          do k = bk, min(bk+tilenz(narr)-1,Prnz)
+            do j = bj, min(bj+tileny(narr)-1,Prny)
+              do i = bi ,min(bi+tilenx(narr)-1,Prnx)
                 k_es = (U(i,j,k) - Uf(i,j,k))**2 + &
                        (V(i,j,k) - Vf(i,j,k))**2 + &
                        (W(i,j,k) - Wf(i,j,k))**2
@@ -45,7 +46,7 @@ contains
                 T_s = TimeScale(i, j, k, k_es)
 
                 Viscosity(i,j,k) = C_mts * k_es * T_s
-                
+         
                 Viscosity(i,j,k) = Viscosity(i,j,k) + molecular_viscosity
               end do
             end do
@@ -73,7 +74,7 @@ contains
       magD = sqrt(2 * sum(D**2))
                 
       res = sqrt(k_es) * rec_width
-                     
+
       res = res + magD / Ct
                   
       res = max(res, epsilon(1._knd))
@@ -100,6 +101,5 @@ contains
 
   end subroutine
 
-  
   
 end module Subgrid_MixedTimeScale
