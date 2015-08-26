@@ -757,6 +757,134 @@ contains
 
 
 
+  subroutine MomentumDiffusion_nobranch(U2,V2,W2,U,V,W)
+    use Parameters, nu => Viscosity
+    use Wallmodels
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: U,V,W
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U2,V2,W2
+    real(knd) :: recdxmin2, recdymin2, recdzmin2
+    integer :: i,j,k,bi,bj,bk
+    integer, parameter :: narr = 6
+       
+    recdxmin2 = 1._knd / dxmin**2
+    recdymin2 = 1._knd / dymin**2
+    recdzmin2 = 1._knd / dzmin**2
+
+    !$omp parallel private(i,j,k,bi,bj,bk)
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Unz, tilenz(narr)
+     do bj = 1, Uny, tileny(narr)
+      do bi = 1, Unx, tilenx(narr)
+       do k = bk, min(bk+tilenz(narr)-1,Unz)
+        do j = bj, min(bj+tileny(narr)-1,Uny)
+         do i = bi, min(bi+tilenx(narr)-1,Unx)
+             U2(i,j,k) = U2(i,j,k) + &
+              nu(i+1,j,k) * (U(i+1,j,k)-U(i,j,k)) *recdxmin2
+             U2(i,j,k) = U2(i,j,k) - &
+               nu(i,j,k) * (U(i,j,k)-U(i-1,j,k)) * recdxmin2 
+             U2(i,j,k) = U2(i,j,k) + &
+               0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (U(i,j+1,k)-U(i,j,k)) * recdymin2
+             U2(i,j,k) = U2(i,j,k) - &
+               0.25_knd * (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * (U(i,j,k)-U(i,j-1,k)) * recdymin2
+             U2(i,j,k) = U2(i,j,k) + &
+               0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (U(i,j,k+1)-U(i,j,k)) * recdzmin2
+             U2(i,j,k) = U2(i,j,k) - &
+               0.25_knd * (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (U(i,j,k)-U(i,j,k-1)) * recdzmin2
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+#define comp 1
+#define wrk U2
+#include "wmfluxes-nobranch-inc.f90"
+#undef wrk
+#undef comp
+
+
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Vnz, tilenz(narr)
+     do bj = 1, Vny, tileny(narr)
+      do bi = 1, Vnx, tilenx(narr)
+       do k = bk, min(bk+tilenz(narr)-1,Vnz)
+        do j = bj, min(bj+tileny(narr)-1,Vny)
+         do i = bi, min(bi+tilenx(narr)-1,Vnx)
+             V2(i,j,k) = V2(i,j,k) + &
+               0.25_knd * (nu(i+1,j+1,k)+nu(i+1,j,k)+nu(i,j+1,k)+nu(i,j,k)) * (V(i+1,j,k)-V(i,j,k)) * recdxmin2
+             V2(i,j,k) = V2(i,j,k) - &
+               0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * (V(i,j,k)-V(i-1,j,k)) * recdxmin2
+             V2(i,j,k) = V2(i,j,k) + &
+               nu(i,j+1,k) * (V(i,j+1,k)-V(i,j,k)) * recdymin2
+             V2(i,j,k) = V2(i,j,k) - &
+               nu(i,j,k) * (V(i,j,k)-V(i,j-1,k)) * recdymin2
+             V2(i,j,k) = V2(i,j,k) + &
+               0.25_knd * (nu(i,j+1,k+1)+nu(i,j+1,k)+nu(i,j,k+1)+nu(i,j,k)) * (V(i,j,k+1)-V(i,j,k)) * recdzmin2
+             V2(i,j,k) = V2(i,j,k) - &
+               0.25_knd * (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * (V(i,j,k)-V(i,j,k-1)) * recdzmin2
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+#define comp 2
+#define wrk V2
+#include "wmfluxes-nobranch-inc.f90"
+#undef wrk
+#undef comp
+
+
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Wnz, tilenz(narr)
+     do bj = 1, Wny, tileny(narr)
+      do bi = 1, Wnx, tilenx(narr)
+       do k = bk, min(bk+tilenz(narr)-1,Wnz)
+        do j = bj, min(bj+tileny(narr)-1,Wny)
+         do i = bi, min(bi+tilenx(narr)-1,Wnx)
+             W2(i,j,k) = W2(i,j,k) + &
+               0.25_knd * (nu(i+1,j,k+1)+nu(i+1,j,k)+nu(i,j,k+1)+nu(i,j,k)) * (W(i+1,j,k)-W(i,j,k)) * recdxmin2
+             W2(i,j,k) = W2(i,j,k) - &
+               0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * (W(i,j,k)-W(i-1,j,k)) * recdxmin2
+             W2(i,j,k) = W2(i,j,k) + &
+               0.25_knd * (nu(i,j+1,k+1)+nu(i,j,k+1)+nu(i,j+1,k)+nu(i,j,k)) * (W(i,j+1,k)-W(i,j,k)) * recdymin2
+             W2(i,j,k) = W2(i,j,k) - &
+               0.25_knd * (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * (W(i,j,k)-W(i,j-1,k)) * recdymin2
+             W2(i,j,k) = W2(i,j,k) + &
+               nu(i,j,k+1) * (W(i,j,k+1)-W(i,j,k)) * recdzmin2
+             W2(i,j,k) = W2(i,j,k) - &
+               nu(i,j,k) * (W(i,j,k)-W(i,j,k-1)) * recdzmin2
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+#define comp 3
+#define wrk W2
+#include "wmfluxes-nobranch-inc.f90"
+#undef wrk
+#undef comp
+    !$omp end parallel
+
+  end subroutine MomentumDiffusion_nobranch
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
