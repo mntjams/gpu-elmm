@@ -94,6 +94,10 @@ if str(comp)=='intel':
   if str(diag)=='yes':
     env.Append(F90FLAGS=' -diag-enable sc1 -diag-enable sc-precise')
     env.Append(LINKFLAGS=' -diag-enable sc1 -diag-enable sc-precise')
+  
+  #workaround of https://software.intel.com/en-us/forums/topic/509671
+  env.Append(F90FLAGS='-Dcollapse=!')
+
    
 elif str(comp)=='cray':
   env = Environment(CC='cc', CXX='CC', F90='ftn', FORTRAN='ftn', LINK='ftn')
