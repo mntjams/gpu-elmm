@@ -23,6 +23,7 @@ extra = ARGUMENTS.get('extra','')
 cgal = ARGUMENTS.get('cgal','')
 mpi = ARGUMENTS.get('mpi','')
 cray = ARGUMENTS.get('cray','')
+ompp = ARGUMENTS.get('ompp','')
 lapack_blas = ARGUMENTS.get('lapack_blas','')
 missing_pfft_r2r = ARGUMENTS.get('missing_pfft_r2r','')
 
@@ -294,6 +295,9 @@ if customTimeStepProcedure=='yes':
 if cray=='yes':
   env.Replace(CC='cc', CXX='CC', F90='ftn', FORTRAN='ftn')
   env.Replace(LINK='ftn')
+
+if ompp=='yes':
+  env.Prepend(LINK='kinst-ompp ')
 
 env.Replace(FORTRANFLAGS=env['F90FLAGS'])
 
