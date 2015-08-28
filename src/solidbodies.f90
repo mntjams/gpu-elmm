@@ -37,9 +37,9 @@ module SolidBodies
   
   character(1024) :: displacement_file = ''
   
-  real(knd), public :: obstacles_bbox_xmin, obstacles_bbox_xmax, &
-                       obstacles_bbox_ymin, obstacles_bbox_ymax, &
-                       obstacles_bbox_zmin, obstacles_bbox_zmax
+  real(knd), public :: obstacles_bbox(6) = [-huge(1._knd)/2, huge(1._knd), &
+                                            -huge(1._knd)/2, huge(1._knd), &
+                                            -huge(1._knd)/2, huge(1._knd)]
   
   interface AddSolidBody
     module procedure AddSolidBody_scalar
@@ -99,7 +99,7 @@ contains
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
         do k = 0,Prnz+1
-         if (zPr(k) > obstacles_bbox_zmax .or. zPr(k) < obstacles_bbox_zmin) cycle
+         if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
          do j = 0,Prny+1
           do i = 0,Prnx+1
              if (CurrentSB%Inside(xPr(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20)) &
@@ -118,7 +118,7 @@ contains
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
         do k = 0,Unz+1
-         if (zPr(k) > obstacles_bbox_zmax .or. zPr(k) < obstacles_bbox_zmin) cycle 
+         if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle 
          do j = 0,Uny+1
           do i = 0,Unx+1
              if (CurrentSB%Inside(xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20))&
@@ -137,7 +137,7 @@ contains
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
         do k = 0,Vnz+1
-         if (zPr(k) > obstacles_bbox_zmax .or. zPr(k) < obstacles_bbox_zmin) cycle
+         if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
          do j = 0,Vny+1
           do i = 0,Vnx+1
              if (CurrentSB%Inside(xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20))&
@@ -154,7 +154,7 @@ contains
 
         !$omp parallel do private(i,j,k) schedule(dynamic)
         do k = 0,Wnz+1
-         if (zPr(k) > obstacles_bbox_zmax .or. zPr(k) < obstacles_bbox_zmin) cycle
+         if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
          do j = 0,Wny+1
           do i = 0,Wnx+1
              if (CurrentSB%Inside(xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._knd/3)/20))&
