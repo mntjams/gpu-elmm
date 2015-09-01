@@ -38,12 +38,36 @@ contains
     !Shift of the region boundaries at the walls.
     !We do not want to get the outside points into the stencil.
     !It causes too large difference between the original and filtered value.
-    if (Btype(We)==NOSLIP.or.Btype(We)==DIRICHLET) smini = + 1
-    if (Btype(Ea)==NOSLIP.or.Btype(Ea)==DIRICHLET) smaxi = - 1
-    if (Btype(So)==NOSLIP.or.Btype(So)==DIRICHLET) sminj = + 1
-    if (Btype(No)==NOSLIP.or.Btype(No)==DIRICHLET) smaxj = - 1
-    if (Btype(Bo)==NOSLIP.or.Btype(Bo)==DIRICHLET) smink = + 1
-    if (Btype(To)==NOSLIP.or.Btype(To)==DIRICHLET) smaxk = - 1
+    if (Btype(We)==NOSLIP.or.Btype(We)==DIRICHLET) then
+      smini = + 1
+    else
+      smini = 0
+    end if
+    if (Btype(Ea)==NOSLIP.or.Btype(Ea)==DIRICHLET) then
+      smaxi = - 1
+    else
+      smaxi = 0
+    end if
+    if (Btype(So)==NOSLIP.or.Btype(So)==DIRICHLET) then
+      sminj = + 1
+    else
+      sminj = 0
+    end if
+    if (Btype(No)==NOSLIP.or.Btype(No)==DIRICHLET) then
+      smaxj = - 1
+    else
+      smaxj = 0
+    end if
+    if (Btype(Bo)==NOSLIP.or.Btype(Bo)==DIRICHLET) then
+      smink = + 1
+    else
+      smink = 0
+    end if
+    if (Btype(To)==NOSLIP.or.Btype(To)==DIRICHLET) then
+      smaxk = - 1
+    else
+      smaxk = 0
+    end if
 
     !$omp parallel private(i, j, k, tmp) shared(U, mini, maxi, minj, maxj, mink, maxk)
     !$omp do
