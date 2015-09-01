@@ -37,6 +37,8 @@ module SolidBodies
   
   character(1024) :: displacement_file = ''
   
+  !global bounding box containing all obstacles
+  !Can be set by a custom code (CustomSolidBodies) to speed up the search for inside cells.
   real(knd), public :: obstacles_bbox(6) = [-huge(1._knd)/2, huge(1._knd), &
                                             -huge(1._knd)/2, huge(1._knd), &
                                             -huge(1._knd)/2, huge(1._knd)]
@@ -98,14 +100,16 @@ contains
         if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = 0,Prnz+1
-         if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
-         do j = 0,Prny+1
-          do i = 0,Prnx+1
-             if (CurrentSB%Inside(xPr(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20)) &
-                      Prtype(i,j,k) = CurrentSB%numofbody
+        do k = 0, Prnz+1
+          if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
+          do j = 0, Prny+1
+            if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
+            do i = 0, Prnx+1
+              if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
+              if (CurrentSB%Inside(xPr(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20)) &
+                        Prtype(i,j,k) = CurrentSB%numofbody
+            enddo
           enddo
-         enddo
         enddo
         !$omp end parallel do
       end subroutine
@@ -117,14 +121,16 @@ contains
         if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = 0,Unz+1
-         if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle 
-         do j = 0,Uny+1
-          do i = 0,Unx+1
-             if (CurrentSB%Inside(xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20))&
-                       Utype(i,j,k) = CurrentSB%numofbody
+        do k = 0, Unz+1
+          if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle 
+          do j = 0, Uny+1
+            if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
+            do i = 0, Unx+1
+              if (xU(i) > obstacles_bbox(Ea) .or. xU(i) < obstacles_bbox(We)) cycle
+              if (CurrentSB%Inside(xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20)) &
+                         Utype(i,j,k) = CurrentSB%numofbody
+            enddo
           enddo
-         enddo
         enddo
         !$omp end parallel do
       end subroutine
@@ -136,14 +142,16 @@ contains
         if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = 0,Vnz+1
-         if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
-         do j = 0,Vny+1
-          do i = 0,Vnx+1
-             if (CurrentSB%Inside(xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20))&
-                       Vtype(i,j,k) = CurrentSB%numofbody
+        do k = 0, Vnz+1
+          if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
+          do j = 0, Vny+1
+            if (yV(j) > obstacles_bbox(No) .or. yV(j) < obstacles_bbox(So)) cycle
+            do i = 0, Vnx+1
+              if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
+              if (CurrentSB%Inside(xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20)) &
+                         Vtype(i,j,k) = CurrentSB%numofbody
+            enddo
           enddo
-         enddo
         enddo
         !$omp end parallel do
       end subroutine
@@ -153,14 +161,16 @@ contains
         integer i,j,k
 
         !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = 0,Wnz+1
-         if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
-         do j = 0,Wny+1
-          do i = 0,Wnx+1
-             if (CurrentSB%Inside(xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._knd/3)/20))&
-                       Wtype(i,j,k) = CurrentSB%numofbody
+        do k = 0, Wnz+1
+          if (zW(k) > obstacles_bbox(To) .or. zW(k) < obstacles_bbox(Bo)) cycle
+          do j = 0, Wny+1
+            if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
+            do i = 0, Wnx+1
+              if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
+              if (CurrentSB%Inside(xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._knd/3)/20)) &
+                         Wtype(i,j,k) = CurrentSB%numofbody
+            enddo
           enddo
-         enddo
         enddo
         !$omp end parallel do
       end subroutine
