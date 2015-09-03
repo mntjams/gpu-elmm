@@ -39,34 +39,22 @@ contains
     !We do not want to get the outside points into the stencil.
     !It causes too large difference between the original and filtered value.
     if (Btype(We)==NOSLIP.or.Btype(We)==DIRICHLET) then
-      smini = + 1
-    else
-      smini = 0
+      mini = mini + 1
     end if
     if (Btype(Ea)==NOSLIP.or.Btype(Ea)==DIRICHLET) then
-      smaxi = - 1
-    else
-      smaxi = 0
+      maxi = maxi - 1
     end if
     if (Btype(So)==NOSLIP.or.Btype(So)==DIRICHLET) then
-      sminj = + 1
-    else
-      sminj = 0
+      minj = minj + 1
     end if
     if (Btype(No)==NOSLIP.or.Btype(No)==DIRICHLET) then
-      smaxj = - 1
-    else
-      smaxj = 0
+      maxj = maxj - 1
     end if
     if (Btype(Bo)==NOSLIP.or.Btype(Bo)==DIRICHLET) then
-      smink = + 1
-    else
-      smink = 0
+      mink = mink + 1
     end if
     if (Btype(To)==NOSLIP.or.Btype(To)==DIRICHLET) then
-      smaxk = - 1
-    else
-      smaxk = 0
+      maxk = maxk - 1
     end if
 
     !$omp parallel private(i, j, k, tmp) shared(U, mini, maxi, minj, maxj, mink, maxk)
@@ -99,7 +87,7 @@ contains
     do j = minj, maxj
       do i = mini, maxi
         tmp(:ubound(U,3)) = Uf(i,j,:)
-        do k = mink + smink, maxk + smaxk
+        do k = mink, maxk
           if (all(Utype(i,j,k-1:k+1)<=0)) then
             Uf(i,j,k) = 0.25 * (tmp(k+1) + 2 * tmp(k) + tmp(k-1))
           end if
