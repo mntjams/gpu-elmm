@@ -27,8 +27,8 @@ module Outputs
          
   type ProfileSwitches
     real(knd) :: average_start = 0, average_end = -1
-    real(knd) :: instant_start = 0, instant_end = -1, instant_interval = huge(1)
-    real(knd) :: running_start = 0, running_end = -1, running_interval = huge(1)
+    real(knd) :: instant_start = 0, instant_end = -1, instant_interval = huge(1.0_knd)
+    real(knd) :: running_start = 0, running_end = -1, running_interval = huge(1.0_knd)
   end type
   
   type(ProfileSwitches) :: profiles_config
