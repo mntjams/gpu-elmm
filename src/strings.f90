@@ -104,6 +104,10 @@ contains
           if (pos>1) call res%add(token)
           token = s
           call send
+        else if (s==','.or.s=='=') then
+          if (pos>1) call res%add(token)
+          token = s
+          call send
         else if (s=='"') then
           if (pos>1) then
             ierr = 1
@@ -331,6 +335,21 @@ contains
 
         call get_field(fields%array(size(tmp)+1), pos, stat)
         if (stat /= 0) return
+
+        if (tokens(pos) /= ')' .and. tokens(pos) /= ',') then
+          write(*,*) "Error in '" // &
+                     fname // &
+                     "', expected '" // &
+                     ",' or ')" // &
+                     "' read '" // &
+                     downcase(tokens(pos)) // &
+                     "' instead."
+          stat = 1
+        else if (tokens(pos) == ',') then
+          pos = pos + 1
+        end if
+        if (stat /= 0) return
+
       end do
     end subroutine
 
