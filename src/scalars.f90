@@ -1059,7 +1059,7 @@ contains
   subroutine ScalarDiffusion_nobranch(Scal2, Scal)
     real(knd), contiguous, intent(inout) :: Scal2(-1:,-1:,-1:)
     real(knd), contiguous, intent(in)    :: Scal(-1:,-1:,-1:)
-    integer, parameter :: narr = 6
+    integer, parameter :: narr = 3
     integer :: i, j, k, bi, bj, bk
     integer :: xi, yj, zk
     real(knd) :: Ax, Ay, Az
