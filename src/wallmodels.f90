@@ -242,7 +242,9 @@ contains
         if (associated(p)) then
           WMPoints(i) = p
         else
-          call error_stop("Assert error, pointer not associated. File "//__FILE__//" line ",__LINE__)
+          call error_stop("Assert error, pointer not associated. File "// &
+            __FILE__ &
+            //" line ",__LINE__)
         end if
       end do
 
@@ -321,7 +323,9 @@ contains
           if (associated(p)) then
             arr(i) = p
           else
-            write(*,*) "Assert error, pointer not associated. File ",__FILE__," line ",__LINE__
+            write(*,*) "Assert error, pointer not associated. File ", &
+              __FILE__ &
+              ," line ",__LINE__
             call error_stop
           end if
         end do
