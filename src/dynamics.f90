@@ -799,7 +799,7 @@ contains
     !$omp end do
 #define comp 1
 #define wrk U2
-#include "wmfluxes-nobranch-inc.f90"
+#include "wmfluxes-nobranch-U-inc.f90"
 #undef wrk
 #undef comp
 
@@ -832,7 +832,7 @@ contains
     !$omp end do
 #define comp 2
 #define wrk V2
-#include "wmfluxes-nobranch-inc.f90"
+#include "wmfluxes-nobranch-V-inc.f90"
 #undef wrk
 #undef comp
 
@@ -865,7 +865,7 @@ contains
     !$omp end do
 #define comp 3
 #define wrk W2
-#include "wmfluxes-nobranch-inc.f90"
+#include "wmfluxes-nobranch-W-inc.f90"
 #undef wrk
 #undef comp
     !$omp end parallel

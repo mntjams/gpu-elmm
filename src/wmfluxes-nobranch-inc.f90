@@ -1,3 +1,10 @@
+!These macros generate lines too long for Fortran.
+!This file is therefore used only to generate the 
+!files specific to each component which is than adjusted by hand 
+!to havelines short enough.
+!Command to generate specific files:
+!    gfortran -E -cpp -Dcomp=1  wmfluxes-nobranch-inc.f90 > wmfluxes-nobranch-U-inc.f90
+
 #if comp == 1
 
 #define xm UxmWMpoints 
