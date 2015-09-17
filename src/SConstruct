@@ -401,6 +401,8 @@ objs += env.Object(target = target_dir + 'initial',            source = 'initial
 objs += env.Object(target = target_dir + 'advection',          source = 'advection.f90')
 objs += env.Object(target = target_dir + 'sponge',             source = 'sponge.f90')
 objs += env.Object(target = target_dir + 'dynamics',           source = 'dynamics.f90')
+Depends(objs[-1], 'wmfluxes-inc.f90')
+Depends(objs[-1], 'wmfluxes-nobranch-inc.f90')
 objs += env.Object(target = target_dir + 'tsteps',             source = 'tsteps.f90')
 objs += env.Object(target = target_dir + 'main',               source = 'main.f90')
 

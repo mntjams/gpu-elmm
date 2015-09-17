@@ -764,7 +764,7 @@ contains
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U2,V2,W2
     real(knd) :: recdxmin2, recdymin2, recdzmin2
     integer :: i,j,k,bi,bj,bk
-    integer, parameter :: narr = 6
+    integer, parameter :: narr = 3
        
     recdxmin2 = 1._knd / dxmin**2
     recdymin2 = 1._knd / dymin**2
@@ -779,7 +779,7 @@ contains
         do j = bj, min(bj+tileny(narr)-1,Uny)
          do i = bi, min(bi+tilenx(narr)-1,Unx)
              U2(i,j,k) = U2(i,j,k) + &
-              nu(i+1,j,k) * (U(i+1,j,k)-U(i,j,k)) *recdxmin2
+              nu(i+1,j,k) * (U(i+1,j,k)-U(i,j,k)) * recdxmin2
              U2(i,j,k) = U2(i,j,k) - &
                nu(i,j,k) * (U(i,j,k)-U(i-1,j,k)) * recdxmin2 
              U2(i,j,k) = U2(i,j,k) + &
