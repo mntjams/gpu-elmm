@@ -23,8 +23,6 @@ contains
     integer :: i, j, k, bi, bj, bk
     integer :: mini, minj, mink
     integer :: maxi, maxj, maxk
-    integer :: smini, sminj, smink
-    integer :: smaxi, smaxj, smaxk
 
     real(knd) :: tmp(-2:max(ubound(U,1), ubound(U,2), ubound(U,3)))
 
@@ -62,7 +60,7 @@ contains
     do k = mink, maxk
       do j = minj, maxj
         tmp(:ubound(U,1)) = U(:,j,k)
-        do i = mini + smini, maxi + smaxi
+        do i = mini, maxi
           if (all(Utype(i-1:i+1,j,k)<=0)) then
             Uf(i,j,k) = 0.25 * (tmp(i+1) + 2 * tmp(i) + tmp(i-1))
           else
@@ -76,7 +74,7 @@ contains
     do k = mink, maxk
       do i = mini, maxi
         tmp(:ubound(U,2)) = Uf(i,:,k)
-        do j = minj + sminj, maxj + smaxj
+        do j = minj, maxj
           if (all(Utype(i,j-1:j+1,k)<=0)) &
             Uf(i,j,k) = 0.25 * (tmp(j+1) + 2 * tmp(j) + tmp(j-1))
         end do
