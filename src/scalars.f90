@@ -195,7 +195,7 @@ contains
         end do
         !$omp end parallel do
 
-        if (explicit_scalar_diffusion) call ScalarDiffusion(Array_adv, Array)
+        if (explicit_scalar_diffusion) call ScalarDiffusion_nobranch(Array_adv, Array)
 
         call extra_procedure
 
