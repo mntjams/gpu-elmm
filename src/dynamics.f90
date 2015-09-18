@@ -347,7 +347,7 @@ contains
 
     call StressBoundaryFlux(Ustar, Vstar, dt)
 
-    if (explicit_diffusion) call MomentumDiffusion(Ustar, Vstar, Wstar, U, V, W)
+    if (explicit_diffusion) call MomentumDiffusion_nobranch(Ustar, Vstar, Wstar, U, V, W)
 
 
     !$omp parallel private(i,j,k)
