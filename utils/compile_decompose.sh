@@ -1,0 +1,1 @@
+mpif90 -g -fbacktrace -fcheck=all -Wall ../bin/gcc/mpi-debug/P/*.o ../bin/gcc/mpi-debug/stop.o ../bin/gcc/mpi-debug/parameters.o ../bin/gcc/mpi-debug/custom_mpi.o ../bin/gcc/mpi-debug/lists.o  ../bin/gcc/mpi-debug/strings.o -I../bin/gcc/mpi-debug/ decomposevtk.f90 -lpfft -lpfftf -lfftw3_mpi -lfftw3f_mpi -lfftw3 -lfftw3f -o decomposevtk
