@@ -154,7 +154,7 @@ else:
     check_flag = '  -fbacktrace -g'
   else:
     fast_flag = ' -O5 -ffast-math -fno-protect-parens'
-    c_check_flag = ' -g -Wall -Wno-unused -Wno-maybe-uninitialized'
+    c_check_flag = '  -fbacktrace -g -Wall -Wno-unused -Wno-maybe-uninitialized'
     check_flag = c_check_flag + ' -fbacktrace -Waliasing -Wimplicit-interface -Wsurprising -Wno-unused-dummy-argument -Wno-aliasing  -fcheck=all  -Werror'
 
   if str(sanitize)=='yes':
