@@ -199,7 +199,7 @@ contains
     integer :: ie
     integer :: required, provided
 
-    required = MPI_THREAD_FUNNELED
+    required = MPI_THREAD_SERIALIZED
   
     call MPI_Init_thread(required, provided, ie)
     if (ie/=0) call error_stop("Error in MPI_Init")
