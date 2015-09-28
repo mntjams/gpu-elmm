@@ -1728,7 +1728,7 @@ contains
     real(knd) dist(3), vel(3), wallvel(3), prgrad(3)
     real(knd) visc
 
-    !$omp parallel do private(i,xi,yj,zk,tdif, vel, wallvel, dist, prgrad, visc)
+    !$omp parallel do private(i,xi,yj,zk,tdif, vel, wallvel, dist, prgrad, visc) schedule(guided,5)
     do i = 1,size(WMPoints)
 
       xi = WMPoints(i)%xi
@@ -1851,7 +1851,7 @@ contains
       
       drec = [1/dxmin, 1/dxmin, 1/dymin, 1/dymin, 1/dzmin, 1/dzmin]
 
-      !$omp parallel do private(point,xi,yj,zk,dist,vel,wallvel,tan_vect,p,mag)
+      !$omp parallel do private(point,xi,yj,zk,dist,vel,wallvel,tan_vect,p,mag) schedule(guided,5)
       do point = 1,size(points)
 
 !         associate (p => points(i))  NOTE: ASSOCIATE supported only in OpenMP 4
@@ -1998,9 +1998,22 @@ contains
   end function
 
 
-  pure real(knd) function GroundUstar()
-    if (any(WMPoints%zk == 1)) then
-      GroundUstar = sum(WMPoints%ustar, mask = (WMPoints%zk == 1)) / count(WMPoints%zk == 1)
+  real(knd) function GroundUstar()
+    integer :: i, n
+
+    if (offset_to_global_z==0) then
+      GroundUstar = 0
+      n = 0
+      !$omp parallel do private(i) reduction(+:GroundUstar,n) schedule(guided,5)
+      do i = 1, size(WMPoints)
+        if (WMPoints(i)%zk==1) then
+          GroundUstar = GroundUstar + WMPoints(i)%ustar
+          n = n + 1
+        end if
+      end do
+      !$omp end parallel do
+
+      GroundUstar = GroundUstar / max(n, 1)
     else
       GroundUstar = 0
     end if
@@ -2008,24 +2021,27 @@ contains
 
 
   real(knd) function GroundUstarUVW() result(res)
-    integer :: i, j, n
+    integer :: i, j, k, n
 
     if (any(WMPoints%zk == 1)) then
       res = 0
       n = 0
+      !$omp parallel reduction(+:res,n)
       do j = 1,2
         do i = 1,6
-          associate(p => WMPointsUVW(i,j))
-            n = n +  count(p%points%zk == 1)
-            res = res + sum(p%points%ustar, mask = (p%points%zk == 1))
-          end associate
+            !$omp do private(k) schedule(guided,5)
+            do k = 1, size(WMPointsUVW(i,j)%points)
+              if (WMPointsUVW(i,j)%points(k)%zk==1) then
+                res = res + WMPointsUVW(i,j)%points(k)%ustar
+                n = n + 1
+              end if
+            end do
+            !$omp end do nowait
         end do
       end do
-      if (n>0) then
-        res = res / n
-      else
-        res = 0
-      end if
+      !$omp end parallel
+
+      res = res / max(n, 1)
     else
       res = 0
     end if
