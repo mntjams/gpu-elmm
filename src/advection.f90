@@ -23,7 +23,7 @@ contains
     Ay = 0.25_knd / dymin
     Az = 0.25_knd / dzmin
 
-    !$omp parallel do private(i, j, k, bi, bj, bk)
+    !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
     do bk = 1, Unz, tilenz(narr)
       do bj = 1, Uny, tileny(narr)
         do bi = 1, Unx, tilenx(narr)
@@ -61,7 +61,7 @@ contains
     Ay = 0.25_knd / dymin
     Az = 0.25_knd / dzmin
 
-    !$omp parallel do private(i, j, k, bi, bj, bk)
+    !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
     do bk = 1, Vnz, tilenz(narr)
       do bj = 1, Vny, tileny(narr)
         do bi = 1, Vnx, tilenx(narr)
@@ -98,7 +98,7 @@ contains
     Ay = 0.25_knd / dymin
     Az = 0.25_knd / dzmin
 
-    !$omp parallel do private(i, j, k, bi, bj, bk)
+    !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
     do bk = 1, Wnz, tilenz(narr)
       do bj = 1, Wny, tileny(narr)
         do bi = 1, Wnx, tilenx(narr)
@@ -141,7 +141,7 @@ contains
     Ay = 0.125_knd / dymin
     Az = 0.125_knd / dzmin
 
-    !$omp parallel do private(i, j, k, bi, bj, bk)
+    !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
     do bk = 1, Unz, tilenz(narr)
       do bj = 1, Uny, tileny(narr)
         do bi = 1, Unx, tilenx(narr)
@@ -178,7 +178,7 @@ contains
     Ay = 0.5_knd / dymin
     Az = 0.125_knd / dzmin
 
-    !$omp parallel do private(i, j, k, bi, bj, bk)
+    !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
     do bk = 1, Vnz, tilenz(narr)
       do bj = 1, Vny, tileny(narr)
         do bi = 1, Vnx, tilenx(narr)
@@ -215,7 +215,7 @@ contains
     Ay = 0.125_knd / dymin
     Az = 0.5_knd / dzmin
 
-    !$omp parallel do private(i, j, k, bi, bj, bk)
+    !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
     do bk = 1, Wnz, tilenz(narr)
       do bj = 1, Wny, tileny(narr)
         do bi = 1, Wnx, tilenx(narr)
@@ -255,10 +255,10 @@ contains
     real(knd), contiguous, intent(out) :: U2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
 
-    U2 = 0
+    call set(U2, 0)
     call CDUdiv(U2, U, V, W)
     call CDUadv(U2, U, V, W)
-    U2 = U2 / 2
+    call multiply(U2, 0.5_knd)
   end subroutine CDU
 
 
@@ -270,10 +270,10 @@ contains
     real(knd), contiguous, intent(out) :: V2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
 
-    V2 = 0
+    call set(V2, 0)
     call CDVdiv(V2, U, V, W)
     call CDVadv(V2, U, V, W)
-    V2 = V2 / 2
+    call multiply(V2, 0.5_knd)
   end subroutine CDV
 
 
@@ -284,10 +284,10 @@ contains
     real(knd), contiguous, intent(out) :: W2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
 
-    W2 = 0
+    call set(W2, 0)
     call CDWdiv(W2, U, V, W)
     call CDWadv(W2, U, V, W)
-    W2 = W2 / 2
+    call multiply(W2, 0.5_knd)
   end subroutine CDW
 
 
@@ -312,7 +312,7 @@ contains
     call set(U2, 0._knd)
 
     !$omp parallel private(bi, bj, bk, i, j, k, li, lj, lk, Uint, Vint, Wint, dU, UV1, UV3)
-    !$omp do
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Unz, tilenz(narr)
      do bj = 1, Uny, tileny(narr)
       do bi = 1, Unx, tilenx(narr)
@@ -356,7 +356,7 @@ contains
     end do
     !$omp end do
 
-    !$omp do
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Unz, tilenz(narr)
      do bj = 1, Uny, tileny(narr)
       do bi = 1, Unx, tilenx(narr)
@@ -400,7 +400,7 @@ contains
     end do
     !$omp end do
 
-    !$omp do
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Unz, tilenz(narr)
      do bj = 1, Uny, tileny(narr)
       do bi = 1, Unx, tilenx(narr)
@@ -476,7 +476,7 @@ contains
     call set(V2, 0._knd)
 
     !$omp parallel private(bi, bj, bk, i, j, k, li, lj, lk, Uint, Vint, Wint, dV, UV1, UV3)
-    !$omp do
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Vnz, tilenz(narr)
      do bj = 1, Vny, tileny(narr)
       do bi = 1, Vnx, tilenx(narr)
@@ -520,7 +520,7 @@ contains
     end do
     !$omp end do
 
-    !$omp do
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Vnz, tilenz(narr)
      do bj = 1, Vny, tileny(narr)
       do bi = 1, Vnx, tilenx(narr)
@@ -564,7 +564,7 @@ contains
     end do
     !$omp end do
 
-    !$omp do
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Vnz, tilenz(narr)
      do bj = 1, Vny, tileny(narr)
       do bi = 1, Vnx, tilenx(narr)
@@ -645,7 +645,7 @@ contains
     call set(W2, 0._knd)
 
     !$omp parallel private(bi, bj, bk, i, j, k, li, lj, lk, Uint, Vint, Wint, dW, UV1, UV3)
-    !$omp do
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Wnz, tilenz(narr)
      do bj = 1, Wny, tileny(narr)
       do bi = 1, Wnx, tilenx(narr)
@@ -689,7 +689,7 @@ contains
     end do
     !$omp end do
 
-    !$omp do
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Wnz, tilenz(narr)
      do bj = 1, Wny, tileny(narr)
       do bi = 1, Wnx, tilenx(narr)
@@ -733,7 +733,7 @@ contains
     end do
     !$omp end do
 
-    !$omp do
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Wnz, tilenz(narr)
      do bj = 1, Wny, tileny(narr)
       do bi = 1, Wnx, tilenx(narr)
