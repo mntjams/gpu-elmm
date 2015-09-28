@@ -56,7 +56,7 @@ contains
     end if
 
     !$omp parallel private(i, j, k, tmp) shared(U, mini, maxi, minj, maxj, mink, maxk)
-    !$omp do
+    !$omp do collapse(2) schedule(dynamic,4)
     do k = mink, maxk
       do j = minj, maxj
         tmp(:ubound(U,1)) = U(:,j,k)
@@ -70,7 +70,7 @@ contains
       end do
     end do
 
-    !$omp do
+    !$omp do schedule(dynamic)
     do k = mink, maxk
       do i = mini, maxi
         tmp(:ubound(U,2)) = Uf(i,:,k)
@@ -81,7 +81,7 @@ contains
       end do
     end do
 
-    !$omp do
+    !$omp do collapse(2) schedule(guided)
     do j = minj, maxj
       do i = mini, maxi
         tmp(:ubound(U,3)) = Uf(i,j,:)
