@@ -13,8 +13,8 @@ module Subgrid
 
   integer :: sgstype
 
-  integer, parameter, public :: SmagorinskyModel=1, SigmaModel=2, VremanModel=3, &
-                                StabSubgridModel=4, MixedTimeScaleModel = 5
+  integer, parameter, public :: SmagorinskyModel = 1, SigmaModel = 2, VremanModel = 3, &
+                                StabSubgridModel = 4, MixedTimeScaleModel = 5
 
   contains
 
@@ -233,45 +233,43 @@ module Subgrid
          do k = bk, min(bk+tilenz(narr)-1,Prnz)
           do j = bj, min(bj+tileny(narr)-1,Prny)
            do i = bi, min(bi+tilenx(narr)-1,Prnx)
-            a(1,1) = (U(i,j,k)-U(i-1,j,k))/dxmin
-            a(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._knd*dymin)
-            a(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._knd*dzmin)
+             a(1,1) = (U(i,j,k)-U(i-1,j,k))/dxmin
+             a(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._knd*dymin)
+             a(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._knd*dzmin)
 
-            a(2,2) = (V(i,j,k)-V(i,j-1,k))/dymin
-            a(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(4._knd*dxmin)
-            a(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(4._knd*dzmin)
+             a(2,2) = (V(i,j,k)-V(i,j-1,k))/dymin
+             a(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(4._knd*dxmin)
+             a(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(4._knd*dzmin)
 
-            a(3,3) = (W(i,j,k)-W(i,j,k-1))/dzmin
-            a(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4._knd*dxmin)
-            a(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4._knd*dymin)
+             a(3,3) = (W(i,j,k)-W(i,j,k-1))/dzmin
+             a(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4._knd*dxmin)
+             a(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4._knd*dymin)
 
-            do jj = 1, 3
-             do ii = 1, 3
-              b(ii,jj) = dx2 * a(1,ii) * a(1,jj) + &
-                         dy2 * a(2,ii) * a(2,jj) + &
-                         dz2 * a(3,ii) * a(3,jj)
+             do jj = 1, 3
+              do ii = 1, 3
+               b(ii,jj) = dx2 * a(1,ii) * a(1,jj) + &
+                          dy2 * a(2,ii) * a(2,jj) + &
+                          dz2 * a(3,ii) * a(3,jj)
+              end do
              end do
-            end do
 
-            bb =      b(1,1)*b(2,2) - b(1,2)**2
-            bb = bb + b(1,1)*b(3,3) - b(1,3)**2
-            bb = bb + b(2,2)*b(3,3) - b(2,3)**2
+             bb =      b(1,1)*b(2,2) - b(1,2)**2
+             bb = bb + b(1,1)*b(3,3) - b(1,3)**2
+             bb = bb + b(2,2)*b(3,3) - b(2,3)**2
 
-            aa = 0
+             aa = 0
 
-            do jj = 1, 3
-             do ii = 1, 3
-              aa = aa + (a(ii,jj)**2)
+             do jj = 1, 3
+              do ii = 1, 3
+               aa = aa + (a(ii,jj)**2)
+              end do
              end do
-            end do
 
 
-            if (abs(aa)>1e-5.and.bb>0)  then
-              Viscosity(i,j,k) = c2 * sqrt(bb/aa) + molecular_viscosity
-            else
-              Viscosity(i,j,k) = molecular_viscosity
-            end if
 
+             Viscosity(i,j,k) = c2 * sqrt(bb/aa)
+
+             Viscosity(i,j,k) = max(0._knd, Viscosity(i,j,k)) + molecular_viscosity
            end do
           end do
          end do
@@ -279,7 +277,6 @@ module Subgrid
        end do
       end do
       !$omp end parallel do
-
     endsubroutine SGS_Vreman
 
 
@@ -312,11 +309,9 @@ module Subgrid
 
             call Sigmas(s1,s2,s3,g)
 
-            if (s1>0) then
-              D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
-            else
-              D = 0
-            end if
+            D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
+
+            D = max(0._knd, D)
 
             Viscosity(i,j,k) = C * D + molecular_viscosity
 
@@ -358,7 +353,16 @@ module Subgrid
 
         real(sigma_knd) :: trG2, i1, i2, i3, a1, a2, a3, c, G(3,3)
 
-        G = real( matmul(transpose(grads),grads) ,sigma_knd)
+        !G = matmul(transpose(grads),grads)
+        G(1,1) = grads(1,1)**2           + grads(2,1)**2           + grads(3,1)**2
+        G(1,2) = grads(1,1) * grads(1,2) + grads(2,1) * grads(2,2) + grads(3,1) * grads(3,2)
+        G(1,3) = grads(1,1) * grads(1,3) + grads(2,1) * grads(2,3) + grads(3,1) * grads(3,3)
+        G(2,1) = grads(1,1) * grads(1,2) + grads(2,1) * grads(2,2) + grads(3,1) * grads(3,2)
+        G(2,2) = grads(1,2)**2           + grads(2,2)**2           + grads(3,2)**2
+        G(2,3) = grads(1,2) * grads(1,3) + grads(2,2) * grads(2,3) + grads(3,2) * grads(3,3)
+        G(3,1) = grads(1,1) * grads(1,3) + grads(2,1) * grads(2,3) + grads(3,1) * grads(3,3)
+        G(3,2) = grads(1,2) * grads(1,3) + grads(2,2) * grads(2,3) + grads(3,2) * grads(3,3)
+        G(3,3) = grads(1,3)**2           + grads(2,3)**2           + grads(3,3)**2
 
         trG2 = dot_product(G(:,1),G(:,1)) +&
                dot_product(G(:,2),G(:,2)) +&
@@ -464,11 +468,9 @@ module Subgrid
 
             call Sigmas(s1,s2,s3,g)
 
-            if (s1>0) then
-              D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
-            else
-              D = 0
-            end if
+            D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
+
+            D = max(0._knd, D)
 
             Viscosity(i,j,k) = C * D
 
