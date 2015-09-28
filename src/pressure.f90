@@ -318,12 +318,16 @@ contains
       !$omp workshare
       Phi_ref = sum(Pr(1:Prnx,1:Prny,Prnz))
       !$omp end workshare
+      !$omp single
       Phi_ref = par_co_sum(Phi_ref, comm = comm_plane_xy)
       Phi_ref = Phi_ref / (gPrnx * gPrny)
+      !$omp end single
     end if
 
     !all kim==nzims broadcast to images with smaller kim
+    !$omp single
     call par_broadcast_from_top(Phi_ref)
+    !$omp end single
 
 #else
     !$omp workshare
@@ -336,16 +340,15 @@ contains
     
 
     !$omp end parallel
-!     !$omp sections
-!     !$omp section
+
     call BoundU(1,U,Uin)
-!     !$omp section
+
     call BoundU(2,V,Vin)
-!     !$omp section
+
     call BoundU(3,W,Win)
-!     !$omp section
+
     call Bound_Pr(Pr)
-!     !$omp end sections
+
 
 
     if (check_divergence) then
