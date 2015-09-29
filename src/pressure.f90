@@ -113,27 +113,25 @@ contains
     real(knd) :: S
     integer   :: i,j,k
 
-!     !$omp parallel
-!     !$omp sections
-!     !$omp section
+
     call BoundU(1,U,Uin)
-!     !$omp section
+
     call BoundU(2,V,Vin)
-!     !$omp section
+
     call BoundU(3,W,Win)
-!     !$omp end sections
-!     !$omp end parallel
+
 
     if (correctcompatibility>=1) then
       S=0
       !$omp parallel do private(i,j,k) reduction(+:S)
-      do k=1,Prnz
-       do j=1,Prny
-        do i=1,Prnx
-         S = S + (-((U(i,j,k)-U(i-1,j,k))/(dxmin)+(V(i,j,k)-V(i,j-1,k))/(dymin)+(W(i,j,k)-W(i,j,k-1))&
-                      /(dzmin)))
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            S = S - ((U(i,j,k) - U(i-1,j,k)) / (dxmin) + &
+                    (V(i,j,k) - V(i,j-1,k)) / (dymin) + &
+                    (W(i,j,k) - W(i,j,k-1)) / (dzmin))
+          end do
         end do
-       end do
       end do
       !$omp end parallel do
 
@@ -192,29 +190,29 @@ contains
 
     if (allocated(Q)) then
       !$omp parallel do private(i,j,k)
-      do k=1,Prnz            !divergence of U -> RHS
-       do j=1,Prny
-        do i=1,Prnx
+      do k = 1, Prnz            !divergence of U -> RHS
+        do j = 1, Prny
+          do i = 1, Prnx
              RHS(i,j,k) = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
                          +(V(i,j,k)-V(i,j-1,k))/(dymin)&
                          +(W(i,j,k)-W(i,j,k-1))/(dzmin)&
                          -Q(i,j,k)
              RHS(i,j,k) = RHS(i,j,k)/(dt2)
+          end do
         end do
-       end do
       end do
       !$omp end parallel do
     else
       !$omp parallel do private(i,j,k)
-      do k=1,Prnz            !divergence of U -> RHS
-       do j=1,Prny
-        do i=1,Prnx
+      do k = 1, Prnz            !divergence of U -> RHS
+        do j = 1, Prny
+          do i = 1, Prnx
              RHS(i,j,k) = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
                          +(V(i,j,k)-V(i,j-1,k))/(dymin)&
                          +(W(i,j,k)-W(i,j,k-1))/(dzmin)
              RHS(i,j,k) = RHS(i,j,k)/(dt2)
+          end do
         end do
-       end do
       end do
       !$omp end parallel do
     end if
@@ -255,59 +253,59 @@ contains
     dzmin2 = dzmin**2
 
 
-    !$omp parallel
-    !$omp do private(k,j,i)
-    do k=1,Unz
-     do j=1,Uny
-      do i=1,Unx
-        U(i,j,k)=U(i,j,k)-Au*(Phi(i+1,j,k)-Phi(i,j,k))
+    !$omp parallel private (i,j,k)
+    !$omp do
+    do k = 1, Unz
+      do j = 1, Uny
+        do i = 1, Unx
+          U(i,j,k) = U(i,j,k) - Au * (Phi(i+1,j,k) - Phi(i,j,k))
+        end do
       end do
-     end do
     end do
     !$omp end do nowait
-    !$omp do private(k,j,i)
-    do k=1,Vnz
-     do j=1,Vny
-      do i=1,Vnx
-        V(i,j,k)=V(i,j,k)-Av*(Phi(i,j+1,k)-Phi(i,j,k))
+    !$omp do
+    do k = 1, Vnz
+      do j = 1, Vny
+        do i = 1, Vnx
+          V(i,j,k) = V(i,j,k) - Av * (Phi(i,j+1,k) - Phi(i,j,k))
+        end do
       end do
-     end do
     end do
     !$omp end do nowait
-    !$omp do private(k,j,i)
-    do k=1,Wnz
-     do j=1,Wny
-      do i=1,Wnx
-        W(i,j,k)=W(i,j,k)-Aw*(Phi(i,j,k+1)-Phi(i,j,k))
+    !$omp do
+    do k = 1, Wnz
+      do j = 1, Wny
+        do i = 1, Wnx
+          W(i,j,k) = W(i,j,k) - Aw * (Phi(i,j,k+1) - Phi(i,j,k))
+        end do
       end do
-     end do
     end do
     !$omp end do nowait
 
     if (explicit_diffusion) then
-      !$omp do private(k,j,i)
-      do k=1,Prnz
-       do j=1,Prny
-        do i=1,Prnx
-          Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k)
+      !$omp do
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k)
+          end do
         end do
-       end do
       end do
       !$omp end do
     else
-      !$omp do private(k,j,i)
-      do k=1,Prnz
-       do j=1,Prny
-        do i=1,Prnx
-          Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k) - &
-                       dt3 * Viscosity(i,j,k) * (((Phi(i+1,j,k)-Phi(i,j,k)) - &
-                                                  (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
-                                                 ((Phi(i,j+1,k)-Phi(i,j,k)) - &
-                                                  (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
-                                                 ((Phi(i,j,k+1)-Phi(i,j,k)) - &
-                                                  (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
+      !$omp do
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k) - &
+                        dt3 * Viscosity(i,j,k) * (((Phi(i+1,j,k)-Phi(i,j,k)) - &
+                                                   (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
+                                                  ((Phi(i,j+1,k)-Phi(i,j,k)) - &
+                                                   (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
+                                                  ((Phi(i,j,k+1)-Phi(i,j,k)) - &
+                                                   (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
+          end do
         end do
-       end do
       end do
       !$omp end do
     end if
@@ -315,9 +313,14 @@ contains
 #ifdef PAR
     !images in top plane compute the reference pressure
     if (kim==nzims) then
-      !$omp workshare
-      Phi_ref = sum(Pr(1:Prnx,1:Prny,Prnz))
-      !$omp end workshare
+      !$omp do reduction(+:Phi_ref)
+      do j = 1, Prny
+        do i = 1, Prnx
+          Phi_ref = Phi_ref + Pr(i,j,Prnz)
+        end do
+      end do
+      !$omp end do
+
       !$omp single
       Phi_ref = par_co_sum(Phi_ref, comm = comm_plane_xy)
       Phi_ref = Phi_ref / (gPrnx * gPrny)
@@ -330,14 +333,25 @@ contains
     !$omp end single
 
 #else
-    !$omp workshare
-    Phi_ref = sum(Pr(1:Prnx,1:Prny,Prnz)) / (Prnx*Prny)
-    !$omp end workshare
+
+    !$omp do reduction(+:Phi_ref)
+    do j = 1, Prny
+      do i = 1, Prnx
+        Phi_ref = Phi_ref + Pr(i,j,Prnz)
+      end do
+    end do
+    !$omp end do
 #endif
-    !$omp workshare
-    Pr = Pr - (Phi_ref - top_pressure)
-    !$omp end workshare
-    
+
+    !$omp do reduction(+:Phi_ref)
+    do k = 1, Prnz
+      do j = 1, Prny
+        do i = 1, Prnx
+          Pr(i,j,k) = Pr(i,j,k) - (Phi_ref - top_pressure)
+        end do
+      end do
+    end do
+    !$omp end do   
 
     !$omp end parallel
 
@@ -355,29 +369,31 @@ contains
       S = 0
       if (allocated(Q)) then
         !$omp parallel do private(i,j,k,p) reduction(max:S)
-        do k=1,Prnz            !divergence of U -> RHS
-         do j=1,Prny
-          do i=1,Prnx
-               p = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
-                           +(V(i,j,k)-V(i,j-1,k))/(dymin)&
-                           +(W(i,j,k)-W(i,j,k-1))/(dzmin)&
-                           -Q(i,j,k)
+        do k = 1, Prnz            !divergence of U -> RHS
+          do j = 1, Prny
+            do i = 1, Prnx
+               p =   (U(i,j,k) - U(i-1,j,k)) / (dxmin) &
+                   + (V(i,j,k) - V(i,j-1,k)) / (dymin) &
+                   + (W(i,j,k) - W(i,j,k-1)) / (dzmin) &
+                   - Q(i,j,k)
+
                S = max(S,abs(p))
+            end do
           end do
-         end do
         end do
         !$omp end parallel do
       else
         !$omp parallel do private(i,j,k,p) reduction(max:S)
-        do k=1,Prnz            !divergence of U -> RHS
-         do j=1,Prny
-          do i=1,Prnx
-               p = (U(i,j,k)-U(i-1,j,k))/(dxmin)&
-                           +(V(i,j,k)-V(i,j-1,k))/(dymin)&
-                           +(W(i,j,k)-W(i,j,k-1))/(dzmin)
+        do k = 1, Prnz            !divergence of U -> RHS
+          do j = 1, Prny
+            do i = 1, Prnx
+               p =   (U(i,j,k) - U(i-1,j,k)) / (dxmin) &
+                   + (V(i,j,k) - V(i,j-1,k)) / (dymin) &
+                   + (W(i,j,k) - W(i,j,k-1)) / (dzmin)
+
                S = max(S,abs(p))
+            end do
           end do
-         end do
         end do
         !$omp end parallel do
       end if
