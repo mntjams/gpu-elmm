@@ -798,10 +798,14 @@ contains
     allocate(Scfly_mask(Prnx,0:Prny,Prnz))
     allocate(Scflz_mask(Prnx,Prny,0:Prnz))
 
+    !$omp parallel
+    !$omp workshare
     Scflx_mask = .true.
     Scfly_mask = .true.
     Scflz_mask = .true.
+    !$omp end workshare
 
+    !$omp do collapse(3) schedule(dynamic, 100)
     do k = 1, Prnz
       do j = 1, Prny
         do i = 1, Prnx
@@ -812,9 +816,13 @@ contains
       end do
     end do
 
+    !$omp single
     nx = 0
     ny = 0
     nz = 0
+    !$omp end single
+
+    !$omp do reduction(+:nx,ny,nz) collapse(3) schedule(dynamic, 100)
     do k = 1, Prnz
       do j = 1, Prny
         do i = 1, Prnx
@@ -824,6 +832,7 @@ contains
         end do
       end do
     end do
+    !$omp end parallel
 
     allocate(Scflx_points(nx))
     allocate(Scfly_points(ny))
@@ -831,6 +840,8 @@ contains
     nx = 0
     ny = 0
     nz = 0
+
+    
     do k = 1, Prnz
       do j = 1, Prny
         do i = 1, Prnx
@@ -876,38 +887,40 @@ contains
       fly = .true.
       flz = .true.
 
+      !$omp parallel
 
+      !$omp do private(i)
       do i = 1, size(xm)
-        associate(p => xm(i))
-            flx(p%xi,p%yj,p%zk) = .false.
-        end associate
+        flx(xm(i)%xi,xm(i)%yj,xm(i)%zk) = .false.
       end do
+      !$omp end do
+      !$omp do private(i)
       do i = 1, size(xp)
-        associate(p => xp(i))
-            flx(p%xi+1,p%yj,p%zk) = .false.
-        end associate
+        flx(xp(i)%xi+1,xp(i)%yj,xp(i)%zk) = .false.
       end do
+      !$omp end do nowait
+      !$omp do private(i)
       do i = 1, size(ym)
-        associate(p => ym(i))
-            fly(p%xi,p%yj,p%zk) = .false.
-        end associate
+        fly(ym(i)%xi,ym(i)%yj,ym(i)%zk) = .false.
       end do
+      !$omp end do
+      !$omp do private(i)
       do i = 1, size(yp)
-        associate(p => yp(i))
-            fly(p%xi,p%yj+1,p%zk) = .false.
-        end associate
+        fly(yp(i)%xi,yp(i)%yj+1,yp(i)%zk) = .false.
       end do
+      !$omp end do nowait
+      !$omp do private(i)
       do i = 1, size(zm)
-        associate(p => zm(i))
-            flz(p%xi,p%yj,p%zk) = .false.
-        end associate
+        flz(zm(i)%xi,zm(i)%yj,zm(i)%zk) = .false.
       end do
+      !$omp end do
+      !$omp do private(i)
       do i = 1, size(zp)
-        associate(p => zp(i))
-            flz(p%xi,p%yj,p%zk+1) = .false.
-        end associate
+        flz(zp(i)%xi,zp(i)%yj,zp(i)%zk+1) = .false.
       end do
+      !$omp end do
 
+      !$omp do private(i,j,k) collapse(3) schedule(dynamic, 100)
       do k = 1, nz
         do j = 1, ny
           do i = 1, nx
@@ -917,6 +930,9 @@ contains
           end do
         end do
       end do
+      !$omp end do
+
+      !$omp end parallel
     end subroutine
 
   end subroutine InitWMMasks
