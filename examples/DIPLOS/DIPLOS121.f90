@@ -23,8 +23,8 @@ subroutine  CustomSolidBodies
    
    points = base  
 
-   do j = -2, 5
-     do i = -2, 3
+   do j = -3, 5
+     do i = -3, 3
        points(1,:) = base(1,:) + i * period(1)
        points(2,:) = base(2,:) + j * period(2)
        call AddSolidBody(SolidBody(ConvexPolyhedron_FromTopPoints(points)))
