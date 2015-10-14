@@ -490,7 +490,7 @@ contains
     logical :: xdir, ydir, zdir
     integer :: nx, ny, nz
     
-    ierr = 0; status=0; tag = 0
+    ierr = 0; status = 0; tag = 0
     
     nx = Prnx
     ny = Prny
