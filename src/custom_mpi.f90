@@ -30,6 +30,7 @@ module custom_par
   integer :: myim, myrank, iim, jim, kim
   integer :: w_im, e_im, s_im, n_im, b_im, t_im
   integer :: w_rank, e_rank, s_rank, n_rank, b_rank, t_rank
+  integer :: neigh_ims(6), neigh_ranks(6)
   integer :: global_comm, poisfft_comm, cart_comm
   integer :: comm_plane_yz = -1, comm_plane_xz = -1, comm_plane_xy = -1
   integer :: comm_row_x = -1, comm_row_y = -1, comm_row_z = -1
@@ -177,6 +178,10 @@ contains
     b_rank = b_im - 1
     t_rank = t_im - 1
     
+    neigh_ranks = [w_rank, e_rank, s_rank, n_rank, b_rank, t_rank]
+    
+    neigh_ims = [w_im, e_im, s_im, n_im, b_im, t_im]
+    
     allocate(images_grid(1:nxims, 1:nyims, 1:nzims))
     do k = 1, nzims
       do j = 1, nyims
@@ -281,15 +286,15 @@ contains
     !Create the 3D Cartesian communicator "cart_comm" for use in CLMM
     call MPI_Cart_create(global_comm, 3, int(npxyz(3:1:-1)), &
                          [.false.,.false.,.false.], &
-                         .false., cart_comm, ie)
+                         .true., cart_comm, ie)
     if (ie/=0) call error_stop("Error calling MPI_Cart_create.")
+    
+    global_comm = cart_comm
 
     !creates a 2D! Cartesian communicator "poisfft_comm"
     !2D because of the PFFT library
-    !the dimnsions in the poisfft_comm are z,y
+    !the dimensions in the poisfft_comm are z,y
     call PoisFFT_InitMPIGrid(global_comm, npxyz(3:2:-1), poisfft_comm, ie)
-    !This uses the 3D communicator, slower, but necessary for 3D decomposition
-!     poisfft_comm = cart_comm
     
     call par_init_sub_comms
     
