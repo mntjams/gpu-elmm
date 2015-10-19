@@ -27,6 +27,7 @@ module Initial
   use Puffs, only: InitPuffSources
 #ifdef PAR
   use custom_par
+  use exchange_par
 #endif
 
   implicit none
@@ -848,7 +849,10 @@ contains
                           Wnz = Prnz-1
    end if
    
+   
 #ifdef PAR
+   call par_init_exchange
+      
    gUnx = par_co_sum(Unx, comm_row_x)
    gUny = par_co_sum(Uny, comm_row_y)
    gUnz = par_co_sum(Unz, comm_row_z)
@@ -1521,9 +1525,6 @@ contains
 
   subroutine ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
     use Endianness
-#ifdef PAR
-    use exchange_par
-#endif
     real(knd), intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd), intent(inout) :: Pr(1:,1:,1:)
     real(knd), intent(inout) :: Temperature(-1:,-1:,-1:)
@@ -1665,9 +1666,9 @@ contains
       W(0:Prnx-1,1:Prny,1:Prnz) = W(0:Prnx-1,1:Prny,1:Prnz) + W(1:Prnx,1:Prny,1:Prnz)
 
 #ifdef PAR
-      call par_exchange_U_x(U, Unx, Uny, Unz)
-      call par_exchange_U_y(V, Vnx, Vny, Vnz)
-      call par_exchange_U_z(W, Wnx, Wny, Wnz)
+      call par_exchange_U_x(U, 1)
+      call par_exchange_U_y(V, 2)
+      call par_exchange_U_z(W, 3)
 #endif
       if (Btype(Ea)>=MPI_BOUNDS.or.Btype(Ea)==PERIODIC) U(Prnx,1:Prny,1:Prnz) = U(Prnx,1:Prny,1:Prnz) + U(0,1:Prny,1:Prnz)
       if (Btype(No)>=MPI_BOUNDS.or.Btype(No)==PERIODIC) V(1:Prnx,Prny,1:Prnz) = V(1:Prnx,Prny,1:Prnz) + V(1:Prnx,0,1:Prnz)

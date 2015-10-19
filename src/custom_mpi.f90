@@ -290,7 +290,13 @@ contains
     if (ie/=0) call error_stop("Error calling MPI_Cart_create.")
     
     global_comm = cart_comm
-
+    
+    myim = par_this_image()
+    
+    myrank = myim - 1
+    !very unlikely to be changed
+    master = (myrank==0)
+    
     !creates a 2D! Cartesian communicator "poisfft_comm"
     !2D because of the PFFT library
     !the dimensions in the poisfft_comm are z,y

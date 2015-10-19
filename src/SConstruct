@@ -328,6 +328,7 @@ objs += env.Object(target = target_dir + 'P/main',             source = '../../P
 if str(mpi)=='yes':
   objs += env.Object(target = target_dir + 'custom_mpi',       source = 'custom_mpi.f90')
   objs += env.Object(target = target_dir + 'exchange_mpi',     source = 'exchange_mpi.f90')
+  objs += env.Object(target = target_dir + 'exchange_mpi_derived_types', source = 'exchange_mpi_derived_types.f90')
 else:
   objs += env.Object(target = target_dir + 'dummy_par',        source = 'dummy_par.f90') 
 
