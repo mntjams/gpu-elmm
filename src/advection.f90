@@ -17,19 +17,25 @@ contains
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Az
     integer :: i, j, k, bi, bj, bk
+    integer :: tnx, tny, tnz
+    
     integer, parameter :: narr = 4
+    
+    tnx = tilenx(narr)
+    tny = tileny(narr)
+    tnz = tilenz(narr)
 
     Ax = 0.25_knd / dxmin
     Ay = 0.25_knd / dymin
     Az = 0.25_knd / dzmin
 
     !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
-    do bk = 1, Unz, tilenz(narr)
-      do bj = 1, Uny, tileny(narr)
-        do bi = 1, Unx, tilenx(narr)
-          do k = bk, min(bk+tilenz(narr)-1, Unz)
-            do j = bj, min(bj+tileny(narr)-1, Uny)
-              do i = bi, min(bi+tilenx(narr)-1, Unx)
+    do bk = 1, Unz, tnz
+      do bj = 1, Uny, tny
+        do bi = 1, Unx, tnx
+          do k = bk, min(bk+tnz-1, Unz)
+            do j = bj, min(bj+tny-1, Uny)
+              do i = bi, min(bi+tnx-1, Unx)
                 U2(i,j,k) = - ((Ax*(U(i+1,j,k) + U(i,j,k)) * (U(i+1,j,k) + U(i,j,k)) &
                               - Ax*(U(i,j,k) + U(i-1,j,k)) * (U(i,j,k) + U(i-1,j,k))) &
                              + (Ay*(U(i,j+1,k) + U(i,j,k)) * (V(i+1,j,k) + V(i,j,k)) &
@@ -55,19 +61,25 @@ contains
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Az
     integer :: i, j, k, bi, bj, bk
+    integer :: tnx, tny, tnz
+    
     integer, parameter :: narr = 4
+    
+    tnx = tilenx(narr)
+    tny = tileny(narr)
+    tnz = tilenz(narr)
 
     Ax = 0.25_knd / dxmin
     Ay = 0.25_knd / dymin
     Az = 0.25_knd / dzmin
 
     !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
-    do bk = 1, Vnz, tilenz(narr)
-      do bj = 1, Vny, tileny(narr)
-        do bi = 1, Vnx, tilenx(narr)
-          do k = bk, min(bk+tilenz(narr)-1, Vnz)
-            do j = bj, min(bj+tileny(narr)-1, Vny)
-              do i = bi, min(bi+tilenx(narr)-1, Vnx)
+    do bk = 1, Vnz, tnz
+      do bj = 1, Vny, tny
+        do bi = 1, Vnx, tnx
+          do k = bk, min(bk+tnz-1, Vnz)
+            do j = bj, min(bj+tny-1, Vny)
+              do i = bi, min(bi+tnx-1, Vnx)
                 V2(i,j,k) = - ((Ay*(V(i,j+1,k) + V(i,j,k)) * (V(i,j+1,k) + V(i,j,k)) &
                                -Ay*(V(i,j,k) + V(i,j-1,k)) * (V(i,j,k) + V(i,j-1,k))) &
                               +(Ax*(V(i+1,j,k) + V(i,j,k)) * (U(i,j+1,k) + U(i,j,k)) &
@@ -92,19 +104,25 @@ contains
     real(knd), contiguous, intent(in) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Az
     integer :: i, j, k, bi, bj, bk
+    integer :: tnx, tny, tnz
+    
     integer, parameter :: narr = 4
+    
+    tnx = tilenx(narr)
+    tny = tileny(narr)
+    tnz = tilenz(narr)
 
     Ax = 0.25_knd / dxmin
     Ay = 0.25_knd / dymin
     Az = 0.25_knd / dzmin
 
     !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
-    do bk = 1, Wnz, tilenz(narr)
-      do bj = 1, Wny, tileny(narr)
-        do bi = 1, Wnx, tilenx(narr)
-          do k = bk, min(bk+tilenz(narr)-1, Wnz)
-            do j = bj, min(bj+tileny(narr)-1, Wny)
-              do i = bi, min(bi+tilenx(narr)-1, Wnx)
+    do bk = 1, Wnz, tnz
+      do bj = 1, Wny, tny
+        do bi = 1, Wnx, tnx
+          do k = bk, min(bk+tnz-1, Wnz)
+            do j = bj, min(bj+tny-1, Wny)
+              do i = bi, min(bi+tnx-1, Wnx)
                 W2(i,j,k) = - ((Az*(W(i,j,k+1) + W(i,j,k)) * (W(i,j,k+1) + W(i,j,k)) &
                               - Az*(W(i,j,k) + W(i,j,k-1)) * (W(i,j,k) + W(i,j,k-1))) &
                              + (Ay*(W(i,j+1,k) + W(i,j,k)) * (V(i,j,k+1) + V(i,j,k)) &
@@ -135,19 +153,25 @@ contains
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Az, Vadv, Wadv
     integer :: i, j, k, bi, bj, bk
+    integer :: tnx, tny, tnz
+    
     integer, parameter :: narr = 4
+    
+    tnx = tilenx(narr)
+    tny = tileny(narr)
+    tnz = tilenz(narr)
 
     Ax = 0.5_knd / dxmin
     Ay = 0.125_knd / dymin
     Az = 0.125_knd / dzmin
 
     !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
-    do bk = 1, Unz, tilenz(narr)
-      do bj = 1, Uny, tileny(narr)
-        do bi = 1, Unx, tilenx(narr)
-          do k = bk, min(bk+tilenz(narr)-1, Unz)
-            do j = bj, min(bj+tileny(narr)-1, Uny)
-              do i = bi, min(bi+tilenx(narr)-1, Unx)
+    do bk = 1, Unz, tnz
+      do bj = 1, Uny, tny
+        do bi = 1, Unx, tnx
+          do k = bk, min(bk+tnz-1, Unz)
+            do j = bj, min(bj+tny-1, Uny)
+              do i = bi, min(bi+tnx-1, Unx)
                 Vadv = ( V(i,j,k) + V(i+1,j,k) + V(i,j-1,k) + V(i+1,j-1,k) )
                 Wadv = ( W(i,j,k) + W(i+1,j,k) + W(i,j,k-1) + W(i+1,j,k-1) )
                 U2(i,j,k) = U2(i,j,k) &
@@ -172,19 +196,25 @@ contains
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Az, Uadv, Wadv
     integer :: i, j, k, bi, bj, bk
+    integer :: tnx, tny, tnz
+    
     integer, parameter :: narr = 4
+    
+    tnx = tilenx(narr)
+    tny = tileny(narr)
+    tnz = tilenz(narr)
 
     Ax = 0.125_knd / dxmin
     Ay = 0.5_knd / dymin
     Az = 0.125_knd / dzmin
 
     !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
-    do bk = 1, Vnz, tilenz(narr)
-      do bj = 1, Vny, tileny(narr)
-        do bi = 1, Vnx, tilenx(narr)
-          do k = bk, min(bk+tilenz(narr)-1, Vnz)
-            do j = bj, min(bj+tileny(narr)-1, Vny)
-              do i = bi, min(bi+tilenx(narr)-1, Vnx)
+    do bk = 1, Vnz, tnz
+      do bj = 1, Vny, tny
+        do bi = 1, Vnx, tnx
+          do k = bk, min(bk+tnz-1, Vnz)
+            do j = bj, min(bj+tny-1, Vny)
+              do i = bi, min(bi+tnx-1, Vnx)
                 Uadv = ( U(i,j,k) + U(i,j+1,k) + U(i-1,j,k) + U(i-1,j+1,k) )
                 Wadv = ( W(i,j,k) + W(i,j+1,k) + W(i,j,k-1) + W(i,j+1,k-1) )
                 V2(i,j,k) = V2(i,j,k) &
@@ -209,19 +239,25 @@ contains
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Az, Uadv, Vadv
     integer :: i, j, k, bi, bj, bk
+    integer :: tnx, tny, tnz
+    
     integer, parameter :: narr = 4
+    
+    tnx = tilenx(narr)
+    tny = tileny(narr)
+    tnz = tilenz(narr)
 
     Ax = 0.125_knd / dxmin
     Ay = 0.125_knd / dymin
     Az = 0.5_knd / dzmin
 
     !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
-    do bk = 1, Wnz, tilenz(narr)
-      do bj = 1, Wny, tileny(narr)
-        do bi = 1, Wnx, tilenx(narr)
-          do k = bk, min(bk+tilenz(narr)-1, Wnz)
-            do j = bj, min(bj+tileny(narr)-1, Wny)
-              do i = bi, min(bi+tilenx(narr)-1, Wnx)
+    do bk = 1, Wnz, tnz
+      do bj = 1, Wny, tny
+        do bi = 1, Wnx, tnx
+          do k = bk, min(bk+tnz-1, Wnz)
+            do j = bj, min(bj+tny-1, Wny)
+              do i = bi, min(bi+tnx-1, Wnx)
                 Uadv = ( U(i,j,k) + U(i,j,k+1) + U(i-1,j,k) + U(i-1,j,k+1) )
                 Vadv = ( V(i,j,k) + V(i,j,k+1) + V(i,j-1,k) + V(i,j-1,k+1) )
                 W2(i,j,k) = W2(i,j,k) &
@@ -308,18 +344,23 @@ contains
     real(knd) :: UV3(-1:tilenx(narr)+2, -1:tileny(narr)+2, -1:tilenz(narr)+2)
     integer   :: bi, bj, bk, i, j, k, li, lj, lk
     real(knd) :: Uint, Vint, Wint, dU
+    integer :: tnx, tny, tnz
+    
+    tnx = tilenx(narr)
+    tny = tileny(narr)
+    tnz = tilenz(narr)
 
     call set(U2, 0._knd)
 
     !$omp parallel private(bi, bj, bk, i, j, k, li, lj, lk, Uint, Vint, Wint, dU, UV1, UV3)
     !$omp do schedule(runtime) collapse(3)
-    do bk = 1, Unz, tilenz(narr)
-     do bj = 1, Uny, tileny(narr)
-      do bi = 1, Unx, tilenx(narr)
+    do bk = 1, Unz, tnz
+     do bj = 1, Uny, tny
+      do bi = 1, Unx, tnx
 
-        do k = bk, min(bk+tilenz(narr)-1, Unz)
-         do j = bj, min(bj+tileny(narr)-1, Uny)
-          do i = bi-1, min(bi+tilenx(narr)-1, Unx) + 2
+        do k = bk, min(bk+tnz-1, Unz)
+         do j = bj, min(bj+tny-1, Uny)
+          do i = bi-1, min(bi+tnx-1, Unx) + 2
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -331,9 +372,9 @@ contains
          end do
         end do
 
-        do k = bk, min(bk+tilenz(narr)-1, Unz)
-         do j = bj, min(bj+tileny(narr)-1, Uny)
-          do i = bi, min(bi+tilenx(narr)-1, Unx)
+        do k = bk, min(bk+tnz-1, Unz)
+         do j = bj, min(bj+tny-1, Uny)
+          do i = bi, min(bi+tnx-1, Unx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -357,13 +398,13 @@ contains
     !$omp end do
 
     !$omp do schedule(runtime) collapse(3)
-    do bk = 1, Unz, tilenz(narr)
-     do bj = 1, Uny, tileny(narr)
-      do bi = 1, Unx, tilenx(narr)
+    do bk = 1, Unz, tnz
+     do bj = 1, Uny, tny
+      do bi = 1, Unx, tnx
 
-        do k = bk, min(bk+tilenz(narr)-1, Unz)
-         do j = bj-2, min(bj+tileny(narr)-1, Uny) + 1
-          do i = bi, min(bi+tilenx(narr)-1, Unx)
+        do k = bk, min(bk+tnz-1, Unz)
+         do j = bj-2, min(bj+tny-1, Uny) + 1
+          do i = bi, min(bi+tnx-1, Unx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -375,9 +416,9 @@ contains
          end do
         end do
 
-        do k = bk, min(bk+tilenz(narr)-1, Unz)
-         do j = bj, min(bj+tileny(narr)-1, Uny)
-          do i = bi, min(bi+tilenx(narr)-1, Unx)
+        do k = bk, min(bk+tnz-1, Unz)
+         do j = bj, min(bj+tny-1, Uny)
+          do i = bi, min(bi+tnx-1, Unx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -401,13 +442,13 @@ contains
     !$omp end do
 
     !$omp do schedule(runtime) collapse(3)
-    do bk = 1, Unz, tilenz(narr)
-     do bj = 1, Uny, tileny(narr)
-      do bi = 1, Unx, tilenx(narr)
+    do bk = 1, Unz, tnz
+     do bj = 1, Uny, tny
+      do bi = 1, Unx, tnx
 
-        do k = bk-2, min(bk+tilenz(narr), Unz) + 1
-         do j = bj, min(bj+tileny(narr)-1, Uny)
-          do i = bi, min(bi+tilenx(narr)-1, Unx)
+        do k = bk-2, min(bk+tnz, Unz) + 1
+         do j = bj, min(bj+tny-1, Uny)
+          do i = bi, min(bi+tnx-1, Unx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -419,9 +460,9 @@ contains
          end do
         end do
 
-        do k = bk, min(bk+tilenz(narr)-1, Unz)
-         do j = bj, min(bj+tileny(narr)-1, Uny)
-          do i = bi, min(bi+tilenx(narr)-1, Unx)
+        do k = bk, min(bk+tnz-1, Unz)
+         do j = bj, min(bj+tny-1, Uny)
+          do i = bi, min(bi+tnx-1, Unx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -472,18 +513,23 @@ contains
     real(knd) :: UV3(-1:tilenx(narr)+2, -1:tileny(narr)+2, -1:tilenz(narr)+2)
     integer   :: bi, bj, bk, i, j, k, li, lj, lk
     real(knd) :: Uint, Vint, Wint, dV
+    integer :: tnx, tny, tnz
+    
+    tnx = tilenx(narr)
+    tny = tileny(narr)
+    tnz = tilenz(narr)
 
     call set(V2, 0._knd)
 
     !$omp parallel private(bi, bj, bk, i, j, k, li, lj, lk, Uint, Vint, Wint, dV, UV1, UV3)
     !$omp do schedule(runtime) collapse(3)
-    do bk = 1, Vnz, tilenz(narr)
-     do bj = 1, Vny, tileny(narr)
-      do bi = 1, Vnx, tilenx(narr)
+    do bk = 1, Vnz, tnz
+     do bj = 1, Vny, tny
+      do bi = 1, Vnx, tnx
 
-        do k = bk, min(bk+tilenz(narr)-1, Vnz)
-         do j = bj, min(bj+tileny(narr)-1, Vny)
-          do i = bi-2, min(bi+tilenx(narr)-1, Vnx) + 1
+        do k = bk, min(bk+tnz-1, Vnz)
+         do j = bj, min(bj+tny-1, Vny)
+          do i = bi-2, min(bi+tnx-1, Vnx) + 1
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -495,9 +541,9 @@ contains
          end do
         end do
 
-        do k = bk, min(bk+tilenz(narr)-1, Vnz)
-         do j = bj, min(bj+tileny(narr)-1, Vny)
-          do i = bi, min(bi+tilenx(narr)-1, Vnx)
+        do k = bk, min(bk+tnz-1, Vnz)
+         do j = bj, min(bj+tny-1, Vny)
+          do i = bi, min(bi+tnx-1, Vnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -521,13 +567,13 @@ contains
     !$omp end do
 
     !$omp do schedule(runtime) collapse(3)
-    do bk = 1, Vnz, tilenz(narr)
-     do bj = 1, Vny, tileny(narr)
-      do bi = 1, Vnx, tilenx(narr)
+    do bk = 1, Vnz, tnz
+     do bj = 1, Vny, tny
+      do bi = 1, Vnx, tnx
 
-        do k = bk, min(bk+tilenz(narr)-1, Vnz)
-         do j = bj-1, min(bj+tileny(narr)-1, Vny) + 2
-          do i = bi, min(bi+tilenx(narr)-1, Vnx)
+        do k = bk, min(bk+tnz-1, Vnz)
+         do j = bj-1, min(bj+tny-1, Vny) + 2
+          do i = bi, min(bi+tnx-1, Vnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -539,9 +585,9 @@ contains
          end do
         end do
 
-        do k = bk, min(bk+tilenz(narr)-1, Vnz)
-         do j = bj, min(bj+tileny(narr)-1, Vny)
-          do i = bi, min(bi+tilenx(narr)-1, Vnx)
+        do k = bk, min(bk+tnz-1, Vnz)
+         do j = bj, min(bj+tny-1, Vny)
+          do i = bi, min(bi+tnx-1, Vnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -565,13 +611,13 @@ contains
     !$omp end do
 
     !$omp do schedule(runtime) collapse(3)
-    do bk = 1, Vnz, tilenz(narr)
-     do bj = 1, Vny, tileny(narr)
-      do bi = 1, Vnx, tilenx(narr)
+    do bk = 1, Vnz, tnz
+     do bj = 1, Vny, tny
+      do bi = 1, Vnx, tnx
 
-        do k = bk-2, min(bk+tilenz(narr), Vnz) + 1
-         do j = bj, min(bj+tileny(narr)-1, Vny)
-          do i = bi, min(bi+tilenx(narr)-1, Vnx)
+        do k = bk-2, min(bk+tnz, Vnz) + 1
+         do j = bj, min(bj+tny-1, Vny)
+          do i = bi, min(bi+tnx-1, Vnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -583,9 +629,9 @@ contains
          end do
         end do
 
-        do k = bk, min(bk+tilenz(narr)-1, Vnz)
-         do j = bj, min(bj+tileny(narr)-1, Vny)
-          do i = bi, min(bi+tilenx(narr)-1, Vnx)
+        do k = bk, min(bk+tnz-1, Vnz)
+         do j = bj, min(bj+tny-1, Vny)
+          do i = bi, min(bi+tnx-1, Vnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -641,18 +687,23 @@ contains
     real(knd) :: UV3(-1:tilenx(narr)+2, -1:tileny(narr)+2, -1:tilenz(narr)+2)
     integer   :: bi, bj, bk, i, j, k, li, lj, lk
     real(knd) :: Uint, Vint, Wint, dW
+    integer :: tnx, tny, tnz
+    
+    tnx = tilenx(narr)
+    tny = tileny(narr)
+    tnz = tilenz(narr)
 
     call set(W2, 0._knd)
 
     !$omp parallel private(bi, bj, bk, i, j, k, li, lj, lk, Uint, Vint, Wint, dW, UV1, UV3)
     !$omp do schedule(runtime) collapse(3)
-    do bk = 1, Wnz, tilenz(narr)
-     do bj = 1, Wny, tileny(narr)
-      do bi = 1, Wnx, tilenx(narr)
+    do bk = 1, Wnz, tnz
+     do bj = 1, Wny, tny
+      do bi = 1, Wnx, tnx
 
-        do k = bk, min(bk+tilenz(narr)-1, Wnz)
-         do j = bj, min(bj+tileny(narr)-1, Wny)
-          do i = bi-2, min(bi+tilenx(narr)-1, Wnx) + 1
+        do k = bk, min(bk+tnz-1, Wnz)
+         do j = bj, min(bj+tny-1, Wny)
+          do i = bi-2, min(bi+tnx-1, Wnx) + 1
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -664,9 +715,9 @@ contains
          end do
         end do
 
-        do k = bk, min(bk+tilenz(narr)-1, Wnz)
-         do j = bj, min(bj+tileny(narr)-1, Wny)
-          do i = bi, min(bi+tilenx(narr)-1, Wnx)
+        do k = bk, min(bk+tnz-1, Wnz)
+         do j = bj, min(bj+tny-1, Wny)
+          do i = bi, min(bi+tnx-1, Wnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -690,13 +741,13 @@ contains
     !$omp end do
 
     !$omp do schedule(runtime) collapse(3)
-    do bk = 1, Wnz, tilenz(narr)
-     do bj = 1, Wny, tileny(narr)
-      do bi = 1, Wnx, tilenx(narr)
+    do bk = 1, Wnz, tnz
+     do bj = 1, Wny, tny
+      do bi = 1, Wnx, tnx
 
-        do k = bk, min(bk+tilenz(narr)-1, Wnz)
-         do j = bj-2, min(bj+tileny(narr)-1, Wny) + 1
-          do i = bi, min(bi+tilenx(narr)-1, Wnx)
+        do k = bk, min(bk+tnz-1, Wnz)
+         do j = bj-2, min(bj+tny-1, Wny) + 1
+          do i = bi, min(bi+tnx-1, Wnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -708,9 +759,9 @@ contains
          end do
         end do
 
-        do k = bk, min(bk+tilenz(narr)-1, Wnz)
-         do j = bj, min(bj+tileny(narr)-1, Wny)
-          do i = bi, min(bi+tilenx(narr)-1, Wnx)
+        do k = bk, min(bk+tnz-1, Wnz)
+         do j = bj, min(bj+tny-1, Wny)
+          do i = bi, min(bi+tnx-1, Wnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -734,13 +785,13 @@ contains
     !$omp end do
 
     !$omp do schedule(runtime) collapse(3)
-    do bk = 1, Wnz, tilenz(narr)
-     do bj = 1, Wny, tileny(narr)
-      do bi = 1, Wnx, tilenx(narr)
+    do bk = 1, Wnz, tnz
+     do bj = 1, Wny, tny
+      do bi = 1, Wnx, tnx
 
-        do k = bk-1, min(bk+tilenz(narr)-1, Wnz) + 2
-         do j = bj, min(bj+tileny(narr)-1, Wny)
-          do i = bi, min(bi+tilenx(narr)-1, Wnx)
+        do k = bk-1, min(bk+tnz-1, Wnz) + 2
+         do j = bj, min(bj+tny-1, Wny)
+          do i = bi, min(bi+tnx-1, Wnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1
@@ -752,9 +803,9 @@ contains
          end do
         end do
 
-        do k = bk, min(bk+tilenz(narr)-1, Wnz)
-         do j = bj, min(bj+tileny(narr)-1, Wny)
-          do i = bi, min(bi+tilenx(narr)-1, Wnx)
+        do k = bk, min(bk+tnz-1, Wnz)
+         do j = bj, min(bj+tny-1, Wny)
+          do i = bi, min(bi+tnx-1, Wnx)
             li = i-bi+1
             lj = j-bj+1
             lk = k-bk+1

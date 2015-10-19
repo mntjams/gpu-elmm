@@ -215,9 +215,15 @@ module Subgrid
       real(knd), dimension(1:3,1:3) :: a, b
       real(knd) :: dx2, dy2, dz2
       real(knd),parameter ::c = 0.041
-      integer,parameter :: narr = 4
       real(knd) :: c2
       integer :: i, j, k, bi, bj, bk, ii, jj
+      integer :: tnx, tny, tnz
+
+      integer,parameter :: narr = 4
+    
+      tnx = tilenx(narr)
+      tny = tileny(narr)
+      tnz = tilenz(narr)
 
       c2 = c * filter_ratio**2
 
@@ -227,12 +233,12 @@ module Subgrid
 
 
       !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) collapse(3)
-      do bk = 1, Prnz, tilenz(narr)
-       do bj = 1, Prny, tileny(narr)
-        do bi = 1, Prnx, tilenx(narr)
-         do k = bk, min(bk+tilenz(narr)-1,Prnz)
-          do j = bj, min(bj+tileny(narr)-1,Prny)
-           do i = bi, min(bi+tilenx(narr)-1,Prnx)
+      do bk = 1, Prnz, tnz
+       do bj = 1, Prny, tny
+        do bi = 1, Prnx, tnx
+         do k = bk, min(bk+tnz-1,Prnz)
+          do j = bj, min(bj+tny-1,Prny)
+           do i = bi, min(bi+tnx-1,Prnx)
              a(1,1) = (U(i,j,k)-U(i-1,j,k))/dxmin
              a(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._knd*dymin)
              a(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._knd*dzmin)
@@ -289,21 +295,27 @@ module Subgrid
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
       real(knd), parameter :: Csig = 1.04_knd
-      integer, parameter   :: narr = 4
       integer   :: i,j,k,bi,bj,bk
       real(knd) :: width, C, D, g(3,3), s1, s2, s3
       integer, parameter :: sigma_knd = knd
+      integer :: tnx, tny, tnz
+
+      integer,parameter :: narr = 4
+    
+      tnx = tilenx(narr)
+      tny = tileny(narr)
+      tnz = tilenz(narr)
 
       width = filter_ratio * (dxmin*dymin*dzmin)**(1._knd/3._knd)
       C = (Csig*width)**2
 
       !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk) schedule(runtime) collapse(3)
-      do bk = 1, Prnz, tilenz(narr)
-       do bj = 1, Prny, tileny(narr)
-        do bi = 1, Prnx, tilenx(narr)
-         do k = bk, min(bk+tilenz(narr)-1,Prnz)
-          do j = bj, min(bj+tileny(narr)-1,Prny)
-           do i = bi ,min(bi+tilenx(narr)-1,Prnx)
+      do bk = 1, Prnz, tnz
+       do bj = 1, Prny, tny
+        do bi = 1, Prnx, tnx
+         do k = bk, min(bk+tnz-1,Prnz)
+          do j = bj, min(bj+tny-1,Prny)
+           do i = bi ,min(bi+tnx-1,Prnx)
 
             call GradientTensorUG(g,i,j,k)
 
@@ -424,7 +436,6 @@ module Subgrid
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
       real(knd), parameter :: Csig = 1.04_knd
-      integer, parameter   :: narr = 4
       integer   :: i,j,k,bi,bj,bk
       real(knd) :: width, C, Pr_sgs, D, g(3,3), s1, s2, s3
       integer, parameter :: sigma_knd = knd
@@ -432,6 +443,14 @@ module Subgrid
       real(knd) :: tempfl_p(0:Prnz), momfl_p(0:Prnz)
       
       logical :: enable_stability_correction
+      integer :: tnx, tny, tnz
+
+      integer,parameter :: narr = 4
+    
+      tnx = tilenx(narr)
+      tny = tileny(narr)
+      tnz = tilenz(narr)
+      
       enable_stability_correction = enable_buoyancy .and. enable_profiles
 
       if (enable_stability_correction) then
@@ -449,10 +468,10 @@ module Subgrid
       width = filter_ratio * (dxmin*dymin*dzmin)**(1._knd/3._knd)
 
       !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk,C,Pr_sgs) schedule(runtime) collapse(3)
-      do bk = 1, Prnz, tilenz(narr)
-       do bj = 1, Prny, tileny(narr)
-        do bi = 1, Prnx, tilenx(narr)
-         do k = bk, min(bk+tilenz(narr)-1,Prnz)
+      do bk = 1, Prnz, tnz
+       do bj = 1, Prny, tny
+        do bi = 1, Prnx, tnx
+         do k = bk, min(bk+tnz-1,Prnz)
          
           if (enable_stability_correction) then
             call stability_correction_L_MO(k, width, C, Pr_sgs)
@@ -461,8 +480,8 @@ module Subgrid
             C = (Csig*width)**2
           end if
             
-          do j = bj, min(bj+tileny(narr)-1,Prny)
-           do i = bi ,min(bi+tilenx(narr)-1,Prnx)
+          do j = bj, min(bj+tny-1,Prny)
+           do i = bi ,min(bi+tnx-1,Prnx)
 
             call GradientTensorUG(g,i,j,k)
 

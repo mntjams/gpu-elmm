@@ -16,8 +16,13 @@ contains
     real(knd), dimension(:,:,:), allocatable, save :: Uf, Vf, Wf
     integer :: i, j, k, bi, bj, bk
     real(knd) :: rec_width, T_s, k_es
+    integer :: tnx, tny, tnz
 
     integer, parameter :: narr = 7
+
+    tnx = tilenx(narr)
+    tny = tileny(narr)
+    tnz = tilenz(narr)
 
     rec_width = 1 / (dxmin*dymin*dzmin)**(1._knd/3._knd)
 
@@ -33,12 +38,12 @@ contains
     call FilterTopHat(Wf, W, Wtype)
 
     !$omp parallel do private(k_es, T_s, i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
-    do bk = 1, Prnz, tilenz(narr)
-      do bj = 1, Prny, tileny(narr)
-        do bi = 1, Prnx, tilenx(narr)
-          do k = bk, min(bk+tilenz(narr)-1,Prnz)
-            do j = bj, min(bj+tileny(narr)-1,Prny)
-              do i = bi ,min(bi+tilenx(narr)-1,Prnx)
+    do bk = 1, Prnz, tnz
+      do bj = 1, Prny, tny
+        do bi = 1, Prnx, tnx
+          do k = bk, min(bk+tnz-1,Prnz)
+            do j = bj, min(bj+tny-1,Prny)
+              do i = bi ,min(bi+tnx-1,Prnx)
                 k_es = (U(i,j,k) - Uf(i,j,k))**2 + &
                        (V(i,j,k) - Vf(i,j,k))**2 + &
                        (W(i,j,k) - Wf(i,j,k))**2
