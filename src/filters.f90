@@ -17,6 +17,7 @@ module Filters
 contains
 
   subroutine FilterTopHat(Uf, U, Utype)
+    use ArrayUtilities, only: set
     real(knd), dimension(-2:,-2:,-2:), intent(out)  :: Uf
     real(knd), dimension(-2:,-2:,-2:), intent(in)  :: U
     integer, dimension(-2:,-2:,-2:), intent(in)  :: Utype
@@ -54,8 +55,73 @@ contains
     if (Btype(To)==NOSLIP.or.Btype(To)==DIRICHLET) then
       maxk = maxk - 1
     end if
-
+    
     !$omp parallel private(i, j, k, tmp) shared(U, mini, maxi, minj, maxj, mink, maxk)
+    
+    !copy the portions which are not filtered
+    
+    !omp do collapse(3)
+    do k = -2, mink-1
+      do j = -2, ubound(U,2)
+        do i = -2, ubound(U,1)
+          Uf(i,j,k) = U(i,j,k)
+        end do
+      end do
+    end do
+    !$omp end do nowait
+
+    !omp do collapse(3)
+    do k = maxk+1, ubound(U, 3)
+      do j = -2, ubound(U,2)
+        do i = -2, ubound(U,1)
+          Uf(i,j,k) = U(i,j,k)
+        end do
+      end do
+    end do
+    !$omp end do nowait
+    
+    !omp do collapse(3)
+    do k = 1, maxk
+      do j = -2, minj-1
+        do i = -2, ubound(U,1)
+          Uf(i,j,k) = U(i,j,k)
+        end do
+      end do
+    end do
+    !$omp end do nowait
+    
+    !omp do collapse(3)
+    do k = 1, maxk
+      do j = maxj+1, ubound(U,2)
+        do i = -2, ubound(U,1)
+          Uf(i,j,k) = U(i,j,k)
+        end do
+      end do
+    end do
+    !$omp end do nowait
+    
+    !omp do collapse(3)
+    do k = 1, maxk
+      do j = 1, maxj
+        do i = -2, mini-1
+          Uf(i,j,k) = U(i,j,k)
+        end do
+      end do
+    end do
+    !$omp end do nowait
+    
+    !omp do collapse(3)
+    do k = 1, maxk
+      do j = 1, maxj
+        do i = maxi+1, ubound(U,1)
+          Uf(i,j,k) = U(i,j,k)
+        end do
+      end do
+    end do
+    !$omp end do nowait
+    
+    !filter by the separable kernel in all three directions
+    
     !$omp do collapse(2) schedule(dynamic,4)
     do k = mink, maxk
       do j = minj, maxj
