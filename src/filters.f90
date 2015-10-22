@@ -60,7 +60,7 @@ contains
     
     !copy the portions which are not filtered
     
-    !omp do collapse(3)
+    !$omp do collapse(3)
     do k = -2, mink-1
       do j = -2, ubound(U,2)
         do i = -2, ubound(U,1)
@@ -70,7 +70,7 @@ contains
     end do
     !$omp end do nowait
 
-    !omp do collapse(3)
+    !$omp do collapse(3)
     do k = maxk+1, ubound(U, 3)
       do j = -2, ubound(U,2)
         do i = -2, ubound(U,1)
@@ -80,7 +80,7 @@ contains
     end do
     !$omp end do nowait
     
-    !omp do collapse(3)
+    !$omp do collapse(3)
     do k = 1, maxk
       do j = -2, minj-1
         do i = -2, ubound(U,1)
@@ -90,7 +90,7 @@ contains
     end do
     !$omp end do nowait
     
-    !omp do collapse(3)
+    !$omp do collapse(3)
     do k = 1, maxk
       do j = maxj+1, ubound(U,2)
         do i = -2, ubound(U,1)
@@ -100,7 +100,7 @@ contains
     end do
     !$omp end do nowait
     
-    !omp do collapse(3)
+    !$omp do collapse(3)
     do k = 1, maxk
       do j = 1, maxj
         do i = -2, mini-1
@@ -110,7 +110,7 @@ contains
     end do
     !$omp end do nowait
     
-    !omp do collapse(3)
+    !$omp do collapse(3)
     do k = 1, maxk
       do j = 1, maxj
         do i = maxi+1, ubound(U,1)
