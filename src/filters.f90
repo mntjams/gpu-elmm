@@ -98,7 +98,7 @@ contains
         end do
       end do
     end do
-    !$omp end do nowait
+    !$omp end do nowait   
 
     !$omp do collapse(3)
     do k = 1, maxk
