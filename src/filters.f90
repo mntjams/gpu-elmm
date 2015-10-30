@@ -17,6 +17,7 @@ module Filters
 contains
 
   subroutine FilterTopHat(Uf, U, Utype)
+    use ArrayUtilities, only: set
     real(knd), dimension(-2:,-2:,-2:), intent(out)  :: Uf
     real(knd), dimension(-2:,-2:,-2:), intent(in)  :: U
     integer, dimension(-2:,-2:,-2:), intent(in)  :: Utype
@@ -98,7 +99,7 @@ contains
       end do
     end do
     !$omp end do nowait
-    
+
     !$omp do collapse(3)
     do k = 1, maxk
       do j = 1, maxj
