@@ -237,8 +237,14 @@ if str(mpi)=='yes':
   env.Append(F90FLAGS=' -DMPI -DPAR')
   env.Append(CFLAGS=' -DMPI -DPAR')
   env.Append(CXXFLAGS=' -DMPI -DPAR')
-  env.Append(LIBS = ['pfft','pfftf','fftw3_mpi','fftw3f_mpi'])
-
+  
+  if (openmp=='no'):
+    env.Append(LIBS = ['pfft','pfftf'])
+  else:
+    env.Append(LIBS = ['pfft_omp','pfftf_omp'])
+    
+  env.Append(LIBS = ['fftw3_mpi','fftw3f_mpi'])
+  
 if cray!='yes':
   #if necessary pass openblas, mkl_xx or equivalent (and include their dependencies) 
   # in the `lapack_blas` argument
@@ -247,10 +253,10 @@ if cray!='yes':
   else:
     env.Append(LIBS = ['blas','lapack'])
 
-env.Append(LIBS = ['fftw3','fftw3f','pthread','stdc++'])
-
 if str(openmp)!='no':
   env.Append(LIBS = ['fftw3_omp','fftw3f_omp'])
+
+env.Append(LIBS = ['fftw3','fftw3f','pthread','stdc++'])
 
 if customSB=='yes':
   env.Append(F90FLAGS='-DCUSTOMSB')
