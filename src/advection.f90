@@ -165,7 +165,7 @@ contains
     Ay = 0.125_knd / dymin
     Az = 0.125_knd / dzmin
 
-    !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
+    !$omp parallel do private(i, j, k, bi, bj, bk, Vadv, Wadv) schedule(runtime) collapse(3)
     do bk = 1, Unz, tnz
       do bj = 1, Uny, tny
         do bi = 1, Unx, tnx
@@ -208,7 +208,7 @@ contains
     Ay = 0.5_knd / dymin
     Az = 0.125_knd / dzmin
 
-    !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
+    !$omp parallel do private(i, j, k, bi, bj, bk, Uadv, Wadv) schedule(runtime) collapse(3)
     do bk = 1, Vnz, tnz
       do bj = 1, Vny, tny
         do bi = 1, Vnx, tnx
@@ -251,7 +251,7 @@ contains
     Ay = 0.125_knd / dymin
     Az = 0.5_knd / dzmin
 
-    !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
+    !$omp parallel do private(i, j, k, bi, bj, bk, Uadv, Vadv) schedule(runtime) collapse(3)
     do bk = 1, Wnz, tnz
       do bj = 1, Wny, tny
         do bi = 1, Wnx, tnx
