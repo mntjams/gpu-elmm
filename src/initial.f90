@@ -993,7 +993,7 @@ contains
        namelist /cmd/ tilesize, debugparam, debuglevel, windangle, projectiontype, &
                        Prnx, Prny, Prnz,&
 #ifdef PAR
-                       npxyz, &
+                       npxyz, domain_index, &
 #endif
                        obstacles_file, probes_file, scalar_probes_file, scratch_dir
 

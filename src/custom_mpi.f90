@@ -24,6 +24,20 @@ module custom_par
 
   private :: MPI_knd, MPI_real32, MPI_real64, MPI_IN_PLACE_real32, MPI_IN_PLACE_real64  
 
+  !number of the domain
+  integer :: domain_index = 1
+  
+  !numbers of images in individual domains
+  integer, allocatable :: domain_nims(:), &
+                          domain_nxims(:), 
+                          domain_nyims(:), 
+                          domain_nzims(:)
+  
+  !at which number starts numbering of this domain?
+  integer :: first_domain_rank_in_world = 0
+  integer :: first_domain_im_in_world = 1
+  
+  
   integer :: nims, npx = -1, npy = -1, npz = -1
   integer :: npxyz(3) = -1, pxyz(3)
   integer :: nxims, nyims, nzims
@@ -31,7 +45,13 @@ module custom_par
   integer :: w_im, e_im, s_im, n_im, b_im, t_im
   integer :: w_rank, e_rank, s_rank, n_rank, b_rank, t_rank
   integer :: neigh_ims(6), neigh_ranks(6)
-  integer :: global_comm, poisfft_comm, cart_comm
+  
+  
+  integer :: global_comm = MPI_COMM_NULL, poisfft_comm = MPI_COMM_NULL, cart_comm = MPI_COMM_NULL
+  
+  !MPI communicators which include the inner or the outer domain
+  integer :: inner_comm = MPI_COMM_NULL, outer_comm = MPI_COMM_NULL
+  
   integer :: comm_plane_yz = -1, comm_plane_xz = -1, comm_plane_xy = -1
   integer :: comm_row_x = -1, comm_row_y = -1, comm_row_z = -1
   integer :: cart_comm_dim = -1
