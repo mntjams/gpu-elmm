@@ -24,18 +24,25 @@ module custom_par
 
   private :: MPI_knd, MPI_real32, MPI_real64, MPI_IN_PLACE_real32, MPI_IN_PLACE_real64  
 
+  logical :: enable_multiple_domains = .true.
+  
   !number of the domain
   integer :: domain_index = 1
   
+  !number of the domain
+  integer :: number_of_domains = 1
+  
   !numbers of images in individual domains
   integer, allocatable :: domain_nims(:), &
-                          domain_nxims(:), 
-                          domain_nyims(:), 
+                          domain_nxims(:), &
+                          domain_nyims(:), &
                           domain_nzims(:)
   
   !at which number starts numbering of this domain?
   integer :: first_domain_rank_in_world = 0
   integer :: first_domain_im_in_world = 1
+  
+  integer :: world_comm_size
   
   
   integer :: nims, npx = -1, npy = -1, npz = -1
@@ -47,7 +54,7 @@ module custom_par
   integer :: neigh_ims(6), neigh_ranks(6)
   
   
-  integer :: global_comm = MPI_COMM_NULL, poisfft_comm = MPI_COMM_NULL, cart_comm = MPI_COMM_NULL
+  integer :: global_comm = MPI_COMM_WORLD, poisfft_comm = MPI_COMM_NULL, cart_comm = MPI_COMM_NULL
   
   !MPI communicators which include the inner or the outer domain
   integer :: inner_comm = MPI_COMM_NULL, outer_comm = MPI_COMM_NULL
@@ -214,7 +221,7 @@ contains
     ranks_grid = images_grid - 1
      
   end subroutine
-
+  
   
   
   subroutine par_init
@@ -243,19 +250,14 @@ contains
     call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real32, [1])
     call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real64, [1])
     
-    global_comm = MPI_COMM_WORLD
-
     call MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_ARE_FATAL, ie)
     if (ie/=0) call error_stop("Error in MPI_Errhandler_set")
     
-    nims = par_num_images()
-
-    myim = par_this_image()
     
-    myrank = myim - 1
-
-    master = (myrank==0)
-
+    call MPI_Comm_size(MPI_Comm_world, world_comm_size, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Comm_size")
+    
+    
   contains
 
     type(c_ptr) function my_loc(t)
@@ -264,6 +266,72 @@ contains
     end function
       
   end subroutine
+  
+  
+  
+  subroutine par_init_domains
+    integer :: ie
+    integer, allocatable :: check_n(:)
+    integer :: ind
+    
+    interface
+      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+        import
+        integer :: SENDBUF, RECVBUF(*)
+        integer :: COUNT, DATATYPE, OP, COMM, IERROR
+      end subroutine
+      subroutine MPI_ALLGATHER(SENDBUF, SENDCOUNT, SENDTYPE, RECVBUF, RECVCOUNT, &
+                 RECVTYPE, COMM, IERROR)
+        integer ::  SENDBUF, RECVBUF(*)
+        integer :: SENDCOUNT, SENDTYPE, RECVCOUNT, RECVTYPE, COMM
+        integer :: IERROR
+      end subroutine
+    end interface
+    
+    if (number_of_domains < domain_index) then
+      write(*,*) "Error, domain index", domain_index, " larger than the number of domains", number_of_domains
+      call error_stop()
+    end if
+    
+    
+    allocate(check_n(world_comm_size))
+    
+    call MPI_AllGather(number_of_domains, 1, MPI_INTEGER, &
+                       check_n, 1, MPI_INTEGER, &
+                       MPI_COMM_WORLD, ie)
+                       
+    if (any(check_n /= number_of_domains)) then
+      write(*,*) "Error, number of domains is not defined equally for all images."
+      call error_stop()
+    end if
+
+  
+    allocate(domain_nims(number_of_domains))
+    allocate(domain_nxims(number_of_domains))
+    allocate(domain_nyims(number_of_domains))
+    allocate(domain_nzims(number_of_domains))
+    
+    domain_nims = 0
+    
+    domain_nims(domain_index) = 1
+    
+    call MPI_AllReduce(MPI_IN_PLACE, domain_nims, number_of_domains, &
+                       MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ie)
+                       
+    if (domain_nims(domain_index) /= product(npxyz)) then
+      write(*,*) "Error, npxyz must be specified and equal to the number of MPI processes for each domain."
+      write(*,*) domain_nims(domain_index), " /= ", npxyz(1) * npxyz(2) * npxyz(3), " for domain ", domain_index
+      call error_stop()
+    end if
+    
+    if (any(domain_nims <= 0)) then
+      ind = minloc(domain_nims, 1)
+      write(*,*) "Error, ", domain_nims(ind), " images in domain", ind
+      call error_stop()
+    end if
+  end subroutine
+  
+  
   
   subroutine par_init_grid
     use PoisFFT
@@ -277,6 +345,20 @@ contains
     integer :: ie
     integer :: pos
     character(80) :: str_dir
+
+    if (enable_multiple_domains) then
+      call par_init_domains
+    else
+      global_comm = MPI_COMM_WORLD
+    end if
+
+    nims = par_num_images()
+
+    myim = par_this_image()
+    
+    myrank = myim - 1
+
+    master = (myrank==0)
 
 !     npxyz = [npx, npy, npz]
     
