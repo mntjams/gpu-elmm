@@ -36,7 +36,9 @@ module custom_par
   integer, allocatable :: domain_nims(:), &
                           domain_nxims(:), &
                           domain_nyims(:), &
-                          domain_nzims(:)
+                          domain_nzims(:), &
+                          domain_comms(:), &
+                          domain_groups(:)
   
   !at which number starts numbering of this domain?
   integer :: first_domain_rank_in_world = 0
@@ -58,6 +60,8 @@ module custom_par
   integer :: domain_comm = MPI_COMM_WORLD
   integer :: poisfft_comm = MPI_COMM_NULL
   integer :: cart_comm = MPI_COMM_NULL
+
+  integer :: world_group = MPI_GROUP_NULL
   
   !MPI communicators which include the inner or the outer domain
   integer :: inner_comm = MPI_COMM_NULL, outer_comm = MPI_COMM_NULL
@@ -253,7 +257,7 @@ contains
     call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real32, [1])
     call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real64, [1])
     
-    call MPI_Errhandler_set(world_comm, MPI_ERRORS_ARE_FATAL, ie)
+    call MPI_Errhandler_set(world_comm, MPI_ERRORS_RETURN, ie)
     if (ie/=0) call error_stop("Error in MPI_Errhandler_set")
     
     
@@ -275,7 +279,7 @@ contains
   subroutine par_init_domains
     integer :: ie
     integer, allocatable :: check_n(:)
-    integer :: ind
+    integer :: dom, i
     
     interface
       subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
@@ -314,6 +318,9 @@ contains
     allocate(domain_nyims(number_of_domains))
     allocate(domain_nzims(number_of_domains))
     
+    allocate(domain_comms(number_of_domains))
+    allocate(domain_groups(number_of_domains))
+    
     domain_nims = 0
     
     domain_nims(domain_index) = 1
@@ -328,10 +335,28 @@ contains
     end if
     
     if (any(domain_nims <= 0)) then
-      ind = minloc(domain_nims, 1)
-      write(*,*) "Error, ", domain_nims(ind), " images in domain", ind
+      dom = minloc(domain_nims, 1)
+      write(*,*) "Error, ", domain_nims(dom), " images in domain", dom
       call error_stop()
     end if
+
+    call MPI_Comm_group(world_comm, world_group, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Comm_group.")
+
+
+    do dom = 1, number_of_domains
+      call MPI_Group_incl(world_group, domain_nims(dom), &
+             [( sum(domain_nims(1:dom-1)) + i - 1, i = 1,  domain_nims(dom) )], &
+             domain_groups(dom), &
+             ie)
+      if (ie/=0) call error_stop("Error calling MPI_Group_incl.")
+
+      call MPI_Comm_create(world_comm, domain_groups(dom), domain_comms(dom), ie)
+      if (ie/=0) call error_stop("Error calling MPI_Comm_create.")
+    end do
+
+    domain_comm = domain_comms(domain_index)  
+    
   end subroutine par_init_domains
   
   
@@ -852,4 +877,4 @@ contains
     if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
   end subroutine
 
-end module
+end module custom_par
