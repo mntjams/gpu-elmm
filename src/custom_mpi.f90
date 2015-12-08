@@ -59,8 +59,8 @@ module custom_par
   !MPI communicators which include the inner or the outer domain
   integer :: inner_comm = MPI_COMM_NULL, outer_comm = MPI_COMM_NULL
   
-  integer :: comm_plane_yz = -1, comm_plane_xz = -1, comm_plane_xy = -1
-  integer :: comm_row_x = -1, comm_row_y = -1, comm_row_z = -1
+  integer :: comm_plane_yz = MPI_COMM_NULL, comm_plane_xz = MPI_COMM_NULL, comm_plane_xy = MPI_COMM_NULL
+  integer :: comm_row_x = MPI_COMM_NULL, comm_row_y = MPI_COMM_NULL, comm_row_z = MPI_COMM_NULL
   integer :: cart_comm_dim = -1
   integer, allocatable :: images_grid(:,:,:), ranks_grid(:,:,:)
   
