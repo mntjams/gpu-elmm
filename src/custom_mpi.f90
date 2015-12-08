@@ -38,7 +38,9 @@ module custom_par
                           domain_nyims(:), &
                           domain_nzims(:), &
                           domain_comms(:), &
-                          domain_groups(:)
+                          domain_groups(:), &
+                          domain_comms_with_nth(:), &
+                          domain_groups_with_nth(:)
   
   !at which number starts numbering of this domain?
   integer :: first_domain_rank_in_world = 0
@@ -320,6 +322,8 @@ contains
     
     allocate(domain_comms(number_of_domains))
     allocate(domain_groups(number_of_domains))
+    allocate(domain_comms_with_nth(number_of_domains))
+    allocate(domain_groups_with_nth(number_of_domains))
     
     domain_nims = 0
     
@@ -344,6 +348,9 @@ contains
     if (ie/=0) call error_stop("Error calling MPI_Comm_group.")
 
 
+    first_domain_rank_in_world = sum(domain_nims(1:domain_index-1))
+    first_domain_im_in_world = first_domain_rank_in_world + 1
+
     do dom = 1, number_of_domains
       call MPI_Group_incl(world_group, domain_nims(dom), &
              [( sum(domain_nims(1:dom-1)) + i - 1, i = 1,  domain_nims(dom) )], &
@@ -357,6 +364,14 @@ contains
 
     domain_comm = domain_comms(domain_index)  
     
+    do dom = 1, number_of_domains
+      call MPI_Group_union(domain_groups(domain_index), domain_groups(dom), domain_groups_with_nth(dom), ie)
+      if (ie/=0) call error_stop("Error calling MPI_Group_union.")
+
+      call MPI_Comm_create(world_comm, domain_groups_with_nth(dom), domain_comms_with_nth(dom), ie)
+      if (ie/=0) call error_stop("Error calling MPI_Comm_create.")
+    end do
+
   end subroutine par_init_domains
   
   
