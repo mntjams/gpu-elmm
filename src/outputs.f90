@@ -3001,7 +3001,7 @@ contains
 !         end if
 !       end if
 ! #ifdef PAR
-!       call MPI_Barrier(global_comm, ie)
+!       call MPI_Barrier(domain_comm, ie)
 ! #endif
 !     end do
   end subroutine

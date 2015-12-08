@@ -54,7 +54,10 @@ module custom_par
   integer :: neigh_ims(6), neigh_ranks(6)
   
   
-  integer :: global_comm = MPI_COMM_WORLD, poisfft_comm = MPI_COMM_NULL, cart_comm = MPI_COMM_NULL
+  integer, parameter :: world_comm = MPI_COMM_WORLD
+  integer :: domain_comm = MPI_COMM_WORLD
+  integer :: poisfft_comm = MPI_COMM_NULL
+  integer :: cart_comm = MPI_COMM_NULL
   
   !MPI communicators which include the inner or the outer domain
   integer :: inner_comm = MPI_COMM_NULL, outer_comm = MPI_COMM_NULL
@@ -109,7 +112,7 @@ contains
 
   subroutine par_sync_all()
     integer ie
-    call MPI_Barrier(global_comm, ie)
+    call MPI_Barrier(domain_comm, ie)
     if (ie/=0) call error_stop("Error in MPI Barrier.")
   end subroutine
 
@@ -123,7 +126,7 @@ contains
  
   integer function par_this_image() result(res)
     integer ie
-    call MPI_Comm_rank(global_comm, res, ie)
+    call MPI_Comm_rank(domain_comm, res, ie)
     res = res + 1
     if (ie/=0) call error_stop("MPI_Comm_rank ERROR")
   end function
@@ -131,7 +134,7 @@ contains
 
   integer function par_num_images() result(res)
     integer ie
-    call MPI_Comm_size(global_comm, res, ie)  
+    call MPI_Comm_size(domain_comm, res, ie)  
     if (ie/=0) call error_stop("MPI_Comm_size ERROR")
   end function
 
@@ -250,11 +253,11 @@ contains
     call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real32, [1])
     call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real64, [1])
     
-    call MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_ARE_FATAL, ie)
+    call MPI_Errhandler_set(world_comm, MPI_ERRORS_ARE_FATAL, ie)
     if (ie/=0) call error_stop("Error in MPI_Errhandler_set")
     
     
-    call MPI_Comm_size(MPI_Comm_world, world_comm_size, ie)
+    call MPI_Comm_size(world_comm, world_comm_size, ie)
     if (ie/=0) call error_stop("Error calling MPI_Comm_size")
     
     
@@ -265,7 +268,7 @@ contains
       my_loc = c_loc(t)
     end function
       
-  end subroutine
+  end subroutine par_init
   
   
   
@@ -298,7 +301,7 @@ contains
     
     call MPI_AllGather(number_of_domains, 1, MPI_INTEGER, &
                        check_n, 1, MPI_INTEGER, &
-                       MPI_COMM_WORLD, ie)
+                       world_comm, ie)
                        
     if (any(check_n /= number_of_domains)) then
       write(*,*) "Error, number of domains is not defined equally for all images."
@@ -316,7 +319,7 @@ contains
     domain_nims(domain_index) = 1
     
     call MPI_AllReduce(MPI_IN_PLACE, domain_nims, number_of_domains, &
-                       MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ie)
+                       MPI_INTEGER, MPI_SUM, world_comm, ie)
                        
     if (domain_nims(domain_index) /= product(npxyz)) then
       write(*,*) "Error, npxyz must be specified and equal to the number of MPI processes for each domain."
@@ -329,7 +332,7 @@ contains
       write(*,*) "Error, ", domain_nims(ind), " images in domain", ind
       call error_stop()
     end if
-  end subroutine
+  end subroutine par_init_domains
   
   
   
@@ -349,7 +352,7 @@ contains
     if (enable_multiple_domains) then
       call par_init_domains
     else
-      global_comm = MPI_COMM_WORLD
+      domain_comm = world_comm
     end if
 
     nims = par_num_images()
@@ -386,12 +389,12 @@ contains
     if (npxyz(1)/=1) call error_stop("The number of images in x direction must be one.")
     
     !Create the 3D Cartesian communicator "cart_comm" for use in CLMM
-    call MPI_Cart_create(global_comm, 3, int(npxyz(3:1:-1)), &
+    call MPI_Cart_create(domain_comm, 3, int(npxyz(3:1:-1)), &
                          [.false.,.false.,.false.], &
                          .true., cart_comm, ie)
     if (ie/=0) call error_stop("Error calling MPI_Cart_create.")
     
-    global_comm = cart_comm
+    domain_comm = cart_comm
     
     myim = par_this_image()
     
@@ -402,7 +405,7 @@ contains
     !creates a 2D! Cartesian communicator "poisfft_comm"
     !2D because of the PFFT library
     !the dimensions in the poisfft_comm are z,y
-    call PoisFFT_InitMPIGrid(global_comm, npxyz(3:2:-1), poisfft_comm, ie)
+    call PoisFFT_InitMPIGrid(domain_comm, npxyz(3:2:-1), poisfft_comm, ie)
     
     call par_init_sub_comms
     
@@ -419,12 +422,12 @@ contains
     call PoisFFT_LocalGridSize(3,ng,cart_comm,nxyz,off,nxyz2,nsxyz2)
     if (any(nxyz/=nxyz2).or.any(off/=nsxyz2)) call error_stop(40)
     
-    call MPI_Barrier(global_comm, ie)
+    call MPI_Barrier(domain_comm, ie)
     if (ie/=0) call error_stop("Error in MPI Barrier.")
     
     write(*,*) iim,jim,kim, "nxyz:", nxyz
     
-    call MPI_Barrier(global_comm, ie)
+    call MPI_Barrier(domain_comm, ie)
     if (ie/=0) call error_stop("Error in MPI Barrier.")
     
     if (par_co_any(any(nxyz<=0))) then
@@ -449,7 +452,7 @@ contains
                                            "-" // itoa(jim) // &
                                            "-" // itoa(kim) // "/"
 
-  end subroutine
+  end subroutine par_init_grid
 
   
   subroutine par_init_boundaries
@@ -499,11 +502,11 @@ contains
       end if
     end subroutine
     
-  end subroutine
+  end subroutine par_init_boundaries
   
   subroutine par_finalize
     integer :: ie
-    call MPI_Barrier(global_comm, ie)
+    call MPI_Barrier(domain_comm, ie)
     if (ie/=0) call error_stop("Error when waiting before finalizing MPI.")
     call MPI_Finalize(ie)
     if (ie/=0) call error_stop("Error finalizing MPI.")
@@ -662,7 +665,7 @@ contains
     real(real32),intent(in) :: x
     integer ie
     
-    res = par_co_reduce(x, MPI_MIN, global_comm)
+    res = par_co_reduce(x, MPI_MIN, domain_comm)
   end function
 
   function par_co_min_64(x) result(res)
@@ -670,7 +673,7 @@ contains
     real(real64),intent(in) :: x
     integer ie
     
-    res = par_co_reduce(x, MPI_MIN, global_comm)
+    res = par_co_reduce(x, MPI_MIN, domain_comm)
   end function
 
   function par_co_min_int(x) result(res)
@@ -678,7 +681,7 @@ contains
     integer,intent(in) :: x
     integer ie
     
-    res = par_co_reduce(x, MPI_MIN, global_comm)
+    res = par_co_reduce(x, MPI_MIN, domain_comm)
   end function
 
   function par_co_max_32(x) result(res)
@@ -686,7 +689,7 @@ contains
     real(real32),intent(in) :: x
     integer ie
     
-    res = par_co_reduce(x, MPI_MAX, global_comm)
+    res = par_co_reduce(x, MPI_MAX, domain_comm)
   end function
 
   function par_co_max_64(x) result(res)
@@ -694,7 +697,7 @@ contains
     real(real64),intent(in) :: x
     integer ie
     
-    res = par_co_reduce(x, MPI_MAX, global_comm)
+    res = par_co_reduce(x, MPI_MAX, domain_comm)
   end function
 
   function par_co_sum_int(x) result(res)
@@ -702,7 +705,7 @@ contains
     integer,intent(in) :: x
     integer ie
     
-    res = par_co_reduce(x, MPI_SUM, global_comm)
+    res = par_co_reduce(x, MPI_SUM, domain_comm)
   end function
 
   function par_co_sum_int_comm(x, comm) result(res)
@@ -719,7 +722,7 @@ contains
     real(real32),intent(in) :: x
     integer ie
     
-    res = par_co_reduce(x, MPI_SUM, global_comm)
+    res = par_co_reduce(x, MPI_SUM, domain_comm)
   end function
 
   function par_co_sum_64(x) result(res)
@@ -727,7 +730,7 @@ contains
     real(real64),intent(in) :: x
     integer ie
     
-    res = par_co_reduce(x, MPI_SUM, global_comm)
+    res = par_co_reduce(x, MPI_SUM, domain_comm)
   end function
 
   function par_co_sum_32_comm(x, comm) result(res)
@@ -771,7 +774,7 @@ contains
     logical,intent(in) :: x
     integer ie
     
-    res = par_co_reduce(x, MPI_LOR, global_comm)
+    res = par_co_reduce(x, MPI_LOR, domain_comm)
   end function
 
 
@@ -780,7 +783,7 @@ contains
     logical,intent(in) :: x
     integer ie
     
-    res = par_co_reduce(x, MPI_LAND, global_comm)
+    res = par_co_reduce(x, MPI_LAND, domain_comm)
   end function
 
   subroutine par_sum_to_master_horizontal_32_1d(x)

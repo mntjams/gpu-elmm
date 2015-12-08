@@ -1,5 +1,5 @@
 module exchange_par
-  use custom_par, only: global_comm, &
+  use custom_par, only: domain_comm, &
                         w_rank, e_rank, s_rank, n_rank, b_rank, t_rank, neigh_ranks ,&
                         nxims, nyims, nzims, iim, jim, kim, myrank
 
@@ -184,7 +184,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_ISend(a, 1, send_mpi_types(side, component), neigh_ranks(side), &
-                      1000*myrank+100*neigh_ranks(side)+component, global_comm, requests(side), ierr)
+                      1000*myrank+100*neigh_ranks(side)+component, domain_comm, requests(side), ierr)
       if (ierr/=0) stop "error sending MPI message."    
     end subroutine
     
@@ -193,7 +193,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_IRecv(a, 1, recv_mpi_types(side, component), neigh_ranks(side), &
-                     1000*neigh_ranks(side)+100*myrank+component, global_comm, requests(side+6), ierr)
+                     1000*neigh_ranks(side)+100*myrank+component, domain_comm, requests(side+6), ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -377,7 +377,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_ISend(a, 1, send_mpi_types(side, 6), neigh_ranks(side), &
-                     10000*myrank+100*neigh_ranks(side)+6, global_comm, requests(side), ierr)
+                     10000*myrank+100*neigh_ranks(side)+6, domain_comm, requests(side), ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -386,7 +386,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_IRecv(a, 1, recv_mpi_types(side, 6), neigh_ranks(side), &
-                     10000*neigh_ranks(side)+100*myrank+6, global_comm, requests(side+6), ierr)
+                     10000*neigh_ranks(side)+100*myrank+6, domain_comm, requests(side+6), ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -531,7 +531,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_ISend(a, 1, send_mpi_types(side, 7), neigh_ranks(side), &
-                     1000*myrank+100*neigh_ranks(side)+7, global_comm, requests(side), ierr)
+                     1000*myrank+100*neigh_ranks(side)+7, domain_comm, requests(side), ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -540,7 +540,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_IRecv(a, size(a), MPI_KND, neigh_ranks(side), &
-                    1000*neigh_ranks(side)+100*myrank+7, global_comm, requests(side+6), ierr)
+                    1000*neigh_ranks(side)+100*myrank+7, domain_comm, requests(side+6), ierr)
       if (ierr/=0) stop "error sending MPI message."
       
       update(side) = .true.
@@ -727,8 +727,8 @@ contains
     subroutine send(a,to)
       real(knd), intent(in) :: a(:,:)
       integer, intent(in) :: to
-      !Must be global_comm, for `to` and `from` derived from `x_rank` to be valid!
-      call MPI_Send(a, size(a) , MPI_KND, to, tag, global_comm, ierr)
+      !Must be domain_comm, for `to` and `from` derived from `x_rank` to be valid!
+      call MPI_Send(a, size(a) , MPI_KND, to, tag, domain_comm, ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -736,7 +736,7 @@ contains
       real(knd), intent(out) :: a(:,:)
       integer, intent(in) :: from
 
-      call MPI_Recv(a, size(a) , MPI_KND, from, tag, global_comm, status, ierr)
+      call MPI_Recv(a, size(a) , MPI_KND, from, tag, domain_comm, status, ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
