@@ -39,8 +39,8 @@ module custom_par
                           domain_nzims(:), &
                           domain_comms(:), &
                           domain_groups(:), &
-                          domain_comms_with_nth(:), &
-                          domain_groups_with_nth(:)
+                          domain_comms_union(:,:), &
+                          domain_groups_union(:,:)
   
   !at which number starts numbering of this domain?
   integer :: first_domain_rank_in_world = 0
@@ -130,9 +130,15 @@ contains
   end subroutine
 
  
-  integer function par_this_image() result(res)
+  integer function par_this_image(comm) result(res)
+    integer, intent(in), optional :: comm
     integer ie
-    call MPI_Comm_rank(domain_comm, res, ie)
+
+    if (present(comm)) then
+      call MPI_Comm_rank(comm, res, ie)
+    else
+      call MPI_Comm_rank(domain_comm, res, ie)
+    end if
     res = res + 1
     if (ie/=0) call error_stop("MPI_Comm_rank ERROR")
   end function
@@ -259,7 +265,7 @@ contains
     call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real32, [1])
     call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real64, [1])
     
-    call MPI_Errhandler_set(world_comm, MPI_ERRORS_RETURN, ie)
+    call MPI_Errhandler_set(world_comm, MPI_ERRORS_ARE_FATAL, ie)
     if (ie/=0) call error_stop("Error in MPI_Errhandler_set")
     
     
@@ -280,11 +286,14 @@ contains
   
   subroutine par_init_domains
     integer :: ie
+    !domain of a (world-ordered) image
+    integer, allocatable :: ims_domain(:)
     integer, allocatable :: check_n(:)
-    integer :: dom, i
+    integer :: dom, dom2, i
+
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         integer :: SENDBUF, RECVBUF(*)
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
@@ -320,17 +329,25 @@ contains
     allocate(domain_nyims(number_of_domains))
     allocate(domain_nzims(number_of_domains))
     
-    allocate(domain_comms(number_of_domains))
-    allocate(domain_groups(number_of_domains))
-    allocate(domain_comms_with_nth(number_of_domains))
-    allocate(domain_groups_with_nth(number_of_domains))
-    
     domain_nims = 0
     
     domain_nims(domain_index) = 1
+
+
+    allocate(domain_comms(number_of_domains))
+    allocate(domain_groups(number_of_domains))
+    allocate(domain_comms_union(number_of_domains-1, 2:number_of_domains))
+    allocate(domain_groups_union(number_of_domains-1, 2:number_of_domains))
+
+    domain_comms = MPI_COMM_NULL
+    domain_groups = MPI_GROUP_NULL
+    domain_comms_union = MPI_COMM_NULL
+    domain_groups_union = MPI_GROUP_NULL
     
-    call MPI_AllReduce(MPI_IN_PLACE, domain_nims, number_of_domains, &
+    
+    call MPI_Allreduce(MPI_IN_PLACE, domain_nims, number_of_domains, &
                        MPI_INTEGER, MPI_SUM, world_comm, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Allreduce for domain_nims.")
                        
     if (domain_nims(domain_index) /= product(npxyz)) then
       write(*,*) "Error, npxyz must be specified and equal to the number of MPI processes for each domain."
@@ -347,15 +364,28 @@ contains
     call MPI_Comm_group(world_comm, world_group, ie)
     if (ie/=0) call error_stop("Error calling MPI_Comm_group.")
 
+    domain_comm = world_comm
+    allocate(ims_domain(world_comm_size))
+    ims_domain = 0
+    ims_domain(par_this_image(world_comm)) = domain_index
+
+    call MPI_Allreduce(MPI_IN_PLACE, ims_domain, world_comm_size, &
+                       MPI_INTEGER, MPI_SUM, world_comm, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Allreduce for ims_domain.")
+
+    do i = 2, world_comm_size
+      if (ims_domain(i-1)>ims_domain(i)) &
+        call error_stop("Error, MPI ranks must be order to individual domains in an increasing order.")
+    end do
 
     first_domain_rank_in_world = sum(domain_nims(1:domain_index-1))
     first_domain_im_in_world = first_domain_rank_in_world + 1
 
     do dom = 1, number_of_domains
       call MPI_Group_incl(world_group, domain_nims(dom), &
-             [( sum(domain_nims(1:dom-1)) + i - 1, i = 1,  domain_nims(dom) )], &
-             domain_groups(dom), &
-             ie)
+                          [( sum(domain_nims(1:dom-1)) + i - 1, i = 1,  domain_nims(dom) )], &
+                          domain_groups(dom), &
+                          ie)
       if (ie/=0) call error_stop("Error calling MPI_Group_incl.")
 
       call MPI_Comm_create(world_comm, domain_groups(dom), domain_comms(dom), ie)
@@ -364,13 +394,22 @@ contains
 
     domain_comm = domain_comms(domain_index)  
     
-    do dom = 1, number_of_domains
-      call MPI_Group_union(domain_groups(domain_index), domain_groups(dom), domain_groups_with_nth(dom), ie)
-      if (ie/=0) call error_stop("Error calling MPI_Group_union.")
+    do dom = 1, number_of_domains - 1
+      do dom2 = dom + 1, number_of_domains
+        call MPI_Group_union(min(domain_groups(dom), domain_groups(dom2)), &
+                             max(domain_groups(dom), domain_groups(dom2)), &
+                             domain_groups_union(dom, dom2), ie)
+        if (ie/=0) call error_stop("Error calling MPI_Group_union.")
 
-      call MPI_Comm_create(world_comm, domain_groups_with_nth(dom), domain_comms_with_nth(dom), ie)
-      if (ie/=0) call error_stop("Error calling MPI_Comm_create.")
+        call MPI_Comm_create(world_comm, domain_groups_union(dom, dom2), domain_comms_union(dom, dom2), ie)
+        if (ie/=0) call error_stop("Error calling MPI_Comm_create.")
+      end do
     end do
+
+    !handshake
+    if (domain_index==2.or.domain_index==3) then
+      call MPI_Barrier(domain_comms_union(2,3), ie)
+    end if
 
   end subroutine par_init_domains
   
@@ -587,14 +626,14 @@ contains
     integer ie
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         real(real32) :: SENDBUF, RECVBUF
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
       end subroutine
     end interface
     
-    call MPI_AllReduce(x, res, &
+    call MPI_Allreduce(x, res, &
                        count=1, datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_32.")
@@ -607,14 +646,14 @@ contains
     integer ie
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         real(real64) :: SENDBUF, RECVBUF
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
       end subroutine
     end interface
     
-    call MPI_AllReduce(x, res, &
+    call MPI_Allreduce(x, res, &
                        count=1, datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_64.")
@@ -627,14 +666,14 @@ contains
     integer ie
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
         real(real32) :: SENDBUF(count), RECVBUF(count)
       end subroutine
     end interface
     
-    call MPI_AllReduce(x, res, &
+    call MPI_Allreduce(x, res, &
                        count=size(x), datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_32.")
@@ -647,14 +686,14 @@ contains
     integer ie
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
         real(real64) :: SENDBUF(count), RECVBUF(count)
       end subroutine
     end interface
     
-    call MPI_AllReduce(x, res, &
+    call MPI_Allreduce(x, res, &
                        count=size(x), datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_64.")
@@ -667,14 +706,14 @@ contains
     integer ie
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         logical :: SENDBUF, RECVBUF
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
       end subroutine
     end interface
     
-    call MPI_AllReduce(x, res, &
+    call MPI_Allreduce(x, res, &
                        count=1, datatype=MPI_LOGICAL, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_logical.")
@@ -687,14 +726,14 @@ contains
     integer ie
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         integer :: SENDBUF, RECVBUF
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
       end subroutine
     end interface
     
-    call MPI_AllReduce(x, res, &
+    call MPI_Allreduce(x, res, &
                        count=1, datatype=MPI_INTEGER, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_logical.")
