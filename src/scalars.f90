@@ -223,7 +223,7 @@ contains
 
         call TemperatureVolumeSources(Temperature_adv)
 
-        if (TempBtype(To)==AUTOMATICflux) then
+        if (TempBtype(To)==BC_AUTOMATIC_FLUX) then
           first = min(Prnz*5/6, Prnz-5)
           last = Prnz-5
           sideTemp(To) = sum(temperature_flux_profile(first:last)) / (last-first+1)
@@ -246,7 +246,7 @@ contains
 
         call MoistureVolumeSources(Moisture_adv)
 
-        if (MoistBtype(To)==AUTOMATICflux) then
+        if (MoistBtype(To)==BC_AUTOMATIC_FLUX) then
           first = min(Prnz*5/6, Prnz-5)
           last = Prnz-5
           sideMoist(To) = sum(moisture_flux_profile(first:last)) / (last-first+1)

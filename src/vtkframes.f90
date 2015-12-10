@@ -74,15 +74,15 @@ contains
       if (D%direction==1) then
         res = (D%position>=xU(0) .and. &
                (D%position<xU(Prnx) .or. &
-                (D%position==xU(Prnx).and.Btype(Ea)/=MPI_BOUNDARY)))
+                (D%position==xU(Prnx).and.Btype(Ea)/=BC_MPI_BOUNDARY)))
       else if (D%direction==2) then   
         res = (D%position>=yV(0) .and. &
                (D%position<yV(Prny) .or. &
-                (D%position==yV(Prny).and.Btype(No)/=MPI_BOUNDARY)))
+                (D%position==yV(Prny).and.Btype(No)/=BC_MPI_BOUNDARY)))
       else if (D%direction==3) then   
         res = (D%position>=zW(0) .and. &
                (D%position<zW(Prnz) .or. &
-                (D%position==zW(Prnz).and.Btype(To)/=MPI_BOUNDARY)))
+                (D%position==zW(Prnz).and.Btype(To)/=BC_MPI_BOUNDARY)))
       else
         res = .false.
       end if

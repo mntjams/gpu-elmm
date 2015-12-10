@@ -1,6 +1,6 @@
 module exchange_mpi_derived_types
   use Kinds
-  use Parameters, only: We, Ea, So, No, Bo, To, MPI_PERIODIC
+  use Parameters, only: We, Ea, So, No, Bo, To, BC_MPI_PERIODIC
   use custom_mpi, only: MPI_ORDER_FORTRAN, MPI_KND, MPI_DATATYPE_NULL
   
   implicit none

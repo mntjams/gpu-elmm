@@ -438,7 +438,7 @@ contains
      ustar = huge(1.0)
    end if
 
-   if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
+   if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==BC_MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
      allocate(tstar(2,1:time_series_max_length))
      tstar = huge(1.0)
    end if
@@ -569,19 +569,19 @@ contains
      
    else
    
-     if (Btype(To)==AUTOMATICFLUX) then
+     if (Btype(To)==BC_AUTOMATIC_FLUX) then
        allocate(current_profiles%uw(0:Prnz), current_profiles%uwsgs(0:Prnz))
        allocate(current_profiles%vw(0:Prnz), current_profiles%vwsgs(0:Prnz))
      end if
      
-     if (TempBtype(To)==AUTOMATICFLUX) then
+     if (TempBtype(To)==BC_AUTOMATIC_FLUX) then
        allocate(current_profiles%tempfl(0:Prnz), current_profiles%tempflsgs(0:Prnz))
      else
        !to avoid the necessity of an allocatable dummy argument
        allocate(current_profiles%tempfl(0))
      end if
 
-     if (MoistBtype(To)==AUTOMATICFLUX) then
+     if (MoistBtype(To)==BC_AUTOMATIC_FLUX) then
        allocate(current_profiles%moistfl(0:Prnz), current_profiles%moistflsgs(0:Prnz))
      else
        !to avoid the necessity of an allocatable dummy argument
@@ -1019,7 +1019,7 @@ contains
     end if
 
 
-    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
+    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==BC_MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
      S2 = GroundTFlux()
      S = - S2 /  ground_ustar_Pr
 
@@ -1041,7 +1041,7 @@ contains
     end if
 
     if ((enable_profiles) .or. &
-       Btype(To)==AUTOMATICFLUX) then
+       Btype(To)==BC_AUTOMATIC_FLUX) then
       call StressProfiles(U,V,W)
     end if
 
@@ -1049,17 +1049,17 @@ contains
 
       call FluxSGSProfiles(W,Temperature,Moisture,Scalar)
 
-    else if (TempBtype(To)==AUTOMATICFLUX .or. &
-             MoistBtype(To)==AUTOMATICFLUX .or. &
-             ScalBType(To)==AUTOMATICFLUX) then
+    else if (TempBtype(To)==BC_AUTOMATIC_FLUX .or. &
+             MoistBtype(To)==BC_AUTOMATIC_FLUX .or. &
+             ScalBType(To)==BC_AUTOMATIC_FLUX) then
 
-      if (TempBtype(To)==AUTOMATICFLUX.and.enable_buoyancy) &
+      if (TempBtype(To)==BC_AUTOMATIC_FLUX.and.enable_buoyancy) &
         call TemperatureFluxSGSProfile(W,Temperature)
 
-      if (MoistBtype(To)==AUTOMATICFLUX.and.enable_moisture) &
+      if (MoistBtype(To)==BC_AUTOMATIC_FLUX.and.enable_moisture) &
         call MoistureFluxSGSProfile(W,Moisture)
 
-      if (ScalBtype(To)==AUTOMATICFLUX.and.num_of_scalars>0) &
+      if (ScalBtype(To)==BC_AUTOMATIC_FLUX.and.num_of_scalars>0) &
         call ScalarFluxSGSProfile(W,Scalar)
 
     end if

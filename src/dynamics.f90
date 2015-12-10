@@ -155,7 +155,7 @@ contains
     real(knd) :: flux
     integer :: first,last
     
-    if (Btype(To)==AUTOMATICFLUX) then
+    if (Btype(To)==BC_AUTOMATIC_FLUX) then
       first = min(Prnz*5/6,Prnz-5)
       last = Prnz-5
       

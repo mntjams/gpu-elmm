@@ -273,7 +273,7 @@ implicit none
     !$omp parallel private(i,j,k)
 
     !!! corners and edges for periodic conditions
-    if (Btype(Ea)==PERIODIC.and.Btype(No)==PERIODIC.and.Btype(To)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC.and.Btype(No)==BC_PERIODIC.and.Btype(To)==BC_PERIODIC) then
     !$omp sections
     !$omp section
      do k=nz+1,nz+3
@@ -342,7 +342,7 @@ implicit none
      !$omp end sections
     end if
 
-    if (Btype(Ea)==PERIODIC.and.Btype(No)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC.and.Btype(No)==BC_PERIODIC) then
      !$omp sections
      !$omp section
      do k = 1, nz
@@ -380,7 +380,7 @@ implicit none
     end if
 
 
-    if (Btype(Ea)==PERIODIC.and.Btype(To)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC.and.Btype(To)==BC_PERIODIC) then
      !$omp sections
      !$omp section
      do k=nz+1,nz+3
@@ -418,7 +418,7 @@ implicit none
     end if
 
 
-    if (Btype(No)==PERIODIC.and.Btype(To)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC.and.Btype(To)==BC_PERIODIC) then
      !$omp sections
      !$omp section
      do k=nz+1,nz+3
@@ -466,7 +466,7 @@ implicit none
 #endif
     !$omp sections
     !$omp section
-    if (Btype(We)==DIRICHLET.and.regime/=interm) then
+    if (Btype(We)==BC_DIRICHLET.and.regime/=interm) then
       if (component==1) then
          do k = 1, nz
           do j = 1, ny                       !Dirichlet inlet
@@ -484,8 +484,8 @@ implicit none
           end do
          end do
       end if
-    else if (Btype(We)==NOSLIP .or. (component==1.and.Btype(We)==FREESLIP) .or. &
-             (Btype(We)==DIRICHLET.and.regime==interm)) then
+    else if (Btype(We)==BC_NOSLIP .or. (component==1.and.Btype(We)==BC_FREESLIP) .or. &
+             (Btype(We)==BC_DIRICHLET.and.regime==interm)) then
       if (component==1) then
          do k = 1, nz
           do j = 1, ny                       !Solid wall
@@ -503,7 +503,7 @@ implicit none
           end do
          end do
       end if
-    else if (Btype(We)==NEUMANN.or.(component/=1.and.Btype(We)==FREESLIP)) then
+    else if (Btype(We)==BC_NEUMANN.or.(component/=1.and.Btype(We)==BC_FREESLIP)) then
       if (component==1) then
          do k = 1, nz
           do j = 1, ny                       !Neumann inlet
@@ -521,7 +521,7 @@ implicit none
           end do
          end do
       end if
-    else if (Btype(We)==PERIODIC) then  !Periodic BC
+    else if (Btype(We)==BC_PERIODIC) then  !Periodic BC
       do k = 1, nz
        do j = 1, ny
         U(0,j,k)=U(nx,j,k)
@@ -529,7 +529,7 @@ implicit none
         U(-2,j,k)=U(nx-2,j,k)
        end do
       end do
-    else if (Btype(We)==TURBULENTINLET.or.Btype(We)==INLETFROMFILE) then
+    else if (Btype(We)==BC_TURBULENT_INLET.or.Btype(We)==BC_INLET_FROM_FILE) then
       if (regime/=interm) then
         if (component==1) then
           do k=-1,nz+2
@@ -571,7 +571,7 @@ implicit none
 
 
     !$omp section
-    if (Btype(Ea)==DIRICHLET.and.regime/=interm) then
+    if (Btype(Ea)==BC_DIRICHLET.and.regime/=interm) then
       if (component==1) then
         do k = 1, nz
          do j = 1, ny                       !Dirichlet inlet
@@ -589,8 +589,8 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(Ea)==NOSLIP .or. (component==1.and.Btype(Ea)==FREESLIP) .or. &
-              (Btype(Ea)==DIRICHLET.and.regime==interm)) then
+    else if (Btype(Ea)==BC_NOSLIP .or. (component==1.and.Btype(Ea)==BC_FREESLIP) .or. &
+              (Btype(Ea)==BC_DIRICHLET.and.regime==interm)) then
       if (component==1) then
         do k = 1, nz
          do j = 1, ny                       !Solid wall
@@ -608,7 +608,7 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(Ea)==NEUMANN.or.(component/=1.and.Btype(Ea)==FREESLIP)) then   !Neumann outlet
+    else if (Btype(Ea)==BC_NEUMANN.or.(component/=1.and.Btype(Ea)==BC_FREESLIP)) then   !Neumann outlet
       do k = 1, nz
        do j = 1, ny
         U(nx+1,j,k)=U(nx,j,k)
@@ -616,7 +616,7 @@ implicit none
         U(nx+3,j,k)=U(nx,j,k)
        end do
       end do
-    else if (Btype(Ea)==PERIODIC) then  !Periodic BC
+    else if (Btype(Ea)==BC_PERIODIC) then  !Periodic BC
       do k = 1, nz
        do j = 1, ny
         U(nx+1,j,k)=U(1,j,k)
@@ -624,7 +624,7 @@ implicit none
         U(nx+3,j,k)=U(3,j,k)
        end do
       end do
-    else if (Btype(Ea)==TURBULENTINLET) then
+    else if (Btype(Ea)==BC_TURBULENT_INLET) then
       if (regime/=interm) then
         if (component==1) then
           do k = 1, nz
@@ -671,7 +671,7 @@ implicit none
 #endif
     !$omp sections
     !$omp section
-    if (Btype(So)==DIRICHLET.and.regime/=interm) then
+    if (Btype(So)==BC_DIRICHLET.and.regime/=interm) then
       if (component==2) then
         do k = 1, nz
          do i = -2, nx+3                       !Dirichlet inlet
@@ -689,8 +689,8 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(So)==NOSLIP .or. (component==2.and.Btype(So)==FREESLIP) .or. &
-               (Btype(So)==DIRICHLET.and.regime==interm)) then
+    else if (Btype(So)==BC_NOSLIP .or. (component==2.and.Btype(So)==BC_FREESLIP) .or. &
+               (Btype(So)==BC_DIRICHLET.and.regime==interm)) then
       if (component==2) then
         do k = 1, nz
          do i = -2, nx+3                       !Solid wall
@@ -708,7 +708,7 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(So)==NEUMANN.or.(component/=2.and.Btype(So)==FREESLIP)) then
+    else if (Btype(So)==BC_NEUMANN.or.(component/=2.and.Btype(So)==BC_FREESLIP)) then
       do k = 1, nz
        do i = -2, nx+3                       !Neumann inlet
         U(i,0,k)=U(i,1,k)
@@ -716,7 +716,7 @@ implicit none
         U(i,-2,k)=U(i,1,k)
        end do
       end do
-    else if (Btype(So)==PERIODIC) then  !Periodic BC
+    else if (Btype(So)==BC_PERIODIC) then  !Periodic BC
       do k = 1, nz
        do i = -2, nx+3
         U(i,0,k)=U(i,ny,k)
@@ -728,7 +728,7 @@ implicit none
 
 
     !$omp section
-    if (Btype(No)==DIRICHLET.and.regime/=interm) then
+    if (Btype(No)==BC_DIRICHLET.and.regime/=interm) then
       if (component==2) then
         do k = 1, nz
          do i = -2, nx+3                       !Dirichlet inlet
@@ -746,8 +746,8 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(No)==NOSLIP .or. (component==2.and.Btype(No)==FREESLIP) .or. &
-             (Btype(No)==DIRICHLET.and.regime==interm)) then
+    else if (Btype(No)==BC_NOSLIP .or. (component==2.and.Btype(No)==BC_FREESLIP) .or. &
+             (Btype(No)==BC_DIRICHLET.and.regime==interm)) then
       if (component==2) then
         do k = 1, nz
          do i = -2, nx+3                       !Solid wall
@@ -765,7 +765,7 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(No)==NEUMANN .or. (component/=2.and.Btype(No)==FREESLIP)) then
+    else if (Btype(No)==BC_NEUMANN .or. (component/=2.and.Btype(No)==BC_FREESLIP)) then
       do k = 1, nz
        do i = -2, nx+3                       !Neumann inlet
         U(i,ny+1,k)=U(i,ny,k)
@@ -773,7 +773,7 @@ implicit none
         U(i,ny+3,k)=U(i,ny,k)
        end do
       end do
-    else if (Btype(No)==PERIODIC) then  !Periodic BC
+    else if (Btype(No)==BC_PERIODIC) then  !Periodic BC
       do k = 1, nz
        do i = -2, nx+3
         U(i,ny+1,k)=U(i,1,k)
@@ -789,7 +789,7 @@ implicit none
 #endif
     !$omp sections
     !$omp section
-    if (Btype(Bo)==DIRICHLET .and. regime/=interm) then
+    if (Btype(Bo)==BC_DIRICHLET .and. regime/=interm) then
       if (component==3) then
         do j = -2, ny+3
          do i = -2, nx+3                       !Dirichlet inlet
@@ -807,8 +807,8 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(Bo)==NOSLIP .or. (component==3.and.Btype(Bo)==FREESLIP) .or. &
-               (Btype(Bo)==DIRICHLET.and.regime==interm)) then
+    else if (Btype(Bo)==BC_NOSLIP .or. (component==3.and.Btype(Bo)==BC_FREESLIP) .or. &
+               (Btype(Bo)==BC_DIRICHLET.and.regime==interm)) then
       if (component==3) then
         do j = -2, ny+3
          do i = -2, nx+3                       !Solid wall
@@ -826,7 +826,7 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(Bo)==NEUMANN.or.(component/=3.and.Btype(Bo)==FREESLIP)) then
+    else if (Btype(Bo)==BC_NEUMANN.or.(component/=3.and.Btype(Bo)==BC_FREESLIP)) then
       do j = -2, ny+3
        do i = -2, nx+3                       !Neumann inlet
         U(i,j,0)=U(i,j,1)
@@ -834,7 +834,7 @@ implicit none
         U(i,j,-2)=U(i,j,1)
        end do
       end do
-    else if (Btype(Bo)==PERIODIC) then  !Periodic BC
+    else if (Btype(Bo)==BC_PERIODIC) then  !Periodic BC
      do j = -2, ny+3
       do i = -2, nx+3
        U(i,j,0)=U(i,j,nz)
@@ -845,7 +845,7 @@ implicit none
     end if
 
     !$omp section
-    if (Btype(To)==DIRICHLET.and.regime/=interm) then
+    if (Btype(To)==BC_DIRICHLET.and.regime/=interm) then
       if (component==3) then
         do j = -2, ny+3
          do i = -2, nx+3                       !Dirichlet inlet
@@ -863,10 +863,10 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(To)==NOSLIP .or. &
-             (component==3.and.(Btype(To)==FREESLIP .or. &
-                                Btype(To)==AUTOMATICFLUX)) .or. &
-             (Btype(To)==DIRICHLET.and.regime==interm) ) then
+    else if (Btype(To)==BC_NOSLIP .or. &
+             (component==3.and.(Btype(To)==BC_FREESLIP .or. &
+                                Btype(To)==BC_AUTOMATIC_FLUX)) .or. &
+             (Btype(To)==BC_DIRICHLET.and.regime==interm) ) then
       if (component==3) then
         do j = -2, ny+3
          do i = -2, nx+3                       !Solid wall
@@ -884,9 +884,9 @@ implicit none
          end do
         end do
       end if
-    else if (Btype(To)==NEUMANN .or. &
-             (component/=3.and.(Btype(To)==FREESLIP .or. &
-                                Btype(To)==AUTOMATICFLUX))) then
+    else if (Btype(To)==BC_NEUMANN .or. &
+             (component/=3.and.(Btype(To)==BC_FREESLIP .or. &
+                                Btype(To)==BC_AUTOMATIC_FLUX))) then
       do j = -2, ny+3
        do i = -2, nx+3                       !Neumann inlet
         U(i,j,nz+1)=U(i,j,nz)
@@ -894,7 +894,7 @@ implicit none
         U(i,j,nz+3)=U(i,j,nz)
        end do
       end do
-    else if (Btype(To)==PERIODIC) then  !Periodic BC
+    else if (Btype(To)==BC_PERIODIC) then  !Periodic BC
      do j = -2, ny+3
       do i = -2, nx+3
        U(i,j,nz+1)=U(i,j,1)
@@ -921,13 +921,13 @@ implicit none
     call par_exchange_boundaries(Phi, Btype, 5)
 #endif
     
-    if (Btype(We)==PERIODIC) then
+    if (Btype(We)==BC_PERIODIC) then
      do k = 1, nz
       do j = 1, ny                      !Periodic BC
        Phi(0,j,k)=Phi(nx,j,k)
       end do
      end do
-    else if (Btype(We)<MPI_BOUNDS) then
+    else if (Btype(We)<BC_MPI_BOUNDS) then
      do k = 1, nz
       do j = 1, ny                      !Other BCs
        Phi(0,j,k)=Phi(1,j,k)
@@ -935,13 +935,13 @@ implicit none
      end do
     end if
 
-    if (Btype(Ea)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC) then
      do k = 1, nz
       do j = 1, ny                      !Periodic BC
        Phi(nx+1,j,k)=Phi(1,j,k)
       end do
      end do
-    else if (Btype(Ea)<MPI_BOUNDS) then
+    else if (Btype(Ea)<BC_MPI_BOUNDS) then
      do k = 1, nz
       do j = 1, ny                      !Other BCs
        Phi(nx+1,j,k)=Phi(nx,j,k)
@@ -949,13 +949,13 @@ implicit none
      end do
     end if
 
-    if (Btype(So)==PERIODIC) then
+    if (Btype(So)==BC_PERIODIC) then
      do k = 1, nz
       do i = 1, nx                      !Periodic BC
        Phi(i,0,k)=Phi(i,ny,k)
       end do
      end do
-    else if (Btype(So)<MPI_BOUNDS) then
+    else if (Btype(So)<BC_MPI_BOUNDS) then
      do k = 1, nz
       do i = 1, nx                      !Other BCs
        Phi(i,0,k)=Phi(i,1,k)
@@ -963,13 +963,13 @@ implicit none
      end do
     end if
 
-    if (Btype(No)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC) then
     do k = 1, nz
       do i = 1, nx                      !Periodic BC
        Phi(i,ny+1,k)=Phi(i,1,k)
       end do
      end do
-    else if (Btype(No)<MPI_BOUNDS) then
+    else if (Btype(No)<BC_MPI_BOUNDS) then
      do k = 1, nz
       do i = 1, nx                      !Other BCs
        Phi(i,ny+1,k)=Phi(i,ny,k)
@@ -977,13 +977,13 @@ implicit none
      end do
     end if
 
-    if (Btype(Bo)==PERIODIC) then
+    if (Btype(Bo)==BC_PERIODIC) then
      do j = 1, ny
       do i = 1, nx                      !Periodic BC
        Phi(i,j,0)=Phi(i,j,nz)
       end do
      end do
-    else if (Btype(Bo)<MPI_BOUNDS) then
+    else if (Btype(Bo)<BC_MPI_BOUNDS) then
      do j = 1, ny
       do i = 1, nx                      !Other BCs
        Phi(i,j,0)=Phi(i,j,1)
@@ -991,13 +991,13 @@ implicit none
      end do
     end if
 
-    if (Btype(To)==PERIODIC) then
+    if (Btype(To)==BC_PERIODIC) then
      do j = 1, ny
       do i = 1, nx                      !Periodic BC
        Phi(i,j,nz+1)=Phi(i,j,1)
       end do
      end do
-    else if (Btype(To)<MPI_BOUNDS) then
+    else if (Btype(To)<BC_MPI_BOUNDS) then
      do j = 1, ny
       do i = 1, nx                      !Other BCs
        Phi(i,j,nz+1)=Phi(i,j,nz)
@@ -1019,21 +1019,21 @@ implicit none
     call par_exchange_Pr(Pr)
 #endif
 
-    if (Btype(We)==PERIODIC) then
+    if (Btype(We)==BC_PERIODIC) then
      do k = 1, nz
       do j = 1, ny
        Pr(nx+1,j,k)=Pr(1,j,k)
       end do
      end do
     end if
-    if (Btype(No)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC) then
      do k = 1, nz
       do i = 1, nx
        Pr(i,ny+1,k)=Pr(i,1,k)
       end do
      end do
     end if
-    if (Btype(To)==PERIODIC) then
+    if (Btype(To)==BC_PERIODIC) then
      do j = 1, ny
       do i = 1, nx
        Pr(i,j,nz+1)=Pr(i,j,1)
@@ -1041,25 +1041,25 @@ implicit none
      end do
     end if
 
-    if (Btype(We)==PERIODIC.and.Btype(No)==PERIODIC) then
+    if (Btype(We)==BC_PERIODIC.and.Btype(No)==BC_PERIODIC) then
      do k = 1, nz
         Pr(nx+1,ny+1,k)=Pr(1,1,k)
      end do
     end if
 
-     if (Btype(We)==PERIODIC.and.Btype(To)==PERIODIC) then
+     if (Btype(We)==BC_PERIODIC.and.Btype(To)==BC_PERIODIC) then
      do j = 1, ny
         Pr(nx+1,j,nz+1)=Pr(1,j,1)
      end do
     end if
 
-    if (Btype(No)==PERIODIC.and.Btype(To)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC.and.Btype(To)==BC_PERIODIC) then
      do i = 1, nx
         Pr(i,ny+1,nz+1)=Pr(i,1,1)
      end do
     end if
 
-    if (Btype(We)==PERIODIC.and.Btype(No)==PERIODIC.and.Btype(To)==PERIODIC)  Pr(nx+1,ny+1,nz+1)=Pr(1,1,1)
+    if (Btype(We)==BC_PERIODIC.and.Btype(No)==BC_PERIODIC.and.Btype(To)==BC_PERIODIC)  Pr(nx+1,ny+1,nz+1)=Pr(1,1,1)
 
   end subroutine Bound_Pr
 
@@ -1080,13 +1080,13 @@ implicit none
     !The above filled the buffers, but we have to add
     ! the content of the buffers to the inside points.
 
-    if (Btype(We)==PERIODIC) then
+    if (Btype(We)==BC_PERIODIC) then
      do k = 1, nz
       do j = 1, ny                      !Periodic BC
        Phi(nx,j,k)=Phi(0,j,k)+Phi(nx,j,k)
       end do
      end do
-    else if (Btype(We)<MPI_BOUNDS) then
+    else if (Btype(We)<BC_MPI_BOUNDS) then
      do k = 1, nz
       do j = 1, ny                      !Other BCs
        Phi(1,j,k)=Phi(1,j,k)+Phi(0,j,k)
@@ -1094,13 +1094,13 @@ implicit none
      end do
     end if
 
-    if (Btype(Ea)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC) then
      do k = 1, nz
       do j = 1, ny                      !Periodic BC
        Phi(1,j,k)=Phi(1,j,k)+Phi(nx+1,j,k)
       end do
      end do
-    else if (Btype(Ea)<MPI_BOUNDS) then
+    else if (Btype(Ea)<BC_MPI_BOUNDS) then
      do k = 1, nz
       do j = 1, ny                      !Other BCs
        Phi(nx,j,k)=Phi(nx,j,k)+Phi(nx+1,j,k)
@@ -1108,13 +1108,13 @@ implicit none
      end do
     end if
 
-    if (Btype(So)==PERIODIC) then
+    if (Btype(So)==BC_PERIODIC) then
      do k = 1, nz
       do i = 1, nx                      !Periodic BC
        Phi(i,ny,k)=Phi(i,ny,k)+Phi(i,0,k)
       end do
      end do
-    else if (Btype(So)<MPI_BOUNDS) then
+    else if (Btype(So)<BC_MPI_BOUNDS) then
      do k = 1, nz
       do i = 1, nx                      !Other BCs
        Phi(i,1,k)=Phi(i,1,k)+Phi(i,0,k)
@@ -1122,13 +1122,13 @@ implicit none
      end do
     end if
 
-    if (Btype(No)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC) then
      do k = 1, nz
       do i = 1, nx                      !Periodic BC
        Phi(i,1,k)=Phi(i,1,k)+Phi(i,ny+1,k)
       end do
      end do
-    else if (Btype(No)<MPI_BOUNDS) then
+    else if (Btype(No)<BC_MPI_BOUNDS) then
      do k = 1, nz
       do i = 1, nx                      !Other BCs
        Phi(i,ny,k)=Phi(i,ny,k)+Phi(i,ny+1,k)
@@ -1136,13 +1136,13 @@ implicit none
      end do
     end if
 
-    if (Btype(Bo)==PERIODIC) then
+    if (Btype(Bo)==BC_PERIODIC) then
      do j = 1, ny
       do i = 1, nx                      !Periodic BC
        Phi(i,j,nz)=Phi(i,j,nz)+Phi(i,j,0)
       end do
      end do
-    else if (Btype(Bo)<MPI_BOUNDS) then
+    else if (Btype(Bo)<BC_MPI_BOUNDS) then
      do j = 1, ny
       do i = 1, nx                      !Other BCs
        Phi(i,j,1)=Phi(i,j,1)+Phi(i,j,0)
@@ -1150,13 +1150,13 @@ implicit none
      end do
     end if
 
-    if (Btype(To)==PERIODIC) then
+    if (Btype(To)==BC_PERIODIC) then
      do j = 1, ny
       do i = 1, nx                      !Periodic BC
        Phi(i,j,1)=Phi(i,j,1)+Phi(i,j,nz+1)
       end do
      end do
-    else if (Btype(To)<MPI_BOUNDS) then
+    else if (Btype(To)<BC_MPI_BOUNDS) then
      do j = 1, ny
       do i = 1, nx                      !Other BCs
        Phi(i,j,nz)=Phi(i,j,nz)+Phi(i,j,nz+1)

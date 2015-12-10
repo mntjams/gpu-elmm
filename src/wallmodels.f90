@@ -438,7 +438,7 @@ contains
 
     !type==0 below, therefore we need 
     ! type of free bounderies not to be -1
-    if (Btype(We)==NOSLIP) then
+    if (Btype(We)==BC_NOSLIP) then
       do k = 1,Prnz
        do j = 1,Prny
          if (Prtype(1,j,k)==0) then
@@ -458,7 +458,7 @@ contains
       end do
     end if
 
-    if (Btype(Ea)==NOSLIP) then
+    if (Btype(Ea)==BC_NOSLIP) then
       do k = 1,Prnz
        do j = 1,Prny
          if (Prtype(Prnx,j,k)==0) then
@@ -478,7 +478,7 @@ contains
       end do
     end if
 
-    if (Btype(So)==NOSLIP.or.(Btype(So)==DIRICHLET.and.sideU(2,So)==0)) then
+    if (Btype(So)==BC_NOSLIP.or.(Btype(So)==BC_DIRICHLET.and.sideU(2,So)==0)) then
       do k = 1,Prnz
        do i = 1,Prnx
          if (Prtype(i,1,k)==0) then
@@ -490,7 +490,7 @@ contains
            WMP%distz = 0
            WMP%ustar = 1
 
-           if (Btype(So)==DIRICHLET) then
+           if (Btype(So)==BC_DIRICHLET) then
              WMP%wallu = sideU(1,So)
              WMP%wallv = 0
              WMP%wallw = sideU(3,So)
@@ -504,7 +504,7 @@ contains
       end do
     end if
 
-    if (Btype(No)==NOSLIP.or.(Btype(No)==DIRICHLET.and.sideU(2,No)==0)) then
+    if (Btype(No)==BC_NOSLIP.or.(Btype(No)==BC_DIRICHLET.and.sideU(2,No)==0)) then
       do k = 1,Prnz
        do i = 1,Prnx
          if (Prtype(i,Prny,k)==0) then
@@ -516,7 +516,7 @@ contains
            WMP%distz = 0
            WMP%ustar = 1
 
-           if (Btype(No)==DIRICHLET) then
+           if (Btype(No)==BC_DIRICHLET) then
              WMP%wallu = sideU(1,No)
              WMP%wallv = 0
              WMP%wallw = sideU(3,No)
@@ -530,7 +530,7 @@ contains
       end do
     end if
 
-    if (Btype(Bo)==NOSLIP.or.(Btype(Bo)==DIRICHLET.and.sideU(3,Bo)==0)) then
+    if (Btype(Bo)==BC_NOSLIP.or.(Btype(Bo)==BC_DIRICHLET.and.sideU(3,Bo)==0)) then
       do j = 1,Prny
        do i = 1,Prnx
          if (Prtype(i,j,1)==0) then
@@ -543,7 +543,7 @@ contains
            WMP%distz = zW(0) - zPr(1)
            WMP%ustar = 1
 
-           if (Btype(Bo)==DIRICHLET) then
+           if (Btype(Bo)==BC_DIRICHLET) then
              WMP%wallu = sideU(1,Bo)
              WMP%wallv = sideU(2,Bo)
              WMP%wallw = 0
@@ -552,11 +552,11 @@ contains
            WMP%z0 = z0B
            WMP%z0H = WMP%z0
 
-           if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==WALL_FLUX) then
+           if (TempBtype(Bo)==BC_CONSTFLUX.or.TempBtype(Bo)==BC_WALL_FLUX) then
              WMP%temperature_flux = sideTemp(Bo)
            end if
 
-           if (TempBtype(Bo)==DIRICHLET.or.TempBtype(Bo)==WALL_DIRICHLET) then
+           if (TempBtype(Bo)==BC_DIRICHLET.or.TempBtype(Bo)==BC_WALL_DIRICHLET) then
              WMP%temperature = sideTemp(Bo)
            end if
 
@@ -567,7 +567,7 @@ contains
       end do
     end if
 
-    if (Btype(To)==NOSLIP.or.(Btype(To)==DIRICHLET.and.sideU(3,To)==0)) then
+    if (Btype(To)==BC_NOSLIP.or.(Btype(To)==BC_DIRICHLET.and.sideU(3,To)==0)) then
 
       do j = 1,Prny
        do i = 1,Prnx
@@ -580,7 +580,7 @@ contains
            WMP%distz = zW(Wnz+1) - zPr(Prnz)
            WMP%ustar = 1
 
-           if (Btype(To)==DIRICHLET) then
+           if (Btype(To)==BC_DIRICHLET) then
              WMP%wallu = sideU(1,To)
              WMP%wallv = sideU(2,To)
              WMP%wallw = 0
@@ -616,7 +616,7 @@ contains
 
       !type==0 below, therefore we need 
       ! type of free bounderies not to be -1
-      if (Btype(We)==NOSLIP) then
+      if (Btype(We)==BC_NOSLIP) then
         do k = 1,nz
          do j = 1,ny
            if (Xtype(1,j,k)==0.and.Xtype(0,j,k)<=0) then
@@ -636,7 +636,7 @@ contains
         end do
       end if
 
-      if (Btype(Ea)==NOSLIP) then
+      if (Btype(Ea)==BC_NOSLIP) then
         do k = 1,nz
          do j = 1,ny
            if (Xtype(nx,j,k)==0.and.Xtype(nx+1,j,k)<=0) then
@@ -656,7 +656,7 @@ contains
         end do
       end if
 
-      if (Btype(So)==NOSLIP.or.(Btype(So)==DIRICHLET.and.sideU(2,So)==0)) then
+      if (Btype(So)==BC_NOSLIP.or.(Btype(So)==BC_DIRICHLET.and.sideU(2,So)==0)) then
         do k = 1,nz
          do i = 1,nx
            if (Xtype(i,1,k)==0.and.Xtype(i,0,k)<=0) then
@@ -668,7 +668,7 @@ contains
              p%distz = 0
              p%ustar = 1
 
-             if (Btype(So)==DIRICHLET) then
+             if (Btype(So)==BC_DIRICHLET) then
                p%wallu = sideU(1,So)
                p%wallv = 0
                p%wallw = sideU(3,So)
@@ -682,7 +682,7 @@ contains
         end do
       end if
 
-      if (Btype(No)==NOSLIP.or.(Btype(No)==DIRICHLET.and.sideU(2,No)==0)) then
+      if (Btype(No)==BC_NOSLIP.or.(Btype(No)==BC_DIRICHLET.and.sideU(2,No)==0)) then
         do k = 1,nz
          do i = 1,nx
            if (Xtype(i,ny,k)==0.and.Xtype(i,ny+1,k)<=0) then
@@ -694,7 +694,7 @@ contains
              p%distz = 0
              p%ustar = 1
 
-             if (Btype(No)==DIRICHLET) then
+             if (Btype(No)==BC_DIRICHLET) then
                p%wallu = sideU(1,No)
                p%wallv = 0
                p%wallw = sideU(3,No)
@@ -708,7 +708,7 @@ contains
         end do
       end if
 
-      if (Btype(Bo)==NOSLIP.or.(Btype(Bo)==DIRICHLET.and.sideU(3,Bo)==0)) then
+      if (Btype(Bo)==BC_NOSLIP.or.(Btype(Bo)==BC_DIRICHLET.and.sideU(3,Bo)==0)) then
         do j = 1,ny
          do i = 1,nx
            if (Xtype(i,j,1)==0.and.Xtype(i,j,0)<=0) then
@@ -721,7 +721,7 @@ contains
              p%distz = zW(0) - z(1)
              p%ustar = 1
 
-             if (Btype(Bo)==DIRICHLET) then
+             if (Btype(Bo)==BC_DIRICHLET) then
                p%wallu = sideU(1,Bo)
                p%wallv = sideU(2,Bo)
                p%wallw = 0
@@ -730,11 +730,11 @@ contains
              p%z0 = z0B
              p%z0H = p%z0
 
-             if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==WALL_FLUX) then
+             if (TempBtype(Bo)==BC_CONSTFLUX.or.TempBtype(Bo)==BC_WALL_FLUX) then
                p%temperature_flux = sideTemp(Bo)
              end if
 
-             if (TempBtype(Bo)==DIRICHLET.or.TempBtype(Bo)==WALL_DIRICHLET) then
+             if (TempBtype(Bo)==BC_DIRICHLET.or.TempBtype(Bo)==BC_WALL_DIRICHLET) then
                p%temperature = sideTemp(Bo)
              end if
 
@@ -745,7 +745,7 @@ contains
         end do
       end if
 
-      if (Btype(To)==NOSLIP.or.(Btype(To)==DIRICHLET.and.sideU(3,To)==0)) then
+      if (Btype(To)==BC_NOSLIP.or.(Btype(To)==BC_DIRICHLET.and.sideU(3,To)==0)) then
 
         do j = 1,ny
          do i = 1,nx
@@ -758,7 +758,7 @@ contains
              p%distz = zW(Wnz+1) - z(nz)
              p%ustar = 1
 
-             if (Btype(To)==DIRICHLET) then
+             if (Btype(To)==BC_DIRICHLET) then
                p%wallu = sideU(1,To)
                p%wallv = sideU(2,To)
                p%wallw = 0
@@ -767,11 +767,11 @@ contains
              p%z0 = z0T
              p%z0H = p%z0
              
-             if (TempBtype(To)==CONSTFLUX.or.TempBtype(To)==WALL_FLUX) then
+             if (TempBtype(To)==BC_CONSTFLUX.or.TempBtype(To)==BC_WALL_FLUX) then
                p%temperature_flux = sideTemp(To)
              end if
 
-             if (TempBtype(To)==DIRICHLET.or.TempBtype(To)==WALL_DIRICHLET) then
+             if (TempBtype(To)==BC_DIRICHLET.or.TempBtype(To)==BC_WALL_DIRICHLET) then
                p%temperature = sideTemp(To)
              end if
              
@@ -1627,7 +1627,7 @@ contains
     nx = Prnx
     ny = Prny
 
-    if (Btype(Ea)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC) then
       do j = 1,ny
         Nu(0,j) = Nu(nx,j)
         Nu(nx+1,j) = Nu(1,j)
@@ -1639,7 +1639,7 @@ contains
       end do
     end if
 
-    if (Btype(No)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC) then
       do i = 1,nx
         Nu(i,0) = Nu(i,ny)
         Nu(i,ny+1) = Nu(i,1)
@@ -1661,7 +1661,7 @@ contains
     integer :: i, j, k
     type(WMPointUVW), pointer :: pts(:)
 
-    if (enable_buoyancy.and.TempBtype(Bo)==MO_TEMPERATURE) then
+    if (enable_buoyancy.and.TempBtype(Bo)==BC_MO_TEMPERATURE) then
       do i = 1, size(WMPoints)
         if (WMPoints(i)%zk==1) then
           WMPoints(i)%temperature_flux = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&

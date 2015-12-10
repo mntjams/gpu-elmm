@@ -2782,13 +2782,13 @@ contains
       ly = yV(Prny) - yV(0)
       lz = zW(Prnz) - zW(0)
 
-      if (Btype(Ea)==PERIODIC.and.x2>xU(Prnx+1)) x2 = x2-lx
-      if (Btype(No)==PERIODIC.and.y2>yV(Prny+1)) y2 = y2-ly
-      if (Btype(To)==PERIODIC.and.z2>zW(Prnz+1)) z2 = z2-lz
+      if (Btype(Ea)==BC_PERIODIC.and.x2>xU(Prnx+1)) x2 = x2-lx
+      if (Btype(No)==BC_PERIODIC.and.y2>yV(Prny+1)) y2 = y2-ly
+      if (Btype(To)==BC_PERIODIC.and.z2>zW(Prnz+1)) z2 = z2-lz
 
-      if (Btype(We)==PERIODIC.and.x2<xU(0)) x2 = x2+lx
-      if (Btype(So)==PERIODIC.and.y2<yV(0)) y2 = y2+ly
-      if (Btype(Bo)==PERIODIC.and.z2<zW(0)) z2 = z2+lz
+      if (Btype(We)==BC_PERIODIC.and.x2<xU(0)) x2 = x2+lx
+      if (Btype(So)==BC_PERIODIC.and.y2<yV(0)) y2 = y2+ly
+      if (Btype(Bo)==BC_PERIODIC.and.z2<zW(0)) z2 = z2+lz
       CInside = self%GeometricShape%Inside(x2,y2,z2,eps)
 
     end if

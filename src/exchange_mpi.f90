@@ -7,7 +7,7 @@ module exchange_par
   use custom_mpi, only: MPI_knd, MPI_STATUS_SIZE, MPI_REQUEST_NULL
 #endif
 
-  use Parameters, only: We, Ea, So, No, Bo, To, MPI_PERIODIC
+  use Parameters, only: We, Ea, So, No, Bo, To, BC_MPI_PERIODIC
 
   use Kinds
   
@@ -130,7 +130,7 @@ contains
 
     !global domain boundaries
     if (xdir) then
-      if (Btype(We)==MPI_PERIODIC.or.Btype(Ea)==MPI_PERIODIC) then
+      if (Btype(We)==BC_MPI_PERIODIC.or.Btype(Ea)==BC_MPI_PERIODIC) then
         if (iim==1) then
           call send(Phi, We)
         else if (iim==nxims) then
@@ -145,7 +145,7 @@ contains
     end if
 
     if (ydir) then  
-      if (Btype(So)==MPI_PERIODIC.or.Btype(No)==MPI_PERIODIC) then
+      if (Btype(So)==BC_MPI_PERIODIC.or.Btype(No)==BC_MPI_PERIODIC) then
         if (jim==1) then
           call send(Phi, So)
         else if (jim==nyims) then
@@ -160,7 +160,7 @@ contains
     end if
 
     if (zdir) then
-      if (Btype(Bo)==MPI_PERIODIC.or.Btype(To)==MPI_PERIODIC) then
+      if (Btype(Bo)==BC_MPI_PERIODIC.or.Btype(To)==BC_MPI_PERIODIC) then
         if (kim==1) then
           call send(Phi, Bo)
         else if (kim==nzims) then
@@ -309,7 +309,7 @@ contains
    
    
   subroutine par_exchange_Pr(Phi)
-    use Parameters, only: We, Ea, So, No, Bo, To, MPI_PERIODIC, Prnx, Prny, Prnz, Btype
+    use Parameters, only: We, Ea, So, No, Bo, To, BC_MPI_PERIODIC, Prnx, Prny, Prnz, Btype
     real(knd), intent(inout), contiguous :: Phi(1:,1:,1:)
     logical :: oddx, oddy, oddz, evenx, eveny, evenz
     integer :: ierr
@@ -343,7 +343,7 @@ contains
    
 
     !global domain boundaries
-    if (Btype(We)==MPI_PERIODIC.or.Btype(Ea)==MPI_PERIODIC) then
+    if (Btype(We)==BC_MPI_PERIODIC.or.Btype(Ea)==BC_MPI_PERIODIC) then
       if (iim==1) then
         call send(Phi, We)
       else if (iim==nxims) then
@@ -351,7 +351,7 @@ contains
       end if     
     end if
 
-    if (Btype(So)==MPI_PERIODIC.or.Btype(No)==MPI_PERIODIC) then
+    if (Btype(So)==BC_MPI_PERIODIC.or.Btype(No)==BC_MPI_PERIODIC) then
       if (jim==1) then
         call send(Phi, So)
       else if (jim==nyims) then
@@ -359,7 +359,7 @@ contains
       end if
     end if
           
-    if (Btype(Bo)==MPI_PERIODIC.or.Btype(To)==MPI_PERIODIC) then
+    if (Btype(Bo)==BC_MPI_PERIODIC.or.Btype(To)==BC_MPI_PERIODIC) then
       if (kim==1) then
         call send(Phi, Bo)
       else if (kim==nzims) then
@@ -441,7 +441,7 @@ contains
   
   
   subroutine par_exchange_Q(Phi)
-    use Parameters, only: We, Ea, So, No, Bo, To, MPI_PERIODIC, &
+    use Parameters, only: We, Ea, So, No, Bo, To, BC_MPI_PERIODIC, &
                           nx=>Prnx, ny=>Prny, nz=>Prnz, Btype
     real(knd), intent(inout), contiguous :: Phi(0:,0:,0:)
     integer :: ierr
@@ -473,7 +473,7 @@ contains
     call recv_t
 
     !global domain boundaries
-    if (Btype(We)==MPI_PERIODIC.or.Btype(Ea)==MPI_PERIODIC) then
+    if (Btype(We)==BC_MPI_PERIODIC.or.Btype(Ea)==BC_MPI_PERIODIC) then
       if (iim==1) then
         call recv(tmp_w, We)
       else if (iim==nxims) then
@@ -486,7 +486,7 @@ contains
       end if
     end if
 
-    if (Btype(So)==MPI_PERIODIC.or.Btype(No)==MPI_PERIODIC) then
+    if (Btype(So)==BC_MPI_PERIODIC.or.Btype(No)==BC_MPI_PERIODIC) then
       if (jim==1) then
         call recv(tmp_s, So)
       else if (jim==nyims) then
@@ -499,7 +499,7 @@ contains
       end if
     end if
 
-    if (Btype(Bo)==MPI_PERIODIC.or.Btype(To)==MPI_PERIODIC) then
+    if (Btype(Bo)==BC_MPI_PERIODIC.or.Btype(To)==BC_MPI_PERIODIC) then
       if (kim==1) then
         call recv(tmp_b, Bo)
       else if (kim==nzims) then
@@ -620,7 +620,7 @@ contains
   
   
   subroutine par_exchange_boundaries_yz(Phi, ny, nz, Btype, lby, lbz, widthy, widthz)
-    use Parameters, only: So, No, Bo, To, MPI_PERIODIC
+    use Parameters, only: So, No, Bo, To, BC_MPI_PERIODIC
     real(knd), intent(inout), contiguous :: Phi(lby:, lbz:)
     integer, intent(in) :: ny, nz
     integer, intent(in) :: Btype(6)
@@ -691,7 +691,7 @@ contains
     !global domain boundaries
 
     tag = tag + 1
-    if (Btype(So)==MPI_PERIODIC.or.Btype(No)==MPI_PERIODIC) then
+    if (Btype(So)==BC_MPI_PERIODIC.or.Btype(No)==BC_MPI_PERIODIC) then
       if (jim==1) then
         call send(Phi(1:0+widthy,1:nz), s_rank)
       else if (jim==nyims) then
@@ -707,7 +707,7 @@ contains
 
 
     tag = tag + 1
-    if (Btype(Bo)==MPI_PERIODIC.or.Btype(To)==MPI_PERIODIC) then
+    if (Btype(Bo)==BC_MPI_PERIODIC.or.Btype(To)==BC_MPI_PERIODIC) then
       if (kim==1) then
         call send(Phi(1-widthy:ny+widthy,1:0+widthz), b_rank)
       else if (kim==nzims) then

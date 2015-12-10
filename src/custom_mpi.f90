@@ -549,35 +549,35 @@ contains
       
       if (nxims>1) then
         if (iim>1) then
-          Bt(We) = MPI_BOUNDARY
+          Bt(We) = BC_MPI_BOUNDARY
         end if
         if (iim<nxims) then
-          Bt(Ea) = MPI_BOUNDARY
+          Bt(Ea) = BC_MPI_BOUNDARY
         end if
-        if (iim==1.and.Bt(We)==PERIODIC) Bt(We) = MPI_PERIODIC
-        if (iim==nxims.and.Bt(Ea)==PERIODIC) Bt(Ea) = MPI_PERIODIC
+        if (iim==1.and.Bt(We)==BC_PERIODIC) Bt(We) = BC_MPI_PERIODIC
+        if (iim==nxims.and.Bt(Ea)==BC_PERIODIC) Bt(Ea) = BC_MPI_PERIODIC
       end if
     
       if (nyims>1) then
         if (jim>1) then
-          Bt(So) = MPI_BOUNDARY
+          Bt(So) = BC_MPI_BOUNDARY
         end if
         if (jim<nyims) then
-          Bt(No) = MPI_BOUNDARY
+          Bt(No) = BC_MPI_BOUNDARY
         end if
-        if (jim==1.and.Bt(So)==PERIODIC) Bt(So) = MPI_PERIODIC
-        if (jim==nyims.and.Bt(No)==PERIODIC) Bt(No) = MPI_PERIODIC
+        if (jim==1.and.Bt(So)==BC_PERIODIC) Bt(So) = BC_MPI_PERIODIC
+        if (jim==nyims.and.Bt(No)==BC_PERIODIC) Bt(No) = BC_MPI_PERIODIC
       end if
     
       if (nzims>1) then
         if (kim>1) then
-          Bt(Bo) = MPI_BOUNDARY
+          Bt(Bo) = BC_MPI_BOUNDARY
         end if
         if (kim<nzims) then
-          Bt(To) = MPI_BOUNDARY
+          Bt(To) = BC_MPI_BOUNDARY
         end if
-        if (kim==1.and.Bt(Bo)==PERIODIC) Bt(Bo) = MPI_PERIODIC
-        if (kim==nzims.and.Bt(To)==PERIODIC) Bt(To) = MPI_PERIODIC
+        if (kim==1.and.Bt(Bo)==BC_PERIODIC) Bt(Bo) = BC_MPI_PERIODIC
+        if (kim==nzims.and.Bt(To)==BC_PERIODIC) Bt(To) = BC_MPI_PERIODIC
       end if
     end subroutine
     

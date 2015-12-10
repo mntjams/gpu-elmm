@@ -176,11 +176,11 @@ module Parameters
                        ScalarTypeMoisture = 2, &
                        ScalarTypePassive = 3
 
-  integer, parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6, &  !boundary condition types
-                        TURBULENTINLET=7, INLETFROMFILE=10, RADIATION=7, &
-                        MO_TEMPERATURE=10, &
-                        AUTOMATICFLUX=11, WALL_DIRICHLET=12, WALL_FLUX=13, &
-                        MPI_BOUNDS=1000, MPI_BOUNDARY=1000, MPI_PERIODIC=1001
+  integer, parameter :: BC_NOSLIP=1, BC_FREESLIP=2, BC_PERIODIC=3, BC_DIRICHLET=4, BC_NEUMANN=5, BC_CONSTFLUX=6, &  !boundary condition types
+                        BC_TURBULENT_INLET=7, BC_INLET_FROM_FILE=10, BC_RADIATION=7, &
+                        BC_MO_TEMPERATURE=10, &
+                        BC_AUTOMATIC_FLUX=11, BC_WALL_DIRICHLET=12, BC_WALL_FLUX=13, &
+                        BC_MPI_BOUNDS=1000, BC_MPI_BOUNDARY=1000, BC_MPI_PERIODIC=1001
   !inlet types
   integer, parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
                         ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5, &

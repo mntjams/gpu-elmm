@@ -8,7 +8,7 @@ module TurbInlet
   implicit none
 
   private
-  public GetTurbulentInlet, GetInletFromFile, TLag, Lturby, Lturbz, Ustar_inlet, relative_stress, &
+  public GetTurbulentInlet, GetBC_INLET_FROM_FILE, TLag, Lturby, Lturbz, Ustar_inlet, relative_stress, &
          Ustar_surf_inlet, stress_gradient_inlet, U_ref_inlet, z_ref_inlet, z0_inlet, power_exponent_inlet
 
   real(knd) :: TLag
@@ -118,7 +118,7 @@ contains
       !$omp end parallel
 
 
-      if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
+      if ((Btype(So)==BC_PERIODIC).or.(Btype(No)==BC_PERIODIC)) then
         !$omp parallel workshare
         forall(k = klo:kup,j = jlo:0)
            Ru(j,k,1:2) = Ru(j+Prny,k,1:2)
@@ -133,7 +133,7 @@ contains
         !$omp end  parallel workshare
       end if
 
-      if  ((Btype(Bo)==PERIODIC).or.(Btype(To)==PERIODIC)) then
+      if  ((Btype(Bo)==BC_PERIODIC).or.(Btype(To)==BC_PERIODIC)) then
         !$omp parallel workshare
         forall(k = klo:0,j = jlo:jup)
            Ru(j,k,1:2) = Ru(j,k+Prnz,1:2)
@@ -254,18 +254,18 @@ contains
    end do
    !$omp end parallel do
 
-   if (Btype(We)==TURBULENTINLET .or. Btype(Ea)==TURBULENTINLET) then
+   if (Btype(We)==BC_TURBULENT_INLET .or. Btype(Ea)==BC_TURBULENT_INLET) then
      !$omp parallel workshare
      p = sum(Uin(1:Prny,1:Prnz))
      !$omp end parallel workshare
-   else if (Btype(So)==TURBULENTINLET .or. Btype(No)==TURBULENTINLET) then
+   else if (Btype(So)==BC_TURBULENT_INLET .or. Btype(No)==BC_TURBULENT_INLET) then
      !$omp parallel workshare
      p = sum(Vin(1:Prny,1:Prnz))
      !$omp end parallel workshare
    end if
 
-   if (Btype(We)==TURBULENTINLET .or. Btype(Ea)==TURBULENTINLET .or. &
-       Btype(So)==TURBULENTINLET .or. Btype(No)==TURBULENTINLET) then
+   if (Btype(We)==BC_TURBULENT_INLET .or. Btype(Ea)==BC_TURBULENT_INLET .or. &
+       Btype(So)==BC_TURBULENT_INLET .or. Btype(No)==BC_TURBULENT_INLET) then
 #ifdef PAR
      p = par_co_sum(p)
 #endif
@@ -297,7 +297,7 @@ contains
    end do
    !$omp end do
 
-   if ((Btype(So)==PERIODIC).or.(Btype(No)==PERIODIC)) then
+   if ((Btype(So)==BC_PERIODIC).or.(Btype(No)==BC_PERIODIC)) then
      !workaround to a bug in Cray Fortran
      !$omp single
      i = Prny+1
@@ -322,7 +322,7 @@ contains
      end do
      !$omp end do
    end if
-   if  ((Btype(Bo)==PERIODIC).or.(Btype(To)==PERIODIC)) then
+   if  ((Btype(Bo)==BC_PERIODIC).or.(Btype(To)==BC_PERIODIC)) then
      !$omp do collapse(2)
      do k = klo, 0
        do j = jlo, jup
@@ -462,7 +462,7 @@ contains
   end subroutine InitMeanProfiles
 
 
-  subroutine GetInletFromFile(t)
+  subroutine GetBC_INLET_FROM_FILE(t)
     real(TIM),intent(in):: t
     integer,save:: called = 0
     integer Prny2, Prnz2, Vny2, Wnz2
@@ -508,7 +508,7 @@ contains
         call error_stop
        end if
        read(102) t1
-       call ReadInletFromFile(11,In1)
+       call ReadBC_INLET_FROM_FILE(11,In1)
        close(11)
 
        inletfnum = inletfnum+1
@@ -523,7 +523,7 @@ contains
         call error_stop
        end if
        read(102) t2
-       call ReadInletFromFile(11,In2)
+       call ReadBC_INLET_FROM_FILE(11,In2)
        close(11)
     end if
 
@@ -548,7 +548,7 @@ contains
        Inp=>In1
        In1=>In2
        In2=>Inp
-       call ReadInletFromFile(11,In2)
+       call ReadBC_INLET_FROM_FILE(11,In2)
        close(11)
       end if
     end do
@@ -572,9 +572,9 @@ contains
     Win(1:Wny,1:Wnz) = c1*In1%W+c2*In2%W
     if (enable_buoyancy) TempIn(1:Prny,1:Prnz) = c1*In1%temperature+c2*In2%temperature
 
-  end subroutine GetInletFromFile
+  end subroutine GetBC_INLET_FROM_FILE
 
-  subroutine  ReadInletFromFile(unitnum,In)
+  subroutine  ReadBC_INLET_FROM_FILE(unitnum,In)
     integer,intent(in):: unitnum
     type(TInlet),intent(inout)::In
 
@@ -584,7 +584,7 @@ contains
     if (enable_buoyancy) then
          read(unitnum) In%temperature
     end if
-  end subroutine ReadInletFromFile
+  end subroutine ReadBC_INLET_FROM_FILE
 
 
   subroutine BoundUin(component,Uin)
@@ -614,7 +614,7 @@ contains
                                      -2, -2, 2, 2)
 #endif
 
-    if (Btype(Bo)==DIRICHLET) then
+    if (Btype(Bo)==BC_DIRICHLET) then
       if (component==3) then
         Uin(1:ny,0) = sideU(component,Bo)
         Uin(1:ny,-1) = sideU(component,Bo)+(sideU(component,Bo)-Uin(1:ny,1))
@@ -622,23 +622,23 @@ contains
         Uin(1:ny,0) = sideU(component,Bo)+(sideU(component,Bo)-Uin(1:ny,1))
         Uin(1:ny,-1) = sideU(component,Bo)+(sideU(component,Bo)-Uin(1:ny,2))
       end  if
-    else if (Btype(Bo)==PERIODIC) then
+    else if (Btype(Bo)==BC_PERIODIC) then
         Uin(1:ny,-1:0) = Uin(1:ny,nz-1:nz)
-    else if (Btype(Bo)==NOSLIP.or.(component==3.and.Btype(Bo)==FREESLIP)) then
+    else if (Btype(Bo)==BC_NOSLIP.or.(component==3.and.Btype(Bo)==BC_FREESLIP)) then
       if (component==3) then
         Uin(1:ny,0) = 0
         Uin(1:ny,-1)=-Uin(1:ny,1)
       else
         Uin(1:ny,-1:0)=-Uin(1:ny,2:1:-1)
       end if
-    else if (Btype(Bo)==NEUMANN.or.(component/=3.and.Btype(Bo)==FREESLIP)) then
+    else if (Btype(Bo)==BC_NEUMANN.or.(component/=3.and.Btype(Bo)==BC_FREESLIP)) then
         Uin(1:ny,0) = Uin(1:ny,1)
         Uin(1:ny,-1) = Uin(1:ny,1)
-    else if (Btype(Bo)==PERIODIC) then
+    else if (Btype(Bo)==BC_PERIODIC) then
         Uin(1:ny,-1:0) = Uin(1:ny,nz-1:nz)
     end if
 
-    if (Btype(To)==DIRICHLET) then
+    if (Btype(To)==BC_DIRICHLET) then
       if (component==3) then
         Uin(1:ny,nz+1) = sideU(component,To)
         Uin(1:ny,nz+2) = sideU(component,To)+(sideU(component,To)-Uin(1:ny,nz))
@@ -646,23 +646,23 @@ contains
         Uin(1:ny,nz+1) = sideU(component,To)+(sideU(component,To)-Uin(1:ny,nz))
         Uin(1:ny,nz+2) = sideU(component,To)+(sideU(component,To)-Uin(1:ny,nz-1))
       end  if
-    else if (Btype(To)==PERIODIC) then
+    else if (Btype(To)==BC_PERIODIC) then
         Uin(1:ny,nz+1:nz+2) = Uin(1:ny,nz-1:nz)
-    else if (Btype(To)==NOSLIP.or.(component==3.and.(Btype(To)==FREESLIP))) then
+    else if (Btype(To)==BC_NOSLIP.or.(component==3.and.(Btype(To)==BC_FREESLIP))) then
       if (component==3) then
         Uin(1:ny,nz+1) = 0
         Uin(1:ny,nz+2)=-Uin(1:ny,nz)
       else
         Uin(1:ny,nz+1:nz+2)=-Uin(1:ny,nz:nz-1:-1)
       end if
-    else if (Btype(To)==NEUMANN.or.(component/=3.and.(Btype(To)==FREESLIP))) then
+    else if (Btype(To)==BC_NEUMANN.or.(component/=3.and.(Btype(To)==BC_FREESLIP))) then
         Uin(1:ny,nz+1) = Uin(1:ny,nz)
         Uin(1:ny,nz+2) = Uin(1:ny,nz)
-    else if (Btype(To)==PERIODIC) then
+    else if (Btype(To)==BC_PERIODIC) then
         Uin(1:ny,nz+1:nz+2) = Uin(1:ny,1:2)
     end if
 
-    if (Btype(So)==DIRICHLET) then
+    if (Btype(So)==BC_DIRICHLET) then
       if (component==2) then
         Uin(0,-1:nz+2) = sideU(component,So)
         Uin(-1,-1:nz+2) = sideU(component,So)+(sideU(component,So)-Uin(1,-1:nz+2))
@@ -670,7 +670,7 @@ contains
         Uin(0,-1:nz+2) = sideU(component,So)+(sideU(component,So)-Uin(1,-1:nz+2))
         Uin(-1,-1:nz+2) = sideU(component,So)+(sideU(component,So)-Uin(2,-1:nz+2))
       end if
-    else if (Btype(So)==NOSLIP.or.(component==2.and.Btype(So)==FREESLIP)) then
+    else if (Btype(So)==BC_NOSLIP.or.(component==2.and.Btype(So)==BC_FREESLIP)) then
       if (component==2) then
         Uin(0,-1:nz+2) = 0
         Uin(-1,-1:nz+2)=-Uin(1,-1:nz+2)
@@ -678,15 +678,15 @@ contains
         Uin(0,-1:nz+2)=-Uin(1,-1:nz+2)
         Uin(-1,-1:nz+2)=-Uin(2,-1:nz+2)
       end if
-    else if (Btype(So)==NEUMANN.or.(component/=2.and.Btype(So)==FREESLIP)) then
+    else if (Btype(So)==BC_NEUMANN.or.(component/=2.and.Btype(So)==BC_FREESLIP)) then
         Uin(0,-1:nz+2) = Uin(1,-1:nz+2)
         Uin(-1,-1:nz+2) = Uin(1,-1:nz+2)
-    else if (Btype(So)==PERIODIC) then  !Periodic BC
+    else if (Btype(So)==BC_PERIODIC) then  !Periodic BC
         Uin(0,-1:nz+2) = Uin(ny,-1:nz+2)
         Uin(-1,-1:nz+2) = Uin(ny-1,-1:nz+2)
     end if
 
-    if (Btype(No)==DIRICHLET) then
+    if (Btype(No)==BC_DIRICHLET) then
       if (component==2) then
         Uin(ny+1,-1:nz+2) = sideU(component,No)
         Uin(ny+2,-1:nz+2) = sideU(component,No)+(sideU(component,No)-Uin(ny,-1:nz+2))
@@ -694,17 +694,17 @@ contains
         Uin(ny+1,-1:nz+2) = sideU(component,No)+(sideU(component,No)-Uin(ny,-1:nz+2))
         Uin(ny+2,-1:nz+2) = sideU(component,No)+(sideU(component,No)-Uin(ny-1,-1:nz+2))
       end if
-    else if (Btype(No)==NOSLIP.or.(component==2.and.Btype(So)==FREESLIP)) then
+    else if (Btype(No)==BC_NOSLIP.or.(component==2.and.Btype(So)==BC_FREESLIP)) then
       if (component==2) then
         Uin(ny+1,-1:nz+2) = 0
         Uin(ny+2,-1:nz+2)=-Uin(ny,-1:nz+2)
       else
         Uin(ny+1:ny+2,-1:nz+2)=-Uin(ny:ny-1:-1,-1:nz+2)
       end if
-    else if (Btype(No)==NEUMANN.or.(component/=2.and.Btype(No)==FREESLIP)) then
+    else if (Btype(No)==BC_NEUMANN.or.(component/=2.and.Btype(No)==BC_FREESLIP)) then
         Uin(ny+1,-1:nz+2) = Uin(ny,-1:nz+2)
         Uin(ny+2,-1:nz+2) = Uin(ny,-1:nz+2)
-    else if (Btype(No)==PERIODIC) then  !Periodic BC
+    else if (Btype(No)==BC_PERIODIC) then  !Periodic BC
         Uin(ny+1:ny+2,-1:nz+2) = Uin(1:2,-1:nz+2)
     end if
 

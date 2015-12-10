@@ -120,45 +120,45 @@ contains
           do i=1+mod(j+k,2),nx,2
             p=0
             Ap=0
-            if (i>1.or.Btype(We)>=MPI_BOUNDS) then
+            if (i>1.or.Btype(We)>=BC_MPI_BOUNDS) then
                       p=p+Phi(i-1,j,k)*Aw(i)
                       Ap=Ap+Aw(i)
-            else if (Btype(We)==PERIODIC) then
+            else if (Btype(We)==BC_PERIODIC) then
                       p=p+Phi(nx,j,k)*Aw(i)
                       Ap=Ap+Aw(i)
             end if
-            if (i<nx.or.Btype(Ea)>=MPI_BOUNDS) then
+            if (i<nx.or.Btype(Ea)>=BC_MPI_BOUNDS) then
                       p=p+Phi(i+1,j,k)*Ae(i)
                       Ap=Ap+Ae(i)
-            else if (Btype(We)==PERIODIC) then
+            else if (Btype(We)==BC_PERIODIC) then
                       p=p+Phi(1,j,k)*Ae(i)
                       Ap=Ap+Ae(i)
             end if
-            if (j>1.or.Btype(So)>=MPI_BOUNDS) then
+            if (j>1.or.Btype(So)>=BC_MPI_BOUNDS) then
                       p=p+Phi(i,j-1,k)*As(j)
                       Ap=Ap+As(j)
-            else if (Btype(No)==PERIODIC) then
+            else if (Btype(No)==BC_PERIODIC) then
                       p=p+Phi(i,ny,k)*As(j)
                       Ap=Ap+As(j)
             end if
-            if (j<ny.or.Btype(No)>=MPI_BOUNDS) then
+            if (j<ny.or.Btype(No)>=BC_MPI_BOUNDS) then
                       p=p+Phi(i,j+1,k)*An(j)
                       Ap=Ap+An(j)
-            else if (Btype(No)==PERIODIC) then
+            else if (Btype(No)==BC_PERIODIC) then
                       p=p+Phi(i,1,k)*An(j)
                       Ap=Ap+An(j)
             end if
-            if (k>1.or.Btype(Bo)>=MPI_BOUNDS) then
+            if (k>1.or.Btype(Bo)>=BC_MPI_BOUNDS) then
                       p=p+Phi(i,j,k-1)*Ab(k)
                       Ap=Ap+Ab(k)
-            else if (Btype(To)==PERIODIC) then
+            else if (Btype(To)==BC_PERIODIC) then
                       p=p+Phi(i,j,nz)*Ab(k)
                       Ap=Ap+Ab(k)
             end if
-            if (k<nz.or.Btype(To)>=MPI_BOUNDS) then
+            if (k<nz.or.Btype(To)>=BC_MPI_BOUNDS) then
                       p=p+Phi(i,j,k+1)*At(k)
                       Ap=Ap+At(k)
-            else if (Btype(To)==PERIODIC) then
+            else if (Btype(To)==BC_PERIODIC) then
                       p=p+Phi(i,j,1)*At(k)
                       Ap=Ap+At(k)
             end if
@@ -179,42 +179,42 @@ contains
             if (i>1) then
                       p=p+Phi(i-1,j,k)*Aw(i)
                       Ap=Ap+Aw(i)
-            else if (Btype(We)==PERIODIC) then
+            else if (Btype(We)==BC_PERIODIC) then
                       p=p+Phi(nx,j,k)*Aw(i)
                       Ap=Ap+Aw(i)
             end if
             if (i<nx) then
                       p=p+Phi(i+1,j,k)*Ae(i)
                       Ap=Ap+Ae(i)
-            else if (Btype(We)==PERIODIC) then
+            else if (Btype(We)==BC_PERIODIC) then
                       p=p+Phi(1,j,k)*Ae(i)
                       Ap=Ap+Ae(i)
             end if
             if (j>1) then
                       p=p+Phi(i,j-1,k)*As(j)
                       Ap=Ap+As(j)
-            else if (Btype(No)==PERIODIC) then
+            else if (Btype(No)==BC_PERIODIC) then
                       p=p+Phi(i,ny,k)*As(j)
                       Ap=Ap+As(j)
             end if
             if (j<ny) then
                       p=p+Phi(i,j+1,k)*An(j)
                       Ap=Ap+An(j)
-            else if (Btype(No)==PERIODIC) then
+            else if (Btype(No)==BC_PERIODIC) then
                       p=p+Phi(i,1,k)*An(j)
                       Ap=Ap+An(j)
             end if
             if (k>1) then
                       p=p+Phi(i,j,k-1)*Ab(k)
                       Ap=Ap+Ab(k)
-            else if (Btype(To)==PERIODIC) then
+            else if (Btype(To)==BC_PERIODIC) then
                       p=p+Phi(i,j,nz)*Ab(k)
                       Ap=Ap+Ab(k)
             end if
             if (k<nz) then
                       p=p+Phi(i,j,k+1)*At(k)
                       Ap=Ap+At(k)
-            else if (Btype(To)==PERIODIC) then
+            else if (Btype(To)==BC_PERIODIC) then
                       p=p+Phi(i,j,1)*At(k)
                       Ap=Ap+At(k)
             end if

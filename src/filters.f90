@@ -37,22 +37,22 @@ contains
     !Shift of the region boundaries at the walls.
     !We do not want to get the outside points into the stencil.
     !It causes too large difference between the original and filtered value.
-    if (Btype(We)==NOSLIP.or.Btype(We)==DIRICHLET) then
+    if (Btype(We)==BC_NOSLIP.or.Btype(We)==BC_DIRICHLET) then
       mini = mini + 1
     end if
-    if (Btype(Ea)==NOSLIP.or.Btype(Ea)==DIRICHLET) then
+    if (Btype(Ea)==BC_NOSLIP.or.Btype(Ea)==BC_DIRICHLET) then
       maxi = maxi - 1
     end if
-    if (Btype(So)==NOSLIP.or.Btype(So)==DIRICHLET) then
+    if (Btype(So)==BC_NOSLIP.or.Btype(So)==BC_DIRICHLET) then
       minj = minj + 1
     end if
-    if (Btype(No)==NOSLIP.or.Btype(No)==DIRICHLET) then
+    if (Btype(No)==BC_NOSLIP.or.Btype(No)==BC_DIRICHLET) then
       maxj = maxj - 1
     end if
-    if (Btype(Bo)==NOSLIP.or.Btype(Bo)==DIRICHLET) then
+    if (Btype(Bo)==BC_NOSLIP.or.Btype(Bo)==BC_DIRICHLET) then
       mink = mink + 1
     end if
-    if (Btype(To)==NOSLIP.or.Btype(To)==DIRICHLET) then
+    if (Btype(To)==BC_NOSLIP.or.Btype(To)==BC_DIRICHLET) then
       maxk = maxk - 1
     end if
     

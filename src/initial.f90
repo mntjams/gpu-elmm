@@ -12,7 +12,7 @@ module Initial
   use Scalars
   use Filters, only: filtertype, filter_ratios
   use Subgrid
-  use Turbinlet, only: GetTurbulentInlet, GetInletFromFile, TLag, Lturby, Lturbz, Ustar_inlet, relative_stress, &
+  use Turbinlet, only: GetTurbulentInlet, GetBC_INLET_FROM_FILE, TLag, Lturby, Lturbz, Ustar_inlet, relative_stress, &
                Ustar_surf_inlet, stress_gradient_inlet, U_ref_inlet, z_ref_inlet, z0_inlet, power_exponent_inlet
   use SolarRadiation, only: InitSolarRadiation
   use SolidBodies, only: obstacles_file, roughness_file, displacement_file, InitSolidBodies
@@ -632,93 +632,93 @@ contains
 
      write(*,'(a2)',advance='no') " W "
      select case (Btype(We))
-       case (NOSLIP)
+       case (BC_NOSLIP)
          write(*,*) "noslip"
-       case (FREESLIP)
+       case (BC_FREESLIP)
          write(*,*) "freeslip"
-       case (PERIODIC)
+       case (BC_PERIODIC)
          write(*,*) "periodic"
-       case (DIRICHLET)
+       case (BC_DIRICHLET)
          write(*,*) "dirichlet"
-       case (NEUMANN)
+       case (BC_NEUMANN)
          write(*,*) "neumann"
      endselect
 
      write(*,'(a2)',advance='no') " E "
      select case (Btype(Ea))
-       case (NOSLIP)
+       case (BC_NOSLIP)
          write(*,*) "noslip"
-       case (FREESLIP)
+       case (BC_FREESLIP)
          write(*,*) "freeslip"
-       case (PERIODIC)
+       case (BC_PERIODIC)
          write(*,*) "periodic"
-       case (DIRICHLET)
+       case (BC_DIRICHLET)
          write(*,*) "dirichlet"
-       case (NEUMANN)
+       case (BC_NEUMANN)
          write(*,*) "neumann"
      endselect
 
      write(*,'(a2)',advance='no') " S "
      select case (Btype(So))
-       case (NOSLIP)
+       case (BC_NOSLIP)
          write(*,*) "noslip"
-       case (FREESLIP)
+       case (BC_FREESLIP)
          write(*,*) "freeslip"
-       case (PERIODIC)
+       case (BC_PERIODIC)
          write(*,*) "periodic"
-       case (DIRICHLET)
+       case (BC_DIRICHLET)
          write(*,*) "dirichlet"
-       case (NEUMANN)
+       case (BC_NEUMANN)
          write(*,*) "neumann"
      endselect
 
      write(*,'(a2)',advance='no') " N "
      select case (Btype(No))
-       case (NOSLIP)
+       case (BC_NOSLIP)
          write(*,*) "noslip"
-       case (FREESLIP)
+       case (BC_FREESLIP)
          write(*,*) "freeslip"
-       case (PERIODIC)
+       case (BC_PERIODIC)
          write(*,*) "periodic"
-       case (DIRICHLET)
+       case (BC_DIRICHLET)
          write(*,*) "dirichlet"
-       case (NEUMANN)
+       case (BC_NEUMANN)
          write(*,*) "neumann"
      endselect
 
      write(*,'(a2)',advance='no') " B "
      select case (Btype(Bo))
-       case (NOSLIP)
+       case (BC_NOSLIP)
          write(*,*) "noslip"
-       case (FREESLIP)
+       case (BC_FREESLIP)
          write(*,*) "freeslip"
-       case (PERIODIC)
+       case (BC_PERIODIC)
          write(*,*) "periodic"
-       case (DIRICHLET)
+       case (BC_DIRICHLET)
          write(*,*) "dirichlet"
-       case (NEUMANN)
+       case (BC_NEUMANN)
          write(*,*) "neumann"
      endselect
 
      write(*,'(a2)',advance='no') " T "
      select case (Btype(To))
-       case (NOSLIP)
+       case (BC_NOSLIP)
          write(*,*) "noslip"
-       case (FREESLIP)
+       case (BC_FREESLIP)
          write(*,*) "freeslip"
-       case (PERIODIC)
+       case (BC_PERIODIC)
          write(*,*) "periodic"
-       case (DIRICHLET)
+       case (BC_DIRICHLET)
          write(*,*) "dirichlet"
-       case (NEUMANN)
+       case (BC_NEUMANN)
          write(*,*) "neumann"
      endselect
      
-     if ((Btype(We)==PERIODIC.or.Btype(Ea)==PERIODIC).and.Btype(We)/=Btype(Ea)) &
+     if ((Btype(We)==BC_PERIODIC.or.Btype(Ea)==BC_PERIODIC).and.Btype(We)/=Btype(Ea)) &
        call error_stop("Error: Both X boundary conditions must be periodic or not periodic.")
-     if ((Btype(So)==PERIODIC.or.Btype(No)==PERIODIC).and.Btype(So)/=Btype(No)) &
+     if ((Btype(So)==BC_PERIODIC.or.Btype(No)==BC_PERIODIC).and.Btype(So)/=Btype(No)) &
        call error_stop("Error: Both Y boundary conditions must be periodic or not periodic.")
-     if ((Btype(Bo)==PERIODIC.or.Btype(To)==PERIODIC).and.Btype(Bo)/=Btype(To)) &
+     if ((Btype(Bo)==BC_PERIODIC.or.Btype(To)==BC_PERIODIC).and.Btype(Bo)/=Btype(To)) &
        call error_stop("Error: Both Z boundary conditions must be periodic or not periodic.")
 
    end if
@@ -766,8 +766,8 @@ contains
    end if
 
 
-   if (Btype(We)==TURBULENTINLET) inlettype = TurbulentInletType
-   if (Btype(We)==INLETFROMFILE) inlettype = FromFileInletType
+   if (Btype(We)==BC_TURBULENT_INLET) inlettype = TurbulentInletType
+   if (Btype(We)==BC_INLET_FROM_FILE) inlettype = FromFileInletType
 
 
    if (timeavg2>=timeavg1) then
@@ -786,7 +786,7 @@ contains
 
    !Btype might get overwritten by MPI procedures
    do i = We, To
-     if (Btype(i)==PERIODIC) then
+     if (Btype(i)==BC_PERIODIC) then
         PoissonBtype(i) = PoisFFT_PERIODIC
      else
         PoissonBtype(i) = PoisFFT_NeumannStag
@@ -825,7 +825,7 @@ contains
    call read_staggered_frames
 
 
-   if (Btype(Ea)==PERIODIC.or.Btype(Ea)>=MPI_BOUNDS) then
+   if (Btype(Ea)==BC_PERIODIC.or.Btype(Ea)>=BC_MPI_BOUNDS) then
                           Unx = Prnx
    else
                           Unx = Prnx-1
@@ -834,7 +834,7 @@ contains
    Unz = Prnz
 
    Vnx = Prnx
-   if (Btype(No)==PERIODIC.or.Btype(No)>=MPI_BOUNDS) then
+   if (Btype(No)==BC_PERIODIC.or.Btype(No)>=BC_MPI_BOUNDS) then
                           Vny = Prny
    else
                           Vny = Prny-1
@@ -843,7 +843,7 @@ contains
 
    Wnx = Prnx
    Wny = Prny
-   if (Btype(To)==PERIODIC.or.Btype(To)>=MPI_BOUNDS) then
+   if (Btype(To)==BC_PERIODIC.or.Btype(To)>=BC_MPI_BOUNDS) then
                           Wnz = Prnz
    else
                           Wnz = Prnz-1
@@ -1685,9 +1685,9 @@ contains
       call par_exchange_U_y(V, 2)
       call par_exchange_U_z(W, 3)
 #endif
-      if (Btype(Ea)>=MPI_BOUNDS.or.Btype(Ea)==PERIODIC) U(Prnx,1:Prny,1:Prnz) = U(Prnx,1:Prny,1:Prnz) + U(0,1:Prny,1:Prnz)
-      if (Btype(No)>=MPI_BOUNDS.or.Btype(No)==PERIODIC) V(1:Prnx,Prny,1:Prnz) = V(1:Prnx,Prny,1:Prnz) + V(1:Prnx,0,1:Prnz)
-      if (Btype(To)>=MPI_BOUNDS.or.Btype(To)==PERIODIC) W(1:Prnx,1:Prny,Prnz) = W(1:Prnx,1:Prny,Prnz) + W(1:Prnx,1:Prny,0)
+      if (Btype(Ea)>=BC_MPI_BOUNDS.or.Btype(Ea)==BC_PERIODIC) U(Prnx,1:Prny,1:Prnz) = U(Prnx,1:Prny,1:Prnz) + U(0,1:Prny,1:Prnz)
+      if (Btype(No)>=BC_MPI_BOUNDS.or.Btype(No)==BC_PERIODIC) V(1:Prnx,Prny,1:Prnz) = V(1:Prnx,Prny,1:Prnz) + V(1:Prnx,0,1:Prnz)
+      if (Btype(To)>=BC_MPI_BOUNDS.or.Btype(To)==BC_PERIODIC) W(1:Prnx,1:Prny,Prnz) = W(1:Prnx,1:Prny,Prnz) + W(1:Prnx,1:Prny,0)
 
       U = U / 2
       V = V / 2
@@ -2230,7 +2230,7 @@ contains
       Vnx = Prnx
       Wnx = Prnx
 
-      if (Btype(Ea)==PERIODIC) then
+      if (Btype(Ea)==BC_PERIODIC) then
                             Unx = Prnx
       else
                             Unx = Prnx-1
@@ -2260,7 +2260,7 @@ contains
       Uny = Prny
       Wny = Prny
 
-      if (Btype(No)==PERIODIC) then
+      if (Btype(No)==BC_PERIODIC) then
                             Vny = Prny
       else
                             Vny = Prny-1
@@ -2291,7 +2291,7 @@ contains
       Unz = Prnz
       Vnz = Prnz
 
-      if (Btype(To)==PERIODIC) then
+      if (Btype(To)==BC_PERIODIC) then
                             Wnz = Prnz
       else
                             Wnz = Prnz-1
@@ -2322,7 +2322,7 @@ contains
       end do
       close(unit)
 
-      if (Btype(We)==PERIODIC) then
+      if (Btype(We)==BC_PERIODIC) then
         do j = -1, -3, -1
           xU2(j) = xU2(0)-(xU2(nx)-xU2(nx+j))
         end do
@@ -2332,7 +2332,7 @@ contains
         end do
       end if
 
-      if (Btype(Ea)==PERIODIC) then
+      if (Btype(Ea)==BC_PERIODIC) then
         do j = nx+1, nx+4
           xU2(j) = xU2(nx)+(xU2(j-nx)-xU2(0))
         end do
@@ -2363,7 +2363,7 @@ contains
       end do
       close(unit)
 
-      if (Btype(So)==PERIODIC) then
+      if (Btype(So)==BC_PERIODIC) then
         do j = -1, -3, -1
           yV2(j) = yV2(0)-(yV2(ny)-yV2(ny+j))
         end do
@@ -2373,7 +2373,7 @@ contains
         end do
       end if
 
-      if (Btype(No)==PERIODIC) then
+      if (Btype(No)==BC_PERIODIC) then
         do j = ny+1, ny+4
           yV2(j) = yV2(ny)+(yV2(j-ny)-yV2(0))
         end do
@@ -2404,7 +2404,7 @@ contains
       end do
       close(unit)
 
-      if (Btype(Bo)==PERIODIC) then
+      if (Btype(Bo)==BC_PERIODIC) then
         do j = -1, -3, -1
           zW2(j) = zW2(0)-(zW2(nz)-zW2(nz+j))
         end do
@@ -2414,7 +2414,7 @@ contains
         end do
       end if
 
-      if (Btype(To)==PERIODIC) then
+      if (Btype(To)==BC_PERIODIC) then
         do j = nz+1, nz+4
           zW2(j) = zW2(nz)+(zW2(j-nz)-zW2(0))
         end do
@@ -2532,7 +2532,7 @@ contains
       case (TurbulentInletType)
         call GetTurbulentInlet(dt)
       case (FromFileInletType)
-        call GetInletFromFile(start_time)
+        call GetBC_INLET_FROM_FILE(start_time)
       case (GeostrophicInletType)
         call GeostrophicWindInlet(geostrophic_wind)
       case default
@@ -2544,19 +2544,19 @@ contains
        
        call par_sync_out("  ...setting boundary temperature and temperature flux.")
 
-       if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==DIRICHLET) then
+       if (TempBtype(Bo)==BC_CONSTFLUX.or.TempBtype(Bo)==BC_DIRICHLET) then
 
          allocate(BsideTFlArr(-1:Prnx+2,-1:Prny+2))
 
          if (enable_radiation) then
            BsideTFlArr = 0
-         else if (TempBtype(Bo)==CONSTFLUX) then
+         else if (TempBtype(Bo)==BC_CONSTFLUX) then
            BsideTFlArr = sideTemp(Bo)
          else
            BsideTFlArr = 0
          end if
 
-         if (TempBtype(Bo)==DIRICHLET) then
+         if (TempBtype(Bo)==BC_DIRICHLET) then
            allocate(BsideTArr(-1:Prnx+2,-1:Prny+2))
            BsideTArr = sideTemp(Bo)
          end if
@@ -2572,19 +2572,19 @@ contains
 
        call par_sync_out("  ...setting boundary moisture and moisture flux.")
 
-       if (MoistBtype(Bo)==CONSTFLUX.or.MoistBtype(Bo)==DIRICHLET) then
+       if (MoistBtype(Bo)==BC_CONSTFLUX.or.MoistBtype(Bo)==BC_DIRICHLET) then
 
          allocate(BsideMFlArr(-1:Prnx+2,-1:Prny+2))
 
          if (enable_radiation) then
            BsideMFlArr = 0
-         else if (MoistBtype(Bo)==CONSTFLUX) then
+         else if (MoistBtype(Bo)==BC_CONSTFLUX) then
            BsideMFlArr = sideMoist(Bo)
          else
            BsideMFlArr = 0
          end if
 
-         if (MoistBtype(Bo)==DIRICHLET) then
+         if (MoistBtype(Bo)==BC_DIRICHLET) then
            allocate(BsideMArr(-1:Prnx+2,-1:Prny+2))
            BsideMArr = sideMoist(Bo)
          end if
