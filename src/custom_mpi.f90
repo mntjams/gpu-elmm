@@ -32,6 +32,10 @@ module custom_par
   !number of the domain
   integer :: number_of_domains = 1
   
+  type domain_grid
+    integer, allocatable :: arr(:,:,:)
+  end type
+
   !numbers of images in individual domains
   integer, allocatable :: domain_nims(:), &
                           domain_nxims(:), &
@@ -41,6 +45,10 @@ module custom_par
                           domain_groups(:), &
                           domain_comms_union(:,:), &
                           domain_groups_union(:,:)
+
+  type(domain_grid), allocatable :: domain_images_grid(:), &
+                                    domain_ranks_grid(:)
+
   
   !at which number starts numbering of this domain?
   integer :: first_domain_rank_in_world = 0
@@ -56,14 +64,18 @@ module custom_par
   integer :: w_im, e_im, s_im, n_im, b_im, t_im
   integer :: w_rank, e_rank, s_rank, n_rank, b_rank, t_rank
   integer :: neigh_ims(6), neigh_ranks(6)
+
+  integer :: my_world_im, my_world_rank
   
   
   integer, parameter :: world_comm = MPI_COMM_WORLD
   integer :: domain_comm = MPI_COMM_WORLD
   integer :: poisfft_comm = MPI_COMM_NULL
   integer :: cart_comm = MPI_COMM_NULL
+  integer :: domain_masters_comm
 
   integer :: world_group = MPI_GROUP_NULL
+  integer :: domain_masters_group
   
   !MPI communicators which include the inner or the outer domain
   integer :: inner_comm = MPI_COMM_NULL, outer_comm = MPI_COMM_NULL
@@ -330,6 +342,9 @@ contains
     allocate(domain_nzims(number_of_domains))
     
     domain_nims = 0
+    domain_nxims = 0
+    domain_nyims = 0
+    domain_nzims = 0
     
     domain_nims(domain_index) = 1
 
@@ -375,7 +390,7 @@ contains
 
     do i = 2, world_comm_size
       if (ims_domain(i-1)>ims_domain(i)) &
-        call error_stop("Error, MPI ranks must be order to individual domains in an increasing order.")
+        call error_stop("Error, MPI ranks must be ordered to individual domains in an increasing order.")
     end do
 
     first_domain_rank_in_world = sum(domain_nims(1:domain_index-1))
@@ -405,15 +420,83 @@ contains
         if (ie/=0) call error_stop("Error calling MPI_Comm_create.")
       end do
     end do
-
-    !handshake
-    if (domain_index==2.or.domain_index==3) then
-      call MPI_Barrier(domain_comms_union(2,3), ie)
-    end if
+! print *, "including ranks:", [( sum(domain_nims(1:dom-1)) , dom = 1,  number_of_domains )]
+!     call MPI_Group_incl(world_group, domain_nims(dom), &
+!                           [( sum(domain_nims(1:dom-1)) , dom = 1,  number_of_domains )], &
+!                           domain_masters_group, &
+!                           ie)
+!     call MPI_Comm_create(world_comm, domain_masters_group, domain_masters_comm, ie)
 
   end subroutine par_init_domains
+
   
+
+
+  subroutine par_init_domain_grids
+    integer :: dom
+    integer :: ie
   
+    interface
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+        import
+        integer :: SENDBUF, RECVBUF(*)
+        integer :: COUNT, DATATYPE, OP, COMM, IERROR
+      end subroutine
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+            integer :: BUFFER(*)
+            integer :: COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+! call MPI_Barrier(world_comm, ie)
+! print *, "--------------?????-------"
+! call MPI_Barrier(world_comm, ie)
+!     if (master) then
+!       print *, "**", my_world_rank, domain_masters_comm, MPI_COMM_NULL
+!       call MPI_Barrier(domain_masters_comm, ie)
+!       if (ie/=0) call error_stop("Error calling MPI_Barrier for the domain masters communicator.")
+!     end if
+
+    domain_nxims(domain_index) = nxims
+    domain_nyims(domain_index) = nyims
+    domain_nzims(domain_index) = nzims
+
+    !broadcast the process domain dimensions from one image of each domain
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_nxims(dom), 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+    end do
+
+    allocate(domain_images_grid(number_of_domains))
+    allocate(domain_ranks_grid(number_of_domains))
+
+
+    do dom = 1, number_of_domains
+
+      allocate(domain_images_grid(dom)%arr(domain_nxims(dom), &
+                                           domain_nyims(dom), &
+                                           domain_nzims(dom)))
+      allocate(domain_ranks_grid(dom)%arr(domain_nxims(dom), &
+                                           domain_nyims(dom), &
+                                           domain_nzims(dom)))
+    end do
+    domain_images_grid(domain_index)%arr(iim, jim, kim) = my_world_im
+    domain_ranks_grid(domain_index)%arr(iim, jim, kim) = my_world_rank
+
+    !instead of scatter due to the 3D topology
+    call MPI_Allreduce(MPI_IN_PLACE, domain_images_grid(domain_index)%arr, &
+                       1, MPI_INTEGER, MPI_SUM, domain_comm, ie)
+
+    !broadcast all domain grids from one image of each domain
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_images_grid(dom)%arr, domain_nims(dom), &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+    end do 
+
+  
+  end subroutine par_init_domain_grids
+
+
+
   
   subroutine par_init_grid
     use PoisFFT
@@ -437,10 +520,15 @@ contains
     nims = par_num_images()
 
     myim = par_this_image()
-    
+
     myrank = myim - 1
 
     master = (myrank==0)
+
+    my_world_im = par_this_image(world_comm)
+
+    my_world_rank = my_world_im - 1
+    
 
 !     npxyz = [npx, npy, npz]
     
@@ -522,6 +610,9 @@ contains
     offset_to_global_z = int(off(3))
     
     offsets_to_global = int(off)
+
+    if (enable_multiple_domains) call par_init_domain_grids
+   
     
     output_dir = output_dir // "im-" // itoa(iim) // &
                                  "-" // itoa(jim) // &
