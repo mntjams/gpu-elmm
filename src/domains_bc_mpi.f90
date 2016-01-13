@@ -1,6 +1,6 @@
 module domains_bc_par
 
-  use mpi, only: MPI_PROC_NULL, MPI_COMM_NULL, MPI_STATUS_SIZE, MPI_Waitall, MPI_Type_create_subarray
+  use mpi, only: MPI_PROC_NULL, MPI_COMM_NULL, MPI_STATUS_SIZE
   use Parameters
   use custom_mpi
   use custom_par
