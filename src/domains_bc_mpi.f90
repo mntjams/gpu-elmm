@@ -1,9 +1,30 @@
 module domains_bc_par
 
+  use mpi, only: MPI_PROC_NULL, MPI_COMM_NULL, MPI_STATUS_SIZE, MPI_Waitall, MPI_Type_create_subarray
+  use Parameters
+  use custom_mpi
   use custom_par
 
+  implicit none
+
+  private
+
+  public par_init_domain_boundary_conditions, par_exchange_domain_bounds, par_update_domain_bounds
 
   type dom_bc_buffer_copy
+    logical :: enabled = .false.
+
+    integer :: remote_domain
+    !This is the index of the cell boundary corresponding to the domain boundary 
+    ! or to the nested domain boundary.
+    integer :: position
+    !The direction of the buffer from position, 1 to 6 (We to To).
+    integer :: direction = 0
+
+    !grid coordinates of the buffer (from 1 to 2)
+    integer :: Ui1, Ui2, Vi1, Vi2, Wi1, Wi2, Pri1, Pri2
+    integer :: Uj1, Uj2, Vj1, Vj2, Wj1, Wj2, Prj1, Prj2
+    integer :: Uk1, Uk2, Vk1, Vk2, Wk1, Wk2, Prk1, Prk2
     !the most simple type, just a copy, no interpolation
     !the grid resolution must be identical
     !the boundary position must always exactly coincide with the grid cell boundaries
@@ -12,40 +33,470 @@ module domains_bc_par
     real(knd), allocatable, dimension(:,:,:) :: dU_dt, dV_dt, dW_dt, dPr_dt, &
                                                 dTemperature_dt, dMoisture_dt
     real(knd), allocatable, dimension(:,:,:,:) :: dScalar_dt
-    integer :: comm !communicator connecting
-    integer :: remote_rank
+
+    integer :: U_mpi_type, V_mpi_type, W_mpi_type, Pr_mpi_type
+
+    !time at which the data is valid
+    real(tim) :: time
+
+    !MPI communicator for the remote communication
+    integer :: comm = MPI_COMM_NULL
+    integer :: remote_rank = MPI_PROC_NULL
+    !The buffers are transferred every `time_step_ratio` time steps
+    integer :: time_step_ratio = 1 
   end type
 
-  type(dom_bc_buffer_copy), allocatable :: domain_bc_buffers_copy(:)
+  !send buffers should be indexed from 1, there may be more of them from several nested domains
+  !they are not accessed by the boundary conditions routines
+  type(dom_bc_buffer_copy), allocatable :: domain_bc_send_buffers_copy(:)
+  !receive buffers should be indexed with the index of the domain side (West to Top)
+  ! to ease finding the right buffer to a given nested boundary 
+  type(dom_bc_buffer_copy), allocatable :: domain_bc_recv_buffers_copy(:)
+
 contains
 
 
 
   subroutine par_init_domain_boundary_conditions
-
+    integer :: Ui1, Ui2, Vi1, Vi2, Wi1, Wi2, Pri1, Pri2
+    integer :: Uj1, Uj2, Vj1, Vj2, Wj1, Wj2, Prj1, Prj2
+    integer :: Uk1, Uk2, Vk1, Vk2, Wk1, Wk2, Prk1, Prk2
     !temporary testing hack
 
-    if (domain_index==1) then
-      if (iim==nxims) then
-        Btype(Ea) = BC_DOMAIN_COPY
-        allocate(domain_bc_buffers_copy(Ea:Ea)
-        domain_bc_buffers_copy(Ea)%comm = world_comm
-        domain_bc_buffers_copy(Ea)%remote = domain_ranks_grid(2)%arr(1,jim,kim)
-        
-      endif
-    else if (domain_ranks_grid==2) then
-      if (iim==1) then
-        Btype(We) = BC_DOMAIN_COPY
-        allocate(domain_bc_buffers_copy(We:We)
-        domain_bc_buffers_copy(We)%comm = world_comm
-        domain_bc_buffers_copy(We)%remote = domain_ranks_grid(1)%arr(domain_nxims(1),jim,kim)        
-      endif
+    if (enable_multiple_domains) then
 
-    end if
+      if (domain_index==1) then
 
+        if (iim==nxims) then
+          !send buffers should be counted from 1, there may be more of them from several nested domains
+          allocate(domain_bc_send_buffers_copy(1))
+          domain_bc_send_buffers_copy(1)%comm = world_comm
+          domain_bc_send_buffers_copy(1)%remote_rank = domain_ranks_grid(2)%arr(1,jim,kim)
+          domain_bc_send_buffers_copy(1)%remote_domain = 2
+          domain_bc_send_buffers_copy(1)%direction = Ea
+          domain_bc_send_buffers_copy(1)%enabled = .true.
+
+          Ui1 = Prnx
+          Ui2 = Prnx+2
+          Uj1 = -2
+          Uj2 = Uny+3
+          Uk1 = -2
+          Uk2 = Unz+3
+
+          Vi1 = Prnx+1
+          Vi2 = Prnx+3
+          Vj1 = -2
+          Vj2 = Vny+3
+          Vk1 = -2
+          Vk2 = Vnz+3
+
+          Wi1 = Prnx+1
+          Wi2 = Prnx+3
+          Wj1 = -2
+          Wj2 = Wny+3
+          Wk1 = -2
+          Wk2 = Wnz+3
+
+          Pri1 = Prnx+1
+          Pri2 = Prnx+3
+          Prj1 = -2
+          Prj2 = Prny+3
+          Prk1 = -2
+          Prk2 = Prnz+3
+
+          domain_bc_send_buffers_copy(1)%Ui1 = Ui1 
+          domain_bc_send_buffers_copy(1)%Ui2 = Ui2 
+          domain_bc_send_buffers_copy(1)%Uj1 = Uj1 
+          domain_bc_send_buffers_copy(1)%Uj2 = Uj2 
+          domain_bc_send_buffers_copy(1)%Uk1 = Uk1 
+          domain_bc_send_buffers_copy(1)%Uk2 = Uk2 
+
+          domain_bc_send_buffers_copy(1)%Vi1 = Vi1 
+          domain_bc_send_buffers_copy(1)%Vi2 = Vi2 
+          domain_bc_send_buffers_copy(1)%Vj1 = Vj1 
+          domain_bc_send_buffers_copy(1)%Vj2 = Vj2 
+          domain_bc_send_buffers_copy(1)%Vk1 = Vk1 
+          domain_bc_send_buffers_copy(1)%Vk2 = Vk2 
+
+          domain_bc_send_buffers_copy(1)%Wi1 = Wi1 
+          domain_bc_send_buffers_copy(1)%Wi2 = Wi2 
+          domain_bc_send_buffers_copy(1)%Wj1 = Wj1 
+          domain_bc_send_buffers_copy(1)%Wj2 = Wj2 
+          domain_bc_send_buffers_copy(1)%Wk1 = Wk1 
+          domain_bc_send_buffers_copy(1)%Wk2 = Wk2 
+
+          domain_bc_send_buffers_copy(1)%Pri1 = Pri1
+          domain_bc_send_buffers_copy(1)%Pri2 = Pri2
+          domain_bc_send_buffers_copy(1)%Prj1 = Prj1
+          domain_bc_send_buffers_copy(1)%Prj2 = Prj2
+          domain_bc_send_buffers_copy(1)%Prk1 = Prk1
+          domain_bc_send_buffers_copy(1)%Prk2 = Prk2
+
+
+          allocate(domain_bc_send_buffers_copy(1)%U(Ui1:Ui2,Uj1:Uj2,Uk1:Uk2))
+          allocate(domain_bc_send_buffers_copy(1)%V(Vi1:Vi2,Vj1:Vj2,Vk1:Vk2))
+          allocate(domain_bc_send_buffers_copy(1)%W(Wi1:Wi2,Wj1:Wj2,Wk1:Wk2))
+
+          if (enable_buoyancy) then
+            allocate(domain_bc_send_buffers_copy(1)%Temperature(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
+          end if
+          if (enable_moisture) then
+            allocate(domain_bc_send_buffers_copy(1)%Moisture(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
+          end if
+
+          domain_bc_send_buffers_copy(1)%U_mpi_type = U_mpi_subarray_type(Ui1,Ui2,Uj1,Uj2,Uk1,Uk2)
+          domain_bc_send_buffers_copy(1)%V_mpi_type = V_mpi_subarray_type(Vi1,Vi2,Vj1,Vj2,Vk1,Vk2)
+          domain_bc_send_buffers_copy(1)%W_mpi_type = W_mpi_subarray_type(Wi1,Wi2,Wj1,Wj2,Wk1,Wk2)
+          !for arrays defined from -1 to Prn+2
+          if (enable_buoyancy.or.enable_moisture) then
+            domain_bc_send_buffers_copy(1)%Pr_mpi_type = Pr_mpi_subarray_type(Pri1,Pri2,Prj1,Prj2,Prk1,Prk2)
+          end if
+        endif
+
+      else if (domain_index==2) then
+
+        if (iim==1) then
+          Btype(We) = BC_DOMAIN_COPY
+          allocate(domain_bc_recv_buffers_copy(We:We))
+          domain_bc_recv_buffers_copy(We)%comm = world_comm
+          domain_bc_recv_buffers_copy(We)%remote_rank = domain_ranks_grid(1)%arr(domain_nxims(1),jim,kim)        
+          domain_bc_recv_buffers_copy(We)%remote_domain = 1
+          domain_bc_recv_buffers_copy(We)%direction = We
+          domain_bc_recv_buffers_copy(We)%enabled = .true.
+
+          Ui1 = -2
+          Ui2 = 0
+          Uj1 = -2
+          Uj2 = Uny+3
+          Uk1 = -2
+          Uk2 = Unz+3
+
+          Vi1 = -2
+          Vi2 = 0
+          Vj1 = -2
+          Vj2 = Vny+3
+          Vk1 = -2
+          Vk2 = Vnz+3
+
+          Wi1 = -2
+          Wi2 = 0
+          Wj1 = -2
+          Wj2 = Wny+3
+          Wk1 = -2
+          Wk2 = Wnz+3
+
+          Pri1 = -2
+          Pri2 = 0
+          Prj1 = -2
+          Prj2 = Prny+3
+          Prk1 = -2
+          Prk2 = Prnz+3
+
+          domain_bc_recv_buffers_copy(We)%Ui1 = Ui1 
+          domain_bc_recv_buffers_copy(We)%Ui2 = Ui2 
+          domain_bc_recv_buffers_copy(We)%Uj1 = Uj1 
+          domain_bc_recv_buffers_copy(We)%Uj2 = Uj2 
+          domain_bc_recv_buffers_copy(We)%Uk1 = Uk1 
+          domain_bc_recv_buffers_copy(We)%Uk2 = Uk2 
+
+          domain_bc_recv_buffers_copy(We)%Vi1 = Vi1 
+          domain_bc_recv_buffers_copy(We)%Vi2 = Vi2 
+          domain_bc_recv_buffers_copy(We)%Vj1 = Vj1 
+          domain_bc_recv_buffers_copy(We)%Vj2 = Vj2 
+          domain_bc_recv_buffers_copy(We)%Vk1 = Vk1 
+          domain_bc_recv_buffers_copy(We)%Vk2 = Vk2 
+
+          domain_bc_recv_buffers_copy(We)%Wi1 = Wi1 
+          domain_bc_recv_buffers_copy(We)%Wi2 = Wi2 
+          domain_bc_recv_buffers_copy(We)%Wj1 = Wj1 
+          domain_bc_recv_buffers_copy(We)%Wj2 = Wj2 
+          domain_bc_recv_buffers_copy(We)%Wk1 = Wk1 
+          domain_bc_recv_buffers_copy(We)%Wk2 = Wk2 
+
+          domain_bc_recv_buffers_copy(We)%Pri1 = Pri1
+          domain_bc_recv_buffers_copy(We)%Pri2 = Pri2
+          domain_bc_recv_buffers_copy(We)%Prj1 = Prj1
+          domain_bc_recv_buffers_copy(We)%Prj2 = Prj2
+          domain_bc_recv_buffers_copy(We)%Prk1 = Prk1
+          domain_bc_recv_buffers_copy(We)%Prk2 = Prk2
+
+
+          allocate(domain_bc_recv_buffers_copy(We)%U(Ui1:Ui2,Uj1:Uj2,Uk1:Uk2))
+          allocate(domain_bc_recv_buffers_copy(We)%V(Vi1:Vi2,Vj1:Vj2,Vk1:Vk2))
+          allocate(domain_bc_recv_buffers_copy(We)%W(Wi1:Wi2,Wj1:Wj2,Wk1:Wk2))
+
+          if (enable_buoyancy) then
+            allocate(domain_bc_recv_buffers_copy(We)%Temperature(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
+          end if
+          if (enable_moisture) then
+            allocate(domain_bc_recv_buffers_copy(We)%Moisture(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
+          end if
+
+          domain_bc_recv_buffers_copy(We)%U_mpi_type = U_mpi_subarray_type(Ui1,Ui2,Uj1,Uj2,Uk1,Uk2)
+          domain_bc_recv_buffers_copy(We)%V_mpi_type = V_mpi_subarray_type(Vi1,Vi2,Vj1,Vj2,Vk1,Vk2)
+          domain_bc_recv_buffers_copy(We)%W_mpi_type = W_mpi_subarray_type(Wi1,Wi2,Wj1,Wj2,Wk1,Wk2)
+          !for arrays defined from -1 to Prn+2
+          if (enable_buoyancy.or.enable_moisture) then
+            domain_bc_recv_buffers_copy(We)%Pr_mpi_type = Pr_mpi_subarray_type(Pri1,Pri2,Prj1,Prj2,Prk1,Prk2)
+          end if
+        endif
+
+      end if
+
+    end if !enable_multiple_domains
 
   end subroutine
 
 
+  function U_mpi_subarray_type(i1, i2, j1, j2, k1, k2) result(res)
+    integer :: res
+    integer, intent(in) :: i1, i2, j1, j2, k1, k2
+    integer :: ie
+
+    call MPI_Type_create_subarray(3, &
+                                  [Unx+6, Uny+6, Unz+6], &          !whole array shape
+                                  [i2-i1+1, j2-j1+1, k2-k1+1], & !subarray shape
+                                  [i1+2, j1+2, k1+2], &          !offsets, index + lbound
+                                  MPI_ORDER_FORTRAN, &
+                                  MPI_KND, &
+                                  res, &
+                                  ie)                                  
+    if (ie/=0) call error_stop("Error creating MPI subarray derived type in U_mpi_subarray_type().")
+print *, my_world_rank, "dtype", res, product([i2-i1+1, j2-j1+1, k2-k1+1])
+    call MPI_Type_commit(res, ie)
+    if (ie/=0) call error_stop("Error commiting MPI subarray derived type in U_mpi_subarray_type().")
+print *, "res", res
+  end function
+
+  function V_mpi_subarray_type(i1, i2, j1, j2, k1, k2) result(res)
+    integer :: res
+    integer, intent(in) :: i1, i2, j1, j2, k1, k2
+    integer :: ie
+
+    call MPI_Type_create_subarray(3, &
+                                  [Vnx+6, Vny+6, Vnz+6], &          !whole array shape
+                                  [i2-i1+1, j2-j1+1, k2-k1+1], & !subarray shape
+                                  [i1+2, j1+2, k1+2], &          !offsets, index + lbound
+                                  MPI_ORDER_FORTRAN, &
+                                  MPI_KND, &
+                                  res, &
+                                  ie)                                  
+    if (ie/=0) call error_stop("Error creating MPI subarray derived type in V_mpi_subarray_type().")
+print *, my_world_rank, "dtype", res, product([i2-i1+1, j2-j1+1, k2-k1+1])
+    call MPI_Type_commit(res, ie)
+    if (ie/=0) call error_stop("Error commiting MPI subarray derived type in V_mpi_subarray_type().")
+print *, "res", res
+  end function
+
+  function W_mpi_subarray_type(i1, i2, j1, j2, k1, k2) result(res)
+    integer :: res
+    integer, intent(in) :: i1, i2, j1, j2, k1, k2
+    integer :: ie
+
+    call MPI_Type_create_subarray(3, &
+                                  [Wnx+6, Wny+6, Wnz+6], &          !whole array shape
+                                  [i2-i1+1, j2-j1+1, k2-k1+1], & !subarray shape
+                                  [i1+2, j1+2, k1+2], &          !offsets, index + lbound
+                                  MPI_ORDER_FORTRAN, &
+                                  MPI_KND, &
+                                  res, &
+                                  ie)                                  
+    if (ie/=0) call error_stop("Error creating MPI subarray derived type in W_mpi_subarray_type().")
+print *, my_world_rank, "dtype", res, product([i2-i1+1, j2-j1+1, k2-k1+1])
+    call MPI_Type_commit(res, ie)
+    if (ie/=0) call error_stop("Error commiting MPI subarray derived type in W_mpi_subarray_type().")
+print *, "res", res
+  end function
+
+  function Pr_mpi_subarray_type(i1, i2, j1, j2, k1, k2) result(res)
+    integer :: res
+    integer, intent(in) :: i1, i2, j1, j2, k1, k2
+    integer :: ie
+
+    call MPI_Type_create_subarray(3, &
+                                  [Prnx+4, Prny+4, Prnz+4], &          !whole array shape
+                                  [i2-i1+1, j2-j1+1, k2-k1+1], & !subarray shape
+                                  [i1+1, j1+1, k1+1], &          !offsets, index + lbound
+                                  MPI_ORDER_FORTRAN, &
+                                  MPI_KND, &
+                                  res, &
+                                  ie)                                  
+    if (ie/=0) call error_stop("Error creating MPI subarray derived type in Pr_mpi_subarray_type().")
+
+    call MPI_Type_commit(res, ie)
+    if (ie/=0) call error_stop("Error commiting MPI subarray derived type in Pr_mpi_subarray_type().")
+  end function
+
+
+
+
+  subroutine par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time, dt)
+    !if necessary send or receive the new boundary conditions
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V ,W 
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature, Moisture
+    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(in) :: Scalar
+    real(TIM), intent(in) :: time, dt
+
+    integer, allocatable :: requests(:), statuses(:,:)
+    integer :: i
+    integer :: ie
+
+if (allocated(domain_bc_send_buffers_copy)) &
+  print *, my_world_rank, "check send types", domain_bc_send_buffers_copy(1)%U_mpi_type, &
+                                       domain_bc_send_buffers_copy(1)%V_mpi_type, &
+                                       domain_bc_send_buffers_copy(1)%W_mpi_type
+
+if (allocated(domain_bc_recv_buffers_copy)) &
+  print *, my_world_rank, "check recv types", domain_bc_recv_buffers_copy(We)%U_mpi_type, &
+                                       domain_bc_recv_buffers_copy(We)%V_mpi_type, &
+                                       domain_bc_recv_buffers_copy(We)%W_mpi_type
+
+    allocate(requests(0))
+
+    if (enable_multiple_domains) then
+
+      if (allocated(domain_bc_send_buffers_copy)) then
+        do i = lbound(domain_bc_send_buffers_copy,1), &
+               ubound(domain_bc_send_buffers_copy,1)
+          associate(b => domain_bc_send_buffers_copy(i))
+
+            if (b%enabled) then
+              !derivatives approximated by the backward difference
+              b%dU_dt = (U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) - b%U) / dt
+              b%dV_dt = (V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) - b%V) / dt
+              b%dW_dt = (W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) - b%W) / dt
+              if (enable_buoyancy) then
+                b%dTemperature_dt = (Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Temperature) / dt
+              end if
+              if (enable_moisture) then
+                b%dMoisture_dt = (Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Moisture) / dt
+              end if
+
+              b%U = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2)
+              b%V = V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2)
+              b%W = W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2)
+              if (enable_buoyancy) then
+                b%Temperature = Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
+              end if
+              if (enable_moisture) then
+                b%Moisture = Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
+              end if
+  print *, my_world_rank, "check send types b", b%U_mpi_type, &
+                                       b%V_mpi_type, &
+                                       b%W_mpi_type
+              call send_arrays(b)
+            end if
+
+          end associate
+        end do
+      end if
+
+
+      if (allocated(domain_bc_recv_buffers_copy)) then
+        do i = lbound(domain_bc_recv_buffers_copy,1), &
+               ubound(domain_bc_recv_buffers_copy,1)
+          associate(b => domain_bc_recv_buffers_copy(i))
+  print *, my_world_rank, "check recv types b", b%U_mpi_type, &
+                                       b%V_mpi_type, &
+                                       b%W_mpi_type
+            if (b%enabled) then
+              call recv_arrays(b)
+            end if
+
+          end associate
+        end do
+      end if
+
+
+    end if
+
+print *, my_world_rank, "waiting for", size(requests), "requests", requests
+    call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, ie)
+
+  contains
+
+    subroutine send_arrays(b)
+      type(dom_bc_buffer_copy), intent(inout) :: b
+      
+!       call send(b%U, b%U_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 1)
+      call send(b%V, b%V_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 2)
+      call send(b%W, b%W_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 3)
+
+      if (enable_buoyancy) call send(b%Temperature, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 4)
+      if (enable_moisture) call send(b%Moisture, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 5)
+    end subroutine
+
+    subroutine recv_arrays(b)
+      type(dom_bc_buffer_copy), intent(inout) :: b
+    
+!       call recv(b%U, b%U_mpi_type, b%remote_rank, b%comm, domain_index*10 + 1)   
+      call recv(b%V, b%V_mpi_type, b%remote_rank, b%comm, domain_index*10 + 2)     
+      call recv(b%W, b%W_mpi_type, b%remote_rank, b%comm, domain_index*10 + 3)    
+
+      if (enable_buoyancy) call recv(b%Temperature, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*10 + 4)
+      if (enable_moisture) call recv(b%Moisture, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*10 + 5)
+    end subroutine
+
+    subroutine send(a, dtype, rank, comm, tag)
+      real(knd), intent(in), contiguous :: a(:,:,:)
+      integer, intent(in) :: dtype, rank, comm, tag
+      integer :: request, ie
+print *, "sending", my_world_rank, rank, dtype, tag
+      call MPI_ISsend(a, 1, dtype, rank, tag, comm, request, ie)
+print *, "request", request
+      if (ie/=0) stop "error sending MPI message."
+
+      requests = [requests, request]
+    end subroutine
+
+    subroutine recv(a, dtype, rank, comm, tag)
+      real(knd), intent(inout), contiguous :: a(:,:,:)
+      integer, intent(in) :: dtype, rank, comm, tag
+      integer :: request, ie
+print *, "receiving", rank, my_world_rank, dtype, tag
+      call MPI_IRecv(a, 1, dtype, rank, tag, comm, request, ie)
+print *, "request", request
+      if (ie/=0) stop "error receiving MPI message."
+
+      requests = [requests, request]
+    end subroutine
+
+  end subroutine par_exchange_domain_bounds
+
+
+
+  subroutine par_update_domain_bounds(U, V, W, Temperature, Moisture, Scalar, eff_time)
+    !effective time, because it can also reflect individual RK stages
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U, V ,W 
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Temperature, Moisture
+    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(inout) :: Scalar
+    real(knd), intent(in) :: eff_time
+    integer :: i
+
+    if (enable_multiple_domains) then
+
+      if (allocated(domain_bc_recv_buffers_copy)) then
+        do i = lbound(domain_bc_recv_buffers_copy,1), &
+               ubound(domain_bc_recv_buffers_copy,1)
+          associate(b => domain_bc_recv_buffers_copy(i))
+
+              U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = b%U
+              V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = b%V
+              W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = b%W
+              if (enable_buoyancy) then
+                Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = b%Temperature
+              end if
+              if (enable_moisture) then
+                Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = b%Moisture
+              end if
+
+              !TODO: the derivatives
+          end associate
+        end do
+      end if
+
+    end if
+
+  end subroutine
 
 end module domains_bc_par

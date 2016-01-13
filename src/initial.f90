@@ -28,6 +28,7 @@ module Initial
 #ifdef PAR
   use custom_par
   use exchange_par
+  use domains_bc_par
 #endif
 
   implicit none
@@ -876,6 +877,11 @@ contains
    gWnx = Wnx
    gWny = Wny
    gWnz = Wnz 
+#endif
+
+
+#ifdef PAR
+   call par_init_domain_boundary_conditions
 #endif
    
 

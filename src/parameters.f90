@@ -180,7 +180,8 @@ module Parameters
                         BC_TURBULENT_INLET=7, BC_INLET_FROM_FILE=10, BC_RADIATION=7, &
                         BC_MO_TEMPERATURE=10, &
                         BC_AUTOMATIC_FLUX=11, BC_WALL_DIRICHLET=12, BC_WALL_FLUX=13, &
-                        BC_MPI_BOUNDS=1000, BC_MPI_BOUNDARY=1000, BC_MPI_PERIODIC=1001
+                        BC_MPI_BOUNDS=1000, BC_MPI_BOUNDARY=1000, BC_MPI_PERIODIC=1001, &
+                        BC_DOMAIN_BOUNDS=2000, BC_DOMAIN_COPY=2001
   !inlet types
   integer, parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
                         ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5, &

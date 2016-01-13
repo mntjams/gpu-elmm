@@ -464,6 +464,10 @@ contains
     do dom = 1, number_of_domains
       call MPI_Bcast(domain_nxims(dom), 1, &
                      MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_nyims(dom), 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_nzims(dom), 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
     end do
 
     allocate(domain_images_grid(number_of_domains))
@@ -471,27 +475,30 @@ contains
 
 
     do dom = 1, number_of_domains
-
       allocate(domain_images_grid(dom)%arr(domain_nxims(dom), &
                                            domain_nyims(dom), &
                                            domain_nzims(dom)))
+      domain_images_grid(dom)%arr = 0
       allocate(domain_ranks_grid(dom)%arr(domain_nxims(dom), &
                                            domain_nyims(dom), &
                                            domain_nzims(dom)))
+      domain_ranks_grid(dom)%arr = 0
     end do
     domain_images_grid(domain_index)%arr(iim, jim, kim) = my_world_im
-    domain_ranks_grid(domain_index)%arr(iim, jim, kim) = my_world_rank
+!     domain_ranks_grid(domain_index)%arr(iim, jim, kim) = my_world_rank
 
     !instead of scatter due to the 3D topology
     call MPI_Allreduce(MPI_IN_PLACE, domain_images_grid(domain_index)%arr, &
-                       1, MPI_INTEGER, MPI_SUM, domain_comm, ie)
+                       size(domain_images_grid(domain_index)%arr), MPI_INTEGER, MPI_SUM, domain_comm, ie)
 
     !broadcast all domain grids from one image of each domain
     do dom = 1, number_of_domains
       call MPI_Bcast(domain_images_grid(dom)%arr, domain_nims(dom), &
                      MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+      domain_ranks_grid(dom)%arr = domain_images_grid(dom)%arr - 1
     end do 
-
+print *, domain_index, "::", domain_images_grid(1)%arr, "/", domain_images_grid(2)%arr
+print *, domain_index, ":", domain_ranks_grid(1)%arr, "/", domain_ranks_grid(2)%arr
   
   end subroutine par_init_domain_grids
 

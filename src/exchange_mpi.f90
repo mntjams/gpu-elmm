@@ -194,7 +194,7 @@ contains
 
       call MPI_IRecv(a, 1, recv_mpi_types(side, component), neigh_ranks(side), &
                      1000*neigh_ranks(side)+100*myrank+component, domain_comm, requests(side+6), ierr)
-      if (ierr/=0) stop "error sending MPI message."
+      if (ierr/=0) stop "error receiving MPI message."
     end subroutine
     
 
@@ -387,7 +387,7 @@ contains
 
       call MPI_IRecv(a, 1, recv_mpi_types(side, 6), neigh_ranks(side), &
                      10000*neigh_ranks(side)+100*myrank+6, domain_comm, requests(side+6), ierr)
-      if (ierr/=0) stop "error sending MPI message."
+      if (ierr/=0) stop "error receiving MPI message."
     end subroutine
     
 
@@ -541,7 +541,7 @@ contains
 
       call MPI_IRecv(a, size(a), MPI_KND, neigh_ranks(side), &
                     1000*neigh_ranks(side)+100*myrank+7, domain_comm, requests(side+6), ierr)
-      if (ierr/=0) stop "error sending MPI message."
+      if (ierr/=0) stop "error receiving MPI message."
       
       update(side) = .true.
     end subroutine
@@ -737,7 +737,7 @@ contains
       integer, intent(in) :: from
 
       call MPI_Recv(a, size(a) , MPI_KND, from, tag, domain_comm, status, ierr)
-      if (ierr/=0) stop "error sending MPI message."
+      if (ierr/=0) stop "error receiving MPI message."
     end subroutine
     
 

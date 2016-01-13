@@ -23,6 +23,7 @@ contains
     use RK3
 #ifdef PAR
     use custom_par
+    use domains_bc_par
 #endif
     real(knd), allocatable, intent(inout) :: U(:,:,:), V(:,:,:) ,W(:,:,:), Pr(:,:,:)
     real(knd), allocatable, intent(inout) :: Temperature(:,:,:), Moisture(:,:,:), Scalar(:,:,:,:)
@@ -76,10 +77,10 @@ contains
       call GetBC_INLET_FROM_FILE(time)
     end if
 
+    !uses previous dt (it should be fixed anyway, but...)
+    call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time, dt)
 
     call TimeStepLength(U, V, W, dt)
-
-
 
     if (master) write (*,'(a,f12.6,a,es12.4)') " time: ", time," dt: ", dt
     
