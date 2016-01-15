@@ -176,7 +176,7 @@ implicit none
 
 
   elemental subroutine GridCoords_W(xi, yj, zk, x, y, z)
-    integer, intent(out) :: xi, j, zk
+    integer, intent(out) :: xi, yj, zk
     real(knd), intent(in) :: x, y, z
     integer i
 
