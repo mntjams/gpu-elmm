@@ -454,19 +454,16 @@ implicit none
       end do
      end do
      !$omp end sections
-    end if
+    end if 
 
-    
-    
-    
-    
-    
+    !$omp end parallel
     
     
 #ifdef PAR
     call par_exchange_U_x(U, component)
 #endif
-    !$omp sections
+
+    !$omp parallel sections
     !$omp section
     if (Btype(We)==BC_DIRICHLET.and.regime/=intermediate) then
       if (component==1) then
@@ -665,13 +662,13 @@ implicit none
         end if
       end if
     end if
-    !$omp end sections
-    !$omp end parallel
+    !$omp end parallel sections
     
 #ifdef PAR    
     call par_exchange_U_y(U, component)
 #endif
-    !$omp sections
+
+    !$omp parallel sections
     !$omp section
     if (Btype(So)==BC_DIRICHLET.and.regime/=intermediate) then
       if (component==2) then
@@ -784,12 +781,13 @@ implicit none
        end do
       end do
     end if
-    !$omp end sections
+    !$omp end parallel sections
 
 #ifdef PAR
     call par_exchange_U_z(U, component)
 #endif
-    !$omp sections
+
+    !$omp parallel sections
     !$omp section
     if (Btype(Bo)==BC_DIRICHLET .and. regime/=intermediate) then
       if (component==3) then
@@ -905,7 +903,7 @@ implicit none
       end do
      end do
     end if
-    !$omp end sections
+    !$omp end parallel sections
   end subroutine BoundU
 
 
