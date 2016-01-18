@@ -1372,6 +1372,74 @@ contains
   end subroutine get_geostrophic_wind
 
 
+  subroutine get_pressure_gradient(fname)
+    use Interpolation
+    character(*), intent(in) :: fname
+    type(spline_coefs) :: g
+    character(256) :: line
+    real(knd) :: r3(3)
+    real(knd), allocatable :: dpdx(:), dpdy(:)
+    integer :: unit, io, n, i, j
+
+    open(newunit=unit,file=fname,status="old",action="read",iostat = io)
+    if (io/=0) return
+
+    n = 0
+    do
+      read(unit,'(a)',iostat=io) line
+      if (io/=0) exit
+      read(line,*,iostat=io) r3
+      if (io/=0) exit
+      n = n + 1
+    end do
+    
+    rewind(unit)
+    
+    if (n>0) then
+      allocate(g%z(n), dpdx(n), dpdy(n))
+      allocate(g%cu(0:1,n), g%cv(0:1,n))
+      do i = 1, n
+        read(unit,'(a)',iostat=io) line
+        read(line, *) g%z(i), dpdx(i), dpdy(i)
+      end do
+    else
+      stop "Pressure gradient profile empty."
+    end if
+
+    if (n > 1) then
+      call linear_interpolation(g%z, dpdx, g%cu)
+      call linear_interpolation(g%z, dpdy, g%cv)
+
+      allocate(pr_gradient_profile_x(1:Prnz))
+      allocate(pr_gradient_profile_y(1:Prnz))
+
+      j = 1
+      do i = 1, Prnz
+        pr_gradient_profile_x(i) = linear_interpolation_eval(zPr(i), g%z, g%cu, j)
+      end do
+
+      j = 1
+      do i = 1, Prnz
+        pr_gradient_profile_y(i) = linear_interpolation_eval(zPr(i), g%z, g%cv, j)
+      end do
+
+      enable_pr_gradient_x_profile = any(pr_gradient_profile_x/=0)
+      enable_pr_gradient_y_profile = any(pr_gradient_profile_y/=0)
+
+    else
+
+      pr_gradient_x = dpdx(1)
+      pr_gradient_y = dpdy(1)
+
+      enable_pr_gradient_x_uniform = pr_gradient_x /= 0
+      enable_pr_gradient_y_uniform = pr_gradient_y /= 0
+
+    end if
+    
+
+  end subroutine get_pressure_gradient
+
+
   subroutine get_profiles(fname)
     use Strings
     use ParseTrees
@@ -2474,6 +2542,12 @@ contains
     Vtype = 0
     Wtype = 0
     Prtype = 0
+
+
+    call par_sync_out("  ...reading pressure gradient profile.")
+
+    !Requires grid coordinates
+    call get_pressure_gradient("pressure_gradient_profile.conf")
 
 
     call par_sync_out("  ...reading geostrophic wind.")
