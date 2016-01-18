@@ -31,11 +31,19 @@ module SolidBodies
 
   type(List) :: SolidBodiesList
 
+  type(SolidBody), allocatable, target :: SolidBodiesArray(:)
+
   character(1024) :: obstacles_file = ''
   
   character(1024) :: roughness_file = ''
   
   character(1024) :: displacement_file = ''
+  
+  !global bounding box containing all obstacles
+  !Can be set by a custom code (CustomSolidBodies) to speed up the search for inside cells.
+  real(knd), public :: obstacles_bbox(6) = [-huge(1._knd)/2, huge(1._knd), &
+                                            -huge(1._knd)/2, huge(1._knd), &
+                                            -huge(1._knd)/2, huge(1._knd)]
   
   interface AddSolidBody
     module procedure AddSolidBody_scalar
@@ -51,22 +59,11 @@ contains
 #include "list-inc-proc.f90"
 #undef TYPEPARAM
 
-  subroutine SetCurrentSB(SB,n)
-    type(SolidBody),pointer,intent(out) :: SB
+  subroutine SetCurrentSB(SB, n)
+    type(SolidBody), pointer, intent(out) :: SB
     integer,intent(in) :: n
-    integer i
 
-    call SolidBodiesList%iter_restart
-
-    do i = 1,n
-      SB => SolidBodiesList%iter_next()
-    enddo
-
-    if (.not.associated(SB)) then
-      write (*,*) "Error, no SolidBody with number",n,"in the list."
-      call error_stop
-    end if
-
+    SB => SolidBodiesArray(n)
   end subroutine SetCurrentSB
 
 
@@ -77,13 +74,20 @@ contains
 
 
   subroutine FindInsideCells
-    !find if the gridpoints lie inside a solid body and write it's number
+    !find if the gridpoints lie inside a solid body and write its number
     !do not nullify the .type arrays, they could have been made nonzero by other unit
 
-    call SolidBodiesList%for_each(SetPrtype)
-    call SolidBodiesList%for_each(SetUtype)
-    call SolidBodiesList%for_each(SetVtype)
-    call SolidBodiesList%for_each(SetWtype)
+    real(knd) :: delta
+    integer :: nbody
+
+    delta = (dxmin*dymin*dzmin)**(1._knd/3)/20
+
+    do nbody = 1, size(SolidBodiesArray)
+      call SetPrtype(SolidBodiesArray(nbody))
+      call SetUtype(SolidBodiesArray(nbody))
+      call SetVtype(SolidBodiesArray(nbody))
+      call SetWtype(SolidBodiesArray(nbody))
+    end do
 
     contains
 
@@ -94,13 +98,16 @@ contains
         if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = 0,Prnz+1
-         do j = 0,Prny+1
-          do i = 0,Prnx+1
-             if (CurrentSB%Inside(xPr(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20)) &
-                      Prtype(i,j,k) = CurrentSB%numofbody
+        do k = 0, Prnz+1
+          if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
+          do j = 0, Prny+1
+            if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
+            do i = 0, Prnx+1
+              if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
+              if (CurrentSB%Inside(xPr(i), yPr(j), zPr(k), delta)) &
+                        Prtype(i,j,k) = CurrentSB%numofbody
+            enddo
           enddo
-         enddo
         enddo
         !$omp end parallel do
       end subroutine
@@ -112,13 +119,16 @@ contains
         if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = 0,Unz+1
-         do j = 0,Uny+1
-          do i = 0,Unx+1
-             if (CurrentSB%Inside(xU(i),yPr(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20))&
-                       Utype(i,j,k) = CurrentSB%numofbody
+        do k = 0, Unz+1
+          if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle 
+          do j = 0, Uny+1
+            if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
+            do i = 0, Unx+1
+              if (xU(i) > obstacles_bbox(Ea) .or. xU(i) < obstacles_bbox(We)) cycle
+              if (CurrentSB%Inside(xU(i), yPr(j) ,zPr(k), delta)) &
+                         Utype(i,j,k) = CurrentSB%numofbody
+            enddo
           enddo
-         enddo
         enddo
         !$omp end parallel do
       end subroutine
@@ -130,13 +140,16 @@ contains
         if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = 0,Vnz+1
-         do j = 0,Vny+1
-          do i = 0,Vnx+1
-             if (CurrentSB%Inside(xPr(i),yV(j),zPr(k),(dxmin*dymin*dzmin)**(1._knd/3)/20))&
-                       Vtype(i,j,k) = CurrentSB%numofbody
+        do k = 0, Vnz+1
+          if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
+          do j = 0, Vny+1
+            if (yV(j) > obstacles_bbox(No) .or. yV(j) < obstacles_bbox(So)) cycle
+            do i = 0, Vnx+1
+              if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
+              if (CurrentSB%Inside(xPr(i), yV(j), zPr(k), delta)) &
+                         Vtype(i,j,k) = CurrentSB%numofbody
+            enddo
           enddo
-         enddo
         enddo
         !$omp end parallel do
       end subroutine
@@ -146,13 +159,16 @@ contains
         integer i,j,k
 
         !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = 0,Wnz+1
-         do j = 0,Wny+1
-          do i = 0,Wnx+1
-             if (CurrentSB%Inside(xPr(i),yPr(j),zW(k),(dxmin*dymin*dzmin)**(1._knd/3)/20))&
-                       Wtype(i,j,k) = CurrentSB%numofbody
+        do k = 0, Wnz+1
+          if (zW(k) > obstacles_bbox(To) .or. zW(k) < obstacles_bbox(Bo)) cycle
+          do j = 0, Wny+1
+            if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
+            do i = 0, Wnx+1
+              if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
+              if (CurrentSB%Inside(xPr(i), yPr(j), zW(k), delta)) &
+                         Wtype(i,j,k) = CurrentSB%numofbody
+            enddo
           enddo
-         enddo
         enddo
         !$omp end parallel do
       end subroutine
@@ -177,6 +193,8 @@ contains
     if (len_trim(obstacles_file)>0) then
       call ReadSolidBodiesFromFile(trim(obstacles_file))
     end if
+
+    call MoveSolidBodiesToArray
 
   end subroutine InitSolidBodies
 
@@ -346,6 +364,22 @@ contains
 
   end subroutine ReadTerrain
 
+
+  subroutine MoveSolidBodiesToArray
+    integer :: i, nbodies
+    type(SolidBody), pointer :: tmp
+
+    nbodies = SolidBodiesList%Len()
+    allocate(SolidBodiesArray(nbodies))
+
+    call SolidBodiesList%iter_restart
+    do i = 1, nbodies
+      tmp => SolidBodiesList%iter_next()
+      SolidBodiesArray(i) = tmp
+    end do
+
+    call SolidBodiesList%finalize
+  end subroutine
   
   
   subroutine AddSolidBody_scalar(SB)

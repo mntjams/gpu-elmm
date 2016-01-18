@@ -33,10 +33,11 @@ program CLMM
 
   integer(dbl) :: time_steps_timer_count_1, time_steps_timer_count_2
 
-  call GetEndianness
-
 
   call par_init
+
+  call GetEndianness
+
 
   call par_sync_out("Reading parameters...")
   call ReadConfiguration

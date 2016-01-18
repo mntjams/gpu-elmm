@@ -17,6 +17,12 @@ end module Sort
 module WMPoint_types
   use Kinds
 
+  type point
+    integer   :: xi
+    integer   :: yj
+    integer   :: zk
+  end type
+
   type WMpoint   !points in which we apply wall model
 
     integer   :: xi
@@ -134,11 +140,13 @@ module Wallmodels
 
   type(WMPoint), dimension(:), allocatable, public :: WMPoints
 
-  logical(slog),dimension(:,:,:),allocatable,public :: Scflx_mask, Scfly_mask, Scflz_mask
+  type(point), dimension(:), allocatable, public :: Scflx_points, Scfly_points, Scflz_points
 
-  logical(slog),dimension(:,:,:),allocatable,public :: Uflx_mask, Ufly_mask, Uflz_mask
-  logical(slog),dimension(:,:,:),allocatable,public :: Vflx_mask, Vfly_mask, Vflz_mask
-  logical(slog),dimension(:,:,:),allocatable,public :: Wflx_mask, Wfly_mask, Wflz_mask
+  logical(slog), dimension(:,:,:), allocatable, public :: Scflx_mask, Scfly_mask, Scflz_mask
+
+  logical(slog), dimension(:,:,:), allocatable, public :: Uflx_mask, Ufly_mask, Uflz_mask
+  logical(slog), dimension(:,:,:), allocatable, public :: Vflx_mask, Vfly_mask, Vflz_mask
+  logical(slog), dimension(:,:,:), allocatable, public :: Wflx_mask, Wfly_mask, Wflz_mask
 
   integer :: wallmodeltype
   
@@ -234,7 +242,9 @@ contains
         if (associated(p)) then
           WMPoints(i) = p
         else
-          call error_stop("Assert error, pointer not associated. File "//__FILE__//" line ",__LINE__)
+          call error_stop("Assert error, pointer not associated. File "// &
+            __FILE__ &
+            //" line ",__LINE__)
         end if
       end do
 
@@ -313,7 +323,9 @@ contains
           if (associated(p)) then
             arr(i) = p
           else
-            write(*,*) "Assert error, pointer not associated. File ",__FILE__," line ",__LINE__
+            write(*,*) "Assert error, pointer not associated. File ", &
+              __FILE__ &
+              ," line ",__LINE__
             call error_stop
           end if
         end do
@@ -780,21 +792,71 @@ contains
   
   subroutine InitWMMasks
     integer :: i, j, k
+    integer :: nx, ny, nz
 
     allocate(Scflx_mask(0:Prnx,Prny,Prnz))
     allocate(Scfly_mask(Prnx,0:Prny,Prnz))
     allocate(Scflz_mask(Prnx,Prny,0:Prnz))
 
+    !$omp parallel
+    !$omp workshare
     Scflx_mask = .true.
     Scfly_mask = .true.
     Scflz_mask = .true.
+    !$omp end workshare
 
+    !$omp do collapse(3) schedule(dynamic, 100)
     do k = 1, Prnz
       do j = 1, Prny
         do i = 1, Prnx
           if (Prtype(i,j,k)>0.or.Prtype(i+1,j,k)>0) Scflx_mask(i,j,k) = .false.
           if (Prtype(i,j,k)>0.or.Prtype(i,j+1,k)>0) Scfly_mask(i,j,k) = .false.
           if (Prtype(i,j,k)>0.or.Prtype(i,j,k+1)>0) Scflz_mask(i,j,k) = .false.
+        end do
+      end do
+    end do
+
+    !$omp single
+    nx = 0
+    ny = 0
+    nz = 0
+    !$omp end single
+
+    !$omp do reduction(+:nx,ny,nz) collapse(3) schedule(dynamic, 100)
+    do k = 1, Prnz
+      do j = 1, Prny
+        do i = 1, Prnx
+          if (Prtype(i,j,k)>0.neqv.Prtype(i+1,j,k)>0) nx = nx + 1
+          if (Prtype(i,j,k)>0.neqv.Prtype(i,j+1,k)>0) ny = ny + 1
+          if (Prtype(i,j,k)>0.neqv.Prtype(i,j,k+1)>0) nz = nz + 1
+        end do
+      end do
+    end do
+    !$omp end parallel
+
+    allocate(Scflx_points(nx))
+    allocate(Scfly_points(ny))
+    allocate(Scflz_points(nz))
+    nx = 0
+    ny = 0
+    nz = 0
+
+    
+    do k = 1, Prnz
+      do j = 1, Prny
+        do i = 1, Prnx
+          if (Prtype(i,j,k)>0.neqv.Prtype(i+1,j,k)>0) then
+            nx = nx + 1
+            Scflx_points(nx) = point(i,j,k)
+          end if
+          if (Prtype(i,j,k)>0.neqv.Prtype(i,j+1,k)>0) then
+            ny = ny + 1
+            Scfly_points(ny) = point(i,j,k)
+          end if
+          if (Prtype(i,j,k)>0.neqv.Prtype(i,j,k+1)>0) then
+            nz = nz + 1
+            Scflz_points(nz) = point(i,j,k)
+          end if
         end do
       end do
     end do
@@ -825,38 +887,40 @@ contains
       fly = .true.
       flz = .true.
 
+      !$omp parallel
 
+      !$omp do private(i)
       do i = 1, size(xm)
-        associate(p => xm(i))
-            flx(p%xi,p%yj,p%zk) = .false.
-        end associate
+        flx(xm(i)%xi,xm(i)%yj,xm(i)%zk) = .false.
       end do
+      !$omp end do
+      !$omp do private(i)
       do i = 1, size(xp)
-        associate(p => xp(i))
-            flx(p%xi+1,p%yj,p%zk) = .false.
-        end associate
+        flx(xp(i)%xi+1,xp(i)%yj,xp(i)%zk) = .false.
       end do
+      !$omp end do nowait
+      !$omp do private(i)
       do i = 1, size(ym)
-        associate(p => ym(i))
-            fly(p%xi,p%yj,p%zk) = .false.
-        end associate
+        fly(ym(i)%xi,ym(i)%yj,ym(i)%zk) = .false.
       end do
+      !$omp end do
+      !$omp do private(i)
       do i = 1, size(yp)
-        associate(p => yp(i))
-            fly(p%xi,p%yj+1,p%zk) = .false.
-        end associate
+        fly(yp(i)%xi,yp(i)%yj+1,yp(i)%zk) = .false.
       end do
+      !$omp end do nowait
+      !$omp do private(i)
       do i = 1, size(zm)
-        associate(p => zm(i))
-            flz(p%xi,p%yj,p%zk) = .false.
-        end associate
+        flz(zm(i)%xi,zm(i)%yj,zm(i)%zk) = .false.
       end do
+      !$omp end do
+      !$omp do private(i)
       do i = 1, size(zp)
-        associate(p => zp(i))
-            flz(p%xi,p%yj,p%zk+1) = .false.
-        end associate
+        flz(zp(i)%xi,zp(i)%yj,zp(i)%zk+1) = .false.
       end do
+      !$omp end do
 
+      !$omp do private(i,j,k) collapse(3) schedule(dynamic, 100)
       do k = 1, nz
         do j = 1, ny
           do i = 1, nx
@@ -866,6 +930,9 @@ contains
           end do
         end do
       end do
+      !$omp end do
+
+      !$omp end parallel
     end subroutine
 
   end subroutine InitWMMasks
@@ -1677,7 +1744,7 @@ contains
     real(knd) dist(3), vel(3), wallvel(3), prgrad(3)
     real(knd) visc
 
-    !$omp parallel do private(i,xi,yj,zk,tdif, vel, wallvel, dist, prgrad, visc)
+    !$omp parallel do private(i,xi,yj,zk,tdif, vel, wallvel, dist, prgrad, visc) schedule(guided,5)
     do i = 1,size(WMPoints)
 
       xi = WMPoints(i)%xi
@@ -1702,7 +1769,7 @@ contains
       if (WMPoints(i)%z0>0) then
 
          if (enable_buoyancy .and. WMPoints(i)%prescribed_temperature) then
-if (xi==1.and.yj==1.and.zk==1) debuglevel =1
+
 #ifdef CUSTOM_SURFACE_TEMPERATURE
            WMPoints(i)%temperature = SurfaceTemperature(xPr(xi), yPr(yj), zPr(zk), time)
 #endif
@@ -1711,7 +1778,7 @@ if (xi==1.and.yj==1.and.zk==1) debuglevel =1
            call WM_MO_Dirichlet(visc, WMPoints(i)%ustar, &
                                 WMPoints(i)%temperature_flux, &
                                 WMPoints(i)%z0, WMPoints(i)%z0H, tdif, dist, vel)
-debuglevel = 0
+
          else if (enable_buoyancy .and. WMPoints(i)%temperature_flux>0) then
 
            call WM_MO_FLUX(visc, WMPoints(i)%ustar, WMPoints(i)%temperature_flux, &
@@ -1800,7 +1867,7 @@ debuglevel = 0
       
       drec = [1/dxmin, 1/dxmin, 1/dymin, 1/dymin, 1/dzmin, 1/dzmin]
 
-      !$omp parallel do private(point,xi,yj,zk,dist,vel,wallvel,tan_vect,p,mag)
+      !$omp parallel do private(point,xi,yj,zk,dist,vel,wallvel,tan_vect,p,mag) schedule(guided,5)
       do point = 1,size(points)
 
 !         associate (p => points(i))  NOTE: ASSOCIATE supported only in OpenMP 4
@@ -1947,9 +2014,22 @@ debuglevel = 0
   end function
 
 
-  pure real(knd) function GroundUstar()
-    if (any(WMPoints%zk == 1)) then
-      GroundUstar = sum(WMPoints%ustar, mask = (WMPoints%zk == 1)) / count(WMPoints%zk == 1)
+  real(knd) function GroundUstar()
+    integer :: i, n
+
+    if (offset_to_global_z==0) then
+      GroundUstar = 0
+      n = 0
+      !$omp parallel do private(i) reduction(+:GroundUstar,n) schedule(guided,5)
+      do i = 1, size(WMPoints)
+        if (WMPoints(i)%zk==1) then
+          GroundUstar = GroundUstar + WMPoints(i)%ustar
+          n = n + 1
+        end if
+      end do
+      !$omp end parallel do
+
+      GroundUstar = GroundUstar / max(n, 1)
     else
       GroundUstar = 0
     end if
@@ -1957,24 +2037,27 @@ debuglevel = 0
 
 
   real(knd) function GroundUstarUVW() result(res)
-    integer :: i, j, n
+    integer :: i, j, k, n
 
     if (any(WMPoints%zk == 1)) then
       res = 0
       n = 0
+      !$omp parallel reduction(+:res,n)
       do j = 1,2
         do i = 1,6
-          associate(p => WMPointsUVW(i,j))
-            n = n +  count(p%points%zk == 1)
-            res = res + sum(p%points%ustar, mask = (p%points%zk == 1))
-          end associate
+            !$omp do private(k) schedule(guided,5)
+            do k = 1, size(WMPointsUVW(i,j)%points)
+              if (WMPointsUVW(i,j)%points(k)%zk==1) then
+                res = res + WMPointsUVW(i,j)%points(k)%ustar
+                n = n + 1
+              end if
+            end do
+            !$omp end do nowait
         end do
       end do
-      if (n>0) then
-        res = res / n
-      else
-        res = 0
-      end if
+      !$omp end parallel
+
+      res = res / max(n, 1)
     else
       res = 0
     end if

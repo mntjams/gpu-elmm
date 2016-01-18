@@ -399,7 +399,7 @@ contains
     real(knd), intent(out) :: Q(0:,0:,0:)
     integer :: i, xi, yj, zk
 
-    Q = 0
+    call set(Q, 0)
 
     !$omp parallel
     !$omp do private(xi, yj, zk)

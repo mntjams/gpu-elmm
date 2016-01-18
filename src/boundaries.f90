@@ -462,7 +462,7 @@ implicit none
     
     
 #ifdef PAR
-    call par_exchange_U_x(U, nx, ny, nz)
+    call par_exchange_U_x(U, component)
 #endif
     !$omp sections
     !$omp section
@@ -667,7 +667,7 @@ implicit none
     !$omp end parallel
     
 #ifdef PAR    
-    call par_exchange_U_y(U, nx, ny, nz)
+    call par_exchange_U_y(U, component)
 #endif
     !$omp sections
     !$omp section
@@ -785,7 +785,7 @@ implicit none
     !$omp end sections
 
 #ifdef PAR
-    call par_exchange_U_z(U, nx, ny, nz)
+    call par_exchange_U_z(U, component)
 #endif
     !$omp sections
     !$omp section
@@ -918,7 +918,7 @@ implicit none
     nz = Prnz
 
 #ifdef PAR
-    call par_exchange_boundaries(Phi, nx, ny, nz, Btype, 0, 1)
+    call par_exchange_boundaries(Phi, Btype, 5)
 #endif
     
     if (Btype(We)==PERIODIC) then

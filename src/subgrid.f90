@@ -2,15 +2,19 @@ module Subgrid
 
   use Parameters
   use Boundaries, only: BoundU
+  use Subgrid_MixedTimeScale, only: SGS_MixedTimeScale
 
   implicit none
 
   private
   public :: sgstype, SubgridModel
 
-  real(knd),parameter :: CSmag = 0.1_knd
+  real(knd),parameter :: CSmag = 0.122_knd
 
   integer :: sgstype
+
+  integer, parameter, public :: SmagorinskyModel = 1, SigmaModel = 2, VremanModel = 3, &
+                                StabSubgridModel = 4, MixedTimeScaleModel = 5
 
   contains
 
@@ -210,10 +214,16 @@ module Subgrid
       real(knd) :: aa, bb
       real(knd), dimension(1:3,1:3) :: a, b
       real(knd) :: dx2, dy2, dz2
-      real(knd),parameter ::c = 0.05
-      integer,parameter :: narr = 4
+      real(knd),parameter ::c = 0.041
       real(knd) :: c2
       integer :: i, j, k, bi, bj, bk, ii, jj
+      integer :: tnx, tny, tnz
+
+      integer,parameter :: narr = 4
+    
+      tnx = tilenx(narr)
+      tny = tileny(narr)
+      tnz = tilenz(narr)
 
       c2 = c * filter_ratio**2
 
@@ -222,52 +232,50 @@ module Subgrid
       dz2 = dzmin**2
 
 
-      !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) !collapse(3)
-      do bk = 1, Prnz, tilenz(narr)
-       do bj = 1, Prny, tileny(narr)
-        do bi = 1, Prnx, tilenx(narr)
-         do k = bk, min(bk+tilenz(narr)-1,Prnz)
-          do j = bj, min(bj+tileny(narr)-1,Prny)
-           do i = bi, min(bi+tilenx(narr)-1,Prnx)
-            a(1,1) = (U(i,j,k)-U(i-1,j,k))/dxmin
-            a(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._knd*dymin)
-            a(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._knd*dzmin)
+      !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) collapse(3)
+      do bk = 1, Prnz, tnz
+       do bj = 1, Prny, tny
+        do bi = 1, Prnx, tnx
+         do k = bk, min(bk+tnz-1,Prnz)
+          do j = bj, min(bj+tny-1,Prny)
+           do i = bi, min(bi+tnx-1,Prnx)
+             a(1,1) = (U(i,j,k)-U(i-1,j,k))/dxmin
+             a(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._knd*dymin)
+             a(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._knd*dzmin)
 
-            a(2,2) = (V(i,j,k)-V(i,j-1,k))/dymin
-            a(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(4._knd*dxmin)
-            a(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(4._knd*dzmin)
+             a(2,2) = (V(i,j,k)-V(i,j-1,k))/dymin
+             a(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(4._knd*dxmin)
+             a(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(4._knd*dzmin)
 
-            a(3,3) = (W(i,j,k)-W(i,j,k-1))/dzmin
-            a(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4._knd*dxmin)
-            a(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4._knd*dymin)
+             a(3,3) = (W(i,j,k)-W(i,j,k-1))/dzmin
+             a(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(4._knd*dxmin)
+             a(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(4._knd*dymin)
 
-            do jj = 1, 3
-             do ii = 1, 3
-              b(ii,jj) = dx2 * a(1,ii) * a(1,jj) + &
-                         dy2 * a(2,ii) * a(2,jj) + &
-                         dz2 * a(3,ii) * a(3,jj)
+             do jj = 1, 3
+              do ii = 1, 3
+               b(ii,jj) = dx2 * a(1,ii) * a(1,jj) + &
+                          dy2 * a(2,ii) * a(2,jj) + &
+                          dz2 * a(3,ii) * a(3,jj)
+              end do
              end do
-            end do
 
-            bb =      b(1,1)*b(2,2) - b(1,2)**2
-            bb = bb + b(1,1)*b(3,3) - b(1,3)**2
-            bb = bb + b(2,2)*b(3,3) - b(2,3)**2
+             bb =      b(1,1)*b(2,2) - b(1,2)**2
+             bb = bb + b(1,1)*b(3,3) - b(1,3)**2
+             bb = bb + b(2,2)*b(3,3) - b(2,3)**2
 
-            aa = 0
+             aa = 0
 
-            do jj = 1, 3
-             do ii = 1, 3
-              aa = aa + (a(ii,jj)**2)
+             do jj = 1, 3
+              do ii = 1, 3
+               aa = aa + (a(ii,jj)**2)
+              end do
              end do
-            end do
 
 
-            if (abs(aa)>1e-5.and.bb>0)  then
-              Viscosity(i,j,k) = c2 * sqrt(bb/aa) + molecular_viscosity
-            else
-              Viscosity(i,j,k) = molecular_viscosity
-            end if
 
+             Viscosity(i,j,k) = c2 * sqrt(bb/aa)
+
+             Viscosity(i,j,k) = max(0._knd, Viscosity(i,j,k)) + molecular_viscosity
            end do
           end do
          end do
@@ -275,7 +283,6 @@ module Subgrid
        end do
       end do
       !$omp end parallel do
-
     endsubroutine SGS_Vreman
 
 
@@ -287,33 +294,36 @@ module Subgrid
       use Tiling, only: tilenx, tileny, tilenz
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
-      real(knd), parameter :: Csig = 1.35_knd
-      integer, parameter   :: narr = 4
+      real(knd), parameter :: Csig = 1.04_knd
       integer   :: i,j,k,bi,bj,bk
       real(knd) :: width, C, D, g(3,3), s1, s2, s3
       integer, parameter :: sigma_knd = knd
+      integer :: tnx, tny, tnz
+
+      integer,parameter :: narr = 4
+    
+      tnx = tilenx(narr)
+      tny = tileny(narr)
+      tnz = tilenz(narr)
 
       width = filter_ratio * (dxmin*dymin*dzmin)**(1._knd/3._knd)
       C = (Csig*width)**2
 
-      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk) schedule(runtime)
-      ! !collapse(3)
-      do bk = 1, Prnz, tilenz(narr)
-       do bj = 1, Prny, tileny(narr)
-        do bi = 1, Prnx, tilenx(narr)
-         do k = bk, min(bk+tilenz(narr)-1,Prnz)
-          do j = bj, min(bj+tileny(narr)-1,Prny)
-           do i = bi ,min(bi+tilenx(narr)-1,Prnx)
+      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk) schedule(runtime) collapse(3)
+      do bk = 1, Prnz, tnz
+       do bj = 1, Prny, tny
+        do bi = 1, Prnx, tnx
+         do k = bk, min(bk+tnz-1,Prnz)
+          do j = bj, min(bj+tny-1,Prny)
+           do i = bi ,min(bi+tnx-1,Prnx)
 
             call GradientTensorUG(g,i,j,k)
 
             call Sigmas(s1,s2,s3,g)
 
-            if (s1>0) then
-              D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
-            else
-              D = 0
-            end if
+            D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
+
+            D = max(0._knd, D)
 
             Viscosity(i,j,k) = C * D + molecular_viscosity
 
@@ -355,7 +365,16 @@ module Subgrid
 
         real(sigma_knd) :: trG2, i1, i2, i3, a1, a2, a3, c, G(3,3)
 
-        G = real( matmul(transpose(grads),grads) ,sigma_knd)
+        !G = matmul(transpose(grads),grads)
+        G(1,1) = grads(1,1)**2           + grads(2,1)**2           + grads(3,1)**2
+        G(1,2) = grads(1,1) * grads(1,2) + grads(2,1) * grads(2,2) + grads(3,1) * grads(3,2)
+        G(1,3) = grads(1,1) * grads(1,3) + grads(2,1) * grads(2,3) + grads(3,1) * grads(3,3)
+        G(2,1) = grads(1,1) * grads(1,2) + grads(2,1) * grads(2,2) + grads(3,1) * grads(3,2)
+        G(2,2) = grads(1,2)**2           + grads(2,2)**2           + grads(3,2)**2
+        G(2,3) = grads(1,2) * grads(1,3) + grads(2,2) * grads(2,3) + grads(3,2) * grads(3,3)
+        G(3,1) = grads(1,1) * grads(1,3) + grads(2,1) * grads(2,3) + grads(3,1) * grads(3,3)
+        G(3,2) = grads(1,2) * grads(1,3) + grads(2,2) * grads(2,3) + grads(3,2) * grads(3,3)
+        G(3,3) = grads(1,3)**2           + grads(2,3)**2           + grads(3,3)**2
 
         trG2 = dot_product(G(:,1),G(:,1)) +&
                dot_product(G(:,2),G(:,2)) +&
@@ -416,8 +435,7 @@ module Subgrid
       use Outputs, only: enable_profiles, current_profiles
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
-      real(knd), parameter :: Csig = 1.35_knd
-      integer, parameter   :: narr = 4
+      real(knd), parameter :: Csig = 1.04_knd
       integer   :: i,j,k,bi,bj,bk
       real(knd) :: width, C, Pr_sgs, D, g(3,3), s1, s2, s3
       integer, parameter :: sigma_knd = knd
@@ -425,6 +443,14 @@ module Subgrid
       real(knd) :: tempfl_p(0:Prnz), momfl_p(0:Prnz)
       
       logical :: enable_stability_correction
+      integer :: tnx, tny, tnz
+
+      integer,parameter :: narr = 4
+    
+      tnx = tilenx(narr)
+      tny = tileny(narr)
+      tnz = tilenz(narr)
+      
       enable_stability_correction = enable_buoyancy .and. enable_profiles
 
       if (enable_stability_correction) then
@@ -441,12 +467,11 @@ module Subgrid
 
       width = filter_ratio * (dxmin*dymin*dzmin)**(1._knd/3._knd)
 
-      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk,C,Pr_sgs) schedule(runtime)
-      ! !collapse(3)
-      do bk = 1, Prnz, tilenz(narr)
-       do bj = 1, Prny, tileny(narr)
-        do bi = 1, Prnx, tilenx(narr)
-         do k = bk, min(bk+tilenz(narr)-1,Prnz)
+      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk,C,Pr_sgs) schedule(runtime) collapse(3)
+      do bk = 1, Prnz, tnz
+       do bj = 1, Prny, tny
+        do bi = 1, Prnx, tnx
+         do k = bk, min(bk+tnz-1,Prnz)
          
           if (enable_stability_correction) then
             call stability_correction_L_MO(k, width, C, Pr_sgs)
@@ -455,18 +480,16 @@ module Subgrid
             C = (Csig*width)**2
           end if
             
-          do j = bj, min(bj+tileny(narr)-1,Prny)
-           do i = bi ,min(bi+tilenx(narr)-1,Prnx)
+          do j = bj, min(bj+tny-1,Prny)
+           do i = bi ,min(bi+tnx-1,Prnx)
 
             call GradientTensorUG(g,i,j,k)
 
             call Sigmas(s1,s2,s3,g)
 
-            if (s1>0) then
-              D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
-            else
-              D = 0
-            end if
+            D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
+
+            D = max(0._knd, D)
 
             Viscosity(i,j,k) = C * D
 
@@ -573,7 +596,6 @@ module Subgrid
           C = 1 / (1 + wL)
           !own fit of graph in Zeid et al. 2010, JFM 665
           Pr_sgs = 0.5 + 0.85 * (1+tanh(log(1.2_knd*wL)))/2
-!           print '(i4,1x,f8.3,1x,f8.3)', k, res, width/L
         else
           C = 1
           Pr_sgs = 0.5
@@ -597,11 +619,14 @@ module Subgrid
                         call SGS_Vreman(U,V,W,filter_ratios(filtertype))
       else if (sgstype==StabSubgridModel) then
                         call SGS_Sigma_stability(U,V,W,filter_ratios(filtertype))
+      else if (sgstype==MixedTimeScaleModel) then
+                        call SGS_MixedTimeScale(U,V,W)
       else
 
         Viscosity = molecular_viscosity
 
       end if
+
     end subroutine
 
 end module Subgrid

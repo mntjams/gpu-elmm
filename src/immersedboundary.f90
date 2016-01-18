@@ -30,7 +30,11 @@ contains
     neighbours(3,5) =  1
     neighbours(3,6) = -1
 
-!     !$omp parallel do private(i,j,k,dist,nb,m,n,o,r,SB,p) collapse(3) schedule(dynamic, 1000)
+    !Pobably not worth parallelizing for just one pass. It can speed it up,
+    !but we need a specific order and we call the sort() in the end
+    ! which would have more work to do.
+    !Also, gfortran 4.8 has a bug which causes crashes when this loop is parallelized.
+
     do k = 1,Prnz
      do j = 1,Prny
       do i = 1,Prnx
@@ -64,11 +68,11 @@ contains
           p%disty = neary-yPr(j)
           p%distz = nearz-zPr(k)
           if (p%distx==0.and.p%disty==0.and.p%distz==0) then
-            print *, Prtype(i,j,k)
-            print *, i,j,k
-            print *, xPr(i), yPr(j), zPr(k)
+            write(*,*) "Prtype(i,j,k)", Prtype(i,j,k)
+            write(*,*) "i,j,k", i,j,k
+            write(*,*) "xPr(i), yPr(j), zPr(k)", xPr(i), yPr(j), zPr(k)
             call SB%Closest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
-            print *, nearx, neary, nearz
+            write(*,*) "nearx, neary, nearz", nearx, neary, nearz
             call error_stop("zero distance WM point")
           end if
           p%ustar = 1
@@ -99,16 +103,13 @@ contains
           end select
           
           p%z0H = p%z0
-          
-          !$omp critical
+
           call AddWMPoint(p)
-          !$omp end critical
         end if
        end if
       end do
      end do
     end do
-
     
   end subroutine GetSolidBodiesWM
   
@@ -147,8 +148,12 @@ contains
       real(knd), pointer, contiguous :: dirvec(:)
       real(knd)     :: nearx, neary, nearz, t, dist, distvec(3)
       integer       :: i, j, k, m, n, o, dir
+      real(knd) :: delta
+
+      delta = (dxmin*dymin*dzmin)**(1._knd/3)/20
       
-!       !$omp parallel do private(i,j,k,dir,dirvec,m,n,o,SB,distvec,nearx,neary,nearz,p) collapse(3) schedule(dynamic, 1000) 
+      !See above in GetSolidBodiesWM why no OpenMP.
+
       do k = 1, nz
        do j = 1, ny
         do i = 1, nx
@@ -183,10 +188,10 @@ contains
                   if (norm2(distvec)<dist) then
                     !Potentially problematic
                     !write(*,'(a)',advance="no") '.'
-                    if (norm2(distvec)<(dxmin*dymin*dzmin)**(1._knd/3)/20) then
+                    if (norm2(distvec) < delta) then
                       !Really problematic
                       write(*,*) "Warning, inconsistent processing of geometry, point",i,j,k,"dir",dir
-                      write(*,*) norm2(distvec),dist,(dxmin*dymin*dzmin)**(1._knd/3)/20
+                      write(*,*) norm2(distvec), dist, delta
                       call SB%Closest(nearx ,neary, nearz, x(i), y(j), z(k))
                   
                       distvec = [nearx - x(i), neary - y(j), nearz - z(k)]
@@ -240,9 +245,7 @@ contains
                 
                 p%z0H = p%z0
                 
-                !$omp critical
                 call AddWMPointUVW(p, component, dir)
-                !$omp end critical
               end if
 
             end do
@@ -258,7 +261,7 @@ contains
     logical function right_direction(a, b)
       !checks if the angle between two vectors is small enough
       real(knd), intent(in) :: a(3), b(3)
-      right_direction = ( dot_product(a, b) / (norm2(a) * norm2(b)) ) > 0.4
+      right_direction = ( dot_product(a, b) / (norm2(a) * norm2(b)) ) > 0.4_knd
     end function
 
   end subroutine GetSolidBodiesWM_UVW
@@ -1965,47 +1968,61 @@ contains
   subroutine MoveIBPointsToArray
     !It would be posible call a generic procedure with the list and array
     ! as an argument, but we want the final arrays not polymorphic.
-    integer :: i
+    integer :: iU, iV, iW, iS
 
+    !$omp parallel sections
+
+    !$omp section
     allocate(UIBPoints(UIBPointsList%Len()))
-    allocate(VIBPoints(VIBPointsList%Len()))
-    allocate(WIBPoints(WIBPointsList%Len()))
-    allocate(ScalFlIBPoints(ScalFlIBPointsList%Len()))
+    iU = 0
+    call UIBPointsList%for_each(CopyUIBPoint)
 
-    i = 0
-    call UIBPointsList%for_each(CopyVelIBPoint)
-    i = 0
-    call VIBPointsList%for_each(CopyVelIBPoint)
-    i = 0
-    call WIBPointsList%for_each(CopyVelIBPoint)
-    i = 0
+    !$omp section
+    allocate(VIBPoints(VIBPointsList%Len()))
+    iV = 0
+    call VIBPointsList%for_each(CopyVIBPoint)
+
+    !$omp section
+    allocate(WIBPoints(WIBPointsList%Len()))
+    iW = 0
+    call WIBPointsList%for_each(CopyWIBPoint)
+
+    !$omp section
+    allocate(ScalFlIBPoints(ScalFlIBPointsList%Len()))
+    iS = 0
     call ScalFlIBPointsList%for_each(CopyScalFlIBPoint)
 
-    contains
+    !$omp end parallel sections
 
-      subroutine CopyVelIBPoint(CurrentIBPoint)
-        type(TVelIBPoint) :: CurrentIBPoint
+  contains
 
-        i = i + 1
+    subroutine CopyUIBPoint(CurrentIBPoint)
+      type(TVelIBPoint) :: CurrentIBPoint
 
-        if (CurrentIBPoint%component==1) then
-          UIBPoints(i) = CurrentIBPoint
-        elseif (CurrentIBPoint%component==2) then
-          VIBPoints(i) = CurrentIBPoint
-        else
-          WIBPoints(i) = CurrentIBPoint
-        end if
+      iU = iU + 1
+      UIBPoints(iU) = CurrentIBPoint
+    end subroutine
 
-      end subroutine
+    subroutine CopyVIBPoint(CurrentIBPoint)
+      type(TVelIBPoint) :: CurrentIBPoint
 
-      subroutine CopyScalFlIBPoint(CurrentIBPoint)
-        type(TScalFlIBPoint) :: CurrentIBPoint
+      iV = iV + 1
+      VIBPoints(iV) = CurrentIBPoint
+    end subroutine
 
-        i = i + 1
+    subroutine CopyWIBPoint(CurrentIBPoint)
+      type(TVelIBPoint) :: CurrentIBPoint
 
-        ScalFlIBPoints(i) = CurrentIBPoint
+      iW = iW + 1
+      WIBPoints(iW) = CurrentIBPoint
+    end subroutine
 
-      end subroutine
+    subroutine CopyScalFlIBPoint(CurrentIBPoint)
+      type(TScalFlIBPoint) :: CurrentIBPoint
+
+      iS = iS + 1
+      ScalFlIBPoints(iS) = CurrentIBPoint
+    end subroutine
 
   end subroutine MoveIBPointsToArray
 
@@ -2015,20 +2032,13 @@ contains
     integer,intent(in)    :: nx,ny,nz,s
     integer,intent(inout) :: Xtype(s:,s:,s:)
     integer i,j,k
-!     if (Btype(We)==DIRICHLET.or.Btype(We)==NOSLIP) Xtype(:0,:,:) = -2
-!     if (Btype(Ea)==DIRICHLET.or.Btype(Ea)==NOSLIP) Xtype(nx+1:,:,:) = -2
-!     if (Btype(So)==DIRICHLET.or.Btype(So)==NOSLIP) Xtype(:,:0,:) = -2
-!     if (Btype(No)==DIRICHLET.or.Btype(No)==NOSLIP) Xtype(:,ny+1:,:) = -2
-!     if (Btype(Bo)==DIRICHLET.or.Btype(Bo)==NOSLIP) Xtype(:,:,:0) = -2
-!     if (Btype(To)==DIRICHLET.or.Btype(To)==NOSLIP) Xtype(:,:,nz+1:) = -2
 
-    do k = 1,nz
-      do j = 1,ny
-        do i = 1,nx
-          if (Xtype(i,j,k)==0.and. &
-              (any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)>0) )) &!.or. &
-!                any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)<-1) ) ) &
-                                                        Xtype(i,j,k) = -1
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          if (Xtype(i,j,k)==0 .and. (any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)>0))) then
+                 Xtype(i,j,k) = -1
+          end if
         end do
       end do
     end do
@@ -2037,10 +2047,17 @@ contains
 
   subroutine FindNeighbouringCells
     !sets type of the cells closest to the solid body to -1
+
+    !$omp parallel sections
+    !$omp section
     call AuxNeighbours(Prtype,Prnx,Prny,Prnz,0)
+    !$omp section
     call AuxNeighbours(Utype,Unx,Uny,Unz,-2)
+    !$omp section
     call AuxNeighbours(Vtype,Vnx,Vny,Vnz,-2)
+    !$omp section
     call AuxNeighbours(Wtype,Wnx,Wny,Wnz,-2)
+    !$omp end parallel sections
   end subroutine FindNeighbouringCells
 
   
@@ -2190,14 +2207,17 @@ contains
     type(TScalFlIBPoint) SIBP
     integer i,j,k
 
-!     !$omp parallel private(i,j,k,IBP,SIBP)
+!strange runtime errors in gfortran 4.8, should not be a race condition
+#if !( (defined __GFORTRAN__) && (__GNUC__==4) && (__GNUC_MINOR__<=8) )
+    !$omp parallel private(i,j,k,IBP,SIBP)
+#endif
     !$omp do collapse(3) schedule(dynamic, 1000) 
     do k = 1,Unz
      do j = 1,Uny
       do i = 1,Unx
        if (Utype(i,j,k)>0) then
-        if (Utype(i+1,j,k)<=0.or.Utype(i-1,j,k)<=0.or.Utype(i,j+1,k)<=0&
-          .or.Utype(i,j-1,k)<=0.or.Utype(i,j,k+1)<=0.or.Utype(i,j,k-1)<=0)  then
+        if (Utype(i+1,j,k)<=0 .or. Utype(i-1,j,k)<=0 .or. Utype(i,j+1,k)<=0 &
+          .or. Utype(i,j-1,k)<=0 .or. Utype(i,j,k+1)<=0 .or. Utype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xU(-2:),yPr(-2:),zPr(-2:),Utype,1)
             !$omp critical
             call  UIBPointsList%add(IBP)
@@ -2214,8 +2234,8 @@ contains
      do j = 1,Vny
       do i = 1,Vnx
        if (Vtype(i,j,k)>0) then
-        if (Vtype(i+1,j,k)<=0.or.Vtype(i-1,j,k)<=0.or.Vtype(i,j+1,k)<=0&
-          .or.Vtype(i,j-1,k)<=0.or.Vtype(i,j,k+1)<=0.or.Vtype(i,j,k-1)<=0)  then
+        if (Vtype(i+1,j,k)<=0 .or. Vtype(i-1,j,k)<=0 .or. Vtype(i,j+1,k)<=0 &
+          .or. Vtype(i,j-1,k)<=0 .or. Vtype(i,j,k+1)<=0 .or. Vtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yV(-2:),zPr(-2:),Vtype,2)
             !$omp critical
             call  VIBPointsList%add(IBP)
@@ -2232,8 +2252,8 @@ contains
      do j = 1,Wny
       do i = 1,Wnx
        if (Wtype(i,j,k)>0) then
-        if (Wtype(i+1,j,k)<=0.or.Wtype(i-1,j,k)<=0.or.Wtype(i,j+1,k)<=0&
-          .or.Wtype(i,j-1,k)<=0.or.Wtype(i,j,k+1)<=0.or.Wtype(i,j,k-1)<=0)  then
+        if (Wtype(i+1,j,k)<=0 .or. Wtype(i-1,j,k)<=0 .or. Wtype(i,j+1,k)<=0 &
+          .or. Wtype(i,j-1,k)<=0 .or. Wtype(i,j,k+1)<=0 .or. Wtype(i,j,k-1)<=0)  then
             call  Create(IBP,i,j,k,xPr(-2:),yPr(-2:),zW(-2:),Wtype,3)
             !$omp critical
             call  WIBPointsList%add(IBP)
@@ -2250,8 +2270,8 @@ contains
      do j = 1,Prny
       do i = 1,Prnx
        if (Prtype(i,j,k)>0) then
-        if (Prtype(i+1,j,k)<=0.or.Prtype(i-1,j,k)<=0.or.Prtype(i,j+1,k)<=0&
-          .or.Prtype(i,j-1,k)<=0.or.Prtype(i,j,k+1)<=0.or.Prtype(i,j,k-1)<=0)  then
+        if (Prtype(i+1,j,k)<=0 .or. Prtype(i-1,j,k)<=0 .or. Prtype(i,j+1,k)<=0 &
+          .or. Prtype(i,j-1,k)<=0 .or. Prtype(i,j,k+1)<=0 .or. Prtype(i,j,k-1)<=0)  then
             call  Create(SIBP,i,j,k)
             !$omp critical
             call  ScalFlIBPointsList%add(SIBP)
@@ -2262,14 +2282,22 @@ contains
      end do
     end do
     !$omp end do nowait
-!     !$omp end parallel
+#if !( (defined __GFORTRAN__) && (__GNUC__==4) && (__GNUC_MINOR__<=8) )
+    !$omp end parallel
+#endif
 
     call MoveIBPointsToArray
 
+    !$omp parallel sections
+    !$omp section
     call UIBPointsList%finalize
+    !$omp section
     call VIBPointsList%finalize
+    !$omp section
     call WIBPointsList%finalize
+    !$omp section
     call ScalFlIBPointsList%finalize
+    !$omp end parallel sections
 
   end subroutine InitImBoundaries
 

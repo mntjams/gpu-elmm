@@ -27,6 +27,7 @@ module Initial
   use Puffs, only: InitPuffSources
 #ifdef PAR
   use custom_par
+  use exchange_par
 #endif
 
   implicit none
@@ -848,7 +849,10 @@ contains
                           Wnz = Prnz-1
    end if
    
+   
 #ifdef PAR
+   call par_init_exchange
+      
    gUnx = par_co_sum(Unx, comm_row_x)
    gUny = par_co_sum(Uny, comm_row_y)
    gUnz = par_co_sum(Unz, comm_row_z)
@@ -1279,7 +1283,7 @@ contains
       type(ScalarAreaSource), allocatable, intent(inout) :: a(:)
       type(ScalarAreaSource), intent(inout) :: e
       type(ScalarAreaSource), allocatable :: tmp(:)
-      integer :: n
+      integer :: i, n
 
       if (.not.allocated(a)) then
         a = [e]
@@ -1288,12 +1292,14 @@ contains
         call move_alloc(a,tmp)
         allocate(a(n+1))
 
-        call assign(a(1:n), tmp)
+        do i = 1, n
+          call assign(a(i), tmp(i))
+        end do
         call assign(a(n+1), e)
       end if
     end subroutine
     
-    elemental subroutine assign(l, r)
+    subroutine assign(l, r)
       type(ScalarAreaSource), intent(out) :: l
       type(ScalarAreaSource), intent(inout) :: r
       l%flux = r%flux
@@ -1585,16 +1591,14 @@ contains
   
   
 
-  subroutine ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
+  subroutine ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,scalars_optional)
     use Endianness
-#ifdef PAR
-    use exchange_par
-#endif
     real(knd), intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd), intent(inout) :: Pr(1:,1:,1:)
     real(knd), intent(inout) :: Temperature(-1:,-1:,-1:)
     real(knd), intent(inout) :: Moisture(-1:,-1:,-1:)
     real(knd), intent(inout) :: Scalar(-1:,-1:,-1:,:)
+    logical, intent(in) :: scalars_optional
     real(real32), allocatable :: buffer(:,:,:), UVWbuffer(:,:,:,:)
     integer :: i, unit, stat, file_stat
     logical :: exU(3)
@@ -1649,23 +1653,37 @@ contains
     if (num_of_scalars > 0) then
       open(newunit=unit,file=image_input_dir//"scalars.vtk",access="stream",status="old",action="read",iostat=file_stat)
 
-      if (file_stat/=0) call error_stop("Error opening "//image_input_dir//"scalars.vtk")
+      if (file_stat/=0 .and. scalars_optional) then
+        !TODO: check consistency between images?
+        if (master) write(*,*) "Warning, no scalar initial conditions found."
+        if (master) write(*,*) "Scalar fields set to zero."
+        
+        Scalar = 0
 
-      do i = 1, num_of_scalars
-        write(scalnum,"(I2.2)") i
-        call skip_to("SCALARS scalar"//scalnum//" float",stat)
-        call skip_line
-        if (stat/=0) then
-          call error_stop("scalar"//scalnum//" field not found in the initial conditions file " // &
-                          image_input_dir // "scalars.vtk")
-        else
+      else if (file_stat/=0) then
+
+        call error_stop("Error opening "//image_input_dir//"scalars.vtk")
+
+      else
+
+        do i = 1, num_of_scalars
+          write(scalnum,"(I2.2)") i
+          call skip_to("SCALARS scalar"//scalnum//" float",stat)
           call skip_line
-          read(unit) buffer
-          Scalar(1:Prnx,1:Prny,1:Prnz,i) =  real(BigEnd(buffer),knd)
-        end if
-      end do
+          if (stat/=0) then
+            call error_stop("scalar"//scalnum//" field not found in the initial conditions file " // &
+                            image_input_dir // "scalars.vtk")
+          else
+            call skip_line
+            read(unit) buffer
+            Scalar(1:Prnx,1:Prny,1:Prnz,i) =  real(BigEnd(buffer),knd)
+          end if
+        end do
 
-      close(unit)
+        close(unit)
+
+      end if
+
     end if
 
 
@@ -1731,9 +1749,9 @@ contains
       W(0:Prnx-1,1:Prny,1:Prnz) = W(0:Prnx-1,1:Prny,1:Prnz) + W(1:Prnx,1:Prny,1:Prnz)
 
 #ifdef PAR
-      call par_exchange_U_x(U, Unx, Uny, Unz)
-      call par_exchange_U_y(V, Vnx, Vny, Vnz)
-      call par_exchange_U_z(W, Wnx, Wny, Wnz)
+      call par_exchange_U_x(U, 1)
+      call par_exchange_U_y(V, 2)
+      call par_exchange_U_z(W, 3)
 #endif
       if (Btype(Ea)>=MPI_BOUNDS.or.Btype(Ea)==PERIODIC) U(Prnx,1:Prny,1:Prnz) = U(Prnx,1:Prny,1:Prnz) + U(0,1:Prny,1:Prnz)
       if (Btype(No)>=MPI_BOUNDS.or.Btype(No)==PERIODIC) V(1:Prnx,Prny,1:Prnz) = V(1:Prnx,Prny,1:Prnz) + V(1:Prnx,0,1:Prnz)
@@ -1850,22 +1868,26 @@ contains
     V(1:Vnx,1:Vny,1:Vnz) = 0
     W(1:Wnx,1:Wny,1:Wnz) = 0
 
-    if (initcondsfromfile==1) then
+    if (initcondsfromfile>0) then
 
       call par_sync_out("  ...reading initial conditions from input files.")
 
-      call ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
+      if (initcondsfromfile==2) then
+        call ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,scalars_optional=.true.)
+      else
+        call ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,scalars_optional=.false.)
+      end if
 
-       Viscosity = molecular_viscosity
+      Viscosity = molecular_viscosity
 
-       if (enable_buoyancy.or. &
-           enable_moisture.or. &
-           num_of_scalars>0)        TDiff = molecular_diffusivity
+      if (enable_buoyancy.or. &
+          enable_moisture.or. &
+          num_of_scalars>0)        TDiff = molecular_diffusivity
 
-       call BoundU(1,U,Uin)
-       call BoundU(2,V,Vin)
-       call BoundU(3,W,Win)
-       call Bound_Pr(Pr)
+      call BoundU(1,U,Uin)
+      call BoundU(2,V,Vin)
+      call BoundU(3,W,Win)
+      call Bound_Pr(Pr)
 
     else   !init conditions not from file
 
@@ -2238,6 +2260,10 @@ contains
       end subroutine
     end interface
 #endif
+
+    !Important to have some defined value before the first call to GetTurbInlet.
+    !The value can be quite arbitrary.
+    dt = min(dxmin,dymin,dzmin) / max(Uinlet,Uref)
 
 
     call par_sync_out("  ...initializing random seed.")
@@ -2647,7 +2673,7 @@ contains
     call par_sync_out("  ...initializing subsidence profile.")
     call InitSubsidenceProfile
 
-    call par_sync_out("  ...initializing thread tiles.")
+    call par_sync_out("  ...initializing loop tiles.")
     call InitTiles(Prnx,Prny,Prnz)
 
     if (enable_radiation) then

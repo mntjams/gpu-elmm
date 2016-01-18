@@ -2,9 +2,16 @@ module custom_mpi
   use mpi
   use Kinds
 
-  integer :: MPI_knd = -huge(1), MPI_real32 = -huge(1), MPI_real64 = -huge(1)
-  real(real32), pointer :: MPI_IN_PLACE_real32(:)
-  real(real64), pointer :: MPI_IN_PLACE_real64(:)
+  integer, parameter :: MPI_real32 = MPI_REAL4, MPI_real64 = MPI_REAL8
+
+#ifdef DPREC
+  integer, parameter :: MPI_knd = MPI_real64
+#else
+  integer, parameter :: MPI_knd = MPI_real32
+#endif
+
+  real(real32), pointer, contiguous :: MPI_IN_PLACE_real32(:)
+  real(real64), pointer, contiguous :: MPI_IN_PLACE_real64(:)
 
 end module
 
@@ -23,6 +30,7 @@ module custom_par
   integer :: myim, myrank, iim, jim, kim
   integer :: w_im, e_im, s_im, n_im, b_im, t_im
   integer :: w_rank, e_rank, s_rank, n_rank, b_rank, t_rank
+  integer :: neigh_ims(6), neigh_ranks(6)
   integer :: global_comm, poisfft_comm, cart_comm
   integer :: comm_plane_yz = -1, comm_plane_xz = -1, comm_plane_xy = -1
   integer :: comm_row_x = -1, comm_row_y = -1, comm_row_z = -1
@@ -170,6 +178,10 @@ contains
     b_rank = b_im - 1
     t_rank = t_im - 1
     
+    neigh_ranks = [w_rank, e_rank, s_rank, n_rank, b_rank, t_rank]
+    
+    neigh_ims = [w_im, e_im, s_im, n_im, b_im, t_im]
+    
     allocate(images_grid(1:nxims, 1:nyims, 1:nzims))
     do k = 1, nzims
       do j = 1, nyims
@@ -188,31 +200,24 @@ contains
   subroutine par_init
     use Kinds
     use iso_c_binding
+
     integer :: ie
+    integer :: required, provided
+
+    required = MPI_THREAD_SERIALIZED
   
-    call MPI_Init(ie)
+    call MPI_Init_thread(required, provided, ie)
     if (ie/=0) call error_stop("Error in MPI_Init")
-    
-    if (knd == kind(1.)) then
-      MPI_knd = MPI_REAL
-    else if (knd == kind(1.D0)) then
-      MPI_knd = MPI_DOUBLE_PRECISION
-    end if
-    
-    if (real32 == kind(1.)) then
-      MPI_real32 = MPI_REAL
-    else if (real32 == kind(1.D0)) then
-      MPI_real32 = MPI_DOUBLE_PRECISION
-    else
-      call error_stop("Unknown MPI_Type for real32.")
-    end if
-    
-    if (real64 == kind(1.)) then
-      MPI_real64 = MPI_REAL
-    else if (real64 == kind(1.D0)) then
-      MPI_real64= MPI_DOUBLE_PRECISION
-    else
-      call error_stop("Unknown MPI_Type for real64.")
+
+    if (provided<required) then
+      write(*,*) "------------------------------"
+      write(*,*) "Error, the provided MPI threading support smaller than required!"
+      write(*,*) "required:", required
+      write(*,*) "provided:", provided
+      write(*,*) "Trying to continue anyway, but a crash is likely and the results will be questionable."
+      write(*,*) "------------------------------"
+
+      call par_sync_all()
     end if
 
     call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real32, [1])
@@ -281,15 +286,21 @@ contains
     !Create the 3D Cartesian communicator "cart_comm" for use in CLMM
     call MPI_Cart_create(global_comm, 3, int(npxyz(3:1:-1)), &
                          [.false.,.false.,.false.], &
-                         .false., cart_comm, ie)
+                         .true., cart_comm, ie)
     if (ie/=0) call error_stop("Error calling MPI_Cart_create.")
-
+    
+    global_comm = cart_comm
+    
+    myim = par_this_image()
+    
+    myrank = myim - 1
+    !very unlikely to be changed
+    master = (myrank==0)
+    
     !creates a 2D! Cartesian communicator "poisfft_comm"
     !2D because of the PFFT library
-    !the dimnsions in the poisfft_comm are z,y
+    !the dimensions in the poisfft_comm are z,y
     call PoisFFT_InitMPIGrid(global_comm, npxyz(3:2:-1), poisfft_comm, ie)
-    !This uses the 3D communicator, slower, but necessary for 3D decomposition
-!     poisfft_comm = cart_comm
     
     call par_init_sub_comms
     

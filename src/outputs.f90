@@ -27,8 +27,8 @@ module Outputs
          
   type ProfileSwitches
     real(knd) :: average_start = 0, average_end = -1
-    real(knd) :: instant_start = 0, instant_end = -1, instant_interval = huge(1)
-    real(knd) :: running_start = 0, running_end = -1, running_interval = huge(1)
+    real(knd) :: instant_start = 0, instant_end = -1, instant_interval = huge(1.0_knd)
+    real(knd) :: running_start = 0, running_end = -1, running_interval = huge(1.0_knd)
   end type
   
   type(ProfileSwitches) :: profiles_config
@@ -394,6 +394,10 @@ contains
        momentum_fluxes_sgs_time = huge(1.0_knd)
        allocate(scalar_fluxes_time(3,1:num_of_scalars,size(probes),1:time_series_max_length))
        scalar_fluxes_time = huge(1.0_knd)
+     else
+       allocate(momentum_fluxes_time(0,0,0))
+       allocate(momentum_fluxes_sgs_time(0,0,0))
+       allocate(scalar_fluxes_time(0,0,0,0))
      end if
 
      if (enable_buoyancy) then

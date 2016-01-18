@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <pthread.h>
 
-void pthread_create_opaque(pthread_t *threadptr, void *procptr, void *dataptr, int *err){
+void pthread_create_opaque(pthread_t *threadptr, void *(*procptr)(void *), void *dataptr, int *err){
 //   creates a new thread using an opaque pointer to the pthread_t structure
   *err = pthread_create(threadptr, NULL, procptr, dataptr);
 }

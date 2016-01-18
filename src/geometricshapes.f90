@@ -711,7 +711,6 @@ contains
   end function
   
   subroutine ConvexPolyhedron_Closest(self,xnear,ynear,znear,x,y,z)
-    use Lapack
     class(ConvexPolyhedron),intent(in) :: self
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
@@ -722,14 +721,9 @@ contains
     real(knd) :: x0iline,y0iline,z0iline,xln,yln,zln,p
     integer   :: inearest,inearest2,inearest3
     integer   :: i
+    real(knd) :: xg(3), ag(3,3), bg(3)
+    real(knd) :: rcond
 
-    integer,dimension(3)    :: ipivot,work2             !arguments of the LAPACK
-    real(knd),dimension(3)  :: xg,bg,R,C,ferr,berr      !  routine GESVX
-    real(knd),dimension(12) :: work
-    real(knd),dimension(3,3) :: ag,af                    !
-    integer   :: info                                   !
-    real(knd) :: rcond                                  !
-    character :: equed                                  !
 
    !Vzdalenosti od rovin, pokud je nejbl. bod roviny uvnitr jine, nebo puv. bod na vnitrni strane -> vzd. *-1
    !Pokud je nejbl. body +- eps. (norm. vektor!,dxmin/100) uvnitr a vne polyh -> hotovo
@@ -830,8 +824,9 @@ contains
 
        bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(zW(Wnz+1)+zW(0))/2._knd /)
 
-       call gesvx("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3, &
-                  rcond,ferr,berr,work,work2,info)
+       call solve3x3(ag, bg, xg, rcond)
+
+       if (rcond>1e6) write(*,*) "Warning, ill-conditioned matrix in ConvexPolyhedron_Closest!"
 
        x0iline = xg(1)
        y0iline = xg(2)
@@ -846,8 +841,9 @@ contains
 
        bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(yV(Vny+1)+yV(0))/2._knd /)
 
-       call gesvx("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3, &
-                  rcond,ferr,berr,work,work2,info)
+       call solve3x3(ag, bg, xg, rcond)
+
+       if (rcond>1e6) write(*,*) "Warning, ill-conditioned matrix in ConvexPolyhedron_Closest!"
 
        x0iline = xg(1)
        y0iline = xg(2)
@@ -862,8 +858,9 @@ contains
 
        bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,(xU(Unx+1)+xU(0))/2._knd /)
 
-       call gesvx("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3, &
-                  rcond,ferr,berr,work,work2,info)
+       if (rcond>1e6) write(*,*) "Warning, ill-conditioned matrix in ConvexPolyhedron_Closest!"
+
+       call solve3x3(ag, bg, xg, rcond)
 
        x0iline = xg(1)
        y0iline = xg(2)
@@ -874,10 +871,10 @@ contains
     call Closest(Line(x0iline,y0iline,z0iline,ailine,biline,ciline),xln,yln,zln,x,y,z)
 
     if (self%Inside(xln,yln,zln,min(dxmin/1000._knd,dymin/10000._knd,dzmin/10000._knd))) then
-     xnear = xln
-     ynear = yln
-     znear = zln
-     return
+      xnear = xln
+      ynear = yln
+      znear = zln
+      return
     endif
 
 
@@ -888,12 +885,46 @@ contains
                shape = (/ 3,3 /))
     bg = (/ -self%Planes(inearest)%d,-self%Planes(inearest2)%d,-self%Planes(inearest3)%d /)
 
-    call gesvx("E","N",3,1,ag,3,af,3,ipivot,EQUED,R,C,bg,3,xg,3, &
-               rcond,ferr,berr,work,work2,info)
+    if (rcond>1e6) write(*,*) "Warning, ill-conditioned matrix in ConvexPolyhedron_Closest!"
+
+    call solve3x3(ag, bg, xg, rcond)
 
     xnear = xg(1)
     ynear = xg(2)
     znear = xg(3)
+
+  contains
+
+    subroutine solve3x3(a, B, x, det)
+      ! Cramers rule from https://groups.google.com/forum/#!topic/comp.lang.fortran/LkZYhHlFIz0
+      ! given a(3,3) and B(3), return x(3) such that a*x=B.
+      ! If det==0 a is singular, and x is meaningless.
+      real(knd), intent(in)  :: a(3,3), b(3)
+      real(knd), intent(out) :: x(3), det
+      real(knd) :: ainv(3,3)
+
+      ainv(1,1) = a(2,2)*a(3,3) - a(2,3)*a(3,2)
+      ainv(1,2) = a(3,2)*a(1,3) - a(3,3)*a(1,2)
+      ainv(1,3) = a(1,2)*a(2,3) - a(1,3)*a(2,2)
+      ainv(2,1) = a(2,3)*a(3,1) - a(2,1)*a(3,3)
+      ainv(2,2) = a(3,3)*a(1,1) - a(3,1)*a(1,3)
+      ainv(2,3) = a(1,3)*a(2,1) - a(1,1)*a(2,3)
+      ainv(3,1) = a(2,1)*a(3,2) - a(2,2)*a(3,1)
+      ainv(3,2) = a(3,1)*a(1,2) - a(3,2)*a(1,1)
+      ainv(3,3) = a(1,1)*a(2,2) - a(1,2)*a(2,1)
+
+      det = a(1,1)*ainv(1,1) + a(1,2)*ainv(2,1) + a(1,3)*ainv(3,1)
+
+      if (abs(det) < 1e-8) then
+        det = 1e8
+        return
+      end if
+
+      det = 1 / det
+      x(1) = det * (ainv(1,1)*b(1) + ainv(1,2)*b(2) + ainv(1,3)*b(3))
+      x(2) = det * (ainv(2,1)*b(1) + ainv(2,2)*b(2) + ainv(2,3)*b(3))
+      x(3) = det * (ainv(3,1)*b(1) + ainv(3,2)*b(2) + ainv(3,3)*b(3))
+    end subroutine
 
   end subroutine ConvexPolyhedron_Closest
 
@@ -2209,10 +2240,10 @@ contains
       call self%items(i)%Closest(xs(i),ys(i),zs(i),x,y,z)
     end do
     
-    associate (j => minloc(hypot(xs,hypot(ys,zs))))
-      xnear = xs(j(1))
-      ynear = ys(j(1))
-      znear = zs(j(1))
+    associate (j => minloc(hypot(xs,hypot(ys,zs)), dim=1))
+      xnear = xs(j)
+      ynear = ys(j)
+      znear = zs(j)
     end associate
   end subroutine
   
@@ -2227,10 +2258,10 @@ contains
       call self%items(i)%Closest(xs(i),ys(i),zs(i),x,y,z)
     end do
     
-    associate (j => minloc(hypot(xs,hypot(ys,zs))))
-      xnear = xs(j(1))
-      ynear = ys(j(1))
-      znear = zs(j(1))
+    associate (j => minloc(hypot(xs,hypot(ys,zs)), dim=1))
+      xnear = xs(j)
+      ynear = ys(j)
+      znear = zs(j)
     end associate
   end subroutine  
   
@@ -2414,15 +2445,16 @@ contains
     
     contains
     
-      subroutine empty_lines(line, sub)
+      subroutine empty_lines(line)
         character(*), intent(out) :: line
-        interface
-          subroutine sub
-          end subroutine
-        end interface
+
         do
           read (unit, '(a)', iostat=io) line
-          if (io/=0) call npoints_error
+          if (io/=0) then
+            write (*,*) "Error reading from file ", filename
+            call error_stop
+          end if
+
           if (len_trim(line)>0) exit
         end do
       end subroutine
@@ -2439,7 +2471,7 @@ contains
       end subroutine
       
       subroutine read_npoints
-        call empty_lines(line, npoints_error)
+        call empty_lines(line)
         call read_npoints_str(line)
         call read_npoints_num(line)
       end subroutine
@@ -2448,8 +2480,8 @@ contains
         character(*), intent(inout) :: line
         line = adjustl(line)
         if (.not.upcase(line(1:7))=='POINTS:') then
-          write (*,*) "Error reading points header in file", filename
-          write (*,*) "Expected 'POINTS:', found:", trim(line)
+          write (*,*) "Error reading points header in file ", filename
+          write (*,*) "Expected 'POINTS:', found: ", trim(line)
           call error_stop
         end if
         line = line(8:)
@@ -2464,7 +2496,7 @@ contains
       end subroutine
       
       subroutine npoints_error
-        write (*,*) "Error reading points header in file", filename
+        write (*,*) "Error reading points header in file ", filename
         call error_stop
       end subroutine
 
@@ -2479,7 +2511,7 @@ contains
       end subroutine
 
       subroutine point_error
-        write (*,*) "Error reading point ",ipoint,"in file", filename
+        write (*,*) "Error reading point ",ipoint,"in file ", filename
         call error_stop
       end subroutine
 
@@ -2511,8 +2543,8 @@ contains
         line = adjustl(line)
         if (.not.upcase(line(1:12))=='POLYHEDRONS:' .and. &
             .not.upcase(line(1:10))=='POLYHEDRA:') then
-          write (*,*) "Error reading polyhedra header in file", filename
-          write (*,*) "Expected 'POLYHEDRA:', found:", trim(line)
+          write (*,*) "Error reading polyhedra header in file ", filename
+          write (*,*) "Expected 'POLYHEDRA:', found: ", trim(line)
           call error_stop
         end if
         ind = index(line(1:12),':')
@@ -2528,7 +2560,7 @@ contains
       end subroutine
       
       subroutine npolyhedra_error
-        write (*,*) "Error reading polyhedra header in file", filename
+        write (*,*) "Error reading polyhedra header in file ", filename
         call error_stop
       end subroutine
 
@@ -2536,7 +2568,7 @@ contains
         type(ConvexPolyhedron), intent(out) :: poly
         type(Plane), allocatable :: planes(:)
 
-        call empty_lines(line, polyhedron_error)
+        call empty_lines(line)
         
         do
           call read_plane(planes, io)
@@ -2549,7 +2581,7 @@ contains
       end subroutine
 
       subroutine polyhedron_error
-        write (*,*) "Error reading polyhedron ",ipolyhedron,"in file", filename
+        write (*,*) "Error reading polyhedron ",ipolyhedron,"in file ", filename
         call error_stop
       end subroutine
       
