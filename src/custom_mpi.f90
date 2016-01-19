@@ -420,12 +420,6 @@ contains
         if (ie/=0) call error_stop("Error calling MPI_Comm_create.")
       end do
     end do
-! print *, "including ranks:", [( sum(domain_nims(1:dom-1)) , dom = 1,  number_of_domains )]
-!     call MPI_Group_incl(world_group, domain_nims(dom), &
-!                           [( sum(domain_nims(1:dom-1)) , dom = 1,  number_of_domains )], &
-!                           domain_masters_group, &
-!                           ie)
-!     call MPI_Comm_create(world_comm, domain_masters_group, domain_masters_comm, ie)
 
   end subroutine par_init_domains
 
@@ -447,14 +441,6 @@ contains
             integer :: COUNT, DATATYPE, ROOT, COMM, IERROR
       end subroutine
     end interface
-! call MPI_Barrier(world_comm, ie)
-! print *, "--------------?????-------"
-! call MPI_Barrier(world_comm, ie)
-!     if (master) then
-!       print *, "**", my_world_rank, domain_masters_comm, MPI_COMM_NULL
-!       call MPI_Barrier(domain_masters_comm, ie)
-!       if (ie/=0) call error_stop("Error calling MPI_Barrier for the domain masters communicator.")
-!     end if
 
     domain_nxims(domain_index) = nxims
     domain_nyims(domain_index) = nyims
@@ -497,8 +483,6 @@ contains
                      MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
       domain_ranks_grid(dom)%arr = domain_images_grid(dom)%arr - 1
     end do 
-print *, domain_index, "::", domain_images_grid(1)%arr, "/", domain_images_grid(2)%arr
-print *, domain_index, ":", domain_ranks_grid(1)%arr, "/", domain_ranks_grid(2)%arr
   
   end subroutine par_init_domain_grids
 

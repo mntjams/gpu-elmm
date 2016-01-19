@@ -41,6 +41,11 @@ contains
     end interface
 #endif
 
+    effective_time = time
+
+    !uses previous dt (it should be fixed anyway, but...)
+    call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time, dt)
+
     if (called==0) then
       called = 1
 
@@ -77,9 +82,6 @@ contains
       call GetBC_INLET_FROM_FILE(time)
     end if
 
-    !uses previous dt (it should be fixed anyway, but...)
-    call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time, dt)
-
     call TimeStepLength(U, V, W, dt)
 
     if (master) write (*,'(a,f12.6,a,es12.4)') " time: ", time," dt: ", dt
@@ -93,6 +95,7 @@ contains
 
       if (debugparam>1.and.master) call system_clock(count=time1)
 
+      effective_time = time + 2 * sum(RK_alpha(1:RK_stage-1)) * dt      
 
       call SubgridStresses(U, V, W, Pr, Temperature)
 
@@ -102,7 +105,7 @@ contains
                       Ustar, Vstar, Wstar, &
                       Temperature, Moisture, &
                       RK_beta, RK_rho, RK_stage, dt)
-
+)
       call ScalarRK3(U, V, W, &
                      Temperature, Moisture, Scalar, &
                      RK_stage, dt, &
@@ -112,7 +115,6 @@ contains
                       U2, V2, W2, &
                       Pr, &
                       2*RK_alpha(RK_stage)*dt)
-
 
       if (enable_top_sponge)  then
 

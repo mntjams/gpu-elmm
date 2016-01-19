@@ -826,7 +826,8 @@ contains
    call read_staggered_frames
 
 
-   if (Btype(Ea)==BC_PERIODIC.or.Btype(Ea)>=BC_MPI_BOUNDS) then
+   if (Btype(Ea)==BC_PERIODIC .or. &
+       (Btype(Ea)>=BC_MPI_BOUNDS_MIN.and.Btype(Ea)<=BC_MPI_BOUNDS_MAX)) then
                           Unx = Prnx
    else
                           Unx = Prnx-1
@@ -835,7 +836,8 @@ contains
    Unz = Prnz
 
    Vnx = Prnx
-   if (Btype(No)==BC_PERIODIC.or.Btype(No)>=BC_MPI_BOUNDS) then
+   if (Btype(No)==BC_PERIODIC .or. &
+       (Btype(No)>=BC_MPI_BOUNDS_MIN.and.Btype(Ea)<=BC_MPI_BOUNDS_MAX)) then
                           Vny = Prny
    else
                           Vny = Prny-1
@@ -844,7 +846,8 @@ contains
 
    Wnx = Prnx
    Wny = Prny
-   if (Btype(To)==BC_PERIODIC.or.Btype(To)>=BC_MPI_BOUNDS) then
+   if (Btype(To)==BC_PERIODIC .or. &
+       (Btype(To)>=BC_MPI_BOUNDS_MIN.and.Btype(Ea)<=BC_MPI_BOUNDS_MAX)) then
                           Wnz = Prnz
    else
                           Wnz = Prnz-1
@@ -1691,9 +1694,15 @@ contains
       call par_exchange_U_y(V, 2)
       call par_exchange_U_z(W, 3)
 #endif
-      if (Btype(Ea)>=BC_MPI_BOUNDS.or.Btype(Ea)==BC_PERIODIC) U(Prnx,1:Prny,1:Prnz) = U(Prnx,1:Prny,1:Prnz) + U(0,1:Prny,1:Prnz)
-      if (Btype(No)>=BC_MPI_BOUNDS.or.Btype(No)==BC_PERIODIC) V(1:Prnx,Prny,1:Prnz) = V(1:Prnx,Prny,1:Prnz) + V(1:Prnx,0,1:Prnz)
-      if (Btype(To)>=BC_MPI_BOUNDS.or.Btype(To)==BC_PERIODIC) W(1:Prnx,1:Prny,Prnz) = W(1:Prnx,1:Prny,Prnz) + W(1:Prnx,1:Prny,0)
+      if ((Btype(Ea)>=BC_MPI_BOUNDS_MIN .and. (Btype(Ea)<=BC_MPI_BOUNDS_MAX)) .or. &
+          Btype(Ea)==BC_PERIODIC) &
+        U(Prnx,1:Prny,1:Prnz) = U(Prnx,1:Prny,1:Prnz) + U(0,1:Prny,1:Prnz)
+      if ((Btype(No)>=BC_MPI_BOUNDS_MIN .and. (Btype(No)<=BC_MPI_BOUNDS_MAX)) .or. &
+          Btype(No)==BC_PERIODIC) &
+        V(1:Prnx,Prny,1:Prnz) = V(1:Prnx,Prny,1:Prnz) + V(1:Prnx,0,1:Prnz)
+      if ((Btype(To)>=BC_MPI_BOUNDS_MIN .and. (Btype(To)<=BC_MPI_BOUNDS_MAX)) .or. &
+          Btype(To)==BC_PERIODIC) &
+        W(1:Prnx,1:Prny,Prnz) = W(1:Prnx,1:Prny,Prnz) + W(1:Prnx,1:Prny,0)
 
       U = U / 2
       V = V / 2
@@ -2101,6 +2110,11 @@ contains
 
        call par_sync_out("  ...setting ghost cell values.")
 
+
+       call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time, 1._knd)
+
+       call par_update_domain_bounds(U, V, W, Temperature, Moisture, Scalar, start_time)
+
        call BoundU(1,U,Uin)
 
        call BoundU(2,V,Vin)
@@ -2108,7 +2122,6 @@ contains
        call BoundU(3,W,Win)
 
        call Bound_Pr(Pr)
-
 
        call par_sync_out("  ...computing pressure correction.")
        call PressureCorrection(U,V,W,Pr,Q,1._knd)

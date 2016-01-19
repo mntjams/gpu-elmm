@@ -243,6 +243,7 @@ implicit none
 
 
   recursive subroutine BoundU(component, U, Uin, reg)
+    use domains_bc_par
     integer, intent(in)                   :: component
     real(knd), contiguous, intent(inout)  :: U(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)     :: Uin(-2:,-2:)
@@ -256,6 +257,7 @@ implicit none
       regime = reg
     else
       regime = 0
+      call par_update_domain_bounds_U(U, effective_time, component)
     end if
 
     if (component==1) then
@@ -927,7 +929,7 @@ implicit none
        Phi(0,j,k) = Phi(nx,j,k)
       end do
      end do
-    else if (Btype(We)<BC_MPI_BOUNDS) then
+    else if ((Btype(We)<BC_MPI_BOUNDS_MIN) .or. (Btype(We)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do j = 1, ny                      !Other BCs
        Phi(0,j,k) = Phi(1,j,k)
@@ -941,7 +943,7 @@ implicit none
        Phi(nx+1,j,k) = Phi(1,j,k)
       end do
      end do
-    else if (Btype(Ea)<BC_MPI_BOUNDS) then
+    else if ((Btype(Ea)<BC_MPI_BOUNDS_MIN) .or. (Btype(Ea)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do j = 1, ny                      !Other BCs
        Phi(nx+1,j,k) = Phi(nx,j,k)
@@ -955,7 +957,7 @@ implicit none
        Phi(i,0,k) = Phi(i,ny,k)
       end do
      end do
-    else if (Btype(So)<BC_MPI_BOUNDS) then
+    else if ((Btype(So)<BC_MPI_BOUNDS_MIN) .or. (Btype(So)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do i = 1, nx                      !Other BCs
        Phi(i,0,k) = Phi(i,1,k)
@@ -969,7 +971,7 @@ implicit none
        Phi(i,ny+1,k) = Phi(i,1,k)
       end do
      end do
-    else if (Btype(No)<BC_MPI_BOUNDS) then
+    else if ((Btype(No)<BC_MPI_BOUNDS_MIN) .or. (Btype(No)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do i = 1, nx                      !Other BCs
        Phi(i,ny+1,k) = Phi(i,ny,k)
@@ -983,7 +985,7 @@ implicit none
        Phi(i,j,0) = Phi(i,j,nz)
       end do
      end do
-    else if (Btype(Bo)<BC_MPI_BOUNDS) then
+    else if ((Btype(Bo)<BC_MPI_BOUNDS_MIN) .or. (Btype(Bo)>BC_MPI_BOUNDS_MAX)) then
      do j = 1, ny
       do i = 1, nx                      !Other BCs
        Phi(i,j,0) = Phi(i,j,1)
@@ -997,7 +999,7 @@ implicit none
        Phi(i,j,nz+1) = Phi(i,j,1)
       end do
      end do
-    else if (Btype(To)<BC_MPI_BOUNDS) then
+    else if ((Btype(To)<BC_MPI_BOUNDS_MIN) .or. (Btype(To)>BC_MPI_BOUNDS_MAX)) then
      do j = 1, ny
       do i = 1, nx                      !Other BCs
        Phi(i,j,nz+1) = Phi(i,j,nz)
@@ -1086,7 +1088,7 @@ implicit none
        Phi(nx,j,k) = Phi(0,j,k) + Phi(nx,j,k)
       end do
      end do
-    else if (Btype(We)<BC_MPI_BOUNDS) then
+    else if ((Btype(We)<BC_MPI_BOUNDS_MIN) .or. (Btype(We)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do j = 1, ny                      !Other BCs
        Phi(1,j,k) = Phi(1,j,k) + Phi(0,j,k)
@@ -1100,7 +1102,7 @@ implicit none
        Phi(1,j,k) = Phi(1,j,k) + Phi(nx+1,j,k)
       end do
      end do
-    else if (Btype(Ea)<BC_MPI_BOUNDS) then
+    else if ((Btype(Ea)<BC_MPI_BOUNDS_MIN) .or. (Btype(Ea)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do j = 1, ny                      !Other BCs
        Phi(nx,j,k) = Phi(nx,j,k) + Phi(nx+1,j,k)
@@ -1114,7 +1116,7 @@ implicit none
        Phi(i,ny,k) = Phi(i,ny,k) + Phi(i,0,k)
       end do
      end do
-    else if (Btype(So)<BC_MPI_BOUNDS) then
+    else if ((Btype(So)<BC_MPI_BOUNDS_MIN) .or. (Btype(So)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do i = 1, nx                      !Other BCs
        Phi(i,1,k) = Phi(i,1,k) + Phi(i,0,k)
@@ -1128,7 +1130,7 @@ implicit none
        Phi(i,1,k) = Phi(i,1,k) + Phi(i,ny+1,k)
       end do
      end do
-    else if (Btype(No)<BC_MPI_BOUNDS) then
+    else if ((Btype(No)<BC_MPI_BOUNDS_MIN) .or. (Btype(No)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do i = 1, nx                      !Other BCs
        Phi(i,ny,k) = Phi(i,ny,k) + Phi(i,ny+1,k)
@@ -1142,7 +1144,7 @@ implicit none
        Phi(i,j,nz) = Phi(i,j,nz) + Phi(i,j,0)
       end do
      end do
-    else if (Btype(Bo)<BC_MPI_BOUNDS) then
+    else if ((Btype(Bo)<BC_MPI_BOUNDS_MIN) .or. (Btype(Bo)>BC_MPI_BOUNDS_MAX)) then
      do j = 1, ny
       do i = 1, nx                      !Other BCs
        Phi(i,j,1) = Phi(i,j,1) + Phi(i,j,0)
@@ -1156,7 +1158,7 @@ implicit none
        Phi(i,j,1) = Phi(i,j,1) + Phi(i,j,nz+1)
       end do
      end do
-    else if (Btype(To)<BC_MPI_BOUNDS) then
+    else if ((Btype(To)<BC_MPI_BOUNDS_MIN) .or. (Btype(To)>BC_MPI_BOUNDS_MAX)) then
      do j = 1, ny
       do i = 1, nx                      !Other BCs
        Phi(i,j,nz) = Phi(i,j,nz) + Phi(i,j,nz+1)

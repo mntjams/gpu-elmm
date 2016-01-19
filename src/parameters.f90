@@ -99,6 +99,10 @@ module Parameters
 
 
   real(knd) :: epsCN, epsPoisson, eps, debugparam
+
+  !the time including the partial time-steps during Runge-Kutta stages
+  real(TIM) :: effective_time
+  !time of the start of the time step
   real(TIM) :: time
   real(TIM) :: timefram1, timefram2, timeavg1, timeavg2
 
@@ -180,8 +184,8 @@ module Parameters
                         BC_TURBULENT_INLET=7, BC_INLET_FROM_FILE=10, BC_RADIATION=7, &
                         BC_MO_TEMPERATURE=10, &
                         BC_AUTOMATIC_FLUX=11, BC_WALL_DIRICHLET=12, BC_WALL_FLUX=13, &
-                        BC_MPI_BOUNDS=1000, BC_MPI_BOUNDARY=1000, BC_MPI_PERIODIC=1001, &
-                        BC_DOMAIN_BOUNDS=2000, BC_DOMAIN_COPY=2001
+                        BC_MPI_BOUNDS_MIN=1000, BC_MPI_BOUNDS_MAX=1010, BC_MPI_BOUNDARY=1000, BC_MPI_PERIODIC=1001, &
+                        BC_DOMAIN_BOUNDS_MIN=2000, BC_DOMAIN_BOUNDS_MAX=2010, BC_DOMAIN_COPY=2001
   !inlet types
   integer, parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
                         ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5, &

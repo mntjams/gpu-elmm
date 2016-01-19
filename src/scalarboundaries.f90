@@ -65,7 +65,7 @@ contains
           arr(-1,j,k) = arr(0,j,k) - (arr(1,j,k)-arr(0,j,k))
         end do
       end do
-    else if (btype(We)<BC_MPI_BOUNDS) then
+    else if ((btype(We)<BC_MPI_BOUNDS_MIN) .or. (btype(We)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
         do j = 1,ny
           arr(0,j,k)  = arr(1,j,k)
@@ -103,7 +103,7 @@ contains
           arr(nx+2,j,k) = arr(nx+1,j,k) - (arr(nx,j,k)-arr(nx+1,j,k))
         end do
       end do
-    else if (btype(Ea)<BC_MPI_BOUNDS) then
+    else if ((btype(Ea)<BC_MPI_BOUNDS_MIN) .or. (btype(Ea)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
         do j = 1,ny
           arr(nx+1,j,k) = arr(nx,j,k)
@@ -145,7 +145,7 @@ contains
           arr(i,-1,k) = arr(i,0,k) - (arr(i,1,k)-arr(i,0,k))
         end do
       end do
-    else if (btype(So)<BC_MPI_BOUNDS) then
+    else if ((btype(So)<BC_MPI_BOUNDS_MIN) .or. (btype(So)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
         do i=-1,nx+2
           arr(i,0,k)  = arr(i,1,k)
@@ -183,7 +183,7 @@ contains
           arr(i,ny+2,k) = arr(i,ny+1,k) - (arr(i,ny,k)-arr(i,ny+1,k))
         end do
       end do
-    else if (btype(No)<BC_MPI_BOUNDS) then
+    else if ((btype(No)<BC_MPI_BOUNDS_MIN) .or. (btype(No)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
         do i=-1,ny+2
           arr(i,ny+1,k) = arr(i,ny,k)
@@ -225,7 +225,7 @@ contains
           arr(i,j,-1) = arr(i,j,0)-(arr(i,j,1)-arr(i,j,0))
         end do
       end do
-    else if (btype(Bo)<BC_MPI_BOUNDS) then
+    else if ((btype(Bo)<BC_MPI_BOUNDS_MIN) .or. (btype(Bo)>BC_MPI_BOUNDS_MAX)) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,0)  = arr(i,j,1)
@@ -263,7 +263,7 @@ contains
           arr(i,j,nz+2) = arr(i,j,nz+1) - (arr(i,j,nz)-arr(i,j,nz+1))
         end do
       end do
-    else if (btype(To)<BC_MPI_BOUNDS) then
+    else if ((btype(To)<BC_MPI_BOUNDS_MIN) .or. (btype(To)>BC_MPI_BOUNDS_MAX)) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,nz+1) = arr(i,j,nz)
@@ -322,7 +322,7 @@ contains
          Nu(nx+1,j,k) = Nu(1,j,k)
        end do
       end do
-    else if (Btype(Ea)<BC_MPI_BOUNDS) then
+    else if ((Btype(Ea)<BC_MPI_BOUNDS_MIN) .or. (Btype(Ea)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
        do j = 1,ny
          Nu(0,j,k) = Nu(1,j,k)
@@ -342,7 +342,7 @@ contains
          Nu(i,ny+1,k) = Nu(i,1,k)
        end do
       end do
-    else if (Btype(No)<BC_MPI_BOUNDS) then
+    else if ((Btype(No)<BC_MPI_BOUNDS_MIN) .or. (Btype(No)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
        do i = 0,nx+1
          Nu(i,0,k) = Nu(i,1,k)
@@ -362,7 +362,7 @@ contains
          Nu(i,j,nz+1) = Nu(i,j,1)
        end do
       end do
-    else if (Btype(To)<BC_MPI_BOUNDS) then
+    else if ((Btype(To)<BC_MPI_BOUNDS_MIN) .or. (Btype(To)>BC_MPI_BOUNDS_MAX)) then
       do j = 0,ny+1
        do i = 0,nx+1
          Nu(i,j,0) = Nu(i,j,1)

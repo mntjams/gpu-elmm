@@ -9,10 +9,15 @@ module domains_bc_par
 
   private
 
-  public par_init_domain_boundary_conditions, par_exchange_domain_bounds, par_update_domain_bounds
+  public par_init_domain_boundary_conditions, &
+         par_exchange_domain_bounds, &
+         par_update_domain_bounds, &
+         par_update_domain_bounds_U
 
   type dom_bc_buffer_copy
     logical :: enabled = .false.
+
+    logical :: rescale_compatibility = .true.
 
     integer :: remote_domain
     !This is the index of the cell boundary corresponding to the domain boundary 
@@ -76,29 +81,29 @@ contains
           domain_bc_send_buffers_copy(1)%direction = Ea
           domain_bc_send_buffers_copy(1)%enabled = .true.
 
-          Ui1 = Prnx
-          Ui2 = Prnx+2
+          Ui1 = Unx-2
+          Ui2 = Unx
           Uj1 = -2
           Uj2 = Uny+3
           Uk1 = -2
           Uk2 = Unz+3
 
-          Vi1 = Prnx+1
-          Vi2 = Prnx+3
+          Vi1 = Vnx-2
+          Vi2 = Vnx
           Vj1 = -2
           Vj2 = Vny+3
           Vk1 = -2
           Vk2 = Vnz+3
 
-          Wi1 = Prnx+1
-          Wi2 = Prnx+3
+          Wi1 = Wnx-2
+          Wi2 = Wnx
           Wj1 = -2
           Wj2 = Wny+3
           Wk1 = -2
           Wk2 = Wnz+3
 
-          Pri1 = Prnx+1
-          Pri2 = Prnx+3
+          Pri1 = Prnx-2
+          Pri2 = Prnx
           Prj1 = -2
           Prj2 = Prny+3
           Prk1 = -2
@@ -262,10 +267,10 @@ contains
                                   res, &
                                   ie)                                  
     if (ie/=0) call error_stop("Error creating MPI subarray derived type in U_mpi_subarray_type().")
-print *, my_world_rank, "dtype", res, product([i2-i1+1, j2-j1+1, k2-k1+1])
+
     call MPI_Type_commit(res, ie)
     if (ie/=0) call error_stop("Error commiting MPI subarray derived type in U_mpi_subarray_type().")
-print *, "res", res
+
   end function
 
   function V_mpi_subarray_type(i1, i2, j1, j2, k1, k2) result(res)
@@ -282,10 +287,10 @@ print *, "res", res
                                   res, &
                                   ie)                                  
     if (ie/=0) call error_stop("Error creating MPI subarray derived type in V_mpi_subarray_type().")
-print *, my_world_rank, "dtype", res, product([i2-i1+1, j2-j1+1, k2-k1+1])
+
     call MPI_Type_commit(res, ie)
     if (ie/=0) call error_stop("Error commiting MPI subarray derived type in V_mpi_subarray_type().")
-print *, "res", res
+
   end function
 
   function W_mpi_subarray_type(i1, i2, j1, j2, k1, k2) result(res)
@@ -302,10 +307,10 @@ print *, "res", res
                                   res, &
                                   ie)                                  
     if (ie/=0) call error_stop("Error creating MPI subarray derived type in W_mpi_subarray_type().")
-print *, my_world_rank, "dtype", res, product([i2-i1+1, j2-j1+1, k2-k1+1])
+
     call MPI_Type_commit(res, ie)
     if (ie/=0) call error_stop("Error commiting MPI subarray derived type in W_mpi_subarray_type().")
-print *, "res", res
+
   end function
 
   function Pr_mpi_subarray_type(i1, i2, j1, j2, k1, k2) result(res)
@@ -325,6 +330,7 @@ print *, "res", res
 
     call MPI_Type_commit(res, ie)
     if (ie/=0) call error_stop("Error commiting MPI subarray derived type in Pr_mpi_subarray_type().")
+
   end function
 
 
@@ -340,16 +346,6 @@ print *, "res", res
     integer, allocatable :: requests(:), statuses(:,:)
     integer :: i
     integer :: ie
-
-if (allocated(domain_bc_send_buffers_copy)) &
-  print *, my_world_rank, "check send types", domain_bc_send_buffers_copy(1)%U_mpi_type, &
-                                       domain_bc_send_buffers_copy(1)%V_mpi_type, &
-                                       domain_bc_send_buffers_copy(1)%W_mpi_type
-
-if (allocated(domain_bc_recv_buffers_copy)) &
-  print *, my_world_rank, "check recv types", domain_bc_recv_buffers_copy(We)%U_mpi_type, &
-                                       domain_bc_recv_buffers_copy(We)%V_mpi_type, &
-                                       domain_bc_recv_buffers_copy(We)%W_mpi_type
 
     allocate(requests(0))
 
@@ -381,9 +377,7 @@ if (allocated(domain_bc_recv_buffers_copy)) &
               if (enable_moisture) then
                 b%Moisture = Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
               end if
-  print *, my_world_rank, "check send types b", b%U_mpi_type, &
-                                       b%V_mpi_type, &
-                                       b%W_mpi_type
+
               call send_arrays(b)
             end if
 
@@ -396,9 +390,7 @@ if (allocated(domain_bc_recv_buffers_copy)) &
         do i = lbound(domain_bc_recv_buffers_copy,1), &
                ubound(domain_bc_recv_buffers_copy,1)
           associate(b => domain_bc_recv_buffers_copy(i))
-  print *, my_world_rank, "check recv types b", b%U_mpi_type, &
-                                       b%V_mpi_type, &
-                                       b%W_mpi_type
+  
             if (b%enabled) then
               call recv_arrays(b)
             end if
@@ -410,7 +402,6 @@ if (allocated(domain_bc_recv_buffers_copy)) &
 
     end if
 
-print *, my_world_rank, "waiting for", size(requests), "requests", requests
     call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, ie)
 
   contains
@@ -418,7 +409,7 @@ print *, my_world_rank, "waiting for", size(requests), "requests", requests
     subroutine send_arrays(b)
       type(dom_bc_buffer_copy), intent(inout) :: b
       
-!       call send(b%U, b%U_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 1)
+      call send(b%U, b%U_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 1)
       call send(b%V, b%V_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 2)
       call send(b%W, b%W_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 3)
 
@@ -429,7 +420,7 @@ print *, my_world_rank, "waiting for", size(requests), "requests", requests
     subroutine recv_arrays(b)
       type(dom_bc_buffer_copy), intent(inout) :: b
     
-!       call recv(b%U, b%U_mpi_type, b%remote_rank, b%comm, domain_index*10 + 1)   
+      call recv(b%U, b%U_mpi_type, b%remote_rank, b%comm, domain_index*10 + 1)   
       call recv(b%V, b%V_mpi_type, b%remote_rank, b%comm, domain_index*10 + 2)     
       call recv(b%W, b%W_mpi_type, b%remote_rank, b%comm, domain_index*10 + 3)    
 
@@ -441,9 +432,8 @@ print *, my_world_rank, "waiting for", size(requests), "requests", requests
       real(knd), intent(in), contiguous :: a(:,:,:)
       integer, intent(in) :: dtype, rank, comm, tag
       integer :: request, ie
-print *, "sending", my_world_rank, rank, dtype, tag
-      call MPI_ISsend(a, 1, dtype, rank, tag, comm, request, ie)
-print *, "request", request
+
+      call MPI_ISsend(a, size(a), MPI_KND, rank, tag, comm, request, ie)
       if (ie/=0) stop "error sending MPI message."
 
       requests = [requests, request]
@@ -453,15 +443,54 @@ print *, "request", request
       real(knd), intent(inout), contiguous :: a(:,:,:)
       integer, intent(in) :: dtype, rank, comm, tag
       integer :: request, ie
-print *, "receiving", rank, my_world_rank, dtype, tag
-      call MPI_IRecv(a, 1, dtype, rank, tag, comm, request, ie)
-print *, "request", request
+
+      call MPI_IRecv(a, size(a), MPI_KND, rank, tag, comm, request, ie)
       if (ie/=0) stop "error receiving MPI message."
 
       requests = [requests, request]
     end subroutine
 
   end subroutine par_exchange_domain_bounds
+
+
+
+  subroutine par_update_domain_bounds_U(U, eff_time, component)
+    !effective time, because it can also reflect individual RK stages
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U
+    real(knd), intent(in) :: eff_time
+    integer, intent(in) :: component
+    integer :: i
+    real(knd) :: S
+
+    if (enable_multiple_domains) then
+
+      if (allocated(domain_bc_recv_buffers_copy)) then
+        do i = lbound(domain_bc_recv_buffers_copy,1), &
+               ubound(domain_bc_recv_buffers_copy,1)
+          associate(b => domain_bc_recv_buffers_copy(i))
+
+            select case (component)
+              case (1)
+                U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = b%U
+                if (b%direction==We .and. b%rescale_compatibility) then
+                    S = sum(U(1,1:Prny,1:Prnz))
+                    S = S / sum(b%U(0,1:Prny,1:Prnz))
+                    U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = S * U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2)  
+                end if
+                  
+              case (2)
+                U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = b%V
+              case (3)
+                U(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = b%W
+            end select
+
+          end associate
+        end do
+      end if
+
+    end if
+
+  end subroutine
 
 
 
