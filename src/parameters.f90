@@ -61,12 +61,46 @@ module Parameters
   integer :: offset_to_global_x = 0, offset_to_global_y = 0, offset_to_global_z = 0
   integer :: gPrns(3), offsets_to_global(3) = 0
   
+  type time_step_control
+    integer   :: max_number_of_time_steps = 2**30 !maximum number of time steps
 
-  integer   :: max_number_of_time_steps    !maximum number of time steps
+    logical   :: variable_time_steps = .true.
 
-  real(TIM) :: start_time, end_time
+    logical   :: enable_U_scaling = .false. !enables that the constant time step to be computed from 
+                                           ! U_time_scaling and from CFL
+    logical   :: enable_CFL_check = .false. !enables check of maximum CFL 
+                                           ! U_time_scaling and from CFL
+    real(tim) :: dt_constant = 0
 
-  real(knd) :: dxmin, dymin, dzmin, CFL, Uref  !minimum grid spacing, dimensions of the domain
+    real(tim) :: dt
+
+    real(tim) :: dt_max           !minimal time step for diagnosing diverging simulation
+    
+    real(tim) :: dt_min           !maximum time step, larger value will not be used
+    
+    real(knd) :: U_scaling(3) = 0 !velocity vector used to compute constant_U
+
+    real(knd) :: U_max(3) = 0     !velocity used to compute minimal_dt
+
+    real(knd) :: U_min(3) = 0     !velocity used to compute minimal_dt
+
+    real(knd) :: CFL = 0.3        !CFL used to compute dt, or computed dt if CFL is fixed
+
+    real(knd) :: CFL_max = 0      !CFL which will result in diagnosing the simulation as diverging
+
+    real(tim) :: effective_time   !the time including the partial time-steps during Runge-Kutta stages
+
+    real(tim) :: time             !time of the start of the time step
+
+    real(tim) :: start_time, end_time
+
+  end type
+
+  type(time_step_control) :: time_stepping
+
+
+
+  real(knd) :: dxmin, dymin, dzmin  !minimum grid spacing, dimensions of the domain
 
 
   real(knd) :: molecular_viscosity = 1._knd / 70000
@@ -100,11 +134,7 @@ module Parameters
 
   real(knd) :: epsCN, epsPoisson, eps, debugparam
 
-  !the time including the partial time-steps during Runge-Kutta stages
-  real(TIM) :: effective_time
-  !time of the start of the time step
-  real(TIM) :: time
-  real(TIM) :: timefram1, timefram2, timeavg1, timeavg2
+  real(tim) :: timefram1, timefram2, timeavg1, timeavg2
 
   integer :: poisson_solver
   integer :: advection_method

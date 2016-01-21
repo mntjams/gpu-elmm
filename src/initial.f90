@@ -125,8 +125,6 @@ contains
 #endif
 
    open(unit,file="main.conf",status="old",action="read")
-   call get(CFL)
-   call get(Uref)
    call get(poisson_solver)
    call get(advection_method)
    call get(limiter_type)
@@ -143,12 +141,6 @@ contains
    call get(timeavg2)
    call get(Re)
    if (master) write(*,*) "Re=",Re
-   call get(start_time)
-   if (master) write(*,*) "start_time=",start_time
-   call get(end_time)
-   if (master) write(*,*) "end_time=",end_time
-   call get(max_number_of_time_steps)
-   if (master) write(*,*) "max_number_of_time_steps=",max_number_of_time_steps
    call get(eps)
    if (master) write(*,*) "eps=",eps
    call get(maxCNiter)
@@ -625,8 +617,6 @@ contains
 
    call parse_command_line
 
-   if (CFL<=0)  CFL = 0.9
-
    if (master) then
 
      write(*,*) "Boundaries:"
@@ -769,6 +759,9 @@ contains
 
    if (Btype(We)==BC_TURBULENT_INLET) inlettype = TurbulentInletType
    if (Btype(We)==BC_INLET_FROM_FILE) inlettype = FromFileInletType
+
+
+   call get_time_stepping("time_stepping.conf")
 
 
    if (timeavg2>=timeavg1) then
@@ -1527,6 +1520,217 @@ contains
 
     
   end subroutine get_profiles
+
+
+  subroutine get_time_stepping(fname)
+    use Strings
+    use ParseTrees
+    character(*), intent(in) :: fname
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: obj, stat
+
+    type field_names
+      character(char_len) :: name
+      class(*), pointer :: var
+    end type
+
+    type field_names_a
+      character(char_len) :: name
+      class(*), pointer :: var(:)
+    end type
+
+    interface field_names
+      procedure field_names_init
+    end interface
+
+    interface field_names_a
+      procedure field_names_a_init
+    end interface
+
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+
+      if (allocated(tree)) then
+        do obj = 1, size(tree)
+          call get_object(tree(obj), time_stepping)
+          call tree(obj)%finalize
+        end do
+      else
+        write(*,*) "Error, no content in " // fname
+        call error_stop
+      end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+
+  contains
+
+    subroutine get_object(obj, t_s)
+      type(tree_object), intent(in) :: obj
+      type(time_step_control), intent(out), target :: t_s
+      integer :: i, j
+      logical, target :: constant_time_steps = .false.
+
+      type(field_names) :: names(12)
+      type(field_names_a) :: names_a(3)
+
+      names = [field_names_init("max_number_of_time_steps",   t_s%max_number_of_time_steps), &
+               field_names_init("variable_time_steps",        t_s%variable_time_steps), &
+               field_names_init("constant_time_steps",        constant_time_steps), &
+               field_names_init("enable_U_scaling",           t_s%enable_U_scaling), &
+               field_names_init("enable_CFL_check",           t_s%enable_CFL_check), &
+               field_names_init("dt",                         t_s%dt_constant), &
+               field_names_init("dt_max",                     t_s%dt_max), &
+               field_names_init("dt_min",                     t_s%dt_min), &
+               field_names_init("CFL",                        t_s%CFL), &
+               field_names_init("CFL_max",                    t_s%CFL_max), &
+               field_names_init("start_time",                 t_s%start_time), &
+               field_names_init("end_time",                   t_s%end_time)]
+
+      names_a = [field_names_a_init("U_scaling", t_s%U_scaling), &
+                 field_names_a_init("U_max",     t_s%U_max), &
+                 field_names_a_init("U_min",     t_s%U_min)]
+
+      if (downcase(obj%name)=='time_stepping') then
+
+        if (allocated(obj%fields%array)) then
+
+          associate(fields => obj%fields%array)
+
+fields_do:  do j = 1, size(fields)
+             
+              do i = 1, size(names)
+                if (fields(j)%name == names(i)%name) then
+                  select type (var => names(i)%var)
+                    type is (integer)
+                      read(fields(j)%value, *) var
+                    type is (real)
+                      read(fields(j)%value, *) var
+                    type is (logical)
+                      read(fields(j)%value, *) var
+                  end select
+                  cycle fields_do
+                end if
+              end do
+
+              do i = 1, size(names_a)
+                if (fields(j)%name == names_a(i)%name) then
+
+                  if (size(names_a(i)%var)/=size(fields(j)%array_value)) then
+                    write(*,*) "Error, expecting", &
+                                size(names_a(i)%var), &
+                                "vector components", &
+                                "but", &
+                                size(fields(j)%array_value), &
+                                "components present."
+                    call error_stop()
+                  end if
+
+                  select type (var => names_a(i)%var)
+                    type is (integer)
+                      read(fields(j)%array_value, *) var
+                    type is (real)
+                      read(fields(j)%array_value, *) var
+                    type is (logical)
+                      read(fields(j)%array_value, *) var
+                  end select
+                  cycle fields_do
+                end if
+              end do
+
+            end do fields_do
+
+          end associate
+
+        end if
+
+      end if
+
+      if (constant_time_steps) t_s%variable_time_steps = .false.
+
+      if (t_s%variable_time_steps) then
+
+        t_s%U_max = abs(t_s%U_max)
+        t_s%U_min = abs(t_s%U_min)
+
+        if (maxval(t_s%U_max) <=  0) &
+          call error_stop("Error, time_stepping%U_max must have at least one non-zero component.")
+
+        if (maxval(t_s%U_min) <=  0) &
+          call error_stop("Error, time_stepping%U_min must have at least one non-zero component.")
+
+        if (t_s%CFL <= 0) &
+          call error_stop("Error, time_stepping%CFL must be positive.")
+
+
+        t_s%dt_min = t_s%CFL / (t_s%U_max(1) / dxmin + &
+                                t_s%U_max(2) / dymin + &
+                                t_s%U_max(3) / dzmin)
+        
+        t_s%dt_max = t_s%CFL / (t_s%U_min(1) / dxmin + &
+                                t_s%U_min(2) / dymin + &
+                                t_s%U_min(3) / dzmin)
+
+        t_s%dt = t_s%dt_min
+
+      else
+
+        t_s%U_scaling = abs(t_s%U_scaling)
+
+        
+        if (maxval(t_s%U_scaling) > 0) then
+
+          t_s%enable_U_scaling = .true.
+
+          if (t_s%CFL<=0) &
+            call error_stop("Error, time_stepping%CFL must be positive when using U_scaling.")
+
+          t_s%dt_constant = t_s%CFL / (t_s%U_scaling(1) / dxmin + &
+                                       t_s%U_scaling(2) / dymin + &
+                                       t_s%U_scaling(3) / dzmin)
+        else
+          if (t_s%dt_constant <=  0) &
+            call error_stop("Error, time_stepping%dt or t_s%U_scaling must be positive.")
+        end if
+
+        t_s%enable_CFL_check = (t_s%CFL_max > 0)
+
+        t_s%dt = t_s%dt_constant
+
+      end if
+      
+    
+    end subroutine
+
+    function field_names_init(name, var) result(res)
+      type(field_names) :: res
+      character(*) :: name
+      class(*), target, intent(in) :: var
+
+      res%name = name
+      res%var => var
+    end function
+
+    function field_names_a_init(name, var) result(res)
+      type(field_names_a) :: res
+      character(*) :: name
+      class(*), target, intent(in) :: var(:)
+
+      res%name = name
+      res%var => var
+    end function
+
+  end subroutine get_time_stepping
   
   
   
@@ -1800,8 +2004,10 @@ contains
 
     if (abs(Uinlet)>0) then
       dt = min(abs(dxmin/Uinlet), abs(dymin/Uinlet), abs(dzmin/Uinlet))
-    else if (abs(Uref)>0) then
-      dt = min(abs(dxmin/Uref), abs(dymin/Uref), abs(dzmin/Uref))
+    else if (maxval(abs(time_stepping%U_min))>0) then
+      dt = min(abs(dxmin/time_stepping%U_min(1)), &
+               abs(dymin/time_stepping%U_min(2)), &
+               abs(dzmin/time_stepping%U_min(3)))
     else
       dt = dxmin
     end if
@@ -2111,9 +2317,9 @@ contains
        call par_sync_out("  ...setting ghost cell values.")
 
 
-       call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time, 1._knd)
+       call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%time, 1._knd)
 
-       call par_update_domain_bounds(U, V, W, Temperature, Moisture, Scalar, start_time)
+       call par_update_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%start_time)
 
        call BoundU(1,U,Uin)
 
@@ -2214,7 +2420,10 @@ contains
 
     !Important to have some defined value before the first call to GetTurbInlet.
     !The value can be quite arbitrary.
-    dt = min(dxmin,dymin,dzmin) / max(Uinlet,Uref)
+    dt = min( min(dxmin,dymin,dzmin) / Uinlet, &
+              min(dxmin / time_stepping%U_max(1), &
+                  dymin / time_stepping%U_max(2), &
+                  dzmin / time_stepping%U_max(3)))
 
 
     call par_sync_out("  ...initializing random seed.")
@@ -2551,7 +2760,7 @@ contains
       case (TurbulentInletType)
         call GetTurbulentInlet(dt)
       case (FromFileInletType)
-        call GetBC_INLET_FROM_FILE(start_time)
+        call GetBC_INLET_FROM_FILE(time_stepping%start_time)
       case (GeostrophicInletType)
         call GeostrophicWindInlet(geostrophic_wind)
       case default

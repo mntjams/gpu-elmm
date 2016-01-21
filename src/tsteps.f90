@@ -19,7 +19,7 @@ module TimeSteps
 contains
 
 
-  subroutine TMarchRK3(U, V, W, Pr, Temperature, Moisture, Scalar, dt, delta)
+  subroutine TMarchRK3(U, V, W, Pr, Temperature, Moisture, Scalar, delta)
     use RK3
 #ifdef PAR
     use custom_par
@@ -27,7 +27,7 @@ contains
 #endif
     real(knd), allocatable, intent(inout) :: U(:,:,:), V(:,:,:) ,W(:,:,:), Pr(:,:,:)
     real(knd), allocatable, intent(inout) :: Temperature(:,:,:), Moisture(:,:,:), Scalar(:,:,:,:)
-    real(knd), intent(out) :: dt, delta
+    real(knd), intent(out) :: delta
 
     integer :: RK_stage
     integer, save :: called = 0
@@ -41,10 +41,11 @@ contains
     end interface
 #endif
 
-    effective_time = time
+    time_stepping%effective_time = time_stepping%time
 
     !uses previous dt (it should be fixed anyway, but...)
-    call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time, dt)
+    call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, &
+                                    time_stepping%time, time_stepping%dt)
 
     if (called==0) then
       called = 1
@@ -77,14 +78,24 @@ contains
 
 
     if ((Btype(We)==BC_TURBULENT_INLET) .or. (Btype(Ea)==BC_TURBULENT_INLET)) then
-      call GetTurbulentInlet(dt)
+      call GetTurbulentInlet(time_stepping%dt)
     else if (Btype(We)==BC_INLET_FROM_FILE) then
-      call GetBC_INLET_FROM_FILE(time)
+      call GetBC_INLET_FROM_FILE(time_stepping%time)
     end if
 
-    call TimeStepLength(U, V, W, dt)
+    call TimeStepLength(U, V, W, time_stepping)
 
-    if (master) write (*,'(a,f12.6,a,es12.4)') " time: ", time," dt: ", dt
+    if (master) then
+      if (time_stepping%variable_time_steps) then
+        write (*,'(a,f12.6,a,es12.4)') " time: ", time_stepping%time,"  dt: ", time_stepping%dt
+      else
+        if (time_stepping%enable_CFL_check) then
+          write (*,'(a,f12.6,a,f6.3)') " time: ", time_stepping%time,"  CFL: ", time_stepping%CFL
+        else
+          write (*,'(a,f12.6,a,es12.4)') " time: ", time_stepping%time
+        end if
+      end if
+    end if
     
 #ifdef  CUSTOM_TIMESTEP_PROCEDURE
     call CustomTimeStepProcedure
@@ -95,7 +106,7 @@ contains
 
       if (debugparam>1.and.master) call system_clock(count=time1)
 
-      effective_time = time + 2 * sum(RK_alpha(1:RK_stage-1)) * dt      
+      time_stepping%effective_time = time_stepping%time + 2 * sum(RK_alpha(1:RK_stage-1)) * time_stepping%dt      
 
       call SubgridStresses(U, V, W, Pr, Temperature)
 
@@ -104,17 +115,17 @@ contains
                       U2, V2, W2, &
                       Ustar, Vstar, Wstar, &
                       Temperature, Moisture, &
-                      RK_beta, RK_rho, RK_stage, dt)
-)
+                      RK_beta, RK_rho, RK_stage, time_stepping%dt)
+
       call ScalarRK3(U, V, W, &
                      Temperature, Moisture, Scalar, &
-                     RK_stage, dt, &
+                     RK_stage, time_stepping%dt, &
                      current_profiles%tempfl, current_profiles%moistfl)
 
       call OtherTerms(U, V, W, &
                       U2, V2, W2, &
                       Pr, &
-                      2*RK_alpha(RK_stage)*dt)
+                      2*RK_alpha(RK_stage)*time_stepping%dt)
 
       if (enable_top_sponge)  then
 
@@ -142,7 +153,7 @@ contains
 
 
       if (poisson_solver>0) then
-        call PressureCorrection(U2, V2, W2, Pr, Q, 2*RK_alpha(RK_stage)*dt)
+        call PressureCorrection(U2, V2, W2, Pr, Q, 2*RK_alpha(RK_stage)*time_stepping%dt)
       end if
 
 

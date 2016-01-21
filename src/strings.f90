@@ -100,7 +100,7 @@ contains
         
       else
        
-        if (s=='('.or.s==')') then
+        if (s=='('.or.s==')'.or.s=='['.or.s==']') then
           if (pos>1) call res%add(token)
           token = s
           call send
@@ -159,13 +159,15 @@ module ParseTrees
 
   private
 
-  public tree_object, tree_object_field, tree_object_fields, parse_file
+  public tree_object, tree_object_field, tree_object_fields, parse_file, char_len
 
   type tree_object_field
     character(char_len) :: name
+    logical :: is_array = .false.
     logical :: is_object = .false.
     character(char_len) :: value
     type(tree_object), pointer :: object_value => null()
+    character(char_len), allocatable :: array_value(:)
   end type
 
   type tree_object_fields
@@ -278,6 +280,48 @@ contains
 
   contains
 
+    recursive subroutine get_array(array, pos, stat)
+      character(char_len), allocatable :: array(:)
+      integer, intent(inout) :: pos
+      integer, intent(out) :: stat
+      character(char_len) :: str
+
+      if (pos+1 > size(tokens)) then
+        !need 2 tokens for an empty array
+        stat = 4
+        return
+      end if
+
+      allocate(array(0))
+      pos = pos + 1
+      do
+        if (tokens(pos) == ']') exit
+
+        call get_string(str, pos, stat)
+
+        array = [array, str]
+
+        if (stat /= 0) return
+
+        if (tokens(pos) /= ']' .and. tokens(pos) /= ',') then
+          write(*,*) "Error in '" // &
+                     fname // &
+                     "', expected '" // &
+                     ",' or ']" // &
+                     "' read '" // &
+                     downcase(tokens(pos)) // &
+                     "' instead."
+          stat = 1
+        else if (tokens(pos) == ',') then
+          pos = pos + 1
+        end if
+        if (stat /= 0) return
+      end do
+
+      call check_string(']', pos, stat)
+
+    end subroutine
+
     recursive subroutine get_object(object, pos, stat)
       type(tree_object) :: object
       integer, intent(inout) :: pos
@@ -296,6 +340,9 @@ contains
         call get_object_fields(object%fields, pos, stat)
         if (stat /= 0) return
         call check_string(')', pos, stat)
+      else
+        stat = 3
+        return
       end if
     end subroutine
 
@@ -361,10 +408,13 @@ contains
       call get_string(field%name, pos, stat)
       call check_string('=', pos, stat)
 
-      if (tokens(pos+1) == '(') then
+      if (tokens(pos+1) == '(' .or. tokens(pos+1) == '[') then
         field%is_object = .true.
         allocate(field%object_value)
         call get_object(field%object_value, pos, stat)
+      else if (tokens(pos) == '[') then
+        field%is_array = .true.
+        call get_array(field%array_value, pos, stat)
       else
         call get_string(field%value, pos, stat)
       end if

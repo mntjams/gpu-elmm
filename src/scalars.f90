@@ -145,7 +145,7 @@ contains
       
     end if
 
-    call PreparePuffs(Scalar, RK_stage, RK_stages, time, dt)
+    call PreparePuffs(Scalar, RK_stage, RK_stages, time_stepping%time, time_stepping%dt)
 
     do sc = 1, num_of_scalars
       call stage(Scalar(:,:,:,sc), Scalar_2(:,:,:,sc), Scalar_adv(:,:,:,sc), &
@@ -1978,72 +1978,5 @@ contains
     end if
   end subroutine InitSubsidenceProfile
 
-
-
-
-  subroutine Release(Scalar, released)
-    real(knd), contiguous, intent(inout) :: Scalar(-1:,-1:,-1:,-1:)
-    logical, intent(inout)   :: released
-    real(knd) :: xc, yc, xs, xf, ys, yf, zs, zf, dxp, dyp, dzp, ct, cr, xp, yp, zp, p
-    integer :: i, j, k, xi, yj, zk, nprobx, nproby, nprobz
-    ct = 7
-    cr = 1.5
-    xc = 3*cos((x_axis_azimuth-70)*pi/180.)
-    yc = 3*sin((x_axis_azimuth-70)*pi/180.)
-    xs = xc-cr
-    ys = yc-cr
-    zs = 0
-    xf = xc+cr
-    yf = yc+cr
-    zf = ct
-
-    nprobx = 100
-    nproby = 100
-    nprobz = 100
-
-    dxp = (xf-xs) / nprobx
-    dyp = (yf-ys) / nproby
-    dzp = (zf-zs) / nprobz
-
-    if (num_of_scalars >=4 ) then
-     if (time > (end_time-start_time)/3._knd) then
-      Scalar = 0
-      p = 0
-      do k = 0, nprobz
-       zp = zs + k * dzp
-       do j = 0, nproby
-        yp = ys + j * dyp
-        do i = 0, nprobx
-          xp = xs + i * dxp
-
-          call GridCoords(xi, yj, zk, xp, yp, zp)
-
-          if ((xp-xc)**2 + (yp-yc)**2 < cr**2) then
-            if   (zp < ct*0.2) then
-             Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:) * 0.2
-             p = p + 1
-            else if (zp < ct*0.4) then
-             Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:) * 0.8
-             p = p + 1
-            else if (zp < ct*0.6) then
-             Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:) * 1.25
-             p = p + 1
-            else if (zp < ct*0.8) then
-             Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:) * 1.75
-             p = p + 1
-            else if (zp <= ct) then
-             Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:)  +percdistrib(:) * 1.1
-             p = p + 1
-            end if
-          end if
-        end do
-       end do
-      end do
-      Scalar = totalscalsource * Scalar / p
-      Scalar = Scalar / (dxmin*dymin*dzmin)
-      released = .true.
-     end if
-    end if
-  endsubroutine Release
 
 end module Scalars

@@ -416,50 +416,77 @@ contains
 
 
 
-  subroutine TimeStepLength(U, V, W, dt)
+  subroutine TimeStepLength(U, V, W, t_s)
     use ieee_arithmetic
 #ifdef PAR
     use custom_par
 #endif
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)  :: U,V,W
-    real(tim), intent(out) :: dt
+    type(time_step_control), intent(inout) :: t_s
     integer :: i,j,k
-    real(knd) :: m, p
+    real(knd) :: U_dx_max, p
     logical :: nan
     
     nan = .false.
-    m = 0
-    !$omp parallel do private(i,j,k,p) reduction(max:m) reduction(.or.:nan)
-    do k = 1, Prnz
-      do j = 1, Prny
-        do i = 1, Prnx
-          !For scalar advection the sum proved to be necessary when the flow is not aligned to grid.
-          p =     max( abs(U(i,j,k)), abs(U(i-1,j,k)) ) / dxmin
-          p = p + max( abs(V(i,j,k)), abs(V(i,j-1,k)) ) / dymin
-          p = p + max( abs(W(i,j,k)), abs(W(i,j,k-1)) ) / dzmin
-          
-          m = max(m,p)
-          if (ieee_is_nan(p)) nan = .true.
-        end do
-      end do
-    end do
-    !$omp end parallel do
 
-    if (nan) then
-      dt = tiny(dt)
-    else if (m>0) then
-      dt = min(CFL/m, min(dxmin,dymin,dzmin)/Uref)
-    else
-      dt = min(dxmin,dymin,dzmin) / Uref
-    end if
+    if (t_s%variable_time_steps) then
 
-    if (steady/=1 .and. dt+time>end_time)  dt = end_time-time
-    
+      call get_U_dx_max
+ 
+      if (nan) then
+        t_s%dt = tiny(t_s%dt)
+      else if (U_dx_max > 0) then
+        t_s%dt = min(t_s%CFL / U_dx_max, t_s%dt_max)
+      else
+        t_s%dt = t_s%dt_max
+      end if
+
 #ifdef PAR
-    dt = par_co_min(dt)
+      t_s%dt = par_co_min(t_s%dt)
 #endif
 
-  endsubroutine TimeStepLength
+    else
+
+      if (t_s%enable_CFL_check) call get_U_dx_max
+
+      if (nan) U_dx_max = huge(U_dx_max)
+
+      t_s%dt = t_s%dt_constant
+
+      t_s%CFL = U_dx_max * t_s%dt
+
+#ifdef PAR
+      if (t_s%enable_CFL_check) t_s%CFL = par_co_max(t_s%CFL)
+#endif
+
+    end if
+
+    if (steady /= 1 .and. t_s%dt + t_s%time > t_s%end_time)  &
+      t_s%dt = t_s%end_time - t_s%time
+    
+
+  contains
+
+    subroutine get_U_dx_max
+      U_dx_max = 0
+      !$omp parallel do private(i,j,k,p) reduction(max:m) reduction(.or.:nan)
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            !For scalar advection the sum proved to be necessary when the flow is not aligned to grid.
+            p =     max( abs(U(i,j,k)), abs(U(i-1,j,k)) ) / dxmin
+            p = p + max( abs(V(i,j,k)), abs(V(i,j-1,k)) ) / dymin
+            p = p + max( abs(W(i,j,k)), abs(W(i,j,k-1)) ) / dzmin
+            
+            U_dx_max = max(U_dx_max, p)
+            if (ieee_is_nan(p)) nan = .true.
+          end do
+        end do
+      end do
+      !$omp end parallel do
+    end subroutine
+
+  end subroutine TimeStepLength
 
 
 

@@ -463,13 +463,13 @@ contains
    
      call current_profiles%allocate
      
-     profiles_config%average_end = min(profiles_config%average_end, end_time)
-     profiles_config%running_end = min(profiles_config%running_end, end_time)
-     profiles_config%instant_end = min(profiles_config%instant_end, end_time)
+     profiles_config%average_end = min(profiles_config%average_end, time_stepping%end_time)
+     profiles_config%running_end = min(profiles_config%running_end, time_stepping%end_time)
+     profiles_config%instant_end = min(profiles_config%instant_end, time_stepping%end_time)
      
-     profiles_config%average_start = max(profiles_config%average_start, start_time)
-     profiles_config%running_start = max(profiles_config%running_start, start_time)
-     profiles_config%instant_start = max(profiles_config%instant_start, start_time)
+     profiles_config%average_start = max(profiles_config%average_start, time_stepping%start_time)
+     profiles_config%running_start = max(profiles_config%running_start, time_stepping%start_time)
+     profiles_config%instant_start = max(profiles_config%instant_start, time_stepping%start_time)
      
      if (profiles_config%average_end > profiles_config%average_start) then
        average_profiles = TimeAveragedProfiles(profiles_config%average_start, &
@@ -723,7 +723,7 @@ contains
       call ComputeViscsWM(U,V,W,Pr,Temperature)
     end if
 
-    times(step) = time
+    times(step) = time_stepping%time
 
     if (store%scalsum_time==1.or.store%scaltotsum_time==1) then
       do l = 1,num_of_scalars
@@ -886,10 +886,15 @@ contains
 
 
 
-    if ((averaging==1).and.((time>=timeavg1).and.(time-dt<timeavg2))) then
+    if ((averaging == 1) .and. &
+        ((time_stepping%time >= timeavg1) .and. &
+         (time_stepping%time - time_stepping%dt < timeavg2))) then
 
-      time_weight = min(dt, time-timeavg1, timeavg2-(time-dt), timeavg2-timeavg1) / &
-                    (timeavg2-timeavg1)
+      time_weight = min(time_stepping%dt, &
+                        time_stepping%time - timeavg1, &
+                        timeavg2 - (time_stepping%time - time_stepping%dt), &
+                        timeavg2 - timeavg1) / &
+                    (timeavg2 - timeavg1)
 
       if (store%avg_U>0) then
          U_avg = U_avg + U * time_weight
@@ -939,8 +944,11 @@ contains
       end if
     end if
 
-    if ((averaging==1).and.((time>=timeavg1).and.(time-dt<timeavg2))) then
-      if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
+    if ((averaging == 1) .and. &
+        ((time_stepping%time >= timeavg1) .and. &
+         (time_stepping%time - time_stepping%dt < timeavg2))) then
+
+      if (num_of_scalars > 0 .and. store%avg_flux_scalar == 1) then
         do i=1,num_of_scalars
           call AddScalarAdvVector(Scalar_fl_U_avg(:,:,:,i), &
                                Scalar_fl_V_avg(:,:,:,i), &
@@ -957,6 +965,7 @@ contains
                                 scalar_probes%i, scalar_probes%j, scalar_probes%k)
         end do
       end if
+
     !UGLY HACK, dat pozor aby fungovalo kdyz nejsou alokovana pole!!!!!!!
     else if (store%probes_fluxes==1) then
       if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
@@ -1067,23 +1076,25 @@ contains
     if (enable_profiles) then
       call BLProfiles(U,V,W,Temperature,Moisture,Scalar)
       
-      if (allocated(average_profiles)) call average_profiles%TimeStep(current_profiles, time, dt)
+      if (allocated(average_profiles)) &
+        call average_profiles%TimeStep(current_profiles, time_stepping%time, time_stepping%dt)
 
-      if (allocated(instant_profiles)) call instant_profiles%TimeStep(current_profiles, time, dt)
+      if (allocated(instant_profiles)) &
+        call instant_profiles%TimeStep(current_profiles, time_stepping%time, time_stepping%dt)
       
       if (allocated(running_average_profiles)) then
         do i = 1, size(running_average_profiles)
-          call running_average_profiles(i)%TimeStep(current_profiles, time, dt)
+          call running_average_profiles(i)%TimeStep(current_profiles, time_stepping%time, time_stepping%dt)
         end do
       end if
     end if
 
 
-    call SaveVTKFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    call SaveVTKFrames(time_stepping%time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
 
-    call SaveSurfaceFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    call SaveSurfaceFrames(time_stepping%time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
 
-    call SaveStaggeredFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    call SaveStaggeredFrames(time_stepping%time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
     
     if (time_series_step==time_series_max_length) then
       call OutputTimeSeries
@@ -2311,7 +2322,7 @@ contains
     
     call OutputTimeSeries
 
-    if (averaging==1.and.time>=timeavg1) then
+    if (averaging==1 .and. time_stepping%time>=timeavg1) then
 
       call OutputAvg(U_avg, V_avg, W_avg, &
                      Pr_avg, Temperature_avg, Moisture_avg, &
@@ -2902,14 +2913,15 @@ contains
 
 
   subroutine OUTINLET(U,V,W,Temperature)
+    use Parameters, t_s => time_stepping
     !for output of 2d data for use as an inilet condition later
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
     integer,save ::fnum
     integer,save :: called = 0
 
-    if ((time>=timefram1).and.(time<=timefram2+(timefram2-timefram1)/(frames-1))&
-        .and.(time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
+    if ((t_s%time>=timefram1).and.(t_s%time<=timefram2+(timefram2-timefram1)/(frames-1))&
+        .and.(t_s%time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
      if (called==0) then
       open(101,file=output_dir//"inletframeinfo.unf",form='unformatted',status='replace',action='write')
       write(101) Prny,Prnz  !for check of consistency of grids before use
@@ -2920,9 +2932,9 @@ contains
       fnum = 0
      end if
      fnum = fnum+1
-     write(101) time-timefram1
+     write(101) t_s%time-timefram1
      call OUTINLETFrame(U,V,W,Temperature,fnum)
-    elseif (time>timefram2+(timefram2-timefram1)/(frames-1).and.called==1) then
+    elseif (t_s%time>timefram2+(timefram2-timefram1)/(frames-1).and.called==1) then
       close(101)
       called = 2
     end if
@@ -2948,7 +2960,7 @@ contains
     fname(1:5)="frame"
     write(fname(6:8),"(I3.3)") n
     fname(9:12)=".unf"
-    if (master) write(*,*) "Saving frame:",fname(1:6),"   time:",time
+    if (master) write(*,*) "Saving frame:",fname(1:6),"   time:", time_stepping%time
 
     call newunit(unit)
 

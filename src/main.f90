@@ -54,42 +54,50 @@ program CLMM
   call AllocateOutputs
 
   call par_sync_out("Setting up initial conditions...")
-  call InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,dt)
+  call InitialConditions(U, V, W, Pr, &
+                         Temperature ,Moisture, Scalar, &
+                         time_stepping%dt)
 
-  time = start_time
+  time_stepping%time = time_stepping%start_time
   time_step = 0
 
-  call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
+  call OutTStep(U, V, W, Pr, &
+                Temperature, Moisture, Scalar, &
+                time_stepping%dt, delta)
   
   init_phase = .false.
   run_phase = .true.
 
   call system_clock(count_rate = timer_rate)
 
-  if (end_time > start_time) then
+  if (time_stepping%end_time > time_stepping%start_time) then
 
     call par_sync_out("Computing...")
 
-    do time_step = 1, max_number_of_time_steps
+    do time_step = 1, time_stepping%max_number_of_time_steps
 
       call system_clock(count = time_steps_timer_count_1)
 
       if (master) then
-        write (*,*) "tstep:",time_step
+        write (*,*) "tstep:", time_step
       end if
 
 
 
 
-      call TMarchRK3(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
+      call TMarchRK3(U, V, W, Pr, &
+                     Temperature, Moisture, Scalar, &
+                     delta)
 
 
 
 
-      time = time + dt
+      time_stepping%time = time_stepping%time + time_stepping%dt
 
 
-      call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
+      call OutTStep(U, V, W, Pr, &
+                    Temperature, Moisture, Scalar, &
+                    time_stepping%dt, delta)
 
 
       call system_clock(count = time_steps_timer_count_2)
@@ -104,12 +112,22 @@ program CLMM
         exit
       endif
 
-      if ((steady==0) .and. (time>=end_time)) then
+      if ((steady==0) .and. (time_stepping%time>=time_stepping%end_time)) then
         if (master) write (*,*) "Time limit reached."
         exit
       endif
 
-      if (time_step>=3 .and. dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/30._knd)) then
+      if (time_step>=3 .and. &
+          time_stepping%variable_time_steps .and. &
+          time_stepping%dt < time_stepping%dt_min) then
+        if (master) write (*,*) "Solution diverged."
+        exit
+      endif
+
+      if (time_step>=3 .and. &
+          .not.time_stepping%variable_time_steps .and. &
+          .not.time_stepping%enable_CFL_check .and. &
+          time_stepping%CFL > time_stepping%CFL_max) then
         if (master) write (*,*) "Solution diverged."
         exit
       endif

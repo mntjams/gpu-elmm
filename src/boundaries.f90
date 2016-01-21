@@ -257,7 +257,7 @@ implicit none
       regime = reg
     else
       regime = 0
-      call par_update_domain_bounds_U(U, effective_time, component)
+      call par_update_domain_bounds_U(U, time_stepping%effective_time, component)
     end if
 
     if (component==1) then
