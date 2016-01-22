@@ -17,7 +17,7 @@ module domains_bc_par
   type dom_bc_buffer_copy
     logical :: enabled = .false.
 
-    logical :: rescale_compatibility = .true.
+    logical :: rescale_compatibility = .false.
 
     integer :: remote_domain
     !This is the index of the cell boundary corresponding to the domain boundary 

@@ -71,7 +71,7 @@ contains
 
     !$omp parallel
     if (enable_pr_gradient_x_profile) then
-       !$omp do
+      !$omp do
       do k = 1, Unz
         do j = 1, Uny
           do i = 1, Unx
@@ -1799,7 +1799,70 @@ contains
 
 
 
+  subroutine CorrectFlowRate(U, V)
+#ifdef PAR
+    use custom_par
+#endif
+    real(knd), intent(inout), contiguous, dimension(-2:,-2:,-2:) :: U, V
 
+    real(knd) :: rate_actual
+    real(knd) :: pr_gradient_diff
+    integer :: i, j, k
+
+    if (flow_rate_x_fixed) then
+      if (iim==nxims) then
+        rate_actual = sum(U(Unx, 1:Uny, 1:Unz)) * dymin * dzmin
+#ifdef PAR        
+        rate_actual = par_co_sum_plane_yz(rate_actual)
+#endif
+      end if
+
+#ifdef PAR        
+      call par_broadcast_from_last_x(rate_actual)
+#endif
+      pr_gradient_diff = (rate_actual - flow_rate_x) / ( dymin * dzmin * gPrny * gPrnz)
+
+      !$omp parallel do private(i,j,k)
+      do k = 1, Unz
+        do j = 1, Uny
+          do i = 1, Unx
+            U(i,j,k) = U(i,j,k) -  pr_gradient_diff
+          end do
+        end do
+      end do
+      !$omp end parallel do
+
+      pr_gradient_x = pr_gradient_x + pr_gradient_diff
+    end if
+
+      
+    if (flow_rate_y_fixed) then
+      if (jim==nyims) then
+        rate_actual = sum(V(1:Vnx, Vny, 1:Vnz)) * dxmin * dzmin
+#ifdef PAR        
+        rate_actual = par_co_sum_plane_xz(rate_actual)
+#endif
+      end if
+
+#ifdef PAR        
+      call par_broadcast_from_last_y(rate_actual)
+#endif
+      pr_gradient_diff = (rate_actual - flow_rate_y) / (dxmin * dzmin * gPrnx * gPrnz)
+
+      !$omp parallel do private(i,j,k)
+      do k = 1, Vnz
+        do j = 1, Vny
+          do i = 1, Vnx
+            V(i,j,k) = V(i,j,k) - pr_gradient_diff
+          end do
+        end do
+      end do
+      !$omp end parallel do
+
+      pr_gradient_y = pr_gradient_y + pr_gradient_diff
+    end if
+      
+  end subroutine CorrectFlowRate
 
 
 

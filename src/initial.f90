@@ -997,7 +997,8 @@ contains
 #ifdef PAR
                        npxyz, domain_index, number_of_domains, &
 #endif
-                       obstacles_file, probes_file, scalar_probes_file, scratch_dir
+                       obstacles_file, probes_file, scalar_probes_file, scratch_dir, &
+                       enable_fixed_flow_rate
 
        if (len_trim(command_line)>0) then
          msg = ''
@@ -1366,6 +1367,9 @@ contains
       enable_pr_gradient_x_profile = any(pr_gradient_profile_x/=0)
       enable_pr_gradient_y_profile = any(pr_gradient_profile_y/=0)
 
+      if (enable_pr_gradient_x_profile) enable_pr_gradient_x_uniform = .false.
+      if (enable_pr_gradient_y_profile) enable_pr_gradient_y_uniform = .false.
+
     else
 
       pr_gradient_x =   Coriolis_parameter * vg(1)
@@ -1614,10 +1618,14 @@ fields_do:  do j = 1, size(fields)
                   select type (var => names(i)%var)
                     type is (integer)
                       read(fields(j)%value, *) var
-                    type is (real)
+                    type is (real(real32))
+                      read(fields(j)%value, *) var
+                    type is (real(real64))
                       read(fields(j)%value, *) var
                     type is (logical)
                       read(fields(j)%value, *) var
+                    class default
+                      call error_stop("Unexpected type in time_stepping.")
                   end select
                   cycle fields_do
                 end if
@@ -1639,10 +1647,14 @@ fields_do:  do j = 1, size(fields)
                   select type (var => names_a(i)%var)
                     type is (integer)
                       read(fields(j)%array_value, *) var
-                    type is (real)
+                    type is (real(real32))
+                      read(fields(j)%array_value, *) var
+                    type is (real(real64))
                       read(fields(j)%array_value, *) var
                     type is (logical)
                       read(fields(j)%array_value, *) var
+                    class default
+                      call error_stop("Unexpected type in time_stepping.")
                   end select
                   cycle fields_do
                 end if
@@ -2385,6 +2397,9 @@ fields_do:  do j = 1, size(fields)
        call par_sync_out("  ...setting viscosity in ghost cells.")
        call BoundViscosity(Viscosity)
 
+       call par_sync_out("  ...initializing fixed flow_rates.")
+       call InitFlowRates(U, V)
+
     end if !init conditions not from file
 
     call par_sync_out("initial conditions set.")
@@ -2824,6 +2839,7 @@ fields_do:  do j = 1, size(fields)
     if (.not.allocated(BsideMFlArr))  allocate(BsideMFlArr(0,0))
 
 
+
     call par_sync_out("  ...initializing subsidence profile.")
     call InitSubsidenceProfile
 
@@ -2927,6 +2943,46 @@ fields_do:  do j = 1, size(fields)
     end subroutine
     
   end subroutine InitBoundaryConditions
+
+
+  subroutine InitFlowRates(U, V)
+#ifdef PAR
+    use custom_par
+#endif
+    real(knd), intent(in), contiguous, dimension(-2:,-2:,-2:) :: U, V
+
+    if (enable_fixed_flow_rate) then
+
+      if (iim==nxims .and. Btype(Ea)==BC_PERIODIC) then
+        flow_rate_x_fixed = .true.
+        flow_rate_x = sum(U(Unx, 1:Uny, 1:Unz)) * dymin * dzmin
+#ifdef PAR
+        flow_rate_x = par_co_sum_plane_yz(flow_rate_x)
+#endif
+      end if
+
+      flow_rate_x_fixed = par_co_any(flow_rate_x_fixed)     
+#ifdef PAR        
+      if (flow_rate_x_fixed) call par_broadcast_from_last_x(flow_rate_x)
+#endif
+
+
+      if (jim==nyims .and. Btype(No)==BC_PERIODIC) then
+        flow_rate_y_fixed = .true.
+        flow_rate_y = sum(V(1:Vnx, Vny, 1:Vnz)) * dxmin * dzmin
+#ifdef PAR
+        flow_rate_y = par_co_sum_plane_xz(flow_rate_y)
+#endif
+      end if
+
+      flow_rate_y_fixed = par_co_any(flow_rate_y_fixed)     
+#ifdef PAR        
+      if (flow_rate_y_fixed) call par_broadcast_from_last_y(flow_rate_y)
+#endif
+
+    end if
+
+  end subroutine
 
 
 

@@ -225,8 +225,7 @@ contains
   subroutine PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3)
 #ifdef PAR
     use custom_par, only: kim, nzims, &
-                          par_co_max, par_co_sum, par_broadcast_from_top, &
-                          comm_plane_xy, comm_row_z
+                          par_co_max, par_broadcast_from_last_z, par_co_sum_plane_xy
 #endif
     real(knd), intent(inout) :: U(-2:,-2:,-2:)
     real(knd), intent(inout) :: V(-2:,-2:,-2:)
@@ -323,14 +322,14 @@ contains
       !$omp end do
 
       !$omp single
-      Phi_ref = par_co_sum(Phi_ref, comm = comm_plane_xy)
+      Phi_ref = par_co_sum_plane_xy(Phi_ref)
       Phi_ref = Phi_ref / (gPrnx * gPrny)
       !$omp end single
     end if
 
     !all kim==nzims broadcast to images with smaller kim
     !$omp single
-    call par_broadcast_from_top(Phi_ref)
+    call par_broadcast_from_last_z(Phi_ref)
     !$omp end single
 
 #else

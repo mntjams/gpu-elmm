@@ -116,14 +116,39 @@ module custom_par
     module procedure par_co_sum_int_comm
   end interface
 
+  interface par_co_sum_plane_xy
+    module procedure par_co_sum_plane_xy_32
+    module procedure par_co_sum_plane_xy_64
+  end interface
+
+  interface par_co_sum_plane_yz
+    module procedure par_co_sum_plane_yz_32
+    module procedure par_co_sum_plane_yz_64
+  end interface
+
+  interface par_co_sum_plane_xz
+    module procedure par_co_sum_plane_xz_32
+    module procedure par_co_sum_plane_xz_64
+  end interface
+
   interface par_sum_to_master_horizontal
     module procedure par_sum_to_master_horizontal_32_1d
     module procedure par_sum_to_master_horizontal_64_1d
   end interface
 
-  interface par_broadcast_from_top
-    module procedure par_broadcast_from_top_real32
-    module procedure par_broadcast_from_top_real64
+  interface par_broadcast_from_last_x
+    module procedure par_broadcast_from_last_x_real32
+    module procedure par_broadcast_from_last_x_real64
+  end interface
+
+  interface par_broadcast_from_last_y
+    module procedure par_broadcast_from_last_y_real32
+    module procedure par_broadcast_from_last_y_real64
+  end interface
+
+  interface par_broadcast_from_last_z
+    module procedure par_broadcast_from_last_z_real32
+    module procedure par_broadcast_from_last_z_real64
   end interface
 
 contains
@@ -947,6 +972,50 @@ contains
     res = par_co_reduce(x, MPI_LAND, domain_comm)
   end function
 
+  
+  function par_co_sum_plane_xy_32(x) result(res)
+    real(real32) :: res
+    real(real32),intent(in) :: x
+
+    res =  par_co_sum_32_comm(x, comm_plane_xy)
+  end function
+
+  function par_co_sum_plane_xy_64(x) result(res)
+    real(real64) :: res
+    real(real64),intent(in) :: x
+
+    res =  par_co_sum_64_comm(x, comm_plane_xy)
+  end function
+
+  function par_co_sum_plane_yz_32(x) result(res)
+    real(real32) :: res
+    real(real32),intent(in) :: x
+
+    res =  par_co_sum_32_comm(x, comm_plane_yz)
+  end function
+
+  function par_co_sum_plane_yz_64(x) result(res)
+    real(real64) :: res
+    real(real64),intent(in) :: x
+
+    res =  par_co_sum_64_comm(x, comm_plane_yz)
+  end function
+
+  function par_co_sum_plane_xz_32(x) result(res)
+    real(real32) :: res
+    real(real32),intent(in) :: x
+
+    res =  par_co_sum_32_comm(x, comm_plane_xz)
+  end function
+
+  function par_co_sum_plane_xz_64(x) result(res)
+    real(real64) :: res
+    real(real64),intent(in) :: x
+
+    res =  par_co_sum_64_comm(x, comm_plane_xz)
+  end function
+
+
   subroutine par_sum_to_master_horizontal_32_1d(x)
     real(real32), intent(inout) :: x(:)
     integer ie
@@ -983,7 +1052,71 @@ contains
     end if
   end subroutine
 
-  subroutine par_broadcast_from_top_real32(x)
+
+
+
+
+  subroutine par_broadcast_from_last_x_real32(x)
+    real(real32), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real32) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real32, nxims-1, comm_row_x, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_last_x_real64(x)
+    real(real64), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real64) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real64, nxims-1, comm_row_x, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_last_y_real32(x)
+    real(real32), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real32) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real32, nyims-1, comm_row_y, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_last_y_real64(x)
+    real(real64), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real64) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real64, nyims-1, comm_row_y, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_last_z_real32(x)
     real(real32), intent(inout) :: x
     integer :: ie
     interface
@@ -998,7 +1131,7 @@ contains
     if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
   end subroutine
 
-  subroutine par_broadcast_from_top_real64(x)
+  subroutine par_broadcast_from_last_z_real64(x)
     real(real64), intent(inout) :: x
     integer :: ie
     interface
