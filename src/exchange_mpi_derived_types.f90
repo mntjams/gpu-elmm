@@ -155,8 +155,10 @@ contains
   
 
 
-  subroutine init_mpi_derived_types_Pr(s_types, r_types, nx, ny, nz)
+  subroutine init_mpi_derived_types_Pr(s_types, r_types, nx, ny, nz, size_x, size_y, size_z)
     integer, intent(out) :: s_types(6), r_types(6)
+    !the allocated size depends on the boundary conditions (Unx+1, Vny+1, Wnz+1)
+    integer, intent(in) :: size_x, size_y, size_z
     integer, intent(in) :: nx, ny, nz
     integer :: i, ierr
     
@@ -173,7 +175,7 @@ contains
     end interface
   
     call MPI_Type_create_subarray(3, &
-                                  [nx+1, ny+1, nz+1], &
+                                  [size_x, size_y, size_z], &
                                   [1, ny, nz], &
                                   off(1, 1, 1), &
                                   MPI_ORDER_FORTRAN, &
@@ -182,7 +184,7 @@ contains
                                   ierr)                               
                                   
     call MPI_Type_create_subarray(3, &
-                                  [nx+1, ny+1, nz+1], &
+                                  [size_x, size_y, size_z], &
                                   [nx, 1, nz], &
                                   off(1, 1, 1), &
                                   MPI_ORDER_FORTRAN, &
@@ -191,7 +193,7 @@ contains
                                   ierr)
                                   
     call MPI_Type_create_subarray(3, &
-                                  [nx+1, ny+1, nz+1], &
+                                  [size_x, size_y, size_z], &
                                   [nx, ny, 1], &
                                   off(1, 1, 1), &
                                   MPI_ORDER_FORTRAN, &
@@ -199,33 +201,35 @@ contains
                                   s_types(Bo), &
                                   ierr)
                                   
- 
-    call MPI_Type_create_subarray(3, &
-                                  [nx+1, ny+1, nz+1], &
-                                  [1, ny, nz], &
-                                  off(nx+1, 1, 1), &
-                                  MPI_ORDER_FORTRAN, &
-                                  MPI_KND, &
-                                  r_types(Ea), &
-                                  ierr)
+    if (size_x >= nx+1) &
+      call MPI_Type_create_subarray(3, &
+                                    [size_x, size_y, size_z], &
+                                    [1, ny, nz], &
+                                    off(nx+1, 1, 1), &
+                                    MPI_ORDER_FORTRAN, &
+                                    MPI_KND, &
+                                    r_types(Ea), &
+                                    ierr)
                                   
-    call MPI_Type_create_subarray(3, &
-                                  [nx+1, ny+1, nz+1], &
-                                  [nx, 1, nz], &
-                                  off(1, ny+1, 1), &
-                                  MPI_ORDER_FORTRAN, &
-                                  MPI_KND, &
-                                  r_types(No), &
-                                  ierr)
+    if (size_y >= ny+1) &
+      call MPI_Type_create_subarray(3, &
+                                    [size_x, size_y, size_z], &
+                                    [nx, 1, nz], &
+                                    off(1, ny+1, 1), &
+                                    MPI_ORDER_FORTRAN, &
+                                    MPI_KND, &
+                                    r_types(No), &
+                                    ierr)
                                   
-    call MPI_Type_create_subarray(3, &
-                                  [nx+1, ny+1, nz+1], &
-                                  [nx, ny, 1], &
-                                  off(1, 1, nz+1), &
-                                  MPI_ORDER_FORTRAN, &
-                                  MPI_KND, &
-                                  r_types(To), &
-                                  ierr)
+    if (size_z >= nz+1) &
+      call MPI_Type_create_subarray(3, &
+                                    [size_x, size_y, size_z], &
+                                    [nx, ny, 1], &
+                                    off(1, 1, nz+1), &
+                                    MPI_ORDER_FORTRAN, &
+                                    MPI_KND, &
+                                    r_types(To), &
+                                    ierr)
  
    do i = 1, 6
      if (s_types(i)/=MPI_DATATYPE_NULL) call MPI_Type_commit(s_types(i), ierr)
