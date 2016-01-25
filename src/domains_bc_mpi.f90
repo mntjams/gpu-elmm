@@ -18,6 +18,7 @@ module domains_bc_par
     logical :: enabled = .false.
 
     logical :: rescale_compatibility = .false.
+    logical :: rescale_dU_dt = .true.
 
     integer :: remote_domain
     !This is the index of the cell boundary corresponding to the domain boundary 
@@ -42,7 +43,7 @@ module domains_bc_par
     integer :: U_mpi_type, V_mpi_type, W_mpi_type, Pr_mpi_type
 
     !time at which the data is valid
-    real(tim) :: time
+    real(tim) :: time = -tiny(1.0_tim)
 
     !MPI communicator for the remote communication
     integer :: comm = MPI_COMM_NULL
@@ -142,11 +143,17 @@ contains
           allocate(domain_bc_send_buffers_copy(1)%V(Vi1:Vi2,Vj1:Vj2,Vk1:Vk2))
           allocate(domain_bc_send_buffers_copy(1)%W(Wi1:Wi2,Wj1:Wj2,Wk1:Wk2))
 
+          allocate(domain_bc_send_buffers_copy(1)%dU_dt(Ui1:Ui2,Uj1:Uj2,Uk1:Uk2))
+          allocate(domain_bc_send_buffers_copy(1)%dV_dt(Vi1:Vi2,Vj1:Vj2,Vk1:Vk2))
+          allocate(domain_bc_send_buffers_copy(1)%dW_dt(Wi1:Wi2,Wj1:Wj2,Wk1:Wk2))
+
           if (enable_buoyancy) then
             allocate(domain_bc_send_buffers_copy(1)%Temperature(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
+            allocate(domain_bc_send_buffers_copy(1)%dTemperature_dt(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
           end if
           if (enable_moisture) then
             allocate(domain_bc_send_buffers_copy(1)%Moisture(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
+            allocate(domain_bc_send_buffers_copy(1)%dMoisture_dt(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
           end if
 
           domain_bc_send_buffers_copy(1)%U_mpi_type = U_mpi_subarray_type(Ui1,Ui2,Uj1,Uj2,Uk1,Uk2)
@@ -230,11 +237,17 @@ contains
           allocate(domain_bc_recv_buffers_copy(We)%V(Vi1:Vi2,Vj1:Vj2,Vk1:Vk2))
           allocate(domain_bc_recv_buffers_copy(We)%W(Wi1:Wi2,Wj1:Wj2,Wk1:Wk2))
 
+          allocate(domain_bc_recv_buffers_copy(We)%dU_dt(Ui1:Ui2,Uj1:Uj2,Uk1:Uk2))
+          allocate(domain_bc_recv_buffers_copy(We)%dV_dt(Vi1:Vi2,Vj1:Vj2,Vk1:Vk2))
+          allocate(domain_bc_recv_buffers_copy(We)%dW_dt(Wi1:Wi2,Wj1:Wj2,Wk1:Wk2))
+
           if (enable_buoyancy) then
             allocate(domain_bc_recv_buffers_copy(We)%Temperature(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
+            allocate(domain_bc_recv_buffers_copy(We)%dTemperature_dt(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
           end if
           if (enable_moisture) then
             allocate(domain_bc_recv_buffers_copy(We)%Moisture(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
+            allocate(domain_bc_recv_buffers_copy(We)%dMoisture_dt(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
           end if
 
           domain_bc_recv_buffers_copy(We)%U_mpi_type = U_mpi_subarray_type(Ui1,Ui2,Uj1,Uj2,Uk1,Uk2)
@@ -358,14 +371,27 @@ contains
 
             if (b%enabled) then
               !derivatives approximated by the backward difference
-              b%dU_dt = (U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) - b%U) / dt
-              b%dV_dt = (V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) - b%V) / dt
-              b%dW_dt = (W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) - b%W) / dt
-              if (enable_buoyancy) then
-                b%dTemperature_dt = (Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Temperature) / dt
-              end if
-              if (enable_moisture) then
-                b%dMoisture_dt = (Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Moisture) / dt
+
+              if (b%time<=-tiny(-1.0_tim)) then
+                b%dU_dt = 0
+                b%dV_dt = 0
+                b%dW_dt = 0
+                if (enable_buoyancy) then
+                  b%dTemperature_dt = 0
+                end if
+                if (enable_moisture) then
+                  b%dMoisture_dt = 0
+                end if
+              else
+                b%dU_dt = (U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) - b%U) / dt
+                b%dV_dt = (V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) - b%V) / dt
+                b%dW_dt = (W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) - b%W) / dt
+                if (enable_buoyancy) then
+                  b%dTemperature_dt = (Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Temperature) / dt
+                end if
+                if (enable_moisture) then
+                  b%dMoisture_dt = (Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Moisture) / dt
+                end if
               end if
 
               b%U = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2)
@@ -377,6 +403,8 @@ contains
               if (enable_moisture) then
                 b%Moisture = Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
               end if
+
+              b%time = time
 
               call send_arrays(b)
             end if
@@ -393,6 +421,7 @@ contains
   
             if (b%enabled) then
               call recv_arrays(b)
+              b%time = time
             end if
 
           end associate
@@ -413,19 +442,68 @@ contains
       call send(b%V, b%V_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 2)
       call send(b%W, b%W_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 3)
 
-      if (enable_buoyancy) call send(b%Temperature, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 4)
-      if (enable_moisture) call send(b%Moisture, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 5)
+      call send(b%dU_dt, b%U_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 1)
+      call send(b%dV_dt, b%V_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 2)
+      call send(b%dW_dt, b%W_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 3)
+
+      if (enable_buoyancy) then
+        call send(b%Temperature, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 4)
+        call send(b%dTemperature_dt, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 4)
+      end if
+
+      if (enable_moisture) then
+        call send(b%Moisture, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 5)
+        call send(b%dMoisture_dt, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 5)
+      end if
+
     end subroutine
 
     subroutine recv_arrays(b)
       type(dom_bc_buffer_copy), intent(inout) :: b
+      real(knd) :: avg
     
       call recv(b%U, b%U_mpi_type, b%remote_rank, b%comm, domain_index*10 + 1)   
       call recv(b%V, b%V_mpi_type, b%remote_rank, b%comm, domain_index*10 + 2)     
       call recv(b%W, b%W_mpi_type, b%remote_rank, b%comm, domain_index*10 + 3)    
 
-      if (enable_buoyancy) call recv(b%Temperature, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*10 + 4)
-      if (enable_moisture) call recv(b%Moisture, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*10 + 5)
+      call recv(b%dU_dt, b%U_mpi_type, b%remote_rank, b%comm, domain_index*10 + 1)   
+      call recv(b%dV_dt, b%V_mpi_type, b%remote_rank, b%comm, domain_index*10 + 2)     
+      call recv(b%dW_dt, b%W_mpi_type, b%remote_rank, b%comm, domain_index*10 + 3)
+
+      if (b%rescale_dU_dt) then
+        !rescales the time derivative to be zero on average
+        !makes sense only in certain situations
+        select case (b%direction)
+          case(We)
+            avg = sum(b%dU_dt(0, 1:Uny, 1:Unz)) / (Uny*Unz)
+            b%dU_dt = b%dU_dt - avg
+          case(Ea)
+            avg = sum(b%dU_dt(Unz+1, 1:Uny, 1:Unz)) / (Uny*Unz)
+            b%dU_dt = b%dU_dt - avg
+          case(So)
+            avg = sum(b%dV_dt(1:Vnx, 0, 1:Vnz)) / (Vnx*Vnz)
+            b%dV_dt = b%dV_dt - avg
+          case(No)
+            avg = sum(b%dV_dt(1:Vnx, Vny+1, 1:Vnz)) / (Vnx*Vnz)
+            b%dV_dt = b%dV_dt - avg
+          case(Bo)
+            avg = sum(b%dW_dt(1:Wnx, 1:Wny, 0)) / (Wnx*Wny)
+            b%dW_dt = b%dW_dt - avg
+          case(To)
+            avg = sum(b%dW_dt(1:Wnx, 1:Wny, Wnz+1)) / (Wnx*Wny)
+            b%dW_dt = b%dW_dt - avg
+        end select
+      end if
+
+      if (enable_buoyancy) then
+        call recv(b%Temperature, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*10 + 4)
+        call recv(b%dTemperature_dt, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*10 + 4)
+      end if
+
+      if (enable_moisture) then
+        call recv(b%Moisture, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*10 + 5)
+        call recv(b%dMoisture_dt, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*10 + 5)
+      end if
     end subroutine
 
     subroutine send(a, dtype, rank, comm, tag)
@@ -472,6 +550,9 @@ contains
             select case (component)
               case (1)
                 U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = b%U
+                 U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) + &
+                                                         b%dU_dt * (eff_time - b%time)
+
                 if (b%direction==We .and. b%rescale_compatibility) then
                     S = sum(U(1,1:Prny,1:Prnz))
                     S = S / sum(b%U(0,1:Prny,1:Prnz))
@@ -480,8 +561,12 @@ contains
                   
               case (2)
                 U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = b%V
+                U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) + &
+                                                         b%dV_dt * (eff_time - b%time)
               case (3)
                 U(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = b%W
+                U(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = U(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) + &
+                                                         b%dW_dt * (eff_time - b%time)
             end select
 
           end associate
@@ -510,8 +595,18 @@ contains
           associate(b => domain_bc_recv_buffers_copy(i))
 
               U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = b%U
+              U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) + &
+                                                       b%dU_dt * (eff_time - b%time)
+
               V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = b%V
+              V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) + &
+                                                       b%dV_dt * (eff_time - b%time)
+
               W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = b%W
+              W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) + &
+                                                       b%dW_dt * (eff_time - b%time)
+
+
               if (enable_buoyancy) then
                 Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = b%Temperature
               end if
