@@ -172,6 +172,8 @@ contains
         integer i,j,k
 
 
+        call boundary_procedure(Array)
+
         if (RK_stage>1) then
 
           call assign(Array2, Array_adv)
@@ -1097,7 +1099,8 @@ contains
     Ay = 1 / (2 * dymin**2)
     Az = 1 / (2 * dzmin**2)
 
-    !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
+    !$omp parallel private(i, j, k, bi, bj, bk, xi, yj, zk)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Prnz, tnz
      do bj = 1, Prny, tny
       do bi = 1, Prnx, tnx
@@ -1124,9 +1127,8 @@ contains
       end do
      end do
     end do
-    !$omp end parallel do
-    
-    !$omp parallel private(i, xi, yj, zk)
+    !$omp end do
+
     !$omp do
     do i = 1, size(Scflx_points)
       xi = Scflx_points(i)%xi

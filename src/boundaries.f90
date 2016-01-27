@@ -243,7 +243,9 @@ implicit none
 
 
   recursive subroutine BoundU(component, U, Uin, reg)
+#ifdef PAR
     use domains_bc_par
+#endif
     integer, intent(in)                   :: component
     real(knd), contiguous, intent(inout)  :: U(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)     :: Uin(-2:,-2:)
@@ -257,7 +259,9 @@ implicit none
       regime = reg
     else
       regime = 0
+#ifdef PAR
       call par_update_domain_bounds_U(U, time_stepping%effective_time, component)
+#endif
     end if
 
     if (component==1) then

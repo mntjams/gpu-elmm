@@ -12,7 +12,9 @@ module domains_bc_par
   public par_init_domain_boundary_conditions, &
          par_exchange_domain_bounds, &
          par_update_domain_bounds, &
-         par_update_domain_bounds_U
+         par_update_domain_bounds_U, &
+         par_update_domain_bounds_temperature, &
+         par_update_domain_bounds_moisture
 
   type dom_bc_buffer_copy
     logical :: enabled = .false.
@@ -51,6 +53,13 @@ module domains_bc_par
     !The buffers are transferred every `time_step_ratio` time steps
     integer :: time_step_ratio = 1 
   end type
+
+  type, extends(dom_bc_buffer_copy) :: dom_bc_buffer_copy_subset
+    !grid coordinates of the receive buffer (from 1 to 2)
+    integer :: r_Ui1, r_Ui2, r_Vi1, r_Vi2, r_Wi1, r_Wi2, r_Pri1, r_Pri2
+    integer :: r_Uj1, r_Uj2, r_Vj1, r_Vj2, r_Wj1, r_Wj2, r_Prj1, r_Prj2
+    integer :: r_Uk1, r_Uk2, r_Vk1, r_Vk2, r_Wk1, r_Wk2, r_Prk1, r_Prk2
+   end type
 
   !send buffers should be indexed from 1, there may be more of them from several nested domains
   !they are not accessed by the boundary conditions routines
@@ -103,12 +112,12 @@ contains
           Wk1 = -2
           Wk2 = Wnz+3
 
-          Pri1 = Prnx-2
+          Pri1 = Prnx-1
           Pri2 = Prnx
-          Prj1 = -2
-          Prj2 = Prny+3
-          Prk1 = -2
-          Prk2 = Prnz+3
+          Prj1 = -1
+          Prj2 = Prny+2
+          Prk1 = -1
+          Prk2 = Prnz+2
 
           domain_bc_send_buffers_copy(1)%Ui1 = Ui1 
           domain_bc_send_buffers_copy(1)%Ui2 = Ui2 
@@ -169,6 +178,10 @@ contains
 
         if (iim==1) then
           Btype(We) = BC_DOMAIN_COPY
+          TempBtype(We) = BC_DOMAIN_COPY
+          MoistBtype(We) = BC_DOMAIN_COPY
+          ScalBtype(We) = BC_DOMAIN_COPY
+
           allocate(domain_bc_recv_buffers_copy(We:We))
           domain_bc_recv_buffers_copy(We)%comm = world_comm
           domain_bc_recv_buffers_copy(We)%remote_rank = domain_ranks_grid(1)%arr(domain_nxims(1),jim,kim)        
@@ -197,12 +210,12 @@ contains
           Wk1 = -2
           Wk2 = Wnz+3
 
-          Pri1 = -2
+          Pri1 = -1
           Pri2 = 0
-          Prj1 = -2
-          Prj2 = Prny+3
-          Prk1 = -2
-          Prk2 = Prnz+3
+          Prj1 = -1
+          Prj2 = Prny+2
+          Prk1 = -1
+          Prk2 = Prnz+2
 
           domain_bc_recv_buffers_copy(We)%Ui1 = Ui1 
           domain_bc_recv_buffers_copy(We)%Ui2 = Ui2 
@@ -538,7 +551,7 @@ contains
     real(knd), intent(in) :: eff_time
     integer, intent(in) :: component
     integer :: i
-    real(knd) :: S
+    real(knd) :: S, t_diff
 
     if (enable_multiple_domains) then
 
@@ -550,8 +563,6 @@ contains
             select case (component)
               case (1)
                 U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = b%U
-                 U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) + &
-                                                         b%dU_dt * (eff_time - b%time)
 
                 if (b%direction==We .and. b%rescale_compatibility) then
                     S = sum(U(1,1:Prny,1:Prnz))
@@ -561,14 +572,27 @@ contains
                   
               case (2)
                 U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = b%V
-                U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) + &
-                                                         b%dV_dt * (eff_time - b%time)
               case (3)
                 U(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = b%W
-                U(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = U(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) + &
-                                                         b%dW_dt * (eff_time - b%time)
+
             end select
 
+            if (eff_time > b%time) then
+              t_diff = eff_time - b%time
+
+              select case (component)
+                case (1)
+                  U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) + &
+                                                           b%dU_dt * t_diff
+                    
+                case (2)
+                  U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) + &
+                                                           b%dV_dt * t_diff
+                case (3)
+                  U(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = U(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) + &
+                                                           b%dW_dt * t_diff
+              end select
+            end if
           end associate
         end do
       end if
@@ -579,12 +603,75 @@ contains
 
 
 
+  subroutine par_update_domain_bounds_temperature(Temperature, eff_time)
+    !effective time, because it can also reflect individual RK stages
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Temperature
+    real(knd), intent(in) :: eff_time
+    real(knd) :: t_diff
+    integer :: i
+
+    if (enable_multiple_domains) then
+
+      if (allocated(domain_bc_recv_buffers_copy)) then
+        do i = lbound(domain_bc_recv_buffers_copy,1), &
+               ubound(domain_bc_recv_buffers_copy,1)
+          associate(b => domain_bc_recv_buffers_copy(i))
+
+              Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = b%Temperature
+
+              t_diff = eff_time - b%time
+              if (t_diff > 0) then
+                  Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = &
+                  Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) + &
+                                                            b%dTemperature_dt * t_diff
+              end if
+
+          end associate
+        end do
+      end if
+
+    end if
+
+  end subroutine
+
+  subroutine par_update_domain_bounds_moisture(Moisture, eff_time)
+    !effective time, because it can also reflect individual RK stages
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Moisture
+    real(knd), intent(in) :: eff_time
+    real(knd) :: t_diff
+    integer :: i
+
+    if (enable_multiple_domains) then
+
+      if (allocated(domain_bc_recv_buffers_copy)) then
+        do i = lbound(domain_bc_recv_buffers_copy,1), &
+               ubound(domain_bc_recv_buffers_copy,1)
+          associate(b => domain_bc_recv_buffers_copy(i))
+
+              Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = b%Moisture
+
+              t_diff = eff_time - b%time
+              if (t_diff > 0) then
+                  Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = &
+                  Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) + &
+                                                            b%dMoisture_dt * t_diff
+              end if
+
+          end associate
+        end do
+      end if
+
+    end if
+
+  end subroutine
+
   subroutine par_update_domain_bounds(U, V, W, Temperature, Moisture, Scalar, eff_time)
     !effective time, because it can also reflect individual RK stages
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U, V ,W 
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Temperature, Moisture
     real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(inout) :: Scalar
     real(knd), intent(in) :: eff_time
+    real(knd) :: t_diff
     integer :: i
 
     if (enable_multiple_domains) then
@@ -595,17 +682,10 @@ contains
           associate(b => domain_bc_recv_buffers_copy(i))
 
               U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = b%U
-              U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) + &
-                                                       b%dU_dt * (eff_time - b%time)
 
               V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = b%V
-              V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) + &
-                                                       b%dV_dt * (eff_time - b%time)
 
               W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = b%W
-              W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) + &
-                                                       b%dW_dt * (eff_time - b%time)
-
 
               if (enable_buoyancy) then
                 Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = b%Temperature
@@ -614,7 +694,28 @@ contains
                 Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = b%Moisture
               end if
 
-              !TODO: the derivatives
+              if (eff_time > b%time) then
+                t_diff = eff_time - b%time
+
+                U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) + &
+                                                         b%dU_dt * t_diff
+                V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) + &
+                                                         b%dV_dt * t_diff
+                W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) + &
+                                                         b%dW_dt * t_diff
+
+                if (enable_buoyancy) then
+                  Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = &
+                  Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) + &
+                                                            b%dTemperature_dt * t_diff
+                end if
+                if (enable_moisture) then
+                  Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = &
+                  Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) + &
+                                                           b%dMoisture_dt * t_diff
+                end if
+              end if
+
           end associate
         end do
       end if

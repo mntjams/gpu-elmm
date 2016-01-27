@@ -65,7 +65,8 @@ contains
           arr(-1,j,k) = arr(0,j,k) - (arr(1,j,k)-arr(0,j,k))
         end do
       end do
-    else if ((btype(We)<BC_MPI_BOUNDS_MIN) .or. (btype(We)>BC_MPI_BOUNDS_MAX)) then
+    else if (((btype(We)<BC_MPI_BOUNDS_MIN) .or. (btype(We)>BC_MPI_BOUNDS_MAX)) .and. &
+             ((btype(We)<BC_DOMAIN_BOUNDS_MIN) .or. (btype(We)>BC_DOMAIN_BOUNDS_MAX))) then
       do k = 1,nz
         do j = 1,ny
           arr(0,j,k)  = arr(1,j,k)
@@ -289,17 +290,32 @@ contains
 
 
   subroutine BoundTemperature(Temperature)
+#ifdef PAR
+    use domains_bc_par
+#endif
     real(knd),intent(inout) :: Temperature(-1:,-1:,-1:)
     
+#ifdef PAR
+    call par_update_domain_bounds_temperature(Temperature, time_stepping%effective_time)
+#endif
+
     call CommonBase(Temperature,TempBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr)
 
   end subroutine BoundTemperature
 
 
   subroutine BoundMoisture(Moisture)
+#ifdef PAR
+    use domains_bc_par
+#endif
     real(knd),intent(inout) :: Moisture(-1:,-1:,-1:)
 
+#ifdef PAR
+    call par_update_domain_bounds_moisture(Moisture, time_stepping%effective_time)
+#endif
+
     call CommonBase(Moisture,MoistBtype,sideMoist)
+
   end subroutine BoundMoisture
 
 
