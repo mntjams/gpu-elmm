@@ -602,23 +602,23 @@ contains
              WMP%wallv = sideU(2,To)
              WMP%wallw = 0
            end if
-
+            
            WMP%z0 = z0T
            WMP%z0H = WMP%z0
 
-           if (TempBtype(Bo)==BC_CONSTFLUX) then
-             WMP%temperature_flux = sideTemp(Bo)
+           if (TempBtype(To)==BC_CONSTFLUX) then
+             WMP%temperature_flux = - sideTemp(To)
            else
              WMP%temperature_flux = 0
            end if
 
            if (TempBtype(To)==BC_DIRICHLET) then
-             WMP%temperature = -sideTemp(To)
+             WMP%temperature = sideTemp(To)
              WMP%prescribed_temperature = .true.
            end if
 
            if (MoistBtype(To)==BC_CONSTFLUX) then
-             WMP%moisture_flux = -sideMoist(To)
+             WMP%moisture_flux = - sideMoist(To)
            end if
 
            call AddWMPoint(WMP)
