@@ -25,8 +25,8 @@ module Initial
   use Tiling, only: tilesize,InitTiles
   use FreeUnit, only: newunit
   use Puffs, only: InitPuffSources
-#ifdef PAR
   use custom_par
+#ifdef PAR
   use exchange_par
   use domains_bc_par
 #endif
@@ -2328,10 +2328,11 @@ fields_do:  do j = 1, size(fields)
 
        call par_sync_out("  ...setting ghost cell values.")
 
-
+#ifdef PAR
        call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%time, 1._knd)
 
        call par_update_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%start_time)
+#endif
 
        call BoundU(1,U,Uin)
 
@@ -2961,8 +2962,8 @@ fields_do:  do j = 1, size(fields)
 #endif
       end if
 
-      flow_rate_x_fixed = par_co_any(flow_rate_x_fixed)     
 #ifdef PAR        
+      flow_rate_x_fixed = par_co_any(flow_rate_x_fixed)     
       if (flow_rate_x_fixed) call par_broadcast_from_last_x(flow_rate_x)
 #endif
 
@@ -2975,8 +2976,8 @@ fields_do:  do j = 1, size(fields)
 #endif
       end if
 
-      flow_rate_y_fixed = par_co_any(flow_rate_y_fixed)     
 #ifdef PAR        
+      flow_rate_y_fixed = par_co_any(flow_rate_y_fixed)     
       if (flow_rate_y_fixed) call par_broadcast_from_last_y(flow_rate_y)
 #endif
 

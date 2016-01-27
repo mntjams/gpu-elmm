@@ -43,9 +43,11 @@ contains
 
     time_stepping%effective_time = time_stepping%time
 
+#ifdef PAR
     !uses previous dt (it should be fixed anyway, but...)
     call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, &
                                     time_stepping%time, time_stepping%dt)
+#endif
 
     if (called==0) then
       called = 1

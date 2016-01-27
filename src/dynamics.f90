@@ -469,7 +469,7 @@ contains
 
     subroutine get_U_dx_max
       U_dx_max = 0
-      !$omp parallel do private(i,j,k,p) reduction(max:m) reduction(.or.:nan)
+      !$omp parallel do private(i,j,k,p) reduction(max:U_dx_max) reduction(.or.:nan)
       do k = 1, Prnz
         do j = 1, Prny
           do i = 1, Prnx
@@ -1800,9 +1800,8 @@ contains
 
 
   subroutine CorrectFlowRate(U, V)
-#ifdef PAR
     use custom_par
-#endif
+
     real(knd), intent(inout), contiguous, dimension(-2:,-2:,-2:) :: U, V
 
     real(knd) :: rate_actual
