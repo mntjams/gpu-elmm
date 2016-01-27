@@ -16,7 +16,7 @@ module Limiters
 
   elemental real(knd) function FluxLimiter(r)
     real(knd),intent(in):: r
-    real(knd) K
+    real(knd) :: K
 
     K=(1+2._knd*r)/3._knd  !assuming kappa=1/3 scheme (Koren, 1993; Hundsdorfer, 1994)
     if (limiter_parameter>0) then
@@ -32,7 +32,7 @@ module Limiters
   elemental real(knd) function Limiter(a,b,c)
     real(knd),intent(in):: a,b
     real(knd),intent(in),optional:: c
-    real(knd) R
+    real(knd) :: R
     real(knd),parameter:: epsil=0.00001_knd
 
     if (limiter_type==minmodlim) then

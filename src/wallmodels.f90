@@ -1295,9 +1295,9 @@ contains
       pure function newguess(ustar)
          !linearize the function by letting the ustar in log constant
          !  and solve the quadratic equation for the larger root
-         real(knd) newguess
+         real(knd) :: newguess
          real(knd),intent(in) :: ustar
-         real(knd) a,b,c,D
+         real(knd) :: a,b,c,D
          !u/u_* = dp/dx * z / (k (u_*)**2)  + (1/k) * ln(z * u_* / nu) + B
 
          a = log(ustar*dist / molecular_viscosity) / 0.41_knd + 5.2_knd
@@ -1322,7 +1322,7 @@ contains
     real(knd),intent(out)   :: visc
     real(knd),intent(inout) :: ustar
     real(knd),intent(in)    :: distvect(3),uvect(3),walluvect(3),prgradvect(3)
-    real(knd) vect(3),vel,dist,prgrad
+    real(knd) :: vect(3),vel,dist,prgrad
 
     dist = sqrt(sum(distvect**2))
 
@@ -1387,7 +1387,7 @@ contains
 
   pure real(knd) function PsiM_MO(zeta)
     real(knd),intent(in):: zeta
-    real(knd) x
+    real(knd) :: x
 
     if (zeta<0) then
       x = (1-15._knd*zeta)**(1/4._knd)
@@ -1400,7 +1400,7 @@ contains
 
   pure real(knd) function PsiH_MO(zeta)
     real(knd),intent(in):: zeta
-    real(knd) x
+    real(knd) :: x
 
     if (zeta<0) then
       x = (1-15._knd*zeta)**(1/4._knd)
@@ -1427,7 +1427,7 @@ contains
 
   pure real(knd) function PsiH_MO_mod(zeta) result(res)
     real(knd),intent(in):: zeta
-    real(knd) x
+    real(knd) :: x
     !For L defined without k!
     if (zeta<0) then
       x = (1-6._knd*zeta)**(1/4._knd)
@@ -1453,7 +1453,7 @@ contains
     real(knd),parameter  :: yplcrit = 11.225_knd
     real(knd),intent(in) :: vel,dist,z0,temperature_flux
     real(knd),intent(in) :: temperature_ref,grav_acc
-    real(knd) ustar2,zL,zL2,Psi
+    real(knd) :: ustar2,zL,zL2,Psi
     integer :: i
 
     if (dist<=z0) then
@@ -1563,7 +1563,7 @@ contains
     real(knd),intent(inout) :: ustar
     real(knd),intent(in)    :: z0,temperature_flux
     real(knd),intent(in)    :: distvect(3),uvect(3)
-    real(knd) vect(3),vel,dist
+    real(knd) :: vect(3),vel,dist
 
     dist = norm2(distvect)
 
@@ -1602,7 +1602,7 @@ contains
     real(knd),intent(in)    :: z0,temperature_flux
     real(knd),intent(in)    :: distvect(3),uvect(3)
     real(knd),intent(out)   :: tan_vect(3)
-    real(knd) vel,dist
+    real(knd) :: vel,dist
 
     call vel_and_dist(tan_vect, dist, uvect, [0._knd,0._knd,0._knd], distvect)
 
@@ -1625,7 +1625,7 @@ contains
     real(knd),intent(in)    :: z0,z0H
     real(knd),intent(in)    :: tempdif ! temperature difference surface - nearest point
     real(knd),intent(in)    :: distvect(3),uvect(3)
-    real(knd) vect(3),vel,dist
+    real(knd) :: vect(3),vel,dist
 
     dist = sqrt(sum(distvect**2))
 
@@ -1654,7 +1654,7 @@ contains
     real(knd),intent(in)    :: tempdif ! temperature difference surface - nearest point
     real(knd),intent(in)    :: distvect(3),uvect(3)
     real(knd),intent(out)   :: tan_vect(3)
-    real(knd) vel,dist
+    real(knd) :: vel,dist
 
     call vel_and_dist(tan_vect, dist, uvect, [0._knd,0._knd,0._knd], distvect)
 
@@ -1788,9 +1788,9 @@ contains
     real(knd),dimension(1:,1:,1:),   intent(in) :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
     integer :: i, xi, yj, zk
-    real(knd) tdif
-    real(knd) dist(3), vel(3), wallvel(3), prgrad(3)
-    real(knd) visc
+    real(knd) :: tdif
+    real(knd) :: dist(3), vel(3), wallvel(3), prgrad(3)
+    real(knd) :: visc
 
     !$omp parallel do private(i,xi,yj,zk,tdif, vel, wallvel, dist, prgrad, visc) schedule(guided,5)
     do i = 1,size(WMPoints)
@@ -1909,7 +1909,7 @@ contains
       integer, intent(in) :: component, direction
       real(knd), intent(in) :: x(:), y(:), z(:)
       integer :: point, xi, yj, zk
-      real(knd) dist(3), vel(3), wallvel(3), tan_vect(3), mag, drec(6), temp
+      real(knd) :: dist(3), vel(3), wallvel(3), tan_vect(3), mag, drec(6), temp
       type(WMPointUVW), pointer :: p
       real(knd), parameter :: eps = 0.0001_knd
       

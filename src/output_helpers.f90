@@ -9,9 +9,9 @@ contains
   function TotKE(U,V,W) result(res)
     real(knd) :: res
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    real(knd) Um,Vm,Wm
+    real(knd) :: Um,Vm,Wm
     integer :: i,j,k
-    real(knd) lx,ly,lz
+    real(knd) :: lx,ly,lz
 
     lx = xU(Prnx) - xU(0)
     ly = yV(Prny) - yV(0)

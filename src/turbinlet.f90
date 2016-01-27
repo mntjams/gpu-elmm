@@ -46,7 +46,7 @@ contains
    integer :: i, j, k
    integer :: jlo, jup, klo, kup
    integer, save:: filtny, filtnz, bigNy, bigNz
-   real(knd) Ui, Vi, Wi, bysum, bzsum, p
+   real(knd) :: Ui, Vi, Wi, bysum, bzsum, p
    real(knd), allocatable, dimension(:):: expsy, expsz
    real(knd), save:: compat
    real(knd), allocatable, dimension(:,:,:), save :: Ru, Rv, Rw !arrays of randoms
@@ -466,16 +466,16 @@ contains
     real(TIM),intent(in):: t
     integer,save:: called = 0
     integer :: Prny2, Prnz2, Vny2, Wnz2
-    real(knd) dx2
+    real(knd) :: dx2
     character(12):: fname
     integer,save:: inletfnum
 
     type(TInlet),pointer,save:: In1=>null(),In2=>null(),Inp=>null() !pointer to inlets to avoid transfers, time(In1)<time(In2)
     real(TIM),save:: t1,t2 !time if file1, file 2
-    real(TIM) tp
+    real(TIM) :: tp
     integer,save:: io
 
-    real(knd) c1,c2
+    real(knd) :: c1,c2
 
     if (called==0) then
        open(102,file="inletframeinfo.unf",form='unformatted',status='old',action='read',iostat = io)

@@ -1605,7 +1605,7 @@ contains
 
   pure real(knd) function DepositionVelocity(dp, rhop, press, temp, z, z0, zL, ustar) !Kharchenko
     real(knd), intent(in) :: dp, rhop, press, temp, z, z0, zL, ustar
-    real(dbl) visc, us, Intz, Intexp, BD, tp
+    real(dbl) :: visc, us, Intz, Intexp, BD, tp
     real(dbl), parameter :: zexp = 0.01
 
     us = SedimVelocity(dp, rhop, press, temp)

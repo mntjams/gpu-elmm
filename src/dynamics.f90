@@ -1104,8 +1104,8 @@ contains
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U2, V2, W2, U3, V3, W3
     real(knd), intent(in) :: coef
-    real(knd) recdxmin2,recdymin2,recdzmin2                                                               !reciprocal values of dx**2
-    real(knd) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
+    real(knd) :: recdxmin2,recdymin2,recdzmin2                                                               !reciprocal values of dx**2
+    real(knd) :: Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
     integer :: i,j,k,bi,bj,bk,l
     integer, save :: called = 0
     integer :: tnx, tny, tnz, tnx2, tny2, tnz2

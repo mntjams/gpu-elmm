@@ -36,8 +36,8 @@ module Initial
   private
   public  ReadConfiguration, InitialConditions, InitBoundaryConditions, probes_file, scalar_probes_file
 
-  real(knd) x0,y0,z0 !domain boundaries, will become xU(0), yV(0), zW(0)
-  real(knd) lx,ly,lz !domain extents
+  real(knd) :: x0,y0,z0 !domain boundaries, will become xU(0), yV(0), zW(0)
+  real(knd) :: lx,ly,lz !domain extents
 
   character(80) :: probes_file = ""
   character(80) :: scalar_probes_file = ""
@@ -1997,7 +1997,7 @@ fields_do:  do j = 1, size(fields)
     real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
     real(knd), intent(out) :: dt
     integer :: i,j,k
-    real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
+    real(knd) :: p,x,y,z,x1,x2,y1,y2,z1,z2
     real(knd),allocatable :: Q(:,:,:)
 
 #ifdef CUSTOM_INITIAL_CONDITIONS

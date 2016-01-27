@@ -21,7 +21,7 @@ contains
                                                            !U,V,W velocity field for correction
     real(knd), save, allocatable :: Phi(:,:,:), RHS(:,:,:) !Pr pressure
                                                            !coef cofficient from Runge Kutta, Q mass sources from immersed boundary
-    real(TIM) dt2,dt3                                      !RHS right hand side of eq. with divergence of U
+    real(TIM) :: dt2,dt3                                      !RHS right hand side of eq. with divergence of U
                                                            !Phi computed pseudopressure, saved as first guess for next time
     real(knd) :: uncompatibility
     integer, save :: called = 0

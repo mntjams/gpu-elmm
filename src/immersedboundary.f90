@@ -811,9 +811,9 @@ contains
 
     type(SolidBody),pointer :: SB
     integer :: dirx,diry,dirz,n1,n2,nx,ny,nz
-    real(knd) x,y,z,xnear,ynear,znear,t
+    real(knd) :: x,y,z,xnear,ynear,znear,t
     logical free100,free010,free001
-    real(knd) x2,y2,z2
+    real(knd) :: x2,y2,z2
     integer :: i
 
     x = xU(xi)                                !real coordinates of the IB forcing point
@@ -1341,8 +1341,8 @@ contains
   recursive subroutine TVelIBPoint_InterpolationCoefs(IBP,xU,yU,zU)
     type(TVelIBpoint),intent(inout)     :: IBP
     real(knd),dimension(-2:),intent(in) :: xU,yU,zU
-    real(knd) xr, yr, zr, x(0:3), y(0:3), z(0:3)
-    real(knd) b1, b2, b3, c
+    real(knd) :: xr, yr, zr, x(0:3), y(0:3), z(0:3)
+    real(knd) :: b1, b2, b3, c
     integer :: xi,yj,zk,dirx,diry,dirz
     
 !     interface IB_interpolation_coefs
@@ -1622,7 +1622,7 @@ contains
     integer,intent(in) :: xi,yj,zk               !grid coordinates of the forcing point
     type(SolidBody),pointer :: SB
     integer :: dirx,diry,dirz,dirx2,diry2,dirz2,nfreedirs,ndirs,i
-    real(knd) x,y,z,xnear,ynear,znear,distx,disty,distz,t,tx,ty,tz
+    real(knd) :: x,y,z,xnear,ynear,znear,distx,disty,distz,t,tx,ty,tz
     logical freep00,free0p0,free00p,freem00,free0m0,free00m
 
     x = xPr(xi)                                   !physical coordinates of the forcing point

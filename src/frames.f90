@@ -16,7 +16,7 @@ module StaggeredFrames
   end type
 
   type r3
-    real(knd) x,y,z
+    real(knd) :: x,y,z
   end type
 
   type irange
