@@ -2820,18 +2820,14 @@ contains
 
 
   real(knd) function ClosestOnLineOut(self,x,y,z,x2,y2,z2) result(t)
-  !Find t, such that x+(x2-x)*t lies on the boundary of the SB
-  ! x lies inside SB
+    !Find t, such that x+(x2-x)*t lies on the boundary of the SB
+    ! x lies inside SB
     class(Body),intent(in) :: self
     real(knd),intent(in) :: x,y,z,x2,y2,z2
-    real(knd) t1,t2
-    integer i
+    real(knd) :: t1,t2
+    integer :: i
     
-real(knd) b(3)
-if (debuglevel>0) then
-  call self%Closest(b(1),b(2),b(3),x2,y2,z2)
-  print *,"near",b
-end if
+
     t1 = 0
     t2 = 1
     !First, find a point lying outside. We should have the right direction.
@@ -2848,7 +2844,7 @@ end if
     endif
     
     t = (t1+t2)/2._knd
-if (debuglevel>0) print *,"*",t
+
     do i = 1,20         !The bisection method with maximum 20 iterations (should be well enough)
      if (self%Inside(x+(x2-x)*t,y+(y2-y)*t,z+(z2-z)*t,0._knd)) then
       t1 = t
@@ -2856,10 +2852,10 @@ if (debuglevel>0) print *,"*",t
       t2 = t
      endif
      t = (t1+t2)/2._knd
-if (debuglevel>0) print *,"**",t
+
      if (abs(t1-t2)<MIN(dxmin/1000._knd,dymin/1000._knd,dzmin/1000._knd))   exit
     enddo
-if (debuglevel>0) print *,"ins",self%Inside(x+(x2-x)*t*0.9,y+(y2-y)*t*0.9,z+(z2-z)*t*0.9,0._knd)
+
   end function ClosestOnLineOut
   
 

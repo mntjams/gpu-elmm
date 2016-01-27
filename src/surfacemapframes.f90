@@ -192,7 +192,6 @@ contains
     
     if (allocated(SurfaceFrameDomains)) then
       do i=1,size(SurfaceFrameDomains)
-print *,"SaveSurfaceFrames",i
         call SurfaceFrameDomains(i)%Save(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
       end do
     end if
