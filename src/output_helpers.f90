@@ -10,7 +10,7 @@ contains
     real(knd) :: res
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     real(knd) Um,Vm,Wm
-    integer i,j,k
+    integer :: i,j,k
     real(knd) lx,ly,lz
 
     lx = xU(Prnx) - xU(0)

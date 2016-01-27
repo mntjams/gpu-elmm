@@ -22,7 +22,7 @@ module Subgrid
      use ArrayUtilities,only: add
      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
      real(knd),intent(in) :: filter_ratio
-     integer i,j,k
+     integer :: i,j,k
 
       !$omp parallel do private(i,j,k)
       do k = 1,Prnz
@@ -67,7 +67,7 @@ module Subgrid
       real(knd) width,Sbar
       real(knd),parameter :: CS = 0.17_knd
       real(knd) S(1:3,1:3)
-      integer i,j,k
+      integer :: i,j,k
 
       do k = 1,Prnz
        do j = 1,Prny

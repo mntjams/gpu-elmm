@@ -27,7 +27,7 @@ contains
   subroutine InitSolarRadiation
     real(knd) :: horiz_component, horiz_angle
     real(knd) :: azimuth, z
-    integer i
+    integer :: i
       
     sun_azimuth = 237
     sun_elevation = 53

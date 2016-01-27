@@ -154,7 +154,7 @@ module custom_par
 contains
 
   subroutine par_sync_all()
-    integer ie
+    integer :: ie
     call MPI_Barrier(domain_comm, ie)
     if (ie/=0) call error_stop("Error in MPI Barrier.")
   end subroutine
@@ -169,7 +169,7 @@ contains
  
   integer function par_this_image(comm) result(res)
     integer, intent(in), optional :: comm
-    integer ie
+    integer :: ie
 
     if (present(comm)) then
       call MPI_Comm_rank(comm, res, ie)
@@ -182,7 +182,7 @@ contains
   
 
   integer function par_num_images() result(res)
-    integer ie
+    integer :: ie
     call MPI_Comm_size(domain_comm, res, ie)  
     if (ie/=0) call error_stop("MPI_Comm_size ERROR")
   end function
@@ -190,7 +190,7 @@ contains
   
   integer function par_image_index(sub) result(res)
     integer, intent(in) :: sub(3)
-    integer ie
+    integer :: ie
     
     if (cart_comm_dim==-1) then
       call MPI_Cartdim_get(cart_comm, cart_comm_dim, ie)
@@ -730,7 +730,7 @@ contains
     real(real32) :: res
     real(real32),intent(in) :: x
     integer, intent(in) :: op, comm
-    integer ie
+    integer :: ie
     
     interface
       subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
@@ -750,7 +750,7 @@ contains
     real(real64) :: res
     real(real64),intent(in) :: x
     integer, intent(in) :: op, comm
-    integer ie
+    integer :: ie
     
     interface
       subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
@@ -770,7 +770,7 @@ contains
     real(real32),intent(in) :: x(:)
     real(real32) :: res(size(x))
     integer, intent(in) :: op, comm
-    integer ie
+    integer :: ie
     
     interface
       subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
@@ -790,7 +790,7 @@ contains
     real(real64),intent(in) :: x(:)
     real(real64) :: res(size(x))
     integer, intent(in) :: op, comm
-    integer ie
+    integer :: ie
     
     interface
       subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
@@ -810,7 +810,7 @@ contains
     logical :: res
     logical,intent(in) :: x
     integer, intent(in) :: op, comm
-    integer ie
+    integer :: ie
     
     interface
       subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
@@ -830,7 +830,7 @@ contains
     integer :: res
     integer,intent(in) :: x
     integer, intent(in) :: op, comm
-    integer ie
+    integer :: ie
     
     interface
       subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
@@ -849,7 +849,7 @@ contains
   function par_co_min_32(x) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_MIN, domain_comm)
   end function
@@ -857,7 +857,7 @@ contains
   function par_co_min_64(x) result(res)
     real(real64) :: res
     real(real64),intent(in) :: x
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_MIN, domain_comm)
   end function
@@ -865,7 +865,7 @@ contains
   function par_co_min_int(x) result(res)
     integer :: res
     integer,intent(in) :: x
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_MIN, domain_comm)
   end function
@@ -873,7 +873,7 @@ contains
   function par_co_max_32(x) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_MAX, domain_comm)
   end function
@@ -881,7 +881,7 @@ contains
   function par_co_max_64(x) result(res)
     real(real64) :: res
     real(real64),intent(in) :: x
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_MAX, domain_comm)
   end function
@@ -889,7 +889,7 @@ contains
   function par_co_sum_int(x) result(res)
     integer :: res
     integer,intent(in) :: x
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, domain_comm)
   end function
@@ -898,7 +898,7 @@ contains
     integer :: res
     integer,intent(in) :: x
     integer, intent(in) :: comm
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, comm)
   end function
@@ -906,7 +906,7 @@ contains
   function par_co_sum_32(x) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, domain_comm)
   end function
@@ -914,7 +914,7 @@ contains
   function par_co_sum_64(x) result(res)
     real(real64) :: res
     real(real64),intent(in) :: x
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, domain_comm)
   end function
@@ -923,7 +923,7 @@ contains
     real(real32) :: res
     real(real32),intent(in) :: x
     integer, intent(in) :: comm
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, comm)
   end function
@@ -932,7 +932,7 @@ contains
     real(real64) :: res
     real(real64),intent(in) :: x
     integer, intent(in) :: comm
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, comm)
   end function
@@ -941,7 +941,7 @@ contains
     real(real32),intent(in) :: x(:)
     real(real32) :: res(size(x))
     integer, intent(in) :: comm
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, comm)
   end function
@@ -950,7 +950,7 @@ contains
     real(real64),intent(in) :: x(:)
     real(real64) :: res(size(x))
     integer, intent(in) :: comm
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, comm)
   end function
@@ -958,7 +958,7 @@ contains
   function par_co_any(x) result(res)
     logical :: res
     logical,intent(in) :: x
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_LOR, domain_comm)
   end function
@@ -967,7 +967,7 @@ contains
   function par_co_all(x) result(res)
     logical :: res
     logical,intent(in) :: x
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_LAND, domain_comm)
   end function
@@ -1018,7 +1018,7 @@ contains
 
   subroutine par_sum_to_master_horizontal_32_1d(x)
     real(real32), intent(inout) :: x(:)
-    integer ie
+    integer :: ie
     interface
       subroutine MPI_REDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, ROOT, COMM, IERROR)
         import
@@ -1036,7 +1036,7 @@ contains
 
   subroutine par_sum_to_master_horizontal_64_1d(x)
     real(real64), intent(inout) :: x(:)
-    integer ie
+    integer :: ie
     interface
       subroutine MPI_REDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, ROOT, COMM, IERROR)
         import

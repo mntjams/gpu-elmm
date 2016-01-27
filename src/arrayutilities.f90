@@ -207,7 +207,7 @@ module ArrayUtilities
     subroutine assign_1D(to,from)
       real(knd),contiguous,intent(out) :: to(:)
       real(knd),contiguous,intent(in)  :: from(:)
-      integer i
+      integer :: i
 
       !$omp parallel do
       do i=1,size(to)
@@ -219,7 +219,7 @@ module ArrayUtilities
     subroutine assign_2D(to,from)
       real(knd),contiguous,intent(out) :: to(:,:)
       real(knd),contiguous,intent(in)  :: from(:,:)
-      integer j
+      integer :: j
 
       !$omp parallel do
       do j=1,size(to,2)
@@ -231,7 +231,7 @@ module ArrayUtilities
     subroutine assign_3D(to,from)
       real(knd),contiguous,intent(out) :: to(:,:,:)
       real(knd),contiguous,intent(in)  :: from(:,:,:)
-      integer k
+      integer :: k
 
       !$omp parallel do
       do k=1,size(to,3)
@@ -243,7 +243,7 @@ module ArrayUtilities
     subroutine assign_4D(to,from)
       real(knd),contiguous,intent(out) :: to(:,:,:,:)
       real(knd),contiguous,intent(in)  :: from(:,:,:,:)
-      integer k
+      integer :: k
 
       do k=1,size(to,4)
         call assign(to(:,:,:,k),from(:,:,:,k))
@@ -254,7 +254,7 @@ module ArrayUtilities
     subroutine add_1D(to,from)
       real(knd),contiguous,intent(inout) :: to(:)
       real(knd),contiguous,intent(in)  :: from(:)
-      integer i
+      integer :: i
 
       !$omp parallel do
       do i=1,size(to)
@@ -266,7 +266,7 @@ module ArrayUtilities
     subroutine add_2D(to,from)
       real(knd),contiguous,intent(inout) :: to(:,:)
       real(knd),contiguous,intent(in)  :: from(:,:)
-      integer j
+      integer :: j
 
       !$omp parallel do
       do j=1,size(to,2)
@@ -278,7 +278,7 @@ module ArrayUtilities
     subroutine add_3D(to,from)
       real(knd),contiguous,intent(inout) :: to(:,:,:)
       real(knd),contiguous,intent(in)  :: from(:,:,:)
-      integer k
+      integer :: k
 
       !$omp parallel do
       do k=1,size(to,3)
@@ -291,7 +291,7 @@ module ArrayUtilities
     subroutine add_4D(to,from)
       real(knd),contiguous,intent(inout) :: to(:,:,:,:)
       real(knd),contiguous,intent(in)  :: from(:,:,:,:)
-      integer k
+      integer :: k
 
       do k=1,size(to,4)
         call add(to(:,:,:,k),from(:,:,:,k))
@@ -302,7 +302,7 @@ module ArrayUtilities
     subroutine add_scalar_1D(to,from)
       real(knd),contiguous,intent(inout) :: to(:)
       real(knd),intent(in)  :: from
-      integer i
+      integer :: i
 
       !$omp parallel do
       do i=1,size(to)
@@ -314,7 +314,7 @@ module ArrayUtilities
     subroutine add_scalar_2D(to,from)
       real(knd),contiguous,intent(inout) :: to(:,:)
       real(knd),intent(in)  :: from
-      integer j
+      integer :: j
 
       !$omp parallel do
       do j=1,size(to,2)
@@ -326,7 +326,7 @@ module ArrayUtilities
     subroutine add_scalar_3D(to,from)
       real(knd),contiguous,intent(inout) :: to(:,:,:)
       real(knd),intent(in)  :: from
-      integer k
+      integer :: k
 
       !$omp parallel do
       do k=1,size(to,3)
@@ -339,7 +339,7 @@ module ArrayUtilities
     subroutine set_1D(to,from)
       real(knd),contiguous,intent(out) :: to(:)
       real(knd),intent(in)  :: from
-      integer i
+      integer :: i
 
       !$omp parallel do
       do i=1,size(to)
@@ -351,7 +351,7 @@ module ArrayUtilities
     subroutine set_2D(to,from)
       real(knd),contiguous,intent(out) :: to(:,:)
       real(knd),intent(in)  :: from
-      integer j
+      integer :: j
 
       !$omp parallel do
       do j=1,size(to,2)
@@ -363,7 +363,7 @@ module ArrayUtilities
     subroutine set_3D(to,from)
       real(knd),contiguous,intent(out) :: to(:,:,:)
       real(knd),intent(in)  :: from
-      integer k
+      integer :: k
 
       !$omp parallel do
       do k=1,size(to,3)
@@ -375,7 +375,7 @@ module ArrayUtilities
     subroutine set_4D(to,from)
       real(knd),contiguous,intent(out) :: to(:,:,:,:)
       real(knd),intent(in)  :: from
-      integer k
+      integer :: k
 
       do k=1,size(to,4)
         call set(to(:,:,:,k), from)
@@ -386,7 +386,7 @@ module ArrayUtilities
     subroutine set_int_1D(to,from)
       real(knd),contiguous,intent(out) :: to(:)
       integer,intent(in)  :: from
-      integer i
+      integer :: i
 
       !$omp parallel do
       do i=1,size(to)
@@ -398,7 +398,7 @@ module ArrayUtilities
     subroutine set_int_2D(to,from)
       real(knd),contiguous,intent(out) :: to(:,:)
       integer,intent(in)  :: from
-      integer j
+      integer :: j
 
       !$omp parallel do
       do j=1,size(to,2)
@@ -410,7 +410,7 @@ module ArrayUtilities
     subroutine set_int_3D(to,from)
       real(knd),contiguous,intent(out) :: to(:,:,:)
       integer,intent(in)  :: from
-      integer k
+      integer :: k
 
       !$omp parallel do
       do k=1,size(to,3)
@@ -422,7 +422,7 @@ module ArrayUtilities
     subroutine set_int_4D(to,from)
       real(knd),contiguous,intent(out) :: to(:,:,:,:)
       integer,intent(in)  :: from
-      integer k
+      integer :: k
 
       do k=1,size(to,4)
         call set(to(:,:,:,k),from)
@@ -433,7 +433,7 @@ module ArrayUtilities
     subroutine multiply_1D(to,a)
       real(knd),contiguous,intent(inout) :: to(:)
       real(knd),intent(in)  :: a
-      integer i
+      integer :: i
 
       !$omp parallel do
       do i=1,size(to)
@@ -445,7 +445,7 @@ module ArrayUtilities
     subroutine multiply_2D(to,a)
       real(knd),contiguous,intent(inout) :: to(:,:)
       real(knd),intent(in)  :: a
-      integer j
+      integer :: j
 
       !$omp parallel do
       do j=1,size(to,2)
@@ -457,7 +457,7 @@ module ArrayUtilities
     subroutine multiply_3D(to,a)
       real(knd),contiguous,intent(inout) :: to(:,:,:)
       real(knd),intent(in)  :: a
-      integer k
+      integer :: k
 
       !$omp parallel do
       do k=1,size(to,3)
@@ -472,7 +472,7 @@ module ArrayUtilities
       real(knd),contiguous,intent(inout) :: to(:)
       real(knd),contiguous,intent(in)  :: from(:)
       real(knd),intent(in)  :: a
-      integer i
+      integer :: i
 
       !$omp parallel do
       do i=1,size(to)
@@ -485,7 +485,7 @@ module ArrayUtilities
       real(knd),contiguous,intent(inout) :: to(:,:)
       real(knd),contiguous,intent(in)  :: from(:,:)
       real(knd),intent(in)  :: a
-      integer j
+      integer :: j
 
       !$omp parallel do
       do j=1,size(to,2)
@@ -498,7 +498,7 @@ module ArrayUtilities
       real(knd),contiguous,intent(inout) :: to(:,:,:)
       real(knd),contiguous,intent(in)  :: from(:,:,:)
       real(knd),intent(in)  :: a
-      integer k
+      integer :: k
 
       !$omp parallel do
       do k=1,size(to,3)
@@ -512,7 +512,7 @@ module ArrayUtilities
       real(knd),contiguous,intent(inout) :: to(:,:,:,:)
       real(knd),contiguous,intent(in)  :: from(:,:,:,:)
       real(knd),intent(in)  :: a
-      integer k
+      integer :: k
 
       do k=1,size(to,4)
         call add_multiplied(to(:,:,:,k),from(:,:,:,k),a)
@@ -525,7 +525,7 @@ module ArrayUtilities
       real(knd),contiguous,intent(inout) :: to(:)
       real(knd),intent(in)  :: b
       real(knd),intent(in)  :: a
-      integer i
+      integer :: i
 
       !$omp parallel do
       do i=1,size(to)
@@ -539,7 +539,7 @@ module ArrayUtilities
       real(knd),contiguous,intent(inout) :: to(:,:)
       real(knd),intent(in)  :: b
       real(knd),intent(in)  :: a
-      integer j
+      integer :: j
 
       !$omp parallel do
       do j=1,size(to,2)
@@ -553,7 +553,7 @@ module ArrayUtilities
       real(knd),contiguous,intent(inout) :: to(:,:,:)
       real(knd),intent(in)  :: b
       real(knd),intent(in)  :: a
-      integer k
+      integer :: k
 
       !$omp parallel do
       do k=1,size(to,3)
@@ -567,7 +567,7 @@ module ArrayUtilities
       ! to = a / to
       real(knd),contiguous,intent(inout) :: to(:)
       real(knd),intent(in)  :: a
-      integer i
+      integer :: i
 
       !$omp parallel do
       do i=1,size(to)
@@ -580,7 +580,7 @@ module ArrayUtilities
       ! to = a / to
       real(knd),contiguous,intent(inout) :: to(:,:)
       real(knd),intent(in)  :: a
-      integer j
+      integer :: j
 
       !$omp parallel do
       do j=1,size(to,2)
@@ -593,7 +593,7 @@ module ArrayUtilities
       ! to = a / to
       real(knd),contiguous,intent(inout) :: to(:,:,:)
       real(knd),intent(in)  :: a
-      integer k
+      integer :: k
 
       !$omp parallel do
       do k=1,size(to,3)

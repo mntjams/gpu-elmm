@@ -369,7 +369,7 @@ contains
 
 
   subroutine InitTurbulenceProfiles
-    integer j,k
+    integer :: j,k
 
     allocate(Ustar_inlet(1:Prnz))
     allocate(transform_tensor(1:6,1:Prny,1:Prnz))
@@ -465,7 +465,7 @@ contains
   subroutine GetBC_INLET_FROM_FILE(t)
     real(TIM),intent(in):: t
     integer,save:: called = 0
-    integer Prny2, Prnz2, Vny2, Wnz2
+    integer :: Prny2, Prnz2, Vny2, Wnz2
     real(knd) dx2
     character(12):: fname
     integer,save:: inletfnum

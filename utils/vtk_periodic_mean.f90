@@ -75,8 +75,8 @@ module Types
   implicit none
 
   type grid
-    integer nx,ny,nz
-    integer unit
+    integer :: nx,ny,nz
+    integer :: unit
     real(vtk_rp),allocatable :: x(:),y(:),z(:)
     character(100) :: fname
   contains

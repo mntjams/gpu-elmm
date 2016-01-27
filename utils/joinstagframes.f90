@@ -215,9 +215,9 @@ module Types
   implicit none
 
   type grid
-    integer nx,ny,nz
-    integer offx,offy,offz
-    integer unit
+    integer :: nx,ny,nz
+    integer :: offx,offy,offz
+    integer :: unit
     real(rp),allocatable :: x(:),y(:),z(:)
     character(100) :: fname
   contains

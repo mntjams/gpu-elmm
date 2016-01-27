@@ -169,7 +169,7 @@ contains
         procedure(boundary_interface) :: boundary_procedure
         procedure(extra_interface) :: extra_procedure
         real(knd), intent(out), contiguous, optional :: flux_profile(0:)
-        integer i,j,k
+        integer :: i,j,k
 
 
         call boundary_procedure(Array)
@@ -1974,7 +1974,7 @@ contains
 
 
   subroutine InitSubsidenceProfile
-    integer k
+    integer :: k
 
     if (SubsidenceGradient/=0) then
       allocate(SubsidenceProfile(0:Prnz))

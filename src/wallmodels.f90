@@ -343,7 +343,7 @@ contains
     use Sort
     type(WMPoint),allocatable,dimension(:),target,intent(inout)  :: WMPoints
     type(WMPoint),allocatable,dimension(:) :: TMP
-    integer i,n
+    integer :: i,n
 
     !Choose the one closer to a wall. If of the same distance, choose the later one.
     !For wider compatibility we do not use MOLD= or SOURCE= in allocate.
@@ -1243,7 +1243,7 @@ contains
     real(knd),parameter :: yplcrit = 11.225_knd
     real(knd),parameter :: ustar_div = 1000
     real(knd) :: ustar1,ustar2,ustar_lam
-    integer i
+    integer :: i
     integer,parameter :: maxiter = 30
 
     !u/u_* = z * u_* / nu  +  dp/dx * z**2 / (2 * u_*)
@@ -1454,7 +1454,7 @@ contains
     real(knd),intent(in) :: vel,dist,z0,temperature_flux
     real(knd),intent(in) :: temperature_ref,grav_acc
     real(knd) ustar2,zL,zL2,Psi
-    integer i
+    integer :: i
 
     if (dist<=z0) then
 
@@ -1513,7 +1513,7 @@ contains
     real(knd),parameter :: k_U = 0.4_knd
     real(knd),parameter :: k_T = 0.47_knd
     real(knd) :: zL, zL0, psi_m, psi_h
-    integer i
+    integer :: i
 
     call WMRoughUstar(ustar,vel,dist,z0)
 
@@ -1670,7 +1670,7 @@ contains
 
   pure subroutine BOUND_temperature_flux(Nu)
     real(knd),intent(inout):: Nu(-1:,-1:)
-    integer i,j,nx,ny
+    integer :: i,j,nx,ny
 
     nx = Prnx
     ny = Prny
@@ -1740,7 +1740,7 @@ contains
     integer,intent(in)    :: i,j,k
     real(knd),intent(in)  :: Pr(1:,1:,1:)
     integer,intent(in)    :: Prtype(0:,0:,0:)
-    integer n
+    integer :: n
 
     prgrad = 0
 
@@ -1787,7 +1787,7 @@ contains
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
     real(knd),dimension(1:,1:,1:),   intent(in) :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
-    integer i, xi, yj, zk
+    integer :: i, xi, yj, zk
     real(knd) tdif
     real(knd) dist(3), vel(3), wallvel(3), prgrad(3)
     real(knd) visc

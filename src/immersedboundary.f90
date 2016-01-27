@@ -588,7 +588,7 @@ contains
     type(TIBPoint),intent(in) :: IBP
     integer,intent(in) :: lb
     real(knd),dimension(lb:,lb:,lb:),intent(in) :: U
-    integer i
+    integer :: i
 
     Uint = 0
 
@@ -604,7 +604,7 @@ contains
     real(knd) :: Uint
     type(TIBPoint),intent(in) :: IBP
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: U
-    integer i,n
+    integer :: i,n
 
     n = 0
     Uint = 0
@@ -810,7 +810,7 @@ contains
     integer,intent(in)                          :: component
 
     type(SolidBody),pointer :: SB
-    integer dirx,diry,dirz,n1,n2,nx,ny,nz
+    integer :: dirx,diry,dirz,n1,n2,nx,ny,nz
     real(knd) x,y,z,xnear,ynear,znear,t
     logical free100,free010,free001
     real(knd) x2,y2,z2
@@ -823,7 +823,7 @@ contains
     call SB%ClosestOut(xnear,ynear,znear,x,y,z)
 
     IBP%component = component
-    IBP%xi = xi                                !integer grid coordinates
+    IBP%xi = xi                                !integer :: grid coordinates
     IBP%yj = yj
     IBP%zk = zk
     IBP%distx = xnear-x                       !real distance to the boundary in the x,y,z direction
@@ -1343,7 +1343,7 @@ contains
     real(knd),dimension(-2:),intent(in) :: xU,yU,zU
     real(knd) xr, yr, zr, x(0:3), y(0:3), z(0:3)
     real(knd) b1, b2, b3, c
-    integer xi,yj,zk,dirx,diry,dirz
+    integer :: xi,yj,zk,dirx,diry,dirz
     
 !     interface IB_interpolation_coefs
 !       module procedure IB_interpolation_coefs_1st_order
@@ -1621,7 +1621,7 @@ contains
     type(TScalFlIBPoint),intent(out) :: IBP
     integer,intent(in) :: xi,yj,zk               !grid coordinates of the forcing point
     type(SolidBody),pointer :: SB
-    integer dirx,diry,dirz,dirx2,diry2,dirz2,nfreedirs,ndirs,i
+    integer :: dirx,diry,dirz,dirx2,diry2,dirz2,nfreedirs,ndirs,i
     real(knd) x,y,z,xnear,ynear,znear,distx,disty,distz,t,tx,ty,tz
     logical freep00,free0p0,free00p,freem00,free0m0,free00m
 
@@ -2031,7 +2031,7 @@ contains
     !helper procedure to FindNeighbouringCells
     integer,intent(in)    :: nx,ny,nz,s
     integer,intent(inout) :: Xtype(s:,s:,s:)
-    integer i,j,k
+    integer :: i,j,k
 
     do k = 1, nz
       do j = 1, ny
@@ -2168,7 +2168,7 @@ contains
   
 !   subroutine SetIBPFluxes
 !     use WallModels, only: WMPoints
-!     integer i,j
+!     integer :: i,j
 !          
 !     ScalFlIBPoints%temperature_flux = 0
 ! 
@@ -2205,7 +2205,7 @@ contains
   subroutine InitImBoundaries
     type(TVelIBPoint) IBP
     type(TScalFlIBPoint) SIBP
-    integer i,j,k
+    integer :: i,j,k
 
 !strange runtime errors in gfortran 4.8, should not be a race condition
 #if !( (defined __GFORTRAN__) && (__GNUC__==4) && (__GNUC_MINOR__<=8) )

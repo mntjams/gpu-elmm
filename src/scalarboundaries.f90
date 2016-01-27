@@ -21,7 +21,7 @@ contains
     real(knd),intent(in)    :: side(6)
     real(knd),intent(in),optional :: in(-1:,-1:)
     real(knd),intent(in),allocatable,optional :: BsideArr(:,:), BsideFlArr(:,:)
-    integer i,j,k,nx,ny,nz
+    integer :: i,j,k,nx,ny,nz
 
     nx = Prnx
     ny = Prny
@@ -321,7 +321,7 @@ contains
 
   subroutine BoundViscosity(Nu)
     real(knd),contiguous,intent(inout) :: Nu(-1:,-1:,-1:)
-    integer i,j,k,nx,ny,nz
+    integer :: i,j,k,nx,ny,nz
 
     nx = Prnx
     ny = Prny

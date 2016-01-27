@@ -93,7 +93,7 @@ contains
 
       subroutine SetPrtype(CurrentSB)
         type(SolidBody) :: CurrentSB
-        integer i,j,k
+        integer :: i,j,k
 
         if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
@@ -114,7 +114,7 @@ contains
 
       subroutine SetUtype(CurrentSB)
         type(SolidBody) :: CurrentSB
-        integer i,j,k
+        integer :: i,j,k
 
         if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
@@ -135,7 +135,7 @@ contains
 
       subroutine SetVtype(CurrentSB)
         type(SolidBody) :: CurrentSB
-        integer i,j,k
+        integer :: i,j,k
 
         if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
@@ -156,7 +156,7 @@ contains
 
       subroutine SetWtype(CurrentSB)
         type(SolidBody) :: CurrentSB
-        integer i,j,k
+        integer :: i,j,k
 
         !$omp parallel do private(i,j,k) schedule(dynamic)
         do k = 0, Wnz+1

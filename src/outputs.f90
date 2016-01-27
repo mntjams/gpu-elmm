@@ -167,7 +167,7 @@ contains
     type(TProbe),allocatable,intent(out) :: ps(:)
     integer,intent(out)     :: nps
     character(*),intent(in) ::pfile
-    integer i,io,unit
+    integer :: i,io,unit
     real(knd) :: tmp3(3)
 
     open(newunit=unit, file=pfile, status="old", action="read",iostat=io)
@@ -1366,7 +1366,7 @@ contains
     real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
     character(70) :: str
     real(real32),allocatable :: tmp(:,:,:,:)
-    integer i,j,k,unit
+    integer :: i,j,k,unit
 
     if (store%out==1) then
 
@@ -1662,7 +1662,7 @@ contains
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Temperature
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Moisture
     character(70) :: str
-    integer i,j,k,unit
+    integer :: i,j,k,unit
     real(real32),allocatable :: tmp(:,:,:,:), sc_tmp(:,:,:)
 
     if (averaging==1) then
@@ -2804,7 +2804,7 @@ contains
 
   subroutine OutputU2(U,V,W)
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    integer unit
+    integer :: unit
     character(70) :: str
 
     call newunit(unit)
@@ -2945,9 +2945,9 @@ contains
   subroutine OUTINLETFrame(U,V,W,Temperature,n)
     real(knd),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
-    integer n
+    integer :: n
     character(12) :: fname
-    integer mini,maxi,minj,maxj,mink,maxk,unit
+    integer :: mini,maxi,minj,maxj,mink,maxk,unit
 
     call GridCoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._knd,(yV(Prny+1)+yV(0))/2._knd,(zW(Prnz+1)+zW(0))/2._knd)
     maxi = mini

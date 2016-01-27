@@ -417,7 +417,7 @@ contains
     use iso_c_binding, only: c_loc, c_funloc
     use stop_procedures, only: error_stop
     class(TSurfaceFrameDomain),target,asynchronous,intent(inout) :: D
-    integer err
+    integer :: err
 
     err = 1
     

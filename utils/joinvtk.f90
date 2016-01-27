@@ -69,9 +69,9 @@ module Types
   implicit none
 
   type grid
-    integer nx,ny,nz
-    integer offx,offy,offz
-    integer unit
+    integer :: nx,ny,nz
+    integer :: offx,offy,offz
+    integer :: unit
     real(rp),allocatable :: x(:),y(:),z(:)
     character(100) :: fname
   contains
@@ -421,7 +421,7 @@ contains
   end subroutine
   
   subroutine save_header
-    integer i
+    integer :: i
     character(70) :: str
     real(rp), allocatable :: x(:),y(:),z(:)
   

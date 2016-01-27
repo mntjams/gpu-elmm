@@ -695,7 +695,7 @@ contains
     class(ConvexPolyhedron),intent(in) :: self
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in) :: eps
-    integer i
+    integer :: i
 
     if (self%nplanes>0) then
       ins = .true.
@@ -933,7 +933,7 @@ contains
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
     real(knd) dists(self%nplanes),xP(self%nplanes),yP(self%nplanes),zP(self%nplanes),minv
-    integer inearest,i
+    integer :: inearest,i
 
     dists = huge(minv)
     do i = 1,self%nplanes
@@ -1442,7 +1442,7 @@ contains
     real(knd),intent(in) :: x2,y2
     integer,intent(out) :: xi,yj,comp
     real(knd) x,y,distPr,distU,distV
-    integer xPri,yPrj,xUi,yVj,i
+    integer :: xPri,yPrj,xUi,yVj,i
 
     x = x2
     y = y2
@@ -2211,7 +2211,7 @@ contains
   logical function Union_in_bbox(self,x,y,z,eps) result(in)
     class(Union),intent(in) :: self
     real(knd),intent(in) :: x,y,z,eps
-    integer i
+    integer :: i
     
     in = any([ ( self%items(i)%in_bbox(x,y,z,eps), i=1,self%size ) ])
 
@@ -2222,7 +2222,7 @@ contains
     class(Union),intent(in) :: self
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in) ::eps
-    integer i
+    integer :: i
     
     ins = any([ ( self%items(i)%InsideEps(x,y,z,eps), i=1,self%size ) ])
     
@@ -2234,7 +2234,7 @@ contains
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
     real(knd) :: xs(self%size),ys(self%size),zs(self%size)
-    integer i
+    integer :: i
 
     do i=1,self%size
       call self%items(i)%Closest(xs(i),ys(i),zs(i),x,y,z)
@@ -2252,7 +2252,7 @@ contains
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
     real(knd) :: xs(self%size),ys(self%size),zs(self%size)
-    integer i
+    integer :: i
     !FIXME: this will work assuming we are close enough to the boundary
     do i=1,self%size
       call self%items(i)%Closest(xs(i),ys(i),zs(i),x,y,z)
@@ -2268,7 +2268,7 @@ contains
   logical function Union_IntersectsRay(self,r) result(res)
     class(Union),intent(in) :: self
     class(Ray),intent(in) :: r
-    integer i
+    integer :: i
     
     res = any([ ( self%items(i)%IntersectsRay(Ray(r%xc,r%yc,r%zc,r%a,r%b,r%c)), &
                   i=1,self%size ) ])
@@ -2301,7 +2301,7 @@ contains
     use Strings, only: upcase
     type(Union) :: res    
     character(*),intent(in) :: filename
-    integer unit,io
+    integer :: unit,io
     character(180) :: line
     type(ConvexPolyhedron) :: poly
     type(ConvexPolyhedron),allocatable :: items(:)
@@ -2351,7 +2351,7 @@ contains
       subroutine ReadPolyhedron(poly,restline)
         type(ConvexPolyhedron),intent(out) :: poly
         character(*),intent(in)  :: restline
-        integer nPlanes,i,io
+        integer :: nPlanes,i,io
 
         read(restline,*,iostat=io) nPlanes
 
@@ -2375,7 +2375,7 @@ contains
         use Strings
         type(Plane),intent(out) :: Pl
         character(180) :: line
-        integer io
+        integer :: io
 
         read(unit,'(a)',iostat=io) line
         if (io/=0) then
@@ -2621,7 +2621,7 @@ contains
     use Strings, only: upcase
     class(GeometricShape),allocatable,intent(out) :: res(:)
     character(*),intent(in) :: filename
-    integer unit,io
+    integer :: unit,io
     character(180) :: line
     type(ConvexPolyhedron) :: poly
     type(ConvexPolyhedron),allocatable :: items(:)
@@ -2667,7 +2667,7 @@ contains
       subroutine ReadPolyhedron(poly,restline)
         type(ConvexPolyhedron),intent(out) :: poly
         character(*),intent(in)  :: restline
-        integer nPlanes,i,io
+        integer :: nPlanes,i,io
 
         read(restline,*,iostat=io) nPlanes
 
@@ -2691,7 +2691,7 @@ contains
         use Strings
         type(Plane),intent(out) :: Pl
         character(180) :: line
-        integer io
+        integer :: io
 
         read(unit,'(a)',iostat=io) line
         if (io/=0) then
@@ -2747,7 +2747,7 @@ module Body_class
 
 
   type,abstract :: Body
-     integer numofbody
+     integer :: numofbody
      class(GeometricShape),allocatable :: GeometricShape
   contains
      procedure :: Inside => CInside  !Hack around yet inidentified problem in GCC.

@@ -51,7 +51,7 @@ implicit none
   elemental subroutine GridCoords_scalar(xi, yj, zk, x, y, z)
     integer, intent(out):: xi, yj, zk
     real(knd), intent(in):: x, y, z
-    integer i
+    integer :: i
 
     
     if (gridtype==uniformgrid) then
@@ -98,7 +98,7 @@ implicit none
   elemental subroutine GridCoords_U(xi, yj, zk, x, y, z)
     integer, intent(out) :: xi, yj, zk
     real(knd), intent(in) :: x, y, z
-    integer i
+    integer :: i
 
     if (gridtype==uniformgrid) then
 
@@ -138,7 +138,7 @@ implicit none
   elemental subroutine GridCoords_V(xi, yj, zk, x, y, z)
     integer, intent(out) :: xi, yj, zk
     real(knd), intent(in) :: x, y, z
-    integer i
+    integer :: i
 
     if (gridtype==uniformgrid) then
 
@@ -178,7 +178,7 @@ implicit none
   elemental subroutine GridCoords_W(xi, yj, zk, x, y, z)
     integer, intent(out) :: xi, yj, zk
     real(knd), intent(in) :: x, y, z
-    integer i
+    integer :: i
 
     if (gridtype==uniformgrid) then
 

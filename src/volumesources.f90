@@ -226,7 +226,7 @@ module VolumeSources
         subroutine GetUCells(PB)
           type(PlantBody) :: PB
           type(TResistanceVolume) :: elem
-          integer i,j,k
+          integer :: i,j,k
 
            if (associated(PB%get_resistance)) then
              do k = 0,Unz+1
@@ -248,7 +248,7 @@ module VolumeSources
         subroutine GetVCells(PB)
           type(PlantBody) :: PB
           type(TResistanceVolume) :: elem
-          integer i,j,k
+          integer :: i,j,k
 
           if (associated(PB%get_resistance)) then
             do k = 0,Vnz+1
@@ -270,7 +270,7 @@ module VolumeSources
         subroutine GetWCells(PB)
           type(PlantBody) :: PB
           type(TResistanceVolume) :: elem
-          integer i,j,k
+          integer :: i,j,k
 
           if (associated(PB%get_resistance)) then
             do k = 0,Wnz+1
@@ -294,7 +294,7 @@ module VolumeSources
           type(TemperatureFlVolume) :: Telem
           type(MoistureFlVolume) :: Melem
           type(ScalarFlVolume) :: Selem
-          integer i,j,k,sc
+          integer :: i,j,k,sc
           
           do k = 0,Prnz+1
            do j = 0,Prny+1
@@ -699,7 +699,7 @@ module VolumeSources
            real(knd),dimension(-2:,-2:,-2:),intent(in)     :: X
            type(TResistanceVolume),allocatable,intent(in)  :: src(:)
            procedure(totU_u) :: fun
-           integer i
+           integer :: i
 
            if (allocated(src)) then
              do i=1,size(src)
@@ -714,7 +714,7 @@ module VolumeSources
 
     subroutine TemperatureVolumeSources(Temperature)
       real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Temperature
-      integer i
+      integer :: i
 !       call FluxKernel(Temperature,TemperatureFlVolumes)
       associate (X=>Temperature, src=> TemperatureFlVolumes)
        do i=1,size(src)
@@ -727,7 +727,7 @@ module VolumeSources
 
     subroutine MoistureVolumeSources(Moisture)
       real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Moisture
-      integer i
+      integer :: i
 !       call FluxKernel(Moisture,MoistureFlVolumes)
       associate (X=>Moisture, src=> MoistureFlVolumes)
        do i=1,size(src)
@@ -760,7 +760,7 @@ module VolumeSources
     subroutine FluxKernel(X, src)
       real(knd),intent(inout) :: X(-1:,-1:,-1:)
       type(ScalarFlVolume),intent(in) :: src(:)
-      integer i
+      integer :: i
       !Assume src is allocated. It must hold if we called MovePointsToArray properly.
       do i=1,size(src)
         associate (xi => src(i)%xi, yj => src(i)%yj, zk => src(i)%zk)
@@ -775,7 +775,7 @@ module VolumeSources
       real(knd),intent(inout) :: X(-1:,-1:,-1:)
       type(ScalarFlVolume),intent(inout) :: src(:)
       integer, intent(in) :: sc
-      integer i
+      integer :: i
       !Assume src is allocated. It must hold if we called MovePointsToArray properly.
       !Assume get_flux is associated. It must hold if we called MovePointsToArray properly.
       do i=1,size(src)
