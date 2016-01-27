@@ -417,9 +417,10 @@ contains
   subroutine GetOutsideBoundariesWM(nscalars)
     integer, intent(in) :: nscalars
 
+    call GetOutsideBoundariesWM_UVW
+
     call GetOutsideBoundariesWM_Pr(nscalars)
 
-    call GetOutsideBoundariesWM_UVW
   end subroutine
 
 
@@ -552,12 +553,19 @@ contains
            WMP%z0 = z0B
            WMP%z0H = WMP%z0
 
-           if (TempBtype(Bo)==BC_CONSTFLUX.or.TempBtype(Bo)==BC_WALL_FLUX) then
+           if (TempBtype(Bo)==BC_CONSTFLUX) then
              WMP%temperature_flux = sideTemp(Bo)
+           else
+             WMP%temperature_flux = 0
            end if
 
-           if (TempBtype(Bo)==BC_DIRICHLET.or.TempBtype(Bo)==BC_WALL_DIRICHLET) then
+           if (TempBtype(Bo)==BC_DIRICHLET) then
              WMP%temperature = sideTemp(Bo)
+             WMP%prescribed_temperature = .true.
+           end if
+
+           if (MoistBtype(Bo)==BC_CONSTFLUX) then
+             WMP%moisture_flux = sideMoist(Bo)
            end if
 
            call AddWMPoint(WMP)
@@ -565,6 +573,15 @@ contains
          end if
        end do
       end do
+
+      if (TempBtype(Bo)==BC_CONSTFLUX.or.TempBtype(Bo)==BC_DIRICHLET) then
+        TempBtype(Bo) = 0
+      end if
+
+      if (MoistBtype(Bo)==BC_CONSTFLUX) then
+        MoistBtype(Bo) = 0
+      end if
+
     end if
 
     if (Btype(To)==BC_NOSLIP.or.(Btype(To)==BC_DIRICHLET.and.sideU(3,To)==0)) then
@@ -588,10 +605,35 @@ contains
 
            WMP%z0 = z0T
            WMP%z0H = WMP%z0
+
+           if (TempBtype(Bo)==BC_CONSTFLUX) then
+             WMP%temperature_flux = sideTemp(Bo)
+           else
+             WMP%temperature_flux = 0
+           end if
+
+           if (TempBtype(To)==BC_DIRICHLET) then
+             WMP%temperature = -sideTemp(To)
+             WMP%prescribed_temperature = .true.
+           end if
+
+           if (MoistBtype(To)==BC_CONSTFLUX) then
+             WMP%moisture_flux = -sideMoist(To)
+           end if
+
            call AddWMPoint(WMP)
          end if
        end do
       end do
+
+      if (TempBtype(To)==BC_CONSTFLUX.or.TempBtype(To)==BC_DIRICHLET) then
+        TempBtype(To) = 0
+      end if
+
+      if (MoistBtype(To)==BC_CONSTFLUX) then
+        MoistBtype(To) = 0
+      end if
+
     end if
 
   end subroutine GetOutsideBoundariesWM_Pr
@@ -730,12 +772,15 @@ contains
              p%z0 = z0B
              p%z0H = p%z0
 
-             if (TempBtype(Bo)==BC_CONSTFLUX.or.TempBtype(Bo)==BC_WALL_FLUX) then
+             if (TempBtype(Bo)==BC_CONSTFLUX) then
                p%temperature_flux = sideTemp(Bo)
+             else
+               p%temperature_flux = 0
              end if
 
-             if (TempBtype(Bo)==BC_DIRICHLET.or.TempBtype(Bo)==BC_WALL_DIRICHLET) then
+             if (TempBtype(Bo)==BC_DIRICHLET) then
                p%temperature = sideTemp(Bo)
+               p%prescribed_temperature = .true.
              end if
 
              call AddWMPointUVW(p, component, Bo)
@@ -767,12 +812,15 @@ contains
              p%z0 = z0T
              p%z0H = p%z0
              
-             if (TempBtype(To)==BC_CONSTFLUX.or.TempBtype(To)==BC_WALL_FLUX) then
-               p%temperature_flux = sideTemp(To)
+             if (TempBtype(To)==BC_CONSTFLUX) then
+               p%temperature_flux = - sideTemp(To)
+             else
+               p%temperature_flux = 0
              end if
 
-             if (TempBtype(To)==BC_DIRICHLET.or.TempBtype(To)==BC_WALL_DIRICHLET) then
+             if (TempBtype(To)==BC_DIRICHLET) then
                p%temperature = sideTemp(To)
+               p%prescribed_temperature = .true.
              end if
              
              call AddWMPointUVW(p, component, To)

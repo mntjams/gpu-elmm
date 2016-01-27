@@ -213,7 +213,7 @@ module Parameters
   integer, parameter :: BC_NOSLIP=1, BC_FREESLIP=2, BC_PERIODIC=3, BC_DIRICHLET=4, BC_NEUMANN=5, BC_CONSTFLUX=6, &  !boundary condition types
                         BC_TURBULENT_INLET=7, BC_INLET_FROM_FILE=8, &
                         BC_MO_TEMPERATURE=10, &
-                        BC_AUTOMATIC_FLUX=11, BC_WALL_DIRICHLET=12, BC_WALL_FLUX=13, &
+                        BC_AUTOMATIC_FLUX=11, &
                         BC_MPI_BOUNDS_MIN=1000, BC_MPI_BOUNDS_MAX=1010, BC_MPI_BOUNDARY=1000, BC_MPI_PERIODIC=1001, &
                         BC_DOMAIN_BOUNDS_MIN=2000, BC_DOMAIN_BOUNDS_MAX=2010, BC_DOMAIN_COPY=2001
 
