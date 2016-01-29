@@ -12,7 +12,7 @@ module Endianness
   private
   public :: GetEndianness, BigEnd
 
-  logical,save :: littleendian
+  logical,save :: littleendian = .true.
 
   interface BigEnd
     module procedure BigEnd32
