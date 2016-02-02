@@ -239,6 +239,262 @@ contains
 end module Types
 
 
+module InterpBounds
+
+  use Parameters
+  use Boundaries
+  use ScalarBoundaries
+  use Types
+
+  implicit none
+
+  logical :: enable_bc = .false.
+
+  integer :: staggered = 0 !0..cell centres, 1..U, 2..V, 3..W
+
+contains
+
+  subroutine ReadBounds(dir, g)
+    character(*), intent(in) :: dir
+    type(grid), intent(in) :: g
+    integer :: unit, io
+    real(knd) :: Prandtl
+
+    interface get
+      procedure chget1
+      procedure lget1, lget2, lget3
+      procedure iget1, iget2, iget3
+      procedure rget1, rget2, rget3
+      procedure rgetv3
+    end interface
+
+    open(unit,file=dir//"boundconds.conf",status="old",action="read")
+    call get(Btype(We))
+    call get(Btype(Ea))
+    call get(Btype(So))
+    call get(Btype(No))
+    call get(Btype(Bo))
+    call get(Btype(To))
+    call get(sideU(1,So))
+    call get(sideU(2,So))
+    call get(sideU(3,So))
+    call get(sideU(1,No))
+    call get(sideU(2,No))
+    call get(sideU(3,No))
+    call get(sideU(1,Bo))
+    call get(sideU(2,Bo))
+    call get(sideU(3,Bo))
+    call get(sideU(1,To))
+    call get(sideU(2,To))
+    call get(sideU(3,To))
+    call get(z0W)
+    call get(z0E)
+    call get(z0S)
+    call get(z0N)
+    call get(z0B)
+    call get(z0T)
+    close(unit)
+
+    open(unit,file=dir//"thermal.conf",status="old",action="read",iostat = io)
+    if (io==0) then
+      call get(enable_buoyancy)
+      call get(Prandtl)
+      call get(grav_acc)
+      call get(temperature_ref)
+      call get(TempBtype(We))
+      call get(TempBtype(Ea))
+      call get(TempBtype(So))
+      call get(TempBtype(No))
+      call get(TempBtype(Bo))
+      call get(TempBtype(To))
+      call get(sideTemp(We))
+      call get(sideTemp(Ea))
+      call get(sideTemp(So))
+      call get(sideTemp(No))
+      call get(sideTemp(Bo))
+      call get(sideTemp(To))
+      close(unit)
+    else
+      enable_buoyancy = .false.
+    end if
+
+    open(unit,file=dir//"moisture.conf",status="old",action="read",iostat = io)
+    if (io==0) then
+      call get(enable_moisture)
+      call get(moisture_ref)
+      call get(MoistBtype(We))
+      call get(MoistBtype(Ea))
+      call get(MoistBtype(So))
+      call get(MoistBtype(No))
+      call get(MoistBtype(Bo))
+      call get(MoistBtype(To))
+      call get(sideMoist(We))
+      call get(sideMoist(Ea))
+      call get(sideMoist(So))
+      call get(sideMoist(No))
+      call get(sideMoist(Bo))
+      call get(sideMoist(To))
+      close(unit)
+    else
+      enable_moisture = .false.
+    end if
+
+   open(unit,file=dir//"scalars.conf",status="old",action="read",iostat = io)
+   if (io==0) then
+     call get(num_of_scalars)
+     call get(computedeposition)
+     call get(computegravsettling)
+     call get(partdistrib)
+     call get(totalscalsource)
+     call get(scalsourcetype)
+
+     call get(ScalBtype(We))
+     call get(ScalBtype(Ea))
+     call get(ScalBtype(So))
+     call get(ScalBtype(No))
+     call get(ScalBtype(Bo))
+     call get(ScalBtype(To))
+     call get(sideScal(We))
+     call get(sideScal(Ea))
+     call get(sideScal(So))
+     call get(sideScal(No))
+     call get(sideScal(Bo))
+     call get(sideScal(To))
+     close(unit)
+   else
+     num_of_scalars = 0
+   end if
+
+   where (Btype==TURBULENTINLET.or.Btype==INLETFROMFILE) Btype = NEUMANN
+
+   if (staggered == 1) then
+     Prnx = g%nx
+     Prny = g%ny
+     Prnz = g%nz
+     Unx = g%nx
+     Uny = g%ny
+     Unz = g%nz
+   else if (staggered == 2) then
+     Prnx = g%nx
+     Prny = g%ny
+     Prnz = g%nz
+     Vnx = g%nx
+     Vny = g%ny
+     Vnz = g%nz
+   else if (staggered == 2) then
+     Prnx = g%nx
+     Prny = g%ny
+     Prnz = g%nz
+     Vnx = g%nx
+     Vny = g%ny
+     Vnz = g%nz
+   else
+     Prnx = g%nx
+     Prny = g%ny
+     Prnz = g%nz
+
+     Unx = Prnx
+     Uny = Prny
+     Unz = Prnz
+
+     Vnx = Prnx
+     Vny = Prny
+     Vnz = Prnz
+
+     Wnx = Prnx
+     Wny = Prny
+     Wnz = Prnz
+   end if
+
+   allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
+   Uin = 0; Vin = 0; Win = 0
+
+   allocate(Viscosity(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+   Viscosity = 1e-5
+   allocate(TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+   TDiff = 1e-5
+
+   allocate(dxU(-2:Unx+3), dyV(-2:Vny+3), dzW(-2:Wnz+3))
+   dxU = g%dx
+   dyV = g%dy
+   dzW = g%dz
+
+  contains
+
+     subroutine chget1(x)
+       character(*),intent(out) :: x
+       read(unit,fmt='(/)')
+       read(unit,*) x
+     end subroutine
+     subroutine lget1(x)
+       logical,intent(out) :: x
+       character(120) :: line, fname
+       integer :: ierr, tmp
+       read(unit,fmt='(/)')
+       read(unit,'(a)') line
+       read(line,*,iostat=ierr) x
+       if (ierr/=0) then
+         read(line,*,iostat=ierr) tmp
+         if (ierr/=0) then
+           inquire(unit,name=fname)
+           if (master) write(*,*) "Stop expected a boolean flag in file "//trim(fname)
+           if (master) write(*,*) "Received '"//trim(line)//"' instead."
+           call error_stop
+         end if
+         x = tmp /=0
+       end if
+     end subroutine
+     subroutine lget2(x,y)
+       logical,intent(out) :: x,y
+       read(unit,fmt='(/)')
+       read(unit,*) x,y
+     end subroutine
+     subroutine lget3(x,y,z)
+       logical,intent(out) :: x,y,z
+       read(unit,fmt='(/)')
+       read(unit,*) x,y,z
+     end subroutine
+     subroutine iget1(x)
+       integer,intent(out) :: x
+       read(unit,fmt='(/)')
+       read(unit,*) x
+     end subroutine
+     subroutine iget2(x,y)
+       integer,intent(out) :: x,y
+       read(unit,fmt='(/)')
+       read(unit,*) x,y
+     end subroutine
+     subroutine iget3(x,y,z)
+       integer,intent(out) :: x,y,z
+       read(unit,fmt='(/)')
+       read(unit,*) x,y,z
+     end subroutine
+     subroutine rget1(x)
+       real(knd),intent(out) :: x
+       read(unit,fmt='(/)')
+       read(unit,*) x
+     end subroutine
+     subroutine rget2(x,y)
+       real(knd),intent(out) :: x,y
+       read(unit,fmt='(/)')
+       read(unit,*) x,y
+     end subroutine
+     subroutine rget3(x,y,z)
+       real(knd),intent(out) :: x,y,z
+       read(unit,fmt='(/)')
+       read(unit,*) x,y,z
+     end subroutine
+     subroutine rgetv3(v)
+       real(knd),intent(out) :: v(3)
+       read(unit,fmt='(/)')
+       read(unit,*) v
+     end subroutine
+  end subroutine
+
+
+end module
+
+
 
 program interpolate_new_grid
   use WorkKinds
@@ -246,7 +502,7 @@ program interpolate_new_grid
   use Endianness
   use Interpolation
   use Strings
-  use Boundaries
+  use InterpBounds
   
   implicit none
   
@@ -257,12 +513,12 @@ program interpolate_new_grid
 
   character(1024) :: file_name, arg
 
-  character(:), allocatable :: base_name, dir_name, title
+  character(:), allocatable :: base_name, dir_name, title, bc_dir
   
   integer :: it, io, status
 
   real(rp) :: lo, up
- 
+
   call GetEndianness
 
   if (command_argument_count()<2) then
@@ -273,8 +529,29 @@ program interpolate_new_grid
   call get_command_argument(1, value=file_name)
   base_name = trim(file_name(scan(file_name,'/',back=.true.) + 1 :  ))
 
+  select case (base_name(1:1))
+    case ('U')
+      staggered = 1
+    case ('V')
+      staggered = 2
+    case ('W')
+      staggered = 3
+    case default
+      staggered = 0
+  end select
+
   call get_command_argument(2, value=arg)
   read(arg,*,iostat=io) new%nx, new%ny, new%nz
+
+  if (command_argument_count()>=3) then
+    call get_command_argument(3, value=arg)
+    enable_bc = arg == "-bc"
+  end if
+  
+  if (enable_bc.and.command_argument_count()>=4) then
+    call get_command_argument(4, value=arg)
+    bc_dir = trim(arg)
+  end if
   
   dir_name = "grid-"//itoa(new%nx)//"-"//itoa(new%ny)//"-"//itoa(new%nz)
 
@@ -309,6 +586,9 @@ program interpolate_new_grid
   call save_header
 
 
+  call ReadBounds(bc_dir, old)
+
+
   allocate(old_sc(-2:old%nx+3,-2:old%ny+3,-2:old%nz+3), &
            old_vec(3,-2:old%nx+3,-2:old%ny+3,-2:old%nz+3))
   allocate(new_sc(-2:new%nx+3,-2:new%ny+3,-2:new%nz+3), &
@@ -319,6 +599,22 @@ program interpolate_new_grid
     if (status==0) exit
 
     call get_buffer(status, old_sc, old_vec)
+
+    if (enable_bc) then
+      if (staggered==1.and.status==SCALAR.and.starts_with_ins(title,"scalars u")) then
+        call BoundU(1,old_sc,Uin)
+      else if (staggered==2.and.status==SCALAR.and.starts_with_ins(title,"scalars v")) then
+        call BoundU(2,old_sc,Vin)
+      else if (staggered==3.and.status==SCALAR.and.starts_with_ins(title,"scalars w")) then
+        call BoundU(3,old_sc,Win)
+      else if (staggered==0.and.status==SCALAR.and.starts_with_ins(title,"scalars temperature")) then
+        call BoundTemperature(old_sc)
+      else if (staggered==0.and.status==SCALAR.and.starts_with_ins(title,"scalars moisture")) then
+        call BoundMoisture(old_sc)
+      else if (staggered==0.and.status==SCALAR.and.starts_with_ins(title,"scalars scalar")) then
+        call BoundScalar(old_sc)
+      end if
+    end if
 
     call interpolate_buffer(status, new_sc, new_vec, old_sc, old_vec)
 
@@ -465,5 +761,14 @@ contains
       call interpolate_vector(new_vec, old_vec)
     end if
   end subroutine
+
+  function starts_with_ins(ch1, ch2) result(res)
+    logical :: res
+    character(*), intent(in) :: ch1, ch2
+    integer :: l1, l2
+    l1 = len_trim(ch1)
+    l2 = len_trim(ch2)
+    res = downcase(ch1(1:min(l1,l2))) == downcase(ch2(1:l2))
+  end function
 
 end program
