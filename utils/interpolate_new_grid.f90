@@ -68,17 +68,19 @@ module Interpolation
 
 contains
 
-  pure real(rp) function TriLinInt(a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111)
-    real(rp),intent(in) :: a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111
+  pure real(rp) function TriLinInt(a, b, c, &
+                                   vel000, vel100, vel010, vel001, vel110, vel101, vel011, vel111)
+    real(rp), intent(in) :: a, b, c
+    real(rp), intent(in) :: vel000, vel100, vel010, vel001, vel110, vel101, vel011, vel111
 
-    TriLinInt =  (1-a)*(1-b)*(1-c)*vel000+&
-                 a*(1-b)*(1-c)*vel100+&
-                 (1-a)*b*(1-c)*vel010+&
-                 (1-a)*(1-b)*c*vel001+&
-                 a*b*(1-c)*vel110+&
-                 a*(1-b)*c*vel101+&
-                 (1-a)*b*c*vel011+&
-                 a*b*c*vel111
+    TriLinInt =  (1-a) * (1-b) * (1-c) * vel000 + &
+                 a     * (1-b) * (1-c) * vel100 + &
+                 (1-a) * b     * (1-c) * vel010 + &
+                 (1-a) * (1-b) * c     * vel001 + &
+                 a     * b     * (1-c) * vel110 + &
+                 a     * (1-b) * c     * vel101 + &
+                 (1-a) * b     * c     * vel011 + &
+                 a     * b     * c     * vel111
 
   end function TriLinInt
 
