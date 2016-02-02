@@ -95,7 +95,6 @@ module Types
 
   type grid
     integer nx,ny,nz
-    integer offx,offy,offz
     integer unit
     real(rp),allocatable :: x(:),y(:),z(:)
     real(rp) :: x1, y1, z1
@@ -219,20 +218,20 @@ contains
   
   subroutine read_scalar(g,buf)
     class(grid),intent(in) :: g
-    real(rp),intent(out) :: buf(:,:,:)
+    real(rp),intent(out) :: buf(-1:,-1:,-1:)
     character :: ch
  
-    read(g%unit) buf(g%offx+1:g%offx+g%nx, g%offy+1:g%offy+g%ny, g%offz+1:g%offz+g%nz)
+    read(g%unit) buf(1:g%nx, 1:g%ny, 1:g%nz)
     buf = BigEnd(buf)
     read(g%unit) ch
   end subroutine
   
   subroutine read_vector(g,buf)
     class(grid),intent(in) :: g
-    real(rp),intent(out) :: buf(:,:,:,:)
+    real(rp),intent(out) :: buf(:,-2:,-2:,-2:)
     character :: ch
     
-    read(g%unit) buf(:, g%offx+1:g%offx+g%nx, g%offy+1:g%offy+g%ny, g%offz+1:g%offz+g%nz)
+    read(g%unit) buf(:, 1:g%nx, 1:g%ny, 1:g%nz)
     buf = BigEnd(buf)
     read(g%unit) ch
   end subroutine
@@ -247,6 +246,7 @@ program interpolate_new_grid
   use Endianness
   use Interpolation
   use Strings
+  use Boundaries
   
   implicit none
   
@@ -309,8 +309,10 @@ program interpolate_new_grid
   call save_header
 
 
-  allocate(old_sc(old%nx,old%ny,old%nz), old_vec(3,old%nx,old%ny,old%nz))
-  allocate(new_sc(new%nx,new%ny,new%nz), new_vec(3,new%nx,new%ny,new%nz))
+  allocate(old_sc(-2:old%nx+3,-2:old%ny+3,-2:old%nz+3), &
+           old_vec(3,-2:old%nx+3,-2:old%ny+3,-2:old%nz+3))
+  allocate(new_sc(-2:new%nx+3,-2:new%ny+3,-2:new%nz+3), &
+           new_vec(3,-2:new%nx+3,-2:new%ny+3,-2:new%nz+3))
 
   do
     call get_next(status,title)
@@ -381,15 +383,15 @@ contains
   subroutine save_buffer(status,title,sc,vec)
     integer, intent(in) :: status
     character(*), intent(in) :: title
-    real(rp), intent(inout) :: sc(:,:,:), vec(:,:,:,:)
+    real(rp), intent(inout) :: sc(-1:,-1:,-1:), vec(:,-2:,-2:,-2:)
     
     write(new%unit) title
     if (status==SCALAR) then
       sc = BigEnd(sc)
-      write(new%unit) sc,lf
+      write(new%unit) sc(1:new%nx, 1:new%ny, 1:new%nz),lf
     else
       vec = BigEnd(vec)
-      write(new%unit) vec,lf
+      write(new%unit) vec(:,1:new%nx, 1:new%ny, 1:new%nz),lf
     end if
   end subroutine
 
@@ -402,9 +404,10 @@ contains
     zk = min(max(floor( (z - old%z(1))/old%dz )+1, 1), old%nz-1)
   end subroutine
 
-  function interpolate_trilinear(arr, x, y, z) result(res)
+  function interpolate_trilinear(arr, lb, x, y, z) result(res)
     real(rp) :: res
-    real(rp), intent(in) :: arr(:,:,:)
+    real(rp), intent(in) :: arr(lb:,lb:,lb:)
+    integer, intent(in) :: lb
     real(rp), intent(in) :: x, y, z
     integer :: xi, yj, zk
 
@@ -424,27 +427,27 @@ contains
   end function
 
   subroutine interpolate_scalar(new_sc, old_sc)
-    real(rp), intent(out) :: new_sc(:,:,:)
-    real(rp), intent(in)  :: old_sc(:,:,:)
+    real(rp), intent(out) :: new_sc(-1:,-1:,-1:)
+    real(rp), intent(in)  :: old_sc(-2:,-2:,-2:)
     integer :: i, j, k
     do k = 1, new%nz
       do j = 1, new%ny
         do i = 1, new%nx
-          new_sc(i,j,k) = interpolate_trilinear(old_sc, new%x(i), new%y(j), new%z(k))
+          new_sc(i,j,k) = interpolate_trilinear(old_sc, -1, new%x(i), new%y(j), new%z(k))
         end do
       end do
     end do
   end subroutine
 
   subroutine interpolate_vector(new_vec, old_vec)
-    real(rp),intent(out) :: new_vec(:,:,:,:)
-    real(rp),intent(in)  :: old_vec(:,:,:,:)
+    real(rp),intent(out) :: new_vec(:,-2:,-2:,-2:)
+    real(rp),intent(in)  :: old_vec(:,-2:,-2:,-2:)
     integer :: i, j, k, comp
     do k = 1, new%nz
       do j = 1, new%ny
         do i = 1, new%nx
           do comp = 1, 3
-            new_vec(comp,i,j,k) = interpolate_trilinear(old_vec(comp,:,:,:), new%x(i), new%y(j), new%z(k))
+            new_vec(comp,i,j,k) = interpolate_trilinear(old_vec(comp,:,:,:), -2, new%x(i), new%y(j), new%z(k))
           end do
         end do
       end do
