@@ -1,4 +1,4 @@
-gfortran -g -fbacktrace -cpp -Wall -Wno-maybe-uninitialized -Wno-unused-dummy-argument -fcheck=all \
+gfortran -O3 -g -fbacktrace -cpp -Wall -Wno-maybe-uninitialized -Wno-unused-dummy-argument -fcheck=all \
 ../src/lists.f90  \
 ../src/strings.f90 \
 ../src/stop.f90 \

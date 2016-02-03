@@ -110,13 +110,15 @@ module Types
   integer, parameter :: SCALAR = 1, VECTOR = 2
   character,parameter :: lf = achar(10)
 
+  real(real32), parameter :: nan32 = transfer(-4194304, 1._real32)
+
 contains
   
 
   subroutine read_header(g)
     use Endianness
     class(grid),intent(inout) :: g
-    integer :: io,nx,ny,nz
+    integer :: io, nx, ny, nz
     character(5) :: ch5
     character(70) :: str
     character :: ch
@@ -135,24 +137,24 @@ contains
 
     read(ch5,'(i5)') g%nx
     nx=g%nx
-    allocate(g%x(g%nx))
-    read(g%unit,pos=219,iostat=io) g%x
-    g%x=BigEnd(g%x)
+    allocate(g%x(-2:g%nx+3))
+    read(g%unit,pos=219,iostat=io) g%x(1:g%nx)
+    g%x(1:g%nx) = BigEnd(g%x(1:g%nx))
 
     read(g%unit,pos=234+nx*4,iostat=io) ch5
     read(ch5,'(i5)') g%ny
-    ny=g%ny
+    ny = g%ny
 
-    allocate(g%y(g%ny))
-    read(g%unit,pos=291+nx*4,iostat=io) g%y
-    g%y=BigEnd(g%y)
+    allocate(g%y(-2:g%ny+3))
+    read(g%unit,pos=291+nx*4,iostat=io) g%y(1:g%ny)
+    g%y(1:g%ny) = BigEnd(g%y(1:g%ny))
 
     read(g%unit,pos=306+nx*4+ny*4,iostat=io) ch5
     read(ch5,'(i5)') g%nz
-    nz=g%nz
-    allocate(g%z(g%nz))
-    read(g%unit,pos=363+nx*4+ny*4,iostat=io) g%z
-    g%z=BigEnd(g%z)
+    nz = g%nz
+    allocate(g%z(-2:g%nz+3))
+    read(g%unit,pos=363+nx*4+ny*4,iostat=io) g%z(1:g%nz)
+    g%z(1:g%nz) = BigEnd(g%z(1:g%nz))
     read(g%unit) ch,str
     read(g%unit) ch
     
@@ -163,6 +165,15 @@ contains
     g%dx = (g%x(nx) - g%x(1)) / (nx-1)
     g%dy = (g%y(ny) - g%y(1)) / (ny-1)
     g%dz = (g%z(nz) - g%z(1)) / (nz-1)
+ 
+    g%x(-2:0) = g%x(1:3) - 3*g%dx     
+    g%y(-2:0) = g%y(1:3) - 3*g%dy     
+    g%z(-2:0) = g%z(1:3) - 3*g%dz
+
+    g%x(nx+1:nx+3) = g%x(nx-2:nx) + 3*g%dx     
+    g%y(ny+1:ny+3) = g%y(ny-2:ny) + 3*g%dy     
+    g%z(nz+1:nz+3) = g%z(nz-2:nz) + 3*g%dz     
+  
     
   contains
     subroutine error()
@@ -218,21 +229,21 @@ contains
   
   subroutine read_scalar(g,buf)
     class(grid),intent(in) :: g
-    real(rp),intent(out) :: buf(-1:,-1:,-1:)
+    real(rp),intent(inout) :: buf(-2:,-2:,-2:)
     character :: ch
  
     read(g%unit) buf(1:g%nx, 1:g%ny, 1:g%nz)
-    buf = BigEnd(buf)
+    buf(1:g%nx, 1:g%ny, 1:g%nz) = BigEnd(buf(1:g%nx, 1:g%ny, 1:g%nz))
     read(g%unit) ch
   end subroutine
   
   subroutine read_vector(g,buf)
     class(grid),intent(in) :: g
-    real(rp),intent(out) :: buf(:,-2:,-2:,-2:)
+    real(rp),intent(inout) :: buf(:,-2:,-2:,-2:)
     character :: ch
     
     read(g%unit) buf(:, 1:g%nx, 1:g%ny, 1:g%nz)
-    buf = BigEnd(buf)
+    buf(:, 1:g%nx, 1:g%ny, 1:g%nz) = BigEnd(buf(:, 1:g%nx, 1:g%ny, 1:g%nz))
     read(g%unit) ch
   end subroutine
   
@@ -267,6 +278,8 @@ contains
       procedure rget1, rget2, rget3
       procedure rgetv3
     end interface
+
+    unit = 11
 
     open(unit,file=dir//"boundconds.conf",status="old",action="read")
     call get(Btype(We))
@@ -410,9 +423,9 @@ contains
    Uin = 0; Vin = 0; Win = 0
 
    allocate(Viscosity(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-   Viscosity = 1e-5
+   Viscosity = 1e5
    allocate(TDiff(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-   TDiff = 1e-5
+   TDiff = 1e5
 
    allocate(dxU(-2:Unx+3), dyV(-2:Vny+3), dzW(-2:Wnz+3))
    dxU = g%dx
@@ -511,21 +524,24 @@ program interpolate_new_grid
   real(rp), allocatable :: old_sc(:,:,:), old_vec(:,:,:,:)
   real(rp), allocatable :: new_sc(:,:,:), new_vec(:,:,:,:)
 
-  character(1024) :: file_name, arg
+  character(1024) :: arg
 
-  character(:), allocatable :: base_name, dir_name, title, bc_dir
+  character(:), allocatable :: file_name, base_name, dir_name, title, bc_dir
   
-  integer :: it, io, status
+  integer :: it, io, status, arg_len
 
   real(rp) :: lo, up
 
   call GetEndianness
 
   if (command_argument_count()<2) then
-    write(*,*) "Usage: joinvtk file_name npx,npy,npz"
+    write(*,*) "Usage: interpolate_new_grid file_name nx,ny,nz"
+    write(*,*) "nx,ny,nz are the numbers of cells in each dimension."
     stop 1
   end if
  
+  call get_command_argument(1, length=arg_len)
+  allocate(character(arg_len) :: file_name)
   call get_command_argument(1, value=file_name)
   base_name = trim(file_name(scan(file_name,'/',back=.true.) + 1 :  ))
 
@@ -558,35 +574,98 @@ program interpolate_new_grid
   call execute_command_line("mkdir -p "//dir_name)
   
   old%fname = file_name
+
   call old%read_header
 
+
+
+  if (enable_bc) call ReadBounds(bc_dir, old)
+
+
+
   new%fname = dir_name // '/' // base_name
+
+
   
-  lo = old%x(1) - old%dx / 2
-  up = old%x(old%nx) + old%dx / 2
+  if (staggered==1) then
+    if (enable_bc.and.Btype(Ea)==PERIODIC) then
+      lo = old%x(1) - old%dx
+      up = old%x(old%nx)
+      new%dx = (up - lo) / new%nx
+    else
+      new%nx = new%nx - 1
+
+      lo = old%x(1) - old%dx
+      up = old%x(old%nx) + old%dx
+      new%dx = (up - lo) / (new%nx+1)
+    end if
+
+    allocate(new%x(-2: new%nx+3))
+    new%x(:) = [ (lo + new%dx * it, it = -2, new%nx+3) ]
+    new%x1 = new%x(1)
+  else
+    lo = old%x(1) - old%dx / 2
+    up = old%x(old%nx) + old%dx / 2
+
+    new%dx = (up - lo) / new%nx
+    allocate(new%x(-2: new%nx+3))
+    new%x(:) = [ (lo + new%dx * (it - 0.5_rp), it = -2, new%nx+3) ]
+    new%x1 = new%x(1)
+  end if
   
-  new%dx = (up - lo) / new%nx
-  new%x = [ (lo + new%dx * (it - 0.5_rp), it = 1, new%nx) ]
-  new%x1 = new%x(1)
-  
-  lo = old%y(1) - old%dy / 2
-  up = old%y(old%ny) + old%dy / 2
-  
-  new%dy = (up - lo) / new%ny
-  new%y = [ (lo + new%dy * (it - 0.5_rp), it = 1, new%ny) ]
-  new%y1 = new%y(1)
-  
-  lo = old%z(1) - old%dz / 2
-  up = old%z(old%nz) + old%dz / 2
-  
-  new%dz = (up - lo) / new%nz
-  new%z = [ (lo + new%dz * (it - 0.5_rp), it = 1, new%nz) ]
-  new%z1 = new%z(1)
+  if (staggered==2) then
+    if (enable_bc.and.Btype(No)==PERIODIC) then
+      lo = old%y(1) - old%dy
+      up = old%y(old%ny)
+      new%dy = (up - lo) / new%ny
+    else
+      new%ny = new%ny - 1
+
+      lo = old%y(1) - old%dy
+      up = old%y(old%ny) + old%dy 
+      new%dy = (up - lo) / (new%ny+1)
+    end if
+
+    allocate(new%y(-2: new%ny+3))
+    new%y(:) = [ (lo + new%dy * it, it = -2, new%ny+3) ]
+    new%y1 = new%y(1)
+  else
+    lo = old%y(1) - old%dy / 2
+    up = old%y(old%ny) + old%dy / 2
+    
+    new%dy = (up - lo) / new%ny
+    allocate(new%y(-2: new%ny+3))
+    new%y(:) = [ (lo + new%dy * (it - 0.5_rp), it = -2, new%ny+3) ]
+    new%y1 = new%y(1)
+  end if
+
+  if (staggered==3) then
+    if (enable_bc.and.Btype(To)==PERIODIC) then
+      lo = old%z(1) - old%dz
+      up = old%z(old%nz)
+      new%dz = (up - lo) / new%nz
+    else
+      new%nz = new%nz - 1
+
+      lo = old%z(1) - old%dz
+      up = old%z(old%nz) + old%dz
+      new%dz = (up - lo) / (new%nz+1)
+    end if
+
+    allocate(new%z(-2: new%nz+3))
+    new%z(:) = [ (lo + new%dz * it, it = -2, new%nz+3) ]
+    new%z1 = new%z(1)
+  else  
+    lo = old%z(1) - old%dz / 2
+    up = old%z(old%nz) + old%dz / 2
+
+    new%dz = (up - lo) / new%nz
+    allocate(new%z(-2: new%nz+3))
+    new%z(:) = [ (lo + new%dz * (it - 0.5_rp), it = -2, new%nz+3) ]
+    new%z1 = new%z(1)
+  end if
   
   call save_header
-
-
-  call ReadBounds(bc_dir, old)
 
 
   allocate(old_sc(-2:old%nx+3,-2:old%ny+3,-2:old%nz+3), &
@@ -594,11 +673,19 @@ program interpolate_new_grid
   allocate(new_sc(-2:new%nx+3,-2:new%ny+3,-2:new%nz+3), &
            new_vec(3,-2:new%nx+3,-2:new%ny+3,-2:new%nz+3))
 
+  old_sc = 0
+  old_vec = 0
+  new_sc = 0
+  new_vec = 0
+
   do
     call get_next(status,title)
+
     if (status==0) exit
 
+
     call get_buffer(status, old_sc, old_vec)
+
 
     if (enable_bc) then
       if (staggered==1.and.status==SCALAR.and.starts_with_ins(title,"scalars u")) then
@@ -608,11 +695,17 @@ program interpolate_new_grid
       else if (staggered==3.and.status==SCALAR.and.starts_with_ins(title,"scalars w")) then
         call BoundU(3,old_sc,Win)
       else if (staggered==0.and.status==SCALAR.and.starts_with_ins(title,"scalars temperature")) then
-        call BoundTemperature(old_sc)
+        call BoundTemperature(old_sc(-1:,-1:,-1:))
       else if (staggered==0.and.status==SCALAR.and.starts_with_ins(title,"scalars moisture")) then
-        call BoundMoisture(old_sc)
+        call BoundMoisture(old_sc(-1:,-1:,-1:))
       else if (staggered==0.and.status==SCALAR.and.starts_with_ins(title,"scalars scalar")) then
-        call BoundScalar(old_sc)
+        call BoundScalar(old_sc(-1:,-1:,-1:))
+      else if (staggered==0.and.status==SCALAR) then
+        call bound_simple(old_sc)
+      else if (staggered==0.and.status==VECTOR) then
+        call bound_simple(old_vec(1,:,:,:))
+        call bound_simple(old_vec(2,:,:,:))
+        call bound_simple(old_vec(3,:,:,:))
       end if
     end if
 
@@ -624,6 +717,14 @@ program interpolate_new_grid
   close(old%unit)
   close(new%unit)
 
+
+  deallocate(new_sc, new_vec, old_sc, old_vec)
+
+  if (allocated(file_name)) deallocate(file_name)
+  if (allocated(base_name)) deallocate(base_name)
+  if (allocated(dir_name)) deallocate(dir_name)
+  if (allocated(title)) deallocate(title)
+  if (allocated(bc_dir)) deallocate(bc_dir)
   
 contains
 
@@ -637,7 +738,7 @@ contains
   
   subroutine get_buffer(status,sc,vec)
     integer,intent(in) :: status
-    real(rp),intent(out) :: sc(:,:,:),vec(:,:,:,:)
+    real(rp),intent(inout) :: sc(-2:,-2:,-2:),vec(:,-2:,-2:,-2:)
     
     if (status==SCALAR) then
       call old%read_scalar(sc)
@@ -662,15 +763,15 @@ contains
     str="X_COORDINATES"
     write(str(15:),'(i5,2x,a)') new%nx,"float"
     write(new%unit) str,lf
-    write(new%unit) BigEnd(real(new%x, real32)),lf
+    write(new%unit) BigEnd(real(new%x(1:new%nx), real32)),lf
     str="Y_COORDINATES"
     write(str(15:),'(i5,2x,a)') new%ny,"float"
     write(new%unit) str,lf
-    write(new%unit) BigEnd(real(new%y, real32)),lf
+    write(new%unit) BigEnd(real(new%y(1:new%ny), real32)),lf
     str="Z_COORDINATES"
     write(str(15:),'(i5,2x,a)') new%nz,"float"
     write(new%unit) str,lf
-    write(new%unit) BigEnd(real(new%z, real32)),lf
+    write(new%unit) BigEnd(real(new%z(1:new%nz), real32)),lf
     str="POINT_DATA"
     write(str(12:),*) new%nx * new%ny * new%nz
     write(new%unit) str,lf 
@@ -679,7 +780,7 @@ contains
   subroutine save_buffer(status,title,sc,vec)
     integer, intent(in) :: status
     character(*), intent(in) :: title
-    real(rp), intent(inout) :: sc(-1:,-1:,-1:), vec(:,-2:,-2:,-2:)
+    real(rp), intent(inout) :: sc(-2:,-2:,-2:), vec(:,-2:,-2:,-2:)
     
     write(new%unit) title
     if (status==SCALAR) then
@@ -695,15 +796,14 @@ contains
     real(rp), intent(in) :: x, y, z
     integer, intent(out) :: xi, yj, zk
 
-    xi = min(max(floor( (x - old%x(1))/old%dx )+1, 1), old%nx-1)
-    yj = min(max(floor( (y - old%y(1))/old%dy )+1, 1), old%ny-1)
-    zk = min(max(floor( (z - old%z(1))/old%dz )+1, 1), old%nz-1)
+    xi = min(max(floor( (x - old%x(1))/old%dx )+1, 0), old%nx)
+    yj = min(max(floor( (y - old%y(1))/old%dy )+1, 0), old%ny)
+    zk = min(max(floor( (z - old%z(1))/old%dz )+1, 0), old%nz)
   end subroutine
 
-  function interpolate_trilinear(arr, lb, x, y, z) result(res)
+  function interpolate_trilinear(arr, x, y, z) result(res)
     real(rp) :: res
-    real(rp), intent(in) :: arr(lb:,lb:,lb:)
-    integer, intent(in) :: lb
+    real(rp), intent(in) :: arr(-2:,-2:,-2:)
     real(rp), intent(in) :: x, y, z
     integer :: xi, yj, zk
 
@@ -723,13 +823,13 @@ contains
   end function
 
   subroutine interpolate_scalar(new_sc, old_sc)
-    real(rp), intent(out) :: new_sc(-1:,-1:,-1:)
+    real(rp), intent(out) :: new_sc(-2:,-2:,-2:)
     real(rp), intent(in)  :: old_sc(-2:,-2:,-2:)
     integer :: i, j, k
     do k = 1, new%nz
       do j = 1, new%ny
         do i = 1, new%nx
-          new_sc(i,j,k) = interpolate_trilinear(old_sc, -1, new%x(i), new%y(j), new%z(k))
+          new_sc(i,j,k) = interpolate_trilinear(old_sc, new%x(i), new%y(j), new%z(k))
         end do
       end do
     end do
@@ -743,7 +843,7 @@ contains
       do j = 1, new%ny
         do i = 1, new%nx
           do comp = 1, 3
-            new_vec(comp,i,j,k) = interpolate_trilinear(old_vec(comp,:,:,:), -2, new%x(i), new%y(j), new%z(k))
+            new_vec(comp,i,j,k) = interpolate_trilinear(old_vec(comp,:,:,:), new%x(i), new%y(j), new%z(k))
           end do
         end do
       end do
@@ -770,5 +870,64 @@ contains
     l2 = len_trim(ch2)
     res = downcase(ch1(1:min(l1,l2))) == downcase(ch2(1:l2))
   end function
+
+  subroutine bound_simple(a)
+    real(knd),intent(inout) :: a(-2:,-2:,-2:)
+    integer i,j,k,nx,ny,nz
+
+    nx = old%nx
+    ny = old%ny
+    nz = old%nz
+    
+    if (Btype(Ea)==PERIODIC) then
+      do k = 1,nz
+       do j = 1,ny
+         a(-2:0,j,k) = a(nx-2:nx,j,k)
+         a(nx+1:nx+3,j,k) = a(1:3,j,k)
+       end do
+      end do
+    else
+      do k = 1,nz
+       do j = 1,ny
+         a(-2:0,j,k) = a(3:1:-1,j,k)
+         a(nx+1:nx+3,j,k) = a(nx:nx-2:-1,j,k)
+       end do
+      end do
+    end if
+
+    if (Btype(No)==PERIODIC) then
+      do k = 1,nz
+       do i = -2,nx+3
+         a(i,-2:0,k) = a(i,ny-2:ny,k)
+         a(i,ny+1:ny+3,k) = a(i,1:3,k)
+       end do
+      end do
+    else
+      do k = 1,nz
+       do i = -2,nx+3
+         a(i,-2:0,k) = a(i,3:1:-1,k)
+         a(i,ny+1:ny+3,k) = a(i,ny:ny-2:-1,k)
+       end do
+      end do
+    end if
+    
+    if (Btype(To)==PERIODIC) then
+      do j = -2,ny+3
+       do i = -2,nx+3
+         a(i,j,-2:0) = a(i,j,nz-2:nz)
+         a(i,j,nz+1:nz+3) = a(i,j,1:3)
+       end do
+      end do
+    else
+      do j = -2,ny+3
+       do i = -2,nx+3
+         a(i,j,-2:0) = a(i,j,3:1:-1)
+         a(i,j,nz+1:nz+3) = a(i,j,nz:nz-2:-1)
+       end do
+      end do
+    end if
+    
+  end subroutine bound_simple
+
 
 end program
