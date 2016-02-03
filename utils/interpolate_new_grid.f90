@@ -710,6 +710,14 @@ program interpolate_new_grid
         call bound_simple(old_vec(2,:,:,:))
         call bound_simple(old_vec(3,:,:,:))
       end if
+    else
+      if (status==SCALAR) then
+        call bound_simple(old_sc)
+      else if (status==VECTOR) then
+        call bound_simple(old_vec(1,:,:,:))
+        call bound_simple(old_vec(2,:,:,:))
+        call bound_simple(old_vec(3,:,:,:))
+      end if
     end if
 
     call interpolate_buffer(status, new_sc, new_vec, old_sc, old_vec)
@@ -853,13 +861,66 @@ contains
     end do
   end subroutine
 
+  subroutine interpolate_scalar_spline(new_sc, old_sc)
+    use bspline_oo_module
+    real(rp), intent(out) :: new_sc(-2:,-2:,-2:)
+    real(rp), intent(in)  :: old_sc(-2:,-2:,-2:)
+    integer :: i, j, k
+    type(bspline_3d) :: s3
+    integer :: iflag, idx, idy, idz
+    real(real64) :: val
+
+    idx = 0; idy = 0; idz = 0
+    
+    call s3%initialize(real(old%x, real64), real(old%y, real64), real(old%z, real64), &
+                       real(old_sc, real64), 4, 4, 4, iflag)
+    
+    
+    do k = 1, new%nz
+      do j = 1, new%ny
+        do i = 1, new%nx
+          call s3%evaluate(real(new%x(i), real64), real(new%y(j), real64), real(new%z(k), real64), &
+                           idx, idy, idz, val, iflag)
+          new_sc(i,j,k) = real(val, rp)
+        end do
+      end do
+    end do
+  end subroutine
+
+  subroutine interpolate_vector_spline(new_vec, old_vec)
+    use bspline_oo_module
+    real(rp),intent(out) :: new_vec(:,-2:,-2:,-2:)
+    real(rp),intent(in)  :: old_vec(:,-2:,-2:,-2:)
+    integer :: i, j, k, comp
+    type(bspline_3d) :: s3
+    integer :: iflag, idx, idy, idz
+    real(real64) :: val
+
+    idx = 0; idy = 0; idz = 0
+    
+    call s3%initialize(real(old%x, real64), real(old%y, real64), real(old%z, real64), &
+                       real(old_sc, real64), 4, 4, 4, iflag)
+    
+    do k = 1, new%nz
+      do j = 1, new%ny
+        do i = 1, new%nx
+          do comp = 1, 3
+            new_vec(comp,i,j,k) = interpolate_trilinear(old_vec(comp,:,:,:), new%x(i), new%y(j), new%z(k))
+            call s3%evaluate(real(new%x(i), real64), real(new%y(j), real64), real(new%z(k), real64), &
+                             idx, idy, idz, val, iflag)
+          end do
+        end do
+      end do
+    end do
+  end subroutine
+
   subroutine interpolate_buffer(status, new_sc, new_vec, old_sc, old_vec)
     integer,intent(in) :: status
     real(rp),intent(out) :: new_sc(:,:,:), new_vec(:,:,:,:)
     real(rp),intent(in) :: old_sc(:,:,:), old_vec(:,:,:,:)
     
     if (status==SCALAR) then
-      call interpolate_scalar(new_sc, old_sc)
+      call interpolate_scalar_spline(new_sc, old_sc)
     else
       call interpolate_vector(new_vec, old_vec)
     end if
