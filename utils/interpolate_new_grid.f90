@@ -689,10 +689,13 @@ program interpolate_new_grid
 
     if (enable_bc) then
       if (staggered==1.and.status==SCALAR.and.starts_with_ins(title,"scalars u")) then
+        Uin(:,:) = old_sc(1,:,:)
         call BoundU(1,old_sc,Uin)
       else if (staggered==2.and.status==SCALAR.and.starts_with_ins(title,"scalars v")) then
+        Vin(:,:) = old_sc(1,:,:)
         call BoundU(2,old_sc,Vin)
       else if (staggered==3.and.status==SCALAR.and.starts_with_ins(title,"scalars w")) then
+        Win(:,:) = old_sc(1,:,:)
         call BoundU(3,old_sc,Win)
       else if (staggered==0.and.status==SCALAR.and.starts_with_ins(title,"scalars temperature")) then
         call BoundTemperature(old_sc(-1:,-1:,-1:))
