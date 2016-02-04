@@ -866,25 +866,35 @@ contains
     real(rp), intent(out) :: new_sc(-2:,-2:,-2:)
     real(rp), intent(in)  :: old_sc(-2:,-2:,-2:)
     integer :: i, j, k
-    type(bspline_3d) :: s3
+    type(bspline_3d) :: spl
     integer :: iflag, idx, idy, idz
     real(real64) :: val
 
     idx = 0; idy = 0; idz = 0
     
-    call s3%initialize(real(old%x, real64), real(old%y, real64), real(old%z, real64), &
-                       real(old_sc, real64), 4, 4, 4, iflag)
+    call spl%initialize(real(old%x(-1:old%nx+2), real64), &
+                        real(old%y(-1:old%ny+2), real64), &
+                        real(old%z(-1:old%nz+2), real64), &
+                        real(old_sc(-1:old%nx+2,-1:old%ny+2,-1:old%nz+2), real64), &
+                        3, 3, 3, iflag)
+    if (iflag/=1) then
+      write(*,*) "Error in spline initialization, iflag:",iflag
+      stop
+    end if
     
     
     do k = 1, new%nz
       do j = 1, new%ny
         do i = 1, new%nx
-          call s3%evaluate(real(new%x(i), real64), real(new%y(j), real64), real(new%z(k), real64), &
-                           idx, idy, idz, val, iflag)
+          call spl%evaluate(real(new%x(i), real64), real(new%y(j), real64), real(new%z(k), real64), &
+                            idx, idy, idz, val, iflag)
+
           new_sc(i,j,k) = real(val, rp)
         end do
       end do
     end do
+
+    call spl%destroy()
   end subroutine
 
   subroutine interpolate_vector_spline(new_vec, old_vec)
@@ -892,25 +902,39 @@ contains
     real(rp),intent(out) :: new_vec(:,-2:,-2:,-2:)
     real(rp),intent(in)  :: old_vec(:,-2:,-2:,-2:)
     integer :: i, j, k, comp
-    type(bspline_3d) :: s3
-    integer :: iflag, idx, idy, idz
-    real(real64) :: val
+    type(bspline_3d) :: spl(3)
+    integer :: iflag, idx(3), idy(3), idz(3)
+    real(real64) :: val(3)
 
     idx = 0; idy = 0; idz = 0
-    
-    call s3%initialize(real(old%x, real64), real(old%y, real64), real(old%z, real64), &
-                       real(old_sc, real64), 4, 4, 4, iflag)
+
+    do comp = 1, 3
+      call spl(comp)%initialize(real(old%x(-1:old%nx+2), real64), &
+                                real(old%y(-1:old%ny+2), real64), &
+                                real(old%z(-1:old%nz+2), real64), &
+                                real(old_vec(comp,-1:old%nx+2,-1:old%ny+2,-1:old%nz+2), real64), &
+                                3, 3, 3, iflag)
+      if (iflag/=1) then
+        write(*,*) "Error in spline initialization, iflag:",iflag
+        stop
+      end if
+    end do
     
     do k = 1, new%nz
       do j = 1, new%ny
         do i = 1, new%nx
           do comp = 1, 3
-            new_vec(comp,i,j,k) = interpolate_trilinear(old_vec(comp,:,:,:), new%x(i), new%y(j), new%z(k))
-            call s3%evaluate(real(new%x(i), real64), real(new%y(j), real64), real(new%z(k), real64), &
-                             idx, idy, idz, val, iflag)
+            call spl(comp)%evaluate(real(new%x(i), real64), real(new%y(j), real64), real(new%z(k), real64), &
+                                    idx(comp), idy(comp), idz(comp), val(comp), iflag)
+
+            new_vec(comp,i,j,k) = real(val(comp), rp)
           end do
         end do
       end do
+    end do
+
+    do comp = 1, 3
+      call spl(comp)%destroy()
     end do
   end subroutine
 
@@ -922,7 +946,7 @@ contains
     if (status==SCALAR) then
       call interpolate_scalar_spline(new_sc, old_sc)
     else
-      call interpolate_vector(new_vec, old_vec)
+      call interpolate_vector_spline(new_vec, old_vec)
     end if
   end subroutine
 
