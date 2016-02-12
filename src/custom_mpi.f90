@@ -24,7 +24,7 @@ module custom_par
 
   private :: MPI_knd, MPI_real32, MPI_real64, MPI_IN_PLACE_real32, MPI_IN_PLACE_real64  
 
-  logical :: enable_multiple_domains = .true.
+  logical :: enable_multiple_domains = .false.
   
   !number of the domain
   integer :: domain_index = 1
@@ -92,6 +92,7 @@ module custom_par
     module procedure par_co_reduce_64_1d
     module procedure par_co_reduce_logical
     module procedure par_co_reduce_int
+    module procedure par_co_reduce_int_1d
   end interface
   
   interface par_co_min
@@ -107,12 +108,15 @@ module custom_par
   
   interface par_co_sum
     module procedure par_co_sum_32
+    module procedure par_co_sum_32_1d
     module procedure par_co_sum_32_comm
     module procedure par_co_sum_32_comm_1d
     module procedure par_co_sum_64
+    module procedure par_co_sum_64_1d
     module procedure par_co_sum_64_comm
     module procedure par_co_sum_64_comm_1d
     module procedure par_co_sum_int
+    module procedure par_co_sum_int_1d
     module procedure par_co_sum_int_comm
   end interface
 
@@ -846,6 +850,26 @@ contains
     if (ie/=0) call error_stop("Error in par_co_reduce_logical.")
   end function
 
+  function par_co_reduce_int_1d(x,op,comm) result(res)
+    integer,intent(in) :: x(:)
+    integer :: res(size(x))
+    integer, intent(in) :: op, comm
+    integer :: ie
+    
+    interface
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+        import
+        integer :: COUNT, DATATYPE, OP, COMM, IERROR
+        integer :: SENDBUF(count), RECVBUF(count)
+      end subroutine
+    end interface
+    
+    call MPI_Allreduce(x, res, &
+                       count=size(x), datatype=MPI_INTEGER, op=op, &
+                       comm=comm, ierror=ie)
+    if (ie/=0) call error_stop("Error in par_co_reduce_logical.")
+  end function
+
   function par_co_min_32(x) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
@@ -894,6 +918,14 @@ contains
     res = par_co_reduce(x, MPI_SUM, domain_comm)
   end function
 
+  function par_co_sum_int_1d(x) result(res)
+    integer,intent(in) :: x(:)
+    integer :: res(size(x))
+    integer :: ie
+    
+    res = par_co_reduce(x, MPI_SUM, domain_comm)
+  end function
+
   function par_co_sum_int_comm(x, comm) result(res)
     integer :: res
     integer,intent(in) :: x
@@ -906,6 +938,22 @@ contains
   function par_co_sum_32(x) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
+    integer :: ie
+    
+    res = par_co_reduce(x, MPI_SUM, domain_comm)
+  end function
+
+  function par_co_sum_64_1d(x) result(res)
+    real(real64),intent(in) :: x(:)
+    real(real64) :: res(size(x))
+    integer :: ie
+    
+    res = par_co_reduce(x, MPI_SUM, domain_comm)
+  end function
+
+  function par_co_sum_32_1d(x) result(res)
+    real(real32),intent(in) :: x(:)
+    real(real32) :: res(size(x))
     integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, domain_comm)
