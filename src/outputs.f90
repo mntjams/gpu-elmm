@@ -1431,7 +1431,7 @@ contains
            write(unit) BigEnd(real((U(1:Prnx,1:Prny,1:Prnz) - &
                                        U(0:Prnx-1,1:Prny,1:Prnz))/dxmin + &
                                     (V(1:Prnx,1:Prny,1:Prnz) - &
-                                       V(1:Vnx,0:Vny-1,1:Vnz))/dymin + &
+                                       V(1:Prnx,0:Prny-1,1:Prnz))/dymin + &
                                     (W(1:Prnx,1:Prny,1:Prnz) - &
                                        W(1:Prnx,1:Prny,0:Prnz-1))/dzmin &
                                , real32))
