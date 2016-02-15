@@ -1903,6 +1903,7 @@ contains
 
 
   subroutine InitHydrostaticPressure(Pr, Temperature, Moisture)
+    use Pressure
     real(knd), contiguous, intent(out) :: Pr(1:,1:,1:)
     real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:)
     real(knd) :: t_virt, t_virt_prev, p
@@ -1914,7 +1915,7 @@ contains
     end interface
 
 
-    p = bottom_pressure
+    p = pressure_solution%bottom_pressure
 
     do k = 1, Prnz
      t_virt = sum(TempIn(1:Prny,k))/Prny
@@ -1926,13 +1927,13 @@ contains
                   / temperature_ref
 
     end do
-    top_pressure = p
+    pressure_solution%top_pressure = p
 
 
     do j = 1, Vny+1
       do i = 1, Unx+1
         t_virt_prev = theta_v(i,j,Prnz)
-        Pr(i,j,Prnz) = top_pressure - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
+        Pr(i,j,Prnz) = pressure_solution%top_pressure - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
                 ( t_virt_prev - temperature_ref ) &
                 / temperature_ref
         do k = Prnz-1, 1, -1

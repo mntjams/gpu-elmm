@@ -99,7 +99,6 @@ module Parameters
   type(time_step_control) :: time_stepping
 
 
-
   real(knd) :: dxmin, dymin, dzmin  !minimum grid spacing, dimensions of the domain
 
 
@@ -118,9 +117,6 @@ module Parameters
 
   real(knd) :: grav_acc = 0, Coriolis_parameter = 0
 
-  real(knd) :: top_pressure !mean pressure at the top boundary - calculated
-  real(knd) :: bottom_pressure = 101325.0
-
   real(knd) :: ShearInletTypeParameter, Uinlet
 
   real(knd) :: z0W, z0E, z0S, z0N, z0B, z0T
@@ -131,12 +127,10 @@ module Parameters
 
   integer :: scalsourcetype
 
-
   real(knd) :: epsCN, epsPoisson, eps, debugparam
 
   real(tim) :: timefram1, timefram2, timeavg1, timeavg2
 
-  integer :: poisson_solver
   integer :: advection_method
   integer :: frames
   integer :: steady
@@ -158,7 +152,6 @@ module Parameters
 
   integer :: partdistrib, computedeposition, computegravsettling
   integer :: maxCNiter, maxPOISSONiter, endstep
-  integer :: projectiontype, correctcompatibility = 0
 
   integer :: inlettype, gridtype, profiletype
 

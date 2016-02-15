@@ -125,7 +125,6 @@ contains
 #endif
 
    open(unit,file="main.conf",status="old",action="read")
-   call get(poisson_solver)
    call get(advection_method)
    call get(limiter_type)
    call get(limiter_parameter)
@@ -504,7 +503,7 @@ contains
       end if
    end if
 
-   if (poisson_solver==3.or.poisson_solver==4.or.poisson_solver==5) then
+   if (pressure_solution%poisson_solver==POISSON_SOLVER_MULTIGRID) then
      open(unit,file="mgopts.conf",status="old",action="read")
      call get(lmg)
      call get(minmglevel)
@@ -518,19 +517,18 @@ contains
      call get(mgepsinnerGS)
      close(unit)
 
-     if (poisson_solver==3.or.poisson_solver==4) then
-       if (Prny==1) then
-        call SetMGParams2d(llmg = lmg,lminmglevel = minmglevel,lbnx = bnx,lbnz = bnz,&
-                           lmgncgc = mgncgc,lmgnpre = mgnpre,lmgnpost = mgnpost,&
-                           lmgmaxinnerGSiter = mgmaxinnerGSiter,lmgepsinnerGS = mgepsinnerGS)
-       else
-        call SetMGParams(llmg = lmg,lminmglevel = minmglevel,&
-                           lbnx = bnx,lbny = bny,lbnz = bnz,&
-                           lmgncgc = mgncgc,lmgnpre = mgnpre,lmgnpost = mgnpost,&
-                           lmgmaxinnerGSiter = mgmaxinnerGSiter,lmgepsinnerGS = mgepsinnerGS)
-       end if
+     if (Prny==1) then
+      call SetMGParams2d(llmg = lmg,lminmglevel = minmglevel,lbnx = bnx,lbnz = bnz,&
+                         lmgncgc = mgncgc,lmgnpre = mgnpre,lmgnpost = mgnpost,&
+                         lmgmaxinnerGSiter = mgmaxinnerGSiter,lmgepsinnerGS = mgepsinnerGS)
+     else
+      call SetMGParams(llmg = lmg,lminmglevel = minmglevel,&
+                         lbnx = bnx,lbny = bny,lbnz = bnz,&
+                         lmgncgc = mgncgc,lmgnpre = mgnpre,lmgnpost = mgnpost,&
+                         lmgmaxinnerGSiter = mgmaxinnerGSiter,lmgepsinnerGS = mgepsinnerGS)
      end if
    end if
+
 
   
 
@@ -612,8 +610,6 @@ contains
    end if
 
    if (master) write(*,*) "num_of_scalars",num_of_scalars
-
-   projectiontype = 1
 
    call parse_command_line
 
@@ -763,7 +759,6 @@ contains
 
    call get_time_stepping("time_stepping.conf")
 
-
    if (timeavg2>=timeavg1) then
      averaging = 1
    else
@@ -803,6 +798,8 @@ contains
 
 
 #ifdef PAR
+   call get_domains("domains.conf")
+
    call par_init_grid
    
    call par_init_boundaries
@@ -811,6 +808,9 @@ contains
    y0 = y0 + offset_to_global_y * dymin
    z0 = z0 + offset_to_global_z * dzmin
 #endif
+
+
+   call get_pressure_solution("pressure_solution.conf")
 
 
    !both procedures below use the name of the output directory (affected by MPI)
@@ -992,7 +992,7 @@ contains
 #ifdef PAR
        use custom_par
 #endif
-       namelist /cmd/ tilesize, debugparam, debuglevel, windangle, projectiontype, &
+       namelist /cmd/ tilesize, debugparam, debuglevel, windangle, &
                        Prnx, Prny, Prnz,&
 #ifdef PAR
                        npxyz, domain_index, number_of_domains, &
@@ -1744,6 +1744,305 @@ fields_do:  do j = 1, size(fields)
 
   end subroutine get_time_stepping
   
+  
+  
+  
+
+  subroutine get_pressure_solution(fname)
+    use Strings
+    use ParseTrees
+    use Pressure
+    character(*), intent(in) :: fname
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: obj, stat
+
+    type field_names
+      character(char_len) :: name
+      class(*), pointer :: var
+    end type
+
+    type field_names_a
+      character(char_len) :: name
+      class(*), pointer :: var(:)
+    end type
+
+    interface field_names
+      procedure field_names_init
+    end interface
+
+    interface field_names_a
+      procedure field_names_a_init
+    end interface
+
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+
+      if (allocated(tree)) then
+        do obj = 1, size(tree)
+          call get_object(tree(obj), pressure_solution)
+          call tree(obj)%finalize
+        end do
+      else
+        write(*,*) "Error, no content in " // fname
+        call error_stop
+      end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+
+  contains
+
+    subroutine get_object(obj, p_s)
+      type(tree_object), intent(in) :: obj
+      type(pressure_solution_control), intent(out), target :: p_s
+      integer :: i, j
+      logical, target :: constant_time_steps = .false.
+
+      type(field_names) :: names(10)
+      type(field_names_a) :: names_a(1)
+
+      names = [field_names_init("check_mass_flux", p_s%check_mass_flux), &
+               field_names_init("correct_mass_flux_west",   p_s%correct_mass_flux(We)), &
+               field_names_init("correct_mass_flux_east",   p_s%correct_mass_flux(Ea)), &
+               field_names_init("correct_mass_flux_south",  p_s%correct_mass_flux(So)), &
+               field_names_init("correct_mass_flux_north",  p_s%correct_mass_flux(No)), &
+               field_names_init("correct_mass_flux_bottom", p_s%correct_mass_flux(Bo)), &
+               field_names_init("correct_mass_flux_top",    p_s%correct_mass_flux(To)), &
+               field_names_init("poisson_solver",      p_s%poisson_solver), &
+               field_names_init("check_divergence",    p_s%check_divergence), &
+               field_names_init("bottom_pressure",     p_s%bottom_pressure)]
+
+      names_a = [field_names_a_init("correct_mass_flux", p_s%correct_mass_flux)]
+
+      if (downcase(obj%name)=='pressure_solution') then
+
+        if (allocated(obj%fields%array)) then
+
+          associate(fields => obj%fields%array)
+
+fields_do:  do j = 1, size(fields)
+             
+              do i = 1, size(names)
+                if (fields(j)%name == names(i)%name) then
+                  select type (var => names(i)%var)
+                    type is (integer)
+                      read(fields(j)%value, *) var
+                    type is (real(real32))
+                      read(fields(j)%value, *) var
+                    type is (real(real64))
+                      read(fields(j)%value, *) var
+                    type is (logical)
+                      read(fields(j)%value, *) var
+                    class default
+                      call error_stop("Unexpected type in pressure_solution.")
+                  end select
+                  cycle fields_do
+                end if
+              end do
+
+              do i = 1, size(names_a)
+                if (fields(j)%name == names_a(i)%name) then
+
+                  if (size(names_a(i)%var)/=size(fields(j)%array_value)) then
+                    write(*,*) "Error, expecting", &
+                                size(names_a(i)%var), &
+                                "array components", &
+                                "but", &
+                                size(fields(j)%array_value), &
+                                "components present."
+                    call error_stop()
+                  end if
+
+                  select type (var => names_a(i)%var)
+                    type is (integer)
+                      read(fields(j)%array_value, *) var
+                    type is (real(real32))
+                      read(fields(j)%array_value, *) var
+                    type is (real(real64))
+                      read(fields(j)%array_value, *) var
+                    type is (logical)
+                      read(fields(j)%array_value, *) var
+                    class default
+                      call error_stop("Unexpected type in pressure_solution.")
+                  end select
+                  cycle fields_do
+                end if
+              end do
+
+            end do fields_do
+
+          end associate
+
+        end if
+
+      end if
+
+      if (any(p_s%correct_mass_flux)) p_s%check_mass_flux = .true.
+
+      where(Btype>=BC_MPI_BOUNDS_MIN .and. Btype<=BC_MPI_BOUNDS_MAX) p_s%correct_mass_flux = .false.
+    
+      where(Btype==BC_NOSLIP) p_s%correct_mass_flux = .false.
+
+      where(Btype==BC_PERIODIC) p_s%correct_mass_flux = .false.
+    
+    end subroutine
+
+    function field_names_init(name, var) result(res)
+      type(field_names) :: res
+      character(*) :: name
+      class(*), target, intent(in) :: var
+
+      res%name = name
+      res%var => var
+    end function
+
+    function field_names_a_init(name, var) result(res)
+      type(field_names_a) :: res
+      character(*) :: name
+      class(*), target, intent(in) :: var(:)
+
+      res%name = name
+      res%var => var
+    end function
+
+  end subroutine get_pressure_solution
+  
+  
+  
+  
+#ifdef PAR
+  subroutine get_domains(fname)
+    use Strings
+    use ParseTrees
+    use custom_par
+    character(*), intent(in) :: fname
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: obj, stat
+
+    type field_names
+      character(char_len) :: name
+      class(*), pointer :: var
+    end type
+
+    interface field_names
+      procedure field_names_init
+    end interface
+
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+
+      if (allocated(tree)) then
+        do obj = 1, size(tree)
+          call get_object(tree(obj))
+          call tree(obj)%finalize
+        end do
+      else
+        write(*,*) "Error, no content in " // fname
+        call error_stop
+      end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+
+  contains
+
+    subroutine get_object(obj)
+      type(tree_object), intent(in) :: obj
+      integer :: i, j
+      logical, target :: constant_time_steps = .false.
+
+      type(field_names) :: names(3)
+      
+      logical, target :: enable_multiple_domains_l = .false.
+      integer, target :: number_of_domains_l = -99
+      integer, target :: domain_index_l = -99
+
+      names = [field_names_init("enable_multiple_domains", enable_multiple_domains_l), &
+               field_names_init("domain_index",   domain_index_l), &
+               field_names_init("number_of_domains",   number_of_domains_l)]
+
+      if (downcase(obj%name)=='domains') then
+
+        if (allocated(obj%fields%array)) then
+
+          associate(fields => obj%fields%array)
+
+fields_do:  do j = 1, size(fields)
+             
+              do i = 1, size(names)
+                if (fields(j)%name == names(i)%name) then
+                  select type (var => names(i)%var)
+                    type is (integer)
+                      read(fields(j)%value, *) var
+                    type is (real(real32))
+                      read(fields(j)%value, *) var
+                    type is (real(real64))
+                      read(fields(j)%value, *) var
+                    type is (logical)
+                      read(fields(j)%value, *) var
+                    class default
+                      call error_stop("Unexpected type in domains.")
+                  end select
+                  cycle fields_do
+                end if
+              end do
+
+            end do fields_do
+
+          end associate
+
+        end if
+
+      end if
+
+      enable_multiple_domains = enable_multiple_domains_l
+      
+      if (enable_multiple_domains) then
+          
+        number_of_domains = number_of_domains_l
+        if (number_of_domains<1) &
+          call error_stop("Error, positive number_of_domains must be specified in domains.")
+    
+        domain_index = domain_index_l
+        if (domain_index<1) &
+          call error_stop("Error, positive domain_index must be specified in domains.")
+        if (number_of_domains<domain_index) &
+          call error_stop("Error, domain_index must be smaller or equal to number_of_domains.")
+      end if
+      
+    end subroutine
+
+    function field_names_init(name, var) result(res)
+      type(field_names) :: res
+      character(*) :: name
+      class(*), target, intent(in) :: var
+
+      res%name = name
+      res%var => var
+    end function
+
+  end subroutine get_domains
+#endif  
   
   
   
@@ -2840,6 +3139,9 @@ fields_do:  do j = 1, size(fields)
     if (.not.allocated(BsideMFlArr))  allocate(BsideMFlArr(0,0))
 
 
+
+    call par_sync_out("  ...pressure correction.")
+    call InitPressureCorrection
 
     call par_sync_out("  ...initializing subsidence profile.")
     call InitSubsidenceProfile

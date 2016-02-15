@@ -3,7 +3,7 @@ module TimeSteps
   use Parameters
   use Dynamics
   use Boundaries, only: BoundU, Bound_Q
-  use Pressure, only: PressureCorrection
+  use Pressure, only: PressureCorrection, pressure_solution, POISSON_SOLVER_NONE
   use Outputs, only: current_profiles
   use Scalars, only: ScalarRK3
   use Turbinlet, only: GetTurbulentInlet, GetBC_INLET_FROM_FILE
@@ -154,7 +154,7 @@ contains
       end if
 
 
-      if (poisson_solver>0) then
+      if (pressure_solution%poisson_solver > POISSON_SOLVER_NONE) then
         call PressureCorrection(U2, V2, W2, Pr, Q, 2*RK_alpha(RK_stage)*time_stepping%dt)
       end if
 
