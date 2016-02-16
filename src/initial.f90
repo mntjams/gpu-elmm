@@ -2348,10 +2348,8 @@ fields_do:  do j = 1, size(fields)
           enable_moisture.or. &
           num_of_scalars>0)        TDiff = molecular_diffusivity
 
-      call BoundU(1,U,Uin)
-      call BoundU(2,V,Vin)
-      call BoundU(3,W,Win)
-      call Bound_Pr(Pr)
+       call BoundUVW(U, V, W)
+       call Bound_Pr(Pr)
 
     else   !init conditions not from file
 
@@ -2633,11 +2631,7 @@ fields_do:  do j = 1, size(fields)
        call par_update_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%start_time)
 #endif
 
-       call BoundU(1,U,Uin)
-
-       call BoundU(2,V,Vin)
-
-       call BoundU(3,W,Win)
+       call BoundUVW(U, V, W)
 
        call Bound_Pr(Pr)
 

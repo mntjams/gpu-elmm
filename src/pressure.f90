@@ -172,11 +172,7 @@ contains
     real(knd) :: df_side(6), df
 
 
-    call BoundU(1,U,Uin)
-
-    call BoundU(2,V,Vin)
-
-    call BoundU(3,W,Win)
+    call BoundUVW(U, V, W)
 
     flux = 0
     if (pressure_solution%check_mass_flux) then
@@ -451,11 +447,7 @@ contains
 
     !$omp end parallel
 
-    call BoundU(1,U,Uin)
-
-    call BoundU(2,V,Vin)
-
-    call BoundU(3,W,Win)
+    call BoundUVW(U, V, W)
 
     call Bound_Pr(Pr)
 

@@ -2,7 +2,7 @@ module Dynamics
   use Parameters
   use ArrayUtilities
   use Tiling, only: tilenx, tileny, tilenz
-  use Boundaries, only: BoundU
+  use Boundaries, only: BoundUVW
   use ScalarBoundaries, only: BoundTemperature, BoundViscosity
 
   implicit none
@@ -387,10 +387,7 @@ contains
       use Filters, only: filtertype, Filter
 
       if (filtertype/=0) then
-        call BoundU(1,Ustar,Uin,2)
-        call BoundU(2,Vstar,Vin,2)
-        call BoundU(3,Wstar,Win,2)
-
+        call BoundUVW(Ustar, Vstar, Wstar, regime=2)
 
         call Filter(Ustar,Utype)
 
@@ -398,9 +395,7 @@ contains
 
         call Filter(Wstar,Wtype)
 
-        call BoundU(1,Ustar,Uin,2)
-        call BoundU(2,Vstar,Vin,2)
-        call BoundU(3,Wstar,Win,2)
+        call BoundUVW(Ustar, Vstar, Wstar, regime=2)
       end if
 
     end subroutine
@@ -1420,9 +1415,7 @@ contains
 
 
     do l = 1, maxCNiter               !Gauss-Seidel iteration for Crank-Nicolson result
-      call BoundU(1,U3,Uin)
-      call BoundU(2,V3,Vin)
-      call BoundU(3,W3,Win)
+      call BoundUVW(U3, V3, W3)
 
       S = 0
       Su = 0

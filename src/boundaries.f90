@@ -9,7 +9,7 @@ implicit none
 
   private
   public volumePr, GridCoords, GridCoords_U, GridCoords_V, GridCoords_W, InDomain,&
-         BoundU, Bound_Phi, Bound_Pr, Bound_Q,&
+         BoundUVW, Bound_Phi, Bound_Pr, Bound_Q,&
          ShearInlet, ParabolicInlet, ConstantInlet
 
   interface GridCoords
@@ -242,23 +242,23 @@ implicit none
   end function
 
 
-  recursive subroutine BoundU(component, U, Uin, reg)
+  recursive subroutine BoundU(component, U, Uin, regime)
 #ifdef PAR
     use domains_bc_par
 #endif
     integer, intent(in)                   :: component
     real(knd), contiguous, intent(inout)  :: U(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)     :: Uin(-2:,-2:)
-    integer, optional, intent(in)         :: reg
-    integer :: regime, i, j, k, nx, ny, nz
+    integer, optional, intent(in)         :: regime
+    integer :: reg, i, j, k, nx, ny, nz
     !intermediate regime is when doing BC for one of the terms for dU/dt
     !currently used when explicit filtering is on only
     integer, parameter :: intermediate = 2
 
-    if (present(reg)) then
-      regime = reg
+    if (present(regime)) then
+      reg = regime
     else
-      regime = 0
+      reg = 0
 #ifdef PAR
       call par_update_domain_bounds_U(U, time_stepping%effective_time, component)
 #endif
@@ -471,7 +471,7 @@ implicit none
 
     !$omp parallel sections
     !$omp section
-    if (Btype(We)==BC_DIRICHLET.and.regime/=intermediate) then
+    if (Btype(We)==BC_DIRICHLET.and.reg/=intermediate) then
       if (component==1) then
          do k = 1, nz
           do j = 1, ny                       !Dirichlet inlet
@@ -490,7 +490,7 @@ implicit none
          end do
       end if
     else if (Btype(We)==BC_NOSLIP .or. (component==1.and.Btype(We)==BC_FREESLIP) .or. &
-             (Btype(We)==BC_DIRICHLET.and.regime==intermediate)) then
+             (Btype(We)==BC_DIRICHLET.and.reg==intermediate)) then
       if (component==1) then
          do k = 1, nz
           do j = 1, ny                       !Solid wall
@@ -535,8 +535,8 @@ implicit none
        end do
       end do
     else if (Btype(We)==BC_TURBULENT_INLET.or.Btype(We)==BC_INLET_FROM_FILE) then
-      if (regime/=intermediate) then
-        if (component==1) then
+      if (reg/=intermediate) then
+       if (component==1) then
           do k = -1, nz+2
            do j = -1, ny+2
             U(0,j,k) = Uin(j,k)
@@ -576,7 +576,7 @@ implicit none
 
 
     !$omp section
-    if (Btype(Ea)==BC_DIRICHLET.and.regime/=intermediate) then
+    if (Btype(Ea)==BC_DIRICHLET.and.reg/=intermediate) then
       if (component==1) then
         do k = 1, nz
          do j = 1, ny                       !Dirichlet inlet
@@ -595,7 +595,7 @@ implicit none
         end do
       end if
     else if (Btype(Ea)==BC_NOSLIP .or. (component==1.and.Btype(Ea)==BC_FREESLIP) .or. &
-              (Btype(Ea)==BC_DIRICHLET.and.regime==intermediate)) then
+              (Btype(Ea)==BC_DIRICHLET.and.reg==intermediate)) then
       if (component==1) then
         do k = 1, nz
          do j = 1, ny                       !Solid wall
@@ -630,7 +630,7 @@ implicit none
        end do
       end do
     else if (Btype(Ea)==BC_TURBULENT_INLET) then
-      if (regime/=intermediate) then
+      if (reg/=intermediate) then
         if (component==1) then
           do k = 1, nz
            do j = 1, ny
@@ -676,7 +676,7 @@ implicit none
 
     !$omp parallel sections
     !$omp section
-    if (Btype(So)==BC_DIRICHLET.and.regime/=intermediate) then
+    if (Btype(So)==BC_DIRICHLET.and.reg/=intermediate) then
       if (component==2) then
         do k = 1, nz
          do i = -2, nx+3                       !Dirichlet inlet
@@ -695,7 +695,7 @@ implicit none
         end do
       end if
     else if (Btype(So)==BC_NOSLIP .or. (component==2.and.Btype(So)==BC_FREESLIP) .or. &
-               (Btype(So)==BC_DIRICHLET.and.regime==intermediate)) then
+               (Btype(So)==BC_DIRICHLET.and.reg==intermediate)) then
       if (component==2) then
         do k = 1, nz
          do i = -2, nx+3                       !Solid wall
@@ -733,7 +733,7 @@ implicit none
 
 
     !$omp section
-    if (Btype(No)==BC_DIRICHLET.and.regime/=intermediate) then
+    if (Btype(No)==BC_DIRICHLET.and.reg/=intermediate) then
       if (component==2) then
         do k = 1, nz
          do i = -2, nx+3                       !Dirichlet inlet
@@ -752,7 +752,7 @@ implicit none
         end do
       end if
     else if (Btype(No)==BC_NOSLIP .or. (component==2.and.Btype(No)==BC_FREESLIP) .or. &
-             (Btype(No)==BC_DIRICHLET.and.regime==intermediate)) then
+             (Btype(No)==BC_DIRICHLET.and.reg==intermediate)) then
       if (component==2) then
         do k = 1, nz
          do i = -2, nx+3                       !Solid wall
@@ -795,7 +795,7 @@ implicit none
 
     !$omp parallel sections
     !$omp section
-    if (Btype(Bo)==BC_DIRICHLET .and. regime/=intermediate) then
+    if (Btype(Bo)==BC_DIRICHLET .and. reg/=intermediate) then
       if (component==3) then
         do j = -2, ny+3
          do i = -2, nx+3                       !Dirichlet inlet
@@ -814,7 +814,7 @@ implicit none
         end do
       end if
     else if (Btype(Bo)==BC_NOSLIP .or. (component==3.and.Btype(Bo)==BC_FREESLIP) .or. &
-               (Btype(Bo)==BC_DIRICHLET.and.regime==intermediate)) then
+               (Btype(Bo)==BC_DIRICHLET.and.reg==intermediate)) then
       if (component==3) then
         do j = -2, ny+3
          do i = -2, nx+3                       !Solid wall
@@ -851,7 +851,7 @@ implicit none
     end if
 
     !$omp section
-    if (Btype(To)==BC_DIRICHLET.and.regime/=intermediate) then
+    if (Btype(To)==BC_DIRICHLET.and.reg/=intermediate) then
       if (component==3) then
         do j = -2, ny+3
          do i = -2, nx+3                       !Dirichlet inlet
@@ -872,7 +872,7 @@ implicit none
     else if (Btype(To)==BC_NOSLIP .or. &
              (component==3.and.(Btype(To)==BC_FREESLIP .or. &
                                 Btype(To)==BC_AUTOMATIC_FLUX)) .or. &
-             (Btype(To)==BC_DIRICHLET.and.regime==intermediate) ) then
+             (Btype(To)==BC_DIRICHLET.and.reg==intermediate) ) then
       if (component==3) then
         do j = -2, ny+3
          do i = -2, nx+3                       !Solid wall
@@ -912,6 +912,15 @@ implicit none
     !$omp end parallel sections
   end subroutine BoundU
 
+
+  subroutine BoundUVW(U, V, W, regime)
+    real(knd), intent(inout)     :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    integer, optional, intent(in) :: regime
+
+    call BoundU(1, U, Uin, regime)
+    call BoundU(2, V, Vin, regime)
+    call BoundU(3, W, Win, regime)
+  end subroutine
 
 
 
