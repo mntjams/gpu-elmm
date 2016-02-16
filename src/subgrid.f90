@@ -1,7 +1,6 @@
 module Subgrid
 
   use Parameters
-  use Boundaries, only: BoundU
   use Subgrid_MixedTimeScale, only: SGS_MixedTimeScale
 
   implicit none

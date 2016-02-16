@@ -2,7 +2,7 @@ module TimeSteps
 
   use Parameters
   use Dynamics
-  use Boundaries, only: BoundU, Bound_Q
+  use Boundaries, only: BoundUVW, Bound_Q
   use Pressure, only: PressureCorrection
   use Outputs, only: current_profiles
   use Scalars, only: ScalarRK3
@@ -53,11 +53,7 @@ contains
       Wstar = W
 
 
-      call BoundU(1, U, Uin)
-
-      call BoundU(2, V, Vin)
-
-      call BoundU(3, W, Win)
+      call BoundUVW(U, V, W)
 
       if (enable_buoyancy) call BoundTemperature(temperature)
 
@@ -125,11 +121,7 @@ contains
 
 
 
-      call BoundU(1, U2, Uin)
-
-      call BoundU(2, V2, Vin)
-
-      call BoundU(3, W2, Win)
+      call BoundUVW(U2, V2, W2)
 
       call IBMomentum(U2, V2, W2)
 
@@ -181,11 +173,7 @@ contains
       call NullInterior(U, V, W)
 
 
-      call BoundU(1, U, Uin)
-
-      call BoundU(2, V, Vin)
-
-      call BoundU(3, W, Win)
+      call BoundUVW(U, V, W)
 
       call IBMomentum(U, V, W)
 
@@ -253,11 +241,7 @@ contains
           call ImplicitDiffusion_ForwEul(U, V, W, U2, V2, W2, U3, V3, W3, coef)
 
 
-          call BoundU(1, U3, Uin)
-
-          call BoundU(2, V3, Vin)
-
-          call BoundU(3, W3, Win)
+          call BoundUVW(U3, V3, W3)
 
           call IBMomentum(U3, V3, W3)
 
@@ -283,11 +267,7 @@ contains
         end if   Re_gt_0
 
 
-        call BoundU(1, U2, Uin)
-
-        call BoundU(2, V2, Vin)
-
-        call BoundU(3, W2, Win)
+        call BoundUVW(U2, V2, W2)
 
         call IBMomentum(U2, V2, W2)
 

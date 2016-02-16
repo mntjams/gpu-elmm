@@ -9,7 +9,7 @@ implicit none
 
   private
   public volumePr, GridCoords, GridCoords_U, GridCoords_V, GridCoords_W, InDomain,&
-         BoundU, Bound_Phi, Bound_Pr, Bound_Q,&
+         BoundUVW, Bound_Phi, Bound_Pr, Bound_Q,&
          ShearInlet, ParabolicInlet, ConstantInlet
 
   interface GridCoords
@@ -242,18 +242,18 @@ implicit none
   end function
 
 
-  recursive subroutine BoundU(component,U,Uin,reg)
+  recursive subroutine BoundU(component,U,Uin,regime)
     integer,intent(in)          :: component
     real(knd),intent(inout)     :: U(-2:,-2:,-2:)
     real(knd),intent(in)        :: Uin(-2:,-2:)
-    integer,optional,intent(in) :: reg
-    integer regime,i,j,k,nx,ny,nz
-    integer,parameter :: interm = 2
+    integer,optional,intent(in) :: regime
+    integer reg,i,j,k,nx,ny,nz
+    integer,parameter :: intermediate = 2
 
-    if (present(reg)) then
-      regime=reg
+    if (present(regime)) then
+      reg=regime
     else
-      regime=0
+      reg=0
     end if
 
     if (component==1) then
@@ -466,7 +466,7 @@ implicit none
 #endif
     !$omp sections
     !$omp section
-    if (Btype(We)==DIRICHLET.and.regime/=interm) then
+    if (Btype(We)==DIRICHLET.and.reg/=intermediate) then
       if (component==1) then
          do k = 1, nz
           do j = 1, ny                       !Dirichlet inlet
@@ -485,7 +485,7 @@ implicit none
          end do
       end if
     else if (Btype(We)==NOSLIP .or. (component==1.and.Btype(We)==FREESLIP) .or. &
-             (Btype(We)==DIRICHLET.and.regime==interm)) then
+             (Btype(We)==DIRICHLET.and.reg==intermediate)) then
       if (component==1) then
          do k = 1, nz
           do j = 1, ny                       !Solid wall
@@ -530,7 +530,7 @@ implicit none
        end do
       end do
     else if (Btype(We)==TURBULENTINLET.or.Btype(We)==INLETFROMFILE) then
-      if (regime/=interm) then
+      if (reg/=intermediate) then
         if (component==1) then
           do k=-1,nz+2
            do j=-1,ny+2
@@ -571,7 +571,7 @@ implicit none
 
 
     !$omp section
-    if (Btype(Ea)==DIRICHLET.and.regime/=interm) then
+    if (Btype(Ea)==DIRICHLET.and.reg/=intermediate) then
       if (component==1) then
         do k = 1, nz
          do j = 1, ny                       !Dirichlet inlet
@@ -590,7 +590,7 @@ implicit none
         end do
       end if
     else if (Btype(Ea)==NOSLIP .or. (component==1.and.Btype(Ea)==FREESLIP) .or. &
-              (Btype(Ea)==DIRICHLET.and.regime==interm)) then
+              (Btype(Ea)==DIRICHLET.and.reg==intermediate)) then
       if (component==1) then
         do k = 1, nz
          do j = 1, ny                       !Solid wall
@@ -625,7 +625,7 @@ implicit none
        end do
       end do
     else if (Btype(Ea)==TURBULENTINLET) then
-      if (regime/=interm) then
+      if (reg/=intermediate) then
         if (component==1) then
           do k = 1, nz
            do j = 1, ny
@@ -671,7 +671,7 @@ implicit none
 #endif
     !$omp sections
     !$omp section
-    if (Btype(So)==DIRICHLET.and.regime/=interm) then
+    if (Btype(So)==DIRICHLET.and.reg/=intermediate) then
       if (component==2) then
         do k = 1, nz
          do i = -2, nx+3                       !Dirichlet inlet
@@ -690,7 +690,7 @@ implicit none
         end do
       end if
     else if (Btype(So)==NOSLIP .or. (component==2.and.Btype(So)==FREESLIP) .or. &
-               (Btype(So)==DIRICHLET.and.regime==interm)) then
+               (Btype(So)==DIRICHLET.and.reg==intermediate)) then
       if (component==2) then
         do k = 1, nz
          do i = -2, nx+3                       !Solid wall
@@ -728,7 +728,7 @@ implicit none
 
 
     !$omp section
-    if (Btype(No)==DIRICHLET.and.regime/=interm) then
+    if (Btype(No)==DIRICHLET.and.reg/=intermediate) then
       if (component==2) then
         do k = 1, nz
          do i = -2, nx+3                       !Dirichlet inlet
@@ -747,7 +747,7 @@ implicit none
         end do
       end if
     else if (Btype(No)==NOSLIP .or. (component==2.and.Btype(No)==FREESLIP) .or. &
-             (Btype(No)==DIRICHLET.and.regime==interm)) then
+             (Btype(No)==DIRICHLET.and.reg==intermediate)) then
       if (component==2) then
         do k = 1, nz
          do i = -2, nx+3                       !Solid wall
@@ -789,7 +789,7 @@ implicit none
 #endif
     !$omp sections
     !$omp section
-    if (Btype(Bo)==DIRICHLET .and. regime/=interm) then
+    if (Btype(Bo)==DIRICHLET .and. reg/=intermediate) then
       if (component==3) then
         do j = -2, ny+3
          do i = -2, nx+3                       !Dirichlet inlet
@@ -808,7 +808,7 @@ implicit none
         end do
       end if
     else if (Btype(Bo)==NOSLIP .or. (component==3.and.Btype(Bo)==FREESLIP) .or. &
-               (Btype(Bo)==DIRICHLET.and.regime==interm)) then
+               (Btype(Bo)==DIRICHLET.and.reg==intermediate)) then
       if (component==3) then
         do j = -2, ny+3
          do i = -2, nx+3                       !Solid wall
@@ -845,7 +845,7 @@ implicit none
     end if
 
     !$omp section
-    if (Btype(To)==DIRICHLET.and.regime/=interm) then
+    if (Btype(To)==DIRICHLET.and.reg/=intermediate) then
       if (component==3) then
         do j = -2, ny+3
          do i = -2, nx+3                       !Dirichlet inlet
@@ -866,7 +866,7 @@ implicit none
     else if (Btype(To)==NOSLIP .or. &
              (component==3.and.(Btype(To)==FREESLIP .or. &
                                 Btype(To)==AUTOMATICFLUX)) .or. &
-             (Btype(To)==DIRICHLET.and.regime==interm) ) then
+             (Btype(To)==DIRICHLET.and.reg==intermediate) ) then
       if (component==3) then
         do j = -2, ny+3
          do i = -2, nx+3                       !Solid wall
@@ -906,6 +906,15 @@ implicit none
     !$omp end sections
   end subroutine BoundU
 
+
+  subroutine BoundUVW(U, V, W, regime)
+    real(knd), intent(inout)     :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    integer, optional, intent(in) :: regime
+
+    call BoundU(1, U, Uin, regime)
+    call BoundU(2, V, Vin, regime)
+    call BoundU(3, W, Win, regime)
+  end subroutine
 
 
 
