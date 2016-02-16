@@ -78,203 +78,7 @@ contains
     integer :: Uk1, Uk2, Vk1, Vk2, Wk1, Wk2, Prk1, Prk2
     !temporary testing hack
 
-    if (enable_multiple_domains) then
-
-      if (domain_index==1) then
-
-        if (iim==nxims) then
-          !send buffers should be counted from 1, there may be more of them from several nested domains
-          allocate(domain_bc_send_buffers_copy(1))
-          domain_bc_send_buffers_copy(1)%comm = world_comm
-          domain_bc_send_buffers_copy(1)%remote_rank = domain_ranks_grid(2)%arr(1,jim,kim)
-          domain_bc_send_buffers_copy(1)%remote_domain = 2
-          domain_bc_send_buffers_copy(1)%direction = Ea
-          domain_bc_send_buffers_copy(1)%enabled = .true.
-
-          Ui1 = Unx-2
-          Ui2 = Unx
-          Uj1 = -2
-          Uj2 = Uny+3
-          Uk1 = -2
-          Uk2 = Unz+3
-
-          Vi1 = Vnx-2
-          Vi2 = Vnx
-          Vj1 = -2
-          Vj2 = Vny+3
-          Vk1 = -2
-          Vk2 = Vnz+3
-
-          Wi1 = Wnx-2
-          Wi2 = Wnx
-          Wj1 = -2
-          Wj2 = Wny+3
-          Wk1 = -2
-          Wk2 = Wnz+3
-
-          Pri1 = Prnx-1
-          Pri2 = Prnx
-          Prj1 = -1
-          Prj2 = Prny+2
-          Prk1 = -1
-          Prk2 = Prnz+2
-
-          domain_bc_send_buffers_copy(1)%Ui1 = Ui1 
-          domain_bc_send_buffers_copy(1)%Ui2 = Ui2 
-          domain_bc_send_buffers_copy(1)%Uj1 = Uj1 
-          domain_bc_send_buffers_copy(1)%Uj2 = Uj2 
-          domain_bc_send_buffers_copy(1)%Uk1 = Uk1 
-          domain_bc_send_buffers_copy(1)%Uk2 = Uk2 
-
-          domain_bc_send_buffers_copy(1)%Vi1 = Vi1 
-          domain_bc_send_buffers_copy(1)%Vi2 = Vi2 
-          domain_bc_send_buffers_copy(1)%Vj1 = Vj1 
-          domain_bc_send_buffers_copy(1)%Vj2 = Vj2 
-          domain_bc_send_buffers_copy(1)%Vk1 = Vk1 
-          domain_bc_send_buffers_copy(1)%Vk2 = Vk2 
-
-          domain_bc_send_buffers_copy(1)%Wi1 = Wi1 
-          domain_bc_send_buffers_copy(1)%Wi2 = Wi2 
-          domain_bc_send_buffers_copy(1)%Wj1 = Wj1 
-          domain_bc_send_buffers_copy(1)%Wj2 = Wj2 
-          domain_bc_send_buffers_copy(1)%Wk1 = Wk1 
-          domain_bc_send_buffers_copy(1)%Wk2 = Wk2 
-
-          domain_bc_send_buffers_copy(1)%Pri1 = Pri1
-          domain_bc_send_buffers_copy(1)%Pri2 = Pri2
-          domain_bc_send_buffers_copy(1)%Prj1 = Prj1
-          domain_bc_send_buffers_copy(1)%Prj2 = Prj2
-          domain_bc_send_buffers_copy(1)%Prk1 = Prk1
-          domain_bc_send_buffers_copy(1)%Prk2 = Prk2
-
-
-          allocate(domain_bc_send_buffers_copy(1)%U(Ui1:Ui2,Uj1:Uj2,Uk1:Uk2))
-          allocate(domain_bc_send_buffers_copy(1)%V(Vi1:Vi2,Vj1:Vj2,Vk1:Vk2))
-          allocate(domain_bc_send_buffers_copy(1)%W(Wi1:Wi2,Wj1:Wj2,Wk1:Wk2))
-
-          allocate(domain_bc_send_buffers_copy(1)%dU_dt(Ui1:Ui2,Uj1:Uj2,Uk1:Uk2))
-          allocate(domain_bc_send_buffers_copy(1)%dV_dt(Vi1:Vi2,Vj1:Vj2,Vk1:Vk2))
-          allocate(domain_bc_send_buffers_copy(1)%dW_dt(Wi1:Wi2,Wj1:Wj2,Wk1:Wk2))
-
-          if (enable_buoyancy) then
-            allocate(domain_bc_send_buffers_copy(1)%Temperature(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
-            allocate(domain_bc_send_buffers_copy(1)%dTemperature_dt(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
-          end if
-          if (enable_moisture) then
-            allocate(domain_bc_send_buffers_copy(1)%Moisture(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
-            allocate(domain_bc_send_buffers_copy(1)%dMoisture_dt(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
-          end if
-
-          domain_bc_send_buffers_copy(1)%U_mpi_type = U_mpi_subarray_type(Ui1,Ui2,Uj1,Uj2,Uk1,Uk2)
-          domain_bc_send_buffers_copy(1)%V_mpi_type = V_mpi_subarray_type(Vi1,Vi2,Vj1,Vj2,Vk1,Vk2)
-          domain_bc_send_buffers_copy(1)%W_mpi_type = W_mpi_subarray_type(Wi1,Wi2,Wj1,Wj2,Wk1,Wk2)
-          !for arrays defined from -1 to Prn+2
-          if (enable_buoyancy.or.enable_moisture) then
-            domain_bc_send_buffers_copy(1)%Pr_mpi_type = Pr_mpi_subarray_type(Pri1,Pri2,Prj1,Prj2,Prk1,Prk2)
-          end if
-        endif
-
-      else if (domain_index==2) then
-
-        if (iim==1) then
-          Btype(We) = BC_DOMAIN_COPY
-          TempBtype(We) = BC_DOMAIN_COPY
-          MoistBtype(We) = BC_DOMAIN_COPY
-          ScalBtype(We) = BC_DOMAIN_COPY
-
-          allocate(domain_bc_recv_buffers_copy(We:We))
-          domain_bc_recv_buffers_copy(We)%comm = world_comm
-          domain_bc_recv_buffers_copy(We)%remote_rank = domain_ranks_grid(1)%arr(domain_nxims(1),jim,kim)        
-          domain_bc_recv_buffers_copy(We)%remote_domain = 1
-          domain_bc_recv_buffers_copy(We)%direction = We
-          domain_bc_recv_buffers_copy(We)%enabled = .true.
-
-          Ui1 = -2
-          Ui2 = 0
-          Uj1 = -2
-          Uj2 = Uny+3
-          Uk1 = -2
-          Uk2 = Unz+3
-
-          Vi1 = -2
-          Vi2 = 0
-          Vj1 = -2
-          Vj2 = Vny+3
-          Vk1 = -2
-          Vk2 = Vnz+3
-
-          Wi1 = -2
-          Wi2 = 0
-          Wj1 = -2
-          Wj2 = Wny+3
-          Wk1 = -2
-          Wk2 = Wnz+3
-
-          Pri1 = -1
-          Pri2 = 0
-          Prj1 = -1
-          Prj2 = Prny+2
-          Prk1 = -1
-          Prk2 = Prnz+2
-
-          domain_bc_recv_buffers_copy(We)%Ui1 = Ui1 
-          domain_bc_recv_buffers_copy(We)%Ui2 = Ui2 
-          domain_bc_recv_buffers_copy(We)%Uj1 = Uj1 
-          domain_bc_recv_buffers_copy(We)%Uj2 = Uj2 
-          domain_bc_recv_buffers_copy(We)%Uk1 = Uk1 
-          domain_bc_recv_buffers_copy(We)%Uk2 = Uk2 
-
-          domain_bc_recv_buffers_copy(We)%Vi1 = Vi1 
-          domain_bc_recv_buffers_copy(We)%Vi2 = Vi2 
-          domain_bc_recv_buffers_copy(We)%Vj1 = Vj1 
-          domain_bc_recv_buffers_copy(We)%Vj2 = Vj2 
-          domain_bc_recv_buffers_copy(We)%Vk1 = Vk1 
-          domain_bc_recv_buffers_copy(We)%Vk2 = Vk2 
-
-          domain_bc_recv_buffers_copy(We)%Wi1 = Wi1 
-          domain_bc_recv_buffers_copy(We)%Wi2 = Wi2 
-          domain_bc_recv_buffers_copy(We)%Wj1 = Wj1 
-          domain_bc_recv_buffers_copy(We)%Wj2 = Wj2 
-          domain_bc_recv_buffers_copy(We)%Wk1 = Wk1 
-          domain_bc_recv_buffers_copy(We)%Wk2 = Wk2 
-
-          domain_bc_recv_buffers_copy(We)%Pri1 = Pri1
-          domain_bc_recv_buffers_copy(We)%Pri2 = Pri2
-          domain_bc_recv_buffers_copy(We)%Prj1 = Prj1
-          domain_bc_recv_buffers_copy(We)%Prj2 = Prj2
-          domain_bc_recv_buffers_copy(We)%Prk1 = Prk1
-          domain_bc_recv_buffers_copy(We)%Prk2 = Prk2
-
-
-          allocate(domain_bc_recv_buffers_copy(We)%U(Ui1:Ui2,Uj1:Uj2,Uk1:Uk2))
-          allocate(domain_bc_recv_buffers_copy(We)%V(Vi1:Vi2,Vj1:Vj2,Vk1:Vk2))
-          allocate(domain_bc_recv_buffers_copy(We)%W(Wi1:Wi2,Wj1:Wj2,Wk1:Wk2))
-
-          allocate(domain_bc_recv_buffers_copy(We)%dU_dt(Ui1:Ui2,Uj1:Uj2,Uk1:Uk2))
-          allocate(domain_bc_recv_buffers_copy(We)%dV_dt(Vi1:Vi2,Vj1:Vj2,Vk1:Vk2))
-          allocate(domain_bc_recv_buffers_copy(We)%dW_dt(Wi1:Wi2,Wj1:Wj2,Wk1:Wk2))
-
-          if (enable_buoyancy) then
-            allocate(domain_bc_recv_buffers_copy(We)%Temperature(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
-            allocate(domain_bc_recv_buffers_copy(We)%dTemperature_dt(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
-          end if
-          if (enable_moisture) then
-            allocate(domain_bc_recv_buffers_copy(We)%Moisture(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
-            allocate(domain_bc_recv_buffers_copy(We)%dMoisture_dt(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
-          end if
-
-          domain_bc_recv_buffers_copy(We)%U_mpi_type = U_mpi_subarray_type(Ui1,Ui2,Uj1,Uj2,Uk1,Uk2)
-          domain_bc_recv_buffers_copy(We)%V_mpi_type = V_mpi_subarray_type(Vi1,Vi2,Vj1,Vj2,Vk1,Vk2)
-          domain_bc_recv_buffers_copy(We)%W_mpi_type = W_mpi_subarray_type(Wi1,Wi2,Wj1,Wj2,Wk1,Wk2)
-          !for arrays defined from -1 to Prn+2
-          if (enable_buoyancy.or.enable_moisture) then
-            domain_bc_recv_buffers_copy(We)%Pr_mpi_type = Pr_mpi_subarray_type(Pri1,Pri2,Prj1,Prj2,Prk1,Prk2)
-          end if
-        endif
-
-      end if
-
-    end if !enable_multiple_domains
+#include "custom_domains_setup.f90"
 
   end subroutine
 
@@ -451,22 +255,22 @@ contains
     subroutine send_arrays(b)
       type(dom_bc_buffer_copy), intent(inout) :: b
       
-      call send(b%U, b%U_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 1)
-      call send(b%V, b%V_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 2)
-      call send(b%W, b%W_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 3)
+      call send(b%U, b%U_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 1)
+      call send(b%V, b%V_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 2)
+      call send(b%W, b%W_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 3)
 
-      call send(b%dU_dt, b%U_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 1)
-      call send(b%dV_dt, b%V_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 2)
-      call send(b%dW_dt, b%W_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 3)
+      call send(b%dU_dt, b%U_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 1)
+      call send(b%dV_dt, b%V_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 2)
+      call send(b%dW_dt, b%W_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 3)
 
       if (enable_buoyancy) then
-        call send(b%Temperature, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 4)
-        call send(b%dTemperature_dt, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 4)
+        call send(b%Temperature, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 4)
+        call send(b%dTemperature_dt, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 4)
       end if
 
       if (enable_moisture) then
-        call send(b%Moisture, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 5)
-        call send(b%dMoisture_dt, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*10 + 5)
+        call send(b%Moisture, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 5)
+        call send(b%dMoisture_dt, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 5)
       end if
 
     end subroutine
@@ -475,13 +279,13 @@ contains
       type(dom_bc_buffer_copy), intent(inout) :: b
       real(knd) :: avg
     
-      call recv(b%U, b%U_mpi_type, b%remote_rank, b%comm, domain_index*10 + 1)   
-      call recv(b%V, b%V_mpi_type, b%remote_rank, b%comm, domain_index*10 + 2)     
-      call recv(b%W, b%W_mpi_type, b%remote_rank, b%comm, domain_index*10 + 3)    
+      call recv(b%U, b%U_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
+      call recv(b%V, b%V_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
+      call recv(b%W, b%W_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)    
 
-      call recv(b%dU_dt, b%U_mpi_type, b%remote_rank, b%comm, domain_index*10 + 1)   
-      call recv(b%dV_dt, b%V_mpi_type, b%remote_rank, b%comm, domain_index*10 + 2)     
-      call recv(b%dW_dt, b%W_mpi_type, b%remote_rank, b%comm, domain_index*10 + 3)
+      call recv(b%dU_dt, b%U_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
+      call recv(b%dV_dt, b%V_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
+      call recv(b%dW_dt, b%W_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)
 
       if (b%rescale_dU_dt) then
         !rescales the time derivative to be zero on average
@@ -491,7 +295,7 @@ contains
             avg = sum(b%dU_dt(0, 1:Uny, 1:Unz)) / (Uny*Unz)
             b%dU_dt = b%dU_dt - avg
           case(Ea)
-            avg = sum(b%dU_dt(Unz+1, 1:Uny, 1:Unz)) / (Uny*Unz)
+            avg = sum(b%dU_dt(Unx+1, 1:Uny, 1:Unz)) / (Uny*Unz)
             b%dU_dt = b%dU_dt - avg
           case(So)
             avg = sum(b%dV_dt(1:Vnx, 0, 1:Vnz)) / (Vnx*Vnz)
@@ -509,13 +313,13 @@ contains
       end if
 
       if (enable_buoyancy) then
-        call recv(b%Temperature, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*10 + 4)
-        call recv(b%dTemperature_dt, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*10 + 4)
+        call recv(b%Temperature, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
+        call recv(b%dTemperature_dt, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
       end if
 
       if (enable_moisture) then
-        call recv(b%Moisture, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*10 + 5)
-        call recv(b%dMoisture_dt, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*10 + 5)
+        call recv(b%Moisture, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
+        call recv(b%dMoisture_dt, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
       end if
     end subroutine
 
@@ -562,14 +366,7 @@ contains
 
             select case (component)
               case (1)
-                U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = b%U
-
-                if (b%direction==We .and. b%rescale_compatibility) then
-                    S = sum(U(1,1:Prny,1:Prnz))
-                    S = S / sum(b%U(0,1:Prny,1:Prnz))
-                    U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = S * U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2)  
-                end if
-                  
+                U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = b%U                  
               case (2)
                 U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = b%V
               case (3)
