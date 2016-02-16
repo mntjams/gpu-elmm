@@ -2295,9 +2295,7 @@ contains
     end interface
 #endif
 
-    call BoundU(1,U,Uin)
-    call BoundU(2,V,Vin)
-    call BoundU(3,W,Win)
+    call BoundUVW(U, V, W)
 
     call OutputOut(U,V,W,Pr,Temperature,Moisture)
 

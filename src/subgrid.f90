@@ -1,7 +1,6 @@
 module Subgrid
 
   use Parameters
-  use Boundaries, only: BoundU
 
   implicit none
 

@@ -113,16 +113,9 @@ contains
     real(knd) :: S
     integer   :: i,j,k
 
-!     !$omp parallel
-!     !$omp sections
-!     !$omp section
-    call BoundU(1,U,Uin)
-!     !$omp section
-    call BoundU(2,V,Vin)
-!     !$omp section
-    call BoundU(3,W,Win)
-!     !$omp end sections
-!     !$omp end parallel
+
+    call BoundUVW(U, V, W)
+
 
     if (correctcompatibility>=1) then
       S=0
@@ -336,16 +329,11 @@ contains
     
 
     !$omp end parallel
-!     !$omp sections
-!     !$omp section
-    call BoundU(1,U,Uin)
-!     !$omp section
-    call BoundU(2,V,Vin)
-!     !$omp section
-    call BoundU(3,W,Win)
-!     !$omp section
+
+    call BoundUVW(U, V, W)
+
     call Bound_Pr(Pr)
-!     !$omp end sections
+
 
 
     if (check_divergence) then

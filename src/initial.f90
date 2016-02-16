@@ -1794,9 +1794,7 @@ contains
            enable_moisture.or. &
            num_of_scalars>0)        TDiff = molecular_diffusivity
 
-       call BoundU(1,U,Uin)
-       call BoundU(2,V,Vin)
-       call BoundU(3,W,Win)
+       call BoundUVW(U, V, W)
        call Bound_Pr(Pr)
 
     else   !init conditions not from file
@@ -2073,11 +2071,7 @@ contains
 
        call par_sync_out("  ...setting ghost cell values.")
 
-       call BoundU(1,U,Uin)
-
-       call BoundU(2,V,Vin)
-
-       call BoundU(3,W,Win)
+       call BoundUVW(U, V, W)
 
        call Bound_Pr(Pr)
 
