@@ -12,7 +12,7 @@ module domains_bc_par
   public par_init_domain_boundary_conditions, &
          par_exchange_domain_bounds, &
          par_update_domain_bounds, &
-         par_update_domain_bounds_U, &
+         par_update_domain_bounds_UVW, &
          par_update_domain_bounds_temperature, &
          par_update_domain_bounds_moisture
 
@@ -349,46 +349,40 @@ contains
 
 
 
-  subroutine par_update_domain_bounds_U(U, eff_time, component)
+  subroutine par_update_domain_bounds_UVW(U, V, W, eff_time)
     !effective time, because it can also reflect individual RK stages
-    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U, V, W
     real(knd), intent(in) :: eff_time
-    integer, intent(in) :: component
-    integer :: i
+    integer :: bi
     real(knd) :: S, t_diff
 
     if (enable_multiple_domains) then
 
       if (allocated(domain_bc_recv_buffers_copy)) then
-        do i = lbound(domain_bc_recv_buffers_copy,1), &
-               ubound(domain_bc_recv_buffers_copy,1)
-          associate(b => domain_bc_recv_buffers_copy(i))
+        do bi = lbound(domain_bc_recv_buffers_copy,1), &
+                ubound(domain_bc_recv_buffers_copy,1)
+          associate(b => domain_bc_recv_buffers_copy(bi))
 
-            select case (component)
-              case (1)
-                U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = b%U                  
-              case (2)
-                U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = b%V
-              case (3)
-                U(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = b%W
 
-            end select
+             U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = b%U                  
+
+             V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = b%V
+
+             W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = b%W
+
 
             if (eff_time > b%time) then
               t_diff = eff_time - b%time
 
-              select case (component)
-                case (1)
-                  U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) + &
-                                                           b%dU_dt * t_diff
-                    
-                case (2)
-                  U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = U(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) + &
-                                                           b%dV_dt * t_diff
-                case (3)
-                  U(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = U(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) + &
-                                                           b%dW_dt * t_diff
-              end select
+              U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) + &
+                                                       b%dU_dt * t_diff
+                
+
+              V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) + &
+                                                       b%dV_dt * t_diff
+
+              W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) + &
+                                                       b%dW_dt * t_diff
             end if
           end associate
         end do
