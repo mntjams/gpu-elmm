@@ -33,6 +33,12 @@ module domains_bc_par
     integer :: Ui1, Ui2, Vi1, Vi2, Wi1, Wi2, Pri1, Pri2
     integer :: Uj1, Uj2, Vj1, Vj2, Wj1, Wj2, Prj1, Prj2
     integer :: Uk1, Uk2, Vk1, Vk2, Wk1, Wk2, Prk1, Prk2
+
+    !grid coordinates of the boundary region (from 1 to 2)
+    integer :: bUi1, bUi2, bVi1, bVi2, bWi1, bWi2, bPri1, bPri2
+    integer :: bUj1, bUj2, bVj1, bVj2, bWj1, bWj2, bPrj1, bPrj2
+    integer :: bUk1, bUk2, bVk1, bVk2, bWk1, bWk2, bPrk1, bPrk2
+
     !the most simple type, just a copy, no interpolation
     !the grid resolution must be identical
     !the boundary position must always exactly coincide with the grid cell boundaries
@@ -364,25 +370,25 @@ contains
           associate(b => domain_bc_recv_buffers_copy(bi))
 
 
-             U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = b%U                  
+             U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = b%U (b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)                 
 
-             V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = b%V
+             V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = b%V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)
 
-             W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = b%W
+             W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = b%W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)
 
 
             if (eff_time > b%time) then
               t_diff = eff_time - b%time
 
-              U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) + &
-                                                       b%dU_dt * t_diff
+              U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) + &
+                                                       b%dU_dt(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) * t_diff
                 
 
-              V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) + &
-                                                       b%dV_dt * t_diff
+              V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) + &
+                                                       b%dV_dt(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) * t_diff
 
-              W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) + &
-                                                       b%dW_dt * t_diff
+              W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) + &
+                                                       b%dW_dt(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) * t_diff
             end if
           end associate
         end do
@@ -408,13 +414,14 @@ contains
                ubound(domain_bc_recv_buffers_copy,1)
           associate(b => domain_bc_recv_buffers_copy(i))
 
-              Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = b%Temperature
+              Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
+                b%Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)
 
               t_diff = eff_time - b%time
               if (t_diff > 0) then
-                  Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = &
-                  Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) + &
-                                                            b%dTemperature_dt * t_diff
+                  Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
+                  Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) + &
+                    b%dTemperature_dt(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) * t_diff
               end if
 
           end associate
@@ -439,13 +446,14 @@ contains
                ubound(domain_bc_recv_buffers_copy,1)
           associate(b => domain_bc_recv_buffers_copy(i))
 
-              Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = b%Moisture
+              Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
+                b%Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)
 
               t_diff = eff_time - b%time
               if (t_diff > 0) then
-                  Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = &
-                  Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) + &
-                                                            b%dMoisture_dt * t_diff
+                  Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
+                  Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) + &
+                    b%dMoisture_dt(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) * t_diff
               end if
 
           end associate
@@ -472,38 +480,40 @@ contains
                ubound(domain_bc_recv_buffers_copy,1)
           associate(b => domain_bc_recv_buffers_copy(i))
 
-              U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = b%U
+              U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = b%U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)
 
-              V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = b%V
+              V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = b%V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)
 
-              W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = b%W
+              W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = b%W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)
 
               if (enable_buoyancy) then
-                Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = b%Temperature
+                Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
+                  b%Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)
               end if
               if (enable_moisture) then
-                Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = b%Moisture
+                Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
+                  b%Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)
               end if
 
               if (eff_time > b%time) then
                 t_diff = eff_time - b%time
 
-                U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) + &
-                                                         b%dU_dt * t_diff
-                V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) = V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) + &
-                                                         b%dV_dt * t_diff
-                W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) = W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) + &
-                                                         b%dW_dt * t_diff
+                U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) + &
+                                                         b%dU_dt(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) * t_diff
+                V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) + &
+                                                         b%dV_dt(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) * t_diff
+                W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) + &
+                                                         b%dW_dt(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) * t_diff
 
                 if (enable_buoyancy) then
-                  Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = &
-                  Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) + &
-                                                            b%dTemperature_dt * t_diff
+                  Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
+                  Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) + &
+                    b%dTemperature_dt(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) * t_diff
                 end if
                 if (enable_moisture) then
-                  Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) = &
-                  Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) + &
-                                                           b%dMoisture_dt * t_diff
+                  Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
+                  Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) + &
+                    b%dMoisture_dt(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) * t_diff
                 end if
               end if
 
