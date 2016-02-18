@@ -33,6 +33,8 @@ program CLMM
 
   integer(dbl) :: time_steps_timer_count_1, time_steps_timer_count_2
 
+  logical :: error_exit = .false.
+
 
   call par_init
 
@@ -121,14 +123,16 @@ program CLMM
           time_stepping%variable_time_steps .and. &
           time_stepping%dt < time_stepping%dt_min) then
         if (master) write (*,*) "Solution diverged."
+        error_exit = .true.
         exit
       endif
 
       if (time_step>=3 .and. &
           .not.time_stepping%variable_time_steps .and. &
-          .not.time_stepping%enable_CFL_check .and. &
+          time_stepping%enable_CFL_check .and. &
           time_stepping%CFL > time_stepping%CFL_max) then
         if (master) write (*,*) "Solution diverged."
+        error_exit = .true.
         exit
       endif
 
@@ -154,8 +158,13 @@ program CLMM
 
   call DeallocateGlobals
 
-  call par_finalize
-
+#ifdef PAR
+  if (error_exit .and. enable_multiple_domains .and. number_of_domains>1) then
+    call error_stop("Error, one of the domains stopped.")
+  else
+    call par_finalize
+  end if
+#endif
 
 
 contains
