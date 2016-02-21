@@ -210,7 +210,7 @@ contains
      call par_sync_all()
      
      if (myim==j) then
-       do k = 1, 1000
+       do k = 1, 10
          call system("mkdir -p "//output_dir)
          open(newunit=u, file=output_dir//"test", status="replace", iostat=io)
          if (io==0) then
@@ -219,7 +219,7 @@ contains
          end if
          call sleep(1)
          
-         if (k==1000) call error_stop("Error, unable to create "//output_dir)
+         if (k==10) call error_stop("Error, unable to create "//output_dir)
        end do
      end if
      
