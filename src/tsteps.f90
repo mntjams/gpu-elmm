@@ -146,6 +146,12 @@ contains
       end if
 
 
+#ifdef PAR
+      !Does nudging of the solution to the parent boundary solution in the relaxation zones.
+      call par_domain_bound_relaxation(U, V, W, Temperature, Moisture, Scalar, time_stepping%effective_time)
+#endif
+
+
       if (pressure_solution%poisson_solver > POISSON_SOLVER_NONE) then
         call PressureCorrection(U2, V2, W2, Pr, Q, 2*RK_alpha(RK_stage)*time_stepping%dt)
       end if

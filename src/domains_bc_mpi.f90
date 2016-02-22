@@ -14,13 +14,16 @@ module domains_bc_par
          par_update_domain_bounds, &
          par_update_domain_bounds_UVW, &
          par_update_domain_bounds_temperature, &
-         par_update_domain_bounds_moisture
+         par_update_domain_bounds_moisture, &
+         par_domain_bound_relaxation
 
   type dom_bc_buffer_copy
     logical :: enabled = .false.
 
     logical :: rescale_compatibility = .false.
     logical :: rescale_dU_dt = .true.
+
+    logical :: relaxation = .true.
 
     integer :: remote_domain
     !This is the index of the cell boundary corresponding to the domain boundary 
@@ -471,14 +474,14 @@ contains
     real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(inout) :: Scalar
     real(knd), intent(in) :: eff_time
     real(knd) :: t_diff
-    integer :: i
+    integer :: bi
 
     if (enable_multiple_domains) then
 
       if (allocated(domain_bc_recv_buffers_copy)) then
-        do i = lbound(domain_bc_recv_buffers_copy,1), &
-               ubound(domain_bc_recv_buffers_copy,1)
-          associate(b => domain_bc_recv_buffers_copy(i))
+        do bi = lbound(domain_bc_recv_buffers_copy,1), &
+                ubound(domain_bc_recv_buffers_copy,1)
+          associate(b => domain_bc_recv_buffers_copy(bi))
 
               U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = b%U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)
 
@@ -524,5 +527,86 @@ contains
     end if
 
   end subroutine
+
+
+  subroutine par_domain_bound_relaxation(U, V, W, Temperature, Moisture, Scalar, eff_time)
+    !effective time, because it can also reflect individual RK stages
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U, V ,W 
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Temperature, Moisture
+    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(inout) :: Scalar
+    real(knd), intent(in) :: eff_time
+    real(knd) :: t_diff
+    integer :: bi
+
+    if (enable_multiple_domains) then
+
+      if (allocated(domain_bc_recv_buffers_copy)) then
+        do bi = lbound(domain_bc_recv_buffers_copy,1), &
+                ubound(domain_bc_recv_buffers_copy,1)
+          associate(b => domain_bc_recv_buffers_copy(bi))
+
+            if (b%relaxation) then
+
+              t_diff = eff_time - b%time
+
+              select case(b%direction)
+                case (We)
+                  call relax_domain_We(b)
+                case (Ea)
+                  call relax_domain_Ea(b)
+                case (So)
+                case (No)
+                case (Bo)
+                case (To)
+              end select
+            end if
+          end associate
+        end do
+      end if
+
+    end if
+  contains
+
+    subroutine relax_domain_We(b)
+      type(dom_bc_buffer_copy), intent(in) :: b
+      real, parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
+
+      U(1,1:Uny,1:Unz) = ca(1) * U(1,1:Uny,1:Unz) + &
+              cb(1) * (b%U(1,1:Uny,1:Unz) + t_diff * b%dU_dt(1,1:Uny,1:Unz))
+      U(2,1:Uny,1:Unz) = ca(2) * U(2,1:Uny,1:Unz) + &
+              cb(2) * (b%U(2,1:Uny,1:Unz) + t_diff * b%dU_dt(2,1:Uny,1:Unz))
+
+      V(1,1:Vny,1:Vnz) = ca(1) * V(1,1:Vny,1:Vnz) + &
+              cb(1) * (b%V(1,1:Vny,1:Vnz) + t_diff * b%dV_dt(1,1:Vny,1:Vnz))
+      V(2,1:Vny,1:Vnz) = ca(2) * V(2,1:Vny,1:Vnz) + &
+              cb(2) * (b%V(2,1:Vny,1:Vnz) + t_diff * b%dV_dt(2,1:Vny,1:Vnz))
+
+      W(1,1:Wny,1:Wnz) = ca(1) * W(1,1:Wny,1:Wnz) + &
+              cb(1) * (b%W(1,1:Wny,1:Wnz) + t_diff * b%dW_dt(1,1:Wny,1:Wnz))
+      W(2,1:Wny,1:Wnz) = ca(2) * W(2,1:Wny,1:Wnz) + &
+              cb(2) * (b%W(2,1:Wny,1:Wnz) + t_diff * b%dW_dt(2,1:Wny,1:Wnz))
+    end subroutine
+
+    subroutine relax_domain_Ea(b)
+      type(dom_bc_buffer_copy), intent(in) :: b
+      real, parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
+
+      U(Unx,1:Uny,1:Unz) = ca(1) * U(Unx,1:Uny,1:Unz) + &
+              cb(1) * (b%U(Unx,1:Uny,1:Unz) + t_diff * b%dU_dt(Unx,1:Uny,1:Unz))
+      U(Unx-1,1:Uny,1:Unz) = ca(2) * U(Unx-1,1:Uny,1:Unz) + &
+              cb(2) * (b%U(Unx-1,1:Uny,1:Unz) + t_diff * b%dU_dt(Unx-1,1:Uny,1:Unz))
+
+      V(Vnx,1:Vny,1:Vnz) = ca(1) * V(Vnx,1:Vny,1:Vnz) + &
+              cb(1) * (b%V(Vnx,1:Vny,1:Vnz) + t_diff * b%dV_dt(Vnx,1:Vny,1:Vnz))
+      V(Vnx-1,1:Vny,1:Vnz) = ca(2) * V(Vnx-1,1:Vny,1:Vnz) + &
+              cb(2) * (b%V(Vnx-1,1:Vny,1:Vnz) + t_diff * b%dV_dt(Vnx-1,1:Vny,1:Vnz))
+
+      W(Wnx,1:Wny,1:Wnz) = ca(1) * W(Wnx,1:Wny,1:Wnz) + &
+              cb(1) * (b%W(Wnx,1:Wny,1:Wnz) + t_diff * b%dW_dt(Wnx,1:Wny,1:Wnz))
+      W(Wnx-1,1:Wny,1:Wnz) = ca(2) * W(Wnx-1,1:Wny,1:Wnz) + &
+              cb(2) * (b%W(Wnx-1,1:Wny,1:Wnz) + t_diff * b%dW_dt(Wnx-1,1:Wny,1:Wnz))
+    end subroutine
+
+  end subroutine par_domain_bound_relaxation
 
 end module domains_bc_par
