@@ -32,7 +32,7 @@ module custom_par
   !number of the domain
   integer :: number_of_domains = 1
   
-  type domain_grid
+  type domain_proc_grid
     integer, allocatable :: arr(:,:,:)
   end type
 
@@ -46,8 +46,26 @@ module custom_par
                           domain_comms_union(:,:), &
                           domain_groups_union(:,:)
 
-  type(domain_grid), allocatable :: domain_images_grid(:), &
-                                    domain_ranks_grid(:)
+  !image numbers and rank numbers (in world_comm)
+  type(domain_proc_grid), allocatable :: domain_images_grid(:), &
+                                         domain_ranks_grid(:)
+
+  type domain_computational_grids
+    real(knd) :: xmin, xmax, ymin, ymax, zmin, zmax
+    real(knd) :: dx, dy, dz
+    !numbers of cells
+    integer   :: nx, ny, nz
+    !offsets to global grid numbering in the domain offsets_x(nxims), offsets_y(nyims), offsets_z(nzims)
+    integer, allocatable :: offsets_x(:), offsets_y(:), offsets_z(:)
+    !numbers of cells nxs(nxims), nys(nyims), nzs(nzims)
+    integer, allocatable :: nxs(:), nys(:), nzs(:)
+    !extents images in the domain xmins(nxims)...
+    real(knd), allocatable :: xmins(:), xmaxs(:), ymins(:), ymaxs(:), zmins(:), zmaxs(:)
+  end type
+
+
+  !the actual computational grids of each domain
+  type(domain_computational_grids), allocatable :: domain_grids(:)
 
   
   !at which number starts numbering of this domain?
@@ -456,20 +474,9 @@ contains
 
 
   subroutine par_init_domain_grids
+    use Parameters
     integer :: dom
     integer :: ie
-  
-    interface
-      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
-        import
-        integer :: SENDBUF, RECVBUF(*)
-        integer :: COUNT, DATATYPE, OP, COMM, IERROR
-      end subroutine
-      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
-            integer :: BUFFER(*)
-            integer :: COUNT, DATATYPE, ROOT, COMM, IERROR
-      end subroutine
-    end interface
 
     domain_nxims(domain_index) = nxims
     domain_nyims(domain_index) = nyims
@@ -495,8 +502,8 @@ contains
                                            domain_nzims(dom)))
       domain_images_grid(dom)%arr = 0
       allocate(domain_ranks_grid(dom)%arr(domain_nxims(dom), &
-                                           domain_nyims(dom), &
-                                           domain_nzims(dom)))
+                                          domain_nyims(dom), &
+                                          domain_nzims(dom)))
       domain_ranks_grid(dom)%arr = 0
     end do
     domain_images_grid(domain_index)%arr(iim, jim, kim) = my_world_im
@@ -512,7 +519,167 @@ contains
                      MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
       domain_ranks_grid(dom)%arr = domain_images_grid(dom)%arr - 1
     end do 
+
   
+    allocate(domain_grids(number_of_domains))
+
+    do dom = 1, number_of_domains
+      allocate(domain_grids(dom)%nxs(domain_nxims(dom)))
+      domain_grids(dom)%nxs = 0
+
+      allocate(domain_grids(dom)%nys(domain_nyims(dom)))
+      domain_grids(dom)%nys = 0
+
+      allocate(domain_grids(dom)%nzs(domain_nzims(dom)))
+      domain_grids(dom)%nzs = 0
+
+      allocate(domain_grids(dom)%offsets_x(domain_nxims(dom)))
+      domain_grids(dom)%offsets_x = 0
+
+      allocate(domain_grids(dom)%offsets_y(domain_nyims(dom)))
+      domain_grids(dom)%offsets_y = 0
+
+      allocate(domain_grids(dom)%offsets_z(domain_nzims(dom)))
+      domain_grids(dom)%offsets_z = 0
+
+      allocate(domain_grids(dom)%xmins(domain_nxims(dom)))
+      domain_grids(dom)%xmins = 0
+      allocate(domain_grids(dom)%xmaxs(domain_nxims(dom)))
+      domain_grids(dom)%xmaxs = 0
+
+      allocate(domain_grids(dom)%ymins(domain_nyims(dom)))
+      domain_grids(dom)%ymins = 0
+      allocate(domain_grids(dom)%ymaxs(domain_nyims(dom)))
+      domain_grids(dom)%ymaxs = 0
+
+      allocate(domain_grids(dom)%zmins(domain_nzims(dom)))
+      domain_grids(dom)%zmins = 0
+      allocate(domain_grids(dom)%zmaxs(domain_nzims(dom)))
+      domain_grids(dom)%zmaxs = 0
+
+    end do
+
+    domain_grids(domain_index)%xmin = gxmin
+    domain_grids(domain_index)%xmax = gxmax
+    domain_grids(domain_index)%ymin = gymin
+    domain_grids(domain_index)%ymax = gymax
+    domain_grids(domain_index)%zmin = gzmin
+    domain_grids(domain_index)%zmax = gzmax
+
+    domain_grids(domain_index)%dx = dxmin
+    domain_grids(domain_index)%dy = dymin
+    domain_grids(domain_index)%dz = dzmin
+
+    domain_grids(domain_index)%nx = gPrnx
+    domain_grids(domain_index)%ny = gPrny
+    domain_grids(domain_index)%nz = gPrnz
+
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_grids(dom)%xmin, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%xmax, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%ymin, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%ymax, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%zmin, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%zmax, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+
+      call MPI_Bcast(domain_grids(dom)%dx, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%dy, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%dz, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+
+      call MPI_Bcast(domain_grids(dom)%nx, 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%ny, 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%nz, 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+
+    end do
+
+    domain_grids(domain_index)%nxs(iim) = Prnx
+    domain_grids(domain_index)%nys(jim) = Prny
+    domain_grids(domain_index)%nzs(kim) = Prnz
+    
+    domain_grids(domain_index)%offsets_x(iim) = offset_to_global_x
+    domain_grids(domain_index)%offsets_y(jim) = offset_to_global_y
+    domain_grids(domain_index)%offsets_z(kim) = offset_to_global_z
+    
+    domain_grids(domain_index)%xmins(iim) = im_xmin
+    domain_grids(domain_index)%xmaxs(iim) = im_xmax
+    domain_grids(domain_index)%ymins(jim) = im_ymin
+    domain_grids(domain_index)%ymaxs(jim) = im_ymax
+    domain_grids(domain_index)%zmins(kim) = im_zmin
+    domain_grids(domain_index)%zmaxs(kim) = im_zmax
+
+    
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%nxs, &
+                       size(domain_grids(domain_index)%nxs), MPI_INTEGER, MPI_SUM, comm_row_x, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%nys, &
+                       size(domain_grids(domain_index)%nys), MPI_INTEGER, MPI_SUM, comm_row_y, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%nzs, &
+                       size(domain_grids(domain_index)%nzs), MPI_INTEGER, MPI_SUM, comm_row_z, ie)
+
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%offsets_x, &
+                       size(domain_grids(domain_index)%offsets_x), MPI_INTEGER, MPI_SUM, comm_row_x, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%offsets_y, &
+                       size(domain_grids(domain_index)%offsets_y), MPI_INTEGER, MPI_SUM, comm_row_y, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%offsets_z, &
+                       size(domain_grids(domain_index)%offsets_z), MPI_INTEGER, MPI_SUM, comm_row_z, ie)
+
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%xmins, &
+                       size(domain_grids(domain_index)%xmins), MPI_KND, MPI_SUM, comm_row_x, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%xmaxs, &
+                       size(domain_grids(domain_index)%xmaxs), MPI_KND, MPI_SUM, comm_row_x, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%ymins, &
+                       size(domain_grids(domain_index)%ymins), MPI_KND, MPI_SUM, comm_row_y, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%ymaxs, &
+                       size(domain_grids(domain_index)%ymaxs), MPI_KND, MPI_SUM, comm_row_y, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%zmins, &
+                       size(domain_grids(domain_index)%zmins), MPI_KND, MPI_SUM, comm_row_z, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%zmaxs, &
+                       size(domain_grids(domain_index)%zmaxs), MPI_KND, MPI_SUM, comm_row_z, ie)
+
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_grids(dom)%nxs, size(domain_grids(dom)%nxs), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%nys, size(domain_grids(dom)%nys), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%nzs, size(domain_grids(dom)%nzs), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+    end do
+
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_grids(dom)%offsets_x, size(domain_grids(dom)%offsets_x), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%offsets_y, size(domain_grids(dom)%offsets_y), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%offsets_z, size(domain_grids(dom)%offsets_z), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+    end do
+
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_grids(dom)%xmins, size(domain_grids(dom)%xmins), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%xmaxs, size(domain_grids(dom)%xmaxs), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%ymins, size(domain_grids(dom)%ymins), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%ymaxs, size(domain_grids(dom)%ymaxs), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%zmins, size(domain_grids(dom)%zmins), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%zmaxs, size(domain_grids(dom)%zmaxs), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+    end do
+
   end subroutine par_init_domain_grids
 
 
@@ -521,9 +688,8 @@ contains
   subroutine par_init_grid
     use PoisFFT
     use iso_c_binding
-    use Parameters, only: gPrnx, gPrny, gPrnz, gPrns, Prnx, Prny, Prnz, &
-                          offset_to_global_x, offset_to_global_y, offset_to_global_z, &
-                          offsets_to_global, output_dir, image_input_dir
+    use Parameters
+
     use strings, only: itoa
     
     integer(c_intptr_t) :: ng(3), nxyz(3), off(3), nxyz2(3), nsxyz2(3)
@@ -630,6 +796,14 @@ contains
     offset_to_global_z = int(off(3))
     
     offsets_to_global = int(off)
+print *, domain_index,iim,jim,kim,offsets_to_global
+    im_xmin = gxmin + offset_to_global_x * dxmin
+    im_ymin = gymin + offset_to_global_y * dymin
+    im_zmin = gzmin + offset_to_global_z * dzmin
+
+    im_xmax = im_xmin + Prnx * dxmin
+    im_ymax = im_ymin + Prny * dymin
+    im_zmax = im_zmin + Prnz * dzmin
 
     if (enable_multiple_domains) call par_init_domain_grids
    

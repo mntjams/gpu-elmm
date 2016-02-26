@@ -63,16 +63,10 @@ module domains_bc_par
     integer :: time_step_ratio = 1 
   end type
 
-  type, extends(dom_bc_buffer_copy) :: dom_bc_buffer_copy_subset
-    !grid coordinates of the receive buffer (from 1 to 2)
-    integer :: r_Ui1, r_Ui2, r_Vi1, r_Vi2, r_Wi1, r_Wi2, r_Pri1, r_Pri2
-    integer :: r_Uj1, r_Uj2, r_Vj1, r_Vj2, r_Wj1, r_Wj2, r_Prj1, r_Prj2
-    integer :: r_Uk1, r_Uk2, r_Vk1, r_Vk2, r_Wk1, r_Wk2, r_Prk1, r_Prk2
-   end type
 
   !send buffers should be indexed from 1, there may be more of them from several nested domains
   !they are not accessed by the boundary conditions routines
-  type(dom_bc_buffer_copy), allocatable :: domain_bc_send_buffers_copy(:)
+  type(dom_bc_buffer_copy), allocatable :: domain_bc_send_buffers(:)
   !receive buffers should be indexed with the index of the domain side (West to Top)
   ! to ease finding the right buffer to a given nested boundary 
   type(dom_bc_buffer_copy), allocatable :: domain_bc_recv_buffers_copy(:)
@@ -190,10 +184,10 @@ contains
 
     if (enable_multiple_domains) then
 
-      if (allocated(domain_bc_send_buffers_copy)) then
-        do i = lbound(domain_bc_send_buffers_copy,1), &
-               ubound(domain_bc_send_buffers_copy,1)
-          associate(b => domain_bc_send_buffers_copy(i))
+      if (allocated(domain_bc_send_buffers)) then
+        do i = lbound(domain_bc_send_buffers,1), &
+               ubound(domain_bc_send_buffers,1)
+          associate(b => domain_bc_send_buffers(i))
 
             if (b%enabled) then
               !derivatives approximated by the backward difference

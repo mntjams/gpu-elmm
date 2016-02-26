@@ -60,6 +60,23 @@ module Parameters
   
   integer :: offset_to_global_x = 0, offset_to_global_y = 0, offset_to_global_z = 0
   integer :: gPrns(3), offsets_to_global(3) = 0
+
+
+  !the domain's (global) extents
+  real(knd) :: gxmin, gxmax, gymin, gymax, gzmin, gzmax
+
+  !the image's extents
+  real(knd) :: im_xmin, im_xmax, im_ymin, im_ymax, im_zmin, im_zmax
+
+  real(knd), allocatable :: xU(:), xPr(:), yV(:), yPr(:), zW(:), zPr(:)          !coordinates of grid points
+  real(knd), allocatable :: dxU(:), dxPr(:), dyV(:), dyPr(:), dzW(:), dzPr(:)    !dxPr(i)=xU(i)-xU(i-1), dxU(i)=xPr(i+1)-xPr(i)
+
+
+
+
+
+
+
   
   type time_step_control
     integer   :: max_number_of_time_steps = 2**30 !maximum number of time steps
@@ -160,10 +177,11 @@ module Parameters
 
   real(knd), allocatable :: TempIn(:,:), MoistIn(:,:)
 
-  real(knd) :: gxmin, gxmax, gymin, gymax, gzmin, gzmax
 
-  real(knd), allocatable :: xU(:), xPr(:), yV(:), yPr(:), zW(:), zPr(:)          !coordinates of grid points
-  real(knd), allocatable :: dxU(:), dxPr(:), dyV(:), dyPr(:), dzW(:), dzPr(:)    !dxPr(i)=xU(i)-xU(i-1), dxU(i)=xPr(i+1)-xPr(i)
+
+
+
+
 
   real(knd) :: x_axis_azimuth = 90!true geographic heading of the x axis in degrees
 

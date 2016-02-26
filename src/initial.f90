@@ -797,6 +797,14 @@ contains
    end if
 
 
+   im_xmin = gxmin
+   im_ymin = gymin
+   im_zmin = gzmin
+
+   im_xmax = gxmax
+   im_ymax = gymax
+   im_zmax = gzmax
+
 #ifdef PAR
    call get_domains("domains.conf")
 
@@ -804,9 +812,9 @@ contains
    
    call par_init_boundaries
    
-   x0 = x0 + offset_to_global_x * dxmin
-   y0 = y0 + offset_to_global_y * dymin
-   z0 = z0 + offset_to_global_z * dzmin
+   x0 = im_xmin
+   y0 = im_ymin
+   z0 = im_zmin
 #endif
 
 
@@ -2861,30 +2869,28 @@ fields_do:  do j = 1, size(fields)
 
       if (Btype(We)==BC_PERIODIC) then
         do j = -1, -3, -1
-          xU2(j) = xU2(0)-(xU2(nx)-xU2(nx+j))
+          xU2(j) = xU2(0) - (xU2(nx)-xU2(nx+j))
         end do
       else
         do j = -1, -3, -1
-          xU2(j) = xU2(0)-(xU2(0-j)-xU2(0))
+          xU2(j) = xU2(0) - (xU2(0-j)-xU2(0))
         end do
       end if
 
       if (Btype(Ea)==BC_PERIODIC) then
         do j = nx+1, nx+4
-          xU2(j) = xU2(nx)+(xU2(j-nx)-xU2(0))
+          xU2(j) = xU2(nx) + (xU2(j-nx)-xU2(0))
         end do
       else
         do j = nx+1, nx+4
-          xU2(j) = xU2(nx)+(xU2(nx)-xU2(nx-(j-nx)))
+          xU2(j) = xU2(nx) + (xU2(nx)-xU2(nx-(j-nx)))
         end do
       end if
-
-      x0 = xU2(0)
 
     else
 
       forall (i=-3:nx+4)
-         xU2(i)=(i)*dxmin+x0
+         xU2(i) = i * dxmin + im_xmin
       end forall
 
     end if
@@ -2902,21 +2908,21 @@ fields_do:  do j = 1, size(fields)
 
       if (Btype(So)==BC_PERIODIC) then
         do j = -1, -3, -1
-          yV2(j) = yV2(0)-(yV2(ny)-yV2(ny+j))
+          yV2(j) = yV2(0) - (yV2(ny)-yV2(ny+j))
         end do
       else
         do j = -1, -3, -1
-          yV2(j) = yV2(0)-(yV2(0-j)-yV2(0))
+          yV2(j) = yV2(0) - (yV2(0-j)-yV2(0))
         end do
       end if
 
       if (Btype(No)==BC_PERIODIC) then
         do j = ny+1, ny+4
-          yV2(j) = yV2(ny)+(yV2(j-ny)-yV2(0))
+          yV2(j) = yV2(ny) + (yV2(j-ny)-yV2(0))
         end do
       else
         do j = ny+1, ny+4
-          yV2(j) = yV2(ny)+(yV2(ny)-yV2(ny-(j-ny)))
+          yV2(j) = yV2(ny) + (yV2(ny)-yV2(ny-(j-ny)))
         end do
       end if
 
@@ -2925,7 +2931,7 @@ fields_do:  do j = 1, size(fields)
     else
 
       forall (j=-3:ny+4)
-        yV2(j)=(j)*dymin+y0
+        yV2(j) = j * dymin + im_ymin
       end forall
 
     end if
@@ -2943,21 +2949,21 @@ fields_do:  do j = 1, size(fields)
 
       if (Btype(Bo)==BC_PERIODIC) then
         do j = -1, -3, -1
-          zW2(j) = zW2(0)-(zW2(nz)-zW2(nz+j))
+          zW2(j) = zW2(0) - (zW2(nz)-zW2(nz+j))
         end do
       else
         do j = -1, -3, -1
-          zW2(j) = zW2(0)-(zW2(0-j)-zW2(0))
+          zW2(j) = zW2(0) - (zW2(0-j)-zW2(0))
         end do
       end if
 
       if (Btype(To)==BC_PERIODIC) then
         do j = nz+1, nz+4
-          zW2(j) = zW2(nz)+(zW2(j-nz)-zW2(0))
+          zW2(j) = zW2(nz) + (zW2(j-nz)-zW2(0))
         end do
       else
         do j = nz+1, nz+4
-          zW2(j) = zW2(nz)+(zW2(nz)-zW2(nz-(j-nz)))
+          zW2(j) = zW2(nz) + (zW2(nz)-zW2(nz-(j-nz)))
         end do
       end if
 
@@ -2966,7 +2972,7 @@ fields_do:  do j = 1, size(fields)
     else
 
        forall (k=-3:nz+4)
-         zW2(k)=(k)*dzmin+z0
+         zW2(k) = k * dzmin + im_zmin
        end forall
 
     end if
@@ -2995,17 +3001,17 @@ fields_do:  do j = 1, size(fields)
     zW = zW2(nzdown-3:nzup+3)
 
     forall (i=-2:nx+4)
-      xPr(i)=(xU(i-1)+xU(i))/2._knd
+      xPr(i) = (xU(i-1)+xU(i))/2._knd
       dxPr(i) = xU(i)-xU(i-1)
     end forall
 
     forall (j=-2:ny+4)
-      yPr(j)=(yV(j-1)+yV(j))/2._knd
+      yPr(j) = (yV(j-1)+yV(j))/2._knd
       dyPr(j) = yV(j)-yV(j-1)
     end forall
 
     forall (k=-2:nz+4)
-      zPr(k)=(zW(k-1)+zW(k))/2._knd
+      zPr(k) = (zW(k-1)+zW(k))/2._knd
       dzPr(k) = zW(k)-zW(k-1)
     end forall
 
