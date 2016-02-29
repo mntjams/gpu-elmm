@@ -1,4 +1,14 @@
 #include <stdint.h>
-uint32_t sum_and_overflow(uint32_t a, uint32_t b) {
-  return a + b;
-}
+#include <memory.h>
+
+int32_t sum_and_overflow (int32_t a, int32_t b)
+{
+  uint32_t au, bu, su;
+  int32_t s;
+ 
+  memcpy(&au, &a, sizeof(a));
+  memcpy(&bu, &b, sizeof(b));
+  su = au + bu;
+  memcpy(&s, &su, sizeof(s));
+  return s;
+} 
