@@ -223,10 +223,14 @@ contains
 
         call TemperatureVolumeSources(Temperature_adv)
 
-        if (TempBtype(To)==AUTOMATICflux) then
+        if (TempBtype(To)==AUTOMATICFLUX) then
           first = min(Prnz*5/6, Prnz-5)
           last = Prnz-5
           sideTemp(To) = sum(temperature_flux_profile(first:last)) / (last-first+1)
+
+          do i = 1, size(WMPoints)
+            if (WMPoints(i)%zk==Prnz) WMPoints(i)%temperature_flux = - sideTemp(To)
+          end do
         end if
 
         do i = 1, size(WMPoints)
