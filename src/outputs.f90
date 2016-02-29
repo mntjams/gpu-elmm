@@ -197,7 +197,7 @@ contains
     use custom_par
     use Strings
     use Wallmodels
-    integer :: k, u, io
+    integer :: j, k, u, io
 
    call GetEndianness
 
@@ -206,14 +206,24 @@ contains
 #if defined(_WIN32) || defined(_WIN64)
    call system("mkdir "//output_dir)
 #else
-   do k = 1, 1000
-     call system("mkdir -p "//output_dir)
-     open(newunit=u, file=output_dir//"test", status="replace", iostat=io)
-     if (io==0) then
-       close(u, status="delete")
-       exit
+   do j = 1, nims
+     call par_sync_all()
+     
+     if (myim==j) then
+       do k = 1, 10
+         call system("mkdir -p "//output_dir)
+         open(newunit=u, file=output_dir//"test", status="replace", iostat=io)
+         if (io==0) then
+           close(u, status="delete")
+           exit
+         end if
+         call sleep(1)
+         
+         if (k==10) call error_stop("Error, unable to create "//output_dir)
+       end do
      end if
-     call sleep(1)
+     
+     call par_sync_all()
    end do
 #endif
 
@@ -672,8 +682,9 @@ contains
   contains
     subroutine create(fname)
       character(*) :: fname
-      integer :: unit
-      open(newunit=unit,file=fname,status="replace")
+      integer :: unit, io
+      open(newunit=unit,file=fname,status="replace",iostat=io)
+      if (io/=0) call error_stop("Error, unable to create "//fname)
       close(unit)
     end subroutine  
   end subroutine InitTimeSeries

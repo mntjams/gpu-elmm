@@ -109,7 +109,7 @@ program CLMM
         exit
       endif
 
-      if (time_step>=3 .and. dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/30._knd)) then
+      if (time_step>=3 .and. dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/300._knd)) then
         if (master) write (*,*) "Solution diverged."
         exit
       endif
