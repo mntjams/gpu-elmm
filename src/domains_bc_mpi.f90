@@ -461,7 +461,7 @@ contains
 
     subroutine relax_domain_copy_We(b)
       type(dom_bc_buffer_copy), intent(in) :: b
-      real, parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
+      real(knd), parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
 
       U(1,1:Uny,1:Unz) = ca(1) * U(1,1:Uny,1:Unz) + &
               cb(1) * (b%U(1,1:Uny,1:Unz) + t_diff * b%dU_dt(1,1:Uny,1:Unz))
@@ -481,7 +481,7 @@ contains
 
     subroutine relax_domain_copy_Ea(b)
       type(dom_bc_buffer_copy), intent(in) :: b
-      real, parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
+      real(knd), parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
 
       U(Unx,1:Uny,1:Unz) = ca(1) * U(Unx,1:Uny,1:Unz) + &
               cb(1) * (b%U(Unx,1:Uny,1:Unz) + t_diff * b%dU_dt(Unx,1:Uny,1:Unz))
@@ -501,7 +501,7 @@ contains
 
     subroutine relax_domain_copy_So(b)
       type(dom_bc_buffer_copy), intent(in) :: b
-      real, parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
+      real(knd), parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
 
       U(1:Unx,1,1:Unz) = ca(1) * U(1:Unx,1,1:Unz) + &
               cb(1) * (b%U(1:Unx,1,1:Unz) + t_diff * b%dU_dt(1:Unx,1,1:Unz))
@@ -521,7 +521,7 @@ contains
 
     subroutine relax_domain_copy_No(b)
       type(dom_bc_buffer_copy), intent(in) :: b
-      real, parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
+      real(knd), parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
 
       U(1:Unx,Uny,1:Unz) = ca(1) * U(1:Unx,Uny,1:Unz) + &
               cb(1) * (b%U(1:Unx,Uny,1:Unz) + t_diff * b%dU_dt(1:Unx,Uny,1:Unz))
@@ -541,7 +541,7 @@ contains
 
     subroutine relax_domain_copy_To(b)
       type(dom_bc_buffer_copy), intent(in) :: b
-      real, parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
+      real(knd), parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
 
       U(1:Unx,1:Uny,Unz) = ca(1) * U(1:Unx,1:Uny,Unz) + &
               cb(1) * (b%U(1:Unx,1:Uny,Unz) + t_diff * b%dU_dt(1:Unx,1:Uny,Unz))
