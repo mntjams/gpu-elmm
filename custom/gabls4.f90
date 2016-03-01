@@ -3,9 +3,8 @@ module Custom_gabls4
   use Interpolation
   use Parameters
 #ifdef PAR  
-  use custom_par, only: iim, jim, kim, nzims, &
-                        comm_row_z, sum_to_master_horizontal, &
-                        MPI_INTEGER, MPI_KND
+  use custom_mpi
+  use custom_par
 #endif
   
   implicit none
@@ -410,18 +409,18 @@ subroutine CustomTimeStepOutput
     uw = uw + current_profiles%uwsgs(1:Prnz)
     vw = vw + current_profiles%vwsgs(1:Prnz)
     
-    call sum_to_master_horizontal(temp)
-    call sum_to_master_horizontal(tempfl)
-    call sum_to_master_horizontal(uw)
-    call sum_to_master_horizontal(vw)
+    call par_sum_to_master_horizontal(temp)
+    call par_sum_to_master_horizontal(tempfl)
+    call par_sum_to_master_horizontal(uw)
+    call par_sum_to_master_horizontal(vw)
   end if
 
   n = gPrnx * gPrny
   
   u_part = current_profiles%u(1:Prnz)
   v_part = current_profiles%v(1:Prnz)
-  call sum_to_master_horizontal(u_part)
-  call sum_to_master_horizontal(v_part)
+  call par_sum_to_master_horizontal(u_part)
+  call par_sum_to_master_horizontal(v_part)
   uu_part = current_profiles%uu(1:Prnz)
   vv_part = current_profiles%vv(1:Prnz)
   ww_part = current_profiles%ww(1:Prnz)
@@ -430,10 +429,10 @@ subroutine CustomTimeStepOutput
   ww_part = ww_part + current_profiles%wwsgs(1:Prnz)
   tkesgs_part = current_profiles%tkesgs(1:Prnz)
   
-  call sum_to_master_horizontal(uu_part)
-  call sum_to_master_horizontal(vv_part)
-  call sum_to_master_horizontal(ww_part)
-  call sum_to_master_horizontal(tkesgs_part)
+  call par_sum_to_master_horizontal(uu_part)
+  call par_sum_to_master_horizontal(vv_part)
+  call par_sum_to_master_horizontal(ww_part)
+  call par_sum_to_master_horizontal(tkesgs_part)
   
   if (iim==1.and.jim==1) then
     u_part = u_part / n
@@ -679,9 +678,9 @@ subroutine CustomConfiguration_last
   
   call move_alloc(theta, TemperatureProfile%points)
   
-  call AddDomain(TFrameDomain('3d', &
-               3, 1, 0.0_knd, &
-               TFrameTimes(3600._knd, 82800._knd, 12), TFrameFlags(U=1, Pr=1, temperature=1)))
+!   call AddDomain(TFrameDomain('3d', &
+!                3, 1, 0.0_knd, &
+!                TFrameTimes(3600._knd, 82800._knd, 12), TFrameFlags(U=1, Pr=1, temperature=1)))
                
   enable_top_sponge = .true.
   top_sponge_bottom = 600
