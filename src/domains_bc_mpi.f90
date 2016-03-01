@@ -21,8 +21,7 @@ module domains_bc_par
     logical :: enabled = .false.
 
     logical :: rescale_compatibility = .false.
-    logical :: rescale_dU_dt = .true.
-
+ 
     logical :: relaxation = .true.
 
     integer :: remote_domain
@@ -50,8 +49,6 @@ module domains_bc_par
     real(knd), allocatable, dimension(:,:,:) :: dU_dt, dV_dt, dW_dt, dPr_dt, &
                                                 dTemperature_dt, dMoisture_dt
     real(knd), allocatable, dimension(:,:,:,:) :: dScalar_dt
-
-    integer :: U_mpi_type, V_mpi_type, W_mpi_type, Pr_mpi_type
 
     !time at which the data is valid
     real(tim) :: time = -tiny(1.0_tim)
@@ -84,88 +81,6 @@ contains
 #include "custom_domains_setup.f90"
 
   end subroutine
-
-
-  function U_mpi_subarray_type(i1, i2, j1, j2, k1, k2) result(res)
-    integer :: res
-    integer, intent(in) :: i1, i2, j1, j2, k1, k2
-    integer :: ie
-
-    call MPI_Type_create_subarray(3, &
-                                  [Unx+6, Uny+6, Unz+6], &          !whole array shape
-                                  [i2-i1+1, j2-j1+1, k2-k1+1], & !subarray shape
-                                  [i1+2, j1+2, k1+2], &          !offsets, index + lbound
-                                  MPI_ORDER_FORTRAN, &
-                                  MPI_KND, &
-                                  res, &
-                                  ie)                                  
-    if (ie/=0) call error_stop("Error creating MPI subarray derived type in U_mpi_subarray_type().")
-
-    call MPI_Type_commit(res, ie)
-    if (ie/=0) call error_stop("Error commiting MPI subarray derived type in U_mpi_subarray_type().")
-
-  end function
-
-  function V_mpi_subarray_type(i1, i2, j1, j2, k1, k2) result(res)
-    integer :: res
-    integer, intent(in) :: i1, i2, j1, j2, k1, k2
-    integer :: ie
-
-    call MPI_Type_create_subarray(3, &
-                                  [Vnx+6, Vny+6, Vnz+6], &          !whole array shape
-                                  [i2-i1+1, j2-j1+1, k2-k1+1], & !subarray shape
-                                  [i1+2, j1+2, k1+2], &          !offsets, index + lbound
-                                  MPI_ORDER_FORTRAN, &
-                                  MPI_KND, &
-                                  res, &
-                                  ie)                                  
-    if (ie/=0) call error_stop("Error creating MPI subarray derived type in V_mpi_subarray_type().")
-
-    call MPI_Type_commit(res, ie)
-    if (ie/=0) call error_stop("Error commiting MPI subarray derived type in V_mpi_subarray_type().")
-
-  end function
-
-  function W_mpi_subarray_type(i1, i2, j1, j2, k1, k2) result(res)
-    integer :: res
-    integer, intent(in) :: i1, i2, j1, j2, k1, k2
-    integer :: ie
-
-    call MPI_Type_create_subarray(3, &
-                                  [Wnx+6, Wny+6, Wnz+6], &          !whole array shape
-                                  [i2-i1+1, j2-j1+1, k2-k1+1], & !subarray shape
-                                  [i1+2, j1+2, k1+2], &          !offsets, index + lbound
-                                  MPI_ORDER_FORTRAN, &
-                                  MPI_KND, &
-                                  res, &
-                                  ie)                                  
-    if (ie/=0) call error_stop("Error creating MPI subarray derived type in W_mpi_subarray_type().")
-
-    call MPI_Type_commit(res, ie)
-    if (ie/=0) call error_stop("Error commiting MPI subarray derived type in W_mpi_subarray_type().")
-
-  end function
-
-  function Pr_mpi_subarray_type(i1, i2, j1, j2, k1, k2) result(res)
-    integer :: res
-    integer, intent(in) :: i1, i2, j1, j2, k1, k2
-    integer :: ie
-
-    call MPI_Type_create_subarray(3, &
-                                  [Prnx+4, Prny+4, Prnz+4], &          !whole array shape
-                                  [i2-i1+1, j2-j1+1, k2-k1+1], & !subarray shape
-                                  [i1+1, j1+1, k1+1], &          !offsets, index + lbound
-                                  MPI_ORDER_FORTRAN, &
-                                  MPI_KND, &
-                                  res, &
-                                  ie)                                  
-    if (ie/=0) call error_stop("Error creating MPI subarray derived type in Pr_mpi_subarray_type().")
-
-    call MPI_Type_commit(res, ie)
-    if (ie/=0) call error_stop("Error commiting MPI subarray derived type in Pr_mpi_subarray_type().")
-
-  end function
-
 
 
 
@@ -240,7 +155,7 @@ contains
           associate(b => domain_bc_recv_buffers_copy(i))
   
             if (b%enabled) then
-              call recv_arrays(b)
+              call recv_arrays_copy(b)
               b%time = time
             end if
 
@@ -252,98 +167,74 @@ contains
     end if
 
     call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, ie)
+    if (ie/=0) call error_stop("Error, MPI_Waitall in par_exchange_domain_bounds returns", ie)
 
   contains
 
     subroutine send_arrays(b)
       type(dom_bc_buffer_copy), intent(inout) :: b
       
-      call send(b%U, b%U_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 1)
-      call send(b%V, b%V_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 2)
-      call send(b%W, b%W_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 3)
+      call send(b%U, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 1)
+      call send(b%V, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 2)
+      call send(b%W, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 3)
 
-      call send(b%dU_dt, b%U_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 1)
-      call send(b%dV_dt, b%V_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 2)
-      call send(b%dW_dt, b%W_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 3)
+      call send(b%dU_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 1)
+      call send(b%dV_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 2)
+      call send(b%dW_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 3)
 
       if (enable_buoyancy) then
-        call send(b%Temperature, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 4)
-        call send(b%dTemperature_dt, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 4)
+        call send(b%Temperature, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 4)
+        call send(b%dTemperature_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 4)
       end if
 
       if (enable_moisture) then
-        call send(b%Moisture, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 5)
-        call send(b%dMoisture_dt, b%Pr_mpi_type, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 5)
+        call send(b%Moisture, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 5)
+        call send(b%dMoisture_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 5)
       end if
 
     end subroutine
 
-    subroutine recv_arrays(b)
+    subroutine recv_arrays_copy(b)
       type(dom_bc_buffer_copy), intent(inout) :: b
       real(knd) :: avg
     
-      call recv(b%U, b%U_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
-      call recv(b%V, b%V_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
-      call recv(b%W, b%W_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)    
+      call recv(b%U, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
+      call recv(b%V, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
+      call recv(b%W, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)    
 
-      call recv(b%dU_dt, b%U_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
-      call recv(b%dV_dt, b%V_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
-      call recv(b%dW_dt, b%W_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)
-
-      if (b%rescale_dU_dt) then
-        !rescales the time derivative to be zero on average
-        !makes sense only in certain situations
-        select case (b%direction)
-          case(We)
-            avg = sum(b%dU_dt(0, 1:Uny, 1:Unz)) / (Uny*Unz)
-            b%dU_dt = b%dU_dt - avg
-          case(Ea)
-            avg = sum(b%dU_dt(Unx+1, 1:Uny, 1:Unz)) / (Uny*Unz)
-            b%dU_dt = b%dU_dt - avg
-          case(So)
-            avg = sum(b%dV_dt(1:Vnx, 0, 1:Vnz)) / (Vnx*Vnz)
-            b%dV_dt = b%dV_dt - avg
-          case(No)
-            avg = sum(b%dV_dt(1:Vnx, Vny+1, 1:Vnz)) / (Vnx*Vnz)
-            b%dV_dt = b%dV_dt - avg
-          case(Bo)
-            avg = sum(b%dW_dt(1:Wnx, 1:Wny, 0)) / (Wnx*Wny)
-            b%dW_dt = b%dW_dt - avg
-          case(To)
-            avg = sum(b%dW_dt(1:Wnx, 1:Wny, Wnz+1)) / (Wnx*Wny)
-            b%dW_dt = b%dW_dt - avg
-        end select
-      end if
+      call recv(b%dU_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
+      call recv(b%dV_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
+      call recv(b%dW_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)
 
       if (enable_buoyancy) then
-        call recv(b%Temperature, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
-        call recv(b%dTemperature_dt, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
+        call recv(b%Temperature, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
+        call recv(b%dTemperature_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
       end if
 
       if (enable_moisture) then
-        call recv(b%Moisture, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
-        call recv(b%dMoisture_dt, b%Pr_mpi_type, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
+        call recv(b%Moisture, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
+        call recv(b%dMoisture_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
       end if
     end subroutine
 
-    subroutine send(a, dtype, rank, comm, tag)
+    subroutine send(a, rank, comm, tag)
       real(knd), intent(in), contiguous :: a(:,:,:)
-      integer, intent(in) :: dtype, rank, comm, tag
+      integer, intent(in) :: rank, comm, tag
       integer :: request, ie
 
-      call MPI_ISsend(a, size(a), MPI_KND, rank, tag, comm, request, ie)
-      if (ie/=0) stop "error sending MPI message."
+      call MPI_ISend(a, size(a), MPI_KND, rank, tag, comm, request, ie)
+      if (ie/=0) call error_stop("error sending MPI message.")
 
       requests = [requests, request]
     end subroutine
 
-    subroutine recv(a, dtype, rank, comm, tag)
+    subroutine recv(a, rank, comm, tag)
       real(knd), intent(inout), contiguous :: a(:,:,:)
-      integer, intent(in) :: dtype, rank, comm, tag
+      integer, intent(in) :: rank, comm, tag
       integer :: request, ie
 
       call MPI_IRecv(a, size(a), MPI_KND, rank, tag, comm, request, ie)
-      if (ie/=0) stop "error receiving MPI message."
+      if (ie/=0) call error_stop("error receiving MPI message.")
 
       requests = [requests, request]
     end subroutine
@@ -365,27 +256,29 @@ contains
         do bi = lbound(domain_bc_recv_buffers_copy,1), &
                 ubound(domain_bc_recv_buffers_copy,1)
           associate(b => domain_bc_recv_buffers_copy(bi))
+            if (b%enabled) then
+
+              U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = b%U (b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)                 
+
+              V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = b%V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)
+
+              W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = b%W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)
 
 
-             U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = b%U (b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)                 
+              if (eff_time > b%time) then
+                t_diff = eff_time - b%time
 
-             V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = b%V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)
+                U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) + &
+                                                         b%dU_dt(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) * t_diff
+                  
 
-             W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = b%W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)
+                V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) + &
+                                                         b%dV_dt(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) * t_diff
 
+                W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) + &
+                                                         b%dW_dt(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) * t_diff
+              end if
 
-            if (eff_time > b%time) then
-              t_diff = eff_time - b%time
-
-              U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) + &
-                                                       b%dU_dt(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) * t_diff
-                
-
-              V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) + &
-                                                       b%dV_dt(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) * t_diff
-
-              W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) + &
-                                                       b%dW_dt(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) * t_diff
             end if
           end associate
         end do
@@ -476,6 +369,7 @@ contains
         do bi = lbound(domain_bc_recv_buffers_copy,1), &
                 ubound(domain_bc_recv_buffers_copy,1)
           associate(b => domain_bc_recv_buffers_copy(bi))
+            if (b%enabled) then
 
               U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = b%U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)
 
@@ -514,6 +408,7 @@ contains
                 end if
               end if
 
+            end if
           end associate
         end do
       end if
@@ -545,13 +440,16 @@ contains
 
               select case(b%direction)
                 case (We)
-                  call relax_domain_We(b)
+                  call relax_domain_copy_We(b)
                 case (Ea)
-                  call relax_domain_Ea(b)
+                  call relax_domain_copy_Ea(b)
                 case (So)
+                  call relax_domain_copy_So(b)
                 case (No)
+                  call relax_domain_copy_No(b)
                 case (Bo)
                 case (To)
+                  call relax_domain_copy_To(b)
               end select
             end if
           end associate
@@ -561,7 +459,7 @@ contains
     end if
   contains
 
-    subroutine relax_domain_We(b)
+    subroutine relax_domain_copy_We(b)
       type(dom_bc_buffer_copy), intent(in) :: b
       real, parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
 
@@ -581,7 +479,7 @@ contains
               cb(2) * (b%W(2,1:Wny,1:Wnz) + t_diff * b%dW_dt(2,1:Wny,1:Wnz))
     end subroutine
 
-    subroutine relax_domain_Ea(b)
+    subroutine relax_domain_copy_Ea(b)
       type(dom_bc_buffer_copy), intent(in) :: b
       real, parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
 
@@ -599,6 +497,66 @@ contains
               cb(1) * (b%W(Wnx,1:Wny,1:Wnz) + t_diff * b%dW_dt(Wnx,1:Wny,1:Wnz))
       W(Wnx-1,1:Wny,1:Wnz) = ca(2) * W(Wnx-1,1:Wny,1:Wnz) + &
               cb(2) * (b%W(Wnx-1,1:Wny,1:Wnz) + t_diff * b%dW_dt(Wnx-1,1:Wny,1:Wnz))
+    end subroutine
+
+    subroutine relax_domain_copy_So(b)
+      type(dom_bc_buffer_copy), intent(in) :: b
+      real, parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
+
+      U(1:Unx,1,1:Unz) = ca(1) * U(1:Unx,1,1:Unz) + &
+              cb(1) * (b%U(1:Unx,1,1:Unz) + t_diff * b%dU_dt(1:Unx,1,1:Unz))
+      U(1:Unx,2,1:Unz) = ca(2) * U(1:Unx,2,1:Unz) + &
+              cb(2) * (b%U(1:Unx,2,1:Unz) + t_diff * b%dU_dt(1:Unx,2,1:Unz))
+
+      V(1:Vnx,1,1:Vnz) = ca(1) * V(1:Vnx,1,1:Vnz) + &
+              cb(1) * (b%V(1:Vnx,1,1:Vnz) + t_diff * b%dV_dt(1:Vnx,1,1:Vnz))
+      V(1:Vnx,2,1:Vnz) = ca(2) * V(1:Vnx,2,1:Vnz) + &
+              cb(2) * (b%V(1:Vnx,2,1:Vnz) + t_diff * b%dV_dt(1:Vnx,2,1:Vnz))
+
+      W(1:Wnx,1,1:Wnz) = ca(1) * W(1:Wnx,1,1:Wnz) + &
+              cb(1) * (b%W(1:Wnx,1,1:Wnz) + t_diff * b%dW_dt(1:Wnx,1,1:Wnz))
+      W(1:Wnx,2,1:Wnz) = ca(2) * W(1:Wnx,2,1:Wnz) + &
+              cb(2) * (b%W(1:Wnx,2,1:Wnz) + t_diff * b%dW_dt(1:Wnx,2,1:Wnz))
+    end subroutine
+
+    subroutine relax_domain_copy_No(b)
+      type(dom_bc_buffer_copy), intent(in) :: b
+      real, parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
+
+      U(1:Unx,Uny,1:Unz) = ca(1) * U(1:Unx,Uny,1:Unz) + &
+              cb(1) * (b%U(1:Unx,Uny,1:Unz) + t_diff * b%dU_dt(1:Unx,Uny,1:Unz))
+      U(1:Unx,Uny-1,1:Unz) = ca(2) * U(1:Unx,Uny-1,1:Unz) + &
+              cb(2) * (b%U(1:Unx,Uny-1,1:Unz) + t_diff * b%dU_dt(1:Unx,Uny-1,1:Unz))
+
+      V(1:Vnx,Vny,1:Vnz) = ca(1) * V(1:Vnx,Vny,1:Vnz) + &
+              cb(1) * (b%V(1:Vnx,Vny,1:Vnz) + t_diff * b%dV_dt(1:Vnx,Vny,1:Vnz))
+      V(1:Vnx,Vny-1,1:Vnz) = ca(2) * V(1:Vnx,Vny-1,1:Vnz) + &
+              cb(2) * (b%V(1:Vnx,Vny-1,1:Vnz) + t_diff * b%dV_dt(1:Vnx,Vny-1,1:Vnz))
+
+      W(1:Wnx,Wny,1:Wnz) = ca(1) * W(1:Wnx,Wny,1:Wnz) + &
+              cb(1) * (b%W(1:Wnx,Wny,1:Wnz) + t_diff * b%dW_dt(1:Wnx,Wny,1:Wnz))
+      W(1:Wnx,Wny-1,1:Wnz) = ca(2) * W(1:Wnx,Wny-1,1:Wnz) + &
+              cb(2) * (b%W(1:Wnx,Wny-1,1:Wnz) + t_diff * b%dW_dt(1:Wnx,Wny-1,1:Wnz))
+    end subroutine
+
+    subroutine relax_domain_copy_To(b)
+      type(dom_bc_buffer_copy), intent(in) :: b
+      real, parameter, dimension(*) :: ca = [.3_knd,.6_knd], cb = 1._knd - ca
+
+      U(1:Unx,1:Uny,Unz) = ca(1) * U(1:Unx,1:Uny,Unz) + &
+              cb(1) * (b%U(1:Unx,1:Uny,Unz) + t_diff * b%dU_dt(1:Unx,1:Uny,Unz))
+      U(1:Unx,1:Uny,Unz-1) = ca(2) * U(1:Unx,1:Uny,Unz-1) + &
+              cb(2) * (b%U(1:Unx,1:Uny,Unz-1) + t_diff * b%dU_dt(1:Unx,1:Uny,Unz-1))
+
+      V(1:Vnx,1:Vny,Vnz) = ca(1) * V(1:Vnx,1:Vny,Vnz) + &
+              cb(1) * (b%V(1:Vnx,1:Vny,Vnz) + t_diff * b%dV_dt(1:Vnx,1:Vny,Vnz))
+      V(1:Vnx,1:Vny,Vnz-1) = ca(2) * V(1:Vnx,1:Vny,Vnz-1) + &
+              cb(2) * (b%V(1:Vnx,1:Vny,Vnz-1) + t_diff * b%dV_dt(1:Vnx,1:Vny,Vnz-1))
+
+      W(1:Wnx,1:Wny,Wnz) = ca(1) * W(1:Wnx,1:Wny,Wnz) + &
+              cb(1) * (b%W(1:Wnx,1:Wny,Wnz) + t_diff * b%dW_dt(1:Wnx,1:Wny,Wnz))
+      W(1:Wnx,1:Wny,Wnz-1) = ca(2) * W(1:Wnx,1:Wny,Wnz-1) + &
+              cb(2) * (b%W(1:Wnx,1:Wny,Wnz-1) + t_diff * b%dW_dt(1:Wnx,1:Wny,Wnz-1))
     end subroutine
 
   end subroutine par_domain_bound_relaxation

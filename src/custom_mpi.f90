@@ -61,6 +61,10 @@ module custom_par
     integer, allocatable :: nxs(:), nys(:), nzs(:)
     !extents images in the domain xmins(nxims)...
     real(knd), allocatable :: xmins(:), xmaxs(:), ymins(:), ymaxs(:), zmins(:), zmaxs(:)
+    !whether the image plus side of the image is an internal or periodic boundary
+    logical, allocatable :: internal_or_periodic_Ea(:), &
+                            internal_or_periodic_No(:), &
+                            internal_or_periodic_To(:)
   end type
 
 
@@ -680,6 +684,35 @@ contains
                      MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
     end do
 
+    do dom = 1, number_of_domains
+      allocate(domain_grids(dom)%internal_or_periodic_Ea(domain_nxims(dom)))
+      allocate(domain_grids(dom)%internal_or_periodic_No(domain_nyims(dom)))
+      allocate(domain_grids(dom)%internal_or_periodic_To(domain_nzims(dom)))
+      domain_grids(dom)%internal_or_periodic_Ea = .false.
+      domain_grids(dom)%internal_or_periodic_No = .false.
+      domain_grids(dom)%internal_or_periodic_To = .false.
+    end do
+
+    domain_grids(domain_index)%internal_or_periodic_Ea(iim) = (iim<nxims) .or. Btype(Ea)==BC_PERIODIC
+    domain_grids(domain_index)%internal_or_periodic_No(jim) = (jim<nyims) .or. Btype(No)==BC_PERIODIC
+    domain_grids(domain_index)%internal_or_periodic_To(kim) = (kim<nzims) .or. Btype(To)==BC_PERIODIC
+
+
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%internal_or_periodic_Ea, &
+                       size(domain_grids(domain_index)%internal_or_periodic_Ea), MPI_LOGICAL, MPI_LOR, comm_row_x, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%internal_or_periodic_No, &
+                       size(domain_grids(domain_index)%internal_or_periodic_No), MPI_LOGICAL, MPI_LOR, comm_row_y, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%internal_or_periodic_To, &
+                       size(domain_grids(domain_index)%internal_or_periodic_To), MPI_LOGICAL, MPI_LOR, comm_row_z, ie)
+
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_grids(dom)%internal_or_periodic_Ea, size(domain_grids(dom)%internal_or_periodic_Ea), &
+                     MPI_LOGICAL, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%internal_or_periodic_No, size(domain_grids(dom)%internal_or_periodic_No), &
+                     MPI_LOGICAL, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%internal_or_periodic_To, size(domain_grids(dom)%internal_or_periodic_To), &
+                     MPI_LOGICAL, sum(domain_nims(1:dom-1)), world_comm, ie)
+    end do
   end subroutine par_init_domain_grids
 
 
@@ -796,7 +829,7 @@ contains
     offset_to_global_z = int(off(3))
     
     offsets_to_global = int(off)
-print *, domain_index,iim,jim,kim,offsets_to_global
+
     im_xmin = gxmin + offset_to_global_x * dxmin
     im_ymin = gymin + offset_to_global_y * dymin
     im_zmin = gzmin + offset_to_global_z * dzmin
