@@ -2634,6 +2634,8 @@ fields_do:  do j = 1, size(fields)
        call par_sync_out("  ...setting ghost cell values.")
 
 #ifdef PAR
+       call BoundUVW(U, V, W)
+
        call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%time, 1._knd)
 
        call par_update_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%start_time)
