@@ -181,7 +181,7 @@ contains
 
           if (dir==We) then
             Ui1 = pos-2
-            Ui2 = pos+3
+            Ui2 = pos+2
 
             Vi1 = pos-2
             Vi2 = pos+3
@@ -192,7 +192,7 @@ contains
             Pri1 = pos-2
             Pri2 = pos+3
           else if (dir==Ea) then
-            Ui1 = pos-3
+            Ui1 = pos-2
             Ui2 = pos+2
 
             Vi1 = pos-2
@@ -402,8 +402,7 @@ contains
 
     subroutine child_buffer(dir, domain)
       integer, intent(in) :: dir, domain
-      integer, parameter :: width = 6
-      integer :: i
+      integer :: i, width
 
       associate(b => domain_bc_recv_buffers(dir))
 
@@ -412,6 +411,8 @@ contains
         b%remote_domain = domain
         b%direction = dir
         b%enabled = .true.
+
+        width = b%spatial_ratio * 2
 
         select case  (dir)
           case (We)
@@ -446,7 +447,7 @@ contains
             Prk2 = Prnz+2
 
             b%r_Ui1 = -2
-            b%r_Ui2 = +3
+            b%r_Ui2 = +2
             b%r_Uj1 = -2
             b%r_Uj2 = Uny/b%spatial_ratio+3
             b%r_Uk1 = -2
@@ -504,7 +505,7 @@ contains
             Prk1 = -1
             Prk2 = Prnz+2
 
-            b%r_Ui1 = Prnx/b%spatial_ratio-3
+            b%r_Ui1 = Prnx/b%spatial_ratio-2
             b%r_Ui2 = Prnx/b%spatial_ratio+2
             b%r_Uj1 = -2
             b%r_Uj2 = Uny/b%spatial_ratio+3

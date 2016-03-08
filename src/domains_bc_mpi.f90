@@ -61,7 +61,10 @@ module domains_bc_par
   end type
 
   type, extends(dom_bc_buffer_copy) :: dom_bc_buffer_refined
+    !the ratio of grid resolutions between parent and child domains
     integer :: spatial_ratio = 3
+    !order of accuracy of the spatial interpolation in the respective directions (2..linear, 3..parabolic)
+    integer :: interp_order(3) = 2
 
     !receive buffer grid, fields are interpolated from this grid to the finer grid
     integer :: r_Ui1, r_Ui2, r_Vi1, r_Vi2, r_Wi1, r_Wi2, r_Pri1, r_Pri2
@@ -326,15 +329,25 @@ contains
   subroutine par_interpolate_buffers(b)
     type(dom_bc_buffer_refined), intent(inout) :: b
 
-    call interpolate_U_spline(b%r_U, b%U)
-    call interpolate_U_spline(b%r_dU_dt, b%dU_dt)
+    if (all(b%interp_order==2)) then
+      call interpolate_U_trilinear(b%r_U, b%U)
+      call interpolate_U_trilinear(b%r_dU_dt, b%dU_dt)
 
-    call interpolate_V_spline(b%r_V, b%V)
-    call interpolate_V_spline(b%r_dV_dt, b%dV_dt)
+      call interpolate_V_trilinear(b%r_V, b%V)
+      call interpolate_V_trilinear(b%r_dV_dt, b%dV_dt)
 
-    call interpolate_W_spline(b%r_W, b%W)
-    call interpolate_W_spline(b%r_dW_dt, b%dW_dt)
+      call interpolate_W_trilinear(b%r_W, b%W)
+      call interpolate_W_trilinear(b%r_dW_dt, b%dW_dt)
+    else
+      call interpolate_U_spline(b%r_U, b%U)
+      call interpolate_U_spline(b%r_dU_dt, b%dU_dt)
 
+      call interpolate_V_spline(b%r_V, b%V)
+      call interpolate_V_spline(b%r_dV_dt, b%dV_dt)
+
+      call interpolate_W_spline(b%r_W, b%W)
+      call interpolate_W_spline(b%r_dW_dt, b%dW_dt)
+    end if
 
   contains
 
@@ -353,7 +366,8 @@ contains
                           b%r_y(b%r_Uj1:b%r_Uj2), &
                           b%r_z(b%r_Uk1:b%r_Uk2), &
                           in, &
-                          3, 3, 3, iflag)
+                          b%interp_order(1), b%interp_order(2), b%interp_order(3), &
+                          iflag)
       if (iflag/=1) then
         write(*,*) "Error in spline initialization, iflag:",iflag
         stop
@@ -366,8 +380,12 @@ contains
             call spl%evaluate(xU(i), yPr(j), zPr(k), &
                               idx, idy, idz, val, iflag)
             if (iflag/=0) then
-              write(*,*) "Error in spline interpolation at", &
+              write(*,*) "Error in spline interpolation of U at", &
                           xU(i), yPr(j), zPr(k)
+              write(*,*) "flag:",iflag
+              write(*,*) "xs:",b%r_xU(b%r_Ui1:b%r_Ui2)
+              write(*,*) "ys:",b%r_y(b%r_Uj1:b%r_Uj2)
+              write(*,*) "zs:",b%r_z(b%r_Uk1:b%r_Uk2)
               call error_stop()
             end if
 
@@ -394,7 +412,8 @@ contains
                           b%r_yV(b%r_Vj1:b%r_Vj2), &
                           b%r_z(b%r_Vk1:b%r_Vk2), &
                           in, &
-                          3, 3, 3, iflag)
+                          b%interp_order(1), b%interp_order(2), b%interp_order(3), &
+                          iflag)
       if (iflag/=1) then
         write(*,*) "Error in spline initialization, iflag:",iflag
         stop
@@ -407,8 +426,12 @@ contains
             call spl%evaluate(xPr(i), yV(j), zPr(k), &
                               idx, idy, idz, val, iflag)
             if (iflag/=0) then
-              write(*,*) "Error in spline interpolation at", &
+              write(*,*) "Error in spline interpolation of V at", &
                           xPr(i), yV(j), zPr(k)
+              write(*,*) "flag:",iflag
+              write(*,*) "xs:",b%r_x(b%r_Vi1:b%r_Vi2)
+              write(*,*) "ys:",b%r_yV(b%r_Vj1:b%r_Vj2)
+              write(*,*) "zs:",b%r_z(b%r_Vk1:b%r_Vk2)
               call error_stop()
             end if
 
@@ -435,7 +458,8 @@ contains
                           b%r_y(b%r_Wj1:b%r_Wj2), &
                           b%r_zW(b%r_Wk1:b%r_Wk2), &
                           b%r_W, &
-                          3, 3, 3, iflag)
+                          b%interp_order(1), b%interp_order(2), b%interp_order(3), &
+                          iflag)
       if (iflag/=1) then
         write(*,*) "Error in spline initialization, iflag:",iflag
         stop
@@ -448,8 +472,12 @@ contains
             call spl%evaluate(xPr(i), yPr(j), zW(k), &
                               idx, idy, idz, val, iflag)
             if (iflag/=0) then
-              write(*,*) "Error in spline interpolation at", &
+              write(*,*) "Error in spline interpolation of W at", &
                           xPr(i), yPr(j), zW(k)
+              write(*,*) "flag:",iflag
+              write(*,*) "xs:",b%r_x(b%r_Wi1:b%r_Wi2)
+              write(*,*) "ys:",b%r_y(b%r_Wj1:b%r_Wj2)
+              write(*,*) "zs:",b%r_zW(b%r_Wk1:b%r_Wk2)
               call error_stop()
             end if
 
@@ -460,6 +488,148 @@ contains
 
       call spl%destroy()
     end subroutine
+
+    subroutine interpolate_U_trilinear(in, out)
+      real(knd), intent(in), allocatable :: in(:,:,:)
+      real(knd), intent(inout), allocatable :: out(:,:,:)
+      integer :: xi, yj, zk
+      integer :: i, j, k
+      
+      do k = b%Uk1, b%Uk2
+        do j = b%Uj1, b%Uj2
+          do i = b%Ui1, b%Ui2
+            call U_r_index(xU(i), yPr(j), zPr(k), xi, yj, zk)
+
+            out(i,j,k) = &
+              TriLinInt((xU(i)   - b%r_xU(xi)) / b%r_dx, &
+                        (yPr(j)  - b%r_y(yj) ) / b%r_dy, &
+                        (zPr(k)  - b%r_z(zk) ) / b%r_dz, &
+                        in(xi  , yj  , zk  ), &
+                        in(xi+1, yj  , zk  ), &
+                        in(xi  , yj+1, zk  ), &
+                        in(xi  , yj  , zk+1), &
+                        in(xi+1, yj+1, zk  ), &
+                        in(xi+1, yj  , zk+1), &
+                        in(xi  , yj+1, zk+1), &
+                        in(xi+1, yj+1, zk+1))
+          end do
+        end do
+      end do
+    end subroutine
+
+    pure subroutine U_r_index(x, y, z, xi, yj, zk)
+      real(knd), intent(in) :: x, y, z
+      integer, intent(out) :: xi, yj, zk
+      integer :: lx, ly, lz
+
+      lx = lbound(b%r_xU,1)
+      ly = lbound(b%r_y,1)
+      lz = lbound(b%r_z,1)
+
+      xi = min(max(floor( (x - b%r_xU(lx))/b%r_dx )+lx, 0), ubound(b%r_xU,1)-1)
+      yj = min(max(floor( (y - b%r_y(ly))/b%r_dy )+ly, 0), ubound(b%r_y,1)-1)
+      zk = min(max(floor( (z - b%r_z(lz))/b%r_dz )+lz, 0), ubound(b%r_z,1)-1)
+    end subroutine
+
+    subroutine interpolate_V_trilinear(in, out)
+      real(knd), intent(in), allocatable :: in(:,:,:)
+      real(knd), intent(inout), allocatable :: out(:,:,:)
+      integer :: xi, yj, zk
+      integer :: i, j, k
+      
+      do k = b%Vk1, b%Vk2
+        do j = b%Vj1, b%Vj2
+          do i = b%Vi1, b%Vi2
+            call V_r_index(xPr(i), yV(j), zPr(k), xi, yj, zk)
+
+            out(i,j,k) = &
+              TriLinInt((xPr(i) - b%r_x(xi) ) / b%r_dx, &
+                        (yV(j)  - b%r_yV(yj)) / b%r_dy, &
+                        (zPr(k) - b%r_z(zk) ) / b%r_dz, &
+                        in(xi  , yj  , zk  ), &
+                        in(xi+1, yj  , zk  ), &
+                        in(xi  , yj+1, zk  ), &
+                        in(xi  , yj  , zk+1), &
+                        in(xi+1, yj+1, zk  ), &
+                        in(xi+1, yj  , zk+1), &
+                        in(xi  , yj+1, zk+1), &
+                        in(xi+1, yj+1, zk+1))
+          end do
+        end do
+      end do
+    end subroutine
+
+    pure subroutine V_r_index(x, y, z, xi, yj, zk)
+      real(knd), intent(in) :: x, y, z
+      integer, intent(out) :: xi, yj, zk
+      integer :: lx, ly, lz
+
+      lx = lbound(b%r_x,1)
+      ly = lbound(b%r_yV,1)
+      lz = lbound(b%r_z,1)
+
+      xi = min(max(floor( (x - b%r_x(lx))/b%r_dx )+lx, 0), ubound(b%r_x,1))
+      yj = min(max(floor( (y - b%r_yV(ly))/b%r_dy )+ly, 0), ubound(b%r_yV,1))
+      zk = min(max(floor( (z - b%r_z(lz))/b%r_dz )+lz, 0), ubound(b%r_z,1))
+    end subroutine
+
+    subroutine interpolate_W_trilinear(in, out)
+      real(knd), intent(in), allocatable :: in(:,:,:)
+      real(knd), intent(inout), allocatable :: out(:,:,:)
+      integer :: xi, yj, zk
+      integer :: i, j, k
+      
+      do k = b%Wk1, b%Wk2
+        do j = b%Wj1, b%Wj2
+          do i = b%Wi1, b%Wi2
+            call W_r_index(xPr(i), yPr(j), zW(k), xi, yj, zk)
+
+            out(i,j,k) = &
+              TriLinInt((xPr(i) - b%r_x(xi) ) / b%r_dx, &
+                        (yV(j)  - b%r_y(yj) ) / b%r_dy, &
+                        (zPr(k) - b%r_zW(zk)) / b%r_dz, &
+                        in(xi  , yj  , zk  ), &
+                        in(xi+1, yj  , zk  ), &
+                        in(xi  , yj+1, zk  ), &
+                        in(xi  , yj  , zk+1), &
+                        in(xi+1, yj+1, zk  ), &
+                        in(xi+1, yj  , zk+1), &
+                        in(xi  , yj+1, zk+1), &
+                        in(xi+1, yj+1, zk+1))
+          end do
+        end do
+      end do
+    end subroutine
+
+    pure subroutine W_r_index(x, y, z, xi, yj, zk)
+      real(knd), intent(in) :: x, y, z
+      integer, intent(out) :: xi, yj, zk
+      integer :: lx, ly, lz
+
+      lx = lbound(b%r_x,1)
+      ly = lbound(b%r_y,1)
+      lz = lbound(b%r_zW,1)
+
+      xi = min(max(floor( (x - b%r_x(lx))/b%r_dx )+lx, 0), ubound(b%r_x,1))
+      yj = min(max(floor( (y - b%r_y(ly))/b%r_dy )+ly, 0), ubound(b%r_y,1))
+      zk = min(max(floor( (z - b%r_zW(lz))/b%r_dz )+lz, 0), ubound(b%r_zW,1))
+    end subroutine
+
+    pure real(knd) function TriLinInt(a, b, c, &
+                                     vel000, vel100, vel010, vel001, vel110, vel101, vel011, vel111)
+      real(knd), intent(in) :: a, b, c
+      real(knd), intent(in) :: vel000, vel100, vel010, vel001, vel110, vel101, vel011, vel111
+
+      TriLinInt =  (1-a) * (1-b) * (1-c) * vel000 + &
+                   a     * (1-b) * (1-c) * vel100 + &
+                   (1-a) * b     * (1-c) * vel010 + &
+                   (1-a) * (1-b) * c     * vel001 + &
+                   a     * b     * (1-c) * vel110 + &
+                   a     * (1-b) * c     * vel101 + &
+                   (1-a) * b     * c     * vel011 + &
+                   a     * b     * c     * vel111
+    end function TriLinInt
+
 
   end subroutine
 
@@ -641,7 +811,8 @@ contains
     real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(inout) :: Scalar
     real(knd), intent(in) :: eff_time
     real(knd) :: t_diff
-    integer :: bi
+    integer :: bi, width
+    real(knd), allocatable :: ca(:), cb(:)
 
     if (enable_multiple_domains) then
 
@@ -678,6 +849,11 @@ contains
           associate(b => domain_bc_recv_buffers(bi))
 
             if (b%relaxation) then
+
+              width = b%spatial_ratio * 2
+
+              ca = ca_table(width)
+              cb = cb_table(width)
 
               t_diff = eff_time - b%time
 
@@ -803,10 +979,10 @@ contains
 
     subroutine relax_domain_We(b)
       type(dom_bc_buffer_refined), intent(in) :: b
-      real(knd), parameter, dimension(*) :: cb = [.12_knd,.08_knd,.05_knd,.03_knd,.02_knd,.01_knd], &
-                                            ca = 1._knd - cb
-      integer, parameter :: width = size(ca)
+      integer :: width
       integer :: i
+
+      width = b%spatial_ratio * 2
 
       do i = 1, width
         U(i,1:Uny,1:Unz) = ca(i) * U(i,1:Uny,1:Unz) + &
@@ -824,28 +1000,46 @@ contains
 
     subroutine relax_domain_Ea(b)
       type(dom_bc_buffer_refined), intent(in) :: b
-      real(knd), parameter, dimension(*) :: cb = [.12_knd,.08_knd,.05_knd,.03_knd,.02_knd,.01_knd], &
-                                            ca = 1._knd - cb
-      integer, parameter :: width = size(ca)
-      integer :: i, bi
+      integer :: width
+      integer :: i, wi
 
-      do bi = 1, width
+      width = b%spatial_ratio * 2
+
+      do wi = 1, width
         i = Unx - bi + 1
-        U(i,1:Uny,1:Unz) = ca(bi) * U(i,1:Uny,1:Unz) + &
-                cb(bi) * (b%U(i,1:Uny,1:Unz) + t_diff * b%dU_dt(i,1:Uny,1:Unz))
-      end do
+        U(i,1:Uny,1:Unz) = ca(wi) * U(i,1:Uny,1:Unz) + &
+                           cb(wi) * (b%U(i,1:Uny,1:Unz) + &
+                                     t_diff * b%dU_dt(i,1:Uny,1:Unz))
 
-      do i = Vnx-width+1, Vnx
-        V(i,1:Vny,1:Vnz) = ca(bi) * V(i,1:Vny,1:Vnz) + &
-                cb(i) * (b%V(i,1:Vny,1:Vnz) + t_diff * b%dV_dt(i,1:Vny,1:Vnz))
-      end do
+        i = Vnx - bi + 1
+        V(i,1:Vny,1:Vnz) = ca(wi) * V(i,1:Vny,1:Vnz) + &
+                           cb(wi) * (b%V(i,1:Vny,1:Vnz) + &
+                                     t_diff * b%dV_dt(i,1:Vny,1:Vnz))
 
-      do i = Wnx-width+1, Wnx
-        W(i,1:Wny,1:Wnz) = ca(bi) * W(i,1:Wny,1:Wnz) + &
-                cb(bi) * (b%W(i,1:Wny,1:Wnz) + t_diff * b%dW_dt(i,1:Wny,1:Wnz))
+        i = Wnx - bi + 1
+        W(i,1:Wny,1:Wnz) = ca(wi) * W(i,1:Wny,1:Wnz) + &
+                           cb(wi) * (b%W(i,1:Wny,1:Wnz) + &
+                                     t_diff * b%dW_dt(i,1:Wny,1:Wnz))
       end do
     end subroutine
 
+    pure function cb_table(width) result(res)
+      integer, intent(in) :: width
+      real(knd) :: res(width)
+      integer :: i
+     
+      do i = 1, width
+        res(i) = 0.2_knd * (width - real(i,knd)+1) / width
+      end do
+    end function
+
+    pure function ca_table(width) result(res)
+      integer, intent(in) :: width
+      real(knd) :: res(width)
+      integer :: i
+     
+      res = 1 - cb_table(width)
+    end function
 
   end subroutine par_domain_bound_relaxation
 
