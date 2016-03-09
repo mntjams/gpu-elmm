@@ -1979,15 +1979,19 @@ fields_do:  do j = 1, size(fields)
       integer :: i, j
       logical, target :: constant_time_steps = .false.
 
-      type(field_names) :: names(3)
+      type(field_names) :: names(5)
       
       logical, target :: enable_multiple_domains_l = .false.
       integer, target :: number_of_domains_l = -99
       integer, target :: domain_index_l = -99
+      integer, target :: spatial_ratio_l = -99
+      integer, target :: time_step_ratio_l = -99
 
       names = [field_names_init("enable_multiple_domains", enable_multiple_domains_l), &
                field_names_init("domain_index",   domain_index_l), &
-               field_names_init("number_of_domains",   number_of_domains_l)]
+               field_names_init("number_of_domains",   number_of_domains_l), &
+               field_names_init("spatial_ratio",   spatial_ratio_l), &
+               field_names_init("time_step_ratio",   time_step_ratio_l)]
 
       if (downcase(obj%name)=='domains') then
 
@@ -2036,6 +2040,9 @@ fields_do:  do j = 1, size(fields)
           call error_stop("Error, positive domain_index must be specified in domains.")
         if (number_of_domains<domain_index) &
           call error_stop("Error, domain_index must be smaller or equal to number_of_domains.")
+
+        if (spatial_ratio_l>0) domain_spatial_ratio = spatial_ratio_l
+        if (time_step_ratio_l>0) domain_time_step_ratio = time_step_ratio_l
       end if
       
     end subroutine

@@ -15,7 +15,9 @@ module domains_bc_par
          par_update_domain_bounds_UVW, &
          par_update_domain_bounds_temperature, &
          par_update_domain_bounds_moisture, &
-         par_domain_bound_relaxation
+         par_domain_bound_relaxation, &
+         domain_spatial_ratio, &
+         domain_time_step_ratio
 
   type dom_bc_buffer_copy
     logical :: enabled = .false.
@@ -58,6 +60,8 @@ module domains_bc_par
     integer :: remote_rank = MPI_PROC_NULL
     !The buffers are transferred every `time_step_ratio` time steps
     integer :: time_step_ratio = 1 
+
+    integer :: time_step = 0
   end type
 
   type, extends(dom_bc_buffer_copy) :: dom_bc_buffer_refined
@@ -84,6 +88,10 @@ module domains_bc_par
                                                 r_dTemperature_dt, r_dMoisture_dt
     real(knd), allocatable, dimension(:,:,:,:) :: r_dScalar_dt    
   end type
+
+  integer :: domain_spatial_ratio = 3
+
+  integer :: domain_time_step_ratio = 3
 
 
   !send buffers should be indexed from 1, there may be more of them from several nested domains
@@ -199,8 +207,16 @@ contains
           associate(b => domain_bc_recv_buffers(i))
   
             if (b%enabled) then
-              call recv_arrays(b)
-              b%time = time
+              !for 0 and 1, initialization and the first time-step
+              if (b%time_step<=1) then
+                call recv_arrays(b)
+                b%time = time
+              end if
+              if (b%time_step==b%time_step_ratio) then
+                b%time_step=1
+              else
+                b%time_step = b%time_step + 1
+              end if
             end if
 
           end associate
@@ -304,7 +320,9 @@ contains
       integer, intent(in) :: rank, comm, tag
       integer :: request, ie
 
-      call MPI_ISend(a, size(a), MPI_KND, rank, tag, comm, request, ie)
+      !ISsend because we do want synchronisation here. Otherwise a fast domain
+      !could run too quickly, buffer too many requests and fill up the memory
+      call MPI_ISsend(a, size(a), MPI_KND, rank, tag, comm, request, ie)
       if (ie/=0) call error_stop("error sending MPI message.")
 
       requests = [requests, request]
@@ -1029,7 +1047,7 @@ contains
       integer :: i
      
       do i = 1, width
-        res(i) = 0.2_knd * (width - real(i,knd)+1) / width
+        res(i) = 0.8_knd * (width - real(i,knd)+1) / width
       end do
     end function
 

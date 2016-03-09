@@ -412,6 +412,9 @@ contains
         b%direction = dir
         b%enabled = .true.
 
+        b%spatial_ratio = domain_spatial_ratio
+        b%time_step_ratio = domain_time_step_ratio
+
         width = b%spatial_ratio * 2
 
         select case  (dir)
