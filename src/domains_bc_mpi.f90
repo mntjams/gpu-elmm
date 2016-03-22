@@ -544,9 +544,9 @@ contains
       ly = lbound(b%r_y,1)
       lz = lbound(b%r_z,1)
 
-      xi = min(max(floor( (x - b%r_xU(lx))/b%r_dx )+lx, 0), ubound(b%r_xU,1)-1)
-      yj = min(max(floor( (y - b%r_y(ly))/b%r_dy )+ly, 0), ubound(b%r_y,1)-1)
-      zk = min(max(floor( (z - b%r_z(lz))/b%r_dz )+lz, 0), ubound(b%r_z,1)-1)
+      xi = min(max(floor( (x - b%r_xU(lx))/b%r_dx ), 0) + lx, ubound(b%r_xU,1)-1)
+      yj = min(max(floor( (y - b%r_y(ly))/b%r_dy ), 0) + ly, ubound(b%r_y,1)-1)
+      zk = min(max(floor( (z - b%r_z(lz))/b%r_dz ), 0) + lz, ubound(b%r_z,1)-1)
     end subroutine
 
     subroutine interpolate_V_trilinear(in, out)
@@ -586,9 +586,9 @@ contains
       ly = lbound(b%r_yV,1)
       lz = lbound(b%r_z,1)
 
-      xi = min(max(floor( (x - b%r_x(lx))/b%r_dx )+lx, 0), ubound(b%r_x,1))
-      yj = min(max(floor( (y - b%r_yV(ly))/b%r_dy )+ly, 0), ubound(b%r_yV,1))
-      zk = min(max(floor( (z - b%r_z(lz))/b%r_dz )+lz, 0), ubound(b%r_z,1))
+      xi = min(max(floor( (x - b%r_x(lx))/b%r_dx ), 0) + lx, ubound(b%r_x,1)-1)
+      yj = min(max(floor( (y - b%r_yV(ly))/b%r_dy ), 0) + ly, ubound(b%r_yV,1)-1)
+      zk = min(max(floor( (z - b%r_z(lz))/b%r_dz ), 0) + lz, ubound(b%r_z,1)-1)
     end subroutine
 
     subroutine interpolate_W_trilinear(in, out)
@@ -628,9 +628,9 @@ contains
       ly = lbound(b%r_y,1)
       lz = lbound(b%r_zW,1)
 
-      xi = min(max(floor( (x - b%r_x(lx))/b%r_dx )+lx, 0), ubound(b%r_x,1))
-      yj = min(max(floor( (y - b%r_y(ly))/b%r_dy )+ly, 0), ubound(b%r_y,1))
-      zk = min(max(floor( (z - b%r_zW(lz))/b%r_dz )+lz, 0), ubound(b%r_zW,1))
+      xi = min(max(floor( (x - b%r_x(lx))/b%r_dx ), 0) + lx, ubound(b%r_x,1)-1)
+      yj = min(max(floor( (y - b%r_y(ly))/b%r_dy ), 0) + ly, ubound(b%r_y,1)-1)
+      zk = min(max(floor( (z - b%r_zW(lz))/b%r_dz ), 0) + lz, ubound(b%r_zW,1)-1)
     end subroutine
 
     pure real(knd) function TriLinInt(a, b, c, &
@@ -881,9 +881,13 @@ contains
                 case (Ea)
                   call relax_domain_Ea(b)
                 case (So)
+                  call relax_domain_So(b)
                 case (No)
+                  call relax_domain_No(b)
                 case (Bo)
+                  call relax_domain_Bo(b)
                 case (To)
+                  call relax_domain_To(b)
               end select
             end if
           end associate
@@ -1024,40 +1028,146 @@ contains
       width = b%spatial_ratio * 2
 
       do wi = 1, width
-        i = Unx - bi + 1
+        i = Unx - wi + 1
         U(i,1:Uny,1:Unz) = ca(wi) * U(i,1:Uny,1:Unz) + &
                            cb(wi) * (b%U(i,1:Uny,1:Unz) + &
                                      t_diff * b%dU_dt(i,1:Uny,1:Unz))
 
-        i = Vnx - bi + 1
+        i = Vnx - wi + 1
         V(i,1:Vny,1:Vnz) = ca(wi) * V(i,1:Vny,1:Vnz) + &
                            cb(wi) * (b%V(i,1:Vny,1:Vnz) + &
                                      t_diff * b%dV_dt(i,1:Vny,1:Vnz))
 
-        i = Wnx - bi + 1
+        i = Wnx - wi + 1
         W(i,1:Wny,1:Wnz) = ca(wi) * W(i,1:Wny,1:Wnz) + &
                            cb(wi) * (b%W(i,1:Wny,1:Wnz) + &
                                      t_diff * b%dW_dt(i,1:Wny,1:Wnz))
       end do
     end subroutine
 
-    pure function cb_table(width) result(res)
-      integer, intent(in) :: width
-      real(knd) :: res(width)
+    subroutine relax_domain_So(b)
+      type(dom_bc_buffer_refined), intent(in) :: b
+      integer :: width
       integer :: i
-     
+
+      width = b%spatial_ratio * 2
+
       do i = 1, width
-        res(i) = 0.8_knd * (width - real(i,knd)+1) / width
+        U(1:Unx,i,1:Unz) = ca(i) * U(1:Unx,i,1:Unz) + &
+                cb(i) * (b%U(1:Unx,i,1:Unz) + t_diff * b%dU_dt(1:Unx,i,1:Unz))
+
+
+        V(1:Vnx,i,1:Vnz) = ca(i) * V(1:Vnx,i,1:Vnz) + &
+                cb(i) * (b%V(1:Vnx,i,1:Vnz) + t_diff * b%dV_dt(1:Vnx,i,1:Vnz))
+
+
+        W(1:Wnx,i,1:Wnz) = ca(i) * W(1:Wnx,i,1:Wnz) + &
+                cb(i) * (b%W(1:Wnx,i,1:Wnz) + t_diff * b%dW_dt(1:Wnx,i,1:Wnz))
       end do
-    end function
+    end subroutine
+
+    subroutine relax_domain_No(b)
+      type(dom_bc_buffer_refined), intent(in) :: b
+      integer :: width
+      integer :: i, wi
+
+      width = b%spatial_ratio * 2
+
+      do wi = 1, width
+        i = Uny - wi + 1
+        U(1:Unx,i,1:Unz) = ca(wi) * U(1:Unx,i,1:Unz) + &
+                           cb(wi) * (b%U(1:Unx,i,1:Unz) + &
+                                     t_diff * b%dU_dt(1:Unx,i,1:Unz))
+
+        i = Vny - wi + 1
+        V(1:Vnx,i,1:Vnz) = ca(wi) * V(1:Vnx,i,1:Vnz) + &
+                           cb(wi) * (b%V(1:Vnx,i,1:Vnz) + &
+                                     t_diff * b%dV_dt(1:Vnx,i,1:Vnz))
+
+        i = Wny - wi + 1
+        W(1:Wnx,i,1:Wnz) = ca(wi) * W(1:Wnx,i,1:Wnz) + &
+                           cb(wi) * (b%W(1:Wnx,i,1:Wnz) + &
+                                     t_diff * b%dW_dt(1:Wnx,i,1:Wnz))
+      end do
+    end subroutine
+
+    subroutine relax_domain_Bo(b)
+      type(dom_bc_buffer_refined), intent(in) :: b
+      integer :: width
+      integer :: i
+
+      width = b%spatial_ratio * 2
+
+      do i = 1, width
+        U(1:Unx,1:Uny,i) = ca(i) * U(1:Unx,1:Uny,i) + &
+                cb(i) * (b%U(1:Unx,1:Uny,i) + t_diff * b%dU_dt(1:Unx,1:Uny,i))
+
+
+        V(1:Vnx,1:Vny,i) = ca(i) * V(1:Vnx,1:Vny,i) + &
+                cb(i) * (b%V(1:Vnx,1:Vny,i) + t_diff * b%dV_dt(1:Vnx,1:Vny,i))
+
+
+        W(1:Wnx,1:Wny,i) = ca(i) * W(1:Wnx,1:Wny,i) + &
+                cb(i) * (b%W(1:Wnx,1:Wny,i) + t_diff * b%dW_dt(1:Wnx,1:Wny,i))
+      end do
+    end subroutine
+
+    subroutine relax_domain_To(b)
+      type(dom_bc_buffer_refined), intent(in) :: b
+      integer :: width
+      integer :: i, wi
+
+      width = b%spatial_ratio * 2
+
+      do wi = 1, width
+        i = Unz - wi + 1
+        U(1:Unx,1:Uny,i) = ca(wi) * U(1:Unx,1:Uny,i) + &
+                           cb(wi) * (b%U(1:Unx,1:Uny,i) + &
+                                     t_diff * b%dU_dt(1:Unx,1:Uny,i))
+
+        i = Vnz - wi + 1
+        V(1:Vnx,1:Vny,i) = ca(wi) * V(1:Vnx,1:Vny,i) + &
+                           cb(wi) * (b%V(1:Vnx,1:Vny,i) + &
+                                     t_diff * b%dV_dt(1:Vnx,1:Vny,i))
+
+        i = Wnz - wi + 1
+        W(1:Wnx,1:Wny,i) = ca(wi) * W(1:Wnx,1:Wny,i) + &
+                           cb(wi) * (b%W(1:Wnx,1:Wny,i) + &
+                                     t_diff * b%dW_dt(1:Wnx,1:Wny,i))
+      end do
+    end subroutine
 
     pure function ca_table(width) result(res)
       integer, intent(in) :: width
       real(knd) :: res(width)
       integer :: i
      
-      res = 1 - cb_table(width)
+      do i = 1, width
+        res(i) = DampF((width - i + 0.5_knd)/width)
+      end do
     end function
+
+    pure function cb_table(width) result(res)
+      integer, intent(in) :: width
+      real(knd) :: res(width)
+      integer :: i
+     
+      res = 1 - ca_table(width)
+    end function
+
+  pure function DampF(x) result(res)
+    real(knd) :: res
+    real(knd), intent(in) :: x
+
+    if (x<=0) then
+      res = 1
+    else if (x>=1) then
+      res = 0
+    else
+      res = (1 - 0.04_knd*x**2) * &
+              ( 1 - (1 - exp(10._knd*x**2)) / (1 - exp(10._knd)) )
+    end if
+  end function
 
   end subroutine par_domain_bound_relaxation
 
