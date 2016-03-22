@@ -148,7 +148,7 @@ contains
 
 #ifdef PAR
       !Does nudging of the solution to the parent boundary solution in the relaxation zones.
-      call par_domain_bound_relaxation(U, V, W, Temperature, Moisture, Scalar, time_stepping%effective_time)
+      call par_domain_bound_relaxation(U2, V2, W2, Temperature, Moisture, Scalar, time_stepping%effective_time)
 #endif
 
 
