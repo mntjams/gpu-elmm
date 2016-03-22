@@ -3,60 +3,72 @@
 
     if (enable_multiple_domains) then
 
-      if (domain_index==1) then
+      if (domain_index<number_of_domains) then
 
         !send buffers should be counted from 1, there may be more of them from several nested domains
-        allocate(domain_bc_send_buffers(2*domain_nyims(2)*domain_nzims(2)))! + &
-!                                         2*domain_nxims(2)*domain_nzims(2) + &
-!                                         domain_nxims(2)*domain_nyims(2)))
+        allocate(domain_bc_send_buffers(2*domain_nyims(domain_index+1)*domain_nzims(domain_index+1) + &
+                                        2*domain_nxims(domain_index+1)*domain_nzims(domain_index+1) + &
+                                        2*domain_nxims(domain_index+1)*domain_nyims(domain_index+1)))
 
         prev = 0
 
-        do dik = 1, domain_nzims(2)
-          do dij = 1, domain_nyims(2)
-            call parent_buffer(num=dij+(dik-1)*domain_nyims(2), &
-                               dir=We, domain=2, im=[1,dij,dik])
+        do dik = 1, domain_nzims(domain_index+1)
+          do dij = 1, domain_nyims(domain_index+1)
+            call parent_buffer(num=dij+(dik-1)*domain_nyims(domain_index+1), &
+                               dir=We, domain=domain_index+1, im=[1,dij,dik])
          end do
         end do
 
-        prev = prev + domain_nyims(2)*domain_nzims(2)
+        prev = prev + domain_nyims(domain_index+1)*domain_nzims(domain_index+1)
 
-        do dik = 1, domain_nzims(2)
-          do dij = 1, domain_nyims(2)
-            call parent_buffer(num=dij+(dik-1)*domain_nyims(2) + prev, &
-                               dir=Ea, domain=2, im=[1,dij,dik])
+        do dik = 1, domain_nzims(domain_index+1)
+          do dij = 1, domain_nyims(domain_index+1)
+            call parent_buffer(num=dij+(dik-1)*domain_nyims(domain_index+1) + prev, &
+                               dir=Ea, domain=domain_index+1, im=[1,dij,dik])
          end do
         end do
 
-!         prev = prev + domain_nyims(2)*domain_nzims(2)
-! 
-!         do dik = 1, domain_nzims(2)
-!           do dii = 1, domain_nxims(2)
-!             call parent_buffer(num=dii+(dik-1)*domain_nxims(2) + prev, &
-!                                dir=So, domain=2, im=[dii,1,dik])
-!          end do
-!         end do
-! 
-!         prev = prev + domain_nxims(2)*domain_nzims(2)
-! 
-!         do dik = 1, domain_nzims(2)
-!           do dii = 1, domain_nxims(2)
-!             call parent_buffer(num=dii+(dik-1)*domain_nxims(2) + prev, &
-!                                dir=No, domain=2, im=[dii,domain_nyims(2),dik])
-!          end do
-!         end do
-! 
-!         prev = prev + domain_nxims(2)*domain_nzims(2)
-! 
-!         do dij = 1, domain_nyims(2)
-!           do dii = 1, domain_nxims(2)
-!             call parent_buffer(num=dii+(dij-1)*domain_nxims(2) + prev, &
-!                                dir=To, domain=2, im=[dii,dij,domain_nzims(2)])
-! 
-!          end do
-!         end do
+        prev = prev + domain_nyims(domain_index+1)*domain_nzims(domain_index+1)
 
-      else if (domain_index==2) then
+        do dik = 1, domain_nzims(domain_index+1)
+          do dii = 1, domain_nxims(domain_index+1)
+            call parent_buffer(num=dii+(dik-1)*domain_nxims(domain_index+1) + prev, &
+                               dir=So, domain=domain_index+1, im=[dii,1,dik])
+         end do
+        end do
+
+        prev = prev + domain_nxims(domain_index+1)*domain_nzims(domain_index+1)
+
+        do dik = 1, domain_nzims(domain_index+1)
+          do dii = 1, domain_nxims(domain_index+1)
+            call parent_buffer(num=dii+(dik-1)*domain_nxims(domain_index+1) + prev, &
+                               dir=No, domain=domain_index+1, im=[dii,domain_nyims(domain_index+1),dik])
+         end do
+        end do
+
+        prev = prev + domain_nxims(domain_index+1)*domain_nzims(domain_index+1)
+
+        do dij = 1, domain_nyims(domain_index+1)
+          do dii = 1, domain_nxims(domain_index+1)
+            call parent_buffer(num=dii+(dij-1)*domain_nxims(domain_index+1) + prev, &
+                               dir=Bo, domain=domain_index+1, im=[dii,dij,1])
+
+         end do
+        end do
+
+        prev = prev + domain_nxims(domain_index+1)*domain_nyims(domain_index+1)
+
+        do dij = 1, domain_nyims(domain_index+1)
+          do dii = 1, domain_nxims(domain_index+1)
+            call parent_buffer(num=dii+(dij-1)*domain_nxims(domain_index+1) + prev, &
+                               dir=To, domain=domain_index+1, im=[dii,dij,domain_nzims(domain_index+1)])
+
+         end do
+        end do
+
+      end if
+
+      if (domain_index>1) then
 
         allocate(domain_bc_recv_buffers(We:To))
 
@@ -66,7 +78,7 @@
           MoistBtype(We) = BC_DOMAIN_COPY
           ScalBtype(We) = BC_DOMAIN_COPY
 
-          call child_buffer(dir=We, domain=1)
+          call child_buffer(dir=We, domain=domain_index-1)
         endif
 
         if (iim==nxims) then
@@ -75,35 +87,44 @@
           MoistBtype(Ea) = BC_DOMAIN_COPY
           ScalBtype(Ea) = BC_DOMAIN_COPY
 
-          call child_buffer(dir=Ea, domain=1)
+          call child_buffer(dir=Ea, domain=domain_index-1)
         end if
-! 
-!         if (jim==1) then
-!           Btype(So) = BC_DOMAIN_COPY
-!           TempBtype(So) = BC_DOMAIN_COPY
-!           MoistBtype(So) = BC_DOMAIN_COPY
-!           ScalBtype(So) = BC_DOMAIN_COPY
-! 
-!           call child_buffer(dir=So, domain=1)
-!         endif
-! 
-!         if (jim==nyims) then
-!           Btype(No) = BC_DOMAIN_COPY
-!           TempBtype(No) = BC_DOMAIN_COPY
-!           MoistBtype(No) = BC_DOMAIN_COPY
-!           ScalBtype(No) = BC_DOMAIN_COPY
-! 
-!           call child_buffer(dir=No, domain=1)
-!         end if
-! 
-!         if (kim==nzims) then
-!           Btype(To) = BC_DOMAIN_COPY
-!           TempBtype(To) = BC_DOMAIN_COPY
-!           MoistBtype(To) = BC_DOMAIN_COPY
-!           ScalBtype(To) = BC_DOMAIN_COPY
-! 
-!           call child_buffer(dir=To, domain=1)
-!         end if
+
+        if (jim==1) then
+          Btype(So) = BC_DOMAIN_COPY
+          TempBtype(So) = BC_DOMAIN_COPY
+          MoistBtype(So) = BC_DOMAIN_COPY
+          ScalBtype(So) = BC_DOMAIN_COPY
+
+          call child_buffer(dir=So, domain=domain_index-1)
+        endif
+
+        if (jim==nyims) then
+          Btype(No) = BC_DOMAIN_COPY
+          TempBtype(No) = BC_DOMAIN_COPY
+          MoistBtype(No) = BC_DOMAIN_COPY
+          ScalBtype(No) = BC_DOMAIN_COPY
+
+          call child_buffer(dir=No, domain=domain_index-1)
+        end if
+
+        if (kim==1) then
+          Btype(Bo) = BC_DOMAIN_COPY
+          TempBtype(Bo) = BC_DOMAIN_COPY
+          MoistBtype(Bo) = BC_DOMAIN_COPY
+          ScalBtype(Bo) = BC_DOMAIN_COPY
+
+          call child_buffer(dir=Bo, domain=domain_index-1)
+        end if
+
+        if (kim==nzims) then
+          Btype(To) = BC_DOMAIN_COPY
+          TempBtype(To) = BC_DOMAIN_COPY
+          MoistBtype(To) = BC_DOMAIN_COPY
+          ScalBtype(To) = BC_DOMAIN_COPY
+
+          call child_buffer(dir=To, domain=domain_index-1)
+        end if
 
       end if
 
@@ -237,27 +258,27 @@ contains
 
           if (dir==So) then
             Uj1 = pos-2
-            Uj2 = pos+2
-
-            Vj1 = pos-2
-            Vj2 = pos+2
-
-            Wj1 = pos-2
-            Wj2 = pos+2
-
-            Prj1 = pos-1
-            Prj2 = pos+2
-          else if (dir==No) then
-            Uj1 = pos-1
             Uj2 = pos+3
 
             Vj1 = pos-2
             Vj2 = pos+2
 
-            Wj1 = pos-1
+            Wj1 = pos-2
             Wj2 = pos+3
 
-            Prj1 = pos-1
+            Prj1 = pos-2
+            Prj2 = pos+3
+          else if (dir==No) then
+            Uj1 = pos-2
+            Uj2 = pos+3
+
+            Vj1 = pos-2
+            Vj2 = pos+2
+
+            Wj1 = pos-2
+            Wj2 = pos+3
+
+            Prj1 = pos-2
             Prj2 = pos+2
           end if
 
@@ -293,27 +314,27 @@ contains
 
           if (dir==Bo) then
             Uk1 = pos-2
-            Uk2 = pos+2
-
-            Vk1 = pos-2
-            Vk2 = pos+2
-
-            Wk1 = pos-2
-            Wk2 = pos+2
-
-            Prk1 = pos-1
-            Prk2 = pos+2
-          else if (dir==To) then
-            Uk1 = pos-1
             Uk2 = pos+3
 
-            Vk1 = pos-1
+            Vk1 = pos-2
             Vk2 = pos+3
 
             Wk1 = pos-2
             Wk2 = pos+2
 
-            Prk1 = pos-1
+            Prk1 = pos-2
+            Prk2 = pos+3
+          else if (dir==To) then
+            Uk1 = pos-2
+            Uk2 = pos+3
+
+            Vk1 = pos-2
+            Vk2 = pos+3
+
+            Wk1 = pos-2
+            Wk2 = pos+2
+
+            Prk1 = pos-2
             Prk2 = pos+2
           end if
 
@@ -407,7 +428,7 @@ contains
       associate(b => domain_bc_recv_buffers(dir))
 
         b%comm = world_comm
-        b%remote_rank = domain_ranks_grid(1)%arr(1,1,1) !arr(domain_nxims(1),jim,kim)        
+        b%remote_rank = domain_ranks_grid(domain)%arr(1,1,1) !arr(domain_nxims(1),jim,kim)        
         b%remote_domain = domain
         b%direction = dir
         b%enabled = .true.
@@ -542,64 +563,177 @@ contains
             Ui1 = -2
             Ui2 = Unx+3
             Uj1 = -2
-            Uj2 = +2
+            Uj2 = width
             Uk1 = -2
             Uk2 = Unz+3
 
             Vi1 = -2
             Vi2 = Vnx+3
             Vj1 = -2
-            Vj2 = +2
+            Vj2 = width
             Vk1 = -2
             Vk2 = Vnz+3
 
             Wi1 = -2
             Wi2 = Wnx+3
             Wj1 = -2
-            Wj2 = +2
+            Wj2 = width
             Wk1 = -2
             Wk2 = Wnz+3
 
             Pri1 = -1
             Pri2 = Prnx+2
             Prj1 = -1
-            Prj2 = +2
+            Prj2 = width
             Prk1 = -1
             Prk2 = Prnz+2
+
+            b%r_Ui1 = -2
+            b%r_Ui2 = Prnx/b%spatial_ratio+3
+            b%r_Uj1 = -2
+            b%r_Uj2 = +3
+            b%r_Uk1 = -2
+            b%r_Uk2 = Prnz/b%spatial_ratio+3
+            
+            b%r_Vi1 = -2
+            b%r_Vi2 = Prnx/b%spatial_ratio+3
+            b%r_Vj1 = -2
+            b%r_Vj2 = +2
+            b%r_Vk1 = -2
+            b%r_Vk2 = Prnz/b%spatial_ratio+3
+            
+            b%r_Wi1 = -2
+            b%r_Wi2 = Prnx/b%spatial_ratio+3
+            b%r_Wj1 = -2
+            b%r_Wj2 = +3
+            b%r_Wk1 = -2
+            b%r_Wk2 = Prnz/b%spatial_ratio+3
+            
+            b%r_Pri1 = -2
+            b%r_Pri2 = Prnx/b%spatial_ratio+2
+            b%r_Prj1 = -1
+            b%r_Prj2 = +3
+            b%r_Prk1 = -1
+            b%r_Prk2 = Prnz/b%spatial_ratio+2
 
           case (No)
             b%position = Prny
 
             Ui1 = -2
             Ui2 = Unx+3
-            Uj1 = Prny-1
+            Uj1 = Uny-width+1
             Uj2 = Prny+3
             Uk1 = -2
             Uk2 = Unz+3
 
             Vi1 = -2
             Vi2 = Vnx+3
-            Vj1 = Prny-2
+            Vj1 = Vny-width+1
             Vj2 = Prny+2
             Vk1 = -2
             Vk2 = Vnz+3
 
             Wi1 = -2
             Wi2 = Wnx+3
-            Wj1 = Prny-1
+            Wj1 = Wny-width+1
             Wj2 = Prny+3
             Wk1 = -2
             Wk2 = Wnz+3
 
             Pri1 = -1
             Pri2 = Prnx+2
-            Prj1 = Prny-1
+            Prj1 = Prny-width+1
             Prj2 = Prny+2
             Prk1 = -1
             Prk2 = Prnz+2
 
+            b%r_Ui1 = -2
+            b%r_Ui2 = Unx/b%spatial_ratio+3
+            b%r_Uj1 = Prny/b%spatial_ratio-2
+            b%r_Uj2 = Prny/b%spatial_ratio+3
+            b%r_Uk1 = -2
+            b%r_Uk2 = Unz/b%spatial_ratio+3
+            
+            b%r_Vi1 = -2
+            b%r_Vi2 = Vnx/b%spatial_ratio+3
+            b%r_Vj1 = Prny/b%spatial_ratio-2
+            b%r_Vj2 = Prny/b%spatial_ratio+2
+            b%r_Vk1 = -2
+            b%r_Vk2 = Vnz/b%spatial_ratio+3
+            
+            b%r_Wi1 = -2
+            b%r_Wi2 = Wnx/b%spatial_ratio+3
+            b%r_Wj1 = Prny/b%spatial_ratio-2
+            b%r_Wj2 = Prny/b%spatial_ratio+3
+            b%r_Wk1 = -2
+            b%r_Wk2 = Wnz/b%spatial_ratio+3
+            
+            b%r_Pri1 = -1
+            b%r_Pri2 = Prnx/b%spatial_ratio+2
+            b%r_Prj1 = Prny/b%spatial_ratio-2
+            b%r_Prj2 = Prny/b%spatial_ratio+2
+            b%r_Prk1 = -1
+            b%r_Prk2 = Prnz/b%spatial_ratio+2
+
           case (Bo)
             b%position = 0
+
+            Ui1 = -2
+            Ui2 = Unx+3
+            Uj1 = -2
+            Uj2 = Uny+3
+            Uk1 = -2
+            Uk2 = width
+
+            Vi1 = -2
+            Vi2 = Vnx+3
+            Vj1 = -2
+            Vj2 = Vny+3
+            Vk1 = -2
+            Vk2 = width
+
+            Wi1 = -2
+            Wi2 = Wnx+3
+            Wj1 = -2
+            Wj2 = Wny+3
+            Wk1 = -2
+            Wk2 = width
+
+            Pri1 = -1
+            Pri2 = Prnx+2
+            Prj1 = -1
+            Prj2 = Prny+2
+            Prk1 = -1
+            Prk2 = width
+
+            b%r_Ui1 = -2
+            b%r_Ui2 = Unx/b%spatial_ratio+3
+            b%r_Uj1 = -2
+            b%r_Uj2 = Uny/b%spatial_ratio+3
+            b%r_Uk1 = -2
+            b%r_Uk2 = +3
+            
+            b%r_Vi1 = -2
+            b%r_Vi2 = Vnx/b%spatial_ratio+3
+            b%r_Vj1 = -2
+            b%r_Vj2 = Vny/b%spatial_ratio+3
+            b%r_Vk1 = -2
+            b%r_Vk2 = +3
+            
+            b%r_Wi1 = -2
+            b%r_Wi2 = Wnx/b%spatial_ratio+3
+            b%r_Wj1 = -2
+            b%r_Wj2 = Wny/b%spatial_ratio+3
+            b%r_Wk1 = -2
+            b%r_Wk2 = +2
+            
+            b%r_Pri1 = -2
+            b%r_Pri2 = Prnx/b%spatial_ratio+2
+            b%r_Prj1 = -1
+            b%r_Prj2 = Prny/b%spatial_ratio+2
+            b%r_Prk1 = -1
+            b%r_Prk2 = +3
+
           case (To)
             b%position = Prnz
 
@@ -607,29 +741,57 @@ contains
             Ui2 = Unx+3
             Uj1 = -2
             Uj2 = Uny+3
-            Uk1 = Prnz-1
+            Uk1 = Unz-width+1
             Uk2 = Prnz+3
 
             Vi1 = -2
             Vi2 = Vnx+3
             Vj1 = -2
             Vj2 = Vny+3
-            Vk1 = Prnz-1
+            Vk1 = Vnz-width+1
             Vk2 = Prnz+3
 
             Wi1 = -2
             Wi2 = Wnx+3
             Wj1 = -2
             Wj2 = Wny+3
-            Wk1 = Prnz-2
+            Wk1 = Wnz-width+1
             Wk2 = Prnz+2
 
             Pri1 = -1
             Pri2 = Prnx+2
             Prj1 = -1
             Prj2 = Prny+2
-            Prk1 = Prnz-1
+            Prk1 = Prnz-width+1
             Prk2 = Prnz+2
+
+            b%r_Ui1 = -2
+            b%r_Ui2 = Unx/b%spatial_ratio+3
+            b%r_Uj1 = -2
+            b%r_Uj2 = Uny/b%spatial_ratio+3
+            b%r_Uk1 = Prnz/b%spatial_ratio-2
+            b%r_Uk2 = Prnz/b%spatial_ratio+3
+            
+            b%r_Vi1 = -2
+            b%r_Vi2 = Vnx/b%spatial_ratio+3
+            b%r_Vj1 = -2
+            b%r_Vj2 = Vny/b%spatial_ratio+3
+            b%r_Vk1 = Prnz/b%spatial_ratio-2
+            b%r_Vk2 = Prnz/b%spatial_ratio+3
+            
+            b%r_Wi1 = -2
+            b%r_Wi2 = Wnx/b%spatial_ratio+3
+            b%r_Wj1 = -2
+            b%r_Wj2 = Wny/b%spatial_ratio+3
+            b%r_Wk1 = Prnz/b%spatial_ratio-2
+            b%r_Wk2 = Prnz/b%spatial_ratio+2
+            
+            b%r_Pri1 = -1
+            b%r_Pri2 = Prnx/b%spatial_ratio+2
+            b%r_Prj1 = -1
+            b%r_Prj2 = Prny/b%spatial_ratio+2
+            b%r_Prk1 = Prnz/b%spatial_ratio-2
+            b%r_Prk2 = Prnz/b%spatial_ratio+2
 
         end select    
 
@@ -713,6 +875,10 @@ contains
             b%bWj1 = Wj1 + width 
             b%bPrj1 = Prj1 + width 
           case (Bo)
+            b%bUk2 = Uk2 - width 
+            b%bVk2 = Vk2 - width 
+            b%bWk2 = Wk2 - width 
+            b%bPrk2 = Prk2 - width 
           case (To)
             b%bUk1 = Uk1 + width 
             b%bVk1 = Vk1 + width 
