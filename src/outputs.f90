@@ -7,7 +7,7 @@ module Outputs
                         GroundTFlux, GroundTFluxUVW, &
                         wallmodeltype
   use ImmersedBoundary
-  use Turbinlet, only: Ustar_inlet
+  use Turbinlet, only: turb_gen => default_turbulence_generator
   use Endianness
   use FreeUnit
   use VTKFrames
@@ -999,8 +999,8 @@ contains
       end if
 
       if (display%ustar==1) then
-        if (allocated(Ustar_inlet)) then
-         if (master) write(*,'(*(a10,es15.3))') "ustar:",ground_ustar_Pr,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
+        if (allocated(turb_gen%Ustar_inlet)) then
+         if (master) write(*,'(*(a10,es15.3))') "ustar:",ground_ustar_Pr,"Re_tau:",S2,"u*inlet",turb_gen%Ustar_inlet(1)
         else
          if (master) write(*,'(*(a10,es15.3))') "ustar:",ground_ustar_Pr,"Re_tau:",S2
         end if
@@ -1015,8 +1015,8 @@ contains
       end if
 
       if (display%ustar==1) then
-        if (allocated(Ustar_inlet)) then
-         if (master) write(*,'(*(a10,es15.3))') "ustarUVW:",ground_ustar_UVW,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
+        if (allocated(turb_gen%Ustar_inlet)) then
+         if (master) write(*,'(*(a10,es15.3))') "ustarUVW:",ground_ustar_UVW,"Re_tau:",S2,"u*inlet",turb_gen%Ustar_inlet(1)
         else
          if (master) write(*,'(*(a10,es15.3))') "ustarUVW:",ground_ustar_UVW,"Re_tau:",S2
         end if

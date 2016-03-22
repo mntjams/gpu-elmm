@@ -12,8 +12,7 @@ module Initial
   use Scalars
   use Filters, only: filtertype, filter_ratios
   use Subgrid
-  use Turbinlet, only: GetTurbulentInlet, GetBC_INLET_FROM_FILE, TLag, Lturby, Lturbz, Ustar_inlet, relative_stress, &
-               Ustar_surf_inlet, stress_gradient_inlet, U_ref_inlet, z_ref_inlet, z0_inlet, power_exponent_inlet
+  use Turbinlet, only: default_turbulence_generator, GetInletFromFile
   use SolarRadiation, only: InitSolarRadiation
   use SolidBodies, only: obstacles_file, roughness_file, displacement_file, InitSolidBodies
   use ImmersedBoundary, only: GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
@@ -411,26 +410,26 @@ contains
    if (master) write(*,*) "G=",ShearInletTypeParameter
    call get(Uinlet)
    if (master) write(*,*) "Uinlet=",Uinlet
-   call get(Ustar_surf_inlet)  !-<u'w'>
-   call get(stress_gradient_inlet) !in relative part per 1m
-   call get(z0_inlet)
-   call get(power_exponent_inlet)
-   call get(z_ref_inlet)
-   call get(U_ref_inlet)
-   call get(relative_stress(1,1))
-   call get(relative_stress(2,2))
-   call get(relative_stress(3,3))
-   call get(relative_stress(1,2))
-   call get(relative_stress(1,3))
-   call get(relative_stress(2,3))
-   call get(TLag)
-   call get(Lturby)
-   call get(Lturbz)
+   call get(default_turbulence_generator%Ustar_surf_inlet)  !-<u'w'>
+   call get(default_turbulence_generator%stress_gradient_inlet) !in relative part per 1m
+   call get(default_turbulence_generator%z0_inlet)
+   call get(default_turbulence_generator%power_exponent_inlet)
+   call get(default_turbulence_generator%z_ref_inlet)
+   call get(default_turbulence_generator%U_ref_inlet)
+   call get(default_turbulence_generator%relative_stress(1,1))
+   call get(default_turbulence_generator%relative_stress(2,2))
+   call get(default_turbulence_generator%relative_stress(3,3))
+   call get(default_turbulence_generator%relative_stress(1,2))
+   call get(default_turbulence_generator%relative_stress(1,3))
+   call get(default_turbulence_generator%relative_stress(2,3))
+   call get(default_turbulence_generator%T_Lag)
+   call get(default_turbulence_generator%L_y)
+   call get(default_turbulence_generator%L_z)
    close(unit)
 
-   relative_stress(2,1) = relative_stress(1,2)
-   relative_stress(3,1) = relative_stress(1,3)
-   relative_stress(3,2) = relative_stress(2,3)
+   default_turbulence_generator%relative_stress(2,1) = default_turbulence_generator%relative_stress(1,2)
+   default_turbulence_generator%relative_stress(3,1) = default_turbulence_generator%relative_stress(1,3)
+   default_turbulence_generator%relative_stress(3,2) = default_turbulence_generator%relative_stress(2,3)
 
    open(unit,file="scalars.conf",status="old",action="read",iostat = io)
    if (io==0) then
@@ -2468,7 +2467,7 @@ fields_do:  do j = 1, size(fields)
 
          do i = 1, Prnx
            
-           call GetTurbulentInlet(dt)
+           call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
            
            !$omp parallel private(j,k)
            !$omp do collapse(2)
@@ -3082,9 +3081,10 @@ fields_do:  do j = 1, size(fields)
       case (ParabolicInletType)
         call ParabolicInlet
       case (TurbulentInletType)
-        call GetTurbulentInlet(dt)
+        call default_turbulence_generator%init()
+        call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
       case (FromFileInletType)
-        call GetBC_INLET_FROM_FILE(time_stepping%start_time)
+        call GetInletFromFile(time_stepping%start_time)
       case (GeostrophicInletType)
         call GeostrophicWindInlet(geostrophic_wind)
       case default

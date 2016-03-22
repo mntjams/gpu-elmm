@@ -6,7 +6,7 @@ module TimeSteps
   use Pressure, only: PressureCorrection, pressure_solution, POISSON_SOLVER_NONE
   use Outputs, only: current_profiles
   use Scalars, only: ScalarRK3
-  use Turbinlet, only: GetTurbulentInlet, GetBC_INLET_FROM_FILE
+  use Turbinlet, only: default_turbulence_generator, GetInletFromFile
   use Sponge, only: enable_top_sponge, enable_out_sponge, SpongeTop, SpongeOut
 
   implicit none
@@ -76,9 +76,9 @@ contains
 
 
     if ((Btype(We)==BC_TURBULENT_INLET) .or. (Btype(Ea)==BC_TURBULENT_INLET)) then
-      call GetTurbulentInlet(time_stepping%dt)
+      call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
     else if (Btype(We)==BC_INLET_FROM_FILE) then
-      call GetBC_INLET_FROM_FILE(time_stepping%time)
+      call GetInletFromFile(time_stepping%time)
     end if
 
     call TimeStepLength(U, V, W, time_stepping)

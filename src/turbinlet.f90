@@ -8,354 +8,385 @@ module TurbInlet
   implicit none
 
   private
-  public GetTurbulentInlet, GetBC_INLET_FROM_FILE, TLag, Lturby, Lturbz, Ustar_inlet, relative_stress, &
-         Ustar_surf_inlet, stress_gradient_inlet, U_ref_inlet, z_ref_inlet, z0_inlet, power_exponent_inlet
+  public :: turbulence_generator, default_turbulence_generator, GetInletFromFile
 
-  real(knd) :: TLag
-  real(knd) :: Lturby
-  real(knd) :: Lturbz
+  type turbulence_generator
+    integer :: direction
 
-  real(knd) :: Ustar_surf_inlet, stress_gradient_inlet, U_ref_inlet, z_ref_inlet, z0_inlet, power_exponent_inlet
+    real(knd) :: T_lag
+    real(knd) :: L_y
+    real(knd) :: L_z
+
+    real(knd) :: Ustar_surf_inlet, &
+                 stress_gradient_inlet, &
+                 U_ref_inlet, &
+                 z_ref_inlet, &
+                 z0_inlet, &
+                 power_exponent_inlet
+
+    integer :: filtny, filtnz, bigNy, bigNz
+
+    real(knd), allocatable, dimension(:) :: expsy, expsz
+    real(knd) :: compat
+    real(knd), allocatable, dimension(:,:,:) :: Ru, Rv, Rw !arrays of randoms
+    real(knd), allocatable, dimension(:,:,:) :: Psiu, Psiv, Psiw
+    real(knd), allocatable, dimension(:,:,:) :: bfilt !filter coefficients (ii,jj,kk,kz)
 
 
-  real(knd),allocatable,dimension(:)     :: Ustar_inlet !friction velocity profile at inlet
-  real(knd),allocatable,dimension(:,:)   :: Uinavg,Vinavg,Winavg !mean values of U,V,W at inflow
-  real(knd),allocatable,dimension(:,:,:) :: transform_tensor
-  real(knd),dimension(1:3,1:3) :: relative_stress
+    real(knd),allocatable,dimension(:)     :: Ustar_inlet !friction velocity profile at inlet
+    real(knd),allocatable,dimension(:,:)   :: Uinavg, Vinavg, Winavg !mean values of U,V,W at inflow
+    real(knd),allocatable,dimension(:,:,:) :: transform_tensor
+    real(knd),dimension(1:3,1:3) :: relative_stress
+  contains
+    procedure :: init => turbulence_generator_init
+    procedure :: time_step => turbulence_generator_time_step
+    procedure, private :: init_turbulence_profiles => turbulence_generator_init_turbulence_profiles
+    procedure, private :: init_mean_profiles => turbulence_generator_init_mean_profiles
+  end type
 
+  type TInlet
+    real(knd),allocatable,dimension(:,:) :: U, V, W, temperature
+  end type
 
-   type TInlet
-     real(knd),allocatable,dimension(:,:) :: U,V,W,temperature
-   end type
-
-  interface GetTurbulentInlet
-    module procedure GetTurbInletXie
-  end interface
+  type(turbulence_generator) :: default_turbulence_generator
 
 contains
 
-
-
- subroutine GetTurbInletXie(dt)
+  subroutine turbulence_generator_init(g)
 #ifdef PAR
-   use custom_par, only: iim, jim, kim, nxims, nyims, nzims, par_co_sum, par_co_min
-   use exchange_par
+    use custom_par, only: iim, jim, kim, nxims, nyims, nzims, par_co_sum, par_co_min
+    use exchange_par
 #endif
-   real(knd), intent(in) :: dt
-   logical, save:: called=.false.
-   integer :: i, j, k
-   integer :: jlo, jup, klo, kup
-   integer, save:: filtny, filtnz, bigNy, bigNz
-   real(knd) :: Ui, Vi, Wi, bysum, bzsum, p
-   real(knd), allocatable, dimension(:):: expsy, expsz
-   real(knd), save:: compat
-   real(knd), allocatable, dimension(:,:,:), save :: Ru, Rv, Rw !arrays of randoms
-   real(knd), allocatable, dimension(:,:,:), save :: Psiu, Psiv, Psiw
-   real(knd), allocatable, dimension(:,:,:), save :: bfilt !filter coefficients (ii,jj,kk,kz)
-   integer :: tid
-   
+    class(turbulence_generator), intent(inout) :: g
+    integer :: i, j, k
+    integer :: jlo, jup, klo, kup
+    real(knd) :: bysum, bzsum
+    integer :: tid
+
 #ifdef PAR
-   !should not happen for 2D decomposition in X and Y
-   if (.not.(iim==1.or.iim==nxims)) return
-   if (nxims>1.and.iim==nxims.and.Btype(Ea)/=TurbulentInletType) return
+    !should not happen for 2D decomposition in Y and Z
+    if (.not. (iim==1 .or. iim==nxims)) return
+    if (nxims > 1 .and. iim==nxims .and. Btype(Ea) /= TurbulentInletType) return
 #endif
 
-   if (.not. called) then
+    call g%init_turbulence_profiles
 
-      call InitTurbulenceProfiles
-
-      call InitMeanProfiles
+    call g%init_mean_profiles
 
 #ifdef PAR
-      filtny = min(max(nint(lturby/dymin),1),ceiling(1._knd*gPrny/3),Prny)
-      filtnz = min(max(nint(lturbz/dzmin),1),ceiling(1._knd*gPrnz/3),Prnz)
+    g%filtny = min(max(nint(g%L_y / dymin),1), ceiling(1._knd * gPrny / 3),Prny)
+    g%filtnz = min(max(nint(g%L_z / dzmin),1), ceiling(1._knd * gPrnz / 3),Prnz)
 
-      filtny = par_co_min(filtny)
-      filtnz = par_co_min(filtnz)
+    g%filtny = par_co_min(g%filtny)
+    g%filtnz = par_co_min(g%filtnz)
 #else
-      filtny = min(max(nint(lturby/dymin),1),ceiling(1._knd*Prny/3))
-      filtnz = min(max(nint(lturbz/dzmin),1),ceiling(1._knd*Prnz/3))
+    g%filtny = min(max(nint(g%L_y / dymin),1), ceiling(1._knd * Prny / 3))
+    g%filtnz = min(max(nint(g%L_z / dzmin),1), ceiling(1._knd * Prnz / 3))
 #endif
 
-      bigNy = 2*filtny
-      bigNz = 2*filtnz
+    g%bigNy = 2 * g%filtny
+    g%bigNz = 2 * g%filtnz
 
-      jlo = -bigNy+1
-      jup = Prny+bigNy
+    jlo = -g%bigNy + 1
+    jup = Prny + g%bigNy
 
-      klo = -bigNz+1
-      kup = Prnz+bigNz
+    klo = -g%bigNz + 1
+    kup = Prnz + g%bigNz
 
-      allocate(Ru(jlo:jup,klo:kup,2))
-      allocate(Rv(jlo:jup,klo:kup,2))
-      allocate(Rw(jlo:jup,klo:kup,2))
-      allocate(Psiu(1:Prny,1:Prnz,1:2))
-      allocate(Psiv(1:Prny,1:Prnz,1:2))
-      allocate(Psiw(1:Prny,1:Prnz,1:2))
+    allocate(g%Ru(jlo:jup,klo:kup,2))
+    allocate(g%Rv(jlo:jup,klo:kup,2))
+    allocate(g%Rw(jlo:jup,klo:kup,2))
+    allocate(g%Psiu(1:Prny,1:Prnz,1:2))
+    allocate(g%Psiv(1:Prny,1:Prnz,1:2))
+    allocate(g%Psiw(1:Prny,1:Prnz,1:2))
 
-      !$omp parallel private(j,k,tid)
-      tid = 0
-      !$ tid = omp_get_thread_num()
-      
-      !$omp do collapse(2)
-      do k = klo, kup
-       do j = jlo, jup
-         call rng_norm(Ru(j,k,1), tid)
-         call rng_norm(Rv(j,k,1), tid)
-         call rng_norm(Rw(j,k,1), tid)
-       end do
-      end do
+    !$omp parallel private(j,k,tid)
+    tid = 0
+    !$ tid = omp_get_thread_num()
+    
+    !$omp do collapse(2)
+    do k = klo, kup
+     do j = jlo, jup
+       call rng_norm(g%Ru(j,k,1), tid)
+       call rng_norm(g%Rv(j,k,1), tid)
+       call rng_norm(g%Rw(j,k,1), tid)
+     end do
+    end do
 
-      !$omp do collapse(2)
-      do k = klo, kup
-       do j = jlo, jup
-         call rng_norm(Ru(j,k,2), tid)
-         call rng_norm(Rv(j,k,2), tid)
-         call rng_norm(Rw(j,k,2), tid)
-       end do
-      end do
- 
-      !$omp end parallel
+    !$omp do collapse(2)
+    do k = klo, kup
+     do j = jlo, jup
+       call rng_norm(g%Ru(j,k,2), tid)
+       call rng_norm(g%Rv(j,k,2), tid)
+       call rng_norm(g%Rw(j,k,2), tid)
+     end do
+    end do
+
+    !$omp end parallel
 
 
-      if ((Btype(So)==BC_PERIODIC).or.(Btype(No)==BC_PERIODIC)) then
-        !$omp parallel workshare
-        forall(k = klo:kup,j = jlo:0)
-           Ru(j,k,1:2) = Ru(j+Prny,k,1:2)
-           Rv(j,k,1:2) = Rv(j+Prny,k,1:2)
-           Rw(j,k,1:2) = Rw(j+Prny,k,1:2)
-        end forall
-        forall(k = klo:kup,j = Prny+1:jup)
-           Ru(j,k,1:2) = Ru(j-Prny,k,1:2)
-           Rv(j,k,1:2) = Rv(j-Prny,k,1:2)
-           Rw(j,k,1:2) = Rw(j-Prny,k,1:2)
-        end forall
-        !$omp end  parallel workshare
-      end if
+    if ((Btype(So)==BC_PERIODIC).or.(Btype(No)==BC_PERIODIC)) then
+      !$omp parallel workshare
+      forall(k = klo:kup, j = jlo:0)
+         g%Ru(j,k,1:2) = g%Ru(j+Prny,k,1:2)
+         g%Rv(j,k,1:2) = g%Rv(j+Prny,k,1:2)
+         g%Rw(j,k,1:2) = g%Rw(j+Prny,k,1:2)
+      end forall
+      forall(k = klo:kup,j = Prny+1:jup)
+         g%Ru(j,k,1:2) = g%Ru(j-Prny,k,1:2)
+         g%Rv(j,k,1:2) = g%Rv(j-Prny,k,1:2)
+         g%Rw(j,k,1:2) = g%Rw(j-Prny,k,1:2)
+      end forall
+      !$omp end  parallel workshare
+    end if
 
-      if  ((Btype(Bo)==BC_PERIODIC).or.(Btype(To)==BC_PERIODIC)) then
-        !$omp parallel workshare
-        forall(k = klo:0,j = jlo:jup)
-           Ru(j,k,1:2) = Ru(j,k+Prnz,1:2)
-           Rv(j,k,1:2) = Rv(j,k+Prnz,1:2)
-           Rw(j,k,1:2) = Rw(j,k+Prnz,1:2)
-        end forall
-        forall(k = Prnz+1:kup,j = jlo:jup)
-           Ru(j,k,1:2) = Ru(j,k-Prnz,1:2)
-           Rv(j,k,1:2) = Rv(j,k-Prnz,1:2)
-           Rw(j,k,1:2) = Rw(j,k-Prnz,1:2)
-        end forall
-        !$omp end  parallel workshare
-      end if
+    if  ((Btype(Bo)==BC_PERIODIC).or.(Btype(To)==BC_PERIODIC)) then
+      !$omp parallel workshare
+      forall(k = klo:0, j = jlo:jup)
+         g%Ru(j,k,1:2) = g%Ru(j,k+Prnz,1:2)
+         g%Rv(j,k,1:2) = g%Rv(j,k+Prnz,1:2)
+         g%Rw(j,k,1:2) = g%Rw(j,k+Prnz,1:2)
+      end forall
+      forall(k = Prnz+1:kup,j = jlo:jup)
+         g%Ru(j,k,1:2) = g%Ru(j,k-Prnz,1:2)
+         g%Rv(j,k,1:2) = g%Rv(j,k-Prnz,1:2)
+         g%Rw(j,k,1:2) = g%Rw(j,k-Prnz,1:2)
+      end forall
+      !$omp end  parallel workshare
+    end if
 
 #ifdef PAR
-      do i=1,2
-        call par_exchange_boundaries_yz(Ru(:,:,i), Prny, Prnz, Btype, &
-                                        jlo, klo, bigNy, bigNz)
-        call par_exchange_boundaries_yz(Rv(:,:,i), Prny, Prnz, Btype, &
-                                        jlo, klo, bigNy, bigNz)
-        call par_exchange_boundaries_yz(Rw(:,:,i), Prny, Prnz, Btype, &
-                                        jlo, klo, bigNy, bigNz)
-      end do
+    do i=1,2
+      call par_exchange_boundaries_yz(g%Ru(:,:,i), Prny, Prnz, Btype, &
+                                      jlo, klo, g%bigNy, g%bigNz)
+      call par_exchange_boundaries_yz(g%Rv(:,:,i), Prny, Prnz, Btype, &
+                                      jlo, klo, g%bigNy, g%bigNz)
+      call par_exchange_boundaries_yz(g%Rw(:,:,i), Prny, Prnz, Btype, &
+                                      jlo, klo, g%bigNy, g%bigNz)
+    end do
 #endif
 
 
-      allocate(bfilt(-bigNy:bigNy,-bigNz:bigNz,1))
-      allocate(expsy(-bigNy:bigNy),expsz(-bigNz:bigNz))
+    allocate(g%bfilt(-g%bigNy:g%bigNy, -g%bigNz:g%bigNz,1))
+    allocate(g%expsy(-g%bigNy:g%bigNy), g%expsz(-g%bigNz:g%bigNz))
 
-      bysum = 0
-      do i = -bigNy,bigNy
-       expsy(i) = exp(-pi*abs(i)/(bigNy))
-       bysum = bysum+expsy(i)**2
+    bysum = 0
+    do i = -g%bigNy, g%bigNy
+     g%expsy(i) = exp(-pi * abs(i) / (g%bigNy))
+     bysum = bysum + g%expsy(i)**2
+    end do
+    bysum = sqrt(bysum)
+    g%expsy = g%expsy / bysum
+
+
+    bzsum = 0
+    do i = -g%bigNz, g%bigNz
+     g%expsz(i) = exp(-pi * abs(i) / (g%bigNz))
+     bzsum = bzsum + g%expsz(i)**2
+    end do
+    bzsum = sqrt(bzsum)
+    g%expsz = g%expsz / bzsum
+
+    !$omp parallel private(j,k)
+    !$omp do
+    do k = -g%bigNz, g%bigNz
+      do j = -g%bigNy, g%bigNy
+         g%bfilt(j,k,1) = g%expsy(j) * g%expsz(k)
       end do
-      bysum = sqrt(bysum)
-      expsy = expsy/bysum
+    end do
+    !$omp end  do
+    !$omp workshare
+    forall(k = 1:Prnz, j = 1:Prny)
+         g%Psiu(j,k,1) = sum(g%bfilt(-g%bigNy:g%bigNy,-g%bigNz:g%bigNz,1) * &
+                             g%Ru(j-g%bigNy:j+g%bigNy,k-g%bigNz:k+g%bigNz,1))
+         g%Psiv(j,k,1) = sum(g%bfilt(-g%bigNy:g%bigNy,-g%bigNz:g%bigNz,1) * &
+                             g%Rv(j-g%bigNy:j+g%bigNy,k-g%bigNz:k+g%bigNz,1))
+         g%Psiw(j,k,1) = sum(g%bfilt(-g%bigNy:g%bigNy,-g%bigNz:g%bigNz,1) * &
+                             g%Rw(j-g%bigNy:j+g%bigNy,k-g%bigNz:k+g%bigNz,1))
+    end forall
+
+    g%compat = sum(g%Uinavg(1:Prny,1:Prnz))
+    !$omp end  workshare
+    !$omp end  parallel
+#ifdef PAR
+    g%compat = par_co_sum(g%compat)
+#endif
+
+  end subroutine
 
 
-      bzsum = 0
-      do i = -bigNz,bigNz
-       expsz(i) = exp(-pi*abs(i)/(bigNz))
-       bzsum = bzsum+expsz(i)**2
-      end do
-      bzsum = sqrt(bzsum)
-      expsz = expsz/bzsum
+  subroutine turbulence_generator_time_step(g, Uin, Vin, Win, dt)
+#ifdef PAR
+    use custom_par, only: iim, jim, kim, nxims, nyims, nzims, par_co_sum, par_co_min
+    use exchange_par
+#endif
+    class(turbulence_generator), intent(inout) :: g
+    real(knd), intent(out) :: Uin(-2:,-2:), Vin(-2:,-2:), Win(-2:,-2:)
+    real(knd), intent(in) :: dt
+    integer :: i, j, k
+    integer :: jlo, jup, klo, kup
+    real(knd) :: Ui, Vi, Wi, p
+    integer :: tid
+    
+#ifdef PAR
+    !should not happen for 2D decomposition in X and Y
+    if (.not. (iim==1 .or. iim==nxims)) return
+    if (nxims > 1 .and. iim==nxims .and. Btype(Ea) /= TurbulentInletType) return
+#endif
 
-      !$omp parallel private(j,k)
-      !$omp do
-      do k = -bigNz,bigNz
-        do j = -bigNy,bigNy
-           bfilt(j,k,1) = expsy(j)*expsz(k)
+    jlo = -g%bigNy + 1
+    jup = Prny + g%bigNy
+
+    klo = -g%bigNz + 1
+    kup = Prnz + g%bigNz
+
+
+    !$omp parallel do private(i,j,k,Ui,Vi,Wi)  
+    do k = 1, Prnz
+      do j = 1, Prny
+         g%Psiu(j,k,2) = sum(g%bfilt(-g%bigNy:g%bigNy,-g%bigNz:g%bigNz,1) * &
+                             g%Ru(j-g%bigNy:j+g%bigNy,k-g%bigNz:k+g%bigNz,2))
+         g%Psiv(j,k,2) = sum(g%bfilt(-g%bigNy:g%bigNy,-g%bigNz:g%bigNz,1) * &
+                             g%Rv(j-g%bigNy:j+g%bigNy,k-g%bigNz:k+g%bigNz,2))
+         g%Psiw(j,k,2) = sum(g%bfilt(-g%bigNy:g%bigNy,-g%bigNz:g%bigNz,1) * &
+                             g%Rw(j-g%bigNy:j+g%bigNy,k-g%bigNz:k+g%bigNz,2))
+      end  do
+    end  do
+    !$omp end  parallel do
+
+    call multiply(g%Psiu(:,:,1), exp(-pi * dt / (2._knd * g%T_lag)))
+    call add_multiplied(g%Psiu(:,:,1), g%Psiu(:,:,2), sqrt(1 - exp(-pi * dt / (g%T_lag))))
+
+    call multiply(g%Psiv(:,:,1),exp(-pi * dt / (2._knd * g%T_lag)))
+    call add_multiplied(g%Psiv(:,:,1), g%Psiv(:,:,2), sqrt(1 - exp(-pi * dt / (g%T_lag))))
+
+    call multiply(g%Psiw(:,:,1),exp(-pi * dt / (2._knd * g%T_lag)))
+    call add_multiplied(g%Psiw(:,:,1), g%Psiw(:,:,2), sqrt(1 - exp(-pi * dt / (g%T_lag))))
+    
+    call set(Uin, 0._knd)
+    call set(Vin, 0._knd)
+    call set(Win, 0._knd)
+    !$omp parallel do private(i,j,k,Ui,Vi,Wi)
+    do k = 1, Prnz
+     do j = 1, Prny
+      Ui = g%Psiu(j,k,1)
+      Vi = g%Psiv(j,k,1)
+      Wi = g%Psiw(j,k,1)
+
+      Uin(j,k) = g%Uinavg(j,k) + g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
+
+      Vin(j,k) = g%Vinavg(j,k) + g%transform_tensor(2,j,k) * Ui&
+                            +g%transform_tensor(3,j,k) * Vi
+
+      Win(j,k) = g%Winavg(j,k) + g%transform_tensor(4,j,k) * Ui&
+                            +g%transform_tensor(5,j,k) * Vi&
+                            +g%transform_tensor(6,j,k) * Wi
+     end do
+    end do
+    !$omp end parallel do
+
+    if (g%direction==We .or. g%direction==Ea) then
+      !$omp parallel workshare
+      p = sum(Uin(1:Prny,1:Prnz))
+      !$omp end parallel workshare
+    else if (g%direction==So .or. g%direction==No) then
+      !$omp parallel workshare
+      p = sum(Vin(1:Prny,1:Prnz))
+      !$omp end parallel workshare
+    end if
+
+    if (g%direction==We .or. g%direction==Ea .or. &
+        g%direction==So .or. g%direction==No) then
+#ifdef PAR
+      p = par_co_sum(p)
+#endif
+      p = g%compat / p                  !To ensure the g%compatibility condition.
+
+      call multiply(Uin, p)
+      call multiply(Vin, p)
+      call multiply(Win, p)
+    end if
+
+
+    call BoundUin(1, Uin)
+
+    call BoundUin(2, Vin)
+
+    call BoundUin(3, Win)
+
+    !$omp parallel private(j,k,tid)
+    tid = 0
+    !$ tid = omp_get_thread_num()
+    
+    !$omp do collapse(2) 
+    do k = klo, kup
+     do j = jlo, jup
+       call rng_norm(g%Ru(j,k,2), tid)
+       call rng_norm(g%Rv(j,k,2), tid)
+       call rng_norm(g%Rw(j,k,2), tid)
+     end do
+    end do
+    !$omp end do
+
+    if ((Btype(So)==BC_PERIODIC) .or. (Btype(No)==BC_PERIODIC)) then
+      !workaround to a bug in Cray Fortran
+      !$omp single
+      i = Prny + 1
+      !$omp end single
+
+      !$omp do collapse(2)
+      do k = klo, kup
+        do j = jlo, 0
+          g%Ru(j,k,1:2) = g%Ru(j+Prny,k,1:2)
+          g%Rv(j,k,1:2) = g%Rv(j+Prny,k,1:2)
+          g%Rw(j,k,1:2) = g%Rw(j+Prny,k,1:2)
         end do
       end do
-      !$omp end  do
-      !$omp workshare
-      forall(k = 1:Prnz,j = 1:Prny)
-           Psiu(j,k,1) = sum(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Ru(j-bigNy:j+bigNy,k-bigNz:k+bigNz,1))
-           Psiv(j,k,1) = sum(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rv(j-bigNy:j+bigNy,k-bigNz:k+bigNz,1))
-           Psiw(j,k,1) = sum(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rw(j-bigNy:j+bigNy,k-bigNz:k+bigNz,1))
-      end forall
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = klo, kup
+        do j = i, jup
+          g%Ru(j,k,1:2) = g%Ru(j-Prny,k,1:2)
+          g%Rv(j,k,1:2) = g%Rv(j-Prny,k,1:2)
+          g%Rw(j,k,1:2) = g%Rw(j-Prny,k,1:2)
+        end do
+      end do
+      !$omp end do
+    end if
+    if  ((Btype(Bo)==BC_PERIODIC) .or. (Btype(To)==BC_PERIODIC)) then
+      !$omp do collapse(2)
+      do k = klo, 0
+        do j = jlo, jup
+          g%Ru(j,k,1:2) = g%Ru(j,k+Prnz,1:2)
+          g%Rv(j,k,1:2) = g%Rv(j,k+Prnz,1:2)
+          g%Rw(j,k,1:2) = g%Rw(j,k+Prnz,1:2)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = Prnz+1, kup
+        do j = jlo, jup
+          g%Ru(j,k,1:2) = g%Ru(j,k-Prnz,1:2)
+          g%Rv(j,k,1:2) = g%Rv(j,k-Prnz,1:2)
+          g%Rw(j,k,1:2) = g%Rw(j,k-Prnz,1:2)
+        end do
+      end do
+      !$omp end do
+    end if
+    !$omp end parallel
 
-      compat = sum(Uinavg(1:Prny,1:Prnz))
-      !$omp end  workshare
-      !$omp end  parallel
 #ifdef PAR
-      compat = par_co_sum(compat)
-#endif
-
-      called=.true.
-
-   end if
-
-   jlo = -bigNy+1
-   jup = Prny+bigNy
-
-   klo = -bigNz+1
-   kup = Prnz+bigNz
-
-
-   !$omp parallel do private(i,j,k,Ui,Vi,Wi)  
-   do k = 1, Prnz
-     do j = 1, Prny
-        Psiu(j,k,2) = sum(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Ru(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
-        Psiv(j,k,2) = sum(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rv(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
-        Psiw(j,k,2) = sum(bfilt(-bigNy:bigNy,-bigNz:bigNz,1)*Rw(j-bigNy:j+bigNy,k-bigNz:k+bigNz,2))
-     end  do
-   end  do
-   !$omp end  parallel do
-
-   call multiply(Psiu(:,:,1), exp(-pi*dt/(2._knd*TLag)))
-   call add_multiplied(Psiu(:,:,1), Psiu(:,:,2), sqrt(1-exp(-pi*dt/(TLag))))
-
-   call multiply(Psiv(:,:,1),exp(-pi*dt/(2._knd*TLag)))
-   call add_multiplied(Psiv(:,:,1), Psiv(:,:,2), sqrt(1-exp(-pi*dt/(TLag))))
-
-   call multiply(Psiw(:,:,1),exp(-pi*dt/(2._knd*TLag)))
-   call add_multiplied(Psiw(:,:,1), Psiw(:,:,2), sqrt(1-exp(-pi*dt/(TLag))))
-   
-   call set(Uin,0._knd)
-   call set(Vin,0._knd)
-   call set(Win,0._knd)
-   !$omp parallel do private(i,j,k,Ui,Vi,Wi)
-   do k = 1, Prnz
-    do j = 1, Prny
-     Ui = Psiu(j,k,1)
-     Vi = Psiv(j,k,1)
-     Wi = Psiw(j,k,1)
-
-     Uin(j,k) = Uinavg(j,k)+transform_tensor(1,j,k)*Ui   !a12,a13,a23 = 0
-
-     Vin(j,k) = Vinavg(j,k)+transform_tensor(2,j,k)*Ui&
-                           +transform_tensor(3,j,k)*Vi
-
-     Win(j,k) = Winavg(j,k)+transform_tensor(4,j,k)*Ui&
-                           +transform_tensor(5,j,k)*Vi&
-                           +transform_tensor(6,j,k)*Wi
+    do i=1,2
+      call par_exchange_boundaries_yz(g%Ru(:,:,i), Prny, Prnz, Btype, &
+                                      jlo, klo, g%bigNy, g%bigNz)
+      call par_exchange_boundaries_yz(g%Rv(:,:,i), Prny, Prnz, Btype, &
+                                      jlo, klo, g%bigNy, g%bigNz)
+      call par_exchange_boundaries_yz(g%Rw(:,:,i), Prny, Prnz, Btype, &
+                                      jlo, klo, g%bigNy, g%bigNz)
     end do
-   end do
-   !$omp end parallel do
-
-   if (Btype(We)==BC_TURBULENT_INLET .or. Btype(Ea)==BC_TURBULENT_INLET) then
-     !$omp parallel workshare
-     p = sum(Uin(1:Prny,1:Prnz))
-     !$omp end parallel workshare
-   else if (Btype(So)==BC_TURBULENT_INLET .or. Btype(No)==BC_TURBULENT_INLET) then
-     !$omp parallel workshare
-     p = sum(Vin(1:Prny,1:Prnz))
-     !$omp end parallel workshare
-   end if
-
-   if (Btype(We)==BC_TURBULENT_INLET .or. Btype(Ea)==BC_TURBULENT_INLET .or. &
-       Btype(So)==BC_TURBULENT_INLET .or. Btype(No)==BC_TURBULENT_INLET) then
-#ifdef PAR
-     p = par_co_sum(p)
-#endif
-     p = compat/p                  !To ensure the compatibility condition.
-
-     call multiply(Uin,p)
-     call multiply(Vin,p)
-     call multiply(Win,p)
-   end if
-
-
-   call BoundUin(1,Uin)
-
-   call BoundUin(2,Vin)
-
-   call BoundUin(3,Win)
-
-   !$omp parallel private(j,k,tid)
-   tid = 0
-   !$ tid = omp_get_thread_num()
-   
-   !$omp do collapse(2) 
-   do k = klo, kup
-    do j = jlo, jup
-      call rng_norm(Ru(j,k,2), tid)
-      call rng_norm(Rv(j,k,2), tid)
-      call rng_norm(Rw(j,k,2), tid)
-    end do
-   end do
-   !$omp end do
-
-   if ((Btype(So)==BC_PERIODIC).or.(Btype(No)==BC_PERIODIC)) then
-     !workaround to a bug in Cray Fortran
-     !$omp single
-     i = Prny+1
-     !$omp end single
-
-     !$omp do collapse(2)
-     do k = klo, kup
-       do j = jlo, 0
-         Ru(j,k,1:2) = Ru(j+Prny,k,1:2)
-         Rv(j,k,1:2) = Rv(j+Prny,k,1:2)
-         Rw(j,k,1:2) = Rw(j+Prny,k,1:2)
-       end do
-     end do
-     !$omp end do nowait
-     !$omp do collapse(2)
-     do k = klo, kup
-       do j = i, jup
-         Ru(j,k,1:2) = Ru(j-Prny,k,1:2)
-         Rv(j,k,1:2) = Rv(j-Prny,k,1:2)
-         Rw(j,k,1:2) = Rw(j-Prny,k,1:2)
-       end do
-     end do
-     !$omp end do
-   end if
-   if  ((Btype(Bo)==BC_PERIODIC).or.(Btype(To)==BC_PERIODIC)) then
-     !$omp do collapse(2)
-     do k = klo, 0
-       do j = jlo, jup
-         Ru(j,k,1:2) = Ru(j,k+Prnz,1:2)
-         Rv(j,k,1:2) = Rv(j,k+Prnz,1:2)
-         Rw(j,k,1:2) = Rw(j,k+Prnz,1:2)
-       end do
-     end do
-     !$omp end do nowait
-     !$omp do collapse(2)
-     do k = Prnz+1, kup
-       do j = jlo, jup
-         Ru(j,k,1:2) = Ru(j,k-Prnz,1:2)
-         Rv(j,k,1:2) = Rv(j,k-Prnz,1:2)
-         Rw(j,k,1:2) = Rw(j,k-Prnz,1:2)
-       end do
-     end do
-     !$omp end do
-   end if
-   !$omp end parallel
-
-#ifdef PAR
-   do i=1,2
-     call par_exchange_boundaries_yz(Ru(:,:,i), Prny, Prnz, Btype, &
-                                     jlo, klo, bigNy, bigNz)
-     call par_exchange_boundaries_yz(Rv(:,:,i), Prny, Prnz, Btype, &
-                                     jlo, klo, bigNy, bigNz)
-     call par_exchange_boundaries_yz(Rw(:,:,i), Prny, Prnz, Btype, &
-                                     jlo, klo, bigNy, bigNz)
-   end do
 #endif
 
- end subroutine GetTurbInletXie
+  end subroutine turbulence_generator_time_step
 
 
 
@@ -368,76 +399,78 @@ contains
 
 
 
-  subroutine InitTurbulenceProfiles
+  subroutine turbulence_generator_init_turbulence_profiles(g)
+    class(turbulence_generator), intent(inout) :: g
     integer :: j,k
 
-    allocate(Ustar_inlet(1:Prnz))
-    allocate(transform_tensor(1:6,1:Prny,1:Prnz))
+    allocate(g%Ustar_inlet(1:Prnz))
+    allocate(g%transform_tensor(1:6,1:Prny,1:Prnz))
     
     !constant stress assumption
-    if ((profiletype==LOGPROF.and.Ustar_surf_inlet<=0).or.(profiletype==POWERPROF.and.Ustar_surf_inlet<=0)) then
-      Ustar_surf_inlet = abs(Karman*U_ref_inlet/log(z0_inlet/z_ref_inlet))
+    if ((profiletype==LOGPROF.and.g%Ustar_surf_inlet<=0).or.(profiletype==POWERPROF.and.g%Ustar_surf_inlet<=0)) then
+      g%Ustar_surf_inlet = abs(Karman * g%U_ref_inlet / log(g%z0_inlet / g%z_ref_inlet))
     end if
 
 
     do k = 1, Prnz
-      Ustar_inlet(k) = Ustar_surf_inlet*sqrt(max(1+stress_gradient_inlet*zPr(k),1E-5_knd))
+      g%Ustar_inlet(k) = g%Ustar_surf_inlet * sqrt(max(1 + g%stress_gradient_inlet * zPr(k),1E-5_knd))
     end do
 
 
     do k = 1, Prnz
      do j = 1, Prny  ! tt1 = a11,tt2 = a21,tt3 = a22, tt4 = a31, tt5 = a32, tt6 = a33
-        transform_tensor(1,j,k) = sqrt((Ustar_inlet(k)**2)*relative_stress(1,1))
-        transform_tensor(2,j,k) = (Ustar_inlet(k)**2)*relative_stress(2,1)/transform_tensor(1,j,k)
-        transform_tensor(3,j,k) = sqrt((Ustar_inlet(k)**2)*relative_stress(2,2)-transform_tensor(2,j,k)**2)
-        transform_tensor(4,j,k) = (Ustar_inlet(k)**2)*relative_stress(3,1)/transform_tensor(1,j,k)
-        transform_tensor(5,j,k) = ((Ustar_inlet(k)**2)*relative_stress(3,2)-&
-                                 transform_tensor(2,j,k)*transform_tensor(4,j,k))/transform_tensor(3,j,k)
-        transform_tensor(6,j,k) = sqrt((Ustar_inlet(k)**2)*relative_stress(3,3)-&
-                                 transform_tensor(4,j,k)**2-transform_tensor(5,j,k)**2)
+        g%transform_tensor(1,j,k) = sqrt((g%Ustar_inlet(k)**2) * g%relative_stress(1,1))
+        g%transform_tensor(2,j,k) = (g%Ustar_inlet(k)**2) * g%relative_stress(2,1) / g%transform_tensor(1,j,k)
+        g%transform_tensor(3,j,k) = sqrt((g%Ustar_inlet(k)**2) * g%relative_stress(2,2) - g%transform_tensor(2,j,k)**2)
+        g%transform_tensor(4,j,k) = (g%Ustar_inlet(k)**2) * g%relative_stress(3,1) / g%transform_tensor(1,j,k)
+        g%transform_tensor(5,j,k) = ((g%Ustar_inlet(k)**2) * g%relative_stress(3,2)-&
+                                 g%transform_tensor(2,j,k) * g%transform_tensor(4,j,k)) / g%transform_tensor(3,j,k)
+        g%transform_tensor(6,j,k) = sqrt((g%Ustar_inlet(k)**2) * g%relative_stress(3,3)-&
+                                 g%transform_tensor(4,j,k)**2 - g%transform_tensor(5,j,k)**2)
 
      end do
     end do
-  end subroutine InitTurbulenceProfiles
+  end subroutine
 
-  subroutine InitMeanProfiles
+  subroutine turbulence_generator_init_mean_profiles(g)
+    class(turbulence_generator), intent(inout) :: g
     real(knd) :: Ustar_prof, utmp
     integer :: k
 
-    allocate(Uinavg(-2:Uny+3,-2:Unz+3),Vinavg(-2:Vny+3,-2:Vnz+3),Winavg(-2:Wny+3,-2:Wnz+3))
-    Vinavg = 0
-    Winavg = 0
+    allocate(g%Uinavg(-2:Uny+3,-2:Unz+3), g%Vinavg(-2:Vny+3,-2:Vnz+3), g%Winavg(-2:Wny+3,-2:Wnz+3))
+    g%Vinavg = 0
+    g%Winavg = 0
 
     if  (profiletype==CONSTPROF) then
 
       do k = 1, Prnz
 
-        Uinavg(:,k) = Uinlet
+        g%Uinavg(:,k) = Uinlet
 
       end do
 
     else if (profiletype==LOGPROF) then
 
-      if (U_ref_inlet/=0.and.z_ref_inlet>0) then
+      if (g%U_ref_inlet/=0.and.g%z_ref_inlet>0) then
 
-        Ustar_prof = U_ref_inlet * Karman / log(z_ref_inlet/z0_inlet)
+        Ustar_prof = g%U_ref_inlet * Karman / log(g%z_ref_inlet / g%z0_inlet)
 
         do k = 1, Prnz
-          utmp = (Ustar_prof/Karman)*log(zPr(k)/z0_inlet)
-          if (sign(1._knd,Ustar_prof)*utmp<abs(Ustar_prof)/2) &
-            utmp = (Ustar_prof/2)*zPr(k)/(z0_inlet*1.22)
-          Uinavg(:,k) = utmp
+          utmp = (Ustar_prof / Karman) * log(zPr(k) / g%z0_inlet)
+          if (sign(1._knd,Ustar_prof) * utmp<abs(Ustar_prof) / 2) &
+            utmp = (Ustar_prof / 2) * zPr(k) / (g%z0_inlet * 1.22)
+          g%Uinavg(:,k) = utmp
         end do
 
       else
 
-        utmp = (Ustar_inlet(1)/Karman)*log(zPr(1)/z0_inlet)
-        Uinavg(:,1) = utmp
+        utmp = (g%Ustar_inlet(1) / Karman) * log(zPr(1) / g%z0_inlet)
+        g%Uinavg(:,1) = utmp
         do k = 2, Prnz
-          utmp = (Ustar_inlet(k)/Karman)*log(zPr(k)/zPr(k-1)) + utmp
-          if (sign(1._knd,Ustar_inlet(1))*utmp<abs(Ustar_inlet(1))/2) &
-            utmp = (Ustar_inlet(1)/2)*zPr(k)/(z0_inlet*1.22)
-          Uinavg(:,k) = utmp
+          utmp = (g%Ustar_inlet(k) / Karman) * log(zPr(k) / zPr(k-1)) + utmp
+          if (sign(1._knd,g%Ustar_inlet(1)) * utmp < abs(g%Ustar_inlet(1)) / 2) &
+            utmp = (g%Ustar_inlet(1) / 2) * zPr(k) / (g%z0_inlet * 1.22)
+          g%Uinavg(:,k) = utmp
         end do
 
       end  if
@@ -445,24 +478,24 @@ contains
     else if (profiletype==POWERPROF) then
 
       do k = 1, Prnz
-        Uinavg(:,k) = U_ref_inlet*(zPr(k)/z_ref_inlet)**power_exponent_inlet
+        g%Uinavg(:,k) = g%U_ref_inlet * (zPr(k) / g%z_ref_inlet)**g%power_exponent_inlet
       end do
 
     else
 
-      Uinavg = 0
+      g%Uinavg = 0
 
     end if
 
     if (windangle/=0) then
-        Vinavg = Uinavg * sin(windangle/180._knd*pi)
-        Uinavg = Uinavg * cos(windangle/180._knd*pi)
+        g%Vinavg = g%Uinavg * sin(windangle / 180._knd * pi)
+        g%Uinavg = g%Uinavg * cos(windangle / 180._knd * pi)
     end if
 
-  end subroutine InitMeanProfiles
+  end subroutine turbulence_generator_init_mean_profiles
 
 
-  subroutine GetBC_INLET_FROM_FILE(t)
+  subroutine GetInletFromFile(t)
     real(TIM),intent(in):: t
     integer,save:: called = 0
     integer :: Prny2, Prnz2, Vny2, Wnz2
@@ -572,7 +605,7 @@ contains
     Win(1:Wny,1:Wnz) = c1*In1%W+c2*In2%W
     if (enable_buoyancy) TempIn(1:Prny,1:Prnz) = c1*In1%temperature+c2*In2%temperature
 
-  end subroutine GetBC_INLET_FROM_FILE
+  end subroutine GetInletFromFile
 
   subroutine  ReadBC_INLET_FROM_FILE(unitnum,In)
     integer,intent(in):: unitnum
