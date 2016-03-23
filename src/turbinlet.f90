@@ -44,6 +44,16 @@ module TurbInlet
     procedure, private :: init_mean_profiles => turbulence_generator_init_mean_profiles
   end type
 
+  
+
+  type, extends(turbulence_generator) :: nesting_turbulence_generator
+   real(knd), allocatable, dimension(:,:) :: sgs_tke
+  contains
+    procedure, private :: init_turbulence_profiles => nesting_init_turbulence_profiles
+    procedure, private :: init_mean_profiles => nesting_init_mean_profiles
+  end type
+
+
   type TInlet
     real(knd),allocatable,dimension(:,:) :: U, V, W, temperature
   end type
@@ -266,24 +276,46 @@ contains
     call set(Uin, 0._knd)
     call set(Vin, 0._knd)
     call set(Win, 0._knd)
-    !$omp parallel do private(i,j,k,Ui,Vi,Wi)
-    do k = 1, Prnz
-     do j = 1, Prny
-      Ui = g%Psiu(j,k,1)
-      Vi = g%Psiv(j,k,1)
-      Wi = g%Psiw(j,k,1)
 
-      Uin(j,k) = g%Uinavg(j,k) + g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
+    if (allocated(g%Uinavg) .and. allocated(g%Vinavg) .and. allocated(g%Winavg)) then
+      !$omp parallel do private(i,j,k,Ui,Vi,Wi)
+      do k = 1, Prnz
+       do j = 1, Prny
+        Ui = g%Psiu(j,k,1)
+        Vi = g%Psiv(j,k,1)
+        Wi = g%Psiw(j,k,1)
 
-      Vin(j,k) = g%Vinavg(j,k) + g%transform_tensor(2,j,k) * Ui&
-                            +g%transform_tensor(3,j,k) * Vi
+        Uin(j,k) = g%Uinavg(j,k) + g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
 
-      Win(j,k) = g%Winavg(j,k) + g%transform_tensor(4,j,k) * Ui&
-                            +g%transform_tensor(5,j,k) * Vi&
-                            +g%transform_tensor(6,j,k) * Wi
-     end do
-    end do
-    !$omp end parallel do
+        Vin(j,k) = g%Vinavg(j,k) + g%transform_tensor(2,j,k) * Ui&
+                              +g%transform_tensor(3,j,k) * Vi
+
+        Win(j,k) = g%Winavg(j,k) + g%transform_tensor(4,j,k) * Ui&
+                              +g%transform_tensor(5,j,k) * Vi&
+                              +g%transform_tensor(6,j,k) * Wi
+       end do
+      end do
+      !$omp end parallel do
+    else
+      !$omp parallel do private(i,j,k,Ui,Vi,Wi)
+      do k = 1, Prnz
+       do j = 1, Prny
+        Ui = g%Psiu(j,k,1)
+        Vi = g%Psiv(j,k,1)
+        Wi = g%Psiw(j,k,1)
+
+        Uin(j,k) = g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
+
+        Vin(j,k) =  g%transform_tensor(2,j,k) * Ui &
+                  + g%transform_tensor(3,j,k) * Vi
+
+        Win(j,k) =  g%transform_tensor(4,j,k) * Ui &
+                  + g%transform_tensor(5,j,k) * Vi &
+                  + g%transform_tensor(6,j,k) * Wi
+       end do
+      end do
+      !$omp end parallel do
+    end if
 
     if (g%direction==We .or. g%direction==Ea) then
       !$omp parallel workshare
@@ -493,6 +525,40 @@ contains
     end if
 
   end subroutine turbulence_generator_init_mean_profiles
+
+
+  subroutine nesting_init_turbulence_profiles(g)
+    class(nesting_turbulence_generator), intent(inout) :: g
+    integer :: j,k
+    real(knd) :: stress
+
+    g%relative_stress = 0
+    g%relative_stress(1,1) = 1
+    g%relative_stress(2,2) = 1
+    g%relative_stress(3,3) = 1
+
+    allocate(g%transform_tensor(1:6,1:Prny,1:Prnz))
+
+    do k = 1, Prnz
+     do j = 1, Prny  ! tt1 = a11,tt2 = a21,tt3 = a22, tt4 = a31, tt5 = a32, tt6 = a33
+        stress = g%sgs_tke(j,k)/3
+        g%transform_tensor(1,j,k) = sqrt(stress * g%relative_stress(1,1))
+        g%transform_tensor(2,j,k) = (stress) * g%relative_stress(2,1) / g%transform_tensor(1,j,k)
+        g%transform_tensor(3,j,k) = sqrt(max(stress * g%relative_stress(2,2) - g%transform_tensor(2,j,k)**2, 0._knd))
+        g%transform_tensor(4,j,k) = stress * g%relative_stress(3,1) / g%transform_tensor(1,j,k)
+        g%transform_tensor(5,j,k) = (stress * g%relative_stress(3,2)-&
+                                 g%transform_tensor(2,j,k) * g%transform_tensor(4,j,k)) / g%transform_tensor(3,j,k)
+        g%transform_tensor(6,j,k) = sqrt(max(stress * g%relative_stress(3,3)-&
+                                 g%transform_tensor(4,j,k)**2 - g%transform_tensor(5,j,k)**2, 0._knd))
+
+     end do
+    end do
+  end subroutine
+
+  subroutine nesting_init_mean_profiles(g)
+    class(nesting_turbulence_generator), intent(inout) :: g
+    !leave the avg profiles unallocated
+  end subroutine nesting_init_mean_profiles
 
 
   subroutine GetInletFromFile(t)
