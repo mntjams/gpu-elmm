@@ -226,7 +226,8 @@ module Parameters
                         BC_MO_TEMPERATURE=10, &
                         BC_AUTOMATIC_FLUX=11, &
                         BC_MPI_BOUNDS_MIN=1000, BC_MPI_BOUNDS_MAX=1010, BC_MPI_BOUNDARY=1000, BC_MPI_PERIODIC=1001, &
-                        BC_DOMAIN_BOUNDS_MIN=2000, BC_DOMAIN_BOUNDS_MAX=2010, BC_DOMAIN_COPY=2001
+                        BC_DOMAIN_BOUNDS_MIN=2000, BC_DOMAIN_BOUNDS_MAX=2010, &
+                        BC_DOMAIN_NESTED=2001, BC_DOMAIN_COPY=2002, BC_DOMAIN_NESTED_TURBULENT=2003
 
   !set by user
   logical :: enable_fixed_flow_rate = .false.
