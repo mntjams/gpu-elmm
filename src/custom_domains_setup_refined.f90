@@ -46,15 +46,15 @@
          end do
         end do
 
-        prev = prev + domain_nxims(domain_index+1)*domain_nzims(domain_index+1)
-
-        do dij = 1, domain_nyims(domain_index+1)
-          do dii = 1, domain_nxims(domain_index+1)
-            call parent_buffer(num=dii+(dij-1)*domain_nxims(domain_index+1) + prev, &
-                               dir=Bo, domain=domain_index+1, im=[dii,dij,1])
-
-         end do
-        end do
+!         prev = prev + domain_nxims(domain_index+1)*domain_nzims(domain_index+1)
+! 
+!         do dij = 1, domain_nyims(domain_index+1)
+!           do dii = 1, domain_nxims(domain_index+1)
+!             call parent_buffer(num=dii+(dij-1)*domain_nxims(domain_index+1) + prev, &
+!                                dir=Bo, domain=domain_index+1, im=[dii,dij,1])
+! 
+!          end do
+!         end do
 
         prev = prev + domain_nxims(domain_index+1)*domain_nyims(domain_index+1)
 
@@ -87,7 +87,7 @@
           MoistBtype(Ea) = BC_DOMAIN_COPY
           ScalBtype(Ea) = BC_DOMAIN_COPY
 
-          call child_buffer(dir=Ea, domain=domain_index-1)
+          call child_buffer(dir=Ea, domain=domain_index-1, relax_factor=10._knd)
         end if
 
         if (jim==1) then
@@ -108,14 +108,14 @@
           call child_buffer(dir=No, domain=domain_index-1)
         end if
 
-        if (kim==1) then
-          Btype(Bo) = BC_DOMAIN_COPY
-          TempBtype(Bo) = BC_DOMAIN_COPY
-          MoistBtype(Bo) = BC_DOMAIN_COPY
-          ScalBtype(Bo) = BC_DOMAIN_COPY
-
-          call child_buffer(dir=Bo, domain=domain_index-1)
-        end if
+!         if (kim==1) then
+!           Btype(Bo) = BC_DOMAIN_COPY
+!           TempBtype(Bo) = BC_DOMAIN_COPY
+!           MoistBtype(Bo) = BC_DOMAIN_COPY
+!           ScalBtype(Bo) = BC_DOMAIN_COPY
+! 
+!           call child_buffer(dir=Bo, domain=domain_index-1)
+!         end if
 
         if (kim==nzims) then
           Btype(To) = BC_DOMAIN_COPY
@@ -421,9 +421,10 @@ contains
     end subroutine parent_buffer
 
 
-    subroutine child_buffer(dir, domain)
+    subroutine child_buffer(dir, domain, relax_factor)
       integer, intent(in) :: dir, domain
       integer :: i, width
+      real(knd), optional :: relax_factor
 
       associate(b => domain_bc_recv_buffers(dir))
 
@@ -432,6 +433,13 @@ contains
         b%remote_domain = domain
         b%direction = dir
         b%enabled = .true.
+
+        b%relaxation = .true.
+        if (present(relax_factor)) then
+          b%relax_factor = relax_factor
+        end if
+
+        b%interp_order = 2
 
         b%spatial_ratio = domain_spatial_ratio
         b%time_step_ratio = domain_time_step_ratio
@@ -942,6 +950,20 @@ contains
           allocate(b%r_dMoisture_dt(b%r_Pri1:b%r_Pri2,b%r_Prj1:b%r_Prj2,b%r_Prk1:b%r_Prk2))
         end if
 
+        if (dir==We) then
+          b%turb_generator_enabled = .true.
+          b%relaxation = .false.
+          allocate(b%U_turb(Uj1:Uj2,Uk1:Uk2))
+          allocate(b%V_turb(Vj1:Vj2,Vk1:Vk2))
+          allocate(b%W_turb(Wj1:Wj2,Wk1:Wk2))
+          allocate(b%turb_generator)
+          allocate(b%turb_generator%sgs_tke(1:Prny, 1:Prnz))
+          b%turb_generator%sgs_tke = 0.01
+          b%turb_generator%L_y = dymin * b%spatial_ratio / 2
+          b%turb_generator%L_z = dzmin * b%spatial_ratio / 2
+          b%turb_generator%T_lag = time_stepping%dt_constant * b%time_step_ratio * 2
+          call b%turb_generator%init()
+        end if
       end associate
 
     end subroutine child_buffer
