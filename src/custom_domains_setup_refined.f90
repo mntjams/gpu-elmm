@@ -46,7 +46,7 @@
          end do
         end do
 
-!         prev = prev + domain_nxims(domain_index+1)*domain_nzims(domain_index+1)
+        prev = prev + domain_nxims(domain_index+1)*domain_nzims(domain_index+1)
 ! 
 !         do dij = 1, domain_nyims(domain_index+1)
 !           do dii = 1, domain_nxims(domain_index+1)
@@ -56,7 +56,7 @@
 !          end do
 !         end do
 
-        prev = prev + domain_nxims(domain_index+1)*domain_nyims(domain_index+1)
+!         prev = prev + domain_nxims(domain_index+1)*domain_nyims(domain_index+1)
 
         do dij = 1, domain_nyims(domain_index+1)
           do dii = 1, domain_nxims(domain_index+1)
