@@ -537,6 +537,7 @@ contains
       integer :: xi, yj, zk
       integer :: i, j, k
       
+      !$omp parallel do private(i, j, k, xi, yj, zk)
       do k = b%Uk1, b%Uk2
         do j = b%Uj1, b%Uj2
           do i = b%Ui1, b%Ui2
@@ -579,6 +580,7 @@ contains
       integer :: xi, yj, zk
       integer :: i, j, k
       
+      !$omp parallel do private(i, j, k, xi, yj, zk)
       do k = b%Vk1, b%Vk2
         do j = b%Vj1, b%Vj2
           do i = b%Vi1, b%Vi2
@@ -621,6 +623,7 @@ contains
       integer :: xi, yj, zk
       integer :: i, j, k
       
+      !$omp parallel do private(i, j, k, xi, yj, zk)
       do k = b%Wk1, b%Wk2
         do j = b%Wj1, b%Wj2
           do i = b%Wi1, b%Wi2
@@ -1090,6 +1093,7 @@ contains
 
       width = b%spatial_ratio * 2
 
+      !$omp parallel do private(i)
       do i = 1, width
         U(i,1:Uny,1:Unz) = ca(i) * U(i,1:Uny,1:Unz) + &
                 cb(i) * (b%U(i,1:Uny,1:Unz) + t_diff * b%dU_dt(i,1:Uny,1:Unz))
@@ -1111,6 +1115,7 @@ contains
 
       width = b%spatial_ratio * 2
 
+      !$omp parallel do private(i, wi)
       do wi = 1, width
         i = Unx - wi + 1
         U(i,1:Uny,1:Unz) = ca(wi) * U(i,1:Uny,1:Unz) + &
@@ -1136,6 +1141,7 @@ contains
 
       width = b%spatial_ratio * 2
 
+      !$omp parallel do private(i)
       do i = 1, width
         U(1:Unx,i,1:Unz) = ca(i) * U(1:Unx,i,1:Unz) + &
                 cb(i) * (b%U(1:Unx,i,1:Unz) + t_diff * b%dU_dt(1:Unx,i,1:Unz))
@@ -1157,6 +1163,7 @@ contains
 
       width = b%spatial_ratio * 2
 
+      !$omp parallel do private(i, wi)
       do wi = 1, width
         i = Uny - wi + 1
         U(1:Unx,i,1:Unz) = ca(wi) * U(1:Unx,i,1:Unz) + &
@@ -1182,6 +1189,7 @@ contains
 
       width = b%spatial_ratio * 2
 
+      !$omp parallel do private(i)
       do i = 1, width
         U(1:Unx,1:Uny,i) = ca(i) * U(1:Unx,1:Uny,i) + &
                 cb(i) * (b%U(1:Unx,1:Uny,i) + t_diff * b%dU_dt(1:Unx,1:Uny,i))
@@ -1203,6 +1211,7 @@ contains
 
       width = b%spatial_ratio * 2
 
+      !$omp parallel do private(i, wi)
       do wi = 1, width
         i = Unz - wi + 1
         U(1:Unx,1:Uny,i) = ca(wi) * U(1:Unx,1:Uny,i) + &
