@@ -103,6 +103,10 @@ contains
    image_input_dir = "input/"
    output_dir = "output/"
 
+
+   call init_random_seed
+
+
    call newunit(unit)
   
    !try read scratch_dir from environment, command line has priority
@@ -2749,11 +2753,6 @@ fields_do:  do j = 1, size(fields)
               min(dxmin / time_stepping%U_max(1), &
                   dymin / time_stepping%U_max(2), &
                   dzmin / time_stepping%U_max(3)))
-
-
-    call par_sync_out("  ...initializing random seed.")
-
-    call init_random_seed
 
 
     call par_sync_out("  ...computing grid coordinates.")
