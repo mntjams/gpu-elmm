@@ -258,7 +258,7 @@ contains
             if (b%turb_generator_enabled) then
               if (b%interpolate) call b%compute_sgs_tke
               call b%turb_generator%time_step(b%U_turb, b%V_turb, b%V_turb, dt)
-print *, b%U_turb(2:3,2:3)
+
             end if
 
           end associate
@@ -1269,8 +1269,6 @@ print *, b%U_turb(2:3,2:3)
         allocate(Vf(b%r_Vi1+2-1:b%r_Vi1+2+1,b%r_Vj1:b%r_Vj2,b%r_Vk1:b%r_Vk2))
         allocate(Wf(b%r_Wi1+2-1:b%r_Wi1+2+1,b%r_Wj1:b%r_Wj2,b%r_Wk1:b%r_Wk2))
 
-        print *,"Uf",lbound(Uf),ubound(Uf)
-        print *,"r_U",lbound(b%r_U),ubound(b%r_U)
         call FilterTopHatSimple(Uf, b%r_U(b%r_Ui1+2-1:b%r_Ui1+2+1,b%r_Uj1:b%r_Uj2,b%r_Uk1:b%r_Uk2))
         call FilterTopHatSimple(Vf, b%r_V(b%r_Vi1+2-1:b%r_Vi1+2+1,b%r_Vj1:b%r_Vj2,b%r_Vk1:b%r_Vk2))
         call FilterTopHatSimple(Wf, b%r_W(b%r_Wi1+2-1:b%r_Wi1+2+1,b%r_Wj1:b%r_Wj2,b%r_Wk1:b%r_Wk2))
