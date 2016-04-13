@@ -8,7 +8,9 @@ module TurbInlet
   implicit none
 
   private
-  public :: turbulence_generator, default_turbulence_generator, GetInletFromFile
+  public :: turbulence_generator, turbulence_generator_nesting, &
+            default_turbulence_generator, &
+            GetInletFromFile
 
   type turbulence_generator
     integer :: direction
@@ -46,11 +48,12 @@ module TurbInlet
 
   
 
-  type, extends(turbulence_generator) :: nesting_turbulence_generator
+  type, extends(turbulence_generator) :: turbulence_generator_nesting
    real(knd), allocatable, dimension(:,:) :: sgs_tke
   contains
     procedure, private :: init_turbulence_profiles => nesting_init_turbulence_profiles
     procedure, private :: init_mean_profiles => nesting_init_mean_profiles
+    procedure, public :: update_turbulence_profiles => nesting_update_turbulence_profiles
   end type
 
 
@@ -214,9 +217,15 @@ contains
          g%Psiw(j,k,1) = sum(g%bfilt(-g%bigNy:g%bigNy,-g%bigNz:g%bigNz,1) * &
                              g%Rw(j-g%bigNy:j+g%bigNy,k-g%bigNz:k+g%bigNz,1))
     end forall
-
-    g%compat = sum(g%Uinavg(1:Prny,1:Prnz))
-    !$omp end  workshare
+    !$omp end  workshare nowait
+    
+    if (allocated(g%Uinavg)) then
+      !$omp workshare
+      g%compat = sum(g%Uinavg(1:Prny,1:Prnz))
+      !$omp end  workshare
+    else
+      g%compat = 0
+    end if
     !$omp end  parallel
 #ifdef PAR
     g%compat = par_co_sum(g%compat)
@@ -528,7 +537,7 @@ contains
 
 
   subroutine nesting_init_turbulence_profiles(g)
-    class(nesting_turbulence_generator), intent(inout) :: g
+    class(turbulence_generator_nesting), intent(inout) :: g
     integer :: j,k
     real(knd) :: stress
 
@@ -538,25 +547,37 @@ contains
     g%relative_stress(3,3) = 1
 
     allocate(g%transform_tensor(1:6,1:Prny,1:Prnz))
+    g%transform_tensor = 0
 
     do k = 1, Prnz
      do j = 1, Prny  ! tt1 = a11,tt2 = a21,tt3 = a22, tt4 = a31, tt5 = a32, tt6 = a33
-        stress = g%sgs_tke(j,k)/3
-        g%transform_tensor(1,j,k) = sqrt(stress * g%relative_stress(1,1))
-        g%transform_tensor(2,j,k) = (stress) * g%relative_stress(2,1) / g%transform_tensor(1,j,k)
-        g%transform_tensor(3,j,k) = sqrt(max(stress * g%relative_stress(2,2) - g%transform_tensor(2,j,k)**2, 0._knd))
-        g%transform_tensor(4,j,k) = stress * g%relative_stress(3,1) / g%transform_tensor(1,j,k)
-        g%transform_tensor(5,j,k) = (stress * g%relative_stress(3,2)-&
-                                 g%transform_tensor(2,j,k) * g%transform_tensor(4,j,k)) / g%transform_tensor(3,j,k)
-        g%transform_tensor(6,j,k) = sqrt(max(stress * g%relative_stress(3,3)-&
-                                 g%transform_tensor(4,j,k)**2 - g%transform_tensor(5,j,k)**2, 0._knd))
+        stress = sqrt(2*g%sgs_tke(j,k)/3)
+        
+        g%transform_tensor(1,j,k) = stress
+        g%transform_tensor(3,j,k) = stress
+        g%transform_tensor(6,j,k) = stress
+     end do
+    end do
+  end subroutine
 
+  subroutine nesting_update_turbulence_profiles(g)
+    class(turbulence_generator_nesting), intent(inout) :: g
+    integer :: j,k
+    real(knd) :: stress
+
+    do k = 1, Prnz
+     do j = 1, Prny  ! tt1 = a11,tt2 = a21,tt3 = a22, tt4 = a31, tt5 = a32, tt6 = a33
+        stress = sqrt(2*g%sgs_tke(j,k)/3)
+
+        g%transform_tensor(1,j,k) = stress
+        g%transform_tensor(3,j,k) = stress
+        g%transform_tensor(6,j,k) = stress
      end do
     end do
   end subroutine
 
   subroutine nesting_init_mean_profiles(g)
-    class(nesting_turbulence_generator), intent(inout) :: g
+    class(turbulence_generator_nesting), intent(inout) :: g
     !leave the avg profiles unallocated
   end subroutine nesting_init_mean_profiles
 

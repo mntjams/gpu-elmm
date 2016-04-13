@@ -4,6 +4,7 @@ module domains_bc_par
   use Parameters
   use custom_mpi
   use custom_par
+  use TurbInlet
 
   implicit none
 
@@ -25,6 +26,7 @@ module domains_bc_par
     logical :: rescale_compatibility = .false.
  
     logical :: relaxation = .true.
+    real(knd) :: relax_factor = 1
 
     integer :: remote_domain
     !This is the index of the cell boundary corresponding to the domain boundary 
@@ -59,7 +61,9 @@ module domains_bc_par
     integer :: comm = MPI_COMM_NULL
     integer :: remote_rank = MPI_PROC_NULL
     !The buffers are transferred every `time_step_ratio` time steps
-    integer :: time_step_ratio = 1 
+    integer :: time_step_ratio = 1
+    !whether the interpolation from the receive buffers is necessary in this tim-step
+    logical :: interpolate = .true.
 
     integer :: time_step = 0
   end type
@@ -89,6 +93,16 @@ module domains_bc_par
     real(knd), allocatable, dimension(:,:,:,:) :: r_dScalar_dt    
   end type
 
+
+  type, extends(dom_bc_buffer_refined) :: dom_bc_buffer_turbulence_generator
+    logical :: turb_generator_enabled = .false.
+    type(turbulence_generator_nesting), allocatable :: turb_generator
+    real(knd), allocatable, dimension(:,:) :: U_turb, V_turb, W_turb
+  contains
+    procedure :: compute_sgs_tke => dom_bc_buffer_turbulence_generator_compute_sgs_tke
+  end type
+
+
   integer :: domain_spatial_ratio = 3
 
   integer :: domain_time_step_ratio = 3
@@ -103,7 +117,7 @@ module domains_bc_par
 
   !receive buffers should be indexed with the index of the domain side (West to Top)
   ! to ease finding the right buffer to a given nested boundary 
-  type(dom_bc_buffer_refined), allocatable :: domain_bc_recv_buffers(:)
+  type(dom_bc_buffer_turbulence_generator), allocatable :: domain_bc_recv_buffers(:)
 
 contains
 
@@ -207,10 +221,14 @@ contains
           associate(b => domain_bc_recv_buffers(i))
   
             if (b%enabled) then
+
+              b%interpolate = .false.
+
               !for 0 and 1, initialization and the first time-step
               if (b%time_step<=1) then
                 call recv_arrays(b)
                 b%time = time
+                b%interpolate = .true.
               end if
               if (b%time_step==b%time_step_ratio) then
                 b%time_step=1
@@ -233,8 +251,14 @@ contains
                ubound(domain_bc_recv_buffers,1)
           associate(b => domain_bc_recv_buffers(i))
   
-            if (b%enabled) then
+            if (b%enabled.and.b%interpolate) then
               call par_interpolate_buffers(b)
+            end if
+
+            if (b%turb_generator_enabled) then
+              if (b%interpolate) call b%compute_sgs_tke
+              call b%turb_generator%time_step(b%U_turb, b%V_turb, b%V_turb, dt)
+print *, b%U_turb(2:3,2:3)
             end if
 
           end associate
@@ -292,7 +316,7 @@ contains
     end subroutine
 
     subroutine recv_arrays(b)
-      type(dom_bc_buffer_refined), intent(inout) :: b
+      class(dom_bc_buffer_refined), intent(inout) :: b
       real(knd) :: avg
     
       call recv(b%r_U, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
@@ -345,7 +369,7 @@ contains
 
 
   subroutine par_interpolate_buffers(b)
-    type(dom_bc_buffer_refined), intent(inout) :: b
+    class(dom_bc_buffer_refined), intent(inout) :: b
 
     if (all(b%interp_order==2)) then
       call interpolate_U_trilinear(b%r_U, b%U)
@@ -634,18 +658,18 @@ contains
     end subroutine
 
     pure real(knd) function TriLinInt(a, b, c, &
-                                     vel000, vel100, vel010, vel001, vel110, vel101, vel011, vel111)
+                                     val000, val100, val010, val001, val110, val101, val011, val111)
       real(knd), intent(in) :: a, b, c
-      real(knd), intent(in) :: vel000, vel100, vel010, vel001, vel110, vel101, vel011, vel111
+      real(knd), intent(in) :: val000, val100, val010, val001, val110, val101, val011, val111
 
-      TriLinInt =  (1-a) * (1-b) * (1-c) * vel000 + &
-                   a     * (1-b) * (1-c) * vel100 + &
-                   (1-a) * b     * (1-c) * vel010 + &
-                   (1-a) * (1-b) * c     * vel001 + &
-                   a     * b     * (1-c) * vel110 + &
-                   a     * (1-b) * c     * vel101 + &
-                   (1-a) * b     * c     * vel011 + &
-                   a     * b     * c     * vel111
+      TriLinInt =  (1-a) * (1-b) * (1-c) * val000 + &
+                   a     * (1-b) * (1-c) * val100 + &
+                   (1-a) * b     * (1-c) * val010 + &
+                   (1-a) * (1-b) * c     * val001 + &
+                   a     * b     * (1-c) * val110 + &
+                   a     * (1-b) * c     * val101 + &
+                   (1-a) * b     * c     * val011 + &
+                   a     * b     * c     * val111
     end function TriLinInt
 
 
@@ -667,6 +691,7 @@ contains
     real(knd), intent(in) :: eff_time
     integer :: bi
     real(knd) :: S, t_diff
+    integer :: i, j, k
 
     if (enable_multiple_domains) then
 
@@ -729,6 +754,64 @@ contains
                                                          b%dW_dt(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) * t_diff
               end if
 
+            end if
+          end associate
+        end do
+      end if
+
+      if (allocated(domain_bc_recv_buffers)) then
+        do bi = lbound(domain_bc_recv_buffers,1), &
+                ubound(domain_bc_recv_buffers,1)
+          associate(b => domain_bc_recv_buffers(bi))
+            if (b%enabled.and.b%turb_generator_enabled) then
+              select case (b%direction)
+                case (We, Ea)
+                  do k = b%bUk1, b%bUk2
+                    do j = b%bUj1, b%bUj2
+                      do i = b%bUi1, b%bUi2
+                        U(i,j,k) = U(i,j,k) + b%U_turb(j,k)
+                      end do
+                    end do
+                  end do
+                  do k = b%bVk1, b%bVk2
+                    do j = b%bVj1, b%bVj2
+                      do i = b%bVi1, b%bVi2
+                        V(i,j,k) = V(i,j,k) + b%V_turb(j,k)
+                      end do
+                    end do
+                  end do
+                  do k = b%bWk1, b%bWk2
+                    do j = b%bWj1, b%bWj2
+                      do i = b%bWi1, b%bWi2
+                        W(i,j,k) = W(i,j,k) + b%W_turb(j,k)
+                      end do
+                    end do
+                  end do
+                case (So, No)
+                  do k = b%bUk1, b%bUk2
+                    do j = b%bUj1, b%bUj2
+                      do i = b%bUi1, b%bUi2
+                        U(i,j,k) = U(i,j,k) + b%U_turb(i,k)
+                      end do
+                    end do
+                  end do
+                  do k = b%bVk1, b%bVk2
+                    do j = b%bVj1, b%bVj2
+                      do i = b%bVi1, b%bVi2
+                        V(i,j,k) = V(i,j,k) + b%V_turb(i,k)
+                      end do
+                    end do
+                  end do
+                  do k = b%bWk1, b%bWk2
+                    do j = b%bWj1, b%bWj2
+                      do i = b%bWi1, b%bWi2
+                        W(i,j,k) = W(i,j,k) + b%W_turb(i,k)
+                      end do
+                    end do
+                  end do
+                case default
+                  continue
+              end select
             end if
           end associate
         end do
@@ -870,8 +953,9 @@ contains
 
               width = b%spatial_ratio * 2
 
-              ca = ca_table(width)
-              cb = cb_table(width)
+              cb = cb_table(width) * b%relax_factor
+              where(cb>1) cb = 1
+              ca = 1 - cb
 
               t_diff = eff_time - b%time
 
@@ -1000,7 +1084,7 @@ contains
 
 
     subroutine relax_domain_We(b)
-      type(dom_bc_buffer_refined), intent(in) :: b
+      class(dom_bc_buffer_refined), intent(in) :: b
       integer :: width
       integer :: i
 
@@ -1021,7 +1105,7 @@ contains
     end subroutine
 
     subroutine relax_domain_Ea(b)
-      type(dom_bc_buffer_refined), intent(in) :: b
+      class(dom_bc_buffer_refined), intent(in) :: b
       integer :: width
       integer :: i, wi
 
@@ -1046,7 +1130,7 @@ contains
     end subroutine
 
     subroutine relax_domain_So(b)
-      type(dom_bc_buffer_refined), intent(in) :: b
+      class(dom_bc_buffer_refined), intent(in) :: b
       integer :: width
       integer :: i
 
@@ -1067,7 +1151,7 @@ contains
     end subroutine
 
     subroutine relax_domain_No(b)
-      type(dom_bc_buffer_refined), intent(in) :: b
+      class(dom_bc_buffer_refined), intent(in) :: b
       integer :: width
       integer :: i, wi
 
@@ -1092,7 +1176,7 @@ contains
     end subroutine
 
     subroutine relax_domain_Bo(b)
-      type(dom_bc_buffer_refined), intent(in) :: b
+      class(dom_bc_buffer_refined), intent(in) :: b
       integer :: width
       integer :: i
 
@@ -1113,7 +1197,7 @@ contains
     end subroutine
 
     subroutine relax_domain_To(b)
-      type(dom_bc_buffer_refined), intent(in) :: b
+      class(dom_bc_buffer_refined), intent(in) :: b
       integer :: width
       integer :: i, wi
 
@@ -1142,9 +1226,7 @@ contains
       real(knd) :: res(width)
       integer :: i
      
-      do i = 1, width
-        res(i) = DampF((width - i + 0.5_knd)/width)
-      end do
+      res = 1 - cb_table(width)
     end function
 
     pure function cb_table(width) result(res)
@@ -1152,23 +1234,151 @@ contains
       real(knd) :: res(width)
       integer :: i
      
-      res = 1 - ca_table(width)
+      do i = 1, width
+        res(i) = (1 - DampF((width - i + 0.5_knd)/width)) / 10
+      end do
+   end function
+
+    pure function DampF(x) result(res)
+      real(knd) :: res
+      real(knd), intent(in) :: x
+
+      if (x<=0) then
+        res = 1
+      else if (x>=1) then
+        res = 0
+      else
+        res = (1 - 0.04_knd*x**2) * &
+                ( 1 - (1 - exp(10._knd*x**2)) / (1 - exp(10._knd)) )
+      end if
     end function
 
-  pure function DampF(x) result(res)
-    real(knd) :: res
-    real(knd), intent(in) :: x
-
-    if (x<=0) then
-      res = 1
-    else if (x>=1) then
-      res = 0
-    else
-      res = (1 - 0.04_knd*x**2) * &
-              ( 1 - (1 - exp(10._knd*x**2)) / (1 - exp(10._knd)) )
-    end if
-  end function
-
   end subroutine par_domain_bound_relaxation
+
+
+  subroutine dom_bc_buffer_turbulence_generator_compute_sgs_tke(b)
+    use Filters
+    class(dom_bc_buffer_turbulence_generator), intent(inout) :: b
+    real(knd), allocatable, dimension(:,:,:) :: Uf, Vf, Wf
+    real(knd) :: uu
+    integer :: i, j, k, xi, yj, zk
+
+    select case (b%direction)
+      case(We)
+        allocate(Uf(b%r_Ui1+2-1:b%r_Ui1+2+1,b%r_Uj1:b%r_Uj2,b%r_Uk1:b%r_Uk2))
+        allocate(Vf(b%r_Vi1+2-1:b%r_Vi1+2+1,b%r_Vj1:b%r_Vj2,b%r_Vk1:b%r_Vk2))
+        allocate(Wf(b%r_Wi1+2-1:b%r_Wi1+2+1,b%r_Wj1:b%r_Wj2,b%r_Wk1:b%r_Wk2))
+
+        print *,"Uf",lbound(Uf),ubound(Uf)
+        print *,"r_U",lbound(b%r_U),ubound(b%r_U)
+        call FilterTopHatSimple(Uf, b%r_U(b%r_Ui1+2-1:b%r_Ui1+2+1,b%r_Uj1:b%r_Uj2,b%r_Uk1:b%r_Uk2))
+        call FilterTopHatSimple(Vf, b%r_V(b%r_Vi1+2-1:b%r_Vi1+2+1,b%r_Vj1:b%r_Vj2,b%r_Vk1:b%r_Vk2))
+        call FilterTopHatSimple(Wf, b%r_W(b%r_Wi1+2-1:b%r_Wi1+2+1,b%r_Wj1:b%r_Wj2,b%r_Wk1:b%r_Wk2))
+
+        Uf(b%r_Ui1+2,:,:) = (b%r_U(b%r_Ui1+2,:,:) - Uf(b%r_Ui1+2,:,:))**2
+        Vf(b%r_Ui1+2,:,:) = (b%r_V(b%r_Vi1+2,:,:) - Vf(b%r_Vi1+2,:,:))**2
+        Wf(b%r_Ui1+2,:,:) = (b%r_W(b%r_Wi1+2,:,:) - Wf(b%r_Wi1+2,:,:))**2
+
+        do k = 1, Prnz
+          do j = 1, Prny
+            b%turb_generator%sgs_tke = 0
+
+            call U_r_index(im_xmin, yPr(j), zPr(k), xi, yj, zk)
+            uu = BiLinInt((yPr(j)  - b%r_y(yj) ) / b%r_dy, &
+                          (zPr(k)  - b%r_z(zk) ) / b%r_dz, &
+                          Uf(b%r_Ui1+2  , yj  , zk  ), &
+                          Uf(b%r_Ui1+2  , yj+1, zk  ), &
+                          Uf(b%r_Ui1+2  , yj  , zk+1), &
+                          Uf(b%r_Ui1+2  , yj+1, zk+1))
+            uu = max(uu,0._knd)
+            b%turb_generator%sgs_tke = b%turb_generator%sgs_tke + uu
+
+            
+
+            call V_r_index(im_xmin, yV(j), zPr(k), xi, yj, zk)
+            uu = BiLinInt((yV(j)   - b%r_y(yj) ) / b%r_dy, &
+                          (zPr(k)  - b%r_z(zk) ) / b%r_dz, &
+                          Vf(b%r_Vi1+2  , yj  , zk  ), &
+                          Vf(b%r_Vi1+2  , yj+1, zk  ), &
+                          Vf(b%r_Vi1+2  , yj  , zk+1), &
+                          Vf(b%r_Vi1+2  , yj+1, zk+1))
+            uu = max(uu,0._knd)
+            b%turb_generator%sgs_tke = b%turb_generator%sgs_tke + uu
+
+            call W_r_index(im_xmin, yPr(j), zW(k), xi, yj, zk)
+            uu = BiLinInt((yPr(j)  - b%r_y(yj) ) / b%r_dy, &
+                          (zW(k)   - b%r_z(zk) ) / b%r_dz, &
+                          Wf(b%r_Wi1+2  , yj  , zk  ), &
+                          Wf(b%r_Wi1+2  , yj+1, zk  ), &
+                          Wf(b%r_Wi1+2  , yj  , zk+1), &
+                          Wf(b%r_Wi1+2  , yj+1, zk+1))
+            uu = max(uu,0._knd)
+            b%turb_generator%sgs_tke = b%turb_generator%sgs_tke + uu
+
+          end do
+        end do
+
+        call b%turb_generator%update_turbulence_profiles
+            
+    end select
+
+  contains
+
+    pure subroutine U_r_index(x, y, z, xi, yj, zk)
+      real(knd), intent(in) :: x, y, z
+      integer, intent(out) :: xi, yj, zk
+      integer :: lx, ly, lz
+
+      lx = lbound(b%r_xU,1)
+      ly = lbound(b%r_y,1)
+      lz = lbound(b%r_z,1)
+
+      xi = min(max(floor( (x - b%r_xU(lx))/b%r_dx ), 0) + lx, ubound(b%r_xU,1)-1)
+      yj = min(max(floor( (y - b%r_y(ly))/b%r_dy ), 0) + ly, ubound(b%r_y,1)-1)
+      zk = min(max(floor( (z - b%r_z(lz))/b%r_dz ), 0) + lz, ubound(b%r_z,1)-1)
+    end subroutine
+
+    pure subroutine V_r_index(x, y, z, xi, yj, zk)
+      real(knd), intent(in) :: x, y, z
+      integer, intent(out) :: xi, yj, zk
+      integer :: lx, ly, lz
+
+      lx = lbound(b%r_x,1)
+      ly = lbound(b%r_yV,1)
+      lz = lbound(b%r_z,1)
+
+      xi = min(max(floor( (x - b%r_x(lx))/b%r_dx ), 0) + lx, ubound(b%r_x,1)-1)
+      yj = min(max(floor( (y - b%r_yV(ly))/b%r_dy ), 0) + ly, ubound(b%r_yV,1)-1)
+      zk = min(max(floor( (z - b%r_z(lz))/b%r_dz ), 0) + lz, ubound(b%r_z,1)-1)
+    end subroutine
+
+    pure subroutine W_r_index(x, y, z, xi, yj, zk)
+      real(knd), intent(in) :: x, y, z
+      integer, intent(out) :: xi, yj, zk
+      integer :: lx, ly, lz
+
+      lx = lbound(b%r_x,1)
+      ly = lbound(b%r_y,1)
+      lz = lbound(b%r_zW,1)
+
+      xi = min(max(floor( (x - b%r_x(lx))/b%r_dx ), 0) + lx, ubound(b%r_x,1)-1)
+      yj = min(max(floor( (y - b%r_y(ly))/b%r_dy ), 0) + ly, ubound(b%r_y,1)-1)
+      zk = min(max(floor( (z - b%r_zW(lz))/b%r_dz ), 0) + lz, ubound(b%r_zW,1)-1)
+    end subroutine
+
+    pure real(knd) function BiLinInt(a, b, &
+                                     val00, val10, val01, val11)
+      real(knd), intent(in) :: a, b
+      real(knd), intent(in) :: val00, val10, val01, val11
+
+      BiLinInt =  (1-a) * (1-b) * val00 + &
+                   a     * (1-b) * val10 + &
+                   (1-a) * b     * val01 + &
+                   a     * b     * val11
+
+    end function BiLinInt
+
+  end subroutine
+
 
 end module domains_bc_par
