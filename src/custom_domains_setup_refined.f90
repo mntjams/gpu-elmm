@@ -597,25 +597,25 @@ contains
             Prk2 = Prnz+2
 
             b%r_Ui1 = -2
-            b%r_Ui2 = Prnx/b%spatial_ratio+3
+            b%r_Ui2 = Unx/b%spatial_ratio+3
             b%r_Uj1 = -2
             b%r_Uj2 = +3
             b%r_Uk1 = -2
-            b%r_Uk2 = Prnz/b%spatial_ratio+3
+            b%r_Uk2 = Unz/b%spatial_ratio+3
             
             b%r_Vi1 = -2
-            b%r_Vi2 = Prnx/b%spatial_ratio+3
+            b%r_Vi2 = Vnx/b%spatial_ratio+3
             b%r_Vj1 = -2
             b%r_Vj2 = +2
             b%r_Vk1 = -2
-            b%r_Vk2 = Prnz/b%spatial_ratio+3
+            b%r_Vk2 = Vnz/b%spatial_ratio+3
             
             b%r_Wi1 = -2
-            b%r_Wi2 = Prnx/b%spatial_ratio+3
+            b%r_Wi2 = Wnx/b%spatial_ratio+3
             b%r_Wj1 = -2
             b%r_Wj2 = +3
             b%r_Wk1 = -2
-            b%r_Wk2 = Prnz/b%spatial_ratio+3
+            b%r_Wk2 = Wnz/b%spatial_ratio+3
             
             b%r_Pri1 = -2
             b%r_Pri2 = Prnx/b%spatial_ratio+2
