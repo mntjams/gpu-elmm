@@ -42,6 +42,8 @@ module Outputs
   real(knd),allocatable :: U_avg(:,:,:),V_avg(:,:,:),W_avg(:,:,:) !<u>
   real(knd),allocatable :: UU_prime(:,:,:),VV_prime(:,:,:),WW_prime(:,:,:) !<uu>, <u'u'> must be computed before saving
   real(knd),allocatable :: UV_prime(:,:,:),UW_prime(:,:,:),VW_prime(:,:,:) !<uv>, <u'v'> must be computed before saving
+  real(knd),allocatable :: UU_prime_sgs(:,:,:),VV_prime_sgs(:,:,:),WW_prime_sgs(:,:,:) !<uu>, <u'u'> must be computed before saving
+  real(knd),allocatable :: UV_prime_sgs(:,:,:),UW_prime_sgs(:,:,:),VW_prime_sgs(:,:,:) !<uv>, <u'v'> must be computed before saving
   real(knd),allocatable :: Pr_avg(:,:,:) !<p>
   real(knd),allocatable :: Temperature_avg(:,:,:) !<theta>
   real(knd),allocatable :: Moisture_avg(:,:,:) !<q>
@@ -245,6 +247,18 @@ contains
        UV_prime = 0
        UW_prime = 0
        VW_prime = 0
+       allocate(UU_prime_sgs(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+       allocate(VV_prime_sgs(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+       allocate(WW_prime_sgs(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+       allocate(UV_prime_sgs(1:Prnx,1:Prny,1:Prnz))
+       allocate(UW_prime_sgs(1:Prnx,1:Prny,1:Prnz))
+       allocate(VW_prime_sgs(1:Prnx,1:Prny,1:Prnz))
+       UU_prime_sgs = 0
+       VV_prime_sgs = 0
+       WW_prime_sgs = 0
+       UV_prime_sgs = 0
+       UW_prime_sgs = 0
+       VW_prime_sgs = 0
      end if
 
      if (store%avg_Pr==1) then
@@ -906,7 +920,10 @@ contains
         VW_prime = VW_prime + (V(1:Prnx,0:Prny-1,1:Prnz)+V(1:Prnx,1:Prny,1:Prnz)) * &
                               (W(1:Prnx,1:Prny,0:Prnz-1)+W(1:Prnx,1:Prny,1:Prnz)) * &
                               time_weight / 4
-        call AddSubgridStresses(UU_prime,VV_prime,WW_prime,UV_prime,UW_prime,VW_prime,U,V,W,time_weight)
+        call AddSubgridStresses(UU_prime_sgs, VV_prime_sgs, WW_prime_sgs, &
+                                UV_prime_sgs, UW_prime_sgs, VW_prime_sgs, &
+                                U, V, W, &
+                                time_weight)
       end if
 
       if (store%avg_Pr==1) then
@@ -1639,10 +1656,13 @@ contains
 
   subroutine OutputAvg(U, V, W, &
                        Pr, Temperature, Moisture, &
-                                              UU, VV, WW, UV, UW, VW)
+                       UU, VV, WW, UV, UW, VW, &
+                       UU_sgs, VV_sgs, WW_sgs, UV_sgs, UW_sgs, VW_sgs)
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U, V, W
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU, VV, WW
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV, UW, VW
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU_sgs, VV_sgs, WW_sgs
+    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV_sgs, UW_sgs, VW_sgs
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(in)    :: Pr
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Temperature
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Moisture
@@ -1785,6 +1805,39 @@ contains
           end do
           write(unit) sc_tmp, lf
           
+          write(unit) "SCALARS uu_prime_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          do k = 1,Prnz
+           do j = 1,Prny
+            do i = 1,Prnx
+              sc_tmp(i,j,k) = BigEnd(real((UU_sgs(i,j,k)+UU_sgs(i-1,j,k))/2._knd, real32))
+            end do
+           end do
+          end do
+          write(unit) sc_tmp, lf
+          
+          write(unit) "SCALARS vv_prime_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          do k = 1,Prnz
+           do j = 1,Prny
+            do i = 1,Prnx
+              sc_tmp(i,j,k) = BigEnd(real((VV_sgs(i,j,k)+VV_sgs(i,j-1,k))/2._knd, real32))
+            end do
+           end do
+          end do
+          write(unit) sc_tmp, lf
+          
+          write(unit) "SCALARS ww_prime_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          do k = 1,Prnz
+           do j = 1,Prny
+            do i = 1,Prnx
+              sc_tmp(i,j,k) = BigEnd(real((WW_sgs(i,j,k)+WW_sgs(i,j,k-1))/2._knd, real32))
+            end do
+           end do
+          end do
+          write(unit) sc_tmp, lf
+          
           write(unit) "SCALARS uv_prime float", lf
           write(unit) "LOOKUP_TABLE default", lf
           write(unit) BigEnd(real(UV, real32)), lf
@@ -1796,6 +1849,18 @@ contains
           write(unit) "SCALARS vw_prime float", lf
           write(unit) "LOOKUP_TABLE default", lf
           write(unit) BigEnd(real(VW, real32)), lf
+          
+          write(unit) "SCALARS uv_prime_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          write(unit) BigEnd(real(UV_sgs, real32)), lf
+          
+          write(unit) "SCALARS uw_prime_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          write(unit) BigEnd(real(UW_sgs, real32)), lf
+          
+          write(unit) "SCALARS vw_prime_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          write(unit) BigEnd(real(VW_sgs, real32)), lf
         end if
 
         if (store%avg_vorticity==1) then
@@ -1824,10 +1889,24 @@ contains
       end if !store%avg
 
       if (btest(store%avg_U,1)) &
-        call OutputUVW(U,V,W,output_dir//"Uavg.vtk",output_dir//"Vavg.vtk",output_dir//"Wavg.vtk",.true.)
+        call OutputUVW(U, V, W, &
+                       output_dir//"Uavg.vtk", &
+                       output_dir//"Vavg.vtk", &
+                       output_dir//"Wavg.vtk", &
+                       .true.)
 
-      if (btest(store%avg_UU_prime,1)) &
-        call OutputUVW(UU,VV,WW,output_dir//"Urms.vtk",output_dir//"Vrms.vtk",output_dir//"Wrms.vtk",.true.)
+      if (btest(store%avg_UU_prime,1)) then
+        call OutputUVW(UU, VV, WW, &
+                       output_dir//"Urms.vtk", &
+                       output_dir//"Vrms.vtk", &
+                       output_dir//"Wrms.vtk", &
+                       .true.)
+        call OutputUVW(UU_sgs, VV_sgs, WW_sgs, &
+                       output_dir//"Urms_sgs.vtk", &
+                       output_dir//"Vrms_sgs.vtk", &
+                       output_dir//"Wrms_sgs.vtk", &
+                       .true.)
+      end if
 
     end if !averaging
 
@@ -2311,7 +2390,10 @@ contains
 
       call OutputAvg(U_avg, V_avg, W_avg, &
                      Pr_avg, Temperature_avg, Moisture_avg, &
-                     UU_prime, VV_prime, WW_prime, UV_prime, UW_prime, VW_prime)
+                     UU_prime, VV_prime, WW_prime, &
+                     UV_prime, UW_prime, VW_prime, &
+                     UU_prime_sgs, VV_prime_sgs, WW_prime_sgs, &
+                     UV_prime_sgs, UW_prime_sgs, VW_prime_sgs)
       
       call OutputScalarStats(Scalar_avg,Scalar_variance,Scalar_max,Scalar_intermitency)
 
