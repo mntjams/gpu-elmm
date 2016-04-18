@@ -60,17 +60,18 @@ module Tiling
           end do
 
           bnzl = bnz !lower try
-          i = 0
-          do
-            i = i - 1
+          if (bnzl>1) then
+            i = 0
+            do
+              i = i - 1
+              if (mod(Prnz/(bnz+i),omp_threads)==0) then
+                bnzl = bnz + i
+                exit
+              end if
 
-            if (mod(Prnz/(bnz+i),omp_threads)==0) then
-              bnzl = bnz + i
-              exit
-            end if
-
-            if (i<=-bnz/2) exit
-          end do
+              if (i<=-bnz/2) exit
+            end do
+          end if
 
           if (bnzu/=bnz .and. bnzl/=bnz) then  !choose the closer one
             if (abs(bnzu-bnz)<=abs(bnzl-bnz)) then
