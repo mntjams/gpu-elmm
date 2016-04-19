@@ -2627,94 +2627,95 @@ fields_do:  do j = 1, size(fields)
          call InitHydrostaticPressure(Pr,Temperature,Moisture)
 
        end if
+       
+     end if !init conditions not from file
 
-       call par_sync_out("  ...setting initial viscosity and diffusivity.")
 
-       call set(Viscosity, molecular_viscosity)
+     call par_sync_out("  ...setting initial viscosity and diffusivity.")
 
-       if (molecular_viscosity > 0 .and. &
-             (enable_buoyancy .or. &
-              enable_moisture .or. &
-              num_of_scalars > 0))     then
+     call set(Viscosity, molecular_viscosity)
 
-         call set(TDiff, molecular_diffusivity)
+     if (molecular_viscosity > 0 .and. &
+           (enable_buoyancy .or. &
+            enable_moisture .or. &
+            num_of_scalars > 0))     then
 
-       end if
+       call set(TDiff, molecular_diffusivity)
 
-       call par_sync_out("  ...setting ghost cell values.")
+     end if
+
+     call par_sync_out("  ...setting ghost cell values.")
 
 #ifdef PAR
-       call BoundUVW(U, V, W)
+     call BoundUVW(U, V, W)
 
-       call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%time, 1._knd)
+     call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%time, 1._knd)
 
-       call par_update_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%start_time)
+     call par_update_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%start_time)
 #endif
 
-       call BoundUVW(U, V, W)
+     call BoundUVW(U, V, W)
 
-       call Bound_Pr(Pr)
+     call Bound_Pr(Pr)
 
-       call par_sync_out("  ...computing pressure correction.")
-       call PressureCorrection(U,V,W,Pr,Q,1._knd)
+     call par_sync_out("  ...computing pressure correction.")
+     call PressureCorrection(U,V,W,Pr,Q,1._knd)
 
-       call par_sync_out("  ...computing initial eddy viscosity.")
-       call SubgridModel(U, V, W)
+     call par_sync_out("  ...computing initial eddy viscosity.")
+     call SubgridModel(U, V, W)
 
-       call par_sync_out("  ...setting viscosity in ghost cells.")
-       call BoundViscosity(Viscosity)
+     call par_sync_out("  ...setting viscosity in ghost cells.")
+     call BoundViscosity(Viscosity)
 
-       if (enable_buoyancy.or. &
-           enable_moisture.or. &
-           num_of_scalars>0)     then
-         call par_sync_out("  ...setting subgrid diffusivity.")
+     if (enable_buoyancy.or. &
+         enable_moisture.or. &
+         num_of_scalars>0)     then
+       call par_sync_out("  ...setting subgrid diffusivity.")
 
-         !$omp parallel do private(i,j,k)
-         do k = 1, Prnz
-           do j = 1, Prny
-             do i = 1, Prnx
-               TDiff(i,j,k) = (Viscosity(i,j,k) - molecular_viscosity) / constPr_sgs + &
-                              molecular_diffusivity
-             end do
+       !$omp parallel do private(i,j,k)
+       do k = 1, Prnz
+         do j = 1, Prny
+           do i = 1, Prnx
+             TDiff(i,j,k) = (Viscosity(i,j,k) - molecular_viscosity) / constPr_sgs + &
+                            molecular_diffusivity
            end do
          end do
-         !$omp end parallel do
-
-         call BoundViscosity(TDiff)
-       end if
-
-       if (enable_buoyancy) then
-         call par_sync_out("  ...setting temperature in ghost cells.")
-         call BoundTemperature(Temperature)
-       end if
-
-       if (enable_moisture) then
-         call par_sync_out("  ...setting moisture in ghost cells.")
-         call BoundMoisture(Moisture)
-       end if
-
-       if (num_of_scalars>0)  call par_sync_out("  ...setting scalars in ghost cells.")
-       do i = 1, num_of_scalars
-         call BoundScalar(Scalar(:,:,:,i))
        end do
+       !$omp end parallel do
 
-       call par_sync_out("  ...setting initial temperature flux.")
-       call InitTempFl(Temperature)
+       call BoundViscosity(TDiff)
+     end if
 
-       if (wallmodeltype>0) then
-                      call par_sync_out("  ...computing wall model in scalar points.")
-                      call ComputeViscsWM(U,V,W,Pr,Temperature)
-                      call par_sync_out("  ...computing wall model in velocity points.")
-                      call ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
-       end if
+     if (enable_buoyancy) then
+       call par_sync_out("  ...setting temperature in ghost cells.")
+       call BoundTemperature(Temperature)
+     end if
 
-       call par_sync_out("  ...setting viscosity in ghost cells.")
-       call BoundViscosity(Viscosity)
+     if (enable_moisture) then
+       call par_sync_out("  ...setting moisture in ghost cells.")
+       call BoundMoisture(Moisture)
+     end if
 
-       call par_sync_out("  ...initializing fixed flow_rates.")
-       call InitFlowRates(U, V)
+     if (num_of_scalars>0)  call par_sync_out("  ...setting scalars in ghost cells.")
+     do i = 1, num_of_scalars
+       call BoundScalar(Scalar(:,:,:,i))
+     end do
 
-    end if !init conditions not from file
+     call par_sync_out("  ...setting initial temperature flux.")
+     call InitTempFl(Temperature)
+
+     if (wallmodeltype>0) then
+                    call par_sync_out("  ...computing wall model in scalar points.")
+                    call ComputeViscsWM(U,V,W,Pr,Temperature)
+                    call par_sync_out("  ...computing wall model in velocity points.")
+                    call ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
+     end if
+
+     call par_sync_out("  ...setting viscosity in ghost cells.")
+     call BoundViscosity(Viscosity)
+
+     call par_sync_out("  ...initializing fixed flow_rates.")
+     call InitFlowRates(U, V)
 
     call par_sync_out("initial conditions set.")
 
