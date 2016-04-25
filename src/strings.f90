@@ -76,14 +76,23 @@ contains
     character,pointer :: s
     integer, intent(out) :: ierr
     character(char_len) :: token
-    integer :: i,pos
+    integer :: stream_len, i, pos
     logical :: in_string
+
+    character, parameter :: tab = achar(9)
 
     in_string = .false.
     pos = 1
     token = ''
     
-    do i = 1, len_trim(stream)
+    i = 0
+
+    stream_len = len_trim(stream)
+
+    do
+
+      i = i + 1
+      if (i > stream_len) exit
 
       s => stream(i:i)
 
@@ -117,11 +126,11 @@ contains
             pos = pos + 1
             in_string = .true.
           end if
-        else if (s==' ') then
+        else if (s==' ' .or. s==tab .or. s==new_line('a')) then
           if (pos>1) call send
         else if (s=='!') then
           if (pos>1) call send
-          exit
+          call skip_line
         else
           token(pos:pos) = s
           pos = pos + 1
@@ -141,6 +150,16 @@ contains
       call res%add(token)
       token = ''
       pos = 1
+    end subroutine
+
+    subroutine skip_line
+      do
+        if ((stream(i:i)/=new_line('a')) .and. (i<stream_len)) then
+          i = i + 1
+        else
+          exit
+        end if
+      end do
     end subroutine
 
   end subroutine tokenize
@@ -250,7 +269,7 @@ contains
     do
       read(unit,'(a)',iostat=io) line
       if (io/=0) exit
-      stream = stream // ' ' // trim(adjustl(line))
+      stream = stream // ' ' // trim(adjustl(line)) // new_line('a')
     end do
 
     call tokenize(stream, token_list, stat)
