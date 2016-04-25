@@ -93,8 +93,15 @@ program CLMM
 
 
 
+      if (time_stepping%variable_time_steps) then
+        time_stepping%time = time_stepping%time + time_stepping%dt
+      else
+        time_stepping%time = time_stepping%start_time + time_step * time_stepping%dt
+        if (abs(time_stepping%time - time_stepping%end_time)<time_stepping%dt/100) then
+          time_stepping%time = time_stepping%end_time
+        end if
+      end if
 
-      time_stepping%time = time_stepping%time + time_stepping%dt
 
 
       call OutTStep(U, V, W, Pr, &
