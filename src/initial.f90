@@ -1679,6 +1679,8 @@ fields_do:  do j = 1, size(fields)
 
       end if
 
+      if (t_s%dt_constant > 0) constant_time_steps = .true.
+
       if (constant_time_steps) t_s%variable_time_steps = .false.
 
       if (t_s%variable_time_steps) then
@@ -1710,8 +1712,8 @@ fields_do:  do j = 1, size(fields)
 
         t_s%U_scaling = abs(t_s%U_scaling)
 
-        
-        if (maxval(t_s%U_scaling) > 0) then
+        !explicitly specified time-step length (dt=) has a priority
+        if (t_s%dt_constant <=0 .and. maxval(t_s%U_scaling) > 0) then
 
           t_s%enable_U_scaling = .true.
 
