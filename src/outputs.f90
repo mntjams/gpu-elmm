@@ -63,9 +63,10 @@ module Outputs
 
   real(knd),allocatable,dimension(:) :: delta_time, tke, dissip
 
+  real(knd),allocatable,dimension(:) :: pr_gradient_x_time, pr_gradient_y_time
+
   real(knd),allocatable,dimension(:,:) :: ustar, tstar                        !first index differentiates flux from friction number
                                                                              !second index is time
-
   real(knd),allocatable,dimension(:,:) :: U_time,V_time,W_time,temp_time,moist_time  !position, time
 
   real(knd),allocatable,dimension(:,:,:) :: scalp_time                        !which scalar, position, time
@@ -469,6 +470,16 @@ contains
     end if
    end if
 
+   if (flow_rate_x_fixed) then
+     allocate(pr_gradient_x_time(1:time_series_max_length))
+     pr_gradient_x_time = huge(1.0_knd)
+   end if
+
+   if (flow_rate_y_fixed) then
+     allocate(pr_gradient_y_time(1:time_series_max_length))
+     pr_gradient_y_time = huge(1.0_knd)
+   end if
+
    if (enable_profiles) then
 
      call par_sync_out("  ...preparing profiles.")
@@ -672,6 +683,15 @@ contains
 
     if (wallmodeltype>0.and.enable_buoyancy.and.allocated(tstar).and.store%tstar==1) then
       call create(output_dir//"tflux.unf")
+    end if
+
+
+    if (flow_rate_x_fixed) then
+      call create(output_dir//"pr_gradient_x.unf")
+    end if
+
+    if (flow_rate_y_fixed) then
+      call create(output_dir//"pr_gradient_y.unf")
     end if
 
 
@@ -887,15 +907,19 @@ contains
       delta_time(step)=delta/dt
     end if
 
+    if (flow_rate_x_fixed) then
+      pr_gradient_x_time(step) = pr_gradient_x
+    end if
 
-
+    if (flow_rate_y_fixed) then
+      pr_gradient_y_time(step) = pr_gradient_y
+    end if
 
 
 
     if (display%delta==1) then
       if (master) write(*,*) "delta: ",delta
     end if
-
 
 
 
@@ -1331,6 +1355,19 @@ contains
       close(unit)
     end if
 
+    if (flow_rate_x_fixed) then
+      open(unit,file=output_dir//"pr_gradient_x.unf", &
+           access="stream",status="old",position="append")
+      write(unit) pr_gradient_x_time(1:time_series_step)
+      close(unit)
+    end if
+
+    if (flow_rate_y_fixed) then
+      open(unit,file=output_dir//"pr_gradient_y.unf", &
+           access="stream",status="old",position="append")
+      write(unit) pr_gradient_y_time(1:time_series_step)
+      close(unit)
+    end if
 
     if (num_of_scalars>0.and.store%scalsum_time==1) then
       open(unit,file=output_dir//"scalsumtime.unf", &

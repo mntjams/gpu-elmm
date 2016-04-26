@@ -890,6 +890,8 @@ contains
 #ifdef PAR
    call par_init_domain_boundary_conditions
 #endif
+
+  call InitFlowRatesBC
    
 
 #ifdef CUSTOM_CONFIG
@@ -3259,6 +3261,35 @@ fields_do:  do j = 1, size(fields)
   end subroutine InitBoundaryConditions
 
 
+  subroutine InitFlowRatesBC
+#ifdef PAR
+    use custom_par
+#endif
+
+    if (enable_fixed_flow_rate) then
+
+      if (iim==nxims .and. Btype(Ea)==BC_PERIODIC) then
+        flow_rate_x_fixed = .true.
+      end if
+
+#ifdef PAR        
+      flow_rate_x_fixed = par_co_any(flow_rate_x_fixed)     
+#endif
+
+
+      if (jim==nyims .and. Btype(No)==BC_PERIODIC) then
+        flow_rate_y_fixed = .true.
+      end if
+
+#ifdef PAR        
+      flow_rate_y_fixed = par_co_any(flow_rate_y_fixed)     
+#endif
+
+    end if
+
+  end subroutine
+
+
   subroutine InitFlowRates(U, V)
 #ifdef PAR
     use custom_par
@@ -3267,32 +3298,22 @@ fields_do:  do j = 1, size(fields)
 
     if (enable_fixed_flow_rate) then
 
-      if (iim==nxims .and. Btype(Ea)==BC_PERIODIC) then
-        flow_rate_x_fixed = .true.
+      if (flow_rate_x_fixed) then
         flow_rate_x = sum(U(Unx, 1:Uny, 1:Unz)) * dymin * dzmin
 #ifdef PAR
         flow_rate_x = par_co_sum_plane_yz(flow_rate_x)
+        call par_broadcast_from_last_x(flow_rate_x)
 #endif
       end if
 
-#ifdef PAR        
-      flow_rate_x_fixed = par_co_any(flow_rate_x_fixed)     
-      if (flow_rate_x_fixed) call par_broadcast_from_last_x(flow_rate_x)
-#endif
 
-
-      if (jim==nyims .and. Btype(No)==BC_PERIODIC) then
-        flow_rate_y_fixed = .true.
+      if (flow_rate_y_fixed) then
         flow_rate_y = sum(V(1:Vnx, Vny, 1:Vnz)) * dxmin * dzmin
 #ifdef PAR
         flow_rate_y = par_co_sum_plane_xz(flow_rate_y)
+        call par_broadcast_from_last_y(flow_rate_y)
 #endif
       end if
-
-#ifdef PAR        
-      flow_rate_y_fixed = par_co_any(flow_rate_y_fixed)     
-      if (flow_rate_y_fixed) call par_broadcast_from_last_y(flow_rate_y)
-#endif
 
     end if
 
