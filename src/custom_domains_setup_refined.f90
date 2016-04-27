@@ -418,7 +418,9 @@ contains
       associate(b => domain_bc_recv_buffers(dir))
 
         b%comm = world_comm
-        b%remote_rank = domain_ranks_grid(domain)%arr(1,1,1) !arr(domain_nxims(1),jim,kim)        
+        b%remote_rank = domain_ranks_grid(domain)%arr(parent_image(1), &
+                                                      parent_image(2), &
+                                                      parent_image(3))       
         b%remote_domain = domain
         b%direction = dir
         b%enabled = .true.
