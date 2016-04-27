@@ -44,6 +44,7 @@ module Outputs
   real(knd),allocatable :: UV_prime(:,:,:),UW_prime(:,:,:),VW_prime(:,:,:) !<uv>, <u'v'> must be computed before saving
   real(knd),allocatable :: UU_prime_sgs(:,:,:),VV_prime_sgs(:,:,:),WW_prime_sgs(:,:,:) !<uu>, <u'u'> must be computed before saving
   real(knd),allocatable :: UV_prime_sgs(:,:,:),UW_prime_sgs(:,:,:),VW_prime_sgs(:,:,:) !<uv>, <u'v'> must be computed before saving
+  real(knd),allocatable :: TKE_prime_sgs(:,:,:) !subgrid TKE approximation
   real(knd),allocatable :: Pr_avg(:,:,:) !<p>
   real(knd),allocatable :: Temperature_avg(:,:,:) !<theta>
   real(knd),allocatable :: Moisture_avg(:,:,:) !<q>
@@ -248,12 +249,14 @@ contains
        UV_prime = 0
        UW_prime = 0
        VW_prime = 0
+       allocate(TKE_prime_sgs(1:Prnx,1:Prny,1:Prnz))
        allocate(UU_prime_sgs(-2:Unx+3,-2:Uny+3,-2:Unz+3))
        allocate(VV_prime_sgs(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
        allocate(WW_prime_sgs(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
        allocate(UV_prime_sgs(1:Prnx,1:Prny,1:Prnz))
        allocate(UW_prime_sgs(1:Prnx,1:Prny,1:Prnz))
        allocate(VW_prime_sgs(1:Prnx,1:Prny,1:Prnz))
+       TKE_prime_sgs = 0
        UU_prime_sgs = 0
        VV_prime_sgs = 0
        WW_prime_sgs = 0
@@ -953,7 +956,7 @@ contains
         VW_prime = VW_prime + (V(1:Prnx,0:Prny-1,1:Prnz)+V(1:Prnx,1:Prny,1:Prnz)) * &
                               (W(1:Prnx,1:Prny,0:Prnz-1)+W(1:Prnx,1:Prny,1:Prnz)) * &
                               time_weight / 4
-        call AddSubgridStresses(UU_prime_sgs, VV_prime_sgs, WW_prime_sgs, &
+        call AddSubgridStresses(TKE_prime_sgs, UU_prime_sgs, VV_prime_sgs, WW_prime_sgs, &
                                 UV_prime_sgs, UW_prime_sgs, VW_prime_sgs, &
                                 U, V, W, &
                                 time_weight)
@@ -1149,14 +1152,20 @@ contains
   end subroutine OutTstep
 
 
-  subroutine AddSubgridStresses(UU, VV, WW, UV, UW, VW, &
+  subroutine AddSubgridStresses(TKE, UU, VV, WW, UV, UW, VW, &
                                 U, V, W, weight)
+    use Filters, only: filtertype, filter_ratios
+    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: TKE
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU, VV, WW
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV, UW, VW
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U, V, W
     real(knd),intent(in) :: weight
     real(knd) :: Ax, Ay, Az, Ax2, Ay2, Az2
     integer :: i, j, k
+    real(knd) :: width
+    real(knd), parameter :: Ck = 0.1 !model constant for the sgs_tke eddy viscosity sgs model
+
+    width = filter_ratios(filtertype) * (dxmin*dymin*dzmin)**(1._knd/3._knd)
     
     Ax = weight/(2*dxmin)
     Ay = weight/(2*dymin)
@@ -1236,6 +1245,15 @@ contains
           VW(i,j,k) = VW(i,j,k) + (Viscosity(i,j,k) - molecular_viscosity) * &
                           (Az2 * (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) + &
                            Ay2 * (W(i,j+1,k)-W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)))
+        end do
+      end do
+    end do
+    !$omp end do nowait
+    !$omp do
+    do k=1,Prnz
+      do j=1,Prny
+        do i=1,Prnx
+          TKE(i,j,k) = TKE(i,j,k) + ((Viscosity(i,j,k) - molecular_viscosity) / (Ck * width))**2
         end do
       end do
     end do
@@ -1709,10 +1727,11 @@ contains
   subroutine OutputAvg(U, V, W, &
                        Pr, Temperature, Moisture, &
                        UU, VV, WW, UV, UW, VW, &
-                       UU_sgs, VV_sgs, WW_sgs, UV_sgs, UW_sgs, VW_sgs)
+                       TKE_sgs, UU_sgs, VV_sgs, WW_sgs, UV_sgs, UW_sgs, VW_sgs)
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U, V, W
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU, VV, WW
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV, UW, VW
+    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: TKE_sgs
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU_sgs, VV_sgs, WW_sgs
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV_sgs, UW_sgs, VW_sgs
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(in)    :: Pr
@@ -1889,6 +1908,10 @@ contains
            end do
           end do
           write(unit) sc_tmp, lf
+          
+          write(unit) "SCALARS tke_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          write(unit) BigEnd(real(TKE_sgs, real32)), lf
           
           write(unit) "SCALARS uv_prime float", lf
           write(unit) "LOOKUP_TABLE default", lf
@@ -2442,7 +2465,7 @@ contains
                      Pr_avg, Temperature_avg, Moisture_avg, &
                      UU_prime, VV_prime, WW_prime, &
                      UV_prime, UW_prime, VW_prime, &
-                     UU_prime_sgs, VV_prime_sgs, WW_prime_sgs, &
+                     TKE_prime_sgs, UU_prime_sgs, VV_prime_sgs, WW_prime_sgs, &
                      UV_prime_sgs, UW_prime_sgs, VW_prime_sgs)
       
       call OutputScalarStats(Scalar_avg,Scalar_variance,Scalar_max,Scalar_intermitency)
