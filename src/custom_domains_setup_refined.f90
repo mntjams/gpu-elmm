@@ -1,130 +1,120 @@
     integer :: xi, dii, dij, dik
     integer :: prev
+    integer :: child_domain, i_child_domain, side
+    integer :: n_send_buffers
 
     if (enable_multiple_domains) then
 
-      if (domain_index<number_of_domains) then
+      !send buffers should be counted from 1, there may be more of them from several nested domains
+      n_send_buffers = 0
+      do i_child_domain = 1, size(child_domains)
+        child_domain = child_domains(i_child_domain)
 
-        !send buffers should be counted from 1, there may be more of them from several nested domains
-        allocate(domain_bc_send_buffers(2*domain_nyims(domain_index+1)*domain_nzims(domain_index+1) + &
-                                        2*domain_nxims(domain_index+1)*domain_nzims(domain_index+1) + &
-                                        2*domain_nxims(domain_index+1)*domain_nyims(domain_index+1)))
+        do side = We, Ea
+          if (domain_is_boundary_nested(side,child_domain)) &
+            n_send_buffers = n_send_buffers + domain_nyims(child_domain)*domain_nzims(child_domain)
+        end do 
+        do side = So, No
+          if (domain_is_boundary_nested(side,child_domain)) &
+            n_send_buffers = n_send_buffers + domain_nxims(child_domain)*domain_nzims(child_domain)
+        end do 
+        do side = Bo, To
+          if (domain_is_boundary_nested(side,child_domain)) &
+            n_send_buffers = n_send_buffers + domain_nxims(child_domain)*domain_nyims(child_domain)
+        end do 
+      end do
 
-        prev = 0
+      allocate(domain_bc_send_buffers(n_send_buffers))
 
-        do dik = 1, domain_nzims(domain_index+1)
-          do dij = 1, domain_nyims(domain_index+1)
-            call parent_buffer(num=dij+(dik-1)*domain_nyims(domain_index+1), &
-                               dir=We, domain=domain_index+1, im=[1,dij,dik])
-         end do
-        end do
+      prev = 0
+      do i_child_domain = 1, size(child_domains)
 
-        prev = prev + domain_nyims(domain_index+1)*domain_nzims(domain_index+1)
+        child_domain = child_domains(i_child_domain)
 
-        do dik = 1, domain_nzims(domain_index+1)
-          do dij = 1, domain_nyims(domain_index+1)
-            call parent_buffer(num=dij+(dik-1)*domain_nyims(domain_index+1) + prev, &
-                               dir=Ea, domain=domain_index+1, im=[1,dij,dik])
-         end do
-        end do
+        if (domain_is_boundary_nested(We,child_domain)) then   
+          do dik = 1, domain_nzims(child_domain)
+            do dij = 1, domain_nyims(child_domain)
+              call parent_buffer(num=dij+(dik-1)*domain_nyims(child_domain) + prev, &
+                                 dir=We, domain=child_domain, im=[1,dij,dik])
+           end do
+          end do
 
-        prev = prev + domain_nyims(domain_index+1)*domain_nzims(domain_index+1)
+          prev = prev + domain_nyims(child_domain)*domain_nzims(child_domain)
+        end if
 
-        do dik = 1, domain_nzims(domain_index+1)
-          do dii = 1, domain_nxims(domain_index+1)
-            call parent_buffer(num=dii+(dik-1)*domain_nxims(domain_index+1) + prev, &
-                               dir=So, domain=domain_index+1, im=[dii,1,dik])
-         end do
-        end do
+        if (domain_is_boundary_nested(Ea,child_domain)) then   
+          do dik = 1, domain_nzims(child_domain)
+            do dij = 1, domain_nyims(child_domain)
+              call parent_buffer(num=dij+(dik-1)*domain_nyims(child_domain) + prev, &
+                                 dir=Ea, domain=child_domain, im=[1,dij,dik])
+           end do
+          end do
 
-        prev = prev + domain_nxims(domain_index+1)*domain_nzims(domain_index+1)
+          prev = prev + domain_nyims(child_domain)*domain_nzims(child_domain)
+        end if
 
-        do dik = 1, domain_nzims(domain_index+1)
-          do dii = 1, domain_nxims(domain_index+1)
-            call parent_buffer(num=dii+(dik-1)*domain_nxims(domain_index+1) + prev, &
-                               dir=No, domain=domain_index+1, im=[dii,domain_nyims(domain_index+1),dik])
-         end do
-        end do
+        if (domain_is_boundary_nested(So,child_domain)) then   
+          do dik = 1, domain_nzims(child_domain)
+            do dii = 1, domain_nxims(child_domain)
+              call parent_buffer(num=dii+(dik-1)*domain_nxims(child_domain) + prev, &
+                                 dir=So, domain=child_domain, im=[dii,1,dik])
+           end do
+          end do
+        end if
 
-        prev = prev + domain_nxims(domain_index+1)*domain_nzims(domain_index+1)
-! 
-!         do dij = 1, domain_nyims(domain_index+1)
-!           do dii = 1, domain_nxims(domain_index+1)
-!             call parent_buffer(num=dii+(dij-1)*domain_nxims(domain_index+1) + prev, &
-!                                dir=Bo, domain=domain_index+1, im=[dii,dij,1])
-! 
-!          end do
-!         end do
+        if (domain_is_boundary_nested(No,child_domain)) then   
+          prev = prev + domain_nxims(child_domain)*domain_nzims(child_domain)
 
-!         prev = prev + domain_nxims(domain_index+1)*domain_nyims(domain_index+1)
+          do dik = 1, domain_nzims(child_domain)
+            do dii = 1, domain_nxims(child_domain)
+              call parent_buffer(num=dii+(dik-1)*domain_nxims(child_domain) + prev, &
+                                 dir=No, domain=child_domain, im=[dii,domain_nyims(child_domain),dik])
+           end do
+          end do
 
-        do dij = 1, domain_nyims(domain_index+1)
-          do dii = 1, domain_nxims(domain_index+1)
-            call parent_buffer(num=dii+(dij-1)*domain_nxims(domain_index+1) + prev, &
-                               dir=To, domain=domain_index+1, im=[dii,dij,domain_nzims(domain_index+1)])
+          prev = prev + domain_nxims(child_domain)*domain_nzims(child_domain)
+        end if
 
-         end do
-        end do
+       if (domain_is_boundary_nested(Bo,child_domain)) then   
+           do dij = 1, domain_nyims(child_domain)
+            do dii = 1, domain_nxims(child_domain)
+              call parent_buffer(num=dii+(dij-1)*domain_nxims(child_domain) + prev, &
+                                 dir=Bo, domain=child_domain, im=[dii,dij,1])
 
-      end if
+           end do
+          end do
 
-      if (domain_index>1) then
+          prev = prev + domain_nxims(child_domain)*domain_nyims(child_domain)
+        end if
 
+        if (domain_is_boundary_nested(To,child_domain)) then   
+          do dij = 1, domain_nyims(child_domain)
+            do dii = 1, domain_nxims(child_domain)
+              call parent_buffer(num=dii+(dij-1)*domain_nxims(child_domain) + prev, &
+                                 dir=To, domain=child_domain, im=[dii,dij,domain_nzims(child_domain)])
+
+           end do
+          end do
+
+          prev = prev + domain_nxims(child_domain)*domain_nyims(child_domain)
+        end if
+
+      end do
+
+
+      if (parent_domain>0) then
         allocate(domain_bc_recv_buffers(We:To))
 
-        if (iim==1) then
-          Btype(We) = BC_DOMAIN_COPY
-          TempBtype(We) = BC_DOMAIN_COPY
-          MoistBtype(We) = BC_DOMAIN_COPY
-          ScalBtype(We) = BC_DOMAIN_COPY
+        do side = We, To
+          if (is_domain_boundary_nested(side).and.is_boundary_domain_boundary(side)) then
+            Btype(side) = BC_DOMAIN_COPY
+            TempBtype(side) = BC_DOMAIN_COPY
+            MoistBtype(side) = BC_DOMAIN_COPY
+            ScalBtype(side) = BC_DOMAIN_COPY
 
-          call child_buffer(dir=We, domain=domain_index-1)
-        endif
-
-        if (iim==nxims) then
-          Btype(Ea) = BC_DOMAIN_COPY
-          TempBtype(Ea) = BC_DOMAIN_COPY
-          MoistBtype(Ea) = BC_DOMAIN_COPY
-          ScalBtype(Ea) = BC_DOMAIN_COPY
-
-          call child_buffer(dir=Ea, domain=domain_index-1, relax_factor=10._knd)
-        end if
-
-        if (jim==1) then
-          Btype(So) = BC_DOMAIN_COPY
-          TempBtype(So) = BC_DOMAIN_COPY
-          MoistBtype(So) = BC_DOMAIN_COPY
-          ScalBtype(So) = BC_DOMAIN_COPY
-
-          call child_buffer(dir=So, domain=domain_index-1)
-        endif
-
-        if (jim==nyims) then
-          Btype(No) = BC_DOMAIN_COPY
-          TempBtype(No) = BC_DOMAIN_COPY
-          MoistBtype(No) = BC_DOMAIN_COPY
-          ScalBtype(No) = BC_DOMAIN_COPY
-
-          call child_buffer(dir=No, domain=domain_index-1)
-        end if
-
-!         if (kim==1) then
-!           Btype(Bo) = BC_DOMAIN_COPY
-!           TempBtype(Bo) = BC_DOMAIN_COPY
-!           MoistBtype(Bo) = BC_DOMAIN_COPY
-!           ScalBtype(Bo) = BC_DOMAIN_COPY
-! 
-!           call child_buffer(dir=Bo, domain=domain_index-1)
-!         end if
-
-        if (kim==nzims) then
-          Btype(To) = BC_DOMAIN_COPY
-          TempBtype(To) = BC_DOMAIN_COPY
-          MoistBtype(To) = BC_DOMAIN_COPY
-          ScalBtype(To) = BC_DOMAIN_COPY
-
-          call child_buffer(dir=To, domain=domain_index-1)
-        end if
+            call child_buffer(dir=side, domain=parent_domain)
+          endif
+       end do
 
       end if
 
@@ -421,10 +411,9 @@ contains
     end subroutine parent_buffer
 
 
-    subroutine child_buffer(dir, domain, relax_factor)
+    subroutine child_buffer(dir, domain)
       integer, intent(in) :: dir, domain
       integer :: i, width
-      real(knd), optional :: relax_factor
 
       associate(b => domain_bc_recv_buffers(dir))
 
@@ -435,9 +424,6 @@ contains
         b%enabled = .true.
 
         b%relaxation = .true.
-        if (present(relax_factor)) then
-          b%relax_factor = relax_factor
-        end if
 
         b%interp_order = 2
 
@@ -963,6 +949,10 @@ contains
           b%turb_generator%L_z = dzmin * b%spatial_ratio / 2
           b%turb_generator%T_lag = time_stepping%dt_constant * b%time_step_ratio * 2
           call b%turb_generator%init()
+        end if
+
+        if (dir==Ea) then
+          b%relax_factor = 10
         end if
       end associate
 

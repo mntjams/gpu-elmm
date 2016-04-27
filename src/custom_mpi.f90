@@ -31,6 +31,19 @@ module custom_par
   
   !number of the domain
   integer :: number_of_domains = 1
+
+  integer :: parent_domain = 0
+
+  integer :: parent_image(3) = [1, 1, 1]
+
+  integer, allocatable :: child_domains(:)
+
+  !whether given domain boundary is receiving and using boundary conditions from parent
+  logical :: is_domain_boundary_nested(6) = .true.
+  !whether given image boundary is receiving and using boundary conditions from parent
+  logical :: is_image_boundary_nested(6) = .false.
+
+  logical :: is_boundary_domain_boundary(6) = .true.
   
   type domain_proc_grid
     integer, allocatable :: arr(:,:,:)
@@ -49,6 +62,9 @@ module custom_par
   !image numbers and rank numbers (in world_comm)
   type(domain_proc_grid), allocatable :: domain_images_grid(:), &
                                          domain_ranks_grid(:)
+
+  !index, boundary
+  logical, allocatable :: domain_is_boundary_nested(:,:)
 
   type domain_computational_grids
     real(knd) :: xmin, xmax, ymin, ymax, zmin, zmax
@@ -356,11 +372,6 @@ contains
 
     
     interface
-      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
-        import
-        integer :: SENDBUF, RECVBUF(*)
-        integer :: COUNT, DATATYPE, OP, COMM, IERROR
-      end subroutine
       subroutine MPI_ALLGATHER(SENDBUF, SENDCOUNT, SENDTYPE, RECVBUF, RECVCOUNT, &
                  RECVTYPE, COMM, IERROR)
         integer ::  SENDBUF, RECVBUF(*)
@@ -374,6 +385,12 @@ contains
       call error_stop()
     end if
     
+    if (.not. allocated(child_domains)) allocate(child_domains(0))
+
+    if (parent_domain==0) then
+      is_domain_boundary_nested = .false.
+      is_image_boundary_nested = .false.
+    end if
     
     allocate(check_n(world_comm_size))
     
@@ -472,6 +489,16 @@ contains
       end do
     end do
 
+    allocate(domain_is_boundary_nested(6,number_of_domains))
+    domain_is_boundary_nested = .false.
+
+    domain_is_boundary_nested(:,domain_index) = is_domain_boundary_nested
+    !instead of scatter due to the 3D topology
+    call MPI_Allreduce(MPI_IN_PLACE, domain_is_boundary_nested, &
+                       size(domain_is_boundary_nested), MPI_LOGICAL, &
+                       MPI_LOR, world_comm, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Allreduce for is_domain_boundary_nested.")
+
   end subroutine par_init_domains
 
   
@@ -485,6 +512,8 @@ contains
     domain_nxims(domain_index) = nxims
     domain_nyims(domain_index) = nyims
     domain_nzims(domain_index) = nzims
+
+    is_boundary_domain_boundary = [iim==1, iim==nxims, jim==1, jim==nyims, kim==1, kim==nzims]
 
     !broadcast the process domain dimensions from one image of each domain
     do dom = 1, number_of_domains
@@ -523,6 +552,7 @@ contains
                      MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
       domain_ranks_grid(dom)%arr = domain_images_grid(dom)%arr - 1
     end do 
+
 
   
     allocate(domain_grids(number_of_domains))

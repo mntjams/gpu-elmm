@@ -1950,8 +1950,19 @@ fields_do:  do j = 1, size(fields)
       class(*), pointer :: var
     end type
 
+    type field_names_a
+      character(char_len) :: name
+      class(*), pointer :: var(:)
+    end type
+
+    type field_names_a_int_alloc
+      character(char_len) :: name
+      integer, allocatable :: var(:)
+    end type
+
     interface field_names
       procedure field_names_init
+      procedure field_names_a_init
     end interface
 
     inquire(file=fname, exist=ex)
@@ -1986,19 +1997,29 @@ fields_do:  do j = 1, size(fields)
       integer :: i, j
       logical, target :: constant_time_steps = .false.
 
-      type(field_names) :: names(5)
+      type(field_names) :: names(6)
+      type(field_names_a) :: names_a(1)
+      type(field_names_a_int_alloc) :: names_a_int_alloc(1)
       
       logical, target :: enable_multiple_domains_l = .false.
       integer, target :: number_of_domains_l = -99
       integer, target :: domain_index_l = -99
+      integer, target :: parent_domain_l = -99
       integer, target :: spatial_ratio_l = -99
       integer, target :: time_step_ratio_l = -99
 
+      logical :: is_domain_boundary_nested_l(6) = .true.
+
       names = [field_names_init("enable_multiple_domains", enable_multiple_domains_l), &
                field_names_init("domain_index",   domain_index_l), &
+               field_names_init("parent_domain",   parent_domain_l), &
                field_names_init("number_of_domains",   number_of_domains_l), &
                field_names_init("spatial_ratio",   spatial_ratio_l), &
                field_names_init("time_step_ratio",   time_step_ratio_l)]
+
+     names_a = [field_names_a_init("is_boundary_nested", is_domain_boundary_nested_l)]
+
+     names_a_int_alloc = [field_names_a_int_alloc_init("child_domains")]
 
       if (downcase(obj%name)=='domains') then
 
@@ -2026,6 +2047,13 @@ fields_do:  do j = 1, size(fields)
                 end if
               end do
 
+              do i = 1, size(names_a_int_alloc)
+                if (fields(j)%name == names_a_int_alloc(i)%name) then
+                  allocate(names_a_int_alloc(i)%var(size(fields(j)%array_value)))
+                  read(fields(j)%array_value, *) names_a_int_alloc(i)%var
+                end if
+              end do
+
             end do fields_do
 
           end associate
@@ -2048,6 +2076,27 @@ fields_do:  do j = 1, size(fields)
         if (number_of_domains<domain_index) &
           call error_stop("Error, domain_index must be smaller or equal to number_of_domains.")
 
+        parent_domain = max(parent_domain_l, 0)
+        if (domain_index>1 .and. parent_domain<=0) &
+          call error_stop("Error, parent_domain shall be specified and positive if domain_index > 1.")
+
+        if (allocated(names_a_int_alloc(1)%var)) then
+          call move_alloc(names_a_int_alloc(1)%var, child_domains)
+          if (any(child_domains<=domain_index) .or. &
+              any(child_domains>number_of_domains)) then
+            call error_stop("Error, child_domains shall be larger than domain_index &
+                           &and smaller or equal to number_of_domains.")
+          end if
+        else if (domain_index<number_of_domains) then
+
+          call error_stop("Error, child_domains shall be specified if domain_index < number_of_domains. &
+                          & It may be empty.")
+        end if
+          
+        is_domain_boundary_nested = is_domain_boundary_nested_l
+
+        where(Btype==BC_NOSLIP) is_domain_boundary_nested = .false.
+
         if (spatial_ratio_l>0) domain_spatial_ratio = spatial_ratio_l
         if (time_step_ratio_l>0) domain_time_step_ratio = time_step_ratio_l
       end if
@@ -2061,6 +2110,22 @@ fields_do:  do j = 1, size(fields)
 
       res%name = name
       res%var => var
+    end function
+
+    function field_names_a_init(name, var) result(res)
+      type(field_names_a) :: res
+      character(*) :: name
+      class(*), target, intent(in) :: var(:)
+
+      res%name = name
+      res%var => var
+    end function
+
+    function field_names_a_int_alloc_init(name) result(res)
+      type(field_names_a_int_alloc) :: res
+      character(*) :: name
+
+      res%name = name
     end function
 
   end subroutine get_domains
