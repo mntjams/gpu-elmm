@@ -324,7 +324,7 @@ contains
        
        p%inside = InDomain(p%x,p%y,p%z)
        
-       call GridCoords(p%i,p%j,p%k,p%x,p%y,p%z)
+       call GridCoords_interp(p%i,p%j,p%k,p%x,p%y,p%z)
 
        p%i = max(p%i,1)
        p%j = max(p%j,1)
@@ -333,9 +333,9 @@ contains
        p%j = min(p%j,Prny)
        p%k = min(p%k,Prnz)
 
-       call GridCoords_U(p%Ui,p%Uj,p%Uk,p%x,p%y,p%z)
-       call GridCoords_V(p%Vi,p%Vj,p%Vk,p%x,p%y,p%z)
-       call GridCoords_W(p%Wi,p%Wj,p%Wk,p%x,p%y,p%z)
+       call GridCoords_interp_U(p%Ui,p%Uj,p%Uk,p%x,p%y,p%z)
+       call GridCoords_interp_V(p%Vi,p%Vj,p%Vk,p%x,p%y,p%z)
+       call GridCoords_interp_W(p%Wi,p%Wj,p%Wk,p%x,p%y,p%z)
 
        if (Utype(p%Ui, p%Uj, p%Uk)>0) then
          do

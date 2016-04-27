@@ -8,7 +8,9 @@ implicit none
 
 
   private
-  public volumePr, GridCoords, GridCoords_U, GridCoords_V, GridCoords_W, InDomain,&
+  public volumePr, &
+         GridCoords, GridCoords_interp, GridCoords_interp_U, GridCoords_interp_V, GridCoords_interp_W, &
+         InDomain,&
          BoundUVW, Bound_Phi, Bound_Pr, Bound_Q,&
          ShearInlet, ParabolicInlet, ConstantInlet
 
@@ -95,125 +97,59 @@ implicit none
     call GridCoords_scalar(ri(1), ri(2), ri(3), r(1), r(2), r(3))
   end subroutine
 
-  elemental subroutine GridCoords_U(xi, yj, zk, x, y, z)
+
+
+  !finds the index from which interpolate by bilinear interpolation
+  !the point (x,y,z) should lie between [xi,yj,zk] and [xi+1,yj+1,zk+1]
+  elemental subroutine GridCoords_interp(xi, yj, zk, x, y, z)
+    integer, intent(out):: xi, yj, zk
+    real(knd), intent(in):: x, y, z
+    integer :: i
+    
+    xi = min( max(floor( (x - xU(0))/dxmin + 0.5_knd ),0) , Prnx)
+    yj = min( max(floor( (y - yV(0))/dymin + 0.5_knd ),0) , Prny)
+    zk = min( max(floor( (z - zW(0))/dzmin + 0.5_knd ),0) , Prnz)
+  end subroutine
+
+  !finds the index from which interpolate by bilinear interpolation
+  !the point (x,y,z) should lie between [xi,yj,zk] and [xi+1,yj+1,zk+1]
+  elemental subroutine GridCoords_interp_U(xi, yj, zk, x, y, z)
     integer, intent(out) :: xi, yj, zk
     real(knd), intent(in) :: x, y, z
     integer :: i
 
-    if (gridtype==uniformgrid) then
-
-        xi = min( max(nint( (x - xU(0))/dxmin ),0) , Unx+1)
-        yj = min( max(nint( (y - yV(0))/dymin + 0.5_knd ),1) , Prny)
-        zk = min( max(nint( (z - zW(0))/dzmin + 0.5_knd ),1) , Prnz)
-
-    else
-
-      xi = Unx+1
-      do i = 1, Unx+1
-       if (xPr(i+1)>=x) then
-                     xi = i-1
-                     exit
-                    end if
-      end do
-
-      yj = Vny
-      do i = 1, Vny
-       if (yV(i)>=y) then
-                     yj = i
-                     exit
-                    end if
-      end do
-      zk = Wnz
-      do i = 1, Wnz
-       if (zW(i)>=z) then
-                     zk = i
-                     exit
-                    end if
-      end do
-
-    end if
-  end subroutine GridCoords_U
+     xi = min( max(floor( (x - xU(0))/dxmin ),0) , Prnx)
+     yj = min( max(floor( (y - yV(0))/dymin + 0.5_knd ),0) , Prny)
+     zk = min( max(floor( (z - zW(0))/dzmin + 0.5_knd ),0) , Prnz)
+  end subroutine
 
 
-  elemental subroutine GridCoords_V(xi, yj, zk, x, y, z)
+  !finds the index from which interpolate by bilinear interpolation
+  !the point (x,y,z) should lie between [xi,yj,zk] and [xi+1,yj+1,zk+1]
+  elemental subroutine GridCoords_interp_V(xi, yj, zk, x, y, z)
     integer, intent(out) :: xi, yj, zk
     real(knd), intent(in) :: x, y, z
     integer :: i
 
-    if (gridtype==uniformgrid) then
-
-        xi = min( max(nint( (x - xU(0))/dxmin + 0.5_knd ),1) , Prnx)
-        yj = min( max(nint( (y - yV(0))/dymin ),0), Vny+1)
-        zk = min( max(nint( (z - zW(0))/dzmin + 0.5_knd ),1) , Prnz)
-
-    else
-
-      xi = Unx
-      do i = 1, Unx
-       if (xU(i)>=x) then
-                     xi = i
-                     exit
-                    end if
-      end do
-
-      yj = Vny+1
-      do i = 1, Vny+1
-       if (yPr(i)>=y) then
-                     yj = i-1
-                     exit
-                    end if
-      end do
-      zk = Wnz
-      do i = 1, Wnz
-       if (zW(i)>=z) then
-                     zk = i
-                     exit
-                    end if
-      end do
-
-    end if
-  end subroutine GridCoords_V
+    xi = min( max(floor( (x - xU(0))/dxmin + 0.5_knd ),0) , Prnx)
+    yj = min( max(floor( (y - yV(0))/dymin ),0), Prny)
+    zk = min( max(floor( (z - zW(0))/dzmin + 0.5_knd ),0) , Prnz)
+  end subroutine
 
 
-  elemental subroutine GridCoords_W(xi, yj, zk, x, y, z)
+  !finds the index from which interpolate by bilinear interpolation
+  !the point (x,y,z) should lie between [xi,yj,zk] and [xi+1,yj+1,zk+1]
+  elemental subroutine GridCoords_interp_W(xi, yj, zk, x, y, z)
     integer, intent(out) :: xi, yj, zk
     real(knd), intent(in) :: x, y, z
     integer :: i
 
-    if (gridtype==uniformgrid) then
+    xi = min( max(floor( (x - xU(0))/dxmin + 0.5_knd ),0) , Prnx)
+    yj = min( max(floor( (y - yV(0))/dymin + 0.5_knd ),0) , Prny)
+    zk = min( max(floor( (z - zW(0))/dzmin ),0) , Prnz)
+  end subroutine
 
-        xi = min( max(nint( (x - xU(0))/dxmin + 0.5_knd ),1) , Prnx)
-        yj = min( max(nint( (y - yV(0))/dymin + 0.5_knd ),1) , Prny)
-        zk = min( max(nint( (z - zW(0))/dzmin ),0) , Wnz+1)
 
-    else
-
-      xi = Unx
-      do i = 1, Unx
-       if (xU(i)>=x) then
-                     xi = i
-                     exit
-                    end if
-      end do
-
-      yj = Vny
-      do i = 1, Vny
-       if (yV(i)>=y) then
-                     yj = i
-                     exit
-                    end if
-      end do
-
-      zk = Wnz+1
-      do i = 1, Wnz+1
-       if (zPr(i)>=z) then
-                     zk = i-1
-                     exit
-                    end if
-      end do
-
-    end if
-  end subroutine GridCoords_W
 
 
   logical function InDomain_3r(x, y, z) result(res)
