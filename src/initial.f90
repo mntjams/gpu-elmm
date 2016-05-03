@@ -886,13 +886,12 @@ contains
    gWnz = Wnz 
 #endif
 
+   call InitFlowRatesBC
 
 #ifdef PAR
    call par_init_domain_boundary_conditions
 #endif
-
-  call InitFlowRatesBC
-   
+  
 
 #ifdef CUSTOM_CONFIG
    call CustomConfiguration_Last
@@ -3364,7 +3363,13 @@ fields_do:  do j = 1, size(fields)
     if (enable_fixed_flow_rate) then
 
       if (flow_rate_x_fixed) then
-        flow_rate_x = sum(U(Unx, 1:Uny, 1:Unz)) * dymin * dzmin
+        if (initcondsfromfile==0.and.inlettype==TurbulentInletType) then
+          flow_rate_x = sum(default_turbulence_generator%Uinavg(1:Uny, 1:Unz)) &
+                        * dymin * dzmin
+        else
+          flow_rate_x = sum(U(Unx,1:Uny, 1:Unz)) &
+                        * dymin * dzmin
+        end if
 #ifdef PAR
         flow_rate_x = par_co_sum_plane_yz(flow_rate_x)
         call par_broadcast_from_last_x(flow_rate_x)
@@ -3373,7 +3378,15 @@ fields_do:  do j = 1, size(fields)
 
 
       if (flow_rate_y_fixed) then
-        flow_rate_y = sum(V(1:Vnx, Vny, 1:Vnz)) * dxmin * dzmin
+        if (initcondsfromfile==0.and.inlettype==TurbulentInletType) then
+          !average V
+          flow_rate_y = sum(default_turbulence_generator%Vinavg(1:Vny, 1:Vnz)) &
+                        / (Vny*Vnz)
+          flow_rate_y = flow_rate_y * Vnx * Vnz * dxmin * dzmin        
+        else
+          flow_rate_y = sum(V(1:Vnx, Vny, 1:Vnz)) * dxmin * dzmin
+        end if
+
 #ifdef PAR
         flow_rate_y = par_co_sum_plane_xz(flow_rate_y)
         call par_broadcast_from_last_y(flow_rate_y)
@@ -3381,7 +3394,6 @@ fields_do:  do j = 1, size(fields)
       end if
 
     end if
-
   end subroutine
 
 
