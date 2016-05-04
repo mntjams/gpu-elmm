@@ -2,8 +2,12 @@
     integer :: prev
     integer :: child_domain, i_child_domain, side
     integer :: n_send_buffers
+    integer :: err
+    integer, allocatable :: requests(:)
 
     if (enable_multiple_domains) then
+
+      allocate(requests(0))
 
       !send buffers should be counted from 1, there may be more of them from several nested domains
       n_send_buffers = 0
@@ -118,6 +122,15 @@
 
       end if
 
+      call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, err)
+
+      if (parent_domain>0) then
+        if (any(domain_bc_recv_buffers%enabled.and.domain_bc_recv_buffers%exchange_pr_gradient_x)) &
+          enable_pr_gradient_x_uniform = .true.
+
+        if (any(domain_bc_recv_buffers%enabled.and.domain_bc_recv_buffers%exchange_pr_gradient_y)) &
+          enable_pr_gradient_y_uniform = .false.
+      end if
 
     end if !enable_multiple_domains
 
@@ -148,6 +161,7 @@ contains
       real(knd) :: cxmax, cxmin, cymax, cymin, czmax, czmin
       integer :: cxi1, cxi2, cyj1, cyj2, czk1, czk2
       integer :: pos
+      integer :: request
 
       associate (b=>domain_bc_send_buffers(num))
 
@@ -156,6 +170,19 @@ contains
         b%remote_domain = domain
         b%direction = dir
         b%enabled = .true.
+
+        b%exchange_pr_gradient_x = enable_fixed_flow_rate .and. flow_rate_x_fixed
+        b%exchange_pr_gradient_y = enable_fixed_flow_rate .and. flow_rate_y_fixed
+
+        call MPI_ISend(b%exchange_pr_gradient_x, 1, MPI_LOGICAL, &
+                       b%remote_rank, 1 + 10*b%direction + 1000 * b%remote_rank, b%comm, &
+                       request, err)
+        requests = [requests, request]
+
+        call MPI_ISend(b%exchange_pr_gradient_y, 1, MPI_LOGICAL, &
+                       b%remote_rank, 2 + 10*b%direction + 1000 * b%remote_rank, b%comm, &
+                       request, err)
+        requests = [requests, request]
 
         !get the child image extent
         cxmin = domain_grids(domain)%xmins(im(1))
@@ -414,6 +441,7 @@ contains
     subroutine child_buffer(dir, domain)
       integer, intent(in) :: dir, domain
       integer :: i, width
+      integer :: request
 
       associate(b => domain_bc_recv_buffers(dir))
 
@@ -433,6 +461,16 @@ contains
         b%time_step_ratio = domain_time_step_ratio
 
         width = b%spatial_ratio * 2
+
+        call MPI_IRecv(b%exchange_pr_gradient_x, 1, MPI_LOGICAL, &
+                       b%remote_rank, 1 + 10*b%direction + 1000 * my_world_rank, b%comm, &
+                       request, err)
+        requests = [requests, request]
+
+        call MPI_IRecv(b%exchange_pr_gradient_y, 1, MPI_LOGICAL, &
+                       b%remote_rank, 2 + 10*b%direction + 1000 * my_world_rank, b%comm, &
+                       request, err)
+        requests = [requests, request]
 
         select case  (dir)
           case (We)

@@ -13,6 +13,7 @@ module domains_bc_par
   public par_init_domain_boundary_conditions, &
          par_exchange_domain_bounds, &
          par_update_domain_bounds, &
+         par_update_pr_gradient, &
          par_update_domain_bounds_UVW, &
          par_update_domain_bounds_temperature, &
          par_update_domain_bounds_moisture, &
@@ -53,6 +54,16 @@ module domains_bc_par
     real(knd), allocatable, dimension(:,:,:) :: dU_dt, dV_dt, dW_dt, dPr_dt, &
                                                 dTemperature_dt, dMoisture_dt
     real(knd), allocatable, dimension(:,:,:,:) :: dScalar_dt
+
+    !whether child gets the pressure gradient from parent
+    !makes sence when parent changes pressure-gradient dynamically
+    logical :: exchange_pr_gradient_x = .false.
+    logical :: exchange_pr_gradient_y = .false.
+
+    real(knd) :: pr_gradient_x = 0
+    real(knd) :: pr_gradient_y = 0
+    real(knd) :: pr_gradient_x_dt = 0
+    real(knd) :: pr_gradient_y_dt = 0
 
     !time at which the data is valid
     real(tim) :: time = -tiny(1.0_tim)
@@ -142,7 +153,7 @@ contains
     real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(in) :: Scalar
     real(TIM), intent(in) :: time, dt
 
-    integer, allocatable :: requests(:), statuses(:,:)
+    integer, allocatable :: requests(:)
     integer :: i
     integer :: ie
 
@@ -190,6 +201,20 @@ contains
                 b%Moisture = Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
               end if
 
+              if (b%exchange_pr_gradient_x) then
+                b%pr_gradient_x_dt = (pr_gradient_x - b%pr_gradient_x) / dt
+                b%pr_gradient_x = pr_gradient_x
+                call send_scalar(b, 11, b%pr_gradient_x)
+                call send_scalar(b, 12, b%pr_gradient_x_dt)
+              end if
+
+              if (b%exchange_pr_gradient_x) then
+                b%pr_gradient_y_dt = (pr_gradient_y - b%pr_gradient_y) / dt
+                b%pr_gradient_y = pr_gradient_y
+                call send_scalar(b, 13, b%pr_gradient_y)
+                call send_scalar(b, 14, b%pr_gradient_y_dt)
+              end if
+
               b%time = time
 
               call send_arrays(b)
@@ -227,6 +252,17 @@ contains
               !for 0 and 1, initialization and the first time-step
               if (b%time_step<=1) then
                 call recv_arrays(b)
+
+                if (b%exchange_pr_gradient_x) then
+                  call recv_scalar(b, 11, b%pr_gradient_x)
+                  call recv_scalar(b, 12, b%pr_gradient_x_dt)
+                end if
+
+                if (b%exchange_pr_gradient_x) then
+                  call recv_scalar(b, 13, b%pr_gradient_y)
+                  call recv_scalar(b, 14, b%pr_gradient_y_dt)
+                end if
+
                 b%time = time
                 b%interpolate = .true.
               end if
@@ -359,6 +395,38 @@ contains
 
       call MPI_IRecv(a, size(a), MPI_KND, rank, tag, comm, request, ie)
       if (ie/=0) call error_stop("error receiving MPI message.")
+
+      requests = [requests, request]
+    end subroutine
+
+    subroutine send_scalar(b, tag_base, a)
+      type(dom_bc_buffer_copy), intent(inout) :: b
+      integer, intent(in) :: tag_base
+      real(knd), intent(in) :: a
+      integer :: request, ie
+      
+      call MPI_ISend(a, 1, MPI_KND, &
+                     b%remote_rank, &
+                     b%remote_domain*100 + b%direction*10 + tag_base, &
+                     b%comm, &
+                     request, ie)
+      if (ie/=0) call error_stop("error sending MPI message.")
+
+      requests = [requests, request]
+    end subroutine
+
+    subroutine recv_scalar(b, tag_base, a)
+      class(dom_bc_buffer_refined), intent(inout) :: b
+      integer, intent(in) :: tag_base
+      real(knd), intent(inout) :: a
+      integer :: request, ie
+      
+      call MPI_IRecv(a, 1, MPI_KND, &
+                      b%remote_rank, &
+                      domain_index*100 + b%direction*10 + tag_base, &
+                      b%comm, &
+                      request, ie)
+      if (ie/=0) call error_stop("error sending MPI message.")
 
       requests = [requests, request]
     end subroutine
@@ -890,6 +958,39 @@ contains
 
   end subroutine
 
+  subroutine par_update_pr_gradient(eff_time)
+    !effective time, because it can also reflect individual RK stages
+    real(knd), intent(in) :: eff_time
+    real(knd) :: t_diff
+    integer :: bi
+
+    if (enable_multiple_domains) then
+
+     if (allocated(domain_bc_recv_buffers)) then
+        do bi = lbound(domain_bc_recv_buffers,1), &
+                ubound(domain_bc_recv_buffers,1)
+          associate(b => domain_bc_recv_buffers(bi))
+            if (b%enabled) then
+
+              t_diff = eff_time - b%time
+
+              if (b%exchange_pr_gradient_x) then
+                pr_gradient_x = b%pr_gradient_x + b%pr_gradient_x_dt * t_diff
+              end if
+              if (b%exchange_pr_gradient_y) then
+                pr_gradient_y = b%pr_gradient_y + b%pr_gradient_y_dt * t_diff
+              end if
+
+              if (b%exchange_pr_gradient_x.or.b%exchange_pr_gradient_y) exit
+            end if
+          end associate
+        end do
+      end if
+
+    end if
+
+  end subroutine
+
   subroutine par_update_domain_bounds(U, V, W, Temperature, Moisture, Scalar, eff_time)
     !effective time, because it can also reflect individual RK stages
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U, V ,W 
@@ -898,6 +999,8 @@ contains
     real(knd), intent(in) :: eff_time
     real(knd) :: t_diff
     integer :: bi
+
+    call par_update_pr_gradient(eff_time)
 
     call par_update_domain_bounds_UVW(U, V, W, eff_time)
 

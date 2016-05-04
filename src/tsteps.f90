@@ -106,6 +106,10 @@ contains
 
       time_stepping%effective_time = time_stepping%time + 2 * sum(RK_alpha(1:RK_stage-1)) * time_stepping%dt      
 
+#ifdef PAR
+      call par_update_pr_gradient(time_stepping%effective_time)
+#endif
+
       call SubgridStresses(U, V, W, Pr, Temperature)
 
 
