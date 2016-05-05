@@ -11,7 +11,7 @@ implicit none
   public volumePr, &
          GridCoords, GridCoords_interp, GridCoords_interp_U, GridCoords_interp_V, GridCoords_interp_W, &
          InDomain,&
-         BoundUVW, Bound_Phi, Bound_Pr, Bound_Q,&
+         BoundUVW, BoundU, Bound_Phi, Bound_Pr, Bound_Q,&
          ShearInlet, ParabolicInlet, ConstantInlet
 
   interface GridCoords
