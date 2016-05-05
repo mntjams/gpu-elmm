@@ -21,7 +21,65 @@ module domains_bc_par
          domain_spatial_ratio, &
          domain_time_step_ratio
 
-  type dom_bc_buffer_copy
+  type dom_buffer_base
+    !MPI communicator for remote communication
+    integer :: comm = MPI_COMM_NULL
+    integer :: remote_rank = MPI_PROC_NULL
+    integer :: remote_image(3) = 0
+
+    !time at which the data is valid
+    real(tim) :: time = -tiny(1.0_tim)
+
+    !The buffers are transferred every `time_step_ratio` time steps
+    integer :: time_step_ratio = 1
+    !count in a cycle depending on time_step_ratio for child domains
+    integer :: time_step = 0
+  end type
+
+  type, extends(dom_buffer_base) :: dom_buffer_pr_gradient
+    !whether child gets the pressure gradient from parent
+    !makes sence when parent changes pressure-gradient dynamically
+    logical :: exchange_pr_gradient_x = .false.
+    logical :: exchange_pr_gradient_y = .false.
+
+    real(knd) :: pr_gradient_x = 0
+    real(knd) :: pr_gradient_y = 0
+    real(knd) :: pr_gradient_x_dt = 0
+    real(knd) :: pr_gradient_y_dt = 0
+  end type
+
+  !exchanges necessary information with the child domain
+  !one instance per child image
+  type, extends(dom_buffer_pr_gradient) :: dom_parent_buffer
+
+    !child image extents
+    real(knd) :: xmin, xmax
+    real(knd) :: ymin, ymax
+    real(knd) :: zmin, zmax
+  end type
+
+
+  !exchanges necessary information with the parent domain
+  !one instance only, there is only one parent image
+  type, extends(dom_buffer_pr_gradient) :: dom_child_buffer
+
+  end type
+
+  type dom_parent_buffers_container
+    integer :: remote_domain
+    type(dom_parent_buffer), allocatable :: bs(:,:,:)
+  end type
+
+  type(dom_child_buffer), allocatable :: domain_child_buffer
+
+  !index is the number of child domain
+  type(dom_parent_buffers_container), allocatable :: domain_parent_buffers(:)
+
+
+
+
+
+  type, extends(dom_buffer_base) :: dom_bc_buffer_copy
     logical :: enabled = .false.
 
     logical :: rescale_compatibility = .false.
@@ -55,28 +113,8 @@ module domains_bc_par
                                                 dTemperature_dt, dMoisture_dt
     real(knd), allocatable, dimension(:,:,:,:) :: dScalar_dt
 
-    !whether child gets the pressure gradient from parent
-    !makes sence when parent changes pressure-gradient dynamically
-    logical :: exchange_pr_gradient_x = .false.
-    logical :: exchange_pr_gradient_y = .false.
-
-    real(knd) :: pr_gradient_x = 0
-    real(knd) :: pr_gradient_y = 0
-    real(knd) :: pr_gradient_x_dt = 0
-    real(knd) :: pr_gradient_y_dt = 0
-
-    !time at which the data is valid
-    real(tim) :: time = -tiny(1.0_tim)
-
-    !MPI communicator for the remote communication
-    integer :: comm = MPI_COMM_NULL
-    integer :: remote_rank = MPI_PROC_NULL
-    !The buffers are transferred every `time_step_ratio` time steps
-    integer :: time_step_ratio = 1
     !whether the interpolation from the receive buffers is necessary in this tim-step
     logical :: interpolate = .true.
-
-    integer :: time_step = 0
   end type
 
   type, extends(dom_bc_buffer_copy) :: dom_bc_buffer_refined
@@ -154,7 +192,7 @@ contains
     real(TIM), intent(in) :: time, dt
 
     integer, allocatable :: requests(:)
-    integer :: i
+    integer :: di, i, j, k
     integer :: ie
 
     allocate(requests(0))
@@ -201,20 +239,6 @@ contains
                 b%Moisture = Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
               end if
 
-              if (b%exchange_pr_gradient_x) then
-                b%pr_gradient_x_dt = (pr_gradient_x - b%pr_gradient_x) / dt
-                b%pr_gradient_x = pr_gradient_x
-                call send_scalar(b, 11, b%pr_gradient_x)
-                call send_scalar(b, 12, b%pr_gradient_x_dt)
-              end if
-
-              if (b%exchange_pr_gradient_x) then
-                b%pr_gradient_y_dt = (pr_gradient_y - b%pr_gradient_y) / dt
-                b%pr_gradient_y = pr_gradient_y
-                call send_scalar(b, 13, b%pr_gradient_y)
-                call send_scalar(b, 14, b%pr_gradient_y_dt)
-              end if
-
               b%time = time
 
               call send_arrays(b)
@@ -223,6 +247,38 @@ contains
           end associate
         end do
       end if
+
+      
+      if (allocated(domain_parent_buffers)) then
+        do di = 1, size(domain_parent_buffers)
+          if (allocated(domain_parent_buffers(di)%bs)) then
+            do k = 1, size(domain_parent_buffers(di)%bs,3)
+              do j = 1, size(domain_parent_buffers(di)%bs,2)
+                do i = 1, size(domain_parent_buffers(di)%bs,1)
+
+                  associate(b => domain_parent_buffers(di)%bs(i,j,k))
+                    if (b%exchange_pr_gradient_x) then
+                      b%pr_gradient_x_dt = (pr_gradient_x - b%pr_gradient_x) / dt
+                      b%pr_gradient_x = pr_gradient_x
+                      call send_scalar(b, 11, b%pr_gradient_x)
+                      call send_scalar(b, 12, b%pr_gradient_x_dt)
+                    end if
+
+                    if (b%exchange_pr_gradient_y) then
+                      b%pr_gradient_y_dt = (pr_gradient_y - b%pr_gradient_y) / dt
+                      b%pr_gradient_y = pr_gradient_y
+                      call send_scalar(b, 13, b%pr_gradient_y)
+                      call send_scalar(b, 14, b%pr_gradient_y_dt)
+                    end if
+                  end associate
+
+                end do
+              end do
+            end do
+          end if
+        end do
+      end if
+
 
 
       if (allocated(domain_bc_recv_buffers_copy)) then
@@ -239,6 +295,29 @@ contains
         end do
       end if
 
+      if (parent_domain>0) then
+        associate (b => domain_child_buffer)
+          if (b%time_step<=1) then
+            if (b%exchange_pr_gradient_x) then
+              call recv_scalar(b, 11, b%pr_gradient_x)
+              call recv_scalar(b, 12, b%pr_gradient_x_dt)
+            end if
+
+            if (b%exchange_pr_gradient_y) then
+              call recv_scalar(b, 13, b%pr_gradient_y)
+              call recv_scalar(b, 14, b%pr_gradient_y_dt)
+            end if
+
+            b%time = time
+          end if
+          if (b%time_step==b%time_step_ratio) then
+            b%time_step=1
+          else
+            b%time_step = b%time_step + 1
+          end if
+        end associate
+      end if
+
 
       if (allocated(domain_bc_recv_buffers)) then
         do i = lbound(domain_bc_recv_buffers,1), &
@@ -252,16 +331,6 @@ contains
               !for 0 and 1, initialization and the first time-step
               if (b%time_step<=1) then
                 call recv_arrays(b)
-
-                if (b%exchange_pr_gradient_x) then
-                  call recv_scalar(b, 11, b%pr_gradient_x)
-                  call recv_scalar(b, 12, b%pr_gradient_x_dt)
-                end if
-
-                if (b%exchange_pr_gradient_x) then
-                  call recv_scalar(b, 13, b%pr_gradient_y)
-                  call recv_scalar(b, 14, b%pr_gradient_y_dt)
-                end if
 
                 b%time = time
                 b%interpolate = .true.
@@ -400,14 +469,14 @@ contains
     end subroutine
 
     subroutine send_scalar(b, tag_base, a)
-      type(dom_bc_buffer_copy), intent(inout) :: b
+      class(dom_buffer_pr_gradient), intent(inout) :: b
       integer, intent(in) :: tag_base
       real(knd), intent(in) :: a
       integer :: request, ie
       
-      call MPI_ISend(a, 1, MPI_KND, &
+      call MPI_ISsend(a, 1, MPI_KND, &
                      b%remote_rank, &
-                     b%remote_domain*100 + b%direction*10 + tag_base, &
+                     tag_base, &
                      b%comm, &
                      request, ie)
       if (ie/=0) call error_stop("error sending MPI message.")
@@ -416,14 +485,14 @@ contains
     end subroutine
 
     subroutine recv_scalar(b, tag_base, a)
-      class(dom_bc_buffer_refined), intent(inout) :: b
+      class(dom_buffer_pr_gradient), intent(inout) :: b
       integer, intent(in) :: tag_base
       real(knd), intent(inout) :: a
       integer :: request, ie
       
       call MPI_IRecv(a, 1, MPI_KND, &
                       b%remote_rank, &
-                      domain_index*100 + b%direction*10 + tag_base, &
+                      tag_base, &
                       b%comm, &
                       request, ie)
       if (ie/=0) call error_stop("error sending MPI message.")
@@ -962,31 +1031,18 @@ contains
     !effective time, because it can also reflect individual RK stages
     real(knd), intent(in) :: eff_time
     real(knd) :: t_diff
-    integer :: bi
 
-    if (enable_multiple_domains) then
+    if (parent_domain>0) then
+      associate(b => domain_child_buffer)
+        t_diff = eff_time - b%time
 
-     if (allocated(domain_bc_recv_buffers)) then
-        do bi = lbound(domain_bc_recv_buffers,1), &
-                ubound(domain_bc_recv_buffers,1)
-          associate(b => domain_bc_recv_buffers(bi))
-            if (b%enabled) then
-
-              t_diff = eff_time - b%time
-
-              if (b%exchange_pr_gradient_x) then
-                pr_gradient_x = b%pr_gradient_x + b%pr_gradient_x_dt * t_diff
-              end if
-              if (b%exchange_pr_gradient_y) then
-                pr_gradient_y = b%pr_gradient_y + b%pr_gradient_y_dt * t_diff
-              end if
-
-              if (b%exchange_pr_gradient_x.or.b%exchange_pr_gradient_y) exit
-            end if
-          end associate
-        end do
-      end if
-
+        if (b%exchange_pr_gradient_x) then
+          pr_gradient_x = b%pr_gradient_x + b%pr_gradient_x_dt * t_diff
+        end if
+        if (b%exchange_pr_gradient_y) then
+          pr_gradient_y = b%pr_gradient_y + b%pr_gradient_y_dt * t_diff
+        end if
+      end associate
     end if
 
   end subroutine

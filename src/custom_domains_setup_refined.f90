@@ -1,18 +1,52 @@
-    integer :: xi, dii, dij, dik
+    integer :: xi, dii, djj, dkk
     integer :: prev
     integer :: child_domain, i_child_domain, side
     integer :: n_send_buffers
     integer :: err
     integer, allocatable :: requests(:)
+    integer :: request
 
     if (enable_multiple_domains) then
 
       allocate(requests(0))
 
+      allocate(domain_parent_buffers(size(child_domains)))
+
       !send buffers should be counted from 1, there may be more of them from several nested domains
       n_send_buffers = 0
       do i_child_domain = 1, size(child_domains)
         child_domain = child_domains(i_child_domain)
+
+        domain_parent_buffers(i_child_domain)%remote_domain = child_domain
+
+        allocate(domain_parent_buffers(i_child_domain)%bs(domain_nxims(child_domain), &
+                                                          domain_nyims(child_domain), &
+                                                          domain_nzims(child_domain)))
+
+        do dkk = 1, domain_nzims(child_domain)
+          do djj = 1, domain_nyims(child_domain)
+            do dii = 1, domain_nxims(child_domain)
+              associate(b => domain_parent_buffers(i_child_domain)%bs(dii,djj,dkk))
+                b%comm = world_comm
+                b%remote_image = [dii,djj,dkk]
+                b%remote_rank = domain_ranks_grid(child_domain)%arr(dii,djj,dkk)
+
+                b%exchange_pr_gradient_x = enable_fixed_flow_rate .and. flow_rate_x_fixed
+                b%exchange_pr_gradient_y = enable_fixed_flow_rate .and. flow_rate_y_fixed
+
+                call MPI_ISend(b%exchange_pr_gradient_x, 1, MPI_LOGICAL, &
+                               b%remote_rank, 1, b%comm, &
+                               request, err)
+                requests = [requests, request]
+
+                call MPI_ISend(b%exchange_pr_gradient_y, 1, MPI_LOGICAL, &
+                               b%remote_rank, 2, b%comm, &
+                               request, err)
+                requests = [requests, request]
+              end associate
+            end do
+          end do
+        end do
 
         do side = We, Ea
           if (domain_is_boundary_nested(side,child_domain)) &
@@ -36,10 +70,10 @@
         child_domain = child_domains(i_child_domain)
 
         if (domain_is_boundary_nested(We,child_domain)) then   
-          do dik = 1, domain_nzims(child_domain)
-            do dij = 1, domain_nyims(child_domain)
-              call parent_buffer(num=dij+(dik-1)*domain_nyims(child_domain) + prev, &
-                                 dir=We, domain=child_domain, im=[1,dij,dik])
+          do dkk = 1, domain_nzims(child_domain)
+            do djj = 1, domain_nyims(child_domain)
+              call parent_buffer(num=djj+(dkk-1)*domain_nyims(child_domain) + prev, &
+                                 dir=We, domain=child_domain, im=[1,djj,dkk])
            end do
           end do
 
@@ -47,10 +81,10 @@
         end if
 
         if (domain_is_boundary_nested(Ea,child_domain)) then   
-          do dik = 1, domain_nzims(child_domain)
-            do dij = 1, domain_nyims(child_domain)
-              call parent_buffer(num=dij+(dik-1)*domain_nyims(child_domain) + prev, &
-                                 dir=Ea, domain=child_domain, im=[1,dij,dik])
+          do dkk = 1, domain_nzims(child_domain)
+            do djj = 1, domain_nyims(child_domain)
+              call parent_buffer(num=djj+(dkk-1)*domain_nyims(child_domain) + prev, &
+                                 dir=Ea, domain=child_domain, im=[1,djj,dkk])
            end do
           end do
 
@@ -58,10 +92,10 @@
         end if
 
         if (domain_is_boundary_nested(So,child_domain)) then   
-          do dik = 1, domain_nzims(child_domain)
+          do dkk = 1, domain_nzims(child_domain)
             do dii = 1, domain_nxims(child_domain)
-              call parent_buffer(num=dii+(dik-1)*domain_nxims(child_domain) + prev, &
-                                 dir=So, domain=child_domain, im=[dii,1,dik])
+              call parent_buffer(num=dii+(dkk-1)*domain_nxims(child_domain) + prev, &
+                                 dir=So, domain=child_domain, im=[dii,1,dkk])
            end do
           end do
         end if
@@ -69,10 +103,10 @@
         if (domain_is_boundary_nested(No,child_domain)) then   
           prev = prev + domain_nxims(child_domain)*domain_nzims(child_domain)
 
-          do dik = 1, domain_nzims(child_domain)
+          do dkk = 1, domain_nzims(child_domain)
             do dii = 1, domain_nxims(child_domain)
-              call parent_buffer(num=dii+(dik-1)*domain_nxims(child_domain) + prev, &
-                                 dir=No, domain=child_domain, im=[dii,domain_nyims(child_domain),dik])
+              call parent_buffer(num=dii+(dkk-1)*domain_nxims(child_domain) + prev, &
+                                 dir=No, domain=child_domain, im=[dii,domain_nyims(child_domain),dkk])
            end do
           end do
 
@@ -80,10 +114,10 @@
         end if
 
        if (domain_is_boundary_nested(Bo,child_domain)) then   
-           do dij = 1, domain_nyims(child_domain)
+           do djj = 1, domain_nyims(child_domain)
             do dii = 1, domain_nxims(child_domain)
-              call parent_buffer(num=dii+(dij-1)*domain_nxims(child_domain) + prev, &
-                                 dir=Bo, domain=child_domain, im=[dii,dij,1])
+              call parent_buffer(num=dii+(djj-1)*domain_nxims(child_domain) + prev, &
+                                 dir=Bo, domain=child_domain, im=[dii,djj,1])
 
            end do
           end do
@@ -92,10 +126,10 @@
         end if
 
         if (domain_is_boundary_nested(To,child_domain)) then   
-          do dij = 1, domain_nyims(child_domain)
+          do djj = 1, domain_nyims(child_domain)
             do dii = 1, domain_nxims(child_domain)
-              call parent_buffer(num=dii+(dij-1)*domain_nxims(child_domain) + prev, &
-                                 dir=To, domain=child_domain, im=[dii,dij,domain_nzims(child_domain)])
+              call parent_buffer(num=dii+(djj-1)*domain_nxims(child_domain) + prev, &
+                                 dir=To, domain=child_domain, im=[dii,djj,domain_nzims(child_domain)])
 
            end do
           end do
@@ -108,6 +142,28 @@
 
       if (parent_domain>0) then
         allocate(domain_bc_recv_buffers(We:To))
+
+        allocate(domain_child_buffer)
+
+        associate(b => domain_child_buffer)
+          b%comm = world_comm
+          b%remote_image = parent_image
+          b%remote_rank = domain_ranks_grid(parent_domain)%arr(parent_image(1), &
+                                                               parent_image(2), &
+                                                               parent_image(3))
+          b%time_step_ratio = domain_time_step_ratio
+
+
+          call MPI_IRecv(b%exchange_pr_gradient_x, 1, MPI_LOGICAL, &
+                         b%remote_rank, 1, b%comm, &
+                         request, err)
+          requests = [requests, request]
+
+          call MPI_IRecv(b%exchange_pr_gradient_y, 1, MPI_LOGICAL, &
+                         b%remote_rank, 2, b%comm, &
+                         request, err)
+          requests = [requests, request]
+        end associate
 
         do side = We, To
           if (is_domain_boundary_nested(side).and.is_boundary_domain_boundary(side)) then
@@ -125,11 +181,11 @@
       call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, err)
 
       if (parent_domain>0) then
-        if (any(domain_bc_recv_buffers%enabled.and.domain_bc_recv_buffers%exchange_pr_gradient_x)) &
+        if (domain_child_buffer%exchange_pr_gradient_x) &
           enable_pr_gradient_x_uniform = .true.
 
-        if (any(domain_bc_recv_buffers%enabled.and.domain_bc_recv_buffers%exchange_pr_gradient_y)) &
-          enable_pr_gradient_y_uniform = .false.
+        if (domain_child_buffer%exchange_pr_gradient_y) &
+          enable_pr_gradient_y_uniform = .true.
       end if
 
     end if !enable_multiple_domains
@@ -161,7 +217,6 @@ contains
       real(knd) :: cxmax, cxmin, cymax, cymin, czmax, czmin
       integer :: cxi1, cxi2, cyj1, cyj2, czk1, czk2
       integer :: pos
-      integer :: request
 
       associate (b=>domain_bc_send_buffers(num))
 
@@ -170,19 +225,6 @@ contains
         b%remote_domain = domain
         b%direction = dir
         b%enabled = .true.
-
-        b%exchange_pr_gradient_x = enable_fixed_flow_rate .and. flow_rate_x_fixed
-        b%exchange_pr_gradient_y = enable_fixed_flow_rate .and. flow_rate_y_fixed
-
-        call MPI_ISend(b%exchange_pr_gradient_x, 1, MPI_LOGICAL, &
-                       b%remote_rank, 1 + 10*b%direction + 1000 * b%remote_rank, b%comm, &
-                       request, err)
-        requests = [requests, request]
-
-        call MPI_ISend(b%exchange_pr_gradient_y, 1, MPI_LOGICAL, &
-                       b%remote_rank, 2 + 10*b%direction + 1000 * b%remote_rank, b%comm, &
-                       request, err)
-        requests = [requests, request]
 
         !get the child image extent
         cxmin = domain_grids(domain)%xmins(im(1))
@@ -441,7 +483,6 @@ contains
     subroutine child_buffer(dir, domain)
       integer, intent(in) :: dir, domain
       integer :: i, width
-      integer :: request
 
       associate(b => domain_bc_recv_buffers(dir))
 
@@ -461,16 +502,6 @@ contains
         b%time_step_ratio = domain_time_step_ratio
 
         width = b%spatial_ratio * 2
-
-        call MPI_IRecv(b%exchange_pr_gradient_x, 1, MPI_LOGICAL, &
-                       b%remote_rank, 1 + 10*b%direction + 1000 * my_world_rank, b%comm, &
-                       request, err)
-        requests = [requests, request]
-
-        call MPI_IRecv(b%exchange_pr_gradient_y, 1, MPI_LOGICAL, &
-                       b%remote_rank, 2 + 10*b%direction + 1000 * my_world_rank, b%comm, &
-                       request, err)
-        requests = [requests, request]
 
         select case  (dir)
           case (We)
