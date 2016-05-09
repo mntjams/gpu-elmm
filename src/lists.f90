@@ -1,9 +1,9 @@
 !example of parametric list usage
-#define STRING32 32
+#define LIST_CHAR_LEN 64
 module str_lists
   implicit none
-  integer, parameter :: char_len = STRING32
-#define TYPEPARAM character(STRING32)
+  integer, parameter :: char_len = LIST_CHAR_LEN
+#define TYPEPARAM character(LIST_CHAR_LEN)
 #include "list-inc-def.f90"
 contains
 #include "list-inc-proc.f90"
