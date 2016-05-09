@@ -1007,14 +1007,30 @@ contains
           allocate(b%r_dMoisture_dt(b%r_Pri1:b%r_Pri2,b%r_Prj1:b%r_Prj2,b%r_Prk1:b%r_Prk2))
         end if
 
-        if (dir==We) then
+        if (has_domain_boundary_turbulence_generator(dir)) then
           b%turb_generator_enabled = .true.
           b%relaxation = .false.
-          allocate(b%U_turb(Uj1:Uj2,Uk1:Uk2))
-          allocate(b%V_turb(Vj1:Vj2,Vk1:Vk2))
-          allocate(b%W_turb(Wj1:Wj2,Wk1:Wk2))
+
           allocate(b%turb_generator)
-          allocate(b%turb_generator%sgs_tke(1:Prny, 1:Prnz))
+
+          select case (dir)
+            case (We:Ea)
+              allocate(b%U_turb(Uj1:Uj2,Uk1:Uk2))
+              allocate(b%V_turb(Vj1:Vj2,Vk1:Vk2))
+              allocate(b%W_turb(Wj1:Wj2,Wk1:Wk2))
+              allocate(b%turb_generator%sgs_tke(1:Prny, 1:Prnz))
+            case (So:No)
+              allocate(b%U_turb(Ui1:Ui2,Uk1:Uk2))
+              allocate(b%V_turb(Vi1:Vi2,Vk1:Vk2))
+              allocate(b%W_turb(Wi1:Wi2,Wk1:Wk2))
+              allocate(b%turb_generator%sgs_tke(1:Prnx, 1:Prnz))
+            case (Bo:To)
+              allocate(b%U_turb(Ui1:Ui2,Uj1:Uj2))
+              allocate(b%V_turb(Vi1:Vi2,Vj1:Vj2))
+              allocate(b%W_turb(Wi1:Wi2,Wj1:Wj2))
+              allocate(b%turb_generator%sgs_tke(1:Prnx, 1:Prny))
+          end select
+
           b%turb_generator%sgs_tke = 0.01
           b%turb_generator%L_y = dymin * b%spatial_ratio / 2
           b%turb_generator%L_z = dzmin * b%spatial_ratio / 2

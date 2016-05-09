@@ -40,10 +40,12 @@ module custom_par
 
   !whether given domain boundary is receiving and using boundary conditions from parent
   logical :: is_domain_boundary_nested(6) = .true.
-  !whether given image boundary is receiving and using boundary conditions from parent
-  logical :: is_image_boundary_nested(6) = .false.
 
   logical :: is_boundary_domain_boundary(6) = .true.
+
+  !whether given domain boundary is generating additional synthetic turbulence
+  logical :: has_domain_boundary_turbulence_generator(6) = .false.
+
   
   type domain_proc_grid
     integer, allocatable :: arr(:,:,:)
@@ -387,10 +389,7 @@ contains
     
     if (.not. allocated(child_domains)) allocate(child_domains(0))
 
-    if (parent_domain==0) then
-      is_domain_boundary_nested = .false.
-      is_image_boundary_nested = .false.
-    end if
+    if (parent_domain==0) is_domain_boundary_nested = .false.
     
     allocate(check_n(world_comm_size))
     

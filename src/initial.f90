@@ -1997,7 +1997,7 @@ fields_do:  do j = 1, size(fields)
       logical, target :: constant_time_steps = .false.
 
       type(field_names) :: names(6)
-      type(field_names_a) :: names_a(1)
+      type(field_names_a) :: names_a(2)
       type(field_names_a_int_alloc) :: names_a_int_alloc(1)
       
       logical, target :: enable_multiple_domains_l = .false.
@@ -2008,6 +2008,7 @@ fields_do:  do j = 1, size(fields)
       integer, target :: time_step_ratio_l = -99
 
       logical :: is_domain_boundary_nested_l(6) = .true.
+      logical :: has_domain_boundary_turbulence_generator_l(6) = .false.
 
       names = [field_names_init("enable_multiple_domains", enable_multiple_domains_l), &
                field_names_init("domain_index",   domain_index_l), &
@@ -2016,7 +2017,8 @@ fields_do:  do j = 1, size(fields)
                field_names_init("spatial_ratio",   spatial_ratio_l), &
                field_names_init("time_step_ratio",   time_step_ratio_l)]
 
-     names_a = [field_names_a_init("is_boundary_nested", is_domain_boundary_nested_l)]
+     names_a = [field_names_a_init("is_boundary_nested", is_domain_boundary_nested_l), &
+                field_names_a_init("has_boundary_turbulence_generator", has_domain_boundary_turbulence_generator_l)]
 
      names_a_int_alloc = [field_names_a_int_alloc_init("child_domains")]
 
@@ -2045,6 +2047,37 @@ fields_do:  do j = 1, size(fields)
                   cycle fields_do
                 end if
               end do
+
+
+              do i = 1, size(names_a)
+                if (fields(j)%name == names_a(i)%name) then
+
+                  if (size(names_a(i)%var)/=size(fields(j)%array_value)) then
+                    write(*,*) "Error, expecting", &
+                                size(names_a(i)%var), &
+                                "vector components", &
+                                "but", &
+                                size(fields(j)%array_value), &
+                                "components present."
+                    call error_stop()
+                  end if
+
+                  select type (var => names_a(i)%var)
+                    type is (integer)
+                      read(fields(j)%array_value, *) var
+                    type is (real(real32))
+                      read(fields(j)%array_value, *) var
+                    type is (real(real64))
+                      read(fields(j)%array_value, *) var
+                    type is (logical)
+                      read(fields(j)%array_value, *) var
+                    class default
+                      call error_stop("Unexpected type in time_stepping.")
+                  end select
+                  cycle fields_do
+                end if
+              end do
+
 
               do i = 1, size(names_a_int_alloc)
                 if (fields(j)%name == names_a_int_alloc(i)%name) then
@@ -2095,6 +2128,9 @@ fields_do:  do j = 1, size(fields)
         is_domain_boundary_nested = is_domain_boundary_nested_l
 
         where(Btype==BC_NOSLIP) is_domain_boundary_nested = .false.
+
+        has_domain_boundary_turbulence_generator = has_domain_boundary_turbulence_generator_l
+        where (.not.is_domain_boundary_nested) has_domain_boundary_turbulence_generator = .false.
 
         if (spatial_ratio_l>0) domain_spatial_ratio = spatial_ratio_l
         if (time_step_ratio_l>0) domain_time_step_ratio = time_step_ratio_l
