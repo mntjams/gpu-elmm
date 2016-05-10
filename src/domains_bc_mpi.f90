@@ -52,10 +52,8 @@ module domains_bc_par
   !one instance per child image
   type, extends(dom_buffer_pr_gradient) :: dom_parent_buffer
 
-    !child image extents
-    real(knd) :: xmin, xmax
-    real(knd) :: ymin, ymax
-    real(knd) :: zmin, zmax
+    !child image extents (0..n+1)
+    integer :: i1, i2, j1, j2, k1, k2
   end type
 
 

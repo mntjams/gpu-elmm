@@ -26,7 +26,8 @@
         do dkk = 1, domain_nzims(child_domain)
           do djj = 1, domain_nyims(child_domain)
             do dii = 1, domain_nxims(child_domain)
-              call create_domain_parent_buffer(domain_parent_buffers(i_child_domain)%bs(dii,djj,dkk), dii, djj, dkk)
+              call create_domain_parent_buffer(domain_parent_buffers(i_child_domain)%bs(dii,djj,dkk), &
+                                               child_domain, [dii, djj, dkk])
             end do
           end do
         end do
@@ -178,7 +179,6 @@ contains
 
     subroutine create_boundary_parent_buffer(num, dir, domain, im)
       integer, intent(in) :: num, dir, domain, im(3)
-
       real(knd) :: cxmax, cxmin, cymax, cymin, czmax, czmin
       integer :: cxi1, cxi2, cyj1, cyj2, czk1, czk2
       integer :: pos
@@ -1012,13 +1012,67 @@ contains
 
 
 
-    subroutine create_domain_parent_buffer(b, di, dj, dk)
+    subroutine create_domain_parent_buffer(b, child_domain, im)
+      use Strings, only: itoa
       type(dom_parent_buffer), intent(out) :: b
-      integer, intent(in) :: di, dj, dk
+      integer, intent(in) :: child_domain
+      integer, intent(in) :: im(3)
+      real(knd) :: cxmax, cxmin, cymax, cymin, czmax, czmin
+      integer :: cxi1, cxi2, cyj1, cyj2, czk1, czk2
 
       b%comm = world_comm
-      b%remote_image = [di,dj,dk]
-      b%remote_rank = domain_ranks_grid(child_domain)%arr(di,dj,dk)
+      b%remote_image = im
+      b%remote_rank = domain_ranks_grid(child_domain)%arr(im(1),im(2),im(3))
+
+      !get the child image extent
+      cxmin = domain_grids(child_domain)%xmins(im(1))
+      cxmax = domain_grids(child_domain)%xmaxs(im(1))
+      cymin = domain_grids(child_domain)%ymins(im(2))
+      cymax = domain_grids(child_domain)%ymaxs(im(2))
+      czmin = domain_grids(child_domain)%zmins(im(3))
+      czmax = domain_grids(child_domain)%zmaxs(im(3))
+
+      !find the child grid indexes
+      cxi1 = x_coord(cxmin)
+      cxi2 = x_coord(cxmax)
+      cyj1 = y_coord(cymin)
+      cyj2 = y_coord(cymax)
+      czk1 = z_coord(czmin)
+      czk2 = z_coord(czmax)
+
+      !check that the grids are aligned
+      if (.not.(abs(cxi1*dxmin + im_xmin - cxmin) < dxmin/100)) &
+        call error_stop("The west boundary of domains "//itoa(domain_index)// &
+                        " and "//itoa(child_domain)//" is not aligned.")
+      if (.not.(abs(cxi2*dxmin + im_xmin - cxmax) < dxmin/100)) &
+        call error_stop("The east boundary of domains "//itoa(domain_index)// &
+                        " and "//itoa(child_domain)//" is not aligned.")
+      if (.not.(abs(cyj1*dymin + im_ymin - cymin) < dymin/100)) &
+        call error_stop("The south boundary of domains "//itoa(domain_index)// &
+                        " and "//itoa(child_domain)//" is not aligned.")
+      if (.not.(abs(cyj2*dymin + im_ymin - cymax) < dymin/100)) &
+        call error_stop("The north boundary of domains "//itoa(domain_index)// &
+                        " and "//itoa(child_domain)//" is not aligned.")
+      if (.not.(abs(czk1*dzmin + im_zmin - czmin) < dzmin/100)) &
+        call error_stop("The bottom boundary of domains "//itoa(domain_index)// &
+                        " and "//itoa(child_domain)//" is not aligned.")
+      if (.not.(abs(czk2*dzmin + im_zmin - czmax) < dzmin/100)) &
+        call error_stop("The top boundary of domains "//itoa(domain_index)// &
+                        " and "//itoa(child_domain)//" is not aligned.")
+
+      !corresponds to index 0 on the child grid
+      b%i1 = cxi1
+      !we need index Prnx+1 on the child grid
+      b%i2 = cxi2 + 1
+
+      b%j1 = cyj1
+      b%j2 = cyj2 + 1
+
+      b%k1 = czk1
+      b%k2 = czk2 + 1
+
+
+
 
       b%exchange_pr_gradient_x = enable_fixed_flow_rate .and. flow_rate_x_fixed
       b%exchange_pr_gradient_y = enable_fixed_flow_rate .and. flow_rate_y_fixed
