@@ -26,24 +26,7 @@
         do dkk = 1, domain_nzims(child_domain)
           do djj = 1, domain_nyims(child_domain)
             do dii = 1, domain_nxims(child_domain)
-              associate(b => domain_parent_buffers(i_child_domain)%bs(dii,djj,dkk))
-                b%comm = world_comm
-                b%remote_image = [dii,djj,dkk]
-                b%remote_rank = domain_ranks_grid(child_domain)%arr(dii,djj,dkk)
-
-                b%exchange_pr_gradient_x = enable_fixed_flow_rate .and. flow_rate_x_fixed
-                b%exchange_pr_gradient_y = enable_fixed_flow_rate .and. flow_rate_y_fixed
-
-                call MPI_ISend(b%exchange_pr_gradient_x, 1, MPI_LOGICAL, &
-                               b%remote_rank, 1, b%comm, &
-                               request, err)
-                requests = [requests, request]
-
-                call MPI_ISend(b%exchange_pr_gradient_y, 1, MPI_LOGICAL, &
-                               b%remote_rank, 2, b%comm, &
-                               request, err)
-                requests = [requests, request]
-              end associate
+              call create_domain_parent_buffer(domain_parent_buffers(i_child_domain)%bs(dii,djj,dkk), dii, djj, dkk)
             end do
           end do
         end do
@@ -72,8 +55,8 @@
         if (domain_is_boundary_nested(We,child_domain)) then   
           do dkk = 1, domain_nzims(child_domain)
             do djj = 1, domain_nyims(child_domain)
-              call parent_buffer(num=djj+(dkk-1)*domain_nyims(child_domain) + prev, &
-                                 dir=We, domain=child_domain, im=[1,djj,dkk])
+              call create_boundary_parent_buffer(num=djj+(dkk-1)*domain_nyims(child_domain) + prev, &
+                                                 dir=We, domain=child_domain, im=[1,djj,dkk])
            end do
           end do
 
@@ -83,8 +66,8 @@
         if (domain_is_boundary_nested(Ea,child_domain)) then   
           do dkk = 1, domain_nzims(child_domain)
             do djj = 1, domain_nyims(child_domain)
-              call parent_buffer(num=djj+(dkk-1)*domain_nyims(child_domain) + prev, &
-                                 dir=Ea, domain=child_domain, im=[1,djj,dkk])
+              call create_boundary_parent_buffer(num=djj+(dkk-1)*domain_nyims(child_domain) + prev, &
+                                                 dir=Ea, domain=child_domain, im=[1,djj,dkk])
            end do
           end do
 
@@ -94,8 +77,8 @@
         if (domain_is_boundary_nested(So,child_domain)) then   
           do dkk = 1, domain_nzims(child_domain)
             do dii = 1, domain_nxims(child_domain)
-              call parent_buffer(num=dii+(dkk-1)*domain_nxims(child_domain) + prev, &
-                                 dir=So, domain=child_domain, im=[dii,1,dkk])
+              call create_boundary_parent_buffer(num=dii+(dkk-1)*domain_nxims(child_domain) + prev, &
+                                                 dir=So, domain=child_domain, im=[dii,1,dkk])
            end do
           end do
         end if
@@ -105,8 +88,8 @@
 
           do dkk = 1, domain_nzims(child_domain)
             do dii = 1, domain_nxims(child_domain)
-              call parent_buffer(num=dii+(dkk-1)*domain_nxims(child_domain) + prev, &
-                                 dir=No, domain=child_domain, im=[dii,domain_nyims(child_domain),dkk])
+              call create_boundary_parent_buffer(num=dii+(dkk-1)*domain_nxims(child_domain) + prev, &
+                                                 dir=No, domain=child_domain, im=[dii,domain_nyims(child_domain),dkk])
            end do
           end do
 
@@ -116,8 +99,8 @@
        if (domain_is_boundary_nested(Bo,child_domain)) then   
            do djj = 1, domain_nyims(child_domain)
             do dii = 1, domain_nxims(child_domain)
-              call parent_buffer(num=dii+(djj-1)*domain_nxims(child_domain) + prev, &
-                                 dir=Bo, domain=child_domain, im=[dii,djj,1])
+              call create_boundary_parent_buffer(num=dii+(djj-1)*domain_nxims(child_domain) + prev, &
+                                                 dir=Bo, domain=child_domain, im=[dii,djj,1])
 
            end do
           end do
@@ -128,8 +111,8 @@
         if (domain_is_boundary_nested(To,child_domain)) then   
           do djj = 1, domain_nyims(child_domain)
             do dii = 1, domain_nxims(child_domain)
-              call parent_buffer(num=dii+(djj-1)*domain_nxims(child_domain) + prev, &
-                                 dir=To, domain=child_domain, im=[dii,djj,domain_nzims(child_domain)])
+              call create_boundary_parent_buffer(num=dii+(djj-1)*domain_nxims(child_domain) + prev, &
+                                                 dir=To, domain=child_domain, im=[dii,djj,domain_nzims(child_domain)])
 
            end do
           end do
@@ -145,25 +128,7 @@
 
         allocate(domain_child_buffer)
 
-        associate(b => domain_child_buffer)
-          b%comm = world_comm
-          b%remote_image = parent_image
-          b%remote_rank = domain_ranks_grid(parent_domain)%arr(parent_image(1), &
-                                                               parent_image(2), &
-                                                               parent_image(3))
-          b%time_step_ratio = domain_time_step_ratio
-
-
-          call MPI_IRecv(b%exchange_pr_gradient_x, 1, MPI_LOGICAL, &
-                         b%remote_rank, 1, b%comm, &
-                         request, err)
-          requests = [requests, request]
-
-          call MPI_IRecv(b%exchange_pr_gradient_y, 1, MPI_LOGICAL, &
-                         b%remote_rank, 2, b%comm, &
-                         request, err)
-          requests = [requests, request]
-        end associate
+        call create_domain_child_buffer(domain_child_buffer)
 
         do side = We, To
           if (is_domain_boundary_nested(side).and.is_boundary_domain_boundary(side)) then
@@ -172,7 +137,7 @@
             MoistBtype(side) = BC_DOMAIN_COPY
             ScalBtype(side) = BC_DOMAIN_COPY
 
-            call child_buffer(dir=side, domain=parent_domain)
+            call create_boundary_child_buffer(dir=side, domain=parent_domain)
           endif
        end do
 
@@ -211,7 +176,7 @@ contains
       res = min( max(nint( (z - im_zmin)/dzmin ),0) , Wnz+1)
     end function
 
-    subroutine parent_buffer(num, dir, domain, im)
+    subroutine create_boundary_parent_buffer(num, dir, domain, im)
       integer, intent(in) :: num, dir, domain, im(3)
 
       real(knd) :: cxmax, cxmin, cymax, cymin, czmax, czmin
@@ -477,10 +442,10 @@ contains
 
       end associate
 
-    end subroutine parent_buffer
+    end subroutine create_boundary_parent_buffer
 
 
-    subroutine child_buffer(dir, domain)
+    subroutine create_boundary_child_buffer(dir, domain)
       integer, intent(in) :: dir, domain
       integer :: i, width
 
@@ -1043,4 +1008,52 @@ contains
         end if
       end associate
 
-    end subroutine child_buffer
+    end subroutine create_boundary_child_buffer
+
+
+
+    subroutine create_domain_parent_buffer(b, di, dj, dk)
+      type(dom_parent_buffer), intent(out) :: b
+      integer, intent(in) :: di, dj, dk
+
+      b%comm = world_comm
+      b%remote_image = [di,dj,dk]
+      b%remote_rank = domain_ranks_grid(child_domain)%arr(di,dj,dk)
+
+      b%exchange_pr_gradient_x = enable_fixed_flow_rate .and. flow_rate_x_fixed
+      b%exchange_pr_gradient_y = enable_fixed_flow_rate .and. flow_rate_y_fixed
+
+      call MPI_ISend(b%exchange_pr_gradient_x, 1, MPI_LOGICAL, &
+                     b%remote_rank, 1, b%comm, &
+                     request, err)
+      requests = [requests, request]
+
+      call MPI_ISend(b%exchange_pr_gradient_y, 1, MPI_LOGICAL, &
+                     b%remote_rank, 2, b%comm, &
+                     request, err)
+      requests = [requests, request]
+    end subroutine
+
+
+
+    subroutine create_domain_child_buffer(b)
+      type(dom_child_buffer), intent(out) :: b
+
+      b%comm = world_comm
+      b%remote_image = parent_image
+      b%remote_rank = domain_ranks_grid(parent_domain)%arr(parent_image(1), &
+                                                           parent_image(2), &
+                                                           parent_image(3))
+      b%time_step_ratio = domain_time_step_ratio
+
+
+      call MPI_IRecv(b%exchange_pr_gradient_x, 1, MPI_LOGICAL, &
+                     b%remote_rank, 1, b%comm, &
+                     request, err)
+      requests = [requests, request]
+
+      call MPI_IRecv(b%exchange_pr_gradient_y, 1, MPI_LOGICAL, &
+                     b%remote_rank, 2, b%comm, &
+                     request, err)
+      requests = [requests, request]
+    end subroutine
