@@ -1092,14 +1092,42 @@ contains
 
     subroutine create_domain_child_buffer(b)
       type(dom_child_buffer), intent(out) :: b
+      integer :: i, j, k
 
       b%comm = world_comm
       b%remote_image = parent_image
       b%remote_rank = domain_ranks_grid(parent_domain)%arr(parent_image(1), &
                                                            parent_image(2), &
                                                            parent_image(3))
+      b%spatial_ratio = domain_spatial_ratio
       b%time_step_ratio = domain_time_step_ratio
 
+      b%r_i1 = 0
+      b%r_i2 = Prnx/b%spatial_ratio + 1
+      b%r_j1 = 0
+      b%r_j2 = Prny/b%spatial_ratio + 1
+      b%r_k1 = 0
+      b%r_k2 = Prnz/b%spatial_ratio + 1
+
+      b%r_x0 = im_xmin
+      b%r_y0 = im_ymin
+      b%r_z0 = im_zmin
+      b%r_dx = domain_grids(parent_domain)%dx
+      b%r_dy = domain_grids(parent_domain)%dy
+      b%r_dz = domain_grids(parent_domain)%dz
+      
+      allocate(b%r_xU(b%r_i1:b%r_i2))
+      allocate(b%r_yV(b%r_j1:b%r_j2))
+      allocate(b%r_zW(b%r_k1:b%r_k2))
+      allocate(b%r_x(b%r_i1:b%r_i2))
+      allocate(b%r_y(b%r_j1:b%r_j2))
+      allocate(b%r_z(b%r_k1:b%r_k2))
+      b%r_xU(:) = [(b%r_x0 + i*b%r_dx , i = b%r_i1,b%r_i2)]
+      b%r_yV(:) = [(b%r_y0 + i*b%r_dy , i = b%r_j1,b%r_j2)]
+      b%r_zW(:) = [(b%r_z0 + i*b%r_dz , i = b%r_k1,b%r_k2)]
+      b%r_x(:) = [(b%r_x0 + (i-0.5_knd)*b%r_dx , i = b%r_i1,b%r_i2)]
+      b%r_y(:) = [(b%r_y0 + (i-0.5_knd)*b%r_dy , i = b%r_j1,b%r_j2)]
+      b%r_z(:) = [(b%r_z0 + (i-0.5_knd)*b%r_dz , i = b%r_k1,b%r_k2)]
 
       call MPI_IRecv(b%exchange_pr_gradient_x, 1, MPI_LOGICAL, &
                      b%remote_rank, 1, b%comm, &

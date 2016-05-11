@@ -46,6 +46,9 @@ module custom_par
   !whether given domain boundary is generating additional synthetic turbulence
   logical :: has_domain_boundary_turbulence_generator(6) = .false.
 
+  !whether receive initial conditions from the parent
+  logical :: receive_initial_conditions_from_parent = .true.
+
   
   type domain_proc_grid
     integer, allocatable :: arr(:,:,:)

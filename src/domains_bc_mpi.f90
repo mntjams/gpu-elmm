@@ -18,6 +18,8 @@ module domains_bc_par
          par_update_domain_bounds_temperature, &
          par_update_domain_bounds_moisture, &
          par_domain_bound_relaxation, &
+         par_receive_initial_conditions, &
+         par_send_initial_conditions, &
          domain_spatial_ratio, &
          domain_time_step_ratio
 
@@ -30,6 +32,8 @@ module domains_bc_par
     !time at which the data is valid
     real(tim) :: time = -tiny(1.0_tim)
 
+    !the ratio of grid resolutions between parent and child domains
+    integer :: spatial_ratio = 3
     !The buffers are transferred every `time_step_ratio` time steps
     integer :: time_step_ratio = 1
     !count in a cycle depending on time_step_ratio for child domains
@@ -60,7 +64,16 @@ module domains_bc_par
   !exchanges necessary information with the parent domain
   !one instance only, there is only one parent image
   type, extends(dom_buffer_pr_gradient) :: dom_child_buffer
+    !receive buffer grid, fields are interpolated from this grid to the finer grid
+    integer :: r_i1, r_i2
+    integer :: r_j1, r_j2
+    integer :: r_k1, r_k2
 
+    real(knd) :: r_dx, r_dy, r_dz
+    real(knd) :: r_x0, r_y0, r_z0
+
+    real(knd), allocatable :: r_xU(:), r_yV(:), r_zW(:)
+    real(knd), allocatable :: r_x(:), r_y(:), r_z(:)
   end type
 
   type dom_parent_buffers_container
@@ -116,8 +129,6 @@ module domains_bc_par
   end type
 
   type, extends(dom_bc_buffer_copy) :: dom_bc_buffer_refined
-    !the ratio of grid resolutions between parent and child domains
-    integer :: spatial_ratio = 3
     !order of accuracy of the spatial interpolation in the respective directions (2..linear, 3..parabolic)
     integer :: interp_order(3) = 2
 
@@ -182,190 +193,206 @@ contains
 
 
 
-  subroutine par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time, dt)
+  subroutine par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time, dt, receive, send)
     !if necessary send or receive the new boundary conditions
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V ,W 
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature, Moisture
     real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(in) :: Scalar
     real(TIM), intent(in) :: time, dt
+    logical, intent(in), optional :: send, receive
+
+    logical :: send_l, receive_l
 
     integer, allocatable :: requests(:)
     integer :: di, i, j, k
     integer :: ie
 
+    send_l = .true.
+    receive_l = .true.
+
+    if (present(send)) send_l = send
+    if (present(receive)) receive_l = receive
+
     allocate(requests(0))
 
     if (enable_multiple_domains) then
 
-      if (allocated(domain_bc_send_buffers)) then
-        do i = lbound(domain_bc_send_buffers,1), &
-               ubound(domain_bc_send_buffers,1)
-          associate(b => domain_bc_send_buffers(i))
+      if (send_l) then
 
-            if (b%enabled) then
-              !derivatives approximated by the backward difference
+        if (allocated(domain_bc_send_buffers)) then
+          do i = lbound(domain_bc_send_buffers,1), &
+                 ubound(domain_bc_send_buffers,1)
+            associate(b => domain_bc_send_buffers(i))
 
-              if (b%time<=-tiny(-1.0_tim)) then
-                b%dU_dt = 0
-                b%dV_dt = 0
-                b%dW_dt = 0
+              if (b%enabled) then
+                !derivatives approximated by the backward difference
+
+                if (b%time<=-tiny(-1.0_tim)) then
+                  b%dU_dt = 0
+                  b%dV_dt = 0
+                  b%dW_dt = 0
+                  if (enable_buoyancy) then
+                    b%dTemperature_dt = 0
+                  end if
+                  if (enable_moisture) then
+                    b%dMoisture_dt = 0
+                  end if
+                else
+                  b%dU_dt = (U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) - b%U) / dt
+                  b%dV_dt = (V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) - b%V) / dt
+                  b%dW_dt = (W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) - b%W) / dt
+                  if (enable_buoyancy) then
+                    b%dTemperature_dt = (Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Temperature) / dt
+                  end if
+                  if (enable_moisture) then
+                    b%dMoisture_dt = (Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Moisture) / dt
+                  end if
+                end if
+
+                b%U = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2)
+                b%V = V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2)
+                b%W = W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2)
                 if (enable_buoyancy) then
-                  b%dTemperature_dt = 0
+                  b%Temperature = Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
                 end if
                 if (enable_moisture) then
-                  b%dMoisture_dt = 0
+                  b%Moisture = Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
                 end if
-              else
-                b%dU_dt = (U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) - b%U) / dt
-                b%dV_dt = (V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) - b%V) / dt
-                b%dW_dt = (W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) - b%W) / dt
-                if (enable_buoyancy) then
-                  b%dTemperature_dt = (Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Temperature) / dt
-                end if
-                if (enable_moisture) then
-                  b%dMoisture_dt = (Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Moisture) / dt
-                end if
-              end if
-
-              b%U = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2)
-              b%V = V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2)
-              b%W = W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2)
-              if (enable_buoyancy) then
-                b%Temperature = Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
-              end if
-              if (enable_moisture) then
-                b%Moisture = Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
-              end if
-
-              b%time = time
-
-              call send_arrays(b)
-            end if
-
-          end associate
-        end do
-      end if
-
-      
-      if (allocated(domain_parent_buffers)) then
-        do di = 1, size(domain_parent_buffers)
-          if (allocated(domain_parent_buffers(di)%bs)) then
-            do k = 1, size(domain_parent_buffers(di)%bs,3)
-              do j = 1, size(domain_parent_buffers(di)%bs,2)
-                do i = 1, size(domain_parent_buffers(di)%bs,1)
-
-                  associate(b => domain_parent_buffers(di)%bs(i,j,k))
-                    if (b%exchange_pr_gradient_x) then
-                      b%pr_gradient_x_dt = (pr_gradient_x - b%pr_gradient_x) / dt
-                      b%pr_gradient_x = pr_gradient_x
-                      call send_scalar(b, 11, b%pr_gradient_x)
-                      call send_scalar(b, 12, b%pr_gradient_x_dt)
-                    end if
-
-                    if (b%exchange_pr_gradient_y) then
-                      b%pr_gradient_y_dt = (pr_gradient_y - b%pr_gradient_y) / dt
-                      b%pr_gradient_y = pr_gradient_y
-                      call send_scalar(b, 13, b%pr_gradient_y)
-                      call send_scalar(b, 14, b%pr_gradient_y_dt)
-                    end if
-                  end associate
-
-                end do
-              end do
-            end do
-          end if
-        end do
-      end if
-
-
-
-      if (allocated(domain_bc_recv_buffers_copy)) then
-        do i = lbound(domain_bc_recv_buffers_copy,1), &
-               ubound(domain_bc_recv_buffers_copy,1)
-          associate(b => domain_bc_recv_buffers_copy(i))
-  
-            if (b%enabled) then
-              call recv_arrays_copy(b)
-              b%time = time
-            end if
-
-          end associate
-        end do
-      end if
-
-      if (parent_domain>0) then
-        associate (b => domain_child_buffer)
-          if (b%time_step<=1) then
-            if (b%exchange_pr_gradient_x) then
-              call recv_scalar(b, 11, b%pr_gradient_x)
-              call recv_scalar(b, 12, b%pr_gradient_x_dt)
-            end if
-
-            if (b%exchange_pr_gradient_y) then
-              call recv_scalar(b, 13, b%pr_gradient_y)
-              call recv_scalar(b, 14, b%pr_gradient_y_dt)
-            end if
-
-            b%time = time
-          end if
-          if (b%time_step==b%time_step_ratio) then
-            b%time_step=1
-          else
-            b%time_step = b%time_step + 1
-          end if
-        end associate
-      end if
-
-
-      if (allocated(domain_bc_recv_buffers)) then
-        do i = lbound(domain_bc_recv_buffers,1), &
-               ubound(domain_bc_recv_buffers,1)
-          associate(b => domain_bc_recv_buffers(i))
-  
-            if (b%enabled) then
-
-              b%interpolate = .false.
-
-              !for 0 and 1, initialization and the first time-step
-              if (b%time_step<=1) then
-                call recv_arrays(b)
 
                 b%time = time
-                b%interpolate = .true.
-              end if
-              if (b%time_step==b%time_step_ratio) then
-                b%time_step=1
-              else
-                b%time_step = b%time_step + 1
-              end if
-            end if
 
-          end associate
-        end do
+                call send_arrays(b)
+              end if
+
+            end associate
+          end do
+        end if
+
+        
+        if (allocated(domain_parent_buffers)) then
+          do di = 1, size(domain_parent_buffers)
+            if (allocated(domain_parent_buffers(di)%bs)) then
+              do k = 1, size(domain_parent_buffers(di)%bs,3)
+                do j = 1, size(domain_parent_buffers(di)%bs,2)
+                  do i = 1, size(domain_parent_buffers(di)%bs,1)
+
+                    associate(b => domain_parent_buffers(di)%bs(i,j,k))
+                      if (b%exchange_pr_gradient_x) then
+                        b%pr_gradient_x_dt = (pr_gradient_x - b%pr_gradient_x) / dt
+                        b%pr_gradient_x = pr_gradient_x
+                        call send_scalar(b, 11, b%pr_gradient_x)
+                        call send_scalar(b, 12, b%pr_gradient_x_dt)
+                      end if
+
+                      if (b%exchange_pr_gradient_y) then
+                        b%pr_gradient_y_dt = (pr_gradient_y - b%pr_gradient_y) / dt
+                        b%pr_gradient_y = pr_gradient_y
+                        call send_scalar(b, 13, b%pr_gradient_y)
+                        call send_scalar(b, 14, b%pr_gradient_y_dt)
+                      end if
+                    end associate
+
+                  end do
+                end do
+              end do
+            end if
+          end do
+        end if
+
       end if
 
+      if (receive_l) then
 
-      call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, ie)
-      if (ie/=0) call error_stop("Error, MPI_Waitall in par_exchange_domain_bounds returns", ie)
+        if (allocated(domain_bc_recv_buffers_copy)) then
+          do i = lbound(domain_bc_recv_buffers_copy,1), &
+                 ubound(domain_bc_recv_buffers_copy,1)
+            associate(b => domain_bc_recv_buffers_copy(i))
+    
+              if (b%enabled) then
+                call recv_arrays_copy(b)
+                b%time = time
+              end if
 
+            end associate
+          end do
+        end if
 
-      if (allocated(domain_bc_recv_buffers)) then
-        do i = lbound(domain_bc_recv_buffers,1), &
-               ubound(domain_bc_recv_buffers,1)
-          associate(b => domain_bc_recv_buffers(i))
-  
-            if (b%enabled.and.b%interpolate) then
-              call par_interpolate_buffers(b)
+        if (parent_domain>0) then
+          associate (b => domain_child_buffer)
+            if (b%time_step<=1) then
+              if (b%exchange_pr_gradient_x) then
+                call recv_scalar(b, 11, b%pr_gradient_x)
+                call recv_scalar(b, 12, b%pr_gradient_x_dt)
+              end if
+
+              if (b%exchange_pr_gradient_y) then
+                call recv_scalar(b, 13, b%pr_gradient_y)
+                call recv_scalar(b, 14, b%pr_gradient_y_dt)
+              end if
+
+              b%time = time
             end if
-
-            if (b%turb_generator_enabled) then
-              if (b%interpolate) call b%compute_sgs_tke
-              call b%turb_generator%time_step(b%U_turb, b%V_turb, b%V_turb, dt)
-
+            if (b%time_step==b%time_step_ratio) then
+              b%time_step=1
+            else
+              b%time_step = b%time_step + 1
             end if
-
           end associate
-        end do
+        end if
+
+
+        if (allocated(domain_bc_recv_buffers)) then
+          do i = lbound(domain_bc_recv_buffers,1), &
+                 ubound(domain_bc_recv_buffers,1)
+            associate(b => domain_bc_recv_buffers(i))
+    
+              if (b%enabled) then
+
+                b%interpolate = .false.
+
+                !for 0 and 1, initialization and the first time-step
+                if (b%time_step<=1) then
+                  call recv_arrays(b)
+
+                  b%time = time
+                  b%interpolate = .true.
+                end if
+                if (b%time_step==b%time_step_ratio) then
+                  b%time_step=1
+                else
+                  b%time_step = b%time_step + 1
+                end if
+              end if
+
+            end associate
+          end do
+        end if
+
+
+        call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, ie)
+        if (ie/=0) call error_stop("Error, MPI_Waitall in par_exchange_domain_bounds returns", ie)
+
+        if (receive_l) then
+          if (allocated(domain_bc_recv_buffers)) then
+            do i = lbound(domain_bc_recv_buffers,1), &
+                   ubound(domain_bc_recv_buffers,1)
+              associate(b => domain_bc_recv_buffers(i))
+      
+                if (b%enabled.and.b%interpolate) then
+                  call par_interpolate_buffers(b)
+                end if
+
+                if (b%turb_generator_enabled) then
+                  if (b%interpolate) call b%compute_sgs_tke
+                  call b%turb_generator%time_step(b%U_turb, b%V_turb, b%V_turb, dt)
+
+                end if
+
+              end associate
+            end do
+          end if
+       end if
+
       end if
       
     end if
@@ -375,22 +402,22 @@ contains
     subroutine send_arrays(b)
       type(dom_bc_buffer_copy), intent(inout) :: b
       
-      call send(b%U, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 1)
-      call send(b%V, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 2)
-      call send(b%W, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 3)
+      call send_array(b%U, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 1)
+      call send_array(b%V, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 2)
+      call send_array(b%W, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 3)
 
-      call send(b%dU_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 1)
-      call send(b%dV_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 2)
-      call send(b%dW_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 3)
+      call send_array(b%dU_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 1)
+      call send_array(b%dV_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 2)
+      call send_array(b%dW_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 3)
 
       if (enable_buoyancy) then
-        call send(b%Temperature, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 4)
-        call send(b%dTemperature_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 4)
+        call send_array(b%Temperature, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 4)
+        call send_array(b%dTemperature_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 4)
       end if
 
       if (enable_moisture) then
-        call send(b%Moisture, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 5)
-        call send(b%dMoisture_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 5)
+        call send_array(b%Moisture, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 5)
+        call send_array(b%dMoisture_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 5)
       end if
 
     end subroutine
@@ -399,22 +426,22 @@ contains
       type(dom_bc_buffer_copy), intent(inout) :: b
       real(knd) :: avg
     
-      call recv(b%U, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
-      call recv(b%V, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
-      call recv(b%W, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)    
+      call recv_array(b%U, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
+      call recv_array(b%V, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
+      call recv_array(b%W, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)    
 
-      call recv(b%dU_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
-      call recv(b%dV_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
-      call recv(b%dW_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)
+      call recv_array(b%dU_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
+      call recv_array(b%dV_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
+      call recv_array(b%dW_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)
 
       if (enable_buoyancy) then
-        call recv(b%Temperature, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
-        call recv(b%dTemperature_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
+        call recv_array(b%Temperature, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
+        call recv_array(b%dTemperature_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
       end if
 
       if (enable_moisture) then
-        call recv(b%Moisture, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
-        call recv(b%dMoisture_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
+        call recv_array(b%Moisture, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
+        call recv_array(b%dMoisture_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
       end if
     end subroutine
 
@@ -422,27 +449,27 @@ contains
       class(dom_bc_buffer_refined), intent(inout) :: b
       real(knd) :: avg
     
-      call recv(b%r_U, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
-      call recv(b%r_V, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
-      call recv(b%r_W, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)    
+      call recv_array(b%r_U, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
+      call recv_array(b%r_V, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
+      call recv_array(b%r_W, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)    
 
-      call recv(b%r_dU_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
-      call recv(b%r_dV_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
-      call recv(b%r_dW_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)
+      call recv_array(b%r_dU_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 1)   
+      call recv_array(b%r_dV_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 2)     
+      call recv_array(b%r_dW_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 3)
 
       if (enable_buoyancy) then
-        call recv(b%r_Temperature, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
-        call recv(b%r_dTemperature_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
+        call recv_array(b%r_Temperature, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
+        call recv_array(b%r_dTemperature_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 4)
       end if
 
       if (enable_moisture) then
-        call recv(b%r_Moisture, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
-        call recv(b%r_dMoisture_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
+        call recv_array(b%r_Moisture, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
+        call recv_array(b%r_dMoisture_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
       end if
 
     end subroutine
 
-    subroutine send(a, rank, comm, tag)
+    subroutine send_array(a, rank, comm, tag)
       real(knd), intent(in), contiguous :: a(:,:,:)
       integer, intent(in) :: rank, comm, tag
       integer :: request, ie
@@ -455,7 +482,7 @@ contains
       requests = [requests, request]
     end subroutine
 
-    subroutine recv(a, rank, comm, tag)
+    subroutine recv_array(a, rank, comm, tag)
       real(knd), intent(inout), contiguous :: a(:,:,:)
       integer, intent(in) :: rank, comm, tag
       integer :: request, ie
@@ -795,24 +822,24 @@ contains
       zk = min(max(floor( (z - b%r_zW(lz))/b%r_dz ), 0) + lz, ubound(b%r_zW,1)-1)
     end subroutine
 
-    pure real(knd) function TriLinInt(a, b, c, &
-                                     val000, val100, val010, val001, val110, val101, val011, val111)
-      real(knd), intent(in) :: a, b, c
-      real(knd), intent(in) :: val000, val100, val010, val001, val110, val101, val011, val111
-
-      TriLinInt =  (1-a) * (1-b) * (1-c) * val000 + &
-                   a     * (1-b) * (1-c) * val100 + &
-                   (1-a) * b     * (1-c) * val010 + &
-                   (1-a) * (1-b) * c     * val001 + &
-                   a     * b     * (1-c) * val110 + &
-                   a     * (1-b) * c     * val101 + &
-                   (1-a) * b     * c     * val011 + &
-                   a     * b     * c     * val111
-    end function TriLinInt
-
-
   end subroutine
 
+
+
+  pure real(knd) function TriLinInt(a, b, c, &
+                                   val000, val100, val010, val001, val110, val101, val011, val111)
+    real(knd), intent(in) :: a, b, c
+    real(knd), intent(in) :: val000, val100, val010, val001, val110, val101, val011, val111
+
+    TriLinInt =  (1-a) * (1-b) * (1-c) * val000 + &
+                 a     * (1-b) * (1-c) * val100 + &
+                 (1-a) * b     * (1-c) * val010 + &
+                 (1-a) * (1-b) * c     * val001 + &
+                 a     * b     * (1-c) * val110 + &
+                 a     * (1-b) * c     * val101 + &
+                 (1-a) * b     * c     * val011 + &
+                 a     * b     * c     * val111
+  end function TriLinInt
 
 
 
@@ -1542,7 +1569,311 @@ contains
 
     end function BiLinInt
 
+  end subroutine dom_bc_buffer_turbulence_generator_compute_sgs_tke
+
+
+  subroutine par_receive_initial_conditions(receive, U, V, W, Pr, Temperature, Moisture, Scalar)
+    real(knd), intent(inout) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:) ,W(-2:,-2:,-2:), Pr(:,:,:)
+    real(knd), intent(inout) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
+    logical, intent(in) :: receive
+    integer :: err
+ 
+    if (parent_domain>0) then
+      call MPI_Send(receive, 1, MPI_LOGICAL, &
+                    domain_child_buffer%remote_rank, 3001, domain_child_buffer%comm, err)
+
+      if (receive) then
+        call receive_and_interpolate(domain_child_buffer, U, V, W, Pr, Temperature, Moisture, Scalar)
+      end if
+    end if
+
   end subroutine
 
+  subroutine receive_and_interpolate(b, U, V, W, Pr, Temperature, Moisture, Scalar)
+    type(dom_child_buffer), intent(inout) :: b
+    real(knd), intent(inout) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:) ,W(-2:,-2:,-2:), Pr(:,:,:)
+    real(knd), intent(inout) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
+    real(knd), allocatable :: tmp(:,:,:)
+    integer :: n
+    integer :: err
+
+    !to avoid unpredictable allocation of large arrays during passing to MPI_Recv
+    !avoiding MPI derived types for each staggered grid at least for now
+    allocate(tmp(b%r_i1:b%r_i2,b%r_j1:b%r_j2,b%r_k1:b%r_k2))
+
+    n = size(tmp)
+
+    call MPI_Recv(tmp, n, MPI_KND, &
+                  b%remote_rank, 3002, b%comm, MPI_STATUS_IGNORE, err)
+    call interpolate_U_trilinear(tmp, U)
+
+    call MPI_Recv(tmp, n, MPI_KND, &
+                  b%remote_rank, 3003, b%comm, MPI_STATUS_IGNORE, err)
+    call interpolate_V_trilinear(tmp, V)
+
+    call MPI_Recv(tmp, n, MPI_KND, &
+                  b%remote_rank, 3004, b%comm, MPI_STATUS_IGNORE, err)
+    call interpolate_W_trilinear(tmp, W)
+
+!     call MPI_Recv(tmp, n, MPI_KND, &
+!                   b%remote_rank, 3005, b%comm, MPI_STATUS_IGNORE, err)
+!     call interpolate_trilinear(tmp, Pr, 1)
+
+    if (enable_buoyancy) then
+      call MPI_Recv(tmp, n, MPI_KND, &
+                    b%remote_rank, 3006, b%comm, MPI_STATUS_IGNORE, err)
+      call interpolate_trilinear(tmp, Pr, -1)
+    end if
+
+    if (enable_moisture) then
+      call MPI_Recv(tmp, n, MPI_KND, &
+                    b%remote_rank, 3007, b%comm, MPI_STATUS_IGNORE, err)
+      call interpolate_trilinear(tmp, Pr, -1)
+    end if
+
+  contains
+
+    subroutine interpolate_trilinear(in, out, lb)
+      integer, intent(in) :: lb
+      real(knd), intent(in), allocatable :: in(:,:,:)
+      real(knd), intent(inout) :: out(lb:,lb:,lb:)
+      integer :: xi, yj, zk
+      integer :: i, j, k
+      
+      !$omp parallel do private(i, j, k, xi, yj, zk)
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            call U_r_index(xPr(i), yPr(j), zPr(k), xi, yj, zk)
+
+            out(i,j,k) = &
+              TriLinInt((xPr(i)  - b%r_z(xi)) / b%r_dx, &
+                        (yPr(j)  - b%r_y(yj)) / b%r_dy, &
+                        (zPr(k)  - b%r_z(zk)) / b%r_dz, &
+                        in(xi  , yj  , zk  ), &
+                        in(xi+1, yj  , zk  ), &
+                        in(xi  , yj+1, zk  ), &
+                        in(xi  , yj  , zk+1), &
+                        in(xi+1, yj+1, zk  ), &
+                        in(xi+1, yj  , zk+1), &
+                        in(xi  , yj+1, zk+1), &
+                        in(xi+1, yj+1, zk+1))
+          end do
+        end do
+      end do
+    end subroutine
+
+    pure subroutine r_index(x, y, z, xi, yj, zk)
+      real(knd), intent(in) :: x, y, z
+      integer, intent(out) :: xi, yj, zk
+      integer :: lx, ly, lz
+
+      lx = lbound(b%r_x,1)
+      ly = lbound(b%r_y,1)
+      lz = lbound(b%r_z,1)
+
+      xi = min(max(floor( (x - b%r_x(lx))/b%r_dx ), 0) + lx, ubound(b%r_x,1)-1)
+      yj = min(max(floor( (y - b%r_y(ly))/b%r_dy ), 0) + ly, ubound(b%r_y,1)-1)
+      zk = min(max(floor( (z - b%r_z(lz))/b%r_dz ), 0) + lz, ubound(b%r_z,1)-1)
+    end subroutine
+
+    subroutine interpolate_U_trilinear(in, out)
+      real(knd), intent(in), allocatable :: in(:,:,:)
+      real(knd), intent(inout) :: out(-2:,-2:,-2:)
+      integer :: xi, yj, zk
+      integer :: i, j, k
+      
+      !$omp parallel do private(i, j, k, xi, yj, zk)
+      do k = 1, Unz
+        do j = 1, Uny
+          do i = 1, Unx
+            call U_r_index(xU(i), yPr(j), zPr(k), xi, yj, zk)
+
+            out(i,j,k) = &
+              TriLinInt((xU(i)   - b%r_xU(xi)) / b%r_dx, &
+                        (yPr(j)  - b%r_y(yj) ) / b%r_dy, &
+                        (zPr(k)  - b%r_z(zk) ) / b%r_dz, &
+                        in(xi  , yj  , zk  ), &
+                        in(xi+1, yj  , zk  ), &
+                        in(xi  , yj+1, zk  ), &
+                        in(xi  , yj  , zk+1), &
+                        in(xi+1, yj+1, zk  ), &
+                        in(xi+1, yj  , zk+1), &
+                        in(xi  , yj+1, zk+1), &
+                        in(xi+1, yj+1, zk+1))
+          end do
+        end do
+      end do
+    end subroutine
+
+    pure subroutine U_r_index(x, y, z, xi, yj, zk)
+      real(knd), intent(in) :: x, y, z
+      integer, intent(out) :: xi, yj, zk
+      integer :: lx, ly, lz
+
+      lx = lbound(b%r_xU,1)
+      ly = lbound(b%r_y,1)
+      lz = lbound(b%r_z,1)
+
+      xi = min(max(floor( (x - b%r_xU(lx))/b%r_dx ), 0) + lx, ubound(b%r_xU,1)-1)
+      yj = min(max(floor( (y - b%r_y(ly))/b%r_dy ), 0) + ly, ubound(b%r_y,1)-1)
+      zk = min(max(floor( (z - b%r_z(lz))/b%r_dz ), 0) + lz, ubound(b%r_z,1)-1)
+    end subroutine
+
+    subroutine interpolate_V_trilinear(in, out)
+      real(knd), intent(in), allocatable :: in(:,:,:)
+      real(knd), intent(inout) :: out(-2:,-2:,-2:)
+      integer :: xi, yj, zk
+      integer :: i, j, k
+      
+      !$omp parallel do private(i, j, k, xi, yj, zk)
+      do k = 1, Vnz
+        do j = 1, Vny
+          do i = 1, Vnx
+            call V_r_index(xPr(i), yV(j), zPr(k), xi, yj, zk)
+
+            out(i,j,k) = &
+              TriLinInt((xPr(i) - b%r_x(xi) ) / b%r_dx, &
+                        (yV(j)  - b%r_yV(yj)) / b%r_dy, &
+                        (zPr(k) - b%r_z(zk) ) / b%r_dz, &
+                        in(xi  , yj  , zk  ), &
+                        in(xi+1, yj  , zk  ), &
+                        in(xi  , yj+1, zk  ), &
+                        in(xi  , yj  , zk+1), &
+                        in(xi+1, yj+1, zk  ), &
+                        in(xi+1, yj  , zk+1), &
+                        in(xi  , yj+1, zk+1), &
+                        in(xi+1, yj+1, zk+1))
+          end do
+        end do
+      end do
+    end subroutine
+
+    pure subroutine V_r_index(x, y, z, xi, yj, zk)
+      real(knd), intent(in) :: x, y, z
+      integer, intent(out) :: xi, yj, zk
+      integer :: lx, ly, lz
+
+      lx = lbound(b%r_x,1)
+      ly = lbound(b%r_yV,1)
+      lz = lbound(b%r_z,1)
+
+      xi = min(max(floor( (x - b%r_x(lx))/b%r_dx ), 0) + lx, ubound(b%r_x,1)-1)
+      yj = min(max(floor( (y - b%r_yV(ly))/b%r_dy ), 0) + ly, ubound(b%r_yV,1)-1)
+      zk = min(max(floor( (z - b%r_z(lz))/b%r_dz ), 0) + lz, ubound(b%r_z,1)-1)
+    end subroutine
+
+    subroutine interpolate_W_trilinear(in, out)
+      real(knd), intent(in), allocatable :: in(:,:,:)
+      real(knd), intent(inout) :: out(-2:,-2:,-2:)
+      integer :: xi, yj, zk
+      integer :: i, j, k
+      
+      !$omp parallel do private(i, j, k, xi, yj, zk)
+      do k = 1, Wnz
+        do j = 1, Wny
+          do i = 1, Wnx
+            call W_r_index(xPr(i), yPr(j), zW(k), xi, yj, zk)
+
+            out(i,j,k) = &
+              TriLinInt((xPr(i) - b%r_x(xi) ) / b%r_dx, &
+                        (yV(j)  - b%r_y(yj) ) / b%r_dy, &
+                        (zPr(k) - b%r_zW(zk)) / b%r_dz, &
+                        in(xi  , yj  , zk  ), &
+                        in(xi+1, yj  , zk  ), &
+                        in(xi  , yj+1, zk  ), &
+                        in(xi  , yj  , zk+1), &
+                        in(xi+1, yj+1, zk  ), &
+                        in(xi+1, yj  , zk+1), &
+                        in(xi  , yj+1, zk+1), &
+                        in(xi+1, yj+1, zk+1))
+          end do
+        end do
+      end do
+    end subroutine
+
+    pure subroutine W_r_index(x, y, z, xi, yj, zk)
+      real(knd), intent(in) :: x, y, z
+      integer, intent(out) :: xi, yj, zk
+      integer :: lx, ly, lz
+
+      lx = lbound(b%r_x,1)
+      ly = lbound(b%r_y,1)
+      lz = lbound(b%r_zW,1)
+
+      xi = min(max(floor( (x - b%r_x(lx))/b%r_dx ), 0) + lx, ubound(b%r_x,1)-1)
+      yj = min(max(floor( (y - b%r_y(ly))/b%r_dy ), 0) + ly, ubound(b%r_y,1)-1)
+      zk = min(max(floor( (z - b%r_zW(lz))/b%r_dz ), 0) + lz, ubound(b%r_zW,1)-1)
+    end subroutine
+
+
+  end subroutine receive_and_interpolate
+
+
+
+  subroutine par_send_initial_conditions(U, V, W, Pr, Temperature, Moisture, Scalar)
+    real(knd), intent(in) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:) ,W(-2:,-2:,-2:), Pr(:,:,:)
+    real(knd), intent(in) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,:)
+
+    real(knd), allocatable :: tmp(:,:,:)
+    integer :: di, i, j, k, n
+    integer :: err
+    logical :: send
+
+    if (allocated(domain_parent_buffers)) then
+      do di = 1, size(domain_parent_buffers)
+        if (allocated(domain_parent_buffers(di)%bs)) then
+          do k = 1, size(domain_parent_buffers(di)%bs,3)
+            do j = 1, size(domain_parent_buffers(di)%bs,2)
+              do i = 1, size(domain_parent_buffers(di)%bs,1)
+
+                associate(b => domain_parent_buffers(di)%bs(i,j,k))
+
+                  call MPI_Recv(send, 1, MPI_LOGICAL, &
+                                b%remote_rank, 3001, b%comm, MPI_STATUS_IGNORE, err)
+
+                  if (send) then
+                    allocate(tmp(b%i1:b%i2,b%j1:b%j2,b%k1:b%k2))
+                    n = size(tmp)
+
+                    tmp = U(b%i1:b%i2,b%j1:b%j2,b%k1:b%k2)
+                    call MPI_Send(tmp, n, MPI_KND, &
+                                  b%remote_rank, 3002, b%comm, err)
+
+                    tmp = V(b%i1:b%i2,b%j1:b%j2,b%k1:b%k2)
+                    call MPI_Send(tmp, n, MPI_KND, &
+                                  b%remote_rank, 3003, b%comm, err)
+
+                    tmp = W(b%i1:b%i2,b%j1:b%j2,b%k1:b%k2)
+                    call MPI_Send(tmp, n, MPI_KND, &
+                                  b%remote_rank, 3004, b%comm, err)
+
+!                     tmp = Pr(b%i1:b%i2,b%j1:b%j2,b%k1:b%k2)
+!                     call MPI_Send(tmp, n, MPI_KND, &
+!                                   b%remote_rank, 3005, b%comm, err)
+
+                    if (enable_buoyancy) then
+                      tmp = Temperature(b%i1:b%i2,b%j1:b%j2,b%k1:b%k2)
+                      call MPI_Send(tmp, n, MPI_KND, &
+                                    b%remote_rank, 3005, b%comm, err)
+                    end if
+
+                    if (enable_moisture) then
+                      tmp = Moisture(b%i1:b%i2,b%j1:b%j2,b%k1:b%k2)
+                      call MPI_Send(tmp, n, MPI_KND, &
+                                    b%remote_rank, 3005, b%comm, err)
+                    end if
+
+                    deallocate(tmp)
+                  end if
+                end associate
+
+              end do
+            end do
+          end do
+        end if
+      end do
+    end if
+  end subroutine par_send_initial_conditions
 
 end module domains_bc_par
