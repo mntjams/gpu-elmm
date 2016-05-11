@@ -1644,7 +1644,7 @@ contains
       do k = 1, Prnz
         do j = 1, Prny
           do i = 1, Prnx
-            call U_r_index(xPr(i), yPr(j), zPr(k), xi, yj, zk)
+            call r_index(xPr(i), yPr(j), zPr(k), xi, yj, zk)
 
             out(i,j,k) = &
               TriLinInt((xPr(i)  - b%r_z(xi)) / b%r_dx, &
