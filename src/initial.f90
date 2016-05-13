@@ -2082,7 +2082,8 @@ fields_do:  do j = 1, size(fields)
               do i = 1, size(names_a_int_alloc)
                 if (fields(j)%name == names_a_int_alloc(i)%name) then
                   allocate(names_a_int_alloc(i)%var(size(fields(j)%array_value)))
-                  read(fields(j)%array_value, *) names_a_int_alloc(i)%var
+                  if (size(names_a_int_alloc(i)%var)>0) &
+                    read(fields(j)%array_value, *) names_a_int_alloc(i)%var
                 end if
               end do
 
