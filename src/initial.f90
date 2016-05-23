@@ -1546,24 +1546,6 @@ contains
     logical :: ex
     integer :: obj, stat
 
-    type field_names
-      character(char_len) :: name
-      class(*), pointer :: var
-    end type
-
-    type field_names_a
-      character(char_len) :: name
-      class(*), pointer :: var(:)
-    end type
-
-    interface field_names
-      procedure field_names_init
-    end interface
-
-    interface field_names_a
-      procedure field_names_a_init
-    end interface
-
     inquire(file=fname, exist=ex)
 
     if (.not.ex) return
@@ -1738,24 +1720,6 @@ fields_do:  do j = 1, size(fields)
     
     end subroutine
 
-    function field_names_init(name, var) result(res)
-      type(field_names) :: res
-      character(*) :: name
-      class(*), target, intent(in) :: var
-
-      res%name = name
-      res%var => var
-    end function
-
-    function field_names_a_init(name, var) result(res)
-      type(field_names_a) :: res
-      character(*) :: name
-      class(*), target, intent(in) :: var(:)
-
-      res%name = name
-      res%var => var
-    end function
-
   end subroutine get_time_stepping
   
   
@@ -1770,24 +1734,6 @@ fields_do:  do j = 1, size(fields)
     type(tree_object), allocatable :: tree(:)
     logical :: ex
     integer :: obj, stat
-
-    type field_names
-      character(char_len) :: name
-      class(*), pointer :: var
-    end type
-
-    type field_names_a
-      character(char_len) :: name
-      class(*), pointer :: var(:)
-    end type
-
-    interface field_names
-      procedure field_names_init
-    end interface
-
-    interface field_names_a
-      procedure field_names_a_init
-    end interface
 
     inquire(file=fname, exist=ex)
 
@@ -1911,24 +1857,6 @@ fields_do:  do j = 1, size(fields)
     
     end subroutine
 
-    function field_names_init(name, var) result(res)
-      type(field_names) :: res
-      character(*) :: name
-      class(*), target, intent(in) :: var
-
-      res%name = name
-      res%var => var
-    end function
-
-    function field_names_a_init(name, var) result(res)
-      type(field_names_a) :: res
-      character(*) :: name
-      class(*), target, intent(in) :: var(:)
-
-      res%name = name
-      res%var => var
-    end function
-
   end subroutine get_pressure_solution
   
   
@@ -1943,26 +1871,6 @@ fields_do:  do j = 1, size(fields)
     type(tree_object), allocatable :: tree(:)
     logical :: ex
     integer :: obj, stat
-
-    type field_names
-      character(char_len) :: name
-      class(*), pointer :: var
-    end type
-
-    type field_names_a
-      character(char_len) :: name
-      class(*), pointer :: var(:)
-    end type
-
-    type field_names_a_int_alloc
-      character(char_len) :: name
-      integer, allocatable :: var(:)
-    end type
-
-    interface field_names
-      procedure field_names_init
-      procedure field_names_a_init
-    end interface
 
     inquire(file=fname, exist=ex)
 
@@ -2138,31 +2046,6 @@ fields_do:  do j = 1, size(fields)
       end if
       
     end subroutine
-
-    function field_names_init(name, var) result(res)
-      type(field_names) :: res
-      character(*) :: name
-      class(*), target, intent(in) :: var
-
-      res%name = name
-      res%var => var
-    end function
-
-    function field_names_a_init(name, var) result(res)
-      type(field_names_a) :: res
-      character(*) :: name
-      class(*), target, intent(in) :: var(:)
-
-      res%name = name
-      res%var => var
-    end function
-
-    function field_names_a_int_alloc_init(name) result(res)
-      type(field_names_a_int_alloc) :: res
-      character(*) :: name
-
-      res%name = name
-    end function
 
   end subroutine get_domains
 #endif  

@@ -168,15 +168,81 @@ end module Strings
 
 
 
-module ParseTrees
 
+module ParseTrees_Fields
   use Strings
 
   use str_lists, only: str_list => list, char_len
 
+  type field_names
+    character(char_len) :: name
+    class(*), pointer :: var
+  end type
+
+  type field_names_a
+    character(char_len) :: name
+    class(*), pointer :: var(:)
+  end type
+
+  type field_names_a_int_alloc
+    character(char_len) :: name
+    integer, allocatable :: var(:)
+  end type
+
+  interface field_names
+    procedure field_names_init
+  end interface
+
+  interface field_names_a
+    procedure field_names_init
+  end interface
+
+  interface field_names_a_int_alloc
+    procedure field_names_a_int_alloc_init
+  end interface
+
+contains
+
+  function field_names_init(name, var) result(res)
+    type(field_names) :: res
+    character(*) :: name
+    class(*), target, intent(in) :: var
+
+    res%name = name
+    res%var => var
+  end function
+
+  function field_names_a_init(name, var) result(res)
+    type(field_names_a) :: res
+    character(*) :: name
+    class(*), target, intent(in) :: var(:)
+
+    res%name = name
+    res%var => var
+  end function
+
+  function field_names_a_int_alloc_init(name) result(res)
+    type(field_names_a_int_alloc) :: res
+    character(*) :: name
+
+    res%name = name
+  end function
+
+end module ParseTrees_Fields
+
+
+
+
+module ParseTrees
+
+  use ParseTrees_Fields
+
   implicit none
 
   private
+
+  public field_names, field_names_a, field_names_a_int_alloc
+  public field_names_init, field_names_a_init, field_names_a_int_alloc_init
 
   public tree_object, tree_object_field, tree_object_fields, parse_file, char_len
 
