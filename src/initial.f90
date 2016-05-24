@@ -8,7 +8,8 @@ module Initial
   use Pressure
   use Boundaries
   use ScalarBoundaries
-  use Outputs, only: store, display, probes, scalar_probes, ReadProbes
+  use Outputs, only: store, display, probes, scalar_probes, ReadProbes, &
+                     ProfileSwitches, profiles_config, enable_profiles
   use Scalars
   use Filters, only: filtertype, filter_ratios
   use Subgrid
@@ -561,7 +562,7 @@ contains
    end if
    
    
-   call get_profiles("profiles.conf")
+   call get_profiles("profiles.conf", profiles_config, enable_profiles)
 
    !probes_file and scalar_probes_file read from command line
    if (probes_file == "" .and. scalar_probes_file == "") then
@@ -760,7 +761,7 @@ contains
    if (Btype(We)==BC_INLET_FROM_FILE) inlettype = FromFileInletType
 
 
-   call get_time_stepping("time_stepping.conf")
+   call get_time_stepping("time_stepping.conf", time_stepping)
 
    if (timeavg2>=timeavg1) then
      averaging = 1
@@ -821,7 +822,7 @@ contains
 #endif
 
 
-   call get_pressure_solution("pressure_solution.conf")
+   call get_pressure_solution("pressure_solution.conf", pressure_solution)
 
 
    !both procedures below use the name of the output directory (affected by MPI)
@@ -1159,6 +1160,123 @@ contains
 
 
 
+  !TODO: This subroutine should be in module ParseTrees, but bug https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64589
+  ! prevents this until moving to GCC
+  subroutine get_object_field_values(tree, object_name, stat, &
+                                     fields, fields_a, fields_a_int_alloc)
+    use Strings
+    use ParseTrees
+    !To extract values of variables from the parse tree
+    use iso_fortran_env, only: real32, real64, int32, int64
+    type(tree_object), intent(in) :: tree(:)
+    character(*), intent(in) :: object_name
+    integer, intent(out) :: stat
+    !stat 0    .. success
+    !stat < 0  .. multiple definitions of object named object_name
+    !stat 1    .. object named object_name not found
+    !stat 2    .. inconsistent number of components in an array in fields_a
+    !stat 11   .. unexpected type of variable in fields
+    !stat 12   .. unexpected type of variable in fields_a
+    type(field_names), intent(in), optional :: fields(:)
+    type(field_names_a), intent(in), optional :: fields_a(:)
+    type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
+
+    integer :: iobj
+
+    stat = 1
+
+    do iobj = 1, size(tree)
+      call get_object(tree(iobj))
+    end do
+    
+  contains
+
+    subroutine get_object(obj)
+      type(tree_object), intent(in) :: obj
+      integer :: i, j
+
+      if (downcase(obj%name)==object_name) then
+        stat = stat - 1
+
+        if (allocated(obj%fields%array)) then
+
+          associate(obj_fields => obj%fields%array)
+
+fields_do:  do j = 1, size(obj_fields)
+             
+              do i = 1, size(fields)
+                if (obj_fields(j)%name == fields(i)%name) then
+                  select type (var => fields(i)%var)
+                    type is (integer)
+                      read(obj_fields(j)%value, *) var
+                    type is (real(real32))
+                      read(obj_fields(j)%value, *) var
+                    type is (real(real64))
+                      read(obj_fields(j)%value, *) var
+                    type is (logical)
+                      read(obj_fields(j)%value, *) var
+                    class default
+                      stat = 11
+                      return
+                  end select
+                  cycle fields_do
+                end if
+              end do
+
+
+              do i = 1, size(fields_a)
+                if (obj_fields(j)%name == fields_a(i)%name) then
+
+                  if (size(fields_a(i)%var)/=size(obj_fields(j)%array_value)) then
+! uncomment to get details when debugging
+!                     write(*,*) "Error, expecting", &
+!                                 size(fields_a(i)%var), &
+!                                 "vector components", &
+!                                 "but", &
+!                                 size(obj_fields(j)%array_value), &
+!                                 "components present."
+                    stat = 2
+                    return
+                  end if
+
+                  select type (var => fields_a(i)%var)
+                    type is (integer)
+                      read(obj_fields(j)%array_value, *) var
+                    type is (real(real32))
+                      read(obj_fields(j)%array_value, *) var
+                    type is (real(real64))
+                      read(obj_fields(j)%array_value, *) var
+                    type is (logical)
+                      read(obj_fields(j)%array_value, *) var
+                    class default
+                      stat = 12
+                      return
+                  end select
+                  cycle fields_do
+                end if
+              end do
+
+
+              do i = 1, size(fields_a_int_alloc)
+                if (obj_fields(j)%name == fields_a_int_alloc(i)%name) then
+                  allocate(fields_a_int_alloc(i)%var(size(obj_fields(j)%array_value)))
+                  if (size(fields_a_int_alloc(i)%var)>0) &
+                    read(obj_fields(j)%array_value, *) fields_a_int_alloc(i)%var
+                end if
+              end do
+
+            end do fields_do
+
+          end associate
+
+        end if
+
+      end if
+    end subroutine get_object
+
+  end subroutine get_object_field_values
+
+
 
 
 
@@ -1170,7 +1288,7 @@ contains
     character(*), intent(in) :: fname
     type(tree_object), allocatable :: tree(:)
     logical :: ex
-    integer :: i, stat
+    integer :: iobj, stat
 
     if (num_of_scalars==0) return
 
@@ -1183,9 +1301,9 @@ contains
     if (stat==0) then
 
       if (allocated(tree)) then
-        do i = 1, size(tree)
-          call get_area_source(tree(i))
-          call tree(i)%finalize
+        do iobj = 1, size(tree)
+          call get_area_source(tree(iobj))
+          call tree(iobj)%finalize
         end do
       end if
 
@@ -1396,15 +1514,29 @@ contains
   end subroutine get_geostrophic_wind
 
 
-  subroutine get_profiles(fname)
+  subroutine get_profiles(fname, profiles_config, enable_profiles)
     use Strings
     use ParseTrees
-    use Outputs, only: profiles_config, enable_profiles
-    
     character(*), intent(in) :: fname
+    type(ProfileSwitches), intent(inout), target :: profiles_config
+    logical, intent(inout), target :: enable_profiles
     type(tree_object), allocatable :: tree(:)
     logical :: ex
     integer :: i, stat
+
+    type(field_names) :: fields_avg(2), fields_inst(3), fields_running(3)
+
+
+    fields_avg = [field_names_init("start",     profiles_config%average_start), &
+                  field_names_init("end",       profiles_config%average_end)]
+
+    fields_inst = [field_names_init("start",     profiles_config%instant_start), &
+                   field_names_init("end",       profiles_config%instant_end), &
+                   field_names_init("interval",  profiles_config%instant_interval)]
+
+    fields_running = [field_names_init("start",     profiles_config%running_start), &
+                      field_names_init("end",       profiles_config%running_end), &
+                      field_names_init("interval",  profiles_config%running_interval)]
 
     inquire(file=fname, exist=ex)
 
@@ -1415,8 +1547,23 @@ contains
     if (stat==0) then
 
       if (allocated(tree)) then
+
+        call get_object_field_values(tree, "average_profiles", stat, &
+                                     fields_avg)
+
+        if (stat<=0) enable_profiles = .true.
+
+        call get_object_field_values(tree, "instantaneous_profiles", stat, &
+                                     fields_inst)
+
+        if (stat<=0) enable_profiles = .true.
+
+        call get_object_field_values(tree, "running_average_profiles", stat, &
+                                     fields_running)
+
+        if (stat<=0) enable_profiles = .true.
+
         do i = 1, size(tree)
-          call get_profile(tree(i))
           call tree(i)%finalize
         end do
       end if
@@ -1428,123 +1575,39 @@ contains
 
     end if
     
-  contains
-  
-    subroutine get_profile(obj)
-      type(tree_object), intent(in) :: obj
-      integer :: j
-      real(knd) :: rval
-
-      if (downcase(obj%name)=='average_profiles') then
-
-        if (allocated(obj%fields%array)) then
-
-          associate(fields => obj%fields%array)
-
-            do j = 1, size(fields)
-              read(fields(j)%value, *) rval
-             
-              select case (downcase(fields(j)%name))
-                case ('start')
-                  profiles_config%average_start = rval
-                case ('end')
-                  profiles_config%average_end = rval
-              end select
-
-            end do
-
-          end associate
-
-        else
-
-          write(*,*) "No fields in the profile object in " // fname
-          call error_stop
-
-        end if
-
-        enable_profiles = .true.
-
-      else if (downcase(obj%name)=='instantaneous_profiles') then
-
-        if (allocated(obj%fields%array)) then
-
-          associate(fields => obj%fields%array)
-
-            do j = 1, size(fields)
-
-              read(fields(j)%value, *) rval
-              
-              select case (downcase(fields(j)%name))
-                case ('start')
-                  profiles_config%instant_start = rval
-                case ('end')
-                  profiles_config%instant_end = rval
-                case ('interval')
-                  profiles_config%instant_interval = rval
-              end select
-
-            end do
-
-          end associate
-
-        else
-
-          write(*,*) "No fields in the profile object in " // fname
-          call error_stop
-
-        end if
-
-        enable_profiles = .true.
-
-      else if (downcase(obj%name)=='running_average_profiles') then
-
-        if (allocated(obj%fields%array)) then
-
-          associate(fields => obj%fields%array)
-
-            do j = 1, size(fields)
-
-              read(fields(j)%value, *) rval
-              
-              select case (downcase(fields(j)%name))
-                case ('start')
-                  profiles_config%running_start = rval
-                case ('end')
-                  profiles_config%running_end = rval
-                case ('interval')
-                  profiles_config%running_interval = rval
-              end select
-
-            end do
-
-          end associate
-          
-        else
-
-          write(*,*) "No fields in the profile object in " // fname
-          call error_stop
-
-        end if
-
-        enable_profiles = .true.
-
-      else
-        write(*,*) "Unknown object type " // downcase(obj%name) // " in " // fname
-        call error_stop
-      end if
-    end subroutine
-
-    
   end subroutine get_profiles
 
 
-  subroutine get_time_stepping(fname)
+  subroutine get_time_stepping(fname, t_s)
     use Strings
     use ParseTrees
     character(*), intent(in) :: fname
+    type(time_step_control), intent(inout), target :: t_s
     type(tree_object), allocatable :: tree(:)
     logical :: ex
-    integer :: obj, stat
+    integer :: iobj, stat
+
+    logical, target :: constant_time_steps = .false.
+
+    type(field_names) :: names(12)
+    type(field_names_a) :: names_a(3)
+
+    names = [field_names_init("max_number_of_time_steps",   t_s%max_number_of_time_steps), &
+             field_names_init("variable_time_steps",        t_s%variable_time_steps), &
+             field_names_init("constant_time_steps",        constant_time_steps), &
+             field_names_init("enable_U_scaling",           t_s%enable_U_scaling), &
+             field_names_init("enable_CFL_check",           t_s%enable_CFL_check), &
+             field_names_init("dt",                         t_s%dt_constant), &
+             field_names_init("dt_max",                     t_s%dt_max), &
+             field_names_init("dt_min",                     t_s%dt_min), &
+             field_names_init("CFL",                        t_s%CFL), &
+             field_names_init("CFL_max",                    t_s%CFL_max), &
+             field_names_init("start_time",                 t_s%start_time), &
+             field_names_init("end_time",                   t_s%end_time)]
+
+    names_a = [field_names_a_init("U_scaling", t_s%U_scaling), &
+               field_names_a_init("U_max",     t_s%U_max), &
+               field_names_a_init("U_min",     t_s%U_min)]
 
     inquire(file=fname, exist=ex)
 
@@ -1555,9 +1618,13 @@ contains
     if (stat==0) then
 
       if (allocated(tree)) then
-        do obj = 1, size(tree)
-          call get_object(tree(obj), time_stepping)
-          call tree(obj)%finalize
+        call get_object_field_values(tree, "time_stepping", stat, &
+                                     fields = names, fields_a = names_a)
+
+        if (stat<=0) call init
+
+        do iobj = 1, size(tree)
+          call tree(iobj)%finalize
         end do
       else
         write(*,*) "Error, no content in " // fname
@@ -1573,94 +1640,7 @@ contains
 
   contains
 
-    subroutine get_object(obj, t_s)
-      type(tree_object), intent(in) :: obj
-      type(time_step_control), intent(out), target :: t_s
-      integer :: i, j
-      logical, target :: constant_time_steps = .false.
-
-      type(field_names) :: names(12)
-      type(field_names_a) :: names_a(3)
-
-      names = [field_names_init("max_number_of_time_steps",   t_s%max_number_of_time_steps), &
-               field_names_init("variable_time_steps",        t_s%variable_time_steps), &
-               field_names_init("constant_time_steps",        constant_time_steps), &
-               field_names_init("enable_U_scaling",           t_s%enable_U_scaling), &
-               field_names_init("enable_CFL_check",           t_s%enable_CFL_check), &
-               field_names_init("dt",                         t_s%dt_constant), &
-               field_names_init("dt_max",                     t_s%dt_max), &
-               field_names_init("dt_min",                     t_s%dt_min), &
-               field_names_init("CFL",                        t_s%CFL), &
-               field_names_init("CFL_max",                    t_s%CFL_max), &
-               field_names_init("start_time",                 t_s%start_time), &
-               field_names_init("end_time",                   t_s%end_time)]
-
-      names_a = [field_names_a_init("U_scaling", t_s%U_scaling), &
-                 field_names_a_init("U_max",     t_s%U_max), &
-                 field_names_a_init("U_min",     t_s%U_min)]
-
-      if (downcase(obj%name)=='time_stepping') then
-
-        if (allocated(obj%fields%array)) then
-
-          associate(fields => obj%fields%array)
-
-fields_do:  do j = 1, size(fields)
-             
-              do i = 1, size(names)
-                if (fields(j)%name == names(i)%name) then
-                  select type (var => names(i)%var)
-                    type is (integer)
-                      read(fields(j)%value, *) var
-                    type is (real(real32))
-                      read(fields(j)%value, *) var
-                    type is (real(real64))
-                      read(fields(j)%value, *) var
-                    type is (logical)
-                      read(fields(j)%value, *) var
-                    class default
-                      call error_stop("Unexpected type in time_stepping.")
-                  end select
-                  cycle fields_do
-                end if
-              end do
-
-              do i = 1, size(names_a)
-                if (fields(j)%name == names_a(i)%name) then
-
-                  if (size(names_a(i)%var)/=size(fields(j)%array_value)) then
-                    write(*,*) "Error, expecting", &
-                                size(names_a(i)%var), &
-                                "vector components", &
-                                "but", &
-                                size(fields(j)%array_value), &
-                                "components present."
-                    call error_stop()
-                  end if
-
-                  select type (var => names_a(i)%var)
-                    type is (integer)
-                      read(fields(j)%array_value, *) var
-                    type is (real(real32))
-                      read(fields(j)%array_value, *) var
-                    type is (real(real64))
-                      read(fields(j)%array_value, *) var
-                    type is (logical)
-                      read(fields(j)%array_value, *) var
-                    class default
-                      call error_stop("Unexpected type in time_stepping.")
-                  end select
-                  cycle fields_do
-                end if
-              end do
-
-            end do fields_do
-
-          end associate
-
-        end if
-
-      end if
+    subroutine init
 
       if (t_s%dt_constant > 0) constant_time_steps = .true.
 
@@ -1726,14 +1706,30 @@ fields_do:  do j = 1, size(fields)
   
   
 
-  subroutine get_pressure_solution(fname)
+  subroutine get_pressure_solution(fname, p_s)
     use Strings
     use ParseTrees
-    use Pressure
     character(*), intent(in) :: fname
+    type(pressure_solution_control), intent(inout), target :: p_s
     type(tree_object), allocatable :: tree(:)
     logical :: ex
-    integer :: obj, stat
+    integer :: iobj, stat
+
+    type(field_names) :: names(10)
+    type(field_names_a) :: names_a(1)
+
+    names = [field_names_init("check_mass_flux", p_s%check_mass_flux), &
+             field_names_init("correct_mass_flux_west",   p_s%correct_mass_flux(We)), &
+             field_names_init("correct_mass_flux_east",   p_s%correct_mass_flux(Ea)), &
+             field_names_init("correct_mass_flux_south",  p_s%correct_mass_flux(So)), &
+             field_names_init("correct_mass_flux_north",  p_s%correct_mass_flux(No)), &
+             field_names_init("correct_mass_flux_bottom", p_s%correct_mass_flux(Bo)), &
+             field_names_init("correct_mass_flux_top",    p_s%correct_mass_flux(To)), &
+             field_names_init("poisson_solver",      p_s%poisson_solver), &
+             field_names_init("check_divergence",    p_s%check_divergence), &
+             field_names_init("bottom_pressure",     p_s%bottom_pressure)]
+
+    names_a = [field_names_a_init("correct_mass_flux", p_s%correct_mass_flux)]
 
     inquire(file=fname, exist=ex)
 
@@ -1744,9 +1740,14 @@ fields_do:  do j = 1, size(fields)
     if (stat==0) then
 
       if (allocated(tree)) then
-        do obj = 1, size(tree)
-          call get_object(tree(obj), pressure_solution)
-          call tree(obj)%finalize
+
+        call get_object_field_values(tree, "pressure_solution", stat, &
+                                     fields = names, fields_a = names_a)
+
+        if (stat<=0) call init
+
+        do iobj = 1, size(tree)
+          call tree(iobj)%finalize
         end do
       else
         write(*,*) "Error, no content in " // fname
@@ -1762,90 +1763,7 @@ fields_do:  do j = 1, size(fields)
 
   contains
 
-    subroutine get_object(obj, p_s)
-      type(tree_object), intent(in) :: obj
-      type(pressure_solution_control), intent(out), target :: p_s
-      integer :: i, j
-      logical, target :: constant_time_steps = .false.
-
-      type(field_names) :: names(10)
-      type(field_names_a) :: names_a(1)
-
-      names = [field_names_init("check_mass_flux", p_s%check_mass_flux), &
-               field_names_init("correct_mass_flux_west",   p_s%correct_mass_flux(We)), &
-               field_names_init("correct_mass_flux_east",   p_s%correct_mass_flux(Ea)), &
-               field_names_init("correct_mass_flux_south",  p_s%correct_mass_flux(So)), &
-               field_names_init("correct_mass_flux_north",  p_s%correct_mass_flux(No)), &
-               field_names_init("correct_mass_flux_bottom", p_s%correct_mass_flux(Bo)), &
-               field_names_init("correct_mass_flux_top",    p_s%correct_mass_flux(To)), &
-               field_names_init("poisson_solver",      p_s%poisson_solver), &
-               field_names_init("check_divergence",    p_s%check_divergence), &
-               field_names_init("bottom_pressure",     p_s%bottom_pressure)]
-
-      names_a = [field_names_a_init("correct_mass_flux", p_s%correct_mass_flux)]
-
-      if (downcase(obj%name)=='pressure_solution') then
-
-        if (allocated(obj%fields%array)) then
-
-          associate(fields => obj%fields%array)
-
-fields_do:  do j = 1, size(fields)
-             
-              do i = 1, size(names)
-                if (fields(j)%name == names(i)%name) then
-                  select type (var => names(i)%var)
-                    type is (integer)
-                      read(fields(j)%value, *) var
-                    type is (real(real32))
-                      read(fields(j)%value, *) var
-                    type is (real(real64))
-                      read(fields(j)%value, *) var
-                    type is (logical)
-                      read(fields(j)%value, *) var
-                    class default
-                      call error_stop("Unexpected type in pressure_solution.")
-                  end select
-                  cycle fields_do
-                end if
-              end do
-
-              do i = 1, size(names_a)
-                if (fields(j)%name == names_a(i)%name) then
-
-                  if (size(names_a(i)%var)/=size(fields(j)%array_value)) then
-                    write(*,*) "Error, expecting", &
-                                size(names_a(i)%var), &
-                                "array components", &
-                                "but", &
-                                size(fields(j)%array_value), &
-                                "components present."
-                    call error_stop()
-                  end if
-
-                  select type (var => names_a(i)%var)
-                    type is (integer)
-                      read(fields(j)%array_value, *) var
-                    type is (real(real32))
-                      read(fields(j)%array_value, *) var
-                    type is (real(real64))
-                      read(fields(j)%array_value, *) var
-                    type is (logical)
-                      read(fields(j)%array_value, *) var
-                    class default
-                      call error_stop("Unexpected type in pressure_solution.")
-                  end select
-                  cycle fields_do
-                end if
-              end do
-
-            end do fields_do
-
-          end associate
-
-        end if
-
-      end if
+    subroutine init
 
       if (any(p_s%correct_mass_flux)) p_s%check_mass_flux = .true.
 
@@ -1870,7 +1788,33 @@ fields_do:  do j = 1, size(fields)
     character(*), intent(in) :: fname
     type(tree_object), allocatable :: tree(:)
     logical :: ex
-    integer :: obj, stat
+    integer :: iobj, stat
+
+    type(field_names) :: names(6)
+    type(field_names_a) :: names_a(2)
+    type(field_names_a_int_alloc) :: names_a_int_alloc(1)
+    
+    logical, target :: enable_multiple_domains_l = .false.
+    integer, target :: number_of_domains_l = -99
+    integer, target :: domain_index_l = -99
+    integer, target :: parent_domain_l = -99
+    integer, target :: spatial_ratio_l = -99
+    integer, target :: time_step_ratio_l = -99
+
+    logical :: is_domain_boundary_nested_l(6) = .true.
+    logical :: has_domain_boundary_turbulence_generator_l(6) = .false.
+
+    names = [field_names_init("enable_multiple_domains", enable_multiple_domains_l), &
+             field_names_init("domain_index",   domain_index_l), &
+             field_names_init("parent_domain",   parent_domain_l), &
+             field_names_init("number_of_domains",   number_of_domains_l), &
+             field_names_init("spatial_ratio",   spatial_ratio_l), &
+             field_names_init("time_step_ratio",   time_step_ratio_l)]
+
+    names_a = [field_names_a_init("is_boundary_nested", is_domain_boundary_nested_l), &
+               field_names_a_init("has_boundary_turbulence_generator", has_domain_boundary_turbulence_generator_l)]
+
+    names_a_int_alloc = [field_names_a_int_alloc_init("child_domains")]
 
     inquire(file=fname, exist=ex)
 
@@ -1881,9 +1825,14 @@ fields_do:  do j = 1, size(fields)
     if (stat==0) then
 
       if (allocated(tree)) then
-        do obj = 1, size(tree)
-          call get_object(tree(obj))
-          call tree(obj)%finalize
+
+        call get_object_field_values(tree, "domains", stat, &
+                                     fields = names, fields_a = names_a, fields_a_int_alloc = names_a_int_alloc)
+
+        if (stat<=0) call init
+
+        do iobj = 1, size(tree)
+          call tree(iobj)%finalize
         end do
       else
         write(*,*) "Error, no content in " // fname
@@ -1899,109 +1848,7 @@ fields_do:  do j = 1, size(fields)
 
   contains
 
-    subroutine get_object(obj)
-      type(tree_object), intent(in) :: obj
-      integer :: i, j
-      logical, target :: constant_time_steps = .false.
-
-      type(field_names) :: names(6)
-      type(field_names_a) :: names_a(2)
-      type(field_names_a_int_alloc) :: names_a_int_alloc(1)
-      
-      logical, target :: enable_multiple_domains_l = .false.
-      integer, target :: number_of_domains_l = -99
-      integer, target :: domain_index_l = -99
-      integer, target :: parent_domain_l = -99
-      integer, target :: spatial_ratio_l = -99
-      integer, target :: time_step_ratio_l = -99
-
-      logical :: is_domain_boundary_nested_l(6) = .true.
-      logical :: has_domain_boundary_turbulence_generator_l(6) = .false.
-
-      names = [field_names_init("enable_multiple_domains", enable_multiple_domains_l), &
-               field_names_init("domain_index",   domain_index_l), &
-               field_names_init("parent_domain",   parent_domain_l), &
-               field_names_init("number_of_domains",   number_of_domains_l), &
-               field_names_init("spatial_ratio",   spatial_ratio_l), &
-               field_names_init("time_step_ratio",   time_step_ratio_l)]
-
-     names_a = [field_names_a_init("is_boundary_nested", is_domain_boundary_nested_l), &
-                field_names_a_init("has_boundary_turbulence_generator", has_domain_boundary_turbulence_generator_l)]
-
-     names_a_int_alloc = [field_names_a_int_alloc_init("child_domains")]
-
-      if (downcase(obj%name)=='domains') then
-
-        if (allocated(obj%fields%array)) then
-
-          associate(fields => obj%fields%array)
-
-fields_do:  do j = 1, size(fields)
-             
-              do i = 1, size(names)
-                if (fields(j)%name == names(i)%name) then
-                  select type (var => names(i)%var)
-                    type is (integer)
-                      read(fields(j)%value, *) var
-                    type is (real(real32))
-                      read(fields(j)%value, *) var
-                    type is (real(real64))
-                      read(fields(j)%value, *) var
-                    type is (logical)
-                      read(fields(j)%value, *) var
-                    class default
-                      call error_stop("Unexpected type in domains.")
-                  end select
-                  cycle fields_do
-                end if
-              end do
-
-
-              do i = 1, size(names_a)
-                if (fields(j)%name == names_a(i)%name) then
-
-                  if (size(names_a(i)%var)/=size(fields(j)%array_value)) then
-                    write(*,*) "Error, expecting", &
-                                size(names_a(i)%var), &
-                                "vector components", &
-                                "but", &
-                                size(fields(j)%array_value), &
-                                "components present."
-                    call error_stop()
-                  end if
-
-                  select type (var => names_a(i)%var)
-                    type is (integer)
-                      read(fields(j)%array_value, *) var
-                    type is (real(real32))
-                      read(fields(j)%array_value, *) var
-                    type is (real(real64))
-                      read(fields(j)%array_value, *) var
-                    type is (logical)
-                      read(fields(j)%array_value, *) var
-                    class default
-                      call error_stop("Unexpected type in time_stepping.")
-                  end select
-                  cycle fields_do
-                end if
-              end do
-
-
-              do i = 1, size(names_a_int_alloc)
-                if (fields(j)%name == names_a_int_alloc(i)%name) then
-                  allocate(names_a_int_alloc(i)%var(size(fields(j)%array_value)))
-                  if (size(names_a_int_alloc(i)%var)>0) &
-                    read(fields(j)%array_value, *) names_a_int_alloc(i)%var
-                end if
-              end do
-
-            end do fields_do
-
-          end associate
-
-        end if
-
-      end if
+    subroutine init
 
       enable_multiple_domains = enable_multiple_domains_l
       

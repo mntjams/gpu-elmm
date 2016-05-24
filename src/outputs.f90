@@ -23,7 +23,7 @@ module Outputs
   private
   public store, display, probes, scalar_probes,  &
          OutTStep, Output, AllocateOutputs, ReadProbes,  &
-         current_profiles, profiles_config, enable_profiles
+         ProfileSwitches, current_profiles, profiles_config, enable_profiles
          
   type ProfileSwitches
     real(knd) :: average_start = 0, average_end = -1
