@@ -1,128 +1,234 @@
     integer :: xi, dii, djj, dkk
-    integer :: prev
+    integer :: num
     integer :: child_domain, i_child_domain, side
     integer :: n_send_buffers
     integer :: err
     integer, allocatable :: requests(:)
     integer :: request
 
+    logical, allocatable :: child_domain_in_this_image(:)
+
+    real(knd), parameter :: eps = 100*epsilon(1._knd)
+ 
+
     if (enable_multiple_domains) then
 
       allocate(requests(0))
 
-      allocate(domain_parent_buffers(size(child_domains)))
+
+
+      ! 1 Find out which child domains are actually immersed in this image.
+
+      allocate(child_domain_in_this_image(size(child_domains)))
+
+      do i_child_domain = 1, size(child_domains)
+        child_domain_in_this_image(i_child_domain) = (im_xmin < domain_grids(i_child_domain)%xmax - eps .and. &
+                                                      im_xmax > domain_grids(i_child_domain)%xmin + eps .and. &
+                                                      im_ymin < domain_grids(i_child_domain)%ymax - eps .and. &
+                                                      im_ymax > domain_grids(i_child_domain)%ymin + eps .and. &
+                                                      im_zmin < domain_grids(i_child_domain)%zmax - eps .and. &
+                                                      im_zmax > domain_grids(i_child_domain)%zmin + eps)
+      end do
+
+      image_child_domains = pack(child_domains, child_domain_in_this_image)
+
+
+      ! 2 Find out which child domain images are immersed in this image.
+      !   They always form 3D rectangular blocks.
+
+      allocate(domain_parent_buffers(size(image_child_domains)))
+
+      do i_child_domain = 1, size(image_child_domains)
+        associate(bs => domain_parent_buffers(i_child_domain))
+
+          child_domain = image_child_domains(i_child_domain)
+          bs%remote_domain = child_domain
+
+          do dkk = 1, domain_nzims(child_domain)
+            do djj = 1, domain_nyims(child_domain)
+              do dii = 1, domain_nxims(child_domain)
+
+                !if child domain immersed in this image
+                if (im_xmin < domain_grids(child_domain)%xmaxs(dii) - eps .and. &
+                    im_xmax > domain_grids(child_domain)%xmins(dii) + eps .and. &
+                    im_ymin < domain_grids(child_domain)%ymaxs(djj) - eps .and. &
+                    im_ymax > domain_grids(child_domain)%ymins(djj) + eps .and. &
+                    im_zmin < domain_grids(child_domain)%zmaxs(dkk) - eps .and. &
+                    im_zmax > domain_grids(child_domain)%zmins(dkk) + eps) then
+
+                  bs%iim2 = dii
+                  bs%jim2 = djj
+                  bs%kim2 = dkk                
+
+                  if (bs%iim1==0) then
+                      bs%iim1 = dii
+                      bs%jim1 = djj
+                      bs%kim1 = dkk
+                  end if
+                end if
+
+              end do
+            end do
+          end do
+
+        end associate
+      end do
+
+
+      
+      ! 3 Find out the parent image.
+
+      !   Only one parent image shall exist.
+      if (parent_domain > 0) then
+outer:  do dkk = 1, domain_nzims(parent_domain)
+          do djj = 1, domain_nyims(parent_domain)
+            do dii = 1, domain_nxims(parent_domain)
+              if (im_xmin < domain_grids(parent_domain)%xmaxs(dii) - eps .and. &
+                  im_xmax > domain_grids(parent_domain)%xmins(dii) + eps .and. &
+                  im_ymin < domain_grids(parent_domain)%ymaxs(djj) - eps .and. &
+                  im_ymax > domain_grids(parent_domain)%ymins(djj) + eps .and. &
+                  im_zmin < domain_grids(parent_domain)%zmaxs(dkk) - eps .and. &
+                  im_zmax > domain_grids(parent_domain)%zmins(dkk) + eps) then
+                parent_image = [dii, djj, dkk]
+                exit outer
+              end if
+            end do
+          end do
+        end do outer
+      end if
+
+      ! 4 Set up the domain parrent buffers for each child image immersed in this image.
 
       !send buffers should be counted from 1, there may be more of them from several nested domains
       n_send_buffers = 0
-      do i_child_domain = 1, size(child_domains)
-        child_domain = child_domains(i_child_domain)
+      do i_child_domain = 1, size(image_child_domains)
+        associate(bs => domain_parent_buffers(i_child_domain))
 
-        domain_parent_buffers(i_child_domain)%remote_domain = child_domain
+          child_domain = image_child_domains(i_child_domain)
 
-        allocate(domain_parent_buffers(i_child_domain)%bs(domain_nxims(child_domain), &
-                                                          domain_nyims(child_domain), &
-                                                          domain_nzims(child_domain)))
+          allocate(bs%bs( &
+                     bs%iim1:bs%iim2, &
+                     bs%jim1:bs%jim2, &
+                     bs%kim1:bs%kim2))
 
-        do dkk = 1, domain_nzims(child_domain)
-          do djj = 1, domain_nyims(child_domain)
-            do dii = 1, domain_nxims(child_domain)
-              call create_domain_parent_buffer(domain_parent_buffers(i_child_domain)%bs(dii,djj,dkk), &
-                                               child_domain, [dii, djj, dkk])
+          do dkk = bs%kim1, bs%kim2
+            do djj = bs%jim1, bs%jim2
+              do dii = bs%iim1, bs%iim2
+                call create_domain_parent_buffer(bs%bs(dii,djj,dkk), &
+                                                 child_domain, [dii, djj, dkk])
+              end do
             end do
           end do
-        end do
 
-        do side = We, Ea
-          if (domain_is_boundary_nested(side,child_domain)) &
-            n_send_buffers = n_send_buffers + domain_nyims(child_domain)*domain_nzims(child_domain)
-        end do 
-        do side = So, No
-          if (domain_is_boundary_nested(side,child_domain)) &
-            n_send_buffers = n_send_buffers + domain_nxims(child_domain)*domain_nzims(child_domain)
-        end do 
-        do side = Bo, To
-          if (domain_is_boundary_nested(side,child_domain)) &
-            n_send_buffers = n_send_buffers + domain_nxims(child_domain)*domain_nyims(child_domain)
-        end do 
+
+          ! 5 Set up the parent (send) buffers for the domain nesting boundaries
+          
+          ! 5a Compute the number of the send boundary buffers.
+
+          do side = We, Ea
+            if (domain_is_boundary_nested(side,child_domain)) &
+              n_send_buffers = n_send_buffers + &
+                                 (bs%jim2-bs%jim1+1) * (bs%kim2-bs%kim1+1)
+          end do 
+          do side = So, No
+            if (domain_is_boundary_nested(side,child_domain)) &
+              n_send_buffers = n_send_buffers + &
+                                 (bs%iim2-bs%iim1+1) * (bs%kim2-bs%kim1+1)
+          end do 
+          do side = Bo, To
+            if (domain_is_boundary_nested(side,child_domain)) &
+              n_send_buffers = n_send_buffers + &
+                                 (bs%iim2-bs%iim1+1) * (bs%jim2-bs%jim1+1)
+          end do 
+
+        end associate
       end do
+
+      
+      ! 5b Set up the parent (send)  boundary buffers
 
       allocate(domain_bc_send_buffers(n_send_buffers))
 
-      prev = 0
-      do i_child_domain = 1, size(child_domains)
+      num = 0
+      do i_child_domain = 1, size(image_child_domains)
+        associate(bs => domain_parent_buffers(i_child_domain))
 
-        child_domain = child_domains(i_child_domain)
+          child_domain = image_child_domains(i_child_domain)
 
-        if (domain_is_boundary_nested(We,child_domain)) then   
-          do dkk = 1, domain_nzims(child_domain)
-            do djj = 1, domain_nyims(child_domain)
-              call create_boundary_parent_buffer(num=djj+(dkk-1)*domain_nyims(child_domain) + prev, &
-                                                 dir=We, domain=child_domain, im=[1,djj,dkk])
-           end do
-          end do
+          if (domain_is_boundary_nested(We,child_domain) .and. bs%iim1==1) then   
+            do dkk = bs%kim1, bs%kim2
+              do djj = bs%jim1, bs%jim2
+                num = num + 1
 
-          prev = prev + domain_nyims(child_domain)*domain_nzims(child_domain)
-        end if
+                call create_boundary_parent_buffer(num=num, &
+                       dir=We, domain=child_domain, im=[1,djj,dkk])
+             end do
+            end do
+          end if
 
-        if (domain_is_boundary_nested(Ea,child_domain)) then   
-          do dkk = 1, domain_nzims(child_domain)
-            do djj = 1, domain_nyims(child_domain)
-              call create_boundary_parent_buffer(num=djj+(dkk-1)*domain_nyims(child_domain) + prev, &
-                                                 dir=Ea, domain=child_domain, im=[1,djj,dkk])
-           end do
-          end do
+          if (domain_is_boundary_nested(Ea,child_domain) .and. bs%iim2==domain_nxims(child_domain)) then   
+            do dkk = bs%kim1, bs%kim2
+              do djj = bs%jim1, bs%jim2
+                num = num + 1
 
-          prev = prev + domain_nyims(child_domain)*domain_nzims(child_domain)
-        end if
+                call create_boundary_parent_buffer(num=num, &
+                       dir=Ea, domain=child_domain, im=[domain_nxims(child_domain),djj,dkk])
+             end do
+            end do
+          end if
 
-        if (domain_is_boundary_nested(So,child_domain)) then   
-          do dkk = 1, domain_nzims(child_domain)
-            do dii = 1, domain_nxims(child_domain)
-              call create_boundary_parent_buffer(num=dii+(dkk-1)*domain_nxims(child_domain) + prev, &
-                                                 dir=So, domain=child_domain, im=[dii,1,dkk])
-           end do
-          end do
-        end if
+          if (domain_is_boundary_nested(So,child_domain) .and. bs%jim1==1) then   
+            do dkk = bs%kim1, bs%kim2
+              do dii = bs%iim1, bs%iim2
+                num = num + 1
 
-        if (domain_is_boundary_nested(No,child_domain)) then   
-          prev = prev + domain_nxims(child_domain)*domain_nzims(child_domain)
+                call create_boundary_parent_buffer(num=num, &
+                       dir=So, domain=child_domain, im=[dii,1,dkk])
+             end do
+            end do
+          end if
 
-          do dkk = 1, domain_nzims(child_domain)
-            do dii = 1, domain_nxims(child_domain)
-              call create_boundary_parent_buffer(num=dii+(dkk-1)*domain_nxims(child_domain) + prev, &
-                                                 dir=No, domain=child_domain, im=[dii,domain_nyims(child_domain),dkk])
-           end do
-          end do
+          if (domain_is_boundary_nested(No,child_domain) .and. bs%jim2==domain_nyims(child_domain)) then   
+            do dkk = bs%kim1, bs%kim2
+              do dii = bs%iim1, bs%iim2
+                num = num + 1
 
-          prev = prev + domain_nxims(child_domain)*domain_nzims(child_domain)
-        end if
+                call create_boundary_parent_buffer(num=num, &
+                       dir=No, domain=child_domain, im=[dii,domain_nyims(child_domain),dkk])
+             end do
+            end do
+          end if
 
-       if (domain_is_boundary_nested(Bo,child_domain)) then   
-           do djj = 1, domain_nyims(child_domain)
-            do dii = 1, domain_nxims(child_domain)
-              call create_boundary_parent_buffer(num=dii+(djj-1)*domain_nxims(child_domain) + prev, &
-                                                 dir=Bo, domain=child_domain, im=[dii,djj,1])
+         if (domain_is_boundary_nested(Bo,child_domain) .and. bs%kim1==1) then   
+             do djj = bs%jim1, bs%jim2
+              do dii = bs%iim1, bs%iim2
+                num = num + 1
 
-           end do
-          end do
+                call create_boundary_parent_buffer(num=num, &
+                       dir=Bo, domain=child_domain, im=[dii,djj,1])
 
-          prev = prev + domain_nxims(child_domain)*domain_nyims(child_domain)
-        end if
+             end do
+            end do
+          end if
 
-        if (domain_is_boundary_nested(To,child_domain)) then   
-          do djj = 1, domain_nyims(child_domain)
-            do dii = 1, domain_nxims(child_domain)
-              call create_boundary_parent_buffer(num=dii+(djj-1)*domain_nxims(child_domain) + prev, &
-                                                 dir=To, domain=child_domain, im=[dii,djj,domain_nzims(child_domain)])
+          if (domain_is_boundary_nested(To,child_domain) .and. bs%kim2==domain_nzims(child_domain)) then   
+            do djj = bs%jim1, bs%jim2
+              do dii = bs%iim1, bs%iim2
+                num = num + 1
 
-           end do
-          end do
+                call create_boundary_parent_buffer(num=num, &
+                       dir=To, domain=child_domain, im=[dii,djj,domain_nzims(child_domain)])
 
-          prev = prev + domain_nxims(child_domain)*domain_nyims(child_domain)
-        end if
+             end do
+            end do
+          end if
 
+        end associate
       end do
 
+
+      ! 6 Set up the domain child buffer and the boundary child buffers.
+      !   Ther shall be only one parent image.
 
       if (parent_domain>0) then
         allocate(domain_bc_recv_buffers(We:To))
@@ -144,7 +250,13 @@
 
       end if
 
+
+      ! 7 Wait until all synchronization messages are sent or received.
+
       call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, err)
+
+
+      ! 8 Set that the uniform pressure force should be used when its value will be being received from the parent.
 
       if (parent_domain>0) then
         if (domain_child_buffer%exchange_pr_gradient_x) &
@@ -1040,6 +1152,44 @@ contains
       czk1 = z_coord(czmin)
       czk2 = z_coord(czmax)
 
+      !check that child image does not exceed this (parent) image
+      if (cxmin < im_xmin - dxmin/100) then
+        write(*,*) "Child image",im,"has lower x bound", cxmin, &
+                   " which is lower than the lower x bound", im_xmin , &
+                   "of parent image",iim,jim,kim
+        call error_stop()
+      end if
+      if (cxmax > im_xmax + dxmin/100) then
+        write(*,*) "Child image",im,"has upper x bound", cxmax, &
+                   " which is higher than the upper x bound", im_xmax , &
+                   "of parent image",iim,jim,kim
+        call error_stop()
+      end if
+      if (cymin < im_ymin - dymin/100) then
+        write(*,*) "Child image",im,"has lower y bound", cymin, &
+                   " which is lower than the lower y bound", im_ymin , &
+                   "of parent image",iim,jim,kim
+        call error_stop()
+      end if
+      if (cymax > im_ymax + dymin/100) then
+        write(*,*) "Child image",im,"has upper y bound", cymax, &
+                   " which is higher than the upper y bound", im_ymax , &
+                   "of parent image",iim,jim,kim
+        call error_stop()
+      end if
+      if (czmin < im_zmin - dzmin/100) then
+        write(*,*) "Child image",im,"has lower z bound", czmin, &
+                   " which is lower than the lower z bound", im_zmin , &
+                   "of parent image",iim,jim,kim
+        call error_stop()
+      end if
+      if (czmax > im_zmax + dzmin/100) then
+        write(*,*) "Child image",im,"has upper z bound", czmax, &
+                   " which is higher than the upper z bound", im_zmax , &
+                   "of parent image",iim,jim,kim
+        call error_stop()
+      end if
+
       !check that the grids are aligned
       if (.not.(abs(cxi1*dxmin + im_xmin - cxmin) < dxmin/100)) &
         call error_stop("The west boundary of domains "//itoa(domain_index)// &
@@ -1059,6 +1209,7 @@ contains
       if (.not.(abs(czk2*dzmin + im_zmin - czmax) < dzmin/100)) &
         call error_stop("The top boundary of domains "//itoa(domain_index)// &
                         " and "//itoa(child_domain)//" is not aligned.")
+
 
       !corresponds to index 0 on the child grid
       b%i1 = cxi1

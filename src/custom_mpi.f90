@@ -38,6 +38,9 @@ module custom_par
 
   integer, allocatable :: child_domains(:)
 
+  !child domains which intersect this image
+  integer, allocatable :: image_child_domains(:)
+
   !whether given domain boundary is receiving and using boundary conditions from parent
   logical :: is_domain_boundary_nested(6) = .true.
 

@@ -78,6 +78,7 @@ module domains_bc_par
 
   type dom_parent_buffers_container
     integer :: remote_domain
+    integer :: iim1 = 0, iim2 = -1, jim1 = 0, jim2 = -1, kim1 = 0, kim2 = -1
     type(dom_parent_buffer), allocatable :: bs(:,:,:)
   end type
 
@@ -238,25 +239,25 @@ contains
                     b%dMoisture_dt = 0
                   end if
                 else
-                  b%dU_dt = (U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) - b%U) / dt
-                  b%dV_dt = (V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) - b%V) / dt
-                  b%dW_dt = (W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) - b%W) / dt
+                  b%dU_dt(:,:,:) = (U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) - b%U) / dt
+                  b%dV_dt(:,:,:) = (V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) - b%V) / dt
+                  b%dW_dt(:,:,:) = (W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2) - b%W) / dt
                   if (enable_buoyancy) then
-                    b%dTemperature_dt = (Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Temperature) / dt
+                    b%dTemperature_dt(:,:,:) = (Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Temperature) / dt
                   end if
                   if (enable_moisture) then
-                    b%dMoisture_dt = (Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Moisture) / dt
+                    b%dMoisture_dt(:,:,:) = (Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Moisture) / dt
                   end if
                 end if
 
-                b%U = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2)
-                b%V = V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2)
-                b%W = W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2)
+                b%U(:,:,:) = U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2)
+                b%V(:,:,:) = V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2)
+                b%W(:,:,:) = W(b%Wi1:b%Wi2,b%Wj1:b%Wj2,b%Wk1:b%Wk2)
                 if (enable_buoyancy) then
-                  b%Temperature = Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
+                  b%Temperature(:,:,:) = Temperature(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
                 end if
                 if (enable_moisture) then
-                  b%Moisture = Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
+                  b%Moisture(:,:,:) = Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
                 end if
 
                 b%time = time
@@ -272,9 +273,9 @@ contains
         if (allocated(domain_parent_buffers)) then
           do di = 1, size(domain_parent_buffers)
             if (allocated(domain_parent_buffers(di)%bs)) then
-              do k = 1, size(domain_parent_buffers(di)%bs,3)
-                do j = 1, size(domain_parent_buffers(di)%bs,2)
-                  do i = 1, size(domain_parent_buffers(di)%bs,1)
+              do k = lbound(domain_parent_buffers(di)%bs,3), ubound(domain_parent_buffers(di)%bs,3)
+                do j = lbound(domain_parent_buffers(di)%bs,2), ubound(domain_parent_buffers(di)%bs,2)
+                  do i = lbound(domain_parent_buffers(di)%bs,1), ubound(domain_parent_buffers(di)%bs,1)
 
                     associate(b => domain_parent_buffers(di)%bs(i,j,k))
                       if (b%exchange_pr_gradient_x) then
@@ -1823,9 +1824,9 @@ contains
     if (allocated(domain_parent_buffers)) then
       do di = 1, size(domain_parent_buffers)
         if (allocated(domain_parent_buffers(di)%bs)) then
-          do k = 1, size(domain_parent_buffers(di)%bs,3)
-            do j = 1, size(domain_parent_buffers(di)%bs,2)
-              do i = 1, size(domain_parent_buffers(di)%bs,1)
+          do k = lbound(domain_parent_buffers(di)%bs,3), ubound(domain_parent_buffers(di)%bs,3)
+            do j = lbound(domain_parent_buffers(di)%bs,2), ubound(domain_parent_buffers(di)%bs,2)
+              do i = lbound(domain_parent_buffers(di)%bs,1), ubound(domain_parent_buffers(di)%bs,1)
 
                 associate(b => domain_parent_buffers(di)%bs(i,j,k))
 
