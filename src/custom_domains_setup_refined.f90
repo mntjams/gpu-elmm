@@ -106,6 +106,8 @@ outer:  do dkk = 1, domain_nzims(parent_domain)
 
           child_domain = image_child_domains(i_child_domain)
 
+          ! 4b Create the domain parent buffers.
+
           allocate(bs%bs( &
                      bs%iim1:bs%iim2, &
                      bs%jim1:bs%jim2, &
@@ -121,9 +123,7 @@ outer:  do dkk = 1, domain_nzims(parent_domain)
           end do
 
 
-          ! 5 Set up the parent (send) buffers for the domain nesting boundaries
-          
-          ! 5a Compute the number of the send boundary buffers.
+          ! 4b Compute the number of the parent (send) boundary buffers.
 
           do side = We, Ea
             if (domain_is_boundary_nested(side,child_domain)) &
@@ -145,8 +145,8 @@ outer:  do dkk = 1, domain_nzims(parent_domain)
       end do
 
       
-      ! 5b Set up the parent (send)  boundary buffers
-
+      ! 5 Set up the parent (send) buffers for the domain nesting boundaries
+          
       allocate(domain_bc_send_buffers(n_send_buffers))
 
       num = 0
