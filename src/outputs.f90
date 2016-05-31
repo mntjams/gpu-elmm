@@ -1253,7 +1253,7 @@ contains
     do k=1,Prnz
       do j=1,Prny
         do i=1,Prnx
-          TKE(i,j,k) = TKE(i,j,k) + ((Viscosity(i,j,k) - molecular_viscosity) / (Ck * width))**2
+          TKE(i,j,k) = TKE(i,j,k) + weight * ((Viscosity(i,j,k) - molecular_viscosity) / (Ck * width))**2
         end do
       end do
     end do
