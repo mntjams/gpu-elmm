@@ -1,14 +1,17 @@
 *.cu*
 *~
 *.mod
+*.smod
 *.hmd
 *.so
 *.o
 *.bak
 *.hmg
 *.i
+*.patch
 .make.*
 bin/*
+*/a.out
 *.dblite
 custom
 
