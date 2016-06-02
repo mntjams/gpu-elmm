@@ -28,7 +28,7 @@ subroutine  CustomSolidBodies
 !    poly = ConvexPolyhedron_FromTopPoints(points(:,4:1:-1))
 !    print *, poly%Inside(0._knd, 1._knd, 0.5_knd)
    
-   do j = -2, 2
+   do j = -3, 2
      do i = -3, 12
        points(1,:) = base(1,:) + i * period(1)
        points(2,:) = base(2,:) + j * period(2)
