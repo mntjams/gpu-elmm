@@ -544,155 +544,158 @@ contains
       call interpolate_W_trilinear(b%r_W, b%W)
       call interpolate_W_trilinear(b%r_dW_dt, b%dW_dt)
     else
-      call interpolate_U_spline(b%r_U, b%U)
-      call interpolate_U_spline(b%r_dU_dt, b%dU_dt)
-
-      call interpolate_V_spline(b%r_V, b%V)
-      call interpolate_V_spline(b%r_dV_dt, b%dV_dt)
-
-      call interpolate_W_spline(b%r_W, b%W)
-      call interpolate_W_spline(b%r_dW_dt, b%dW_dt)
+!       call interpolate_U_spline(b%r_U, b%U)
+!       call interpolate_U_spline(b%r_dU_dt, b%dU_dt)
+! 
+!       call interpolate_V_spline(b%r_V, b%V)
+!       call interpolate_V_spline(b%r_dV_dt, b%dV_dt)
+! 
+!       call interpolate_W_spline(b%r_W, b%W)
+!       call interpolate_W_spline(b%r_dW_dt, b%dW_dt)
     end if
 
   contains
 
-    subroutine interpolate_U_spline(in, out)
-      use bspline_oo_module
-      real(knd), intent(in), allocatable :: in(:,:,:)
-      real(knd), intent(inout), allocatable :: out(:,:,:)
-      integer :: i, j, k
-      type(bspline_3d) :: spl
-      integer :: iflag, idx, idy, idz
-      real(real64) :: val
-
-      idx = 0; idy = 0; idz = 0
-      
-      call spl%initialize(b%r_xU(b%r_Ui1:b%r_Ui2), &
-                          b%r_y(b%r_Uj1:b%r_Uj2), &
-                          b%r_z(b%r_Uk1:b%r_Uk2), &
-                          in, &
-                          b%interp_order(1), b%interp_order(2), b%interp_order(3), &
-                          iflag)
-      if (iflag/=1) then
-        write(*,*) "Error in spline initialization, iflag:",iflag
-        stop
-      end if
-      
-      
-      do k = b%Uk1, b%Uk2
-        do j = b%Uj1, b%Uj2
-          do i = b%Ui1, b%Ui2
-            call spl%evaluate(xU(i), yPr(j), zPr(k), &
-                              idx, idy, idz, val, iflag)
-            if (iflag/=0) then
-              write(*,*) "Error in spline interpolation of U at", &
-                          xU(i), yPr(j), zPr(k)
-              write(*,*) "flag:",iflag
-              write(*,*) "xs:",b%r_xU(b%r_Ui1:b%r_Ui2)
-              write(*,*) "ys:",b%r_y(b%r_Uj1:b%r_Uj2)
-              write(*,*) "zs:",b%r_z(b%r_Uk1:b%r_Uk2)
-              call error_stop()
-            end if
-
-            out(i,j,k) = val
-          end do
-        end do
-      end do
-
-      call spl%destroy()
-    end subroutine
-
-    subroutine interpolate_V_spline(in, out)
-      use bspline_oo_module
-      real(knd), intent(in), allocatable :: in(:,:,:)
-      real(knd), intent(inout), allocatable :: out(:,:,:)
-      integer :: i, j, k
-      type(bspline_3d) :: spl
-      integer :: iflag, idx, idy, idz
-      real(real64) :: val
-
-      idx = 0; idy = 0; idz = 0
-      
-      call spl%initialize(b%r_x(b%r_Vi1:b%r_Vi2), &
-                          b%r_yV(b%r_Vj1:b%r_Vj2), &
-                          b%r_z(b%r_Vk1:b%r_Vk2), &
-                          in, &
-                          b%interp_order(1), b%interp_order(2), b%interp_order(3), &
-                          iflag)
-      if (iflag/=1) then
-        write(*,*) "Error in spline initialization, iflag:",iflag
-        stop
-      end if
-      
-      
-      do k = b%Vk1, b%Vk2
-        do j = b%Vj1, b%Vj2
-          do i = b%Vi1, b%Vi2
-            call spl%evaluate(xPr(i), yV(j), zPr(k), &
-                              idx, idy, idz, val, iflag)
-            if (iflag/=0) then
-              write(*,*) "Error in spline interpolation of V at", &
-                          xPr(i), yV(j), zPr(k)
-              write(*,*) "flag:",iflag
-              write(*,*) "xs:",b%r_x(b%r_Vi1:b%r_Vi2)
-              write(*,*) "ys:",b%r_yV(b%r_Vj1:b%r_Vj2)
-              write(*,*) "zs:",b%r_z(b%r_Vk1:b%r_Vk2)
-              call error_stop()
-            end if
-
-            out(i,j,k) = val
-          end do
-        end do
-      end do
-
-      call spl%destroy()
-    end subroutine
-
-    subroutine interpolate_W_spline(in, out)
-      use bspline_oo_module
-      real(knd), intent(in), allocatable :: in(:,:,:)
-      real(knd), intent(inout), allocatable :: out(:,:,:)
-      integer :: i, j, k
-      type(bspline_3d) :: spl
-      integer :: iflag, idx, idy, idz
-      real(real64) :: val
-
-      idx = 0; idy = 0; idz = 0
-      
-      call spl%initialize(b%r_x(b%r_Wi1:b%r_Wi2), &
-                          b%r_y(b%r_Wj1:b%r_Wj2), &
-                          b%r_zW(b%r_Wk1:b%r_Wk2), &
-                          b%r_W, &
-                          b%interp_order(1), b%interp_order(2), b%interp_order(3), &
-                          iflag)
-      if (iflag/=1) then
-        write(*,*) "Error in spline initialization, iflag:",iflag
-        stop
-      end if
-      
-      
-      do k = b%Wk1, b%Wk2
-        do j = b%Wj1, b%Wj2
-          do i = b%Wi1, b%Wi2
-            call spl%evaluate(xPr(i), yPr(j), zW(k), &
-                              idx, idy, idz, val, iflag)
-            if (iflag/=0) then
-              write(*,*) "Error in spline interpolation of W at", &
-                          xPr(i), yPr(j), zW(k)
-              write(*,*) "flag:",iflag
-              write(*,*) "xs:",b%r_x(b%r_Wi1:b%r_Wi2)
-              write(*,*) "ys:",b%r_y(b%r_Wj1:b%r_Wj2)
-              write(*,*) "zs:",b%r_zW(b%r_Wk1:b%r_Wk2)
-              call error_stop()
-            end if
-
-            out(i,j,k) = val
-          end do
-        end do
-      end do
-
-      call spl%destroy()
-    end subroutine
+!     NOTE: the following implementation of bspline interpolation is working, but only in double precision.
+!     It also should be made faster.
+!
+!     subroutine interpolate_U_spline(in, out)
+!       use bspline_oo_module
+!       real(knd), intent(in), allocatable :: in(:,:,:)
+!       real(knd), intent(inout), allocatable :: out(:,:,:)
+!       integer :: i, j, k
+!       type(bspline_3d) :: spl
+!       integer :: iflag, idx, idy, idz
+!       real(real64) :: val
+! 
+!       idx = 0; idy = 0; idz = 0
+!       
+!       call spl%initialize(b%r_xU(b%r_Ui1:b%r_Ui2), &
+!                           b%r_y(b%r_Uj1:b%r_Uj2), &
+!                           b%r_z(b%r_Uk1:b%r_Uk2), &
+!                           in, &
+!                           b%interp_order(1), b%interp_order(2), b%interp_order(3), &
+!                           iflag)
+!       if (iflag/=1) then
+!         write(*,*) "Error in spline initialization, iflag:",iflag
+!         stop
+!       end if
+!       
+!       
+!       do k = b%Uk1, b%Uk2
+!         do j = b%Uj1, b%Uj2
+!           do i = b%Ui1, b%Ui2
+!             call spl%evaluate(xU(i), yPr(j), zPr(k), &
+!                               idx, idy, idz, val, iflag)
+!             if (iflag/=0) then
+!               write(*,*) "Error in spline interpolation of U at", &
+!                           xU(i), yPr(j), zPr(k)
+!               write(*,*) "flag:",iflag
+!               write(*,*) "xs:",b%r_xU(b%r_Ui1:b%r_Ui2)
+!               write(*,*) "ys:",b%r_y(b%r_Uj1:b%r_Uj2)
+!               write(*,*) "zs:",b%r_z(b%r_Uk1:b%r_Uk2)
+!               call error_stop()
+!             end if
+! 
+!             out(i,j,k) = val
+!           end do
+!         end do
+!       end do
+! 
+!       call spl%destroy()
+!     end subroutine
+! 
+!     subroutine interpolate_V_spline(in, out)
+!       use bspline_oo_module
+!       real(knd), intent(in), allocatable :: in(:,:,:)
+!       real(knd), intent(inout), allocatable :: out(:,:,:)
+!       integer :: i, j, k
+!       type(bspline_3d) :: spl
+!       integer :: iflag, idx, idy, idz
+!       real(real64) :: val
+! 
+!       idx = 0; idy = 0; idz = 0
+!       
+!       call spl%initialize(b%r_x(b%r_Vi1:b%r_Vi2), &
+!                           b%r_yV(b%r_Vj1:b%r_Vj2), &
+!                           b%r_z(b%r_Vk1:b%r_Vk2), &
+!                           in, &
+!                           b%interp_order(1), b%interp_order(2), b%interp_order(3), &
+!                           iflag)
+!       if (iflag/=1) then
+!         write(*,*) "Error in spline initialization, iflag:",iflag
+!         stop
+!       end if
+!       
+!       
+!       do k = b%Vk1, b%Vk2
+!         do j = b%Vj1, b%Vj2
+!           do i = b%Vi1, b%Vi2
+!             call spl%evaluate(xPr(i), yV(j), zPr(k), &
+!                               idx, idy, idz, val, iflag)
+!             if (iflag/=0) then
+!               write(*,*) "Error in spline interpolation of V at", &
+!                           xPr(i), yV(j), zPr(k)
+!               write(*,*) "flag:",iflag
+!               write(*,*) "xs:",b%r_x(b%r_Vi1:b%r_Vi2)
+!               write(*,*) "ys:",b%r_yV(b%r_Vj1:b%r_Vj2)
+!               write(*,*) "zs:",b%r_z(b%r_Vk1:b%r_Vk2)
+!               call error_stop()
+!             end if
+! 
+!             out(i,j,k) = val
+!           end do
+!         end do
+!       end do
+! 
+!       call spl%destroy()
+!     end subroutine
+! 
+!     subroutine interpolate_W_spline(in, out)
+!       use bspline_oo_module
+!       real(knd), intent(in), allocatable :: in(:,:,:)
+!       real(knd), intent(inout), allocatable :: out(:,:,:)
+!       integer :: i, j, k
+!       type(bspline_3d) :: spl
+!       integer :: iflag, idx, idy, idz
+!       real(real64) :: val
+! 
+!       idx = 0; idy = 0; idz = 0
+!       
+!       call spl%initialize(b%r_x(b%r_Wi1:b%r_Wi2), &
+!                           b%r_y(b%r_Wj1:b%r_Wj2), &
+!                           b%r_zW(b%r_Wk1:b%r_Wk2), &
+!                           b%r_W, &
+!                           b%interp_order(1), b%interp_order(2), b%interp_order(3), &
+!                           iflag)
+!       if (iflag/=1) then
+!         write(*,*) "Error in spline initialization, iflag:",iflag
+!         stop
+!       end if
+!       
+!       
+!       do k = b%Wk1, b%Wk2
+!         do j = b%Wj1, b%Wj2
+!           do i = b%Wi1, b%Wi2
+!             call spl%evaluate(xPr(i), yPr(j), zW(k), &
+!                               idx, idy, idz, val, iflag)
+!             if (iflag/=0) then
+!               write(*,*) "Error in spline interpolation of W at", &
+!                           xPr(i), yPr(j), zW(k)
+!               write(*,*) "flag:",iflag
+!               write(*,*) "xs:",b%r_x(b%r_Wi1:b%r_Wi2)
+!               write(*,*) "ys:",b%r_y(b%r_Wj1:b%r_Wj2)
+!               write(*,*) "zs:",b%r_zW(b%r_Wk1:b%r_Wk2)
+!               call error_stop()
+!             end if
+! 
+!             out(i,j,k) = val
+!           end do
+!         end do
+!       end do
+! 
+!       call spl%destroy()
+!     end subroutine
 
     subroutine interpolate_U_trilinear(in, out)
       real(knd), intent(in), allocatable :: in(:,:,:)
