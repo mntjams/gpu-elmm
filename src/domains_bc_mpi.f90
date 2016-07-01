@@ -20,6 +20,7 @@ module domains_bc_par
          par_domain_bound_relaxation, &
          par_receive_initial_conditions, &
          par_send_initial_conditions, &
+         par_domain_double_nesting_feedback, &
          domain_spatial_ratio, &
          domain_time_step_ratio
 
@@ -28,6 +29,9 @@ module domains_bc_par
     integer :: comm = MPI_COMM_NULL
     integer :: remote_rank = MPI_PROC_NULL
     integer :: remote_image(3) = 0
+
+    !whether the child is doubly nested in the parent
+    logical :: is_doubly_nested = .false.
 
     !time at which the data is valid
     real(tim) :: time = -tiny(1.0_tim)
@@ -1812,9 +1816,9 @@ contains
 
 
   end subroutine receive_and_interpolate
-
-
-
+  
+  
+  
   subroutine par_send_initial_conditions(U, V, W, Pr, Temperature, Moisture, Scalar)
     real(knd), intent(in) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:) ,W(-2:,-2:,-2:), Pr(:,:,:)
     real(knd), intent(in) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,:)
@@ -1879,5 +1883,118 @@ contains
       end do
     end if
   end subroutine par_send_initial_conditions
+  
+  
+  
+  
+  subroutine par_domain_double_nesting_feedback(U, V, W, Temperature, Moisture, Scalar, &
+                                                time, dt)
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U, V ,W 
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Temperature, Moisture
+    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(inout) :: Scalar
+    real(TIM), intent(in) :: time, dt
+    real(knd), allocatable :: tmp(:,:,:)
+    integer :: di, i, j, k, n, m(6)
+    integer :: err
+                                            
+    if (parent_domain>0) then
+      associate(b=>domain_child_buffer)
+        if (b%time_step==b%time_step_ratio) then
+          allocate(tmp(b%r_i1:b%r_i2,b%r_j1:b%r_j2,b%r_k1:b%r_k2))
+
+          n = size(tmp)
+
+          call filter(tmp, U)
+          call MPI_Send(tmp, n, MPI_KND, &
+                        b%remote_rank, 4002, b%comm, err)
+
+          call filter(tmp, V)
+          call MPI_Send(tmp, n, MPI_KND, &
+                        b%remote_rank, 4003, b%comm, err)
+
+          call filter(tmp, W)
+          call MPI_Send(tmp, n, MPI_KND, &
+                        b%remote_rank, 4004, b%comm, err)
+        end if
+      end associate
+    end if
+    
+    if (allocated(domain_parent_buffers)) then
+      do di = 1, size(domain_parent_buffers)
+        if (allocated(domain_parent_buffers(di)%bs)) then
+          do k = lbound(domain_parent_buffers(di)%bs,3), ubound(domain_parent_buffers(di)%bs,3)
+            do j = lbound(domain_parent_buffers(di)%bs,2), ubound(domain_parent_buffers(di)%bs,2)
+              do i = lbound(domain_parent_buffers(di)%bs,1), ubound(domain_parent_buffers(di)%bs,1)
+
+                associate(b => domain_parent_buffers(di)%bs(i,j,k))
+
+                    allocate(tmp(b%i1:b%i2,b%j1:b%j2,b%k1:b%k2))
+                    n = size(tmp)
+
+                    m = 1
+                    
+!                     where (is_domain_boundary_nested.and.is_boundary_domain_boundary) &
+!                       m = m + 2
+                    where (is_boundary_domain_boundary) m = 3
+                    m(5) = 1
+                    
+                    call MPI_Recv(tmp, n, MPI_KND, &
+                                  b%remote_rank, 4002, b%comm, MPI_STATUS_IGNORE, err)
+                    U(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
+                      tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
+
+                    call MPI_Recv(tmp, n, MPI_KND, &
+                                  b%remote_rank, 4003, b%comm, MPI_STATUS_IGNORE, err)
+                    V(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
+                      tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
+
+                    call MPI_Recv(tmp, n, MPI_KND, &
+                                  b%remote_rank, 4004, b%comm, MPI_STATUS_IGNORE, err)
+                    W(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
+                      tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
+
+                    deallocate(tmp)
+                end associate
+
+              end do
+            end do
+          end do
+        end if
+      end do
+    end if       
+    
+  contains
+  
+    subroutine filter(t, a)
+      real(knd), allocatable, intent(inout) :: t(:,:,:)
+      real(knd), contiguous, intent(in) :: a(-2:,-2:,-2:)
+      integer :: i, j, k
+      integer :: ii, jj, kk
+      integer :: s
+      
+      associate(b=>domain_child_buffer)
+        s = b%spatial_ratio
+        
+        do k = b%r_k1+1, b%r_k2-1
+          kk = (k - (b%r_k1+1))*s
+          do j = b%r_j1+1, b%r_j2-1 
+            jj = (j - (b%r_j1+1))*s
+            do i = b%r_i1+1, b%r_i2-1
+              ii = (i - (b%r_i1+1))*s
+              t(i,j,k) = sum(a(ii + 1 : ii + s, &
+                               jj + 1 : jj + s, &
+                               kk + 1 : kk + s)) &
+                          / s**3
+            end do
+          end do
+        end do
+      end associate
+    end subroutine
+    
+  end subroutine par_domain_double_nesting_feedback
+
+
+
+
 
 end module domains_bc_par

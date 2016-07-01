@@ -658,28 +658,28 @@ contains
     class(TFrameDomain),target,asynchronous,intent(inout) :: D
     integer :: err
 
-    err = 1
-    
-    select type (Dnp => D)
-      type is (TFrameDomain)
-        call pthread_create_opaque(Dnp%threadptr, &
-                                   c_funloc(SaveBuffers), &
-                                   c_loc(Dnp), err)
-      class default
-        call error_stop("Error: wrong type of D in TFrameDomain_DoSave.")
-    end select
-
-    if (err==0) then
-      D%in_progress = .true.
-    else
-      write (*,*) "Error in creating frame thread. Will run again synchronously. Code:",err
+!     err = 1
+!     
+!     select type (Dnp => D)
+!       type is (TFrameDomain)
+!         call pthread_create_opaque(Dnp%threadptr, &
+!                                    c_funloc(SaveBuffers), &
+!                                    c_loc(Dnp), err)
+!       class default
+!         call error_stop("Error: wrong type of D in TFrameDomain_DoSave.")
+!     end select
+! 
+!     if (err==0) then
+!       D%in_progress = .true.
+!     else
+!       write (*,*) "Error in creating frame thread. Will run again synchronously. Code:",err
       select type (Dnp => D)
         type is (TFrameDomain)
           call SaveBuffers(c_loc(Dnp))
         class default
           call error_stop("Error: wrog type of D in TFrameDomain_DoSave.")
       end select
-    end if
+!     end if
 
   end subroutine TFrameDomain_DoSave
 
