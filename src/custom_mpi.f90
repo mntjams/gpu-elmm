@@ -28,6 +28,8 @@ module custom_par
 
   logical :: enable_multiple_domains = .false.
   
+  !TODO: put current domain properties into a derived type
+  
   !number of the domain
   integer :: domain_index = 1
   
@@ -37,11 +39,14 @@ module custom_par
   integer :: parent_domain = 0
 
   integer :: parent_image(3) = [1, 1, 1]
-
+  
   integer, allocatable :: child_domains(:)
 
   !child domains which intersect this image
   integer, allocatable :: image_child_domains(:)
+  
+  !whether given child domain is double nested
+  logical, allocatable :: is_child_domain_doubly_nested(:)
 
   !whether given domain boundary is receiving and using boundary conditions from parent
   logical :: is_domain_boundary_nested(6) = .true.
@@ -72,6 +77,9 @@ module custom_par
   !image numbers and rank numbers (in world_comm)
   type(domain_proc_grid), allocatable :: domain_images_grid(:), &
                                          domain_ranks_grid(:)
+
+  !is this domain double nested in its parent?
+  logical :: domain_is_doubly_nested = .false.
 
   !index, boundary
   logical, allocatable :: domain_is_boundary_nested(:,:)

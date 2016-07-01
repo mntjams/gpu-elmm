@@ -156,6 +156,11 @@ contains
 #endif
 
 
+#ifdef PAR
+      if (RK_stage==RK_stages) call par_domain_double_nesting_feedback(U2, V2, W2, Temperature, Moisture, Scalar, &
+                                            time_stepping%time, time_stepping%dt)
+#endif
+
       if (pressure_solution%poisson_solver > POISSON_SOLVER_NONE) then
         call PressureCorrection(U2, V2, W2, Pr, Q, 2*RK_alpha(RK_stage)*time_stepping%dt)
       end if
@@ -211,7 +216,7 @@ contains
       end if
 
     end do
-
+    
 
   end subroutine TMarchRK3
 
