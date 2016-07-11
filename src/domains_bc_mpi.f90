@@ -1899,7 +1899,7 @@ contains
                                             
     if (parent_domain>0) then
       associate(b=>domain_child_buffer)
-        if (b%time_step==b%time_step_ratio) then
+        if (b%is_doubly_nested .and. b%time_step==b%time_step_ratio) then
           allocate(tmp(b%r_i1:b%r_i2,b%r_j1:b%r_j2,b%r_k1:b%r_k2))
 
           n = size(tmp)
@@ -1927,7 +1927,7 @@ contains
               do i = lbound(domain_parent_buffers(di)%bs,1), ubound(domain_parent_buffers(di)%bs,1)
 
                 associate(b => domain_parent_buffers(di)%bs(i,j,k))
-
+                  if (b%is_doubly_nested) then
                     allocate(tmp(b%i1:b%i2,b%j1:b%j2,b%k1:b%k2))
                     n = size(tmp)
 
@@ -1954,6 +1954,7 @@ contains
                       tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
 
                     deallocate(tmp)
+                  end if
                 end associate
 
               end do

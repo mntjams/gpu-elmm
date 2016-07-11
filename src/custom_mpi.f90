@@ -45,9 +45,6 @@ module custom_par
   !child domains which intersect this image
   integer, allocatable :: image_child_domains(:)
   
-  !whether given child domain is double nested
-  logical, allocatable :: is_child_domain_doubly_nested(:)
-
   !whether given domain boundary is receiving and using boundary conditions from parent
   logical :: is_domain_boundary_nested(6) = .true.
 
@@ -79,7 +76,10 @@ module custom_par
                                          domain_ranks_grid(:)
 
   !is this domain double nested in its parent?
-  logical :: domain_is_doubly_nested = .false.
+  logical :: domain_is_this_domain_doubly_nested = .false.
+
+  !is this domain double nested in its parent?
+  logical, allocatable :: domain_is_domain_doubly_nested(:)
 
   !index, boundary
   logical, allocatable :: domain_is_boundary_nested(:,:)
@@ -503,6 +503,16 @@ contains
         if (ie/=0) call error_stop("Error calling MPI_Comm_create.")
       end do
     end do
+    
+    allocate(domain_is_domain_doubly_nested(number_of_domains))
+    domain_is_domain_doubly_nested(domain_index) = domain_is_this_domain_doubly_nested
+    !instead of scatter due to the 3D topology
+    call MPI_Allreduce(MPI_IN_PLACE, domain_is_domain_doubly_nested, &
+                       size(domain_is_boundary_nested), MPI_LOGICAL, &
+                       MPI_LOR, world_comm, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Allreduce for is_domain_boundary_nested.")
+    
+    
 
     allocate(domain_is_boundary_nested(6,number_of_domains))
     domain_is_boundary_nested = .false.
