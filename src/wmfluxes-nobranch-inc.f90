@@ -184,7 +184,7 @@
       do i = 1, size(zp)
 #define p zp(i)
             wrk(p%xi,p%yj,p%zk+1) = &
-            wrk(p%xi,p%yj,p%zk+1) - &
+            wrk(p%xi,p%yj,p%zk+1) + &
   flz(p%xi,p%yj,p%zk)
 
             wrk(p%xi,p%yj,p%zk+1) = &
@@ -197,7 +197,7 @@
       do i = 1, size(zp)
 #define p zp(i)
             wrk(p%xi,p%yj,p%zk) = &
-            wrk(p%xi,p%yj,p%zk) + &
+            wrk(p%xi,p%yj,p%zk) - &
   flz(p%xi,p%yj,p%zk)
 
             wrk(p%xi,p%yj,p%zk) = &
