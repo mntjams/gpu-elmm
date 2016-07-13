@@ -19,6 +19,8 @@ contains
     integer       :: i,j,k,m,n,o,r
     integer       :: nb
 
+    if (wallmodeltype==0) return
+
     allocate(p%depscalar(num_of_scalars))
 
     !six triplets [1,0,0], [-1,0,0], [0,1,0],...
@@ -119,6 +121,8 @@ contains
   subroutine GetSolidBodiesWM_UVW
     integer                  :: neighbours(3,MINUSX:PLUSZ)
     real(knd), target        :: r_neighbours(3,MINUSX:PLUSZ)
+
+    if (wallmodeltype==0) return
 
     !six triplets [1,0,0], [-1,0,0], [0,1,0],...
     neighbours = 0
