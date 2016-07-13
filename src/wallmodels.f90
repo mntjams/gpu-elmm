@@ -417,9 +417,13 @@ contains
   subroutine GetOutsideBoundariesWM(nscalars)
     integer, intent(in) :: nscalars
 
-    call GetOutsideBoundariesWM_Pr(nscalars)
+    if (wallmodeltype/=0) then
 
-    call GetOutsideBoundariesWM_UVW
+      call GetOutsideBoundariesWM_Pr(nscalars)
+
+      call GetOutsideBoundariesWM_UVW
+
+    end if
   end subroutine
 
 
@@ -804,62 +808,68 @@ contains
     Scfly_mask = .true.
     Scflz_mask = .true.
     !$omp end workshare
-
-    !$omp do collapse(3) schedule(dynamic, 100)
-    do k = 1, Prnz
-      do j = 1, Prny
-        do i = 1, Prnx
-          if (Prtype(i,j,k)>0.or.Prtype(i+1,j,k)>0) Scflx_mask(i,j,k) = .false.
-          if (Prtype(i,j,k)>0.or.Prtype(i,j+1,k)>0) Scfly_mask(i,j,k) = .false.
-          if (Prtype(i,j,k)>0.or.Prtype(i,j,k+1)>0) Scflz_mask(i,j,k) = .false.
-        end do
-      end do
-    end do
-
-    !$omp single
-    nx = 0
-    ny = 0
-    nz = 0
-    !$omp end single
-
-    !$omp do reduction(+:nx,ny,nz) collapse(3) schedule(dynamic, 100)
-    do k = 1, Prnz
-      do j = 1, Prny
-        do i = 1, Prnx
-          if (Prtype(i,j,k)>0.neqv.Prtype(i+1,j,k)>0) nx = nx + 1
-          if (Prtype(i,j,k)>0.neqv.Prtype(i,j+1,k)>0) ny = ny + 1
-          if (Prtype(i,j,k)>0.neqv.Prtype(i,j,k+1)>0) nz = nz + 1
-        end do
-      end do
-    end do
     !$omp end parallel
 
-    allocate(Scflx_points(nx))
-    allocate(Scfly_points(ny))
-    allocate(Scflz_points(nz))
-    nx = 0
-    ny = 0
-    nz = 0
+    if (wallmodeltype/=0) then
 
-    
-    do k = 1, Prnz
-      do j = 1, Prny
-        do i = 1, Prnx
-          if (Prtype(i,j,k)>0.neqv.Prtype(i+1,j,k)>0) then
-            nx = nx + 1
-            Scflx_points(nx) = point(i,j,k)
-          end if
-          if (Prtype(i,j,k)>0.neqv.Prtype(i,j+1,k)>0) then
-            ny = ny + 1
-            Scfly_points(ny) = point(i,j,k)
-          end if
-          if (Prtype(i,j,k)>0.neqv.Prtype(i,j,k+1)>0) then
-            nz = nz + 1
-            Scflz_points(nz) = point(i,j,k)
-          end if
+      !$omp parallel
+      !$omp do collapse(3) schedule(dynamic, 100)
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            if (Prtype(i,j,k)>0.or.Prtype(i+1,j,k)>0) Scflx_mask(i,j,k) = .false.
+            if (Prtype(i,j,k)>0.or.Prtype(i,j+1,k)>0) Scfly_mask(i,j,k) = .false.
+            if (Prtype(i,j,k)>0.or.Prtype(i,j,k+1)>0) Scflz_mask(i,j,k) = .false.
+          end do
         end do
       end do
-    end do
+
+      !$omp single
+      nx = 0
+      ny = 0
+      nz = 0
+      !$omp end single
+
+      !$omp do reduction(+:nx,ny,nz) collapse(3) schedule(dynamic, 100)
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            if (Prtype(i,j,k)>0.neqv.Prtype(i+1,j,k)>0) nx = nx + 1
+            if (Prtype(i,j,k)>0.neqv.Prtype(i,j+1,k)>0) ny = ny + 1
+            if (Prtype(i,j,k)>0.neqv.Prtype(i,j,k+1)>0) nz = nz + 1
+          end do
+        end do
+      end do
+      !$omp end parallel
+
+      allocate(Scflx_points(nx))
+      allocate(Scfly_points(ny))
+      allocate(Scflz_points(nz))
+      nx = 0
+      ny = 0
+      nz = 0
+
+      
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            if (Prtype(i,j,k)>0.neqv.Prtype(i+1,j,k)>0) then
+              nx = nx + 1
+              Scflx_points(nx) = point(i,j,k)
+            end if
+            if (Prtype(i,j,k)>0.neqv.Prtype(i,j+1,k)>0) then
+              ny = ny + 1
+              Scfly_points(ny) = point(i,j,k)
+            end if
+            if (Prtype(i,j,k)>0.neqv.Prtype(i,j,k+1)>0) then
+              nz = nz + 1
+              Scflz_points(nz) = point(i,j,k)
+            end if
+          end do
+        end do
+      end do
+
+    end if
 
     call set_masks(Uflx_mask, Ufly_mask, Uflz_mask, &
                    UxmWMpoints, UxpWMpoints, UymWMpoints, UypWMpoints, UzmWMpoints, UzpWMpoints, Unx, Uny, Unz, Utype)
@@ -887,52 +897,57 @@ contains
       fly = .true.
       flz = .true.
 
-      !$omp parallel
+      if (wallmodeltype/=0) then
 
-      !$omp do private(i)
-      do i = 1, size(xm)
-        flx(xm(i)%xi,xm(i)%yj,xm(i)%zk) = .false.
-      end do
-      !$omp end do
-      !$omp do private(i)
-      do i = 1, size(xp)
-        flx(xp(i)%xi+1,xp(i)%yj,xp(i)%zk) = .false.
-      end do
-      !$omp end do nowait
-      !$omp do private(i)
-      do i = 1, size(ym)
-        fly(ym(i)%xi,ym(i)%yj,ym(i)%zk) = .false.
-      end do
-      !$omp end do
-      !$omp do private(i)
-      do i = 1, size(yp)
-        fly(yp(i)%xi,yp(i)%yj+1,yp(i)%zk) = .false.
-      end do
-      !$omp end do nowait
-      !$omp do private(i)
-      do i = 1, size(zm)
-        flz(zm(i)%xi,zm(i)%yj,zm(i)%zk) = .false.
-      end do
-      !$omp end do
-      !$omp do private(i)
-      do i = 1, size(zp)
-        flz(zp(i)%xi,zp(i)%yj,zp(i)%zk+1) = .false.
-      end do
-      !$omp end do
+        !$omp parallel
 
-      !$omp do private(i,j,k) collapse(3) schedule(dynamic, 100)
-      do k = 1, nz
-        do j = 1, ny
-          do i = 1, nx
-            if (Xtype(i,j,k)>0.and.Xtype(i-1,j,k)>0) flx(i,j,k) = .false.
-            if (Xtype(i,j,k)>0.and.Xtype(i,j-1,k)>0) fly(i,j,k) = .false.
-            if (Xtype(i,j,k)>0.and.Xtype(i,j,k-1)>0) flz(i,j,k) = .false.
+        !$omp do private(i)
+        do i = 1, size(xm)
+          flx(xm(i)%xi,xm(i)%yj,xm(i)%zk) = .false.
+        end do
+        !$omp end do
+        !$omp do private(i)
+        do i = 1, size(xp)
+          flx(xp(i)%xi+1,xp(i)%yj,xp(i)%zk) = .false.
+        end do
+        !$omp end do nowait
+        !$omp do private(i)
+        do i = 1, size(ym)
+          fly(ym(i)%xi,ym(i)%yj,ym(i)%zk) = .false.
+        end do
+        !$omp end do
+        !$omp do private(i)
+        do i = 1, size(yp)
+          fly(yp(i)%xi,yp(i)%yj+1,yp(i)%zk) = .false.
+        end do
+        !$omp end do nowait
+        !$omp do private(i)
+        do i = 1, size(zm)
+          flz(zm(i)%xi,zm(i)%yj,zm(i)%zk) = .false.
+        end do
+        !$omp end do
+        !$omp do private(i)
+        do i = 1, size(zp)
+          flz(zp(i)%xi,zp(i)%yj,zp(i)%zk+1) = .false.
+        end do
+        !$omp end do
+
+        !$omp do private(i,j,k) collapse(3) schedule(dynamic, 100)
+        do k = 1, nz
+          do j = 1, ny
+            do i = 1, nx
+              if (Xtype(i,j,k)>0.and.Xtype(i-1,j,k)>0) flx(i,j,k) = .false.
+              if (Xtype(i,j,k)>0.and.Xtype(i,j-1,k)>0) fly(i,j,k) = .false.
+              if (Xtype(i,j,k)>0.and.Xtype(i,j,k-1)>0) flz(i,j,k) = .false.
+            end do
           end do
         end do
-      end do
-      !$omp end do
+        !$omp end do
 
-      !$omp end parallel
+        !$omp end parallel
+
+      end if
+
     end subroutine
 
   end subroutine InitWMMasks
