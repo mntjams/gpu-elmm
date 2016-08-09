@@ -57,6 +57,7 @@ contains
    use VTKFrames, only: TFrameFlags, &
                               TFrameDomain,  AddDomain
    use PoisFFT, only: PoisFFT_NeumannStag, PoisFFT_Periodic
+   use Sponge, only: enable_out_sponge, enable_top_sponge, enable_top_sponge_scalar
    integer ::  lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
    real(knd) :: mgepsinnerGS
    integer ::  i,io,io2,itmp
@@ -1011,7 +1012,8 @@ contains
                        npxyz, domain_index, number_of_domains, &
 #endif
                        obstacles_file, probes_file, scalar_probes_file, scratch_dir, &
-                       enable_fixed_flow_rate
+                       enable_fixed_flow_rate, &
+                       enable_out_sponge, enable_top_sponge, enable_top_sponge_scalar
 
        if (len_trim(command_line)>0) then
          msg = ''
