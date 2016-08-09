@@ -341,6 +341,11 @@ contains
       end do
     end do
     !$omp end do
+
+    !$omp single
+    Phi_ref = Phi_ref / (Prnx*Prny)
+    !$omp end single
+
 #endif
 
     !$omp do reduction(+:Phi_ref)
