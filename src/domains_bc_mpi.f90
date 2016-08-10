@@ -30,8 +30,8 @@ module domains_bc_par
     integer :: remote_rank = MPI_PROC_NULL
     integer :: remote_image(3) = 0
 
-    !whether the child is doubly nested in the parent
-    logical :: is_doubly_nested = .false.
+    !whether the child is two way nested in the parent
+    logical :: is_two_way_nested = .false.
 
     !time at which the data is valid
     real(tim) :: time = -tiny(1.0_tim)
@@ -539,7 +539,7 @@ contains
     class(dom_bc_buffer_refined), intent(inout) :: b
 
     if (all(b%interp_order==2)) then
-      call interpolate_U_trilinear(b%r_U, b%U)
+      call interpolate_U_trilinear(b%r_U, b%U, .true.)
       call interpolate_U_trilinear(b%r_dU_dt, b%dU_dt)
 
       call interpolate_V_trilinear(b%r_V, b%V)
@@ -701,33 +701,74 @@ contains
 !       call spl%destroy()
 !     end subroutine
 
-    subroutine interpolate_U_trilinear(in, out)
+    subroutine interpolate_U_trilinear(in, out, treat_bottom)
       real(knd), intent(in), allocatable :: in(:,:,:)
       real(knd), intent(inout), allocatable :: out(:,:,:)
+      logical, intent(in), optional :: treat_bottom
       integer :: xi, yj, zk
       integer :: i, j, k
+      integer :: lo
       
-      !$omp parallel do private(i, j, k, xi, yj, zk)
-      do k = b%Uk1, b%Uk2
-        do j = b%Uj1, b%Uj2
-          do i = b%Ui1, b%Ui2
-            call U_r_index(xU(i), yPr(j), zPr(k), xi, yj, zk)
+      !still somewhat a HACK
+      if (present(treat_bottom) .and. b%direction/=To .and. kim==1 .and. Btype(Bo)==BC_NOSLIP) then
 
-            out(i,j,k) = &
-              TriLinInt((xU(i)   - b%r_xU(xi)) / b%r_dx, &
-                        (yPr(j)  - b%r_y(yj) ) / b%r_dy, &
-                        (zPr(k)  - b%r_z(zk) ) / b%r_dz, &
-                        in(xi  , yj  , zk  ), &
-                        in(xi+1, yj  , zk  ), &
-                        in(xi  , yj+1, zk  ), &
-                        in(xi  , yj  , zk+1), &
-                        in(xi+1, yj+1, zk  ), &
-                        in(xi+1, yj  , zk+1), &
-                        in(xi  , yj+1, zk+1), &
-                        in(xi+1, yj+1, zk+1))
+        lo = b%spatial_ratio / 2 + mod(b%spatial_ratio,2)
+
+        !$omp parallel do private(i, j, k, xi, yj, zk)
+        do k = lo, b%Uk2
+          do j = b%Uj1, b%Uj2
+            do i = b%Ui1, b%Ui2
+              call U_r_index(xU(i), yPr(j), zPr(k), xi, yj, zk)
+
+              out(i,j,k) = &
+                TriLinInt((xU(i)   - b%r_xU(xi)) / b%r_dx, &
+                          (yPr(j)  - b%r_y(yj) ) / b%r_dy, &
+                          (zPr(k)  - b%r_z(zk) ) / b%r_dz, &
+                          in(xi  , yj  , zk  ), &
+                          in(xi+1, yj  , zk  ), &
+                          in(xi  , yj+1, zk  ), &
+                          in(xi  , yj  , zk+1), &
+                          in(xi+1, yj+1, zk  ), &
+                          in(xi+1, yj  , zk+1), &
+                          in(xi  , yj+1, zk+1), &
+                          in(xi+1, yj+1, zk+1))
+            end do
           end do
         end do
-      end do
+
+        do k = lo-1,  1, -1
+          out(:,:,k) = 2* out(:,:,k+1) - out(:,:,k+2)
+        end do
+        do k = b%Uk1,  0
+          out(:,:,k) = - out(:,:,1-k)
+        end do
+
+      else
+
+        !$omp parallel do private(i, j, k, xi, yj, zk)
+        do k = b%Uk1, b%Uk2
+          do j = b%Uj1, b%Uj2
+            do i = b%Ui1, b%Ui2
+              call U_r_index(xU(i), yPr(j), zPr(k), xi, yj, zk)
+
+              out(i,j,k) = &
+                TriLinInt((xU(i)   - b%r_xU(xi)) / b%r_dx, &
+                          (yPr(j)  - b%r_y(yj) ) / b%r_dy, &
+                          (zPr(k)  - b%r_z(zk) ) / b%r_dz, &
+                          in(xi  , yj  , zk  ), &
+                          in(xi+1, yj  , zk  ), &
+                          in(xi  , yj+1, zk  ), &
+                          in(xi  , yj  , zk+1), &
+                          in(xi+1, yj+1, zk  ), &
+                          in(xi+1, yj  , zk+1), &
+                          in(xi  , yj+1, zk+1), &
+                          in(xi+1, yj+1, zk+1))
+            end do
+          end do
+        end do
+
+      end if
+
     end subroutine
 
     pure subroutine U_r_index(x, y, z, xi, yj, zk)
@@ -1899,7 +1940,7 @@ contains
                                             
     if (parent_domain>0) then
       associate(b=>domain_child_buffer)
-        if (b%is_doubly_nested .and. b%time_step==b%time_step_ratio) then
+        if (b%is_two_way_nested .and. b%time_step==b%time_step_ratio) then
           allocate(tmp(b%r_i1:b%r_i2,b%r_j1:b%r_j2,b%r_k1:b%r_k2))
 
           n = size(tmp)
@@ -1927,7 +1968,8 @@ contains
               do i = lbound(domain_parent_buffers(di)%bs,1), ubound(domain_parent_buffers(di)%bs,1)
 
                 associate(b => domain_parent_buffers(di)%bs(i,j,k))
-                  if (b%is_doubly_nested) then
+
+                  if (b%is_two_way_nested) then
                     allocate(tmp(b%i1:b%i2,b%j1:b%j2,b%k1:b%k2))
                     n = size(tmp)
 
