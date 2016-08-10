@@ -150,6 +150,9 @@ contains
       end if
 
 
+
+      time_stepping%effective_time = time_stepping%time + 2 * sum(RK_alpha(1:RK_stage)) * time_stepping%dt      
+
 #ifdef PAR
       !Does nudging of the solution to the parent boundary solution in the relaxation zones.
       call par_domain_bound_relaxation(U2, V2, W2, Temperature, Moisture, Scalar, time_stepping%effective_time)
