@@ -177,7 +177,7 @@
       do i = 1, size(UzpWMpoints)
 
             wrk(UzpWMpoints(i)%xi,UzpWMpoints(i)%yj,UzpWMpoints(i)%zk+1) = &
-            wrk(UzpWMpoints(i)%xi,UzpWMpoints(i)%yj,UzpWMpoints(i)%zk+1) - &
+            wrk(UzpWMpoints(i)%xi,UzpWMpoints(i)%yj,UzpWMpoints(i)%zk+1) + &
   (nu((UzpWMpoints(i)%xi)+1,UzpWMpoints(i)%yj,(UzpWMpoints(i)%zk)+1)+&
    nu((UzpWMpoints(i)%xi)+1,UzpWMpoints(i)%yj,UzpWMpoints(i)%zk)+&
    nu(UzpWMpoints(i)%xi,UzpWMpoints(i)%yj,(UzpWMpoints(i)%zk)+1)+&
@@ -195,7 +195,7 @@
       do i = 1, size(UzpWMpoints)
 
             wrk(UzpWMpoints(i)%xi,UzpWMpoints(i)%yj,UzpWMpoints(i)%zk) = &
-            wrk(UzpWMpoints(i)%xi,UzpWMpoints(i)%yj,UzpWMpoints(i)%zk) + &
+            wrk(UzpWMpoints(i)%xi,UzpWMpoints(i)%yj,UzpWMpoints(i)%zk) - &
   (nu((UzpWMpoints(i)%xi)+1,UzpWMpoints(i)%yj,(UzpWMpoints(i)%zk)+1)+&
    nu((UzpWMpoints(i)%xi)+1,UzpWMpoints(i)%yj,UzpWMpoints(i)%zk)+&
    nu(UzpWMpoints(i)%xi,UzpWMpoints(i)%yj,(UzpWMpoints(i)%zk)+1)+&
