@@ -558,8 +558,10 @@ contains
 
 
     subroutine create_boundary_child_buffer(dir, domain)
+      use fftw3
       integer, intent(in) :: dir, domain
       integer :: i, width
+      integer :: nx, ny, nz
 
       associate(b => domain_bc_recv_buffers(dir))
 
@@ -573,7 +575,7 @@ contains
 
         b%relaxation = .true.
 
-        b%interp_order = 2
+        if (b%direction==We) b%interp_order = 0
 
         b%spatial_ratio = domain_spatial_ratio
         b%time_step_ratio = domain_time_step_ratio
@@ -1083,6 +1085,49 @@ contains
           allocate(b%r_Moisture(b%r_Pri1:b%r_Pri2,b%r_Prj1:b%r_Prj2,b%r_Prk1:b%r_Prk2))
           allocate(b%r_dMoisture_dt(b%r_Pri1:b%r_Pri2,b%r_Prj1:b%r_Prj2,b%r_Prk1:b%r_Prk2))
         end if
+
+
+        if (any(b%interp_order==0).and.b%direction==We) then
+          allocate(b%interpolation%fft_r_U(size(b%r_U,1)/2+1,size(b%r_U,2),size(b%r_U,3)))
+          allocate(b%interpolation%fft_r_V(size(b%r_V,1)/2+1,size(b%r_V,2),size(b%r_V,3)))
+          allocate(b%interpolation%fft_r_W(size(b%r_W,1)/2+1,size(b%r_W,2),size(b%r_W,3)))
+          
+!           call pfft_plan_dft_r2c(int([size(b%r_U,3),size(b%r_U,2),size(b%r_U,1)],c_intptr_t), &
+!                                  b%r_U, b%interpolation%fft_r_U, 
+          b%interpolation%forward_U = fftw_plan_gen(size(b%r_U,3), size(b%r_U,2), size(b%r_U,1), &
+                b%r_U, b%interpolation%fft_r_U, FFTW_UNALIGNED)
+          b%interpolation%forward_V = fftw_plan_gen(size(b%r_V,3), size(b%r_V,2), size(b%r_V,1), &
+                b%r_V, b%interpolation%fft_r_V, FFTW_UNALIGNED)
+          b%interpolation%forward_W = fftw_plan_gen(size(b%r_W,3), size(b%r_W,2), size(b%r_W,1), &
+                b%r_W, b%interpolation%fft_r_W, FFTW_UNALIGNED)
+
+          nx = size(b%r_U,1)*b%spatial_ratio
+          ny = size(b%r_U,2)*b%spatial_ratio
+          nz = size(b%r_U,3)*b%spatial_ratio
+          allocate(b%interpolation%fft_U(nx/2+1,ny,nz))
+          allocate(b%interpolation%trans_U(nx,ny,nz))
+          b%interpolation%backward_U = fftw_plan_gen(nz, ny, nx, &
+                b%interpolation%fft_U, b%interpolation%trans_U, FFTW_UNALIGNED)
+
+          nx = size(b%r_V,1)*b%spatial_ratio
+          ny = size(b%r_V,2)*b%spatial_ratio
+          nz = size(b%r_V,3)*b%spatial_ratio
+          allocate(b%interpolation%fft_V(nx/2+1,ny,nz))
+          allocate(b%interpolation%trans_V(nx,ny,nz))
+          b%interpolation%backward_V = fftw_plan_gen(nz, ny, nx, &
+                b%interpolation%fft_V, b%interpolation%trans_V, FFTW_UNALIGNED)
+
+          nx = size(b%r_W,1)*b%spatial_ratio
+          ny = size(b%r_W,2)*b%spatial_ratio
+          nz = size(b%r_W,3)*b%spatial_ratio
+          allocate(b%interpolation%fft_W(nx/2+1,ny,nz))
+          allocate(b%interpolation%trans_W(nx,ny,nz))
+          b%interpolation%backward_W = fftw_plan_gen(nz, ny, nx, &
+                b%interpolation%fft_W, b%interpolation%trans_W, FFTW_UNALIGNED)
+
+        end if
+
+
 
         if (has_domain_boundary_turbulence_generator(dir)) then
           b%turb_generator_enabled = .true.
