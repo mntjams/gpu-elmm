@@ -1,6 +1,7 @@
 module domains_bc_par
 
   use mpi, only: MPI_PROC_NULL, MPI_COMM_NULL, MPI_STATUS_SIZE
+  use iso_c_binding, only: c_ptr
   use Parameters
   use custom_mpi
   use custom_par
@@ -133,8 +134,21 @@ module domains_bc_par
     logical :: interpolate = .true.
   end type
 
+
+  type spectral_interpolation
+    !FFTW plans
+    type(c_ptr) :: forward_U, forward_V, forward_W
+    type(c_ptr) :: backward_U, backward_V, backward_W
+
+    complex(knd), dimension(:,:,:), allocatable :: fft_r_U, fft_r_V, fft_r_W
+    complex(knd), dimension(:,:,:), allocatable :: fft_U, fft_V, fft_W
+    real(knd),    dimension(:,:,:), allocatable :: trans_U, trans_V, trans_W
+  end type
+
+
+
   type, extends(dom_bc_buffer_copy) :: dom_bc_buffer_refined
-    !order of accuracy of the spatial interpolation in the respective directions (2..linear, 3..parabolic)
+    !order of accuracy of the spatial interpolation in the respective directions (0..spectral, 2..linear, 3..parabolic)
     integer :: interp_order(3) = 2
 
     !receive buffer grid, fields are interpolated from this grid to the finer grid
@@ -153,7 +167,9 @@ module domains_bc_par
     real(knd), allocatable, dimension(:,:,:,:) :: r_Scalar
     real(knd), allocatable, dimension(:,:,:) :: r_dU_dt, r_dV_dt, r_dW_dt, r_dPr_dt, &
                                                 r_dTemperature_dt, r_dMoisture_dt
-    real(knd), allocatable, dimension(:,:,:,:) :: r_dScalar_dt    
+    real(knd), allocatable, dimension(:,:,:,:) :: r_dScalar_dt
+
+    type(spectral_interpolation) :: interpolation   
   end type
 
 
@@ -538,7 +554,11 @@ contains
   subroutine par_interpolate_buffers(b)
     class(dom_bc_buffer_refined), intent(inout) :: b
 
-    if (all(b%interp_order==2)) then
+    if (any(b%interp_order==0)) then
+
+      call interpolate_spectral(b)
+
+    else !(all(b%interp_order==2)) then
       call interpolate_U_trilinear(b%r_U, b%U, .true.)
       call interpolate_U_trilinear(b%r_dU_dt, b%dU_dt)
 
@@ -547,7 +567,7 @@ contains
 
       call interpolate_W_trilinear(b%r_W, b%W)
       call interpolate_W_trilinear(b%r_dW_dt, b%dW_dt)
-    else
+!     else
 !       call interpolate_U_spline(b%r_U, b%U)
 !       call interpolate_U_spline(b%r_dU_dt, b%dU_dt)
 ! 
@@ -892,7 +912,79 @@ contains
 
 
 
+  subroutine interpolate_spectral(b)
+    use fftw3
+    class(dom_bc_buffer_refined), intent(inout) :: b
 
+    call do_transforms(b%interpolation%forward_U, &
+                       b%interpolation%backward_U, &
+                       b%r_U, &
+                       b%interpolation%trans_U, &
+                       b%interpolation%fft_r_U, &
+                       b%interpolation%fft_U)
+
+    call do_transforms(b%interpolation%forward_V, &
+                       b%interpolation%backward_V, &
+                       b%r_V, &
+                       b%interpolation%trans_V, &
+                       b%interpolation%fft_r_V, &
+                       b%interpolation%fft_V)
+
+    call do_transforms(b%interpolation%forward_W, &
+                       b%interpolation%backward_W, &
+                       b%r_W, &
+                       b%interpolation%trans_W, &
+                       b%interpolation%fft_r_W, &
+                       b%interpolation%fft_W)
+
+print *, shape(b%interpolation%trans_U)
+print *, shape(b%U)
+print *, b%r_y
+print *, b%Uj1,b%Uj2
+print *, yPr(b%Uj1:b%Uj2)
+stop
+
+  contains
+
+    subroutine do_transforms(forw, back, in, out, in_cf, out_cf)
+      type(c_ptr), intent(in) :: forw, back
+      real(knd), dimension(:,:,:), contiguous    :: in, out
+      complex(knd), dimension(:,:,:), contiguous :: in_cf, out_cf
+      integer :: nxi, nyi, nzi
+      integer :: nxo, nyo, nzo
+
+#ifdef DPREC
+      call fftw_execute_dft_r2c(forw, in, in_cf)
+#else
+      call fftwf_execute_dft_r2c(forw, in, in_cf)
+#endif
+
+      nxi = size(in,1)
+      nyi = size(in,2)
+      nzi = size(in,3)
+      nxo = size(out,1)
+      nyo = size(out,2)
+      nzo = size(out,3)
+
+      out_cf = 0
+
+      out_cf(1:nxi/2+1,1:nyi/2,1:nzi/2)         = in_cf(1:nxi/2+1,1:nyi/2,1:nzi/2)
+      out_cf(1:nxi/2+1,nyo-nyi/2+1:,1:nzi/2)     = in_cf(1:nxi/2+1,nyi-nyi/2+1:,1:nzi/2)
+      out_cf(1:nxi/2+1,1:nyi/2,nzo-nzi/2+1:)     = in_cf(1:nxi/2+1,1:nyi/2,nzi-nzi/2+1:)
+      out_cf(1:nxi/2+1,nyo-nyi/2+1:,nzo-nzi/2+1:) = in_cf(1:nxi/2+1,nyi-nyi/2+1:,nzi-nzi/2+1:)
+      if (mod(nxi,2)==0) out_cf(nxi/2+1,:,:) = out_cf(nxi/2+1,:,:)/2
+      
+#ifdef DPREC
+      call fftw_execute_dft_c2r(back, out_cf, out)
+#else
+      call fftwf_execute_dft_c2r(back, out_cf, out)
+#endif
+      
+      out = out / ((nxi)*(nyi)*(nzi))
+
+    end subroutine
+
+  end subroutine
 
 
 
