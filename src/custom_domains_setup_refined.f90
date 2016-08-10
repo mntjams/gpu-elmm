@@ -1136,6 +1136,8 @@ contains
       b%remote_image = im
       b%remote_rank = domain_ranks_grid(child_domain)%arr(im(1),im(2),im(3))
 
+      b%is_two_way_nested = domain_is_domain_two_way_nested(child_domain)
+
       !get the child image extent
       cxmin = domain_grids(child_domain)%xmins(im(1))
       cxmax = domain_grids(child_domain)%xmaxs(im(1))
@@ -1252,6 +1254,8 @@ contains
                                                            parent_image(3))
       b%spatial_ratio = domain_spatial_ratio
       b%time_step_ratio = domain_time_step_ratio
+
+      b%is_two_way_nested = is_this_domain_two_way_nested
 
       b%r_i1 = 0
       b%r_i2 = Prnx/b%spatial_ratio + 1

@@ -1795,7 +1795,7 @@ fields_do:  do j = 1, size(obj_fields)
     type(field_names_a_int_alloc) :: names_a_int_alloc(1)
     
     logical, target :: enable_multiple_domains_l = .false.
-    logical, target :: is_doubly_nested_l = .false.
+    logical, target :: is_two_way_nested_l = .false.
     integer, target :: number_of_domains_l = -99
     integer, target :: domain_index_l = -99
     integer, target :: parent_domain_l = -99
@@ -1806,7 +1806,7 @@ fields_do:  do j = 1, size(obj_fields)
     logical :: has_domain_boundary_turbulence_generator_l(6) = .false.
 
     names = [field_names_init("enable_multiple_domains", enable_multiple_domains_l), &
-             field_names_init("is_doubly_nested",   is_doubly_nested_l), &
+             field_names_init("is_two_way_nested",   is_two_way_nested_l), &
              field_names_init("domain_index",   domain_index_l), &
              field_names_init("parent_domain",   parent_domain_l), &
              field_names_init("number_of_domains",   number_of_domains_l), &
@@ -1883,7 +1883,7 @@ fields_do:  do j = 1, size(obj_fields)
                           & It may be empty.")
         end if
           
-        domain_is_doubly_nested = is_doubly_nested_l
+        is_this_domain_two_way_nested = is_two_way_nested_l
 
         is_domain_boundary_nested = is_domain_boundary_nested_l
 

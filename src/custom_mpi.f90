@@ -48,6 +48,9 @@ module custom_par
 
   logical :: is_boundary_domain_boundary(6) = .true.
 
+  !is this domain double nested in its parent?
+  logical :: is_this_domain_two_way_nested = .false.
+
   !whether given domain boundary is generating additional synthetic turbulence
   logical :: has_domain_boundary_turbulence_generator(6) = .false.
 
@@ -74,10 +77,7 @@ module custom_par
                                          domain_ranks_grid(:)
 
   !is this domain double nested in its parent?
-  logical :: domain_is_this_domain_doubly_nested = .false.
-
-  !is this domain double nested in its parent?
-  logical, allocatable :: domain_is_domain_doubly_nested(:)
+  logical, allocatable :: domain_is_domain_two_way_nested(:)
 
   !index, boundary
   logical, allocatable :: domain_is_boundary_nested(:,:)
@@ -502,13 +502,17 @@ contains
       end do
     end do
     
-    allocate(domain_is_domain_doubly_nested(number_of_domains))
-    domain_is_domain_doubly_nested(domain_index) = domain_is_this_domain_doubly_nested
+    allocate(domain_is_domain_two_way_nested(number_of_domains))
+    domain_is_domain_two_way_nested = .false.
+
+    domain_is_domain_two_way_nested(domain_index) = is_this_domain_two_way_nested
+
     !instead of scatter due to the 3D topology
-    call MPI_Allreduce(MPI_IN_PLACE, domain_is_domain_doubly_nested, &
-                       size(domain_is_boundary_nested), MPI_LOGICAL, &
+    call MPI_Allreduce(MPI_IN_PLACE, domain_is_domain_two_way_nested, &
+                       size(domain_is_domain_two_way_nested), MPI_LOGICAL, &
                        MPI_LOR, world_comm, ie)
-    if (ie/=0) call error_stop("Error calling MPI_Allreduce for is_domain_boundary_nested.")
+    if (ie/=0) call error_stop("Error calling MPI_Allreduce for domain_is_domain_two_way_nested.")
+
     
     
 
@@ -520,7 +524,7 @@ contains
     call MPI_Allreduce(MPI_IN_PLACE, domain_is_boundary_nested, &
                        size(domain_is_boundary_nested), MPI_LOGICAL, &
                        MPI_LOR, world_comm, ie)
-    if (ie/=0) call error_stop("Error calling MPI_Allreduce for is_domain_boundary_nested.")
+    if (ie/=0) call error_stop("Error calling MPI_Allreduce for domain_is_boundary_nested.")
 
   end subroutine par_init_domains
 
