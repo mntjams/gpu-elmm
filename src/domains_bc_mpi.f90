@@ -557,6 +557,24 @@ contains
     if (any(b%interp_order==0)) then
 
       call interpolate_spectral(b)
+      call interpolate_U_trilinear(b%r_dU_dt, b%dU_dt)
+      call interpolate_V_trilinear(b%r_dV_dt, b%dV_dt)
+      call interpolate_W_trilinear(b%r_dW_dt, b%dW_dt)
+
+      !HACK
+      if (b%direction/=To .and. kim==1 .and. Btype(Bo)==BC_NOSLIP) then
+        block
+          integer :: lo, k
+          lo = b%spatial_ratio / 2 + mod(b%spatial_ratio,2)
+
+          do k = lo-1,  1, -1
+            b%U(:,:,k) = 2* b%U(:,:,k+1) - b%U(:,:,k+2)
+          end do
+          do k = b%Uk1,  0
+            b%U(:,:,k) = - b%U(:,:,1-k)
+          end do
+        end block
+      end if
 
     else !(all(b%interp_order==2)) then
       call interpolate_U_trilinear(b%r_U, b%U, .true.)
@@ -915,6 +933,7 @@ contains
   subroutine interpolate_spectral(b)
     use fftw3
     class(dom_bc_buffer_refined), intent(inout) :: b
+    integer :: r
 
     call do_transforms(b%interpolation%forward_U, &
                        b%interpolation%backward_U, &
@@ -937,12 +956,26 @@ contains
                        b%interpolation%fft_r_W, &
                        b%interpolation%fft_W)
 
-print *, shape(b%interpolation%trans_U)
-print *, shape(b%U)
-print *, b%r_y
-print *, b%Uj1,b%Uj2
-print *, yPr(b%Uj1:b%Uj2)
-stop
+    r = b%spatial_ratio
+
+    b%U = b%interpolation%trans_U(2*r-1 : 2*r-1 + b%Ui2-b%Ui1, &
+                                  2*r+1 : 2*r+1 + b%Uj2-b%Uj1, &
+                                  2*r+1 : 2*r+1 + b%Uk2-b%Uk1)
+
+    b%V = b%interpolation%trans_V(2*r+1 : 2*r+1 + b%Vi2-b%Vi1, &
+                                  2*r-1 : 2*r-1 + b%Vj2-b%Vj1, &
+                                  2*r+1 : 2*r+1 + b%Vk2-b%Vk1)
+
+    b%W = b%interpolation%trans_W(2*r+1 : 2*r+1 + b%Wi2-b%Wi1, &
+                                  2*r+1 : 2*r+1 + b%Wj2-b%Wj1, &
+                                  2*r-1 : 2*r-1 + b%Wk2-b%Wk1)
+
+! print *, shape(b%interpolation%trans_V)
+! print *, shape(b%V)
+! print *, b%r_yV
+! print *, b%Vj1,b%Vj2
+! print *, yV(b%Vj1:b%Vj2)
+! stop
 
   contains
 
