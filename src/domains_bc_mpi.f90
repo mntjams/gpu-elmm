@@ -477,7 +477,7 @@ contains
 
       !ISsend because we do want synchronisation here. Otherwise a fast domain
       !could run too quickly, buffer too many requests and fill up the memory
-      call MPI_ISsend(a, size(a), MPI_KND, rank, tag, comm, request, ie)
+      call MPI_ISsend(a, size(a), MPI_KND, rank, mod(tag, MPI_TAG_MAX), comm, request, ie)
       if (ie/=0) call error_stop("error sending MPI message.")
 
       requests = [requests, request]
@@ -488,7 +488,7 @@ contains
       integer, intent(in) :: rank, comm, tag
       integer :: request, ie
 
-      call MPI_IRecv(a, size(a), MPI_KND, rank, tag, comm, request, ie)
+      call MPI_IRecv(a, size(a), MPI_KND, rank, mod(tag, MPI_TAG_MAX), comm, request, ie)
       if (ie/=0) call error_stop("error receiving MPI message.")
 
       requests = [requests, request]
@@ -502,7 +502,7 @@ contains
       
       call MPI_ISsend(a, 1, MPI_KND, &
                      b%remote_rank, &
-                     tag_base, &
+                     mod(tag_base, MPI_TAG_MAX), &
                      b%comm, &
                      request, ie)
       if (ie/=0) call error_stop("error sending MPI message.")
@@ -518,7 +518,7 @@ contains
       
       call MPI_IRecv(a, 1, MPI_KND, &
                       b%remote_rank, &
-                      tag_base, &
+                      mod(tag_base, MPI_TAG_MAX), &
                       b%comm, &
                       request, ie)
       if (ie/=0) call error_stop("error sending MPI message.")

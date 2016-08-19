@@ -13,6 +13,8 @@ module custom_mpi
   real(real32), pointer, contiguous :: MPI_IN_PLACE_real32(:)
   real(real64), pointer, contiguous :: MPI_IN_PLACE_real64(:)
 
+  integer, parameter :: MPI_TAG_MAX = 32768
+
 end module
 
 module custom_par

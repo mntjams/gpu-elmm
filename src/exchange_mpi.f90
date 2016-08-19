@@ -184,7 +184,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_ISend(a, 1, send_mpi_types(side, component), neigh_ranks(side), &
-                      1000*myrank+100*neigh_ranks(side)+component, domain_comm, requests(side), ierr)
+                     1000+component, domain_comm, requests(side), ierr)
       if (ierr/=0) stop "error sending MPI message."    
     end subroutine
     
@@ -193,7 +193,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_IRecv(a, 1, recv_mpi_types(side, component), neigh_ranks(side), &
-                     1000*neigh_ranks(side)+100*myrank+component, domain_comm, requests(side+6), ierr)
+                     1000+component, domain_comm, requests(side+6), ierr)
       if (ierr/=0) stop "error receiving MPI message."
     end subroutine
     
@@ -377,7 +377,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_ISend(a, 1, send_mpi_types(side, 6), neigh_ranks(side), &
-                     10000*myrank+100*neigh_ranks(side)+6, domain_comm, requests(side), ierr)
+                     1000+8, domain_comm, requests(side), ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -386,7 +386,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_IRecv(a, 1, recv_mpi_types(side, 6), neigh_ranks(side), &
-                     10000*neigh_ranks(side)+100*myrank+6, domain_comm, requests(side+6), ierr)
+                     1000+8, domain_comm, requests(side+6), ierr)
       if (ierr/=0) stop "error receiving MPI message."
     end subroutine
     
@@ -531,7 +531,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_ISend(a, 1, send_mpi_types(side, 7), neigh_ranks(side), &
-                     1000*myrank+100*neigh_ranks(side)+7, domain_comm, requests(side), ierr)
+                     1000+7 , domain_comm, requests(side), ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -540,7 +540,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_IRecv(a, size(a), MPI_KND, neigh_ranks(side), &
-                    1000*neigh_ranks(side)+100*myrank+7, domain_comm, requests(side+6), ierr)
+                     1000+7 , domain_comm, requests(side+6), ierr)
       if (ierr/=0) stop "error receiving MPI message."
       
       update(side) = .true.
@@ -629,7 +629,7 @@ contains
     integer :: ierr, tag, status(MPI_STATUS_SIZE)
     logical :: ydir, zdir
     
-    ierr = 0; status=0; tag = 0
+    ierr = 0; status=0; tag = 1500
     
     oddy = mod(jim,2) == 1
     eveny = .not. oddy
