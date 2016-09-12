@@ -85,12 +85,10 @@ contains
 
     if (master) then
       if (time_stepping%variable_time_steps) then
-        write (*,'(a,f12.6,a,es12.4)') " time: ", time_stepping%time,"  dt: ", time_stepping%dt
+        write (*,'(a,f12.6,a,es12.4)') "  dt: ", time_stepping%dt
       else
         if (time_stepping%enable_CFL_check) then
-          write (*,'(a,f12.6,a,f6.3)') " time: ", time_stepping%time,"  CFL: ", time_stepping%CFL
-        else
-          write (*,'(a,f12.6,a,es12.4)') " time: ", time_stepping%time
+          write (*,'(a,f12.6,a,f6.3)') "  CFL: ", time_stepping%CFL
         end if
       end if
     end if
