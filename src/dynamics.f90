@@ -456,7 +456,7 @@ contains
 
     end if
 
-    if (steady /= 1 .and. t_s%dt + t_s%time > t_s%end_time)  &
+    if (time_stepping%variable_time_steps .and. steady /= 1 .and. t_s%dt + t_s%time > t_s%end_time)  &
       t_s%dt = t_s%end_time - t_s%time
     
 

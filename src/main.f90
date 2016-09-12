@@ -76,14 +76,25 @@ program CLMM
 
     call par_sync_out("Computing...")
 
-    do time_step = 1, time_stepping%max_number_of_time_steps
+    time_step = 1
+
+    do
 
       call system_clock(count = time_steps_timer_count_1)
 
+#ifdef PAR
       if (master) then
-        write (*,*) "tstep:", time_step
+        if (enable_multiple_domains) then
+          write (*,'(a,i0,a,i12,a,f12.6)') "domain: ", domain_index, &
+                                           " tstep: ", time_step, &
+                                           " time: ",  time_stepping%time
+        else
+          write (*,'(a,i12,a,f12.6)') "tstep: ", time_step, "time: ", time_stepping%time
+        end if
       end if
-
+#else
+      write (*,'(a,i12,a,f12.6)') "tstep: ", time_step, "time: ", time_stepping%time
+#endif
 
 
 
@@ -97,7 +108,7 @@ program CLMM
         time_stepping%time = time_stepping%time + time_stepping%dt
       else
         time_stepping%time = time_stepping%start_time + time_step * time_stepping%dt
-        if (abs(time_stepping%time - time_stepping%end_time)<time_stepping%dt/100) then
+        if (abs(time_stepping%time - time_stepping%end_time)<time_stepping%dt/10) then
           time_stepping%time = time_stepping%end_time
         end if
       end if
@@ -142,6 +153,10 @@ program CLMM
         error_exit = .true.
         exit
       endif
+
+      time_step = time_step + 1
+      
+      if (time_step > time_stepping%max_number_of_time_steps) exit
 
     enddo
 
