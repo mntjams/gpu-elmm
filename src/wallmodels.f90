@@ -417,9 +417,13 @@ contains
   subroutine GetOutsideBoundariesWM(nscalars)
     integer, intent(in) :: nscalars
 
-    call GetOutsideBoundariesWM_UVW
+    if (wallmodeltype/=0) then
 
-    call GetOutsideBoundariesWM_Pr(nscalars)
+      call GetOutsideBoundariesWM_UVW
+
+      call GetOutsideBoundariesWM_Pr(nscalars)
+
+    end if
 
   end subroutine
 
