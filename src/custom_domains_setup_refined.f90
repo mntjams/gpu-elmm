@@ -242,7 +242,8 @@ outer:  do dkk = 1, domain_nzims(parent_domain)
             Btype(side) = BC_DOMAIN_COPY
             TempBtype(side) = BC_DOMAIN_COPY
             MoistBtype(side) = BC_DOMAIN_COPY
-            ScalBtype(side) = BC_DOMAIN_COPY
+            !HACK!
+            if (side/=We) ScalBtype(side) = BC_DOMAIN_COPY
 
             call create_boundary_child_buffer(dir=side, domain=parent_domain)
           endif
@@ -534,7 +535,6 @@ contains
         b%Prk1 = Prk1
         b%Prk2 = Prk2
 
-
         allocate(b%U(Ui1:Ui2,Uj1:Uj2,Uk1:Uk2))
         allocate(b%V(Vi1:Vi2,Vj1:Vj2,Vk1:Vk2))
         allocate(b%W(Wi1:Wi2,Wj1:Wj2,Wk1:Wk2))
@@ -550,6 +550,11 @@ contains
         if (enable_moisture) then
           allocate(b%Moisture(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
           allocate(b%dMoisture_dt(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
+        end if
+
+        if (num_of_scalars > 0) then
+          allocate(b%Scalar(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2,num_of_scalars))
+          allocate(b%dScalar_dt(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2,num_of_scalars))
         end if
 
       end associate
@@ -575,7 +580,8 @@ contains
 
         b%relaxation = .true.
 
-        if (b%direction==We) b%interp_order = 0
+!spectral interpolation is disabled by default. Big problems with mean profile distortion.
+!         if (b%direction==We) b%interp_order = 0
 
         b%spatial_ratio = domain_spatial_ratio
         b%time_step_ratio = domain_time_step_ratio
@@ -753,9 +759,9 @@ contains
             b%r_Wk1 = -2
             b%r_Wk2 = Wnz/b%spatial_ratio+3
             
-            b%r_Pri1 = -2
+            b%r_Pri1 = -1
             b%r_Pri2 = Prnx/b%spatial_ratio+2
-            b%r_Prj1 = -1
+            b%r_Prj1 = -2
             b%r_Prj2 = +3
             b%r_Prk1 = -1
             b%r_Prk2 = Prnz/b%spatial_ratio+2
@@ -871,11 +877,11 @@ contains
             b%r_Wk1 = -2
             b%r_Wk2 = +2
             
-            b%r_Pri1 = -2
+            b%r_Pri1 = -1
             b%r_Pri2 = Prnx/b%spatial_ratio+2
             b%r_Prj1 = -1
             b%r_Prj2 = Prny/b%spatial_ratio+2
-            b%r_Prk1 = -1
+            b%r_Prk1 = -2
             b%r_Prk2 = +3
 
           case (To)
@@ -938,7 +944,6 @@ contains
             b%r_Prk2 = Prnz/b%spatial_ratio+2
 
         end select    
-
 
         b%Ui1 = Ui1 
         b%Ui2 = Ui2 
@@ -1069,6 +1074,11 @@ contains
           allocate(b%dMoisture_dt(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2))
         end if
 
+        if (num_of_scalars > 0) then
+          allocate(b%Scalar(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2,num_of_scalars))
+          allocate(b%dScalar_dt(Pri1:Pri2,Prj1:Prj2,Prk1:Prk2,num_of_scalars))
+        end if
+
         allocate(b%r_U(b%r_Ui1:b%r_Ui2,b%r_Uj1:b%r_Uj2,b%r_Uk1:b%r_Uk2))
         allocate(b%r_V(b%r_Vi1:b%r_Vi2,b%r_Vj1:b%r_Vj2,b%r_Vk1:b%r_Vk2))
         allocate(b%r_W(b%r_Wi1:b%r_Wi2,b%r_Wj1:b%r_Wj2,b%r_Wk1:b%r_Wk2))
@@ -1086,8 +1096,14 @@ contains
           allocate(b%r_dMoisture_dt(b%r_Pri1:b%r_Pri2,b%r_Prj1:b%r_Prj2,b%r_Prk1:b%r_Prk2))
         end if
 
+        if (num_of_scalars > 0) then
+          allocate(b%r_Scalar(b%r_Pri1:b%r_Pri2,b%r_Prj1:b%r_Prj2,b%r_Prk1:b%r_Prk2,num_of_scalars))
+          allocate(b%r_dScalar_dt(b%r_Pri1:b%r_Pri2,b%r_Prj1:b%r_Prj2,b%r_Prk1:b%r_Prk2,num_of_scalars))
+        end if
 
-        if (any(b%interp_order==0).and.b%direction==We) then
+
+        if (any(b%interp_order==0)) then !.and.b%direction==We) then
+          if (b%direction==We) b%relaxation = .false.
           allocate(b%interpolation%fft_r_U(size(b%r_U,1)/2+1,size(b%r_U,2),size(b%r_U,3)))
           allocate(b%interpolation%fft_r_V(size(b%r_V,1)/2+1,size(b%r_V,2),size(b%r_V,3)))
           allocate(b%interpolation%fft_r_W(size(b%r_W,1)/2+1,size(b%r_W,2),size(b%r_W,3)))
@@ -1152,6 +1168,10 @@ contains
               allocate(b%W_turb(Wi1:Wi2,Wj1:Wj2))
               allocate(b%turb_generator%sgs_tke(1:Prnx, 1:Prny))
           end select
+
+          b%U_turb = 0
+          b%V_turb = 0
+          b%W_turb = 0
 
           b%turb_generator%sgs_tke = 0.01
           b%turb_generator%L_y = dymin * b%spatial_ratio / 2

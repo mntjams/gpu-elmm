@@ -225,7 +225,7 @@ contains
     logical :: send_l, receive_l
 
     integer, allocatable :: requests(:)
-    integer :: di, i, j, k
+    integer :: di, i, j, k, scal
     integer :: ie
 
     send_l = .true.
@@ -258,6 +258,9 @@ contains
                   if (enable_moisture) then
                     b%dMoisture_dt = 0
                   end if
+                  if (num_of_scalars > 0) then
+                    b%dScalar_dt = 0
+                  end if
                 else
                   b%dU_dt(:,:,:) = (U(b%Ui1:b%Ui2,b%Uj1:b%Uj2,b%Uk1:b%Uk2) - b%U) / dt
                   b%dV_dt(:,:,:) = (V(b%Vi1:b%Vi2,b%Vj1:b%Vj2,b%Vk1:b%Vk2) - b%V) / dt
@@ -267,6 +270,11 @@ contains
                   end if
                   if (enable_moisture) then
                     b%dMoisture_dt(:,:,:) = (Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2) - b%Moisture) / dt
+                  end if
+                  if (num_of_scalars > 0) then
+                    do scal = 1, num_of_scalars
+                      b%dScalar_dt(:,:,:,scal) = (Scalar(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2,scal)-b%Scalar(:,:,:,scal)) / dt
+                    end do
                   end if
                 end if
 
@@ -278,6 +286,11 @@ contains
                 end if
                 if (enable_moisture) then
                   b%Moisture(:,:,:) = Moisture(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2)
+                end if
+                if (num_of_scalars > 0) then
+                  do scal = 1, num_of_scalars
+                    b%Scalar(:,:,:,scal) = Scalar(b%Pri1:b%Pri2,b%Prj1:b%Prj2,b%Prk1:b%Prk2,scal)
+                  end do
                 end if
 
                 b%time = time
@@ -441,6 +454,11 @@ contains
         call send_array(b%dMoisture_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 5)
       end if
 
+      if (num_of_scalars > 0) then
+        call send_array4(b%Scalar, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 6)
+        call send_array4(b%dScalar_dt, b%remote_rank, b%comm, b%remote_domain*100 + b%direction*10 + 6)
+      end if
+
     end subroutine
 
     subroutine recv_arrays_copy(b)
@@ -463,6 +481,11 @@ contains
       if (enable_moisture) then
         call recv_array(b%Moisture, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
         call recv_array(b%dMoisture_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
+      end if
+
+      if (num_of_scalars > 0) then
+        call recv_array4(b%Scalar, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 6)
+        call recv_array4(b%dScalar_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 6)
       end if
     end subroutine
 
@@ -488,6 +511,11 @@ contains
         call recv_array(b%r_dMoisture_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 5)
       end if
 
+      if (num_of_scalars > 0) then
+        call recv_array4(b%r_Scalar, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 6)
+        call recv_array4(b%r_dScalar_dt, b%remote_rank, b%comm, domain_index*100 + b%direction*10 + 6)
+      end if
+
     end subroutine
 
     subroutine send_array(a, rank, comm, tag)
@@ -503,12 +531,36 @@ contains
       requests = [requests, request]
     end subroutine
 
+    subroutine send_array4(a, rank, comm, tag)
+      real(knd), intent(in), contiguous :: a(:,:,:,:)
+      integer, intent(in) :: rank, comm, tag
+      integer :: request, ie
+
+      !ISsend because we do want synchronisation here. Otherwise a fast domain
+      !could run too quickly, buffer too many requests and fill up the memory
+      call MPI_ISsend(a, size(a), MPI_KND, rank, tag, comm, request, ie)
+      if (ie/=0) call error_stop("error sending MPI message.")
+
+      requests = [requests, request]
+    end subroutine
+
     subroutine recv_array(a, rank, comm, tag)
       real(knd), intent(inout), contiguous :: a(:,:,:)
       integer, intent(in) :: rank, comm, tag
       integer :: request, ie
 
       call MPI_IRecv(a, size(a), MPI_KND, rank, mod(tag, MPI_TAG_MAX), comm, request, ie)
+      if (ie/=0) call error_stop("error receiving MPI message.")
+
+      requests = [requests, request]
+    end subroutine
+
+    subroutine recv_array4(a, rank, comm, tag)
+      real(knd), intent(inout), contiguous :: a(:,:,:,:)
+      integer, intent(in) :: rank, comm, tag
+      integer :: request, ie
+
+      call MPI_IRecv(a, size(a), MPI_KND, rank, tag, comm, request, ie)
       if (ie/=0) call error_stop("error receiving MPI message.")
 
       requests = [requests, request]
@@ -553,6 +605,7 @@ contains
 
   subroutine par_interpolate_buffers(b)
     class(dom_bc_buffer_refined), intent(inout) :: b
+    integer :: scal
 
     if (any(b%interp_order==0)) then
 
@@ -585,6 +638,22 @@ contains
 
       call interpolate_W_trilinear(b%r_W, b%W)
       call interpolate_W_trilinear(b%r_dW_dt, b%dW_dt)
+
+      if (enable_buoyancy) then
+        call interpolate_scalar_trilinear(b%r_Temperature, b%Temperature)
+        call interpolate_scalar_trilinear(b%r_dTemperature_dt, b%dTemperature_dt)
+      end if
+
+      if (enable_moisture) then
+        call interpolate_scalar_trilinear(b%r_Moisture, b%Moisture)
+        call interpolate_scalar_trilinear(b%r_dMoisture_dt, b%dMoisture_dt)
+      end if
+
+      do scal = 1, num_of_scalars
+        call interpolate_scalar_trilinear(b%r_Scalar(:,:,:,1), b%Scalar(:,:,:,1))
+        call interpolate_scalar_trilinear(b%r_dScalar_dt(:,:,:,1), b%dScalar_dt(:,:,:,1))
+      end do
+
 !     else
 !       call interpolate_U_spline(b%r_U, b%U)
 !       call interpolate_U_spline(b%r_dU_dt, b%dU_dt)
@@ -748,12 +817,44 @@ contains
       integer :: lo
       
       !still somewhat a HACK
-      if (present(treat_bottom) .and. b%direction/=To .and. kim==1 .and. Btype(Bo)==BC_NOSLIP) then
+      !it makes the mean flow velocity to be compatible with the lowes cell of the parent
+      if (.false..and.present(treat_bottom) .and. b%direction/=To .and. kim==1 .and. Btype(Bo)==BC_NOSLIP) then
 
-        lo = b%spatial_ratio / 2 + mod(b%spatial_ratio,2)
+!         lo = b%spatial_ratio / 2 + mod(b%spatial_ratio,2)
+! 
+!         !$omp parallel do private(i, j, k, xi, yj, zk)
+!         do k = lo, b%Uk2
+!           do j = b%Uj1, b%Uj2
+!             do i = b%Ui1, b%Ui2
+!               call U_r_index(xU(i), yPr(j), zPr(k), xi, yj, zk)
+! 
+!               out(i,j,k) = &
+!                 TriLinInt((xU(i)   - b%r_xU(xi)) / b%r_dx, &
+!                           (yPr(j)  - b%r_y(yj) ) / b%r_dy, &
+!                           (zPr(k)  - b%r_z(zk) ) / b%r_dz, &
+!                           in(xi  , yj  , zk  ), &
+!                           in(xi+1, yj  , zk  ), &
+!                           in(xi  , yj+1, zk  ), &
+!                           in(xi  , yj  , zk+1), &
+!                           in(xi+1, yj+1, zk  ), &
+!                           in(xi+1, yj  , zk+1), &
+!                           in(xi  , yj+1, zk+1), &
+!                           in(xi+1, yj+1, zk+1))
+!             end do
+!           end do
+!         end do
+! 
+!         do k = lo-1,  1, -1
+!           out(:,:,k) = 2* out(:,:,k+1) - out(:,:,k+2)
+!         end do
+!         do k = b%Uk1,  0
+!           out(:,:,k) = - out(:,:,1-k)
+!         end do
+
+        lo = b%spatial_ratio + 1
 
         !$omp parallel do private(i, j, k, xi, yj, zk)
-        do k = lo, b%Uk2
+        do k = b%Uk1, b%Uk2
           do j = b%Uj1, b%Uj2
             do i = b%Ui1, b%Ui2
               call U_r_index(xU(i), yPr(j), zPr(k), xi, yj, zk)
@@ -774,12 +875,91 @@ contains
           end do
         end do
 
-        do k = lo-1,  1, -1
-          out(:,:,k) = 2* out(:,:,k+1) - out(:,:,k+2)
-        end do
-        do k = b%Uk1,  0
-          out(:,:,k) = - out(:,:,1-k)
-        end do
+!         block
+!           real(knd) :: ustar, h, Ubar, us(b%spatial_ratio)
+! 
+!           do j = b%Uj1, b%Uj2,b%spatial_ratio
+!             do i = b%Ui1, b%Ui2, b%spatial_ratio
+!               call U_r_index(xU(i), yPr(j), zPr(1), xi, yj, zk)
+! !this interpolates to the centre of a Pr cell. 
+! !move to a U cell?
+!               Ubar = TriLinInt((xU(i)   - b%r_xU(xi)) / b%r_dx, &
+!                           (yPr(j)  - b%r_y(yj) ) / b%r_dy, &
+!                           1._knd, &
+!                           in(xi  , yj  , zk  ), &
+!                           in(xi+1, yj  , zk  ), &
+!                           in(xi  , yj+1, zk  ), &
+!                           in(xi  , yj  , zk+1), &
+!                           in(xi+1, yj+1, zk  ), &
+!                           in(xi+1, yj  , zk+1), &
+!                           in(xi  , yj+1, zk+1), &
+!                           in(xi+1, yj+1, zk+1))
+! 
+!               h = zW(b%spatial_ratio)
+!               ustar = Ubar * 0.41 * (h - z0B) / &
+!                           (h * (log(h/z0B)-1) + z0B)
+! 
+!               us(1) = ubar_log(z0B,zW(1),ustar,z0B)
+!               do k = 2, b%spatial_ratio
+!                 us(k) = ubar_log(zW(k-1),zW(k),ustar,z0B)
+!               end do
+! 
+!               do k = 1, b%spatial_ratio
+!                 out(i:i+b%spatial_ratio-1,j:j+b%spatial_ratio-1,k) = &
+!                   out(i:i+b%spatial_ratio-1,j:j+b%spatial_ratio-1,k) * &
+!                   us(k) / &
+!                   (sum(out(i:i+b%spatial_ratio-1,j:j+b%spatial_ratio-1,k))/b%spatial_ratio**2)
+!               end do
+! 
+!             end do
+!           end do
+!           do k = b%Uk1,  0
+!             out(:,:,k) = - out(:,:,1-k)
+!           end do
+!         end block
+
+
+        lo = b%spatial_ratio/2 + mod(b%spatial_ratio,2)
+
+        block
+          real(knd) :: ustar, h, Uout, us(b%spatial_ratio)
+
+          do j = b%Uj1, b%Uj2,b%spatial_ratio
+            do i = b%Ui1, b%Ui2, b%spatial_ratio
+              call U_r_index(xU(i), yPr(j), zPr(1), xi, yj, zk)
+!this interpolates to the centre of a Pr cell. 
+!move to a U cell?
+              Uout = TriLinInt((xU(i)   - b%r_xU(xi)) / b%r_dx, &
+                          (yPr(j)  - b%r_y(yj) ) / b%r_dy, &
+                          1._knd, &
+                          in(xi  , yj  , zk  ), &
+                          in(xi+1, yj  , zk  ), &
+                          in(xi  , yj+1, zk  ), &
+                          in(xi  , yj  , zk+1), &
+                          in(xi+1, yj+1, zk  ), &
+                          in(xi+1, yj  , zk+1), &
+                          in(xi  , yj+1, zk+1), &
+                          in(xi+1, yj+1, zk+1))
+
+              h = (zPr(b%spatial_ratio)+zW(0))/2
+              ustar = Uout * 0.41 /log(h/z0B)
+
+              do k = 1, lo-1
+                us(k) = ustar/0.41 * log(zPr(k)/z0B)
+              end do
+
+              do k = 1, lo-1
+                associate (o => out(i:min(i+b%spatial_ratio-1,b%Ui2),j:min(j+b%spatial_ratio-1,b%Uj2),k))
+                  o = o * us(k) / (sum(o)/size(o))
+                end associate
+              end do
+
+            end do
+          end do
+          do k = b%Uk1,  0
+            out(:,:,k) = - out(:,:,1-k)
+          end do
+        end block
 
       else
 
@@ -808,6 +988,18 @@ contains
       end if
 
     end subroutine
+
+    pure function ubar_log(z1, z2, ustar, z0) result(res)
+      real(knd) :: res
+      real(knd), intent(in) :: z1, z2, ustar, z0
+      res = (ubar_log_primitive(z2,ustar,z0) - ubar_log_primitive(z1,ustar,z0)) / (z2 - z1)
+    end function
+
+    pure function ubar_log_primitive(z, ustar, z0) result(res)
+      real(knd) :: res
+      real(knd), intent(in) :: z, ustar, z0
+      res = (z*ustar/0.41) * (log(z/z0) - 1)
+    end function
 
     pure subroutine U_r_index(x, y, z, xi, yj, zk)
       real(knd), intent(in) :: x, y, z
@@ -909,6 +1101,50 @@ contains
       zk = min(max(floor( (z - b%r_zW(lz))/b%r_dz ), 0) + lz, ubound(b%r_zW,1)-1)
     end subroutine
 
+    subroutine interpolate_scalar_trilinear(in, out)
+      real(knd), intent(in) :: in(b%r_Pri1:,b%r_Prj1:,b%r_Prk1:)
+      real(knd), intent(inout) :: out(b%Pri1:,b%Prj1:,b%Prk1:)
+      integer :: xi, yj, zk
+      integer :: i, j, k
+      
+      !$omp parallel do private(i, j, k, xi, yj, zk)
+      do k = b%Prk1, b%Prk2
+        do j = b%Prj1, b%Prj2
+          do i = b%Pri1, b%Pri2
+            call Pr_r_index(xPr(i), yPr(j), zPr(k), xi, yj, zk)
+
+            out(i,j,k) = &
+              TriLinInt((xPr(i) - b%r_x(xi)) / b%r_dx, &
+                        (yPr(j) - b%r_y(yj)) / b%r_dy, &
+                        (zPr(k) - b%r_z(zk)) / b%r_dz, &
+                        in(xi  , yj  , zk  ), &
+                        in(xi+1, yj  , zk  ), &
+                        in(xi  , yj+1, zk  ), &
+                        in(xi  , yj  , zk+1), &
+                        in(xi+1, yj+1, zk  ), &
+                        in(xi+1, yj  , zk+1), &
+                        in(xi  , yj+1, zk+1), &
+                        in(xi+1, yj+1, zk+1))
+          end do
+        end do
+      end do
+    end subroutine
+
+
+    pure subroutine Pr_r_index(x, y, z, xi, yj, zk)
+      real(knd), intent(in) :: x, y, z
+      integer, intent(out) :: xi, yj, zk
+      integer :: lx, ly, lz
+
+      lx = lbound(b%r_x,1)
+      ly = lbound(b%r_y,1)
+      lz = lbound(b%r_z,1)
+
+      xi = min(max(floor( (x - b%r_x(lx))/b%r_dx ), 0) + lx, ubound(b%r_x,1)-1)
+      yj = min(max(floor( (y - b%r_y(ly))/b%r_dy ), 0) + ly, ubound(b%r_y,1)-1)
+      zk = min(max(floor( (z - b%r_z(lz))/b%r_dz ), 0) + lz, ubound(b%r_z,1)-1)
+    end subroutine
+
   end subroutine
 
 
@@ -932,8 +1168,22 @@ contains
 
   subroutine interpolate_spectral(b)
     use fftw3
+    use ArrayUtilities
     class(dom_bc_buffer_refined), intent(inout) :: b
     integer :: r
+    integer :: i, j, k
+    real(knd) :: slope
+
+    slope = ( avg(b%r_U(:,:,b%r_Uk2)) - avg(b%r_U(:,:,b%r_Uk1)) ) / &
+            ( b%r_z(b%r_Uk2) - b%r_z(b%r_Uk1) )
+
+    do k = b%r_Uk1, b%r_Uk2
+      do j = b%r_Uj1, b%r_Uj2
+        do i = b%r_Ui1, b%r_Ui2
+          b%r_U(i,j,k) = b%r_U(i,j,k) - slope * (b%r_z(k)-b%r_z(b%r_Uk1))
+        end do
+      end do
+    end do
 
     call do_transforms(b%interpolation%forward_U, &
                        b%interpolation%backward_U, &
@@ -962,6 +1212,14 @@ contains
                                   2*r+1 : 2*r+1 + b%Uj2-b%Uj1, &
                                   2*r+1 : 2*r+1 + b%Uk2-b%Uk1)
 
+    do k = b%Uk1, b%Uk2
+      do j = b%Uj1, b%Uj2
+        do i = b%Ui1, b%Ui2
+          b%U(i,j,k) = b%U(i,j,k) + slope * (zPr(k)-b%r_z(b%Uk1))
+        end do
+      end do
+    end do
+
     b%V = b%interpolation%trans_V(2*r+1 : 2*r+1 + b%Vi2-b%Vi1, &
                                   2*r-1 : 2*r-1 + b%Vj2-b%Vj1, &
                                   2*r+1 : 2*r+1 + b%Vk2-b%Vk1)
@@ -969,13 +1227,6 @@ contains
     b%W = b%interpolation%trans_W(2*r+1 : 2*r+1 + b%Wi2-b%Wi1, &
                                   2*r+1 : 2*r+1 + b%Wj2-b%Wj1, &
                                   2*r-1 : 2*r-1 + b%Wk2-b%Wk1)
-
-! print *, shape(b%interpolation%trans_V)
-! print *, shape(b%V)
-! print *, b%r_yV
-! print *, b%Vj1,b%Vj2
-! print *, yV(b%Vj1:b%Vj2)
-! stop
 
   contains
 
@@ -1226,6 +1477,38 @@ contains
 
   end subroutine
 
+  subroutine par_update_domain_bounds_scalar(Scalar, eff_time)
+    !effective time, because it can also reflect individual RK stages
+    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(inout) :: Scalar
+    real(knd), intent(in) :: eff_time
+    real(knd) :: t_diff
+    integer :: i
+
+    if (enable_multiple_domains) then
+
+      if (allocated(domain_bc_recv_buffers_copy)) then
+        do i = lbound(domain_bc_recv_buffers_copy,1), &
+               ubound(domain_bc_recv_buffers_copy,1)
+          associate(b => domain_bc_recv_buffers_copy(i))
+
+              Scalar(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,:) = &
+                b%Scalar(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,:)
+
+              t_diff = eff_time - b%time
+              if (t_diff > 0) then
+                  Scalar(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,:) = &
+                  Scalar(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,:) + &
+                    b%dScalar_dt(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,:) * t_diff
+              end if
+
+          end associate
+        end do
+      end if
+
+    end if
+
+  end subroutine
+
   subroutine par_update_pr_gradient(eff_time)
     !effective time, because it can also reflect individual RK stages
     real(knd), intent(in) :: eff_time
@@ -1262,6 +1545,8 @@ contains
     call par_update_domain_bounds_temperature(Temperature, eff_time)
 
     call par_update_domain_bounds_moisture(Moisture, eff_time)
+
+    call par_update_domain_bounds_scalar(Scalar, eff_time)
 
   end subroutine
 
@@ -2059,8 +2344,9 @@ contains
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Temperature, Moisture
     real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(inout) :: Scalar
     real(TIM), intent(in) :: time, dt
-    real(knd), allocatable :: tmp(:,:,:)
-    integer :: di, i, j, k, n, m(6)
+    real(knd), allocatable :: tmp(:,:,:), tmp4(:,:,:,:)
+    integer :: di, i, j, k, n, scal
+    integer :: m(6), tmp_lb(3)
     integer :: err
                                             
     if (parent_domain>0) then
@@ -2070,17 +2356,43 @@ contains
 
           n = size(tmp)
 
-          call filter(tmp, U)
+          tmp_lb = lbound(tmp)
+
+          call filter(tmp, tmp_lb, U, [-2, -2, -2])
           call MPI_Send(tmp, n, MPI_KND, &
                         b%remote_rank, 4002, b%comm, err)
 
-          call filter(tmp, V)
+          call filter(tmp, tmp_lb, V, [-2, -2, -2])
           call MPI_Send(tmp, n, MPI_KND, &
                         b%remote_rank, 4003, b%comm, err)
 
-          call filter(tmp, W)
+          call filter(tmp, tmp_lb, W, [-2, -2, -2])
           call MPI_Send(tmp, n, MPI_KND, &
                         b%remote_rank, 4004, b%comm, err)
+
+          if (enable_buoyancy) then
+            call filter(tmp, tmp_lb, Temperature, [-1, -1, -1])
+            call MPI_Send(tmp, n, MPI_KND, &
+                          b%remote_rank, 4005, b%comm, err)
+          end if
+
+          if (enable_moisture) then
+            call filter(tmp, tmp_lb, Moisture, [-1, -1, -1])
+            call MPI_Send(tmp, n, MPI_KND, &
+                          b%remote_rank, 4006, b%comm, err)
+          end if
+
+          if (num_of_scalars > 0) then
+            allocate(tmp4(b%r_i1:b%r_i2,b%r_j1:b%r_j2,b%r_k1:b%r_k2,1:num_of_scalars))
+            do scal = 1, num_of_scalars
+              call filter(tmp4(:,:,:,scal), tmp_lb, Scalar(:,:,:,scal), [-1, -1, -1])
+            end do
+            call MPI_Send(tmp4, n*num_of_scalars, MPI_KND, &
+                          b%remote_rank, 4007, b%comm, err)
+            deallocate(tmp4)
+          end if
+
+          deallocate(tmp)
         end if
       end associate
     end if
@@ -2100,10 +2412,15 @@ contains
 
                     m = 1
                     
-!                     where (is_domain_boundary_nested.and.is_boundary_domain_boundary) &
-!                       m = m + 2
                     where (is_boundary_domain_boundary) m = 3
-                    m(5) = 1
+                    if (b%i1==0      .and. BType(We)<BC_DOMAIN_NESTED) m(We) = 1
+                    if (b%i2==Prnx+1 .and. BType(Ea)<BC_DOMAIN_NESTED) m(Ea) = 1
+                    if (b%j1==0      .and. BType(So)<BC_DOMAIN_NESTED) m(So) = 1
+                    if (b%j2==Prny+1 .and. BType(No)<BC_DOMAIN_NESTED) m(No) = 1
+                    if (b%k1==0      .and. BType(Bo)<BC_DOMAIN_NESTED) m(Bo) = 1
+                    if (b%k2==Prnz+1 .and. BType(To)<BC_DOMAIN_NESTED) m(To) = 1
+
+                    m(Ea) = 5
                     
                     call MPI_Recv(tmp, n, MPI_KND, &
                                   b%remote_rank, 4002, b%comm, MPI_STATUS_IGNORE, err)
@@ -2120,6 +2437,29 @@ contains
                     W(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
                       tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
 
+                    if (enable_buoyancy) then
+                      call MPI_Recv(tmp, n, MPI_KND, &
+                                    b%remote_rank, 4005, b%comm, MPI_STATUS_IGNORE, err)
+                      Temperature(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
+                        tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
+                    end if
+
+                    if (enable_moisture) then
+                      call MPI_Recv(tmp, n, MPI_KND, &
+                                    b%remote_rank, 4006, b%comm, MPI_STATUS_IGNORE, err)
+                      Moisture(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
+                        tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
+                    end if
+
+                    if (num_of_scalars > 0) then
+                      allocate(tmp4(b%i1:b%i2,b%j1:b%j2,b%k1:b%k2,1:num_of_scalars))
+                      call MPI_Recv(tmp4, n*num_of_scalars, MPI_KND, &
+                                    b%remote_rank, 4007, b%comm, MPI_STATUS_IGNORE, err)
+                      Scalar(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6),:) = &
+                        tmp4(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6),:)
+                      deallocate(tmp4)
+                    end if
+
                     deallocate(tmp)
                   end if
                 end associate
@@ -2133,9 +2473,10 @@ contains
     
   contains
   
-    subroutine filter(t, a)
-      real(knd), allocatable, intent(inout) :: t(:,:,:)
-      real(knd), contiguous, intent(in) :: a(-2:,-2:,-2:)
+    subroutine filter(t, t_lb, a, a_lb)
+      integer, intent(in) :: t_lb(3), a_lb(3)
+      real(knd), contiguous, intent(inout) :: t(t_lb(1):,t_lb(2):,t_lb(3):)
+      real(knd), contiguous, intent(in) :: a(a_lb(1):,a_lb(2):,a_lb(3):)
       integer :: i, j, k
       integer :: ii, jj, kk
       integer :: s
