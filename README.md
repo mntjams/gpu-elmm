@@ -52,4 +52,4 @@ Repository owner: Vladimir Fuka
 
 Issues should be reported at https://bitbucket.org/LadaF/elmm/issues?status=new&status=open
 
-Any comments and questions are welcome at e-mail: vladimir.fuka@gmail.com
+Any comments and questions are welcome by e-mail: vladimir.fuka@gmail.com. Prefer the above link for more efficient issue solving.
