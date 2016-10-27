@@ -21,7 +21,7 @@ module domains_bc_par
          par_domain_bound_relaxation, &
          par_receive_initial_conditions, &
          par_send_initial_conditions, &
-         par_domain_double_nesting_feedback, &
+         par_domain_two_way_nesting_feedback, &
          domain_spatial_ratio, &
          domain_time_step_ratio
 
@@ -816,40 +816,9 @@ contains
       integer :: i, j, k
       integer :: lo
       
-      !still somewhat a HACK
+      !still a HACK
       !it makes the mean flow velocity to be compatible with the lowes cell of the parent
       if (.false..and.present(treat_bottom) .and. b%direction/=To .and. kim==1 .and. Btype(Bo)==BC_NOSLIP) then
-
-!         lo = b%spatial_ratio / 2 + mod(b%spatial_ratio,2)
-! 
-!         !$omp parallel do private(i, j, k, xi, yj, zk)
-!         do k = lo, b%Uk2
-!           do j = b%Uj1, b%Uj2
-!             do i = b%Ui1, b%Ui2
-!               call U_r_index(xU(i), yPr(j), zPr(k), xi, yj, zk)
-! 
-!               out(i,j,k) = &
-!                 TriLinInt((xU(i)   - b%r_xU(xi)) / b%r_dx, &
-!                           (yPr(j)  - b%r_y(yj) ) / b%r_dy, &
-!                           (zPr(k)  - b%r_z(zk) ) / b%r_dz, &
-!                           in(xi  , yj  , zk  ), &
-!                           in(xi+1, yj  , zk  ), &
-!                           in(xi  , yj+1, zk  ), &
-!                           in(xi  , yj  , zk+1), &
-!                           in(xi+1, yj+1, zk  ), &
-!                           in(xi+1, yj  , zk+1), &
-!                           in(xi  , yj+1, zk+1), &
-!                           in(xi+1, yj+1, zk+1))
-!             end do
-!           end do
-!         end do
-! 
-!         do k = lo-1,  1, -1
-!           out(:,:,k) = 2* out(:,:,k+1) - out(:,:,k+2)
-!         end do
-!         do k = b%Uk1,  0
-!           out(:,:,k) = - out(:,:,1-k)
-!         end do
 
         lo = b%spatial_ratio + 1
 
@@ -874,50 +843,6 @@ contains
             end do
           end do
         end do
-
-!         block
-!           real(knd) :: ustar, h, Ubar, us(b%spatial_ratio)
-! 
-!           do j = b%Uj1, b%Uj2,b%spatial_ratio
-!             do i = b%Ui1, b%Ui2, b%spatial_ratio
-!               call U_r_index(xU(i), yPr(j), zPr(1), xi, yj, zk)
-! !this interpolates to the centre of a Pr cell. 
-! !move to a U cell?
-!               Ubar = TriLinInt((xU(i)   - b%r_xU(xi)) / b%r_dx, &
-!                           (yPr(j)  - b%r_y(yj) ) / b%r_dy, &
-!                           1._knd, &
-!                           in(xi  , yj  , zk  ), &
-!                           in(xi+1, yj  , zk  ), &
-!                           in(xi  , yj+1, zk  ), &
-!                           in(xi  , yj  , zk+1), &
-!                           in(xi+1, yj+1, zk  ), &
-!                           in(xi+1, yj  , zk+1), &
-!                           in(xi  , yj+1, zk+1), &
-!                           in(xi+1, yj+1, zk+1))
-! 
-!               h = zW(b%spatial_ratio)
-!               ustar = Ubar * 0.41 * (h - z0B) / &
-!                           (h * (log(h/z0B)-1) + z0B)
-! 
-!               us(1) = ubar_log(z0B,zW(1),ustar,z0B)
-!               do k = 2, b%spatial_ratio
-!                 us(k) = ubar_log(zW(k-1),zW(k),ustar,z0B)
-!               end do
-! 
-!               do k = 1, b%spatial_ratio
-!                 out(i:i+b%spatial_ratio-1,j:j+b%spatial_ratio-1,k) = &
-!                   out(i:i+b%spatial_ratio-1,j:j+b%spatial_ratio-1,k) * &
-!                   us(k) / &
-!                   (sum(out(i:i+b%spatial_ratio-1,j:j+b%spatial_ratio-1,k))/b%spatial_ratio**2)
-!               end do
-! 
-!             end do
-!           end do
-!           do k = b%Uk1,  0
-!             out(:,:,k) = - out(:,:,1-k)
-!           end do
-!         end block
-
 
         lo = b%spatial_ratio/2 + mod(b%spatial_ratio,2)
 
@@ -989,17 +914,6 @@ contains
 
     end subroutine
 
-    pure function ubar_log(z1, z2, ustar, z0) result(res)
-      real(knd) :: res
-      real(knd), intent(in) :: z1, z2, ustar, z0
-      res = (ubar_log_primitive(z2,ustar,z0) - ubar_log_primitive(z1,ustar,z0)) / (z2 - z1)
-    end function
-
-    pure function ubar_log_primitive(z, ustar, z0) result(res)
-      real(knd) :: res
-      real(knd), intent(in) :: z, ustar, z0
-      res = (z*ustar/0.41) * (log(z/z0) - 1)
-    end function
 
     pure subroutine U_r_index(x, y, z, xi, yj, zk)
       real(knd), intent(in) :: x, y, z
@@ -1291,24 +1205,30 @@ contains
           associate(b => domain_bc_recv_buffers_copy(bi))
             if (b%enabled) then
 
-              U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = b%U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)                 
+              where (Utype(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)<=0) &
+                U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = b%U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)                 
 
-              V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = b%V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)
+              where (Vtype(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)<=0) &
+                V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = b%V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)
 
-              W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = b%W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)
+              where (Wtype(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)<=0) &
+                W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = b%W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)
 
 
               if (eff_time > b%time) then
                 t_diff = eff_time - b%time
 
-                U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) + &
+                where (Utype(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)<=0) &
+                  U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) + &
                                                          b%dU_dt(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) * t_diff
                   
 
-                V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) + &
+                where (Vtype(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)<=0) &
+                  V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) + &
                                                          b%dV_dt(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) * t_diff
 
-                W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) + &
+                where (Wtype(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)<=0) &
+                  W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) + &
                                                          b%dW_dt(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) * t_diff
               end if
 
@@ -1323,24 +1243,30 @@ contains
           associate(b => domain_bc_recv_buffers(bi))
             if (b%enabled) then
 
-              U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = b%U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)                 
+              where (Utype(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)<=0) &
+                U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = b%U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)                 
 
-              V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = b%V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)
+              where (Vtype(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)<=0) &
+                V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = b%V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)
 
-              W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = b%W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)
+              where (Wtype(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)<=0) &
+                W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = b%W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)
 
 
               if (eff_time > b%time) then
                 t_diff = eff_time - b%time
 
-                U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) + &
+                where (Utype(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)<=0) &
+                  U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) + &
                                                          b%dU_dt(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) * t_diff
                   
 
-                V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) + &
+                where (Vtype(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)<=0) &
+                  V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) + &
                                                          b%dV_dt(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) * t_diff
 
-                W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) + &
+                where (Wtype(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)<=0) &
+                  W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) + &
                                                          b%dW_dt(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) * t_diff
               end if
 
@@ -1427,13 +1353,15 @@ contains
                ubound(domain_bc_recv_buffers_copy,1)
           associate(b => domain_bc_recv_buffers_copy(i))
 
-              Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
-                b%Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)
+              where (Prtype(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)<=0) &
+                Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
+                  b%Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)
 
               t_diff = eff_time - b%time
               if (t_diff > 0) then
+                where (Prtype(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)<=0) &
                   Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
-                  Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) + &
+                    Temperature(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) + &
                     b%dTemperature_dt(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) * t_diff
               end if
 
@@ -1459,13 +1387,15 @@ contains
                ubound(domain_bc_recv_buffers_copy,1)
           associate(b => domain_bc_recv_buffers_copy(i))
 
-              Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
-                b%Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)
+              where (Prtype(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)<=0) &
+                Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
+                  b%Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)
 
               t_diff = eff_time - b%time
               if (t_diff > 0) then
+                where (Prtype(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)<=0) &
                   Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) = &
-                  Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) + &
+                    Moisture(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) + &
                     b%dMoisture_dt(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2) * t_diff
               end if
 
@@ -1482,7 +1412,7 @@ contains
     real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(inout) :: Scalar
     real(knd), intent(in) :: eff_time
     real(knd) :: t_diff
-    integer :: i
+    integer :: i, scal
 
     if (enable_multiple_domains) then
 
@@ -1491,15 +1421,20 @@ contains
                ubound(domain_bc_recv_buffers_copy,1)
           associate(b => domain_bc_recv_buffers_copy(i))
 
-              Scalar(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,:) = &
-                b%Scalar(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,:)
+            t_diff = eff_time - b%time
 
-              t_diff = eff_time - b%time
+            do scal = 1, num_of_scalars
+              where (Prtype(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)<=0) &
+                Scalar(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,scal) = &
+                b%Scalar(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,scal)
+
               if (t_diff > 0) then
-                  Scalar(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,:) = &
-                  Scalar(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,:) + &
-                    b%dScalar_dt(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,:) * t_diff
+                where (Prtype(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2)<=0) &
+                  Scalar(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,scal) = &
+                    Scalar(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,scal) + &
+                    b%dScalar_dt(b%bPri1:b%bPri2,b%bPrj1:b%bPrj2,b%bPrk1:b%bPrk2,scal) * t_diff
               end if
+            end do
 
           end associate
         end do
@@ -2338,7 +2273,7 @@ contains
   
   
   
-  subroutine par_domain_double_nesting_feedback(U, V, W, Temperature, Moisture, Scalar, &
+  subroutine par_domain_two_way_nesting_feedback(U, V, W, Temperature, Moisture, Scalar, &
                                                 time, dt)
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U, V ,W 
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Temperature, Moisture
@@ -2424,30 +2359,35 @@ contains
                     
                     call MPI_Recv(tmp, n, MPI_KND, &
                                   b%remote_rank, 4002, b%comm, MPI_STATUS_IGNORE, err)
-                    U(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
-                      tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
+                    where (Utype(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))<=0) &
+                      U(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
+                        tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
 
                     call MPI_Recv(tmp, n, MPI_KND, &
                                   b%remote_rank, 4003, b%comm, MPI_STATUS_IGNORE, err)
-                    V(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
+                    where (Vtype(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))<=0) &
+                      V(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
                       tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
 
                     call MPI_Recv(tmp, n, MPI_KND, &
                                   b%remote_rank, 4004, b%comm, MPI_STATUS_IGNORE, err)
-                    W(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
+                    where (Wtype(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))<=0) &
+                      W(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
                       tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
 
                     if (enable_buoyancy) then
                       call MPI_Recv(tmp, n, MPI_KND, &
                                     b%remote_rank, 4005, b%comm, MPI_STATUS_IGNORE, err)
-                      Temperature(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
+                      where (Prtype(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))<=0) &
+                        Temperature(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
                         tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
                     end if
 
                     if (enable_moisture) then
                       call MPI_Recv(tmp, n, MPI_KND, &
                                     b%remote_rank, 4006, b%comm, MPI_STATUS_IGNORE, err)
-                      Moisture(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
+                      where (Prtype(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))<=0) &
+                        Moisture(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6)) = &
                         tmp(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))
                     end if
 
@@ -2455,8 +2395,11 @@ contains
                       allocate(tmp4(b%i1:b%i2,b%j1:b%j2,b%k1:b%k2,1:num_of_scalars))
                       call MPI_Recv(tmp4, n*num_of_scalars, MPI_KND, &
                                     b%remote_rank, 4007, b%comm, MPI_STATUS_IGNORE, err)
-                      Scalar(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6),:) = &
-                        tmp4(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6),:)
+                      do scal = 1, num_of_scalars
+                        where (Prtype(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6))<=0) &
+                          Scalar(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6),scal) = &
+                          tmp4(b%i1+m(1):b%i2-m(2),b%j1+m(3):b%j2-m(4),b%k1+m(5):b%k2-m(6),scal)
+                      end do
                       deallocate(tmp4)
                     end if
 
@@ -2500,7 +2443,7 @@ contains
       end associate
     end subroutine
     
-  end subroutine par_domain_double_nesting_feedback
+  end subroutine par_domain_two_way_nesting_feedback
 
 
 

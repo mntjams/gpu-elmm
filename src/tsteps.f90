@@ -141,13 +141,6 @@ contains
 
       call BoundUVW(U2, V2, W2)
 
-      call IBMomentum(U2, V2, W2)
-
-      if (enable_ibm_mass_sources) then
-          call IBMassSources(Q, U2, V2, W2)
-      end if
-
-
 
       time_stepping%effective_time = time_stepping%time + 2 * sum(RK_alpha(1:RK_stage)) * time_stepping%dt      
 
@@ -158,9 +151,17 @@ contains
 
 
 #ifdef PAR
-      if (RK_stage==RK_stages) call par_domain_double_nesting_feedback(U2, V2, W2, Temperature, Moisture, Scalar, &
+      if (RK_stage==RK_stages) call par_domain_two_way_nesting_feedback(U2, V2, W2, Temperature, Moisture, Scalar, &
                                             time_stepping%time, time_stepping%dt)
 #endif
+
+      call IBMomentum(U2, V2, W2)
+
+      if (enable_ibm_mass_sources) then
+          call IBMassSources(Q, U2, V2, W2)
+      end if
+
+
 
       if (pressure_solution%poisson_solver > POISSON_SOLVER_NONE) then
         call PressureCorrection(U2, V2, W2, Pr, Q, 2*RK_alpha(RK_stage)*time_stepping%dt)
