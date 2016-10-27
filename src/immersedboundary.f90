@@ -2031,15 +2031,15 @@ contains
   end subroutine MoveIBPointsToArray
 
 
-  subroutine AuxNeighbours(Xtype,nx,ny,nz,s)
+  subroutine AuxNeighbours(Xtype,nx,ny,nz)
     !helper procedure to FindNeighbouringCells
-    integer,intent(in)    :: nx,ny,nz,s
-    integer,intent(inout) :: Xtype(s:,s:,s:)
+    integer,intent(in)    :: nx,ny,nz
+    integer,intent(inout) :: Xtype(-2:,-2:,-2:)
     integer :: i,j,k
 
-    do k = 1, nz
-      do j = 1, ny
-        do i = 1, nx
+    do k = -1, nz+2
+      do j = -1, ny+2
+        do i = -1, nx+2
           if (Xtype(i,j,k)==0 .and. (any(Xtype(i-1:i+1,j-1:j+1,k-1:k+1)>0))) then
                  Xtype(i,j,k) = -1
           end if
@@ -2054,13 +2054,13 @@ contains
 
     !$omp parallel sections
     !$omp section
-    call AuxNeighbours(Prtype,Prnx,Prny,Prnz,0)
+    call AuxNeighbours(Prtype,Prnx,Prny,Prnz)
     !$omp section
-    call AuxNeighbours(Utype,Unx,Uny,Unz,-2)
+    call AuxNeighbours(Utype,Unx,Uny,Unz)
     !$omp section
-    call AuxNeighbours(Vtype,Vnx,Vny,Vnz,-2)
+    call AuxNeighbours(Vtype,Vnx,Vny,Vnz)
     !$omp section
-    call AuxNeighbours(Wtype,Wnx,Wny,Wnz,-2)
+    call AuxNeighbours(Wtype,Wnx,Wny,Wnz)
     !$omp end parallel sections
   end subroutine FindNeighbouringCells
 

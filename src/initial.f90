@@ -2924,7 +2924,7 @@ fields_do:  do j = 1, size(obj_fields)
     allocate(Utype(-2:Unx+3,-2:Uny+3,-2:Unz+3))
     allocate(Vtype(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
     allocate(Wtype(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-    allocate(Prtype(0:Prnx+1,0:Prny+1,0:Prnz+1))
+    allocate(Prtype(-2:Prnx+3,-2:Prny+3,-2:Prnz+3))
 
     Utype = 0
     Vtype = 0

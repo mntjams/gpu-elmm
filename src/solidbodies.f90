@@ -98,11 +98,11 @@ contains
         if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = 0, Prnz+1
+        do k = -2, Prnz+3
           if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
-          do j = 0, Prny+1
+          do j = -2, Prny+3
             if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
-            do i = 0, Prnx+1
+            do i = -2, Prnx+3
               if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
               if (CurrentSB%Inside(xPr(i), yPr(j), zPr(k), delta)) &
                         Prtype(i,j,k) = CurrentSB%numofbody
@@ -119,11 +119,11 @@ contains
         if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = 0, Unz+1
+        do k = -2, Unz+3
           if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle 
-          do j = 0, Uny+1
+          do j = -2, Uny+3
             if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
-            do i = 0, Unx+1
+            do i = -2, Unx+3
               if (xU(i) > obstacles_bbox(Ea) .or. xU(i) < obstacles_bbox(We)) cycle
               if (CurrentSB%Inside(xU(i), yPr(j) ,zPr(k), delta)) &
                          Utype(i,j,k) = CurrentSB%numofbody
@@ -140,11 +140,11 @@ contains
         if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
         !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = 0, Vnz+1
+        do k = -2, Vnz+3
           if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
-          do j = 0, Vny+1
+          do j = -2, Vny+3
             if (yV(j) > obstacles_bbox(No) .or. yV(j) < obstacles_bbox(So)) cycle
-            do i = 0, Vnx+1
+            do i = -2, Vnx+3
               if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
               if (CurrentSB%Inside(xPr(i), yV(j), zPr(k), delta)) &
                          Vtype(i,j,k) = CurrentSB%numofbody
@@ -159,11 +159,11 @@ contains
         integer :: i,j,k
 
         !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = 0, Wnz+1
+        do k = -2, Wnz+3
           if (zW(k) > obstacles_bbox(To) .or. zW(k) < obstacles_bbox(Bo)) cycle
-          do j = 0, Wny+1
+          do j = -2, Wny+3
             if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
-            do i = 0, Wnx+1
+            do i = -2, Wnx+3
               if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
               if (CurrentSB%Inside(xPr(i), yPr(j), zW(k), delta)) &
                          Wtype(i,j,k) = CurrentSB%numofbody
