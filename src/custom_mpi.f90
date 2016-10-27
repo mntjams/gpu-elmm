@@ -59,6 +59,12 @@ module custom_par
   !whether receive initial conditions from the parent
   logical :: receive_initial_conditions_from_parent = .true.
 
+  !ratio of grid sizes between the outer domain and this domain
+  integer :: domain_spatial_ratio = 3
+
+  !ratio of time-step size between the outer domain and this domain
+  integer :: domain_time_step_ratio = 3
+
   
   type domain_proc_grid
     integer, allocatable :: arr(:,:,:)

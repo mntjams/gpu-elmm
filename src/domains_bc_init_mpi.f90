@@ -1,3 +1,20 @@
+module domains_bc_init
+
+  use domains_bc_types
+  use custom_par
+
+  implicit  none
+
+  private
+
+  public par_init_domain_boundary_conditions_implementation
+
+contains
+
+  subroutine par_init_domain_boundary_conditions_implementation(domain_bc_send_buffers, &
+                                                                domain_bc_recv_buffers)
+    type(dom_bc_buffer_copy), allocatable :: domain_bc_send_buffers(:)
+    type(dom_bc_buffer_turbulence_generator), allocatable :: domain_bc_recv_buffers(:)
     integer :: xi, dii, djj, dkk
     integer :: num
     integer :: child_domain, i_child_domain, side
@@ -291,6 +308,9 @@ contains
     end function
 
     subroutine create_boundary_parent_buffer(num, dir, domain, im)
+      integer :: Ui1, Ui2, Vi1, Vi2, Wi1, Wi2, Pri1, Pri2
+      integer :: Uj1, Uj2, Vj1, Vj2, Wj1, Wj2, Prj1, Prj2
+      integer :: Uk1, Uk2, Vk1, Vk2, Wk1, Wk2, Prk1, Prk2
       integer, intent(in) :: num, dir, domain, im(3)
       real(knd) :: cxmax, cxmin, cymax, cymin, czmax, czmin
       integer :: cxi1, cxi2, cyj1, cyj2, czk1, czk2
@@ -564,6 +584,9 @@ contains
 
     subroutine create_boundary_child_buffer(dir, domain)
       use fftw3
+      integer :: Ui1, Ui2, Vi1, Vi2, Wi1, Wi2, Pri1, Pri2
+      integer :: Uj1, Uj2, Vj1, Vj2, Wj1, Wj2, Prj1, Prj2
+      integer :: Uk1, Uk2, Vk1, Vk2, Wk1, Wk2, Prk1, Prk2
       integer, intent(in) :: dir, domain
       integer :: i, width
       integer :: nx, ny, nz
@@ -1359,3 +1382,7 @@ contains
                      request, err)
       requests = [requests, request]
     end subroutine
+
+  end subroutine
+
+end module domains_bc_init
