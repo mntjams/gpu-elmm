@@ -347,7 +347,7 @@ contains
             Wi1 = pos-2
             Wi2 = pos+3
 
-            Pri1 = pos-2
+            Pri1 = pos-1
             Pri2 = pos+3
           else if (dir==Ea) then
             Ui1 = pos-2
@@ -403,7 +403,7 @@ contains
             Wj1 = pos-2
             Wj2 = pos+3
 
-            Prj1 = pos-2
+            Prj1 = pos-1
             Prj2 = pos+3
           else if (dir==No) then
             Uj1 = pos-2
@@ -459,7 +459,7 @@ contains
             Wk1 = pos-2
             Wk2 = pos+2
 
-            Prk1 = pos-2
+            Prk1 = pos-1
             Prk2 = pos+3
           else if (dir==To) then
             Uk1 = pos-2
@@ -641,7 +641,7 @@ contains
             b%r_Wk1 = -2
             b%r_Wk2 = Wnz/b%spatial_ratio+3
             
-            b%r_Pri1 = -2
+            b%r_Pri1 = -1
             b%r_Pri2 = +3
             b%r_Prj1 = -1
             b%r_Prj2 = Prny/b%spatial_ratio+2
@@ -761,7 +761,7 @@ contains
             
             b%r_Pri1 = -1
             b%r_Pri2 = Prnx/b%spatial_ratio+2
-            b%r_Prj1 = -2
+            b%r_Prj1 = -1
             b%r_Prj2 = +3
             b%r_Prk1 = -1
             b%r_Prk2 = Prnz/b%spatial_ratio+2
@@ -881,7 +881,7 @@ contains
             b%r_Pri2 = Prnx/b%spatial_ratio+2
             b%r_Prj1 = -1
             b%r_Prj2 = Prny/b%spatial_ratio+2
-            b%r_Prk1 = -2
+            b%r_Prk1 = -1
             b%r_Prk2 = +3
 
           case (To)
