@@ -74,15 +74,15 @@ contains
       if (D%direction==1) then
         res = (D%position>=xU(0) .and. &
                (D%position<xU(Prnx) .or. &
-                (D%position==xU(Prnx).and.Btype(Ea)/=MPI_BOUNDARY)))
+                (D%position==xU(Prnx).and.Btype(Ea)/=BC_MPI_BOUNDARY)))
       else if (D%direction==2) then   
         res = (D%position>=yV(0) .and. &
                (D%position<yV(Prny) .or. &
-                (D%position==yV(Prny).and.Btype(No)/=MPI_BOUNDARY)))
+                (D%position==yV(Prny).and.Btype(No)/=BC_MPI_BOUNDARY)))
       else if (D%direction==3) then   
         res = (D%position>=zW(0) .and. &
                (D%position<zW(Prnz) .or. &
-                (D%position==zW(Prnz).and.Btype(To)/=MPI_BOUNDARY)))
+                (D%position==zW(Prnz).and.Btype(To)/=BC_MPI_BOUNDARY)))
       else
         res = .false.
       end if
@@ -656,30 +656,30 @@ contains
     use iso_c_binding, only: c_loc, c_funloc
     use stop_procedures, only: error_stop
     class(TFrameDomain),target,asynchronous,intent(inout) :: D
-    integer err
+    integer :: err
 
-    err = 1
-    
-    select type (Dnp => D)
-      type is (TFrameDomain)
-        call pthread_create_opaque(Dnp%threadptr, &
-                                   c_funloc(SaveBuffers), &
-                                   c_loc(Dnp), err)
-      class default
-        call error_stop("Error: wrong type of D in TFrameDomain_DoSave.")
-    end select
-
-    if (err==0) then
-      D%in_progress = .true.
-    else
-      write (*,*) "Error in creating frame thread. Will run again synchronously. Code:",err
+!     err = 1
+!     
+!     select type (Dnp => D)
+!       type is (TFrameDomain)
+!         call pthread_create_opaque(Dnp%threadptr, &
+!                                    c_funloc(SaveBuffers), &
+!                                    c_loc(Dnp), err)
+!       class default
+!         call error_stop("Error: wrong type of D in TFrameDomain_DoSave.")
+!     end select
+! 
+!     if (err==0) then
+!       D%in_progress = .true.
+!     else
+!       write (*,*) "Error in creating frame thread. Will run again synchronously. Code:",err
       select type (Dnp => D)
         type is (TFrameDomain)
           call SaveBuffers(c_loc(Dnp))
         class default
           call error_stop("Error: wrog type of D in TFrameDomain_DoSave.")
       end select
-    end if
+!     end if
 
   end subroutine TFrameDomain_DoSave
 

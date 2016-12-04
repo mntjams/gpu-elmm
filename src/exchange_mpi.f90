@@ -1,5 +1,5 @@
 module exchange_par
-  use custom_par, only: global_comm, &
+  use custom_par, only: domain_comm, &
                         w_rank, e_rank, s_rank, n_rank, b_rank, t_rank, neigh_ranks ,&
                         nxims, nyims, nzims, iim, jim, kim, myrank
 
@@ -7,7 +7,7 @@ module exchange_par
   use custom_mpi, only: MPI_knd, MPI_STATUS_SIZE, MPI_REQUEST_NULL
 #endif
 
-  use Parameters, only: We, Ea, So, No, Bo, To, MPI_PERIODIC
+  use Parameters, only: We, Ea, So, No, Bo, To, BC_MPI_PERIODIC
 
   use Kinds
   
@@ -130,7 +130,7 @@ contains
 
     !global domain boundaries
     if (xdir) then
-      if (Btype(We)==MPI_PERIODIC.or.Btype(Ea)==MPI_PERIODIC) then
+      if (Btype(We)==BC_MPI_PERIODIC.or.Btype(Ea)==BC_MPI_PERIODIC) then
         if (iim==1) then
           call send(Phi, We)
         else if (iim==nxims) then
@@ -145,7 +145,7 @@ contains
     end if
 
     if (ydir) then  
-      if (Btype(So)==MPI_PERIODIC.or.Btype(No)==MPI_PERIODIC) then
+      if (Btype(So)==BC_MPI_PERIODIC.or.Btype(No)==BC_MPI_PERIODIC) then
         if (jim==1) then
           call send(Phi, So)
         else if (jim==nyims) then
@@ -160,7 +160,7 @@ contains
     end if
 
     if (zdir) then
-      if (Btype(Bo)==MPI_PERIODIC.or.Btype(To)==MPI_PERIODIC) then
+      if (Btype(Bo)==BC_MPI_PERIODIC.or.Btype(To)==BC_MPI_PERIODIC) then
         if (kim==1) then
           call send(Phi, Bo)
         else if (kim==nzims) then
@@ -184,7 +184,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_ISend(a, 1, send_mpi_types(side, component), neigh_ranks(side), &
-                      1000*myrank+100*neigh_ranks(side)+component, global_comm, requests(side), ierr)
+                     1000+component, domain_comm, requests(side), ierr)
       if (ierr/=0) stop "error sending MPI message."    
     end subroutine
     
@@ -193,8 +193,8 @@ contains
       integer, intent(in) :: side
 
       call MPI_IRecv(a, 1, recv_mpi_types(side, component), neigh_ranks(side), &
-                     1000*neigh_ranks(side)+100*myrank+component, global_comm, requests(side+6), ierr)
-      if (ierr/=0) stop "error sending MPI message."
+                     1000+component, domain_comm, requests(side+6), ierr)
+      if (ierr/=0) stop "error receiving MPI message."
     end subroutine
     
 
@@ -309,7 +309,7 @@ contains
    
    
   subroutine par_exchange_Pr(Phi)
-    use Parameters, only: We, Ea, So, No, Bo, To, MPI_PERIODIC, Prnx, Prny, Prnz, Btype
+    use Parameters, only: We, Ea, So, No, Bo, To, BC_MPI_PERIODIC, Prnx, Prny, Prnz, Btype
     real(knd), intent(inout), contiguous :: Phi(1:,1:,1:)
     logical :: oddx, oddy, oddz, evenx, eveny, evenz
     integer :: ierr
@@ -343,7 +343,7 @@ contains
    
 
     !global domain boundaries
-    if (Btype(We)==MPI_PERIODIC.or.Btype(Ea)==MPI_PERIODIC) then
+    if (Btype(We)==BC_MPI_PERIODIC.or.Btype(Ea)==BC_MPI_PERIODIC) then
       if (iim==1) then
         call send(Phi, We)
       else if (iim==nxims) then
@@ -351,7 +351,7 @@ contains
       end if     
     end if
 
-    if (Btype(So)==MPI_PERIODIC.or.Btype(No)==MPI_PERIODIC) then
+    if (Btype(So)==BC_MPI_PERIODIC.or.Btype(No)==BC_MPI_PERIODIC) then
       if (jim==1) then
         call send(Phi, So)
       else if (jim==nyims) then
@@ -359,7 +359,7 @@ contains
       end if
     end if
           
-    if (Btype(Bo)==MPI_PERIODIC.or.Btype(To)==MPI_PERIODIC) then
+    if (Btype(Bo)==BC_MPI_PERIODIC.or.Btype(To)==BC_MPI_PERIODIC) then
       if (kim==1) then
         call send(Phi, Bo)
       else if (kim==nzims) then
@@ -377,7 +377,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_ISend(a, 1, send_mpi_types(side, 6), neigh_ranks(side), &
-                     10000*myrank+100*neigh_ranks(side)+6, global_comm, requests(side), ierr)
+                     1000+8, domain_comm, requests(side), ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -386,8 +386,8 @@ contains
       integer, intent(in) :: side
 
       call MPI_IRecv(a, 1, recv_mpi_types(side, 6), neigh_ranks(side), &
-                     10000*neigh_ranks(side)+100*myrank+6, global_comm, requests(side+6), ierr)
-      if (ierr/=0) stop "error sending MPI message."
+                     1000+8, domain_comm, requests(side+6), ierr)
+      if (ierr/=0) stop "error receiving MPI message."
     end subroutine
     
 
@@ -441,7 +441,7 @@ contains
   
   
   subroutine par_exchange_Q(Phi)
-    use Parameters, only: We, Ea, So, No, Bo, To, MPI_PERIODIC, &
+    use Parameters, only: We, Ea, So, No, Bo, To, BC_MPI_PERIODIC, &
                           nx=>Prnx, ny=>Prny, nz=>Prnz, Btype
     real(knd), intent(inout), contiguous :: Phi(0:,0:,0:)
     integer :: ierr
@@ -473,7 +473,7 @@ contains
     call recv_t
 
     !global domain boundaries
-    if (Btype(We)==MPI_PERIODIC.or.Btype(Ea)==MPI_PERIODIC) then
+    if (Btype(We)==BC_MPI_PERIODIC.or.Btype(Ea)==BC_MPI_PERIODIC) then
       if (iim==1) then
         call recv(tmp_w, We)
       else if (iim==nxims) then
@@ -486,7 +486,7 @@ contains
       end if
     end if
 
-    if (Btype(So)==MPI_PERIODIC.or.Btype(No)==MPI_PERIODIC) then
+    if (Btype(So)==BC_MPI_PERIODIC.or.Btype(No)==BC_MPI_PERIODIC) then
       if (jim==1) then
         call recv(tmp_s, So)
       else if (jim==nyims) then
@@ -499,7 +499,7 @@ contains
       end if
     end if
 
-    if (Btype(Bo)==MPI_PERIODIC.or.Btype(To)==MPI_PERIODIC) then
+    if (Btype(Bo)==BC_MPI_PERIODIC.or.Btype(To)==BC_MPI_PERIODIC) then
       if (kim==1) then
         call recv(tmp_b, Bo)
       else if (kim==nzims) then
@@ -531,7 +531,7 @@ contains
       integer, intent(in) :: side
 
       call MPI_ISend(a, 1, send_mpi_types(side, 7), neigh_ranks(side), &
-                     1000*myrank+100*neigh_ranks(side)+7, global_comm, requests(side), ierr)
+                     1000+7 , domain_comm, requests(side), ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -540,8 +540,8 @@ contains
       integer, intent(in) :: side
 
       call MPI_IRecv(a, size(a), MPI_KND, neigh_ranks(side), &
-                    1000*neigh_ranks(side)+100*myrank+7, global_comm, requests(side+6), ierr)
-      if (ierr/=0) stop "error sending MPI message."
+                     1000+7 , domain_comm, requests(side+6), ierr)
+      if (ierr/=0) stop "error receiving MPI message."
       
       update(side) = .true.
     end subroutine
@@ -620,7 +620,7 @@ contains
   
   
   subroutine par_exchange_boundaries_yz(Phi, ny, nz, Btype, lby, lbz, widthy, widthz)
-    use Parameters, only: So, No, Bo, To, MPI_PERIODIC
+    use Parameters, only: So, No, Bo, To, BC_MPI_PERIODIC
     real(knd), intent(inout), contiguous :: Phi(lby:, lbz:)
     integer, intent(in) :: ny, nz
     integer, intent(in) :: Btype(6)
@@ -629,7 +629,7 @@ contains
     integer :: ierr, tag, status(MPI_STATUS_SIZE)
     logical :: ydir, zdir
     
-    ierr = 0; status=0; tag = 0
+    ierr = 0; status=0; tag = 1500
     
     oddy = mod(jim,2) == 1
     eveny = .not. oddy
@@ -691,7 +691,7 @@ contains
     !global domain boundaries
 
     tag = tag + 1
-    if (Btype(So)==MPI_PERIODIC.or.Btype(No)==MPI_PERIODIC) then
+    if (Btype(So)==BC_MPI_PERIODIC.or.Btype(No)==BC_MPI_PERIODIC) then
       if (jim==1) then
         call send(Phi(1:0+widthy,1:nz), s_rank)
       else if (jim==nyims) then
@@ -707,7 +707,7 @@ contains
 
 
     tag = tag + 1
-    if (Btype(Bo)==MPI_PERIODIC.or.Btype(To)==MPI_PERIODIC) then
+    if (Btype(Bo)==BC_MPI_PERIODIC.or.Btype(To)==BC_MPI_PERIODIC) then
       if (kim==1) then
         call send(Phi(1-widthy:ny+widthy,1:0+widthz), b_rank)
       else if (kim==nzims) then
@@ -727,8 +727,8 @@ contains
     subroutine send(a,to)
       real(knd), intent(in) :: a(:,:)
       integer, intent(in) :: to
-      !Must be global_comm, for `to` and `from` derived from `x_rank` to be valid!
-      call MPI_Send(a, size(a) , MPI_KND, to, tag, global_comm, ierr)
+      !Must be domain_comm, for `to` and `from` derived from `x_rank` to be valid!
+      call MPI_Send(a, size(a) , MPI_KND, to, tag, domain_comm, ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine
     
@@ -736,8 +736,8 @@ contains
       real(knd), intent(out) :: a(:,:)
       integer, intent(in) :: from
 
-      call MPI_Recv(a, size(a) , MPI_KND, from, tag, global_comm, status, ierr)
-      if (ierr/=0) stop "error sending MPI message."
+      call MPI_Recv(a, size(a) , MPI_KND, from, tag, domain_comm, status, ierr)
+      if (ierr/=0) stop "error receiving MPI message."
     end subroutine
     
 

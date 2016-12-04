@@ -7,7 +7,7 @@ module Outputs
                         GroundTFlux, GroundTFluxUVW, &
                         wallmodeltype
   use ImmersedBoundary
-  use Turbinlet, only: Ustar_inlet
+  use Turbinlet, only: turb_gen => default_turbulence_generator
   use Endianness
   use FreeUnit
   use VTKFrames
@@ -23,7 +23,7 @@ module Outputs
   private
   public store, display, probes, scalar_probes,  &
          OutTStep, Output, AllocateOutputs, ReadProbes,  &
-         current_profiles, profiles_config, enable_profiles
+         ProfileSwitches, current_profiles, profiles_config, enable_profiles
          
   type ProfileSwitches
     real(knd) :: average_start = 0, average_end = -1
@@ -42,6 +42,9 @@ module Outputs
   real(knd),allocatable :: U_avg(:,:,:),V_avg(:,:,:),W_avg(:,:,:) !<u>
   real(knd),allocatable :: UU_prime(:,:,:),VV_prime(:,:,:),WW_prime(:,:,:) !<uu>, <u'u'> must be computed before saving
   real(knd),allocatable :: UV_prime(:,:,:),UW_prime(:,:,:),VW_prime(:,:,:) !<uv>, <u'v'> must be computed before saving
+  real(knd),allocatable :: UU_prime_sgs(:,:,:),VV_prime_sgs(:,:,:),WW_prime_sgs(:,:,:) !<uu>, <u'u'> must be computed before saving
+  real(knd),allocatable :: UV_prime_sgs(:,:,:),UW_prime_sgs(:,:,:),VW_prime_sgs(:,:,:) !<uv>, <u'v'> must be computed before saving
+  real(knd),allocatable :: TKE_prime_sgs(:,:,:) !subgrid TKE approximation
   real(knd),allocatable :: Pr_avg(:,:,:) !<p>
   real(knd),allocatable :: Temperature_avg(:,:,:) !<theta>
   real(knd),allocatable :: Moisture_avg(:,:,:) !<q>
@@ -61,9 +64,10 @@ module Outputs
 
   real(knd),allocatable,dimension(:) :: delta_time, tke, dissip
 
+  real(knd),allocatable,dimension(:) :: pr_gradient_x_time, pr_gradient_y_time
+
   real(knd),allocatable,dimension(:,:) :: ustar, tstar                        !first index differentiates flux from friction number
                                                                              !second index is time
-
   real(knd),allocatable,dimension(:,:) :: U_time,V_time,W_time,temp_time,moist_time  !position, time
 
   real(knd),allocatable,dimension(:,:,:) :: scalp_time                        !which scalar, position, time
@@ -167,7 +171,7 @@ contains
     type(TProbe),allocatable,intent(out) :: ps(:)
     integer,intent(out)     :: nps
     character(*),intent(in) ::pfile
-    integer i,io,unit
+    integer :: i,io,unit
     real(knd) :: tmp3(3)
 
     open(newunit=unit, file=pfile, status="old", action="read",iostat=io)
@@ -255,6 +259,20 @@ contains
        UV_prime = 0
        UW_prime = 0
        VW_prime = 0
+       allocate(TKE_prime_sgs(1:Prnx,1:Prny,1:Prnz))
+       allocate(UU_prime_sgs(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+       allocate(VV_prime_sgs(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+       allocate(WW_prime_sgs(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+       allocate(UV_prime_sgs(1:Prnx,1:Prny,1:Prnz))
+       allocate(UW_prime_sgs(1:Prnx,1:Prny,1:Prnz))
+       allocate(VW_prime_sgs(1:Prnx,1:Prny,1:Prnz))
+       TKE_prime_sgs = 0
+       UU_prime_sgs = 0
+       VV_prime_sgs = 0
+       WW_prime_sgs = 0
+       UV_prime_sgs = 0
+       UW_prime_sgs = 0
+       VW_prime_sgs = 0
      end if
 
      if (store%avg_Pr==1) then
@@ -448,7 +466,7 @@ contains
      ustar = huge(1.0)
    end if
 
-   if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
+   if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==BC_MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
      allocate(tstar(2,1:time_series_max_length))
      tstar = huge(1.0)
    end if
@@ -465,6 +483,16 @@ contains
     end if
    end if
 
+   if (flow_rate_x_fixed) then
+     allocate(pr_gradient_x_time(1:time_series_max_length))
+     pr_gradient_x_time = huge(1.0_knd)
+   end if
+
+   if (flow_rate_y_fixed) then
+     allocate(pr_gradient_y_time(1:time_series_max_length))
+     pr_gradient_y_time = huge(1.0_knd)
+   end if
+
    if (enable_profiles) then
 
      call par_sync_out("  ...preparing profiles.")
@@ -473,13 +501,13 @@ contains
    
      call current_profiles%allocate
      
-     profiles_config%average_end = min(profiles_config%average_end, end_time)
-     profiles_config%running_end = min(profiles_config%running_end, end_time)
-     profiles_config%instant_end = min(profiles_config%instant_end, end_time)
+     profiles_config%average_end = min(profiles_config%average_end, time_stepping%end_time)
+     profiles_config%running_end = min(profiles_config%running_end, time_stepping%end_time)
+     profiles_config%instant_end = min(profiles_config%instant_end, time_stepping%end_time)
      
-     profiles_config%average_start = max(profiles_config%average_start, start_time)
-     profiles_config%running_start = max(profiles_config%running_start, start_time)
-     profiles_config%instant_start = max(profiles_config%instant_start, start_time)
+     profiles_config%average_start = max(profiles_config%average_start, time_stepping%start_time)
+     profiles_config%running_start = max(profiles_config%running_start, time_stepping%start_time)
+     profiles_config%instant_start = max(profiles_config%instant_start, time_stepping%start_time)
      
      if (profiles_config%average_end > profiles_config%average_start) then
        average_profiles = TimeAveragedProfiles(profiles_config%average_start, &
@@ -579,19 +607,19 @@ contains
      
    else
    
-     if (Btype(To)==AUTOMATICFLUX) then
+     if (Btype(To)==BC_AUTOMATIC_FLUX) then
        allocate(current_profiles%uw(0:Prnz), current_profiles%uwsgs(0:Prnz))
        allocate(current_profiles%vw(0:Prnz), current_profiles%vwsgs(0:Prnz))
      end if
      
-     if (TempBtype(To)==AUTOMATICFLUX) then
+     if (TempBtype(To)==BC_AUTOMATIC_FLUX) then
        allocate(current_profiles%tempfl(0:Prnz), current_profiles%tempflsgs(0:Prnz))
      else
        !to avoid the necessity of an allocatable dummy argument
        allocate(current_profiles%tempfl(0))
      end if
 
-     if (MoistBtype(To)==AUTOMATICFLUX) then
+     if (MoistBtype(To)==BC_AUTOMATIC_FLUX) then
        allocate(current_profiles%moistfl(0:Prnz), current_profiles%moistflsgs(0:Prnz))
      else
        !to avoid the necessity of an allocatable dummy argument
@@ -671,6 +699,15 @@ contains
     end if
 
 
+    if (flow_rate_x_fixed) then
+      call create(output_dir//"pr_gradient_x.unf")
+    end if
+
+    if (flow_rate_y_fixed) then
+      call create(output_dir//"pr_gradient_y.unf")
+    end if
+
+
     if (num_of_scalars>0.and.store%scalsum_time==1) then
       call create(output_dir//"scalsumtime.unf")
     end if
@@ -734,7 +771,7 @@ contains
       call ComputeViscsWM(U,V,W,Pr,Temperature)
     end if
 
-    times(step) = time
+    times(step) = time_stepping%time
 
     if (store%scalsum_time==1.or.store%scaltotsum_time==1) then
       do l = 1,num_of_scalars
@@ -884,8 +921,13 @@ contains
       delta_time(step)=delta/dt
     end if
 
+    if (flow_rate_x_fixed) then
+      pr_gradient_x_time(step) = pr_gradient_x
+    end if
 
-
+    if (flow_rate_y_fixed) then
+      pr_gradient_y_time(step) = pr_gradient_y
+    end if
 
 
 
@@ -896,11 +938,15 @@ contains
 
 
 
+    if ((averaging == 1) .and. &
+        ((time_stepping%time >= timeavg1) .and. &
+         (time_stepping%time - time_stepping%dt < timeavg2))) then
 
-    if ((averaging==1).and.((time>=timeavg1).and.(time-dt<timeavg2))) then
-
-      time_weight = min(dt, time-timeavg1, timeavg2-(time-dt), timeavg2-timeavg1) / &
-                    (timeavg2-timeavg1)
+      time_weight = min(time_stepping%dt, &
+                        time_stepping%time - timeavg1, &
+                        timeavg2 - (time_stepping%time - time_stepping%dt), &
+                        timeavg2 - timeavg1) / &
+                    (timeavg2 - timeavg1)
 
       if (store%avg_U>0) then
          U_avg = U_avg + U * time_weight
@@ -921,7 +967,10 @@ contains
         VW_prime = VW_prime + (V(1:Prnx,0:Prny-1,1:Prnz)+V(1:Prnx,1:Prny,1:Prnz)) * &
                               (W(1:Prnx,1:Prny,0:Prnz-1)+W(1:Prnx,1:Prny,1:Prnz)) * &
                               time_weight / 4
-        call AddSubgridStresses(UU_prime,VV_prime,WW_prime,UV_prime,UW_prime,VW_prime,U,V,W,time_weight)
+        call AddSubgridStresses(TKE_prime_sgs, UU_prime_sgs, VV_prime_sgs, WW_prime_sgs, &
+                                UV_prime_sgs, UW_prime_sgs, VW_prime_sgs, &
+                                U, V, W, &
+                                time_weight)
       end if
 
       if (store%avg_Pr==1) then
@@ -950,8 +999,11 @@ contains
       end if
     end if
 
-    if ((averaging==1).and.((time>=timeavg1).and.(time-dt<timeavg2))) then
-      if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
+    if ((averaging == 1) .and. &
+        ((time_stepping%time >= timeavg1) .and. &
+         (time_stepping%time - time_stepping%dt < timeavg2))) then
+
+      if (num_of_scalars > 0 .and. store%avg_flux_scalar == 1) then
         do i=1,num_of_scalars
           call AddScalarAdvVector(Scalar_fl_U_avg(:,:,:,i), &
                                Scalar_fl_V_avg(:,:,:,i), &
@@ -968,6 +1020,7 @@ contains
                                 scalar_probes%i, scalar_probes%j, scalar_probes%k)
         end do
       end if
+
     !UGLY HACK, dat pozor aby fungovalo kdyz nejsou alokovana pole!!!!!!!
     else if (store%probes_fluxes==1) then
       if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
@@ -1001,8 +1054,8 @@ contains
       end if
 
       if (display%ustar==1) then
-        if (allocated(Ustar_inlet)) then
-         if (master) write(*,'(*(a10,es15.3))') "ustar:",ground_ustar_Pr,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
+        if (allocated(turb_gen%Ustar_inlet)) then
+         if (master) write(*,'(*(a10,es15.3))') "ustar:",ground_ustar_Pr,"Re_tau:",S2,"u*inlet",turb_gen%Ustar_inlet(1)
         else
          if (master) write(*,'(*(a10,es15.3))') "ustar:",ground_ustar_Pr,"Re_tau:",S2
         end if
@@ -1017,8 +1070,8 @@ contains
       end if
 
       if (display%ustar==1) then
-        if (allocated(Ustar_inlet)) then
-         if (master) write(*,'(*(a10,es15.3))') "ustarUVW:",ground_ustar_UVW,"Re_tau:",S2,"u*inlet",Ustar_inlet(1)
+        if (allocated(turb_gen%Ustar_inlet)) then
+         if (master) write(*,'(*(a10,es15.3))') "ustarUVW:",ground_ustar_UVW,"Re_tau:",S2,"u*inlet",turb_gen%Ustar_inlet(1)
         else
          if (master) write(*,'(*(a10,es15.3))') "ustarUVW:",ground_ustar_UVW,"Re_tau:",S2
         end if
@@ -1030,7 +1083,7 @@ contains
     end if
 
 
-    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
+    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==BC_MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
      S2 = GroundTFlux()
      S = - S2 /  ground_ustar_Pr
 
@@ -1052,7 +1105,7 @@ contains
     end if
 
     if ((enable_profiles) .or. &
-       Btype(To)==AUTOMATICFLUX) then
+       Btype(To)==BC_AUTOMATIC_FLUX) then
       call StressProfiles(U,V,W)
     end if
 
@@ -1060,17 +1113,17 @@ contains
 
       call FluxSGSProfiles(W,Temperature,Moisture,Scalar)
 
-    else if (TempBtype(To)==AUTOMATICFLUX .or. &
-             MoistBtype(To)==AUTOMATICFLUX .or. &
-             ScalBType(To)==AUTOMATICFLUX) then
+    else if (TempBtype(To)==BC_AUTOMATIC_FLUX .or. &
+             MoistBtype(To)==BC_AUTOMATIC_FLUX .or. &
+             ScalBType(To)==BC_AUTOMATIC_FLUX) then
 
-      if (TempBtype(To)==AUTOMATICFLUX.and.enable_buoyancy) &
+      if (TempBtype(To)==BC_AUTOMATIC_FLUX.and.enable_buoyancy) &
         call TemperatureFluxSGSProfile(W,Temperature)
 
-      if (MoistBtype(To)==AUTOMATICFLUX.and.enable_moisture) &
+      if (MoistBtype(To)==BC_AUTOMATIC_FLUX.and.enable_moisture) &
         call MoistureFluxSGSProfile(W,Moisture)
 
-      if (ScalBtype(To)==AUTOMATICFLUX.and.num_of_scalars>0) &
+      if (ScalBtype(To)==BC_AUTOMATIC_FLUX.and.num_of_scalars>0) &
         call ScalarFluxSGSProfile(W,Scalar)
 
     end if
@@ -1078,23 +1131,25 @@ contains
     if (enable_profiles) then
       call BLProfiles(U,V,W,Temperature,Moisture,Scalar)
       
-      if (allocated(average_profiles)) call average_profiles%TimeStep(current_profiles, time, dt)
+      if (allocated(average_profiles)) &
+        call average_profiles%TimeStep(current_profiles, time_stepping%time, time_stepping%dt)
 
-      if (allocated(instant_profiles)) call instant_profiles%TimeStep(current_profiles, time, dt)
+      if (allocated(instant_profiles)) &
+        call instant_profiles%TimeStep(current_profiles, time_stepping%time, time_stepping%dt)
       
       if (allocated(running_average_profiles)) then
         do i = 1, size(running_average_profiles)
-          call running_average_profiles(i)%TimeStep(current_profiles, time, dt)
+          call running_average_profiles(i)%TimeStep(current_profiles, time_stepping%time, time_stepping%dt)
         end do
       end if
     end if
 
 
-    call SaveVTKFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    call SaveVTKFrames(time_stepping%time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
 
-    call SaveSurfaceFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    call SaveSurfaceFrames(time_stepping%time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
 
-    call SaveStaggeredFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    call SaveStaggeredFrames(time_stepping%time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
     
     if (time_series_step==time_series_max_length) then
       call OutputTimeSeries
@@ -1108,14 +1163,20 @@ contains
   end subroutine OutTstep
 
 
-  subroutine AddSubgridStresses(UU, VV, WW, UV, UW, VW, &
+  subroutine AddSubgridStresses(TKE, UU, VV, WW, UV, UW, VW, &
                                 U, V, W, weight)
+    use Filters, only: filtertype, filter_ratios
+    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: TKE
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU, VV, WW
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV, UW, VW
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U, V, W
     real(knd),intent(in) :: weight
     real(knd) :: Ax, Ay, Az, Ax2, Ay2, Az2
     integer :: i, j, k
+    real(knd) :: width
+    real(knd), parameter :: Ck = 0.1 !model constant for the sgs_tke eddy viscosity sgs model
+
+    width = filter_ratios(filtertype) * (dxmin*dymin*dzmin)**(1._knd/3._knd)
     
     Ax = weight/(2*dxmin)
     Ay = weight/(2*dymin)
@@ -1195,6 +1256,15 @@ contains
           VW(i,j,k) = VW(i,j,k) + (Viscosity(i,j,k) - molecular_viscosity) * &
                           (Az2 * (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) + &
                            Ay2 * (W(i,j+1,k)-W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)))
+        end do
+      end do
+    end do
+    !$omp end do nowait
+    !$omp do
+    do k=1,Prnz
+      do j=1,Prny
+        do i=1,Prnx
+          TKE(i,j,k) = TKE(i,j,k) + weight * ((Viscosity(i,j,k) - molecular_viscosity) / (Ck * width))**2
         end do
       end do
     end do
@@ -1314,6 +1384,19 @@ contains
       close(unit)
     end if
 
+    if (flow_rate_x_fixed) then
+      open(unit,file=output_dir//"pr_gradient_x.unf", &
+           access="stream",status="old",position="append")
+      write(unit) pr_gradient_x_time(1:time_series_step)
+      close(unit)
+    end if
+
+    if (flow_rate_y_fixed) then
+      open(unit,file=output_dir//"pr_gradient_y.unf", &
+           access="stream",status="old",position="append")
+      write(unit) pr_gradient_y_time(1:time_series_step)
+      close(unit)
+    end if
 
     if (num_of_scalars>0.and.store%scalsum_time==1) then
       open(unit,file=output_dir//"scalsumtime.unf", &
@@ -1366,7 +1449,7 @@ contains
     real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
     character(70) :: str
     real(real32),allocatable :: tmp(:,:,:,:)
-    integer i,j,k,unit
+    integer :: i,j,k,unit
 
     if (store%out==1) then
 
@@ -1654,15 +1737,19 @@ contains
 
   subroutine OutputAvg(U, V, W, &
                        Pr, Temperature, Moisture, &
-                                              UU, VV, WW, UV, UW, VW)
+                       UU, VV, WW, UV, UW, VW, &
+                       TKE_sgs, UU_sgs, VV_sgs, WW_sgs, UV_sgs, UW_sgs, VW_sgs)
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U, V, W
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU, VV, WW
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV, UW, VW
+    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: TKE_sgs
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU_sgs, VV_sgs, WW_sgs
+    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV_sgs, UW_sgs, VW_sgs
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(in)    :: Pr
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Temperature
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Moisture
     character(70) :: str
-    integer i,j,k,unit
+    integer :: i,j,k,unit
     real(real32),allocatable :: tmp(:,:,:,:), sc_tmp(:,:,:)
 
     if (averaging==1) then
@@ -1800,6 +1887,43 @@ contains
           end do
           write(unit) sc_tmp, lf
           
+          write(unit) "SCALARS uu_prime_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          do k = 1,Prnz
+           do j = 1,Prny
+            do i = 1,Prnx
+              sc_tmp(i,j,k) = BigEnd(real((UU_sgs(i,j,k)+UU_sgs(i-1,j,k))/2._knd, real32))
+            end do
+           end do
+          end do
+          write(unit) sc_tmp, lf
+          
+          write(unit) "SCALARS vv_prime_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          do k = 1,Prnz
+           do j = 1,Prny
+            do i = 1,Prnx
+              sc_tmp(i,j,k) = BigEnd(real((VV_sgs(i,j,k)+VV_sgs(i,j-1,k))/2._knd, real32))
+            end do
+           end do
+          end do
+          write(unit) sc_tmp, lf
+          
+          write(unit) "SCALARS ww_prime_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          do k = 1,Prnz
+           do j = 1,Prny
+            do i = 1,Prnx
+              sc_tmp(i,j,k) = BigEnd(real((WW_sgs(i,j,k)+WW_sgs(i,j,k-1))/2._knd, real32))
+            end do
+           end do
+          end do
+          write(unit) sc_tmp, lf
+          
+          write(unit) "SCALARS tke_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          write(unit) BigEnd(real(TKE_sgs, real32)), lf
+          
           write(unit) "SCALARS uv_prime float", lf
           write(unit) "LOOKUP_TABLE default", lf
           write(unit) BigEnd(real(UV, real32)), lf
@@ -1811,6 +1935,18 @@ contains
           write(unit) "SCALARS vw_prime float", lf
           write(unit) "LOOKUP_TABLE default", lf
           write(unit) BigEnd(real(VW, real32)), lf
+          
+          write(unit) "SCALARS uv_prime_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          write(unit) BigEnd(real(UV_sgs, real32)), lf
+          
+          write(unit) "SCALARS uw_prime_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          write(unit) BigEnd(real(UW_sgs, real32)), lf
+          
+          write(unit) "SCALARS vw_prime_sgs float", lf
+          write(unit) "LOOKUP_TABLE default", lf
+          write(unit) BigEnd(real(VW_sgs, real32)), lf
         end if
 
         if (store%avg_vorticity==1) then
@@ -1839,10 +1975,24 @@ contains
       end if !store%avg
 
       if (btest(store%avg_U,1)) &
-        call OutputUVW(U,V,W,output_dir//"Uavg.vtk",output_dir//"Vavg.vtk",output_dir//"Wavg.vtk",.true.)
+        call OutputUVW(U, V, W, &
+                       output_dir//"Uavg.vtk", &
+                       output_dir//"Vavg.vtk", &
+                       output_dir//"Wavg.vtk", &
+                       .true.)
 
-      if (btest(store%avg_UU_prime,1)) &
-        call OutputUVW(UU,VV,WW,output_dir//"Urms.vtk",output_dir//"Vrms.vtk",output_dir//"Wrms.vtk",.true.)
+      if (btest(store%avg_UU_prime,1)) then
+        call OutputUVW(UU, VV, WW, &
+                       output_dir//"Urms.vtk", &
+                       output_dir//"Vrms.vtk", &
+                       output_dir//"Wrms.vtk", &
+                       .true.)
+        call OutputUVW(UU_sgs, VV_sgs, WW_sgs, &
+                       output_dir//"Urms_sgs.vtk", &
+                       output_dir//"Vrms_sgs.vtk", &
+                       output_dir//"Wrms_sgs.vtk", &
+                       .true.)
+      end if
 
     end if !averaging
 
@@ -2320,11 +2470,14 @@ contains
     
     call OutputTimeSeries
 
-    if (averaging==1.and.time>=timeavg1) then
+    if (averaging==1 .and. time_stepping%time>=timeavg1) then
 
       call OutputAvg(U_avg, V_avg, W_avg, &
                      Pr_avg, Temperature_avg, Moisture_avg, &
-                     UU_prime, VV_prime, WW_prime, UV_prime, UW_prime, VW_prime)
+                     UU_prime, VV_prime, WW_prime, &
+                     UV_prime, UW_prime, VW_prime, &
+                     TKE_prime_sgs, UU_prime_sgs, VV_prime_sgs, WW_prime_sgs, &
+                     UV_prime_sgs, UW_prime_sgs, VW_prime_sgs)
       
       call OutputScalarStats(Scalar_avg,Scalar_variance,Scalar_max,Scalar_intermitency)
 
@@ -2802,7 +2955,7 @@ contains
 
   subroutine OutputU2(U,V,W)
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    integer unit
+    integer :: unit
     character(70) :: str
 
     call newunit(unit)
@@ -2911,14 +3064,15 @@ contains
 
 
   subroutine OUTINLET(U,V,W,Temperature)
+    use Parameters, t_s => time_stepping
     !for output of 2d data for use as an inilet condition later
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
     integer,save ::fnum
     integer,save :: called = 0
 
-    if ((time>=timefram1).and.(time<=timefram2+(timefram2-timefram1)/(frames-1))&
-        .and.(time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
+    if ((t_s%time>=timefram1).and.(t_s%time<=timefram2+(timefram2-timefram1)/(frames-1))&
+        .and.(t_s%time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
      if (called==0) then
       open(101,file=output_dir//"inletframeinfo.unf",form='unformatted',status='replace',action='write')
       write(101) Prny,Prnz  !for check of consistency of grids before use
@@ -2929,9 +3083,9 @@ contains
       fnum = 0
      end if
      fnum = fnum+1
-     write(101) time-timefram1
+     write(101) t_s%time-timefram1
      call OUTINLETFrame(U,V,W,Temperature,fnum)
-    elseif (time>timefram2+(timefram2-timefram1)/(frames-1).and.called==1) then
+    elseif (t_s%time>timefram2+(timefram2-timefram1)/(frames-1).and.called==1) then
       close(101)
       called = 2
     end if
@@ -2942,9 +3096,9 @@ contains
   subroutine OUTINLETFrame(U,V,W,Temperature,n)
     real(knd),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
-    integer n
+    integer :: n
     character(12) :: fname
-    integer mini,maxi,minj,maxj,mink,maxk,unit
+    integer :: mini,maxi,minj,maxj,mink,maxk,unit
 
     call GridCoords(mini,minj,mink,(xU(Prnx+1)+xU(0))/2._knd,(yV(Prny+1)+yV(0))/2._knd,(zW(Prnz+1)+zW(0))/2._knd)
     maxi = mini
@@ -2957,7 +3111,7 @@ contains
     fname(1:5)="frame"
     write(fname(6:8),"(I3.3)") n
     fname(9:12)=".unf"
-    if (master) write(*,*) "Saving frame:",fname(1:6),"   time:",time
+    if (master) write(*,*) "Saving frame:",fname(1:6),"   time:", time_stepping%time
 
     call newunit(unit)
 
@@ -3010,7 +3164,7 @@ contains
 !         end if
 !       end if
 ! #ifdef PAR
-!       call MPI_Barrier(global_comm, ie)
+!       call MPI_Barrier(domain_comm, ie)
 ! #endif
 !     end do
   end subroutine

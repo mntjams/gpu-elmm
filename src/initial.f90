@@ -8,12 +8,12 @@ module Initial
   use Pressure
   use Boundaries
   use ScalarBoundaries
-  use Outputs, only: store, display, probes, scalar_probes, ReadProbes
+  use Outputs, only: store, display, probes, scalar_probes, ReadProbes, &
+                     ProfileSwitches, profiles_config, enable_profiles
   use Scalars
   use Filters, only: filtertype, filter_ratios
   use Subgrid
-  use Turbinlet, only: GetTurbulentInlet, GetInletFromFile, TLag, Lturby, Lturbz, Ustar_inlet, relative_stress, &
-               Ustar_surf_inlet, stress_gradient_inlet, U_ref_inlet, z_ref_inlet, z0_inlet, power_exponent_inlet
+  use Turbinlet, only: default_turbulence_generator, GetInletFromFile
   use SolarRadiation, only: InitSolarRadiation
   use SolidBodies, only: obstacles_file, roughness_file, displacement_file, InitSolidBodies
   use ImmersedBoundary, only: GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
@@ -25,9 +25,10 @@ module Initial
   use Tiling, only: tilesize,InitTiles
   use FreeUnit, only: newunit
   use Puffs, only: InitPuffSources
-#ifdef PAR
   use custom_par
+#ifdef PAR
   use exchange_par
+  use domains_bc_par
 #endif
 
   implicit none
@@ -35,8 +36,8 @@ module Initial
   private
   public  ReadConfiguration, InitialConditions, InitBoundaryConditions, probes_file, scalar_probes_file
 
-  real(knd) x0,y0,z0 !domain boundaries, will become xU(0), yV(0), zW(0)
-  real(knd) lx,ly,lz !domain extents
+  real(knd) :: x0,y0,z0 !domain boundaries, will become xU(0), yV(0), zW(0)
+  real(knd) :: lx,ly,lz !domain extents
 
   character(80) :: probes_file = ""
   character(80) :: scalar_probes_file = ""
@@ -56,6 +57,7 @@ contains
    use VTKFrames, only: TFrameFlags, &
                               TFrameDomain,  AddDomain
    use PoisFFT, only: PoisFFT_NeumannStag, PoisFFT_Periodic
+   use Sponge, only: enable_out_sponge, enable_top_sponge, enable_top_sponge_scalar
    integer ::  lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
    real(knd) :: mgepsinnerGS
    integer ::  i,io,io2,itmp
@@ -103,6 +105,10 @@ contains
    image_input_dir = "input/"
    output_dir = "output/"
 
+
+   call init_random_seed
+
+
    call newunit(unit)
   
    !try read scratch_dir from environment, command line has priority
@@ -124,9 +130,6 @@ contains
 #endif
 
    open(unit,file="main.conf",status="old",action="read")
-   call get(CFL)
-   call get(Uref)
-   call get(poisson_solver)
    call get(advection_method)
    call get(limiter_type)
    call get(limiter_parameter)
@@ -142,12 +145,6 @@ contains
    call get(timeavg2)
    call get(Re)
    if (master) write(*,*) "Re=",Re
-   call get(start_time)
-   if (master) write(*,*) "start_time=",start_time
-   call get(end_time)
-   if (master) write(*,*) "end_time=",end_time
-   call get(max_number_of_time_steps)
-   if (master) write(*,*) "max_number_of_time_steps=",max_number_of_time_steps
    call get(eps)
    if (master) write(*,*) "eps=",eps
    call get(maxCNiter)
@@ -419,26 +416,26 @@ contains
    if (master) write(*,*) "G=",ShearInletTypeParameter
    call get(Uinlet)
    if (master) write(*,*) "Uinlet=",Uinlet
-   call get(Ustar_surf_inlet)  !-<u'w'>
-   call get(stress_gradient_inlet) !in relative part per 1m
-   call get(z0_inlet)
-   call get(power_exponent_inlet)
-   call get(z_ref_inlet)
-   call get(U_ref_inlet)
-   call get(relative_stress(1,1))
-   call get(relative_stress(2,2))
-   call get(relative_stress(3,3))
-   call get(relative_stress(1,2))
-   call get(relative_stress(1,3))
-   call get(relative_stress(2,3))
-   call get(TLag)
-   call get(Lturby)
-   call get(Lturbz)
+   call get(default_turbulence_generator%Ustar_surf_inlet)  !-<u'w'>
+   call get(default_turbulence_generator%stress_gradient_inlet) !in relative part per 1m
+   call get(default_turbulence_generator%z0_inlet)
+   call get(default_turbulence_generator%power_exponent_inlet)
+   call get(default_turbulence_generator%z_ref_inlet)
+   call get(default_turbulence_generator%U_ref_inlet)
+   call get(default_turbulence_generator%relative_stress(1,1))
+   call get(default_turbulence_generator%relative_stress(2,2))
+   call get(default_turbulence_generator%relative_stress(3,3))
+   call get(default_turbulence_generator%relative_stress(1,2))
+   call get(default_turbulence_generator%relative_stress(1,3))
+   call get(default_turbulence_generator%relative_stress(2,3))
+   call get(default_turbulence_generator%T_Lag)
+   call get(default_turbulence_generator%L_y)
+   call get(default_turbulence_generator%L_z)
    close(unit)
 
-   relative_stress(2,1) = relative_stress(1,2)
-   relative_stress(3,1) = relative_stress(1,3)
-   relative_stress(3,2) = relative_stress(2,3)
+   default_turbulence_generator%relative_stress(2,1) = default_turbulence_generator%relative_stress(1,2)
+   default_turbulence_generator%relative_stress(3,1) = default_turbulence_generator%relative_stress(1,3)
+   default_turbulence_generator%relative_stress(3,2) = default_turbulence_generator%relative_stress(2,3)
 
    open(unit,file="scalars.conf",status="old",action="read",iostat = io)
    if (io==0) then
@@ -511,7 +508,7 @@ contains
       end if
    end if
 
-   if (poisson_solver==3.or.poisson_solver==4.or.poisson_solver==5) then
+   if (pressure_solution%poisson_solver==POISSON_SOLVER_MULTIGRID) then
      open(unit,file="mgopts.conf",status="old",action="read")
      call get(lmg)
      call get(minmglevel)
@@ -525,19 +522,18 @@ contains
      call get(mgepsinnerGS)
      close(unit)
 
-     if (poisson_solver==3.or.poisson_solver==4) then
-       if (Prny==1) then
-        call SetMGParams2d(llmg = lmg,lminmglevel = minmglevel,lbnx = bnx,lbnz = bnz,&
-                           lmgncgc = mgncgc,lmgnpre = mgnpre,lmgnpost = mgnpost,&
-                           lmgmaxinnerGSiter = mgmaxinnerGSiter,lmgepsinnerGS = mgepsinnerGS)
-       else
-        call SetMGParams(llmg = lmg,lminmglevel = minmglevel,&
-                           lbnx = bnx,lbny = bny,lbnz = bnz,&
-                           lmgncgc = mgncgc,lmgnpre = mgnpre,lmgnpost = mgnpost,&
-                           lmgmaxinnerGSiter = mgmaxinnerGSiter,lmgepsinnerGS = mgepsinnerGS)
-       end if
+     if (Prny==1) then
+      call SetMGParams2d(llmg = lmg,lminmglevel = minmglevel,lbnx = bnx,lbnz = bnz,&
+                         lmgncgc = mgncgc,lmgnpre = mgnpre,lmgnpost = mgnpost,&
+                         lmgmaxinnerGSiter = mgmaxinnerGSiter,lmgepsinnerGS = mgepsinnerGS)
+     else
+      call SetMGParams(llmg = lmg,lminmglevel = minmglevel,&
+                         lbnx = bnx,lbny = bny,lbnz = bnz,&
+                         lmgncgc = mgncgc,lmgnpre = mgnpre,lmgnpost = mgnpost,&
+                         lmgmaxinnerGSiter = mgmaxinnerGSiter,lmgepsinnerGS = mgepsinnerGS)
      end if
    end if
+
 
   
 
@@ -567,7 +563,7 @@ contains
    end if
    
    
-   call get_profiles("profiles.conf")
+   call get_profiles("profiles.conf", profiles_config, enable_profiles)
 
    !probes_file and scalar_probes_file read from command line
    if (probes_file == "" .and. scalar_probes_file == "") then
@@ -620,11 +616,7 @@ contains
 
    if (master) write(*,*) "num_of_scalars",num_of_scalars
 
-   projectiontype = 1
-
    call parse_command_line
-
-   if (CFL<=0)  CFL = 0.9
 
    if (master) then
 
@@ -632,93 +624,93 @@ contains
 
      write(*,'(a2)',advance='no') " W "
      select case (Btype(We))
-       case (NOSLIP)
+       case (BC_NOSLIP)
          write(*,*) "noslip"
-       case (FREESLIP)
+       case (BC_FREESLIP)
          write(*,*) "freeslip"
-       case (PERIODIC)
+       case (BC_PERIODIC)
          write(*,*) "periodic"
-       case (DIRICHLET)
+       case (BC_DIRICHLET)
          write(*,*) "dirichlet"
-       case (NEUMANN)
+       case (BC_NEUMANN)
          write(*,*) "neumann"
      endselect
 
      write(*,'(a2)',advance='no') " E "
      select case (Btype(Ea))
-       case (NOSLIP)
+       case (BC_NOSLIP)
          write(*,*) "noslip"
-       case (FREESLIP)
+       case (BC_FREESLIP)
          write(*,*) "freeslip"
-       case (PERIODIC)
+       case (BC_PERIODIC)
          write(*,*) "periodic"
-       case (DIRICHLET)
+       case (BC_DIRICHLET)
          write(*,*) "dirichlet"
-       case (NEUMANN)
+       case (BC_NEUMANN)
          write(*,*) "neumann"
      endselect
 
      write(*,'(a2)',advance='no') " S "
      select case (Btype(So))
-       case (NOSLIP)
+       case (BC_NOSLIP)
          write(*,*) "noslip"
-       case (FREESLIP)
+       case (BC_FREESLIP)
          write(*,*) "freeslip"
-       case (PERIODIC)
+       case (BC_PERIODIC)
          write(*,*) "periodic"
-       case (DIRICHLET)
+       case (BC_DIRICHLET)
          write(*,*) "dirichlet"
-       case (NEUMANN)
+       case (BC_NEUMANN)
          write(*,*) "neumann"
      endselect
 
      write(*,'(a2)',advance='no') " N "
      select case (Btype(No))
-       case (NOSLIP)
+       case (BC_NOSLIP)
          write(*,*) "noslip"
-       case (FREESLIP)
+       case (BC_FREESLIP)
          write(*,*) "freeslip"
-       case (PERIODIC)
+       case (BC_PERIODIC)
          write(*,*) "periodic"
-       case (DIRICHLET)
+       case (BC_DIRICHLET)
          write(*,*) "dirichlet"
-       case (NEUMANN)
+       case (BC_NEUMANN)
          write(*,*) "neumann"
      endselect
 
      write(*,'(a2)',advance='no') " B "
      select case (Btype(Bo))
-       case (NOSLIP)
+       case (BC_NOSLIP)
          write(*,*) "noslip"
-       case (FREESLIP)
+       case (BC_FREESLIP)
          write(*,*) "freeslip"
-       case (PERIODIC)
+       case (BC_PERIODIC)
          write(*,*) "periodic"
-       case (DIRICHLET)
+       case (BC_DIRICHLET)
          write(*,*) "dirichlet"
-       case (NEUMANN)
+       case (BC_NEUMANN)
          write(*,*) "neumann"
      endselect
 
      write(*,'(a2)',advance='no') " T "
      select case (Btype(To))
-       case (NOSLIP)
+       case (BC_NOSLIP)
          write(*,*) "noslip"
-       case (FREESLIP)
+       case (BC_FREESLIP)
          write(*,*) "freeslip"
-       case (PERIODIC)
+       case (BC_PERIODIC)
          write(*,*) "periodic"
-       case (DIRICHLET)
+       case (BC_DIRICHLET)
          write(*,*) "dirichlet"
-       case (NEUMANN)
+       case (BC_NEUMANN)
          write(*,*) "neumann"
      endselect
      
-     if ((Btype(We)==PERIODIC.or.Btype(Ea)==PERIODIC).and.Btype(We)/=Btype(Ea)) &
+     if ((Btype(We)==BC_PERIODIC.or.Btype(Ea)==BC_PERIODIC).and.Btype(We)/=Btype(Ea)) &
        call error_stop("Error: Both X boundary conditions must be periodic or not periodic.")
-     if ((Btype(So)==PERIODIC.or.Btype(No)==PERIODIC).and.Btype(So)/=Btype(No)) &
+     if ((Btype(So)==BC_PERIODIC.or.Btype(No)==BC_PERIODIC).and.Btype(So)/=Btype(No)) &
        call error_stop("Error: Both Y boundary conditions must be periodic or not periodic.")
-     if ((Btype(Bo)==PERIODIC.or.Btype(To)==PERIODIC).and.Btype(Bo)/=Btype(To)) &
+     if ((Btype(Bo)==BC_PERIODIC.or.Btype(To)==BC_PERIODIC).and.Btype(Bo)/=Btype(To)) &
        call error_stop("Error: Both Z boundary conditions must be periodic or not periodic.")
 
    end if
@@ -766,9 +758,11 @@ contains
    end if
 
 
-   if (Btype(We)==TURBULENTINLET) inlettype = TurbulentInletType
-   if (Btype(We)==INLETFROMFILE) inlettype = FromFileInletType
+   if (Btype(We)==BC_TURBULENT_INLET) inlettype = TurbulentInletType
+   if (Btype(We)==BC_INLET_FROM_FILE) inlettype = FromFileInletType
 
+
+   call get_time_stepping("time_stepping.conf", time_stepping)
 
    if (timeavg2>=timeavg1) then
      averaging = 1
@@ -786,7 +780,7 @@ contains
 
    !Btype might get overwritten by MPI procedures
    do i = We, To
-     if (Btype(i)==PERIODIC) then
+     if (Btype(i)==BC_PERIODIC) then
         PoissonBtype(i) = PoisFFT_PERIODIC
      else
         PoissonBtype(i) = PoisFFT_NeumannStag
@@ -808,15 +802,28 @@ contains
    end if
 
 
+   im_xmin = gxmin
+   im_ymin = gymin
+   im_zmin = gzmin
+
+   im_xmax = gxmax
+   im_ymax = gymax
+   im_zmax = gzmax
+
 #ifdef PAR
+   call get_domains("domains.conf")
+
    call par_init_grid
    
    call par_init_boundaries
    
-   x0 = x0 + offset_to_global_x * dxmin
-   y0 = y0 + offset_to_global_y * dymin
-   z0 = z0 + offset_to_global_z * dzmin
+   x0 = im_xmin
+   y0 = im_ymin
+   z0 = im_zmin
 #endif
+
+
+   call get_pressure_solution("pressure_solution.conf", pressure_solution)
 
 
    !both procedures below use the name of the output directory (affected by MPI)
@@ -825,7 +832,8 @@ contains
    call read_staggered_frames
 
 
-   if (Btype(Ea)==PERIODIC.or.Btype(Ea)>=MPI_BOUNDS) then
+   if (Btype(Ea)==BC_PERIODIC .or. &
+       (Btype(Ea)>=BC_MPI_BOUNDS_MIN.and.Btype(Ea)<=BC_MPI_BOUNDS_MAX)) then
                           Unx = Prnx
    else
                           Unx = Prnx-1
@@ -834,7 +842,8 @@ contains
    Unz = Prnz
 
    Vnx = Prnx
-   if (Btype(No)==PERIODIC.or.Btype(No)>=MPI_BOUNDS) then
+   if (Btype(No)==BC_PERIODIC .or. &
+       (Btype(No)>=BC_MPI_BOUNDS_MIN.and.Btype(Ea)<=BC_MPI_BOUNDS_MAX)) then
                           Vny = Prny
    else
                           Vny = Prny-1
@@ -843,7 +852,8 @@ contains
 
    Wnx = Prnx
    Wny = Prny
-   if (Btype(To)==PERIODIC.or.Btype(To)>=MPI_BOUNDS) then
+   if (Btype(To)==BC_PERIODIC .or. &
+       (Btype(To)>=BC_MPI_BOUNDS_MIN.and.Btype(Ea)<=BC_MPI_BOUNDS_MAX)) then
                           Wnz = Prnz
    else
                           Wnz = Prnz-1
@@ -877,7 +887,13 @@ contains
    gWny = Wny
    gWnz = Wnz 
 #endif
-   
+
+   call InitFlowRatesBC
+
+#ifdef PAR
+   call par_init_domain_boundary_conditions
+#endif
+  
 
 #ifdef CUSTOM_CONFIG
    call CustomConfiguration_Last
@@ -990,12 +1006,14 @@ contains
 #ifdef PAR
        use custom_par
 #endif
-       namelist /cmd/ tilesize, debugparam, debuglevel, windangle, projectiontype, &
+       namelist /cmd/ tilesize, debugparam, debuglevel, windangle, &
                        Prnx, Prny, Prnz,&
 #ifdef PAR
-                       npxyz, &
+                       npxyz, domain_index, number_of_domains, &
 #endif
-                       obstacles_file, probes_file, scalar_probes_file, scratch_dir
+                       obstacles_file, probes_file, scalar_probes_file, scratch_dir, &
+                       enable_fixed_flow_rate, &
+                       enable_out_sponge, enable_top_sponge, enable_top_sponge_scalar
 
        if (len_trim(command_line)>0) then
          msg = ''
@@ -1015,7 +1033,7 @@ contains
         use Strings, only: itoa
         use LineSources, only: ScalarLineSource, ScalarLineSources
         type(ScalarLineSource) :: src
-        integer n
+        integer :: n
 
         call get(n)
         allocate(ScalarLineSources(0))
@@ -1037,7 +1055,7 @@ contains
         use Strings, only: itoa
         use PointSources, only: ScalarPointSource, ScalarPointSources
         type(ScalarPointSource) :: src
-        integer n
+        integer :: n
 
         call get(n)
         allocate(ScalarPointSources(0))
@@ -1144,6 +1162,123 @@ contains
 
 
 
+  !TODO: This subroutine should be in module ParseTrees, but bug https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64589
+  ! prevents this until moving to GCC
+  subroutine get_object_field_values(tree, object_name, stat, &
+                                     fields, fields_a, fields_a_int_alloc)
+    use Strings
+    use ParseTrees
+    !To extract values of variables from the parse tree
+    use iso_fortran_env, only: real32, real64, int32, int64
+    type(tree_object), intent(in) :: tree(:)
+    character(*), intent(in) :: object_name
+    integer, intent(out) :: stat
+    !stat 0    .. success
+    !stat < 0  .. multiple definitions of object named object_name
+    !stat 1    .. object named object_name not found
+    !stat 2    .. inconsistent number of components in an array in fields_a
+    !stat 11   .. unexpected type of variable in fields
+    !stat 12   .. unexpected type of variable in fields_a
+    type(field_names), intent(in), optional :: fields(:)
+    type(field_names_a), intent(in), optional :: fields_a(:)
+    type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
+
+    integer :: iobj
+
+    stat = 1
+
+    do iobj = 1, size(tree)
+      call get_object(tree(iobj))
+    end do
+    
+  contains
+
+    subroutine get_object(obj)
+      type(tree_object), intent(in) :: obj
+      integer :: i, j
+
+      if (downcase(obj%name)==object_name) then
+        stat = stat - 1
+
+        if (allocated(obj%fields%array)) then
+
+          associate(obj_fields => obj%fields%array)
+
+fields_do:  do j = 1, size(obj_fields)
+             
+              do i = 1, size(fields)
+                if (obj_fields(j)%name == fields(i)%name) then
+                  select type (var => fields(i)%var)
+                    type is (integer)
+                      read(obj_fields(j)%value, *) var
+                    type is (real(real32))
+                      read(obj_fields(j)%value, *) var
+                    type is (real(real64))
+                      read(obj_fields(j)%value, *) var
+                    type is (logical)
+                      read(obj_fields(j)%value, *) var
+                    class default
+                      stat = 11
+                      return
+                  end select
+                  cycle fields_do
+                end if
+              end do
+
+
+              do i = 1, size(fields_a)
+                if (obj_fields(j)%name == fields_a(i)%name) then
+
+                  if (size(fields_a(i)%var)/=size(obj_fields(j)%array_value)) then
+! uncomment to get details when debugging
+!                     write(*,*) "Error, expecting", &
+!                                 size(fields_a(i)%var), &
+!                                 "vector components", &
+!                                 "but", &
+!                                 size(obj_fields(j)%array_value), &
+!                                 "components present."
+                    stat = 2
+                    return
+                  end if
+
+                  select type (var => fields_a(i)%var)
+                    type is (integer)
+                      read(obj_fields(j)%array_value, *) var
+                    type is (real(real32))
+                      read(obj_fields(j)%array_value, *) var
+                    type is (real(real64))
+                      read(obj_fields(j)%array_value, *) var
+                    type is (logical)
+                      read(obj_fields(j)%array_value, *) var
+                    class default
+                      stat = 12
+                      return
+                  end select
+                  cycle fields_do
+                end if
+              end do
+
+
+              do i = 1, size(fields_a_int_alloc)
+                if (obj_fields(j)%name == fields_a_int_alloc(i)%name) then
+                  allocate(fields_a_int_alloc(i)%var(size(obj_fields(j)%array_value)))
+                  if (size(fields_a_int_alloc(i)%var)>0) &
+                    read(obj_fields(j)%array_value, *) fields_a_int_alloc(i)%var
+                end if
+              end do
+
+            end do fields_do
+
+          end associate
+
+        end if
+
+      end if
+    end subroutine get_object
+
+  end subroutine get_object_field_values
+
+
 
 
 
@@ -1155,7 +1290,7 @@ contains
     character(*), intent(in) :: fname
     type(tree_object), allocatable :: tree(:)
     logical :: ex
-    integer :: i, stat
+    integer :: iobj, stat
 
     if (num_of_scalars==0) return
 
@@ -1168,9 +1303,9 @@ contains
     if (stat==0) then
 
       if (allocated(tree)) then
-        do i = 1, size(tree)
-          call get_area_source(tree(i))
-          call tree(i)%finalize
+        do iobj = 1, size(tree)
+          call get_area_source(tree(iobj))
+          call tree(iobj)%finalize
         end do
       end if
 
@@ -1364,6 +1499,9 @@ contains
       enable_pr_gradient_x_profile = any(pr_gradient_profile_x/=0)
       enable_pr_gradient_y_profile = any(pr_gradient_profile_y/=0)
 
+      if (enable_pr_gradient_x_profile) enable_pr_gradient_x_uniform = .false.
+      if (enable_pr_gradient_y_profile) enable_pr_gradient_y_uniform = .false.
+
     else
 
       pr_gradient_x =   Coriolis_parameter * vg(1)
@@ -1446,15 +1584,29 @@ contains
   end subroutine get_pressure_gradient
 
 
-  subroutine get_profiles(fname)
+  subroutine get_profiles(fname, profiles_config, enable_profiles)
     use Strings
     use ParseTrees
-    use Outputs, only: profiles_config, enable_profiles
-    
     character(*), intent(in) :: fname
+    type(ProfileSwitches), intent(inout), target :: profiles_config
+    logical, intent(inout), target :: enable_profiles
     type(tree_object), allocatable :: tree(:)
     logical :: ex
     integer :: i, stat
+
+    type(field_names) :: fields_avg(2), fields_inst(3), fields_running(3)
+
+
+    fields_avg = [field_names_init("start",     profiles_config%average_start), &
+                  field_names_init("end",       profiles_config%average_end)]
+
+    fields_inst = [field_names_init("start",     profiles_config%instant_start), &
+                   field_names_init("end",       profiles_config%instant_end), &
+                   field_names_init("interval",  profiles_config%instant_interval)]
+
+    fields_running = [field_names_init("start",     profiles_config%running_start), &
+                      field_names_init("end",       profiles_config%running_end), &
+                      field_names_init("interval",  profiles_config%running_interval)]
 
     inquire(file=fname, exist=ex)
 
@@ -1465,8 +1617,23 @@ contains
     if (stat==0) then
 
       if (allocated(tree)) then
+
+        call get_object_field_values(tree, "average_profiles", stat, &
+                                     fields_avg)
+
+        if (stat<=0) enable_profiles = .true.
+
+        call get_object_field_values(tree, "instantaneous_profiles", stat, &
+                                     fields_inst)
+
+        if (stat<=0) enable_profiles = .true.
+
+        call get_object_field_values(tree, "running_average_profiles", stat, &
+                                     fields_running)
+
+        if (stat<=0) enable_profiles = .true.
+
         do i = 1, size(tree)
-          call get_profile(tree(i))
           call tree(i)%finalize
         end do
       end if
@@ -1478,115 +1645,331 @@ contains
 
     end if
     
-  contains
-  
-    subroutine get_profile(obj)
-      type(tree_object), intent(in) :: obj
-      integer :: j
-      real(knd) :: rval
+  end subroutine get_profiles
 
-      if (downcase(obj%name)=='average_profiles') then
 
-        if (allocated(obj%fields%array)) then
+  subroutine get_time_stepping(fname, t_s)
+    use Strings
+    use ParseTrees
+    character(*), intent(in) :: fname
+    type(time_step_control), intent(inout), target :: t_s
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: iobj, stat
 
-          associate(fields => obj%fields%array)
+    logical, target :: constant_time_steps = .false.
 
-            do j = 1, size(fields)
-              read(fields(j)%value, *) rval
-             
-              select case (downcase(fields(j)%name))
-                case ('start')
-                  profiles_config%average_start = rval
-                case ('end')
-                  profiles_config%average_end = rval
-              end select
+    type(field_names) :: names(12)
+    type(field_names_a) :: names_a(3)
 
-            end do
+    names = [field_names_init("max_number_of_time_steps",   t_s%max_number_of_time_steps), &
+             field_names_init("variable_time_steps",        t_s%variable_time_steps), &
+             field_names_init("constant_time_steps",        constant_time_steps), &
+             field_names_init("enable_U_scaling",           t_s%enable_U_scaling), &
+             field_names_init("enable_CFL_check",           t_s%enable_CFL_check), &
+             field_names_init("dt",                         t_s%dt_constant), &
+             field_names_init("dt_max",                     t_s%dt_max), &
+             field_names_init("dt_min",                     t_s%dt_min), &
+             field_names_init("CFL",                        t_s%CFL), &
+             field_names_init("CFL_max",                    t_s%CFL_max), &
+             field_names_init("start_time",                 t_s%start_time), &
+             field_names_init("end_time",                   t_s%end_time)]
 
-          end associate
+    names_a = [field_names_a_init("U_scaling", t_s%U_scaling), &
+               field_names_a_init("U_max",     t_s%U_max), &
+               field_names_a_init("U_min",     t_s%U_min)]
 
-        else
+    inquire(file=fname, exist=ex)
 
-          write(*,*) "No fields in the profile object in " // fname
-          call error_stop
+    if (.not.ex) return
 
-        end if
+    call parse_file(tree, fname, stat)
 
-        enable_profiles = .true.
+    if (stat==0) then
 
-      else if (downcase(obj%name)=='instantaneous_profiles') then
+      if (allocated(tree)) then
+        call get_object_field_values(tree, "time_stepping", stat, &
+                                     fields = names, fields_a = names_a)
 
-        if (allocated(obj%fields%array)) then
+        if (stat<=0) call init
 
-          associate(fields => obj%fields%array)
-
-            do j = 1, size(fields)
-
-              read(fields(j)%value, *) rval
-              
-              select case (downcase(fields(j)%name))
-                case ('start')
-                  profiles_config%instant_start = rval
-                case ('end')
-                  profiles_config%instant_end = rval
-                case ('interval')
-                  profiles_config%instant_interval = rval
-              end select
-
-            end do
-
-          end associate
-
-        else
-
-          write(*,*) "No fields in the profile object in " // fname
-          call error_stop
-
-        end if
-
-        enable_profiles = .true.
-
-      else if (downcase(obj%name)=='running_average_profiles') then
-
-        if (allocated(obj%fields%array)) then
-
-          associate(fields => obj%fields%array)
-
-            do j = 1, size(fields)
-
-              read(fields(j)%value, *) rval
-              
-              select case (downcase(fields(j)%name))
-                case ('start')
-                  profiles_config%running_start = rval
-                case ('end')
-                  profiles_config%running_end = rval
-                case ('interval')
-                  profiles_config%running_interval = rval
-              end select
-
-            end do
-
-          end associate
-          
-        else
-
-          write(*,*) "No fields in the profile object in " // fname
-          call error_stop
-
-        end if
-
-        enable_profiles = .true.
-
+        do iobj = 1, size(tree)
+          call tree(iobj)%finalize
+        end do
       else
-        write(*,*) "Unknown object type " // downcase(obj%name) // " in " // fname
+        write(*,*) "Error, no content in " // fname
         call error_stop
       end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+
+  contains
+
+    subroutine init
+
+      if (t_s%dt_constant > 0) constant_time_steps = .true.
+
+      if (constant_time_steps) t_s%variable_time_steps = .false.
+
+      if (t_s%variable_time_steps) then
+
+        t_s%U_max = abs(t_s%U_max)
+        t_s%U_min = abs(t_s%U_min)
+
+        if (maxval(t_s%U_max) <=  0) &
+          call error_stop("Error, time_stepping%U_max must have at least one non-zero component.")
+
+        if (maxval(t_s%U_min) <=  0) &
+          call error_stop("Error, time_stepping%U_min must have at least one non-zero component.")
+
+        if (t_s%CFL <= 0) &
+          call error_stop("Error, time_stepping%CFL must be positive.")
+
+
+        t_s%dt_min = t_s%CFL / (t_s%U_max(1) / dxmin + &
+                                t_s%U_max(2) / dymin + &
+                                t_s%U_max(3) / dzmin)
+        
+        t_s%dt_max = t_s%CFL / (t_s%U_min(1) / dxmin + &
+                                t_s%U_min(2) / dymin + &
+                                t_s%U_min(3) / dzmin)
+
+        t_s%dt = t_s%dt_min
+
+      else
+
+        t_s%U_scaling = abs(t_s%U_scaling)
+
+        !explicitly specified time-step length (dt=) has a priority
+        if (t_s%dt_constant <=0 .and. maxval(t_s%U_scaling) > 0) then
+
+          t_s%enable_U_scaling = .true.
+
+          if (t_s%CFL<=0) &
+            call error_stop("Error, time_stepping%CFL must be positive when using U_scaling.")
+
+          t_s%dt_constant = t_s%CFL / (t_s%U_scaling(1) / dxmin + &
+                                       t_s%U_scaling(2) / dymin + &
+                                       t_s%U_scaling(3) / dzmin)
+        else
+          if (t_s%dt_constant <=  0) &
+            call error_stop("Error, time_stepping%dt or t_s%U_scaling must be positive.")
+        end if
+
+        t_s%enable_CFL_check = (t_s%CFL_max > 0)
+
+        t_s%dt = t_s%dt_constant
+
+      end if
+      
+    
     end subroutine
 
-    
-  end subroutine get_profiles
+  end subroutine get_time_stepping
   
+  
+  
+  
+
+  subroutine get_pressure_solution(fname, p_s)
+    use Strings
+    use ParseTrees
+    character(*), intent(in) :: fname
+    type(pressure_solution_control), intent(inout), target :: p_s
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: iobj, stat
+
+    type(field_names) :: names(10)
+    type(field_names_a) :: names_a(1)
+
+    names = [field_names_init("check_mass_flux", p_s%check_mass_flux), &
+             field_names_init("correct_mass_flux_west",   p_s%correct_mass_flux(We)), &
+             field_names_init("correct_mass_flux_east",   p_s%correct_mass_flux(Ea)), &
+             field_names_init("correct_mass_flux_south",  p_s%correct_mass_flux(So)), &
+             field_names_init("correct_mass_flux_north",  p_s%correct_mass_flux(No)), &
+             field_names_init("correct_mass_flux_bottom", p_s%correct_mass_flux(Bo)), &
+             field_names_init("correct_mass_flux_top",    p_s%correct_mass_flux(To)), &
+             field_names_init("poisson_solver",      p_s%poisson_solver), &
+             field_names_init("check_divergence",    p_s%check_divergence), &
+             field_names_init("bottom_pressure",     p_s%bottom_pressure)]
+
+    names_a = [field_names_a_init("correct_mass_flux", p_s%correct_mass_flux)]
+
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+
+      if (allocated(tree)) then
+
+        call get_object_field_values(tree, "pressure_solution", stat, &
+                                     fields = names, fields_a = names_a)
+
+        if (stat<=0) call init
+
+        do iobj = 1, size(tree)
+          call tree(iobj)%finalize
+        end do
+      else
+        write(*,*) "Error, no content in " // fname
+        call error_stop
+      end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+
+  contains
+
+    subroutine init
+
+      if (any(p_s%correct_mass_flux)) p_s%check_mass_flux = .true.
+
+      where(Btype>=BC_MPI_BOUNDS_MIN .and. Btype<=BC_MPI_BOUNDS_MAX) p_s%correct_mass_flux = .false.
+    
+      where(Btype==BC_NOSLIP) p_s%correct_mass_flux = .false.
+
+      where(Btype==BC_PERIODIC) p_s%correct_mass_flux = .false.
+    
+    end subroutine
+
+  end subroutine get_pressure_solution
+  
+  
+  
+  
+#ifdef PAR
+  subroutine get_domains(fname)
+    use Strings
+    use ParseTrees
+    use custom_par
+    character(*), intent(in) :: fname
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: iobj, stat
+
+    type(field_names) :: names(7)
+    type(field_names_a) :: names_a(2)
+    type(field_names_a_int_alloc) :: names_a_int_alloc(1)
+    
+    logical, target :: enable_multiple_domains_l = .false.
+    logical, target :: is_two_way_nested_l = .false.
+    integer, target :: number_of_domains_l = -99
+    integer, target :: domain_index_l = -99
+    integer, target :: parent_domain_l = -99
+    integer, target :: spatial_ratio_l = -99
+    integer, target :: time_step_ratio_l = -99
+
+    logical :: is_domain_boundary_nested_l(6) = .true.
+    logical :: has_domain_boundary_turbulence_generator_l(6) = .false.
+
+    names = [field_names_init("enable_multiple_domains", enable_multiple_domains_l), &
+             field_names_init("is_two_way_nested",   is_two_way_nested_l), &
+             field_names_init("domain_index",   domain_index_l), &
+             field_names_init("parent_domain",   parent_domain_l), &
+             field_names_init("number_of_domains",   number_of_domains_l), &
+             field_names_init("spatial_ratio",   spatial_ratio_l), &
+             field_names_init("time_step_ratio",   time_step_ratio_l)]
+
+    names_a = [field_names_a_init("is_boundary_nested", is_domain_boundary_nested_l), &
+               field_names_a_init("has_boundary_turbulence_generator", has_domain_boundary_turbulence_generator_l)]
+
+    names_a_int_alloc = [field_names_a_int_alloc_init("child_domains")]
+
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+
+      if (allocated(tree)) then
+
+        call get_object_field_values(tree, "domains", stat, &
+                                     fields = names, fields_a = names_a, fields_a_int_alloc = names_a_int_alloc)
+
+        if (stat<=0) call init
+
+        do iobj = 1, size(tree)
+          call tree(iobj)%finalize
+        end do
+      else
+        write(*,*) "Error, no content in " // fname
+        call error_stop
+      end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+
+  contains
+
+    subroutine init
+
+      enable_multiple_domains = enable_multiple_domains_l
+      
+      if (enable_multiple_domains) then
+          
+        number_of_domains = number_of_domains_l
+        if (number_of_domains<1) &
+          call error_stop("Error, positive number_of_domains must be specified in domains.")
+    
+        domain_index = domain_index_l
+        if (domain_index<1) &
+          call error_stop("Error, positive domain_index must be specified in domains.")
+        if (number_of_domains<domain_index) &
+          call error_stop("Error, domain_index must be smaller or equal to number_of_domains.")
+
+        parent_domain = max(parent_domain_l, 0)
+        if (domain_index>1 .and. parent_domain<=0) &
+          call error_stop("Error, parent_domain shall be specified and positive if domain_index > 1.")
+
+        if (allocated(names_a_int_alloc(1)%var)) then
+          call move_alloc(names_a_int_alloc(1)%var, child_domains)
+          if (any(child_domains<=domain_index) .or. &
+              any(child_domains>number_of_domains)) then
+            call error_stop("Error, child_domains shall be larger than domain_index &
+                           &and smaller or equal to number_of_domains.")
+          end if
+        else if (domain_index<number_of_domains) then
+
+          call error_stop("Error, child_domains shall be specified if domain_index < number_of_domains. &
+                          & It may be empty.")
+        end if
+          
+        is_this_domain_two_way_nested = is_two_way_nested_l
+
+        is_domain_boundary_nested = is_domain_boundary_nested_l
+
+        where(Btype==BC_NOSLIP) is_domain_boundary_nested = .false.
+
+        has_domain_boundary_turbulence_generator = has_domain_boundary_turbulence_generator_l
+        where (.not.is_domain_boundary_nested) has_domain_boundary_turbulence_generator = .false.
+
+        if (spatial_ratio_l>0) domain_spatial_ratio = spatial_ratio_l
+        if (time_step_ratio_l>0) domain_time_step_ratio = time_step_ratio_l
+      end if
+      
+    end subroutine
+
+  end subroutine get_domains
+#endif  
   
   
   
@@ -1753,9 +2136,15 @@ contains
       call par_exchange_U_y(V, 2)
       call par_exchange_U_z(W, 3)
 #endif
-      if (Btype(Ea)>=MPI_BOUNDS.or.Btype(Ea)==PERIODIC) U(Prnx,1:Prny,1:Prnz) = U(Prnx,1:Prny,1:Prnz) + U(0,1:Prny,1:Prnz)
-      if (Btype(No)>=MPI_BOUNDS.or.Btype(No)==PERIODIC) V(1:Prnx,Prny,1:Prnz) = V(1:Prnx,Prny,1:Prnz) + V(1:Prnx,0,1:Prnz)
-      if (Btype(To)>=MPI_BOUNDS.or.Btype(To)==PERIODIC) W(1:Prnx,1:Prny,Prnz) = W(1:Prnx,1:Prny,Prnz) + W(1:Prnx,1:Prny,0)
+      if ((Btype(Ea)>=BC_MPI_BOUNDS_MIN .and. (Btype(Ea)<=BC_MPI_BOUNDS_MAX)) .or. &
+          Btype(Ea)==BC_PERIODIC) &
+        U(Prnx,1:Prny,1:Prnz) = U(Prnx,1:Prny,1:Prnz) + U(0,1:Prny,1:Prnz)
+      if ((Btype(No)>=BC_MPI_BOUNDS_MIN .and. (Btype(No)<=BC_MPI_BOUNDS_MAX)) .or. &
+          Btype(No)==BC_PERIODIC) &
+        V(1:Prnx,Prny,1:Prnz) = V(1:Prnx,Prny,1:Prnz) + V(1:Prnx,0,1:Prnz)
+      if ((Btype(To)>=BC_MPI_BOUNDS_MIN .and. (Btype(To)<=BC_MPI_BOUNDS_MAX)) .or. &
+          Btype(To)==BC_PERIODIC) &
+        W(1:Prnx,1:Prny,Prnz) = W(1:Prnx,1:Prny,Prnz) + W(1:Prnx,1:Prny,0)
 
       U = U / 2
       V = V / 2
@@ -1827,15 +2216,19 @@ contains
 
   subroutine InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,dt)
     use custom_par
+#ifdef PAR
+    use domains_bc_par, only: par_receive_initial_conditions, par_send_initial_conditions
+#endif
     use ArrayUtilities
     real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
     real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
     real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
     real(knd), intent(out) :: dt
-    integer i,j,k
-    real(knd) p,x,y,z,x1,x2,y1,y2,z1,z2
+    integer :: i,j,k
+    real(knd) :: p,x,y,z,x1,x2,y1,y2,z1,z2
     real(knd),allocatable :: Q(:,:,:)
+    logical :: receive_ic
 
 #ifdef CUSTOM_INITIAL_CONDITIONS
     interface
@@ -1853,8 +2246,10 @@ contains
 
     if (abs(Uinlet)>0) then
       dt = min(abs(dxmin/Uinlet), abs(dymin/Uinlet), abs(dzmin/Uinlet))
-    else if (abs(Uref)>0) then
-      dt = min(abs(dxmin/Uref), abs(dymin/Uref), abs(dzmin/Uref))
+    else if (maxval(abs(time_stepping%U_min))>0) then
+      dt = min(abs(dxmin/time_stepping%U_min(1)), &
+               abs(dymin/time_stepping%U_min(2)), &
+               abs(dzmin/time_stepping%U_min(3)))
     else
       dt = dxmin
     end if
@@ -1867,6 +2262,8 @@ contains
 
     V(1:Vnx,1:Vny,1:Vnz) = 0
     W(1:Wnx,1:Wny,1:Wnz) = 0
+
+    receive_ic = .false.
 
     if (initcondsfromfile>0) then
 
@@ -1891,338 +2288,381 @@ contains
 
        call par_sync_out("  ...computing initial conditions.")
 
+#ifdef PAR
+       if (parent_domain>0.and.receive_initial_conditions_from_parent) then
+         receive_ic = .true.
+       else
+#endif
+
+
 #ifdef CUSTOM_INITIAL_CONDITIONS
-       call CustomInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
+         call CustomInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
 #else
-       if (task_type==2) then
-         U(1:Unx,1:Uny,1:Unz) = 0
-         do k = 1, Unz
-          do j = 1, Uny
-           do i = 1, Unx
-                  x = xU(i)
-                  y = yPr(j)
-                  z = zPr(k)
-                  U(i,j,k) = -cos(pi*x)*sin(pi*y)
-           end do
-          end do
-         end do
-         do k = 1, Vnz
-          do j = 1, Vny
-           do i = 1, Vnx
-                  x = xPr(i)
-                  y = yV(j)
-                  z = zPr(k)
-                  V(i,j,k) = sin(pi*x)*cos(pi*y)
-           end do
-          end do
-         end do
-         do k = 1, Wnz
-          do j = 1, Wny
-           do i = 1, Wnx
-                  x = xPr(i)
-                  y = yPr(j)
-                  z = zW(k)
-                  W(i,j,k) = 0
-           end do
-          end do
-         end do
-         do k = 1, Prnz
-          do j = 1, Prny
-           do i = 1, Prnx
-                  x = xPr(i)
-                  y = yPr(j)
-                  z = zPr(k)
-                  Pr(i,j,k) = -(1._knd/4._knd)*((cos(2*pi*y)+cos(2*pi*x)))
-           end do
-          end do
-         end do
 
-       elseif (task_type==3) then
-         U(1:Unx,1:Uny,1:Unz) = 0
-         do k = 1, Unz
-          do j = 1, Uny
-           do i = 1, Unx
-
-                  x = xU(i)
-                  y = yPr(j)
-                  z = zPr(k)
-                  U(i,j,k) = Uinlet*sin(x)*cos(z)*cos(-y)
-           end do
-          end do
-         end do
-         do k = 1, Vnz
-          do j = 1, Vny
-           do i = 1, Vnx
-                  x = xPr(i)
-                  y = yV(j)
-                  z = zPr(k)
-                  V(i,j,k) = 0
-           end do
-          end do
-         end do
-         do k = 1, Wnz
-          do j = 1, Wny
-           do i = 1, Wnx
-                  x = xPr(i)
-                  y = yPr(j)
-                  z = zW(k)
-                  W(i,j,k) = -Uinlet*cos(x)*sin(z)*cos(-y)
-           end do
-          end do
-         end do
-         do k = 1, Prnz
-          do j = 1, Prny
-           do i = 1, Prnx
-                  x = xPr(i)
-                  y = yPr(j)
-                  z = zPr(k)
-                  Pr(i,j,k) = (Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
-           end do
-          end do
-         end do
-
-       elseif (InletType==TurbulentInletType) then
-
-         call par_sync_out("  ...computing turbulent initial conditions.")
-
-         dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Uny,1:Unz)),avg(Vin(1:Vny,1:Vnz)))
-
-         do i = 1, Prnx
-           
-           call GetTurbulentInlet(dt)
-           
-           !$omp parallel private(j,k)
-           !$omp do collapse(2)
+         if (task_type==2) then
+           U(1:Unx,1:Uny,1:Unz) = 0
            do k = 1, Unz
             do j = 1, Uny
-              if (Utype(i,j,k)<=0) then
-                 U(i,j,k) = Uin(j,k)
-              else
-                 U(i,j,k) = 0
-              end if
+             do i = 1, Unx
+                    x = xU(i)
+                    y = yPr(j)
+                    z = zPr(k)
+                    U(i,j,k) = -cos(pi*x)*sin(pi*y)
+             end do
             end do
            end do
-           !$omp end do nowait
-           !$omp do collapse(2)
            do k = 1, Vnz
             do j = 1, Vny
-              if (Vtype(i,j,k)<=0) then
-                 V(i,j,k) = Vin(j,k)
-              else
-                 V(i,j,k) = 0
+             do i = 1, Vnx
+                    x = xPr(i)
+                    y = yV(j)
+                    z = zPr(k)
+                    V(i,j,k) = sin(pi*x)*cos(pi*y)
+             end do
+            end do
+           end do
+           do k = 1, Wnz
+            do j = 1, Wny
+             do i = 1, Wnx
+                    x = xPr(i)
+                    y = yPr(j)
+                    z = zW(k)
+                    W(i,j,k) = 0
+             end do
+            end do
+           end do
+           do k = 1, Prnz
+            do j = 1, Prny
+             do i = 1, Prnx
+                    x = xPr(i)
+                    y = yPr(j)
+                    z = zPr(k)
+                    Pr(i,j,k) = -(1._knd/4._knd)*((cos(2*pi*y)+cos(2*pi*x)))
+             end do
+            end do
+           end do
+
+         elseif (task_type==3) then
+           U(1:Unx,1:Uny,1:Unz) = 0
+           do k = 1, Unz
+            do j = 1, Uny
+             do i = 1, Unx
+
+                    x = xU(i)
+                    y = yPr(j)
+                    z = zPr(k)
+                    U(i,j,k) = Uinlet*sin(x)*cos(z)*cos(-y)
+             end do
+            end do
+           end do
+           do k = 1, Vnz
+            do j = 1, Vny
+             do i = 1, Vnx
+                    x = xPr(i)
+                    y = yV(j)
+                    z = zPr(k)
+                    V(i,j,k) = 0
+             end do
+            end do
+           end do
+           do k = 1, Wnz
+            do j = 1, Wny
+             do i = 1, Wnx
+                    x = xPr(i)
+                    y = yPr(j)
+                    z = zW(k)
+                    W(i,j,k) = -Uinlet*cos(x)*sin(z)*cos(-y)
+             end do
+            end do
+           end do
+           do k = 1, Prnz
+            do j = 1, Prny
+             do i = 1, Prnx
+                    x = xPr(i)
+                    y = yPr(j)
+                    z = zPr(k)
+                    Pr(i,j,k) = (Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
+             end do
+            end do
+           end do
+
+         elseif (InletType==TurbulentInletType) then
+
+           call par_sync_out("  ...computing turbulent initial conditions.")
+
+           dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Uny,1:Unz)),avg(Vin(1:Vny,1:Vnz)))
+
+           do i = 1, Prnx
+             
+             call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+             
+             !$omp parallel private(j,k)
+             !$omp do collapse(2)
+             do k = 1, Unz
+              do j = 1, Uny
+                if (Utype(i,j,k)<=0) then
+                   U(i,j,k) = Uin(j,k)
+                else
+                   U(i,j,k) = 0
+                end if
+              end do
+             end do
+             !$omp end do nowait
+             !$omp do collapse(2)
+             do k = 1, Vnz
+              do j = 1, Vny
+                if (Vtype(i,j,k)<=0) then
+                   V(i,j,k) = Vin(j,k)
+                else
+                   V(i,j,k) = 0
+                end if
+              end do
+             end do
+             !$omp end do nowait
+             !$omp do collapse(2)
+             do k = 1, Wnz
+              do j = 1, Wny
+                if (Wtype(i,j,k)<=0) then
+                   W(i,j,k) = Win(j,k)
+                else
+                   W(i,j,k) = 0
+                end if
+              end do
+             end do
+             !$omp end do
+             !$omp end parallel
+           end do
+
+         else
+
+           call par_sync_out("  ...setting initial conditions.")
+
+           !$omp parallel private(i,j,k)
+           !$omp do collapse(3)
+           do k = 1, Unz
+            do j = 1, Uny
+             do i = 1, Unx
+              if (Utype(i,j,k)<=0) then
+                 U(i,j,k) = Uin(j,k)
+               else
+                 U(i,j,k) = 0
               end if
+             end do
             end do
            end do
            !$omp end do nowait
-           !$omp do collapse(2)
+           !$omp do collapse(3)
+           do k = 1, Vnz
+            do j = 1, Vny
+             do i = 1, Vnx
+              if (Vtype(i,j,k)<=0) then
+                 V(i,j,k) = Vin(j,k)
+               else
+                 V(i,j,k) = 0
+              end if
+             end do
+            end do
+           end do
+           !$omp end do nowait
+           !$omp do collapse(3)
            do k = 1, Wnz
             do j = 1, Wny
+             do i = 1, Wnx
               if (Wtype(i,j,k)<=0) then
                  W(i,j,k) = Win(j,k)
-              else
+               else
                  W(i,j,k) = 0
               end if
+             end do
             end do
            end do
            !$omp end do
            !$omp end parallel
-         end do
+         end if  !task_type
 
-       else
 
-         call par_sync_out("  ...setting initial conditions.")
 
-         !$omp parallel private(i,j,k)
-         !$omp do collapse(3)
-         do k = 1, Unz
-          do j = 1, Uny
-           do i = 1, Unx
-            if (Utype(i,j,k)<=0) then
-               U(i,j,k) = Uin(j,k)
-             else
-               U(i,j,k) = 0
-            end if
+         if (num_of_scalars>0) then
+           call par_sync_out("  ...setting initial scalar values.")
+           !$omp parallel
+           !$omp workshare
+           SCALAR(1:Prnx,1:Prny,1:Prnz,:) = 0
+           !$omp end workshare
+           !$omp end parallel
+         end if
+
+         if (enable_buoyancy.and.task_type==2) then
+           call par_sync_out("  ...setting initial temperature values.")
+
+           do k = 0, Prnz+1
+            do j = 0, Prny+1
+             do i = 0, Prnx+1
+              x = xPr(i)
+              y = yPr(j)
+              z = zPr(k)
+              if ((x)**2+(y-0.5)**2<0.2_knd**2) then
+               temperature(i,j,k) = cos(sqrt(x**2+(y-0.5)**2)*pi/2/0.2_knd)**2
+              else
+               temperature(i,j,k) = 0
+              end if
+             end do
+            end do
            end do
-          end do
-         end do
-         !$omp end do nowait
-         !$omp do collapse(3)
-         do k = 1, Vnz
-          do j = 1, Vny
-           do i = 1, Vnx
-            if (Vtype(i,j,k)<=0) then
-               V(i,j,k) = Vin(j,k)
-             else
-               V(i,j,k) = 0
-            end if
+
+         elseif (enable_buoyancy.and.task_type==3) then
+           call par_sync_out("  ...setting initial temperature values.")
+
+           do k = 0, Prnz+1
+            do j = 0, Prny+1
+             do i = 0, Prnx+1
+              x = xPr(i)
+              y = yPr(j)
+              z = zPr(k)
+              temperature(i,j,k) = temperature_ref + &
+                 (temperature_ref/100._knd) * ((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
+             end do
+            end do
            end do
-          end do
-         end do
-         !$omp end do nowait
-         !$omp do collapse(3)
-         do k = 1, Wnz
-          do j = 1, Wny
-           do i = 1, Wnx
-            if (Wtype(i,j,k)<=0) then
-               W(i,j,k) = Win(j,k)
-             else
-               W(i,j,k) = 0
-            end if
-           end do
-          end do
-         end do
-         !$omp end do
-         !$omp end parallel
-       end if  !task_type
 
+         elseif (enable_buoyancy) then
+           call par_sync_out("  ...setting initial temperature values.")
 
+           call InitScalarProfile(TempIn,TemperatureProfile,temperature_ref)
 
-       if (num_of_scalars>0) then
-         call par_sync_out("  ...setting initial scalar values.")
-         !$omp parallel
-         !$omp workshare
-         SCALAR(1:Prnx,1:Prny,1:Prnz,:) = 0
-         !$omp end workshare
-         !$omp end parallel
-       end if
+           call InitScalar(TempIn,TemperatureProfile,Temperature)
 
-       if (enable_buoyancy.and.task_type==2) then
-         call par_sync_out("  ...setting initial temperature values.")
+         end if !buoyancy and task_type
 
-         do k = 0, Prnz+1
-          do j = 0, Prny+1
-           do i = 0, Prnx+1
-            x = xPr(i)
-            y = yPr(j)
-            z = zPr(k)
-            if ((x)**2+(y-0.5)**2<0.2_knd**2) then
-             temperature(i,j,k) = cos(sqrt(x**2+(y-0.5)**2)*pi/2/0.2_knd)**2
-            else
-             temperature(i,j,k) = 0
-            end if
-           end do
-          end do
-         end do
+         if (enable_moisture) then
+           call par_sync_out("  ...setting initial moisture values.")
 
-       elseif (enable_buoyancy.and.task_type==3) then
-         call par_sync_out("  ...setting initial temperature values.")
+           call InitScalarProfile(MoistIn,MoistureProfile,moisture_ref)
 
-         do k = 0, Prnz+1
-          do j = 0, Prny+1
-           do i = 0, Prnx+1
-            x = xPr(i)
-            y = yPr(j)
-            z = zPr(k)
-            temperature(i,j,k) = temperature_ref + &
-               (temperature_ref/100._knd) * ((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
-           end do
-          end do
-         end do
+           call InitScalar(MoistIn,MoistureProfile,Moisture)
 
-       elseif (enable_buoyancy) then
-         call par_sync_out("  ...setting initial temperature values.")
+         end if
 
-         call InitScalarProfile(TempIn,TemperatureProfile,temperature_ref)
-
-         call InitScalar(TempIn,TemperatureProfile,Temperature)
-
-       end if !buoyancy and task_type
-
-       if (enable_moisture) then
-         call par_sync_out("  ...setting initial moisture values.")
-
-         call InitScalarProfile(MoistIn,MoistureProfile,moisture_ref)
-
-         call InitScalar(MoistIn,MoistureProfile,Moisture)
-
-       end if
+!end not custom initial conditions
 #endif
 
 
-       if (enable_buoyancy) then
-         call par_sync_out("  ...setting hydrostatic pressure.")
+         if (enable_buoyancy) then
+           call par_sync_out("  ...setting hydrostatic pressure.")
 
-         call InitHydrostaticPressure(Pr,Temperature,Moisture)
+           call InitHydrostaticPressure(Pr,Temperature,Moisture)
 
-       end if
-
-       call par_sync_out("  ...setting initial viscosity and diffusivity.")
-
-       call set(Viscosity, molecular_viscosity)
-
-       if (molecular_viscosity > 0 .and. &
-             (enable_buoyancy .or. &
-              enable_moisture .or. &
-              num_of_scalars > 0))     then
-
-         call set(TDiff, molecular_diffusivity)
-
-       end if
-
-       call par_sync_out("  ...setting ghost cell values.")
-
-       call BoundUVW(U, V, W)
-
-       call Bound_Pr(Pr)
+         end if
+       
+#ifdef PAR
+       end if !initial conditions not from parent
+#endif
+  
+     end if !init conditions not from file
 
 
-       call par_sync_out("  ...computing pressure correction.")
-       call PressureCorrection(U,V,W,Pr,Q,1._knd)
+     call par_sync_out("  ...setting initial viscosity and diffusivity.")
 
-       call par_sync_out("  ...computing initial eddy viscosity.")
-       call SubgridModel(U, V, W)
+     call set(Viscosity, molecular_viscosity)
 
-       call par_sync_out("  ...setting viscosity in ghost cells.")
-       call BoundViscosity(Viscosity)
+     if (molecular_viscosity > 0 .and. &
+           (enable_buoyancy .or. &
+            enable_moisture .or. &
+            num_of_scalars > 0))     then
 
-       if (enable_buoyancy.or. &
-           enable_moisture.or. &
-           num_of_scalars>0)     then
-         call par_sync_out("  ...setting subgrid diffusivity.")
+       call set(TDiff, molecular_diffusivity)
 
-         !$omp parallel do private(i,j,k)
-         do k = 1, Prnz
-           do j = 1, Prny
-             do i = 1, Prnx
-               TDiff(i,j,k) = (Viscosity(i,j,k) - molecular_viscosity) / constPr_sgs + &
-                              molecular_diffusivity
-             end do
+     end if
+
+#ifdef PAR
+     if (enable_multiple_domains) then
+       call par_sync_out("  ...getting initial conditions from parent (if there is one).")
+
+       call par_receive_initial_conditions(receive_ic, U, V, W, Pr, Temperature, Moisture, Scalar)
+
+       call par_sync_out("  ...getting boundary conditions from parent (if there is one).")
+
+       call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%time, epsilon(1._knd), send=.false.)
+
+       call par_update_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%start_time)
+     end if
+#endif
+
+     call par_sync_out("  ...setting ghost cell values.")
+
+     call BoundUVW(U, V, W)
+
+     call Bound_Pr(Pr)
+
+     call par_sync_out("  ...computing pressure correction.")
+     call PressureCorrection(U,V,W,Pr,Q,1._knd)
+
+     call par_sync_out("  ...computing initial eddy viscosity.")
+     call SubgridModel(U, V, W)
+
+     call par_sync_out("  ...setting viscosity in ghost cells.")
+     call BoundViscosity(Viscosity)
+
+     if (enable_buoyancy.or. &
+         enable_moisture.or. &
+         num_of_scalars>0)     then
+       call par_sync_out("  ...setting subgrid diffusivity.")
+
+       !$omp parallel do private(i,j,k)
+       do k = 1, Prnz
+         do j = 1, Prny
+           do i = 1, Prnx
+             TDiff(i,j,k) = (Viscosity(i,j,k) - molecular_viscosity) / constPr_sgs + &
+                            molecular_diffusivity
            end do
          end do
-         !$omp end parallel do
-
-         call BoundViscosity(TDiff)
-       end if
-
-       if (enable_buoyancy) then
-         call par_sync_out("  ...setting temperature in ghost cells.")
-         call BoundTemperature(Temperature)
-       end if
-
-       if (enable_moisture) then
-         call par_sync_out("  ...setting moisture in ghost cells.")
-         call BoundMoisture(Moisture)
-       end if
-
-       if (num_of_scalars>0)  call par_sync_out("  ...setting scalars in ghost cells.")
-       do i = 1, num_of_scalars
-         call BoundScalar(Scalar(:,:,:,i))
        end do
+       !$omp end parallel do
 
-       call par_sync_out("  ...setting initial temperature flux.")
-       call InitTempFl(Temperature)
+       call BoundViscosity(TDiff)
+     end if
 
-       if (wallmodeltype>0) then
-                      call par_sync_out("  ...computing wall model in scalar points.")
-                      call ComputeViscsWM(U,V,W,Pr,Temperature)
-                      call par_sync_out("  ...computing wall model in velocity points.")
-                      call ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
-       end if
+     if (enable_buoyancy) then
+       call par_sync_out("  ...setting temperature in ghost cells.")
+       call BoundTemperature(Temperature)
+     end if
 
-       call par_sync_out("  ...setting viscosity in ghost cells.")
-       call BoundViscosity(Viscosity)
+     if (enable_moisture) then
+       call par_sync_out("  ...setting moisture in ghost cells.")
+       call BoundMoisture(Moisture)
+     end if
 
-    end if !init conditions not from file
+     if (num_of_scalars>0)  call par_sync_out("  ...setting scalars in ghost cells.")
+     do i = 1, num_of_scalars
+       call BoundScalar(Scalar(:,:,:,i))
+     end do
+
+     call par_sync_out("  ...setting initial temperature flux.")
+     call InitTempFl(Temperature)
+
+     if (wallmodeltype>0) then
+                    call par_sync_out("  ...computing wall model in scalar points.")
+                    call ComputeViscsWM(U,V,W,Pr,Temperature)
+                    call par_sync_out("  ...computing wall model in velocity points.")
+                    call ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
+     end if
+
+     call par_sync_out("  ...setting viscosity in ghost cells.")
+     call BoundViscosity(Viscosity)
+
+     call par_sync_out("  ...initializing fixed flow_rates.")
+     call InitFlowRates(U, V)
+
+#ifdef PAR
+     if (enable_multiple_domains) then
+       call par_sync_out("  ...sending initial conditions to children (if there are any).")
+
+       call par_send_initial_conditions(U, V, W, Pr, Temperature, Moisture, Scalar)
+
+       call par_sync_out("  ...sending boundary conditions to children (if there are any).")
+
+       call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, time_stepping%time, epsilon(1._knd), receive=.false.)
+     end if
+#endif
 
     call par_sync_out("initial conditions set.")
 
@@ -2257,12 +2697,10 @@ contains
 
     !Important to have some defined value before the first call to GetTurbInlet.
     !The value can be quite arbitrary.
-    dt = min(dxmin,dymin,dzmin) / max(Uinlet,Uref)
-
-
-    call par_sync_out("  ...initializing random seed.")
-
-    call init_random_seed
+    dt = min( min(dxmin,dymin,dzmin) / Uinlet, &
+              min(dxmin / time_stepping%U_max(1), &
+                  dymin / time_stepping%U_max(2), &
+                  dzmin / time_stepping%U_max(3)))
 
 
     call par_sync_out("  ...computing grid coordinates.")
@@ -2292,7 +2730,7 @@ contains
       Vnx = Prnx
       Wnx = Prnx
 
-      if (Btype(Ea)==PERIODIC) then
+      if (Btype(Ea)==BC_PERIODIC) then
                             Unx = Prnx
       else
                             Unx = Prnx-1
@@ -2322,7 +2760,7 @@ contains
       Uny = Prny
       Wny = Prny
 
-      if (Btype(No)==PERIODIC) then
+      if (Btype(No)==BC_PERIODIC) then
                             Vny = Prny
       else
                             Vny = Prny-1
@@ -2353,7 +2791,7 @@ contains
       Unz = Prnz
       Vnz = Prnz
 
-      if (Btype(To)==PERIODIC) then
+      if (Btype(To)==BC_PERIODIC) then
                             Wnz = Prnz
       else
                             Wnz = Prnz-1
@@ -2384,32 +2822,30 @@ contains
       end do
       close(unit)
 
-      if (Btype(We)==PERIODIC) then
+      if (Btype(We)==BC_PERIODIC) then
         do j = -1, -3, -1
-          xU2(j) = xU2(0)-(xU2(nx)-xU2(nx+j))
+          xU2(j) = xU2(0) - (xU2(nx)-xU2(nx+j))
         end do
       else
         do j = -1, -3, -1
-          xU2(j) = xU2(0)-(xU2(0-j)-xU2(0))
+          xU2(j) = xU2(0) - (xU2(0-j)-xU2(0))
         end do
       end if
 
-      if (Btype(Ea)==PERIODIC) then
+      if (Btype(Ea)==BC_PERIODIC) then
         do j = nx+1, nx+4
-          xU2(j) = xU2(nx)+(xU2(j-nx)-xU2(0))
+          xU2(j) = xU2(nx) + (xU2(j-nx)-xU2(0))
         end do
       else
         do j = nx+1, nx+4
-          xU2(j) = xU2(nx)+(xU2(nx)-xU2(nx-(j-nx)))
+          xU2(j) = xU2(nx) + (xU2(nx)-xU2(nx-(j-nx)))
         end do
       end if
-
-      x0 = xU2(0)
 
     else
 
       forall (i=-3:nx+4)
-         xU2(i)=(i)*dxmin+x0
+         xU2(i) = i * dxmin + im_xmin
       end forall
 
     end if
@@ -2425,23 +2861,23 @@ contains
       end do
       close(unit)
 
-      if (Btype(So)==PERIODIC) then
+      if (Btype(So)==BC_PERIODIC) then
         do j = -1, -3, -1
-          yV2(j) = yV2(0)-(yV2(ny)-yV2(ny+j))
+          yV2(j) = yV2(0) - (yV2(ny)-yV2(ny+j))
         end do
       else
         do j = -1, -3, -1
-          yV2(j) = yV2(0)-(yV2(0-j)-yV2(0))
+          yV2(j) = yV2(0) - (yV2(0-j)-yV2(0))
         end do
       end if
 
-      if (Btype(No)==PERIODIC) then
+      if (Btype(No)==BC_PERIODIC) then
         do j = ny+1, ny+4
-          yV2(j) = yV2(ny)+(yV2(j-ny)-yV2(0))
+          yV2(j) = yV2(ny) + (yV2(j-ny)-yV2(0))
         end do
       else
         do j = ny+1, ny+4
-          yV2(j) = yV2(ny)+(yV2(ny)-yV2(ny-(j-ny)))
+          yV2(j) = yV2(ny) + (yV2(ny)-yV2(ny-(j-ny)))
         end do
       end if
 
@@ -2450,7 +2886,7 @@ contains
     else
 
       forall (j=-3:ny+4)
-        yV2(j)=(j)*dymin+y0
+        yV2(j) = j * dymin + im_ymin
       end forall
 
     end if
@@ -2466,23 +2902,23 @@ contains
       end do
       close(unit)
 
-      if (Btype(Bo)==PERIODIC) then
+      if (Btype(Bo)==BC_PERIODIC) then
         do j = -1, -3, -1
-          zW2(j) = zW2(0)-(zW2(nz)-zW2(nz+j))
+          zW2(j) = zW2(0) - (zW2(nz)-zW2(nz+j))
         end do
       else
         do j = -1, -3, -1
-          zW2(j) = zW2(0)-(zW2(0-j)-zW2(0))
+          zW2(j) = zW2(0) - (zW2(0-j)-zW2(0))
         end do
       end if
 
-      if (Btype(To)==PERIODIC) then
+      if (Btype(To)==BC_PERIODIC) then
         do j = nz+1, nz+4
-          zW2(j) = zW2(nz)+(zW2(j-nz)-zW2(0))
+          zW2(j) = zW2(nz) + (zW2(j-nz)-zW2(0))
         end do
       else
         do j = nz+1, nz+4
-          zW2(j) = zW2(nz)+(zW2(nz)-zW2(nz-(j-nz)))
+          zW2(j) = zW2(nz) + (zW2(nz)-zW2(nz-(j-nz)))
         end do
       end if
 
@@ -2491,7 +2927,7 @@ contains
     else
 
        forall (k=-3:nz+4)
-         zW2(k)=(k)*dzmin+z0
+         zW2(k) = k * dzmin + im_zmin
        end forall
 
     end if
@@ -2520,17 +2956,17 @@ contains
     zW = zW2(nzdown-3:nzup+3)
 
     forall (i=-2:nx+4)
-      xPr(i)=(xU(i-1)+xU(i))/2._knd
+      xPr(i) = (xU(i-1)+xU(i))/2._knd
       dxPr(i) = xU(i)-xU(i-1)
     end forall
 
     forall (j=-2:ny+4)
-      yPr(j)=(yV(j-1)+yV(j))/2._knd
+      yPr(j) = (yV(j-1)+yV(j))/2._knd
       dyPr(j) = yV(j)-yV(j-1)
     end forall
 
     forall (k=-2:nz+4)
-      zPr(k)=(zW(k-1)+zW(k))/2._knd
+      zPr(k) = (zW(k-1)+zW(k))/2._knd
       dzPr(k) = zW(k)-zW(k-1)
     end forall
 
@@ -2556,7 +2992,7 @@ contains
     allocate(Utype(-2:Unx+3,-2:Uny+3,-2:Unz+3))
     allocate(Vtype(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
     allocate(Wtype(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-    allocate(Prtype(0:Prnx+1,0:Prny+1,0:Prnz+1))
+    allocate(Prtype(-2:Prnx+3,-2:Prny+3,-2:Prnz+3))
 
     Utype = 0
     Vtype = 0
@@ -2598,9 +3034,10 @@ contains
       case (ParabolicInletType)
         call ParabolicInlet
       case (TurbulentInletType)
-        call GetTurbulentInlet(dt)
+        call default_turbulence_generator%init()
+        call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
       case (FromFileInletType)
-        call GetInletFromFile(start_time)
+        call GetInletFromFile(time_stepping%start_time)
       case (GeostrophicInletType)
         call GeostrophicWindInlet(geostrophic_wind)
       case default
@@ -2612,19 +3049,19 @@ contains
        
        call par_sync_out("  ...setting boundary temperature and temperature flux.")
 
-       if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==DIRICHLET) then
+       if (TempBtype(Bo)==BC_CONSTFLUX.or.TempBtype(Bo)==BC_DIRICHLET) then
 
          allocate(BsideTFlArr(-1:Prnx+2,-1:Prny+2))
 
          if (enable_radiation) then
            BsideTFlArr = 0
-         else if (TempBtype(Bo)==CONSTFLUX) then
+         else if (TempBtype(Bo)==BC_CONSTFLUX) then
            BsideTFlArr = sideTemp(Bo)
          else
            BsideTFlArr = 0
          end if
 
-         if (TempBtype(Bo)==DIRICHLET) then
+         if (TempBtype(Bo)==BC_DIRICHLET) then
            allocate(BsideTArr(-1:Prnx+2,-1:Prny+2))
            BsideTArr = sideTemp(Bo)
          end if
@@ -2640,19 +3077,19 @@ contains
 
        call par_sync_out("  ...setting boundary moisture and moisture flux.")
 
-       if (MoistBtype(Bo)==CONSTFLUX.or.MoistBtype(Bo)==DIRICHLET) then
+       if (MoistBtype(Bo)==BC_CONSTFLUX.or.MoistBtype(Bo)==BC_DIRICHLET) then
 
          allocate(BsideMFlArr(-1:Prnx+2,-1:Prny+2))
 
          if (enable_radiation) then
            BsideMFlArr = 0
-         else if (MoistBtype(Bo)==CONSTFLUX) then
+         else if (MoistBtype(Bo)==BC_CONSTFLUX) then
            BsideMFlArr = sideMoist(Bo)
          else
            BsideMFlArr = 0
          end if
 
-         if (MoistBtype(Bo)==DIRICHLET) then
+         if (MoistBtype(Bo)==BC_DIRICHLET) then
            allocate(BsideMArr(-1:Prnx+2,-1:Prny+2))
            BsideMArr = sideMoist(Bo)
          end if
@@ -2663,6 +3100,10 @@ contains
     if (.not.allocated(BsideMArr))  allocate(BsideMArr(0,0))
     if (.not.allocated(BsideMFlArr))  allocate(BsideMFlArr(0,0))
 
+
+
+    call par_sync_out("  ...pressure correction.")
+    call InitPressureCorrection
 
     call par_sync_out("  ...initializing subsidence profile.")
     call InitSubsidenceProfile
@@ -2769,10 +3210,82 @@ contains
   end subroutine InitBoundaryConditions
 
 
+  subroutine InitFlowRatesBC
+#ifdef PAR
+    use custom_par
+#endif
+
+    if (enable_fixed_flow_rate) then
+
+      if (iim==nxims .and. Btype(Ea)==BC_PERIODIC) then
+        flow_rate_x_fixed = .true.
+      end if
+
+#ifdef PAR        
+      flow_rate_x_fixed = par_co_any(flow_rate_x_fixed)     
+#endif
+
+
+      if (jim==nyims .and. Btype(No)==BC_PERIODIC) then
+        flow_rate_y_fixed = .true.
+      end if
+
+#ifdef PAR        
+      flow_rate_y_fixed = par_co_any(flow_rate_y_fixed)     
+#endif
+
+    end if
+
+  end subroutine
+
+
+  subroutine InitFlowRates(U, V)
+#ifdef PAR
+    use custom_par
+#endif
+    real(knd), intent(in), contiguous, dimension(-2:,-2:,-2:) :: U, V
+
+    if (enable_fixed_flow_rate) then
+
+      if (flow_rate_x_fixed) then
+        if (initcondsfromfile==0.and.inlettype==TurbulentInletType) then
+          flow_rate_x = sum(default_turbulence_generator%Uinavg(1:Uny, 1:Unz)) &
+                        * dymin * dzmin
+        else
+          flow_rate_x = sum(U(Unx,1:Uny, 1:Unz)) &
+                        * dymin * dzmin
+        end if
+#ifdef PAR
+        flow_rate_x = par_co_sum_plane_yz(flow_rate_x)
+        call par_broadcast_from_last_x(flow_rate_x)
+#endif
+      end if
+
+
+      if (flow_rate_y_fixed) then
+        if (initcondsfromfile==0.and.inlettype==TurbulentInletType) then
+          !average V
+          flow_rate_y = sum(default_turbulence_generator%Vinavg(1:Vny, 1:Vnz)) &
+                        / (Vny*Vnz)
+          flow_rate_y = flow_rate_y * Vnx * Vnz * dxmin * dzmin        
+        else
+          flow_rate_y = sum(V(1:Vnx, Vny, 1:Vnz)) * dxmin * dzmin
+        end if
+
+#ifdef PAR
+        flow_rate_y = par_co_sum_plane_xz(flow_rate_y)
+        call par_broadcast_from_last_y(flow_rate_y)
+#endif
+      end if
+
+    end if
+  end subroutine
+
+
 
 
   subroutine SetNullifiedPoints
-    integer i,j,k,n
+    integer :: i,j,k,n
 
     !$omp parallel do reduction(+:nUnull)
     do k = 1, Unz

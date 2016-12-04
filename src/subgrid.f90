@@ -21,7 +21,7 @@ module Subgrid
      use ArrayUtilities,only: add
      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
      real(knd),intent(in) :: filter_ratio
-     integer i,j,k
+     integer :: i,j,k
 
       !$omp parallel do private(i,j,k)
       do k = 1,Prnz
@@ -45,8 +45,8 @@ module Subgrid
       integer,intent(in) :: i,j,k
       real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
       real(knd),intent(in) :: filter_ratio
-      real(knd) S(1:3,1:3)
-      real(knd) width,Sbar
+      real(knd) :: S(1:3,1:3)
+      real(knd) :: width,Sbar
 
       width = filter_ratio * (dxPr(i)*dyPr(j)*dzPr(k))**(1._knd/3._knd)
       call StrainIJ(i,j,k,U,V,W,S)
@@ -62,11 +62,11 @@ module Subgrid
       real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
       real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
       real(knd),intent(in) :: filter_ratio
-      real(knd) Ri,l,l0
-      real(knd) width,Sbar
+      real(knd) :: Ri,l,l0
+      real(knd) :: width,Sbar
       real(knd),parameter :: CS = 0.17_knd
-      real(knd) S(1:3,1:3)
-      integer i,j,k
+      real(knd) :: S(1:3,1:3)
+      integer :: i,j,k
 
       do k = 1,Prnz
        do j = 1,Prny
@@ -133,7 +133,7 @@ module Subgrid
       integer,intent(in) :: i,j,k
       real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V
       real(knd),dimension(-1:,-1:,-1:),intent(in) :: temperature
-      real(knd) num,denom
+      real(knd) :: num,denom
 
       num = (grav_acc/temperature_ref) * &
             (temperature(i,j,k+1)-temperature(i,j,k-1)) / (zPr(k+1)-zPr(k-1))
@@ -174,7 +174,7 @@ module Subgrid
       real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
       real(knd),intent(out) :: S(1:3,1:3)
       integer,intent(in) :: i,j,k
-      real(knd) D(1:3,1:3)
+      real(knd) :: D(1:3,1:3)
       integer ::ii,jj
 
       D = 0

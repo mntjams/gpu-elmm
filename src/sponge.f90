@@ -293,22 +293,31 @@ contains
     real(knd), contiguous, intent(inout), dimension(-2:,-2:,-2:) :: U, V, W
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: temperature
     integer   :: i, j, k, bufn
+    integer   :: hi, lo, loU, hiU
     real(knd) :: p, xe, xs, xb, DF
 
-    bufn = min(max(10, Prnx/8), Prnx/2)
+    !size end extent of the buffer region
+    bufn = min(5, Prnx/4)
     xs = xU(Prnx - bufn)
     xe = xU(Prnx)
 
+    !extent of the probe region where the local average is taken from
+    loU = max(2*Unx/3, Unx-50)
+    hiU = Unx-4
+
+    lo = max(2*Prnx/3, Prnx-50)
+    hi = Prnx-4
+
     !$omp parallel private(i, j, k, p, xb, DF)
 
-    !$omp do
+    !$omp do collapse(2)
     do k = 1, Unz
       do j = 1, Uny
         p = 0
-        do i = 2*Unx/3, Unx - 4
+        do i = loU, hiU - 4
           p = p + U(i,j,k)
         end do
-        p = p / (Unx - 4 - 2*Unx/3 + 1)
+        p = p / (hiU - loU + 1)
         do i = Unx - bufn, Unx + 1
           xb = (xU(i)-xs) / (xe-xs)
           DF = DampF(xb)
@@ -318,14 +327,14 @@ contains
     end do
     !$omp end do
 
-    !$omp do
+    !$omp do collapse(2)
     do k = 1, Vnz
       do j = 1, Vny
         p = 0
-        do i = 2*Vnx/3, Vnx - 4
+        do i = lo, hi
           p = p + V(i,j,k)
         end do
-        p = p / (Vnx - 4 - 2*Vnx/3 + 1)
+        p = p / (hi - lo + 1)
         do i = Vnx-bufn, Vnx + 1
           xb = (xPr(i)-xs) / (xe-xs)
           DF = DampF(xb)
@@ -335,14 +344,14 @@ contains
     end do
     !$omp end do
 
-    !$omp do
+    !$omp do collapse(2)
     do k = 1, Wnz
       do j = 1, Wny
         p = 0
-        do i = 2*Wnx/3, Wnx - 4
+        do i = lo, hi
           p = p + W(i,j,k)
         end do
-        p = p / (Wnx - 4 - 2*Wnx/3 + 1)
+        p = p / (hi - lo + 1)
         do i = Wnx - bufn, Wnx + 1
           xb = (xPr(i)-xs) / (xe-xs)
           DF = DampF(xb)
@@ -353,14 +362,14 @@ contains
     !$omp end do
 
     if (enable_buoyancy) then
-      !$omp do
+      !$omp do collapse(2)
       do k = 1, Prnz
         do j = 1, Prny
           p = 0
-          do i = 2*Prnx/3, Prnx-4
+          do i = lo, hi
             p = p + temperature(i,j,k)
           end do
-          p = p / (Prnx - 4 - 2*Prnx/3 + 1)
+          p = p / (hi - lo + 1)
           do i = Prnx - bufn, Prnx + 1
             xb = (xPr(i)-xs) / (xe-xs)
             DF = DampF(xb)

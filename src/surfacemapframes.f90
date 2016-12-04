@@ -192,7 +192,6 @@ contains
     
     if (allocated(SurfaceFrameDomains)) then
       do i=1,size(SurfaceFrameDomains)
-print *,"SaveSurfaceFrames",i
         call SurfaceFrameDomains(i)%Save(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
       end do
     end if
@@ -418,7 +417,7 @@ print *,"SaveSurfaceFrames",i
     use iso_c_binding, only: c_loc, c_funloc
     use stop_procedures, only: error_stop
     class(TSurfaceFrameDomain),target,asynchronous,intent(inout) :: D
-    integer err
+    integer :: err
 
     err = 1
     

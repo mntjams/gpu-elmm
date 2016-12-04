@@ -13,6 +13,8 @@ module custom_mpi
   real(real32), pointer, contiguous :: MPI_IN_PLACE_real32(:)
   real(real64), pointer, contiguous :: MPI_IN_PLACE_real64(:)
 
+  integer, parameter :: MPI_TAG_MAX = 32768
+
 end module
 
 module custom_par
@@ -24,6 +26,99 @@ module custom_par
 
   private :: MPI_knd, MPI_real32, MPI_real64, MPI_IN_PLACE_real32, MPI_IN_PLACE_real64  
 
+  logical :: enable_multiple_domains = .false.
+  
+  !TODO: put current domain properties into a derived type
+  
+  !number of the domain
+  integer :: domain_index = 1
+  
+  !number of the domain
+  integer :: number_of_domains = 1
+
+  integer :: parent_domain = 0
+
+  integer :: parent_image(3) = [1, 1, 1]
+  
+  integer, allocatable :: child_domains(:)
+
+  !child domains which intersect this image
+  integer, allocatable :: image_child_domains(:)
+  
+  !whether given domain boundary is receiving and using boundary conditions from parent
+  logical :: is_domain_boundary_nested(6) = .true.
+
+  logical :: is_boundary_domain_boundary(6) = .true.
+
+  !is this domain double nested in its parent?
+  logical :: is_this_domain_two_way_nested = .false.
+
+  !whether given domain boundary is generating additional synthetic turbulence
+  logical :: has_domain_boundary_turbulence_generator(6) = .false.
+
+  !whether receive initial conditions from the parent
+  logical :: receive_initial_conditions_from_parent = .true.
+
+  !ratio of grid sizes between the outer domain and this domain
+  integer :: domain_spatial_ratio = 3
+
+  !ratio of time-step size between the outer domain and this domain
+  integer :: domain_time_step_ratio = 3
+
+  
+  type domain_proc_grid
+    integer, allocatable :: arr(:,:,:)
+  end type
+
+  !numbers of images in individual domains
+  integer, allocatable :: domain_nims(:), &
+                          domain_nxims(:), &
+                          domain_nyims(:), &
+                          domain_nzims(:), &
+                          domain_comms(:), &
+                          domain_groups(:), &
+                          domain_comms_union(:,:), &
+                          domain_groups_union(:,:)
+
+  !image numbers and rank numbers (in world_comm)
+  type(domain_proc_grid), allocatable :: domain_images_grid(:), &
+                                         domain_ranks_grid(:)
+
+  !is this domain double nested in its parent?
+  logical, allocatable :: domain_is_domain_two_way_nested(:)
+
+  !index, boundary
+  logical, allocatable :: domain_is_boundary_nested(:,:)
+
+  type domain_computational_grids
+    real(knd) :: xmin, xmax, ymin, ymax, zmin, zmax
+    real(knd) :: dx, dy, dz
+    !numbers of cells
+    integer   :: nx, ny, nz
+    !offsets to global grid numbering in the domain offsets_x(nxims), offsets_y(nyims), offsets_z(nzims)
+    integer, allocatable :: offsets_x(:), offsets_y(:), offsets_z(:)
+    !numbers of cells nxs(nxims), nys(nyims), nzs(nzims)
+    integer, allocatable :: nxs(:), nys(:), nzs(:)
+    !extents images in the domain xmins(nxims)...
+    real(knd), allocatable :: xmins(:), xmaxs(:), ymins(:), ymaxs(:), zmins(:), zmaxs(:)
+    !whether the image plus side of the image is an internal or periodic boundary
+    logical, allocatable :: internal_or_periodic_Ea(:), &
+                            internal_or_periodic_No(:), &
+                            internal_or_periodic_To(:)
+  end type
+
+
+  !the actual computational grids of each domain
+  type(domain_computational_grids), allocatable :: domain_grids(:)
+
+  
+  !at which number starts numbering of this domain?
+  integer :: first_domain_rank_in_world = 0
+  integer :: first_domain_im_in_world = 1
+  
+  integer :: world_comm_size
+  
+  
   integer :: nims, npx = -1, npy = -1, npz = -1
   integer :: npxyz(3) = -1, pxyz(3)
   integer :: nxims, nyims, nzims
@@ -31,9 +126,24 @@ module custom_par
   integer :: w_im, e_im, s_im, n_im, b_im, t_im
   integer :: w_rank, e_rank, s_rank, n_rank, b_rank, t_rank
   integer :: neigh_ims(6), neigh_ranks(6)
-  integer :: global_comm, poisfft_comm, cart_comm
-  integer :: comm_plane_yz = -1, comm_plane_xz = -1, comm_plane_xy = -1
-  integer :: comm_row_x = -1, comm_row_y = -1, comm_row_z = -1
+
+  integer :: my_world_im, my_world_rank
+  
+  
+  integer, parameter :: world_comm = MPI_COMM_WORLD
+  integer :: domain_comm = MPI_COMM_WORLD
+  integer :: poisfft_comm = MPI_COMM_NULL
+  integer :: cart_comm = MPI_COMM_NULL
+  integer :: domain_masters_comm
+
+  integer :: world_group = MPI_GROUP_NULL
+  integer :: domain_masters_group
+  
+  !MPI communicators which include the inner or the outer domain
+  integer :: inner_comm = MPI_COMM_NULL, outer_comm = MPI_COMM_NULL
+  
+  integer :: comm_plane_yz = MPI_COMM_NULL, comm_plane_xz = MPI_COMM_NULL, comm_plane_xy = MPI_COMM_NULL
+  integer :: comm_row_x = MPI_COMM_NULL, comm_row_y = MPI_COMM_NULL, comm_row_z = MPI_COMM_NULL
   integer :: cart_comm_dim = -1
   integer, allocatable :: images_grid(:,:,:), ranks_grid(:,:,:)
   
@@ -44,6 +154,7 @@ module custom_par
     module procedure par_co_reduce_64_1d
     module procedure par_co_reduce_logical
     module procedure par_co_reduce_int
+    module procedure par_co_reduce_int_1d
   end interface
   
   interface par_co_min
@@ -59,13 +170,31 @@ module custom_par
   
   interface par_co_sum
     module procedure par_co_sum_32
+    module procedure par_co_sum_32_1d
     module procedure par_co_sum_32_comm
     module procedure par_co_sum_32_comm_1d
     module procedure par_co_sum_64
+    module procedure par_co_sum_64_1d
     module procedure par_co_sum_64_comm
     module procedure par_co_sum_64_comm_1d
     module procedure par_co_sum_int
+    module procedure par_co_sum_int_1d
     module procedure par_co_sum_int_comm
+  end interface
+
+  interface par_co_sum_plane_xy
+    module procedure par_co_sum_plane_xy_32
+    module procedure par_co_sum_plane_xy_64
+  end interface
+
+  interface par_co_sum_plane_yz
+    module procedure par_co_sum_plane_yz_32
+    module procedure par_co_sum_plane_yz_64
+  end interface
+
+  interface par_co_sum_plane_xz
+    module procedure par_co_sum_plane_xz_32
+    module procedure par_co_sum_plane_xz_64
   end interface
 
   interface par_sum_to_master_horizontal
@@ -73,16 +202,26 @@ module custom_par
     module procedure par_sum_to_master_horizontal_64_1d
   end interface
 
-  interface par_broadcast_from_top
-    module procedure par_broadcast_from_top_real32
-    module procedure par_broadcast_from_top_real64
+  interface par_broadcast_from_last_x
+    module procedure par_broadcast_from_last_x_real32
+    module procedure par_broadcast_from_last_x_real64
+  end interface
+
+  interface par_broadcast_from_last_y
+    module procedure par_broadcast_from_last_y_real32
+    module procedure par_broadcast_from_last_y_real64
+  end interface
+
+  interface par_broadcast_from_last_z
+    module procedure par_broadcast_from_last_z_real32
+    module procedure par_broadcast_from_last_z_real64
   end interface
 
 contains
 
   subroutine par_sync_all()
-    integer ie
-    call MPI_Barrier(global_comm, ie)
+    integer :: ie
+    call MPI_Barrier(domain_comm, ie)
     if (ie/=0) call error_stop("Error in MPI Barrier.")
   end subroutine
 
@@ -94,24 +233,30 @@ contains
   end subroutine
 
  
-  integer function par_this_image() result(res)
-    integer ie
-    call MPI_Comm_rank(global_comm, res, ie)
+  integer function par_this_image(comm) result(res)
+    integer, intent(in), optional :: comm
+    integer :: ie
+
+    if (present(comm)) then
+      call MPI_Comm_rank(comm, res, ie)
+    else
+      call MPI_Comm_rank(domain_comm, res, ie)
+    end if
     res = res + 1
     if (ie/=0) call error_stop("MPI_Comm_rank ERROR")
   end function
   
 
   integer function par_num_images() result(res)
-    integer ie
-    call MPI_Comm_size(global_comm, res, ie)  
+    integer :: ie
+    call MPI_Comm_size(domain_comm, res, ie)  
     if (ie/=0) call error_stop("MPI_Comm_size ERROR")
   end function
 
   
   integer function par_image_index(sub) result(res)
     integer, intent(in) :: sub(3)
-    integer ie
+    integer :: ie
     
     if (cart_comm_dim==-1) then
       call MPI_Cartdim_get(cart_comm, cart_comm_dim, ie)
@@ -194,7 +339,7 @@ contains
     ranks_grid = images_grid - 1
      
   end subroutine
-
+  
   
   
   subroutine par_init
@@ -223,19 +368,14 @@ contains
     call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real32, [1])
     call c_f_pointer(my_loc(MPI_IN_PLACE), MPI_IN_PLACE_real64, [1])
     
-    global_comm = MPI_COMM_WORLD
-
-    call MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_ARE_FATAL, ie)
+    call MPI_Errhandler_set(world_comm, MPI_ERRORS_ARE_FATAL, ie)
     if (ie/=0) call error_stop("Error in MPI_Errhandler_set")
     
-    nims = par_num_images()
-
-    myim = par_this_image()
     
-    myrank = myim - 1
-
-    master = (myrank==0)
-
+    call MPI_Comm_size(world_comm, world_comm_size, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Comm_size")
+    
+    
   contains
 
     type(c_ptr) function my_loc(t)
@@ -243,20 +383,436 @@ contains
       my_loc = c_loc(t)
     end function
       
-  end subroutine
+  end subroutine par_init
+  
+  
+  
+  subroutine par_init_domains
+    integer :: ie
+    !domain of a (world-ordered) image
+    integer, allocatable :: ims_domain(:)
+    integer, allocatable :: check_n(:)
+    integer :: dom, dom2, i
+
+    
+    interface
+      subroutine MPI_ALLGATHER(SENDBUF, SENDCOUNT, SENDTYPE, RECVBUF, RECVCOUNT, &
+                 RECVTYPE, COMM, IERROR)
+        integer ::  SENDBUF, RECVBUF(*)
+        integer :: SENDCOUNT, SENDTYPE, RECVCOUNT, RECVTYPE, COMM
+        integer :: IERROR
+      end subroutine
+    end interface
+    
+    if (number_of_domains < domain_index) then
+      write(*,*) "Error, domain index", domain_index, " larger than the number of domains", number_of_domains
+      call error_stop()
+    end if
+    
+    if (.not. allocated(child_domains)) allocate(child_domains(0))
+
+    if (parent_domain==0) is_domain_boundary_nested = .false.
+    
+    allocate(check_n(world_comm_size))
+    
+    call MPI_AllGather(number_of_domains, 1, MPI_INTEGER, &
+                       check_n, 1, MPI_INTEGER, &
+                       world_comm, ie)
+                       
+    if (any(check_n /= number_of_domains)) then
+      write(*,*) "Error, number of domains is not defined equally for all images."
+      call error_stop()
+    end if
+
+  
+    allocate(domain_nims(number_of_domains))
+    allocate(domain_nxims(number_of_domains))
+    allocate(domain_nyims(number_of_domains))
+    allocate(domain_nzims(number_of_domains))
+    
+    domain_nims = 0
+    domain_nxims = 0
+    domain_nyims = 0
+    domain_nzims = 0
+    
+    domain_nims(domain_index) = 1
+
+
+    allocate(domain_comms(number_of_domains))
+    allocate(domain_groups(number_of_domains))
+    allocate(domain_comms_union(number_of_domains-1, 2:number_of_domains))
+    allocate(domain_groups_union(number_of_domains-1, 2:number_of_domains))
+
+    domain_comms = MPI_COMM_NULL
+    domain_groups = MPI_GROUP_NULL
+    domain_comms_union = MPI_COMM_NULL
+    domain_groups_union = MPI_GROUP_NULL
+    
+    
+    call MPI_Allreduce(MPI_IN_PLACE, domain_nims, number_of_domains, &
+                       MPI_INTEGER, MPI_SUM, world_comm, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Allreduce for domain_nims.")
+                       
+    if (domain_nims(domain_index) /= product(npxyz)) then
+      write(*,*) "Error, npxyz must be specified and equal to the number of MPI processes for each domain."
+      write(*,*) domain_nims(domain_index), " /= ", npxyz(1) * npxyz(2) * npxyz(3), " for domain ", domain_index
+      call error_stop()
+    end if
+    
+    if (any(domain_nims <= 0)) then
+      dom = minloc(domain_nims, 1)
+      write(*,*) "Error, ", domain_nims(dom), " images in domain", dom
+      call error_stop()
+    end if
+
+    call MPI_Comm_group(world_comm, world_group, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Comm_group.")
+
+    domain_comm = world_comm
+    allocate(ims_domain(world_comm_size))
+    ims_domain = 0
+    ims_domain(par_this_image(world_comm)) = domain_index
+
+    call MPI_Allreduce(MPI_IN_PLACE, ims_domain, world_comm_size, &
+                       MPI_INTEGER, MPI_SUM, world_comm, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Allreduce for ims_domain.")
+
+    do i = 2, world_comm_size
+      if (ims_domain(i-1)>ims_domain(i)) &
+        call error_stop("Error, MPI ranks must be ordered to individual domains in an increasing order.")
+    end do
+
+    first_domain_rank_in_world = sum(domain_nims(1:domain_index-1))
+    first_domain_im_in_world = first_domain_rank_in_world + 1
+
+    do dom = 1, number_of_domains
+      call MPI_Group_incl(world_group, domain_nims(dom), &
+                          [( sum(domain_nims(1:dom-1)) + i - 1, i = 1,  domain_nims(dom) )], &
+                          domain_groups(dom), &
+                          ie)
+      if (ie/=0) call error_stop("Error calling MPI_Group_incl.")
+
+      call MPI_Comm_create(world_comm, domain_groups(dom), domain_comms(dom), ie)
+      if (ie/=0) call error_stop("Error calling MPI_Comm_create.")
+    end do
+
+    domain_comm = domain_comms(domain_index)  
+    
+    do dom = 1, number_of_domains - 1
+      do dom2 = dom + 1, number_of_domains
+        call MPI_Group_union(min(domain_groups(dom), domain_groups(dom2)), &
+                             max(domain_groups(dom), domain_groups(dom2)), &
+                             domain_groups_union(dom, dom2), ie)
+        if (ie/=0) call error_stop("Error calling MPI_Group_union.")
+
+        call MPI_Comm_create(world_comm, domain_groups_union(dom, dom2), domain_comms_union(dom, dom2), ie)
+        if (ie/=0) call error_stop("Error calling MPI_Comm_create.")
+      end do
+    end do
+    
+    allocate(domain_is_domain_two_way_nested(number_of_domains))
+    domain_is_domain_two_way_nested = .false.
+
+    domain_is_domain_two_way_nested(domain_index) = is_this_domain_two_way_nested
+
+    !instead of scatter due to the 3D topology
+    call MPI_Allreduce(MPI_IN_PLACE, domain_is_domain_two_way_nested, &
+                       size(domain_is_domain_two_way_nested), MPI_LOGICAL, &
+                       MPI_LOR, world_comm, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Allreduce for domain_is_domain_two_way_nested.")
+
+    
+    
+
+    allocate(domain_is_boundary_nested(6,number_of_domains))
+    domain_is_boundary_nested = .false.
+
+    domain_is_boundary_nested(:,domain_index) = is_domain_boundary_nested
+    !instead of scatter due to the 3D topology
+    call MPI_Allreduce(MPI_IN_PLACE, domain_is_boundary_nested, &
+                       size(domain_is_boundary_nested), MPI_LOGICAL, &
+                       MPI_LOR, world_comm, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Allreduce for domain_is_boundary_nested.")
+
+  end subroutine par_init_domains
+
+  
+
+
+  subroutine par_init_domain_grids
+    use Parameters
+    integer :: dom
+    integer :: ie
+
+    domain_nxims(domain_index) = nxims
+    domain_nyims(domain_index) = nyims
+    domain_nzims(domain_index) = nzims
+
+    is_boundary_domain_boundary = [iim==1, iim==nxims, jim==1, jim==nyims, kim==1, kim==nzims]
+
+    !broadcast the process domain dimensions from one image of each domain
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_nxims(dom), 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_nyims(dom), 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_nzims(dom), 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+    end do
+
+    allocate(domain_images_grid(number_of_domains))
+    allocate(domain_ranks_grid(number_of_domains))
+
+
+    do dom = 1, number_of_domains
+      allocate(domain_images_grid(dom)%arr(domain_nxims(dom), &
+                                           domain_nyims(dom), &
+                                           domain_nzims(dom)))
+      domain_images_grid(dom)%arr = 0
+      allocate(domain_ranks_grid(dom)%arr(domain_nxims(dom), &
+                                          domain_nyims(dom), &
+                                          domain_nzims(dom)))
+      domain_ranks_grid(dom)%arr = 0
+    end do
+    domain_images_grid(domain_index)%arr(iim, jim, kim) = my_world_im
+!     domain_ranks_grid(domain_index)%arr(iim, jim, kim) = my_world_rank
+
+    !instead of scatter due to the 3D topology
+    call MPI_Allreduce(MPI_IN_PLACE, domain_images_grid(domain_index)%arr, &
+                       size(domain_images_grid(domain_index)%arr), MPI_INTEGER, MPI_SUM, domain_comm, ie)
+
+    !broadcast all domain grids from one image of each domain
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_images_grid(dom)%arr, domain_nims(dom), &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+      domain_ranks_grid(dom)%arr = domain_images_grid(dom)%arr - 1
+    end do 
+
+
+  
+    allocate(domain_grids(number_of_domains))
+
+    do dom = 1, number_of_domains
+      allocate(domain_grids(dom)%nxs(domain_nxims(dom)))
+      domain_grids(dom)%nxs = 0
+
+      allocate(domain_grids(dom)%nys(domain_nyims(dom)))
+      domain_grids(dom)%nys = 0
+
+      allocate(domain_grids(dom)%nzs(domain_nzims(dom)))
+      domain_grids(dom)%nzs = 0
+
+      allocate(domain_grids(dom)%offsets_x(domain_nxims(dom)))
+      domain_grids(dom)%offsets_x = 0
+
+      allocate(domain_grids(dom)%offsets_y(domain_nyims(dom)))
+      domain_grids(dom)%offsets_y = 0
+
+      allocate(domain_grids(dom)%offsets_z(domain_nzims(dom)))
+      domain_grids(dom)%offsets_z = 0
+
+      allocate(domain_grids(dom)%xmins(domain_nxims(dom)))
+      domain_grids(dom)%xmins = 0
+      allocate(domain_grids(dom)%xmaxs(domain_nxims(dom)))
+      domain_grids(dom)%xmaxs = 0
+
+      allocate(domain_grids(dom)%ymins(domain_nyims(dom)))
+      domain_grids(dom)%ymins = 0
+      allocate(domain_grids(dom)%ymaxs(domain_nyims(dom)))
+      domain_grids(dom)%ymaxs = 0
+
+      allocate(domain_grids(dom)%zmins(domain_nzims(dom)))
+      domain_grids(dom)%zmins = 0
+      allocate(domain_grids(dom)%zmaxs(domain_nzims(dom)))
+      domain_grids(dom)%zmaxs = 0
+
+    end do
+
+    domain_grids(domain_index)%xmin = gxmin
+    domain_grids(domain_index)%xmax = gxmax
+    domain_grids(domain_index)%ymin = gymin
+    domain_grids(domain_index)%ymax = gymax
+    domain_grids(domain_index)%zmin = gzmin
+    domain_grids(domain_index)%zmax = gzmax
+
+    domain_grids(domain_index)%dx = dxmin
+    domain_grids(domain_index)%dy = dymin
+    domain_grids(domain_index)%dz = dzmin
+
+    domain_grids(domain_index)%nx = gPrnx
+    domain_grids(domain_index)%ny = gPrny
+    domain_grids(domain_index)%nz = gPrnz
+
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_grids(dom)%xmin, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%xmax, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%ymin, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%ymax, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%zmin, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%zmax, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+
+      call MPI_Bcast(domain_grids(dom)%dx, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%dy, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%dz, 1, &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+
+      call MPI_Bcast(domain_grids(dom)%nx, 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%ny, 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%nz, 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+
+    end do
+
+    domain_grids(domain_index)%nxs(iim) = Prnx
+    domain_grids(domain_index)%nys(jim) = Prny
+    domain_grids(domain_index)%nzs(kim) = Prnz
+    
+    domain_grids(domain_index)%offsets_x(iim) = offset_to_global_x
+    domain_grids(domain_index)%offsets_y(jim) = offset_to_global_y
+    domain_grids(domain_index)%offsets_z(kim) = offset_to_global_z
+    
+    domain_grids(domain_index)%xmins(iim) = im_xmin
+    domain_grids(domain_index)%xmaxs(iim) = im_xmax
+    domain_grids(domain_index)%ymins(jim) = im_ymin
+    domain_grids(domain_index)%ymaxs(jim) = im_ymax
+    domain_grids(domain_index)%zmins(kim) = im_zmin
+    domain_grids(domain_index)%zmaxs(kim) = im_zmax
+
+    
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%nxs, &
+                       size(domain_grids(domain_index)%nxs), MPI_INTEGER, MPI_SUM, comm_row_x, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%nys, &
+                       size(domain_grids(domain_index)%nys), MPI_INTEGER, MPI_SUM, comm_row_y, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%nzs, &
+                       size(domain_grids(domain_index)%nzs), MPI_INTEGER, MPI_SUM, comm_row_z, ie)
+
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%offsets_x, &
+                       size(domain_grids(domain_index)%offsets_x), MPI_INTEGER, MPI_SUM, comm_row_x, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%offsets_y, &
+                       size(domain_grids(domain_index)%offsets_y), MPI_INTEGER, MPI_SUM, comm_row_y, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%offsets_z, &
+                       size(domain_grids(domain_index)%offsets_z), MPI_INTEGER, MPI_SUM, comm_row_z, ie)
+
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%xmins, &
+                       size(domain_grids(domain_index)%xmins), MPI_KND, MPI_SUM, comm_row_x, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%xmaxs, &
+                       size(domain_grids(domain_index)%xmaxs), MPI_KND, MPI_SUM, comm_row_x, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%ymins, &
+                       size(domain_grids(domain_index)%ymins), MPI_KND, MPI_SUM, comm_row_y, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%ymaxs, &
+                       size(domain_grids(domain_index)%ymaxs), MPI_KND, MPI_SUM, comm_row_y, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%zmins, &
+                       size(domain_grids(domain_index)%zmins), MPI_KND, MPI_SUM, comm_row_z, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%zmaxs, &
+                       size(domain_grids(domain_index)%zmaxs), MPI_KND, MPI_SUM, comm_row_z, ie)
+
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_grids(dom)%nxs, size(domain_grids(dom)%nxs), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%nys, size(domain_grids(dom)%nys), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%nzs, size(domain_grids(dom)%nzs), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+    end do
+
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_grids(dom)%offsets_x, size(domain_grids(dom)%offsets_x), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%offsets_y, size(domain_grids(dom)%offsets_y), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%offsets_z, size(domain_grids(dom)%offsets_z), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+    end do
+
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_grids(dom)%xmins, size(domain_grids(dom)%xmins), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%xmaxs, size(domain_grids(dom)%xmaxs), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%ymins, size(domain_grids(dom)%ymins), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%ymaxs, size(domain_grids(dom)%ymaxs), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%zmins, size(domain_grids(dom)%zmins), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%zmaxs, size(domain_grids(dom)%zmaxs), &
+                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+    end do
+
+    do dom = 1, number_of_domains
+      allocate(domain_grids(dom)%internal_or_periodic_Ea(domain_nxims(dom)))
+      allocate(domain_grids(dom)%internal_or_periodic_No(domain_nyims(dom)))
+      allocate(domain_grids(dom)%internal_or_periodic_To(domain_nzims(dom)))
+      domain_grids(dom)%internal_or_periodic_Ea = .false.
+      domain_grids(dom)%internal_or_periodic_No = .false.
+      domain_grids(dom)%internal_or_periodic_To = .false.
+    end do
+
+    domain_grids(domain_index)%internal_or_periodic_Ea(iim) = (iim<nxims) .or. Btype(Ea)==BC_PERIODIC
+    domain_grids(domain_index)%internal_or_periodic_No(jim) = (jim<nyims) .or. Btype(No)==BC_PERIODIC
+    domain_grids(domain_index)%internal_or_periodic_To(kim) = (kim<nzims) .or. Btype(To)==BC_PERIODIC
+
+
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%internal_or_periodic_Ea, &
+                       size(domain_grids(domain_index)%internal_or_periodic_Ea), MPI_LOGICAL, MPI_LOR, comm_row_x, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%internal_or_periodic_No, &
+                       size(domain_grids(domain_index)%internal_or_periodic_No), MPI_LOGICAL, MPI_LOR, comm_row_y, ie)
+    call MPI_Allreduce(MPI_IN_PLACE, domain_grids(domain_index)%internal_or_periodic_To, &
+                       size(domain_grids(domain_index)%internal_or_periodic_To), MPI_LOGICAL, MPI_LOR, comm_row_z, ie)
+
+    do dom = 1, number_of_domains
+      call MPI_Bcast(domain_grids(dom)%internal_or_periodic_Ea, size(domain_grids(dom)%internal_or_periodic_Ea), &
+                     MPI_LOGICAL, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%internal_or_periodic_No, size(domain_grids(dom)%internal_or_periodic_No), &
+                     MPI_LOGICAL, sum(domain_nims(1:dom-1)), world_comm, ie)
+      call MPI_Bcast(domain_grids(dom)%internal_or_periodic_To, size(domain_grids(dom)%internal_or_periodic_To), &
+                     MPI_LOGICAL, sum(domain_nims(1:dom-1)), world_comm, ie)
+    end do
+  end subroutine par_init_domain_grids
+
+
+
   
   subroutine par_init_grid
     use PoisFFT
     use iso_c_binding
-    use Parameters, only: gPrnx, gPrny, gPrnz, gPrns, Prnx, Prny, Prnz, &
-                          offset_to_global_x, offset_to_global_y, offset_to_global_z, &
-                          offsets_to_global, output_dir, image_input_dir
+    use Parameters
+
     use strings, only: itoa
     
     integer(c_intptr_t) :: ng(3), nxyz(3), off(3), nxyz2(3), nsxyz2(3)
     integer :: ie
     integer :: pos
     character(80) :: str_dir
+
+    if (enable_multiple_domains) then
+      call par_init_domains
+    else
+      domain_comm = world_comm
+    end if
+
+    nims = par_num_images()
+
+    myim = par_this_image()
+
+    myrank = myim - 1
+
+    master = (myrank==0)
+
+    my_world_im = par_this_image(world_comm)
+
+    my_world_rank = my_world_im - 1
+    
 
 !     npxyz = [npx, npy, npz]
     
@@ -284,12 +840,12 @@ contains
     if (npxyz(1)/=1) call error_stop("The number of images in x direction must be one.")
     
     !Create the 3D Cartesian communicator "cart_comm" for use in CLMM
-    call MPI_Cart_create(global_comm, 3, int(npxyz(3:1:-1)), &
+    call MPI_Cart_create(domain_comm, 3, int(npxyz(3:1:-1)), &
                          [.false.,.false.,.false.], &
                          .true., cart_comm, ie)
     if (ie/=0) call error_stop("Error calling MPI_Cart_create.")
     
-    global_comm = cart_comm
+    domain_comm = cart_comm
     
     myim = par_this_image()
     
@@ -300,7 +856,7 @@ contains
     !creates a 2D! Cartesian communicator "poisfft_comm"
     !2D because of the PFFT library
     !the dimensions in the poisfft_comm are z,y
-    call PoisFFT_InitMPIGrid(global_comm, npxyz(3:2:-1), poisfft_comm, ie)
+    call PoisFFT_InitMPIGrid(domain_comm, npxyz(3:2:-1), poisfft_comm, ie)
     
     call par_init_sub_comms
     
@@ -317,12 +873,12 @@ contains
     call PoisFFT_LocalGridSize(3,ng,cart_comm,nxyz,off,nxyz2,nsxyz2)
     if (any(nxyz/=nxyz2).or.any(off/=nsxyz2)) call error_stop(40)
     
-    call MPI_Barrier(global_comm, ie)
+    call MPI_Barrier(domain_comm, ie)
     if (ie/=0) call error_stop("Error in MPI Barrier.")
     
     write(*,*) iim,jim,kim, "nxyz:", nxyz
     
-    call MPI_Barrier(global_comm, ie)
+    call MPI_Barrier(domain_comm, ie)
     if (ie/=0) call error_stop("Error in MPI Barrier.")
     
     if (par_co_any(any(nxyz<=0))) then
@@ -338,6 +894,17 @@ contains
     offset_to_global_z = int(off(3))
     
     offsets_to_global = int(off)
+
+    im_xmin = gxmin + offset_to_global_x * dxmin
+    im_ymin = gymin + offset_to_global_y * dymin
+    im_zmin = gzmin + offset_to_global_z * dzmin
+
+    im_xmax = im_xmin + Prnx * dxmin
+    im_ymax = im_ymin + Prny * dymin
+    im_zmax = im_zmin + Prnz * dzmin
+
+    if (enable_multiple_domains) call par_init_domain_grids
+   
     
     output_dir = output_dir // "im-" // itoa(iim) // &
                                  "-" // itoa(jim) // &
@@ -347,7 +914,7 @@ contains
                                            "-" // itoa(jim) // &
                                            "-" // itoa(kim) // "/"
 
-  end subroutine
+  end subroutine par_init_grid
 
   
   subroutine par_init_boundaries
@@ -365,43 +932,43 @@ contains
       
       if (nxims>1) then
         if (iim>1) then
-          Bt(We) = MPI_BOUNDARY
+          Bt(We) = BC_MPI_BOUNDARY
         end if
         if (iim<nxims) then
-          Bt(Ea) = MPI_BOUNDARY
+          Bt(Ea) = BC_MPI_BOUNDARY
         end if
-        if (iim==1.and.Bt(We)==PERIODIC) Bt(We) = MPI_PERIODIC
-        if (iim==nxims.and.Bt(Ea)==PERIODIC) Bt(Ea) = MPI_PERIODIC
+        if (iim==1.and.Bt(We)==BC_PERIODIC) Bt(We) = BC_MPI_PERIODIC
+        if (iim==nxims.and.Bt(Ea)==BC_PERIODIC) Bt(Ea) = BC_MPI_PERIODIC
       end if
     
       if (nyims>1) then
         if (jim>1) then
-          Bt(So) = MPI_BOUNDARY
+          Bt(So) = BC_MPI_BOUNDARY
         end if
         if (jim<nyims) then
-          Bt(No) = MPI_BOUNDARY
+          Bt(No) = BC_MPI_BOUNDARY
         end if
-        if (jim==1.and.Bt(So)==PERIODIC) Bt(So) = MPI_PERIODIC
-        if (jim==nyims.and.Bt(No)==PERIODIC) Bt(No) = MPI_PERIODIC
+        if (jim==1.and.Bt(So)==BC_PERIODIC) Bt(So) = BC_MPI_PERIODIC
+        if (jim==nyims.and.Bt(No)==BC_PERIODIC) Bt(No) = BC_MPI_PERIODIC
       end if
     
       if (nzims>1) then
         if (kim>1) then
-          Bt(Bo) = MPI_BOUNDARY
+          Bt(Bo) = BC_MPI_BOUNDARY
         end if
         if (kim<nzims) then
-          Bt(To) = MPI_BOUNDARY
+          Bt(To) = BC_MPI_BOUNDARY
         end if
-        if (kim==1.and.Bt(Bo)==PERIODIC) Bt(Bo) = MPI_PERIODIC
-        if (kim==nzims.and.Bt(To)==PERIODIC) Bt(To) = MPI_PERIODIC
+        if (kim==1.and.Bt(Bo)==BC_PERIODIC) Bt(Bo) = BC_MPI_PERIODIC
+        if (kim==nzims.and.Bt(To)==BC_PERIODIC) Bt(To) = BC_MPI_PERIODIC
       end if
     end subroutine
     
-  end subroutine
+  end subroutine par_init_boundaries
   
   subroutine par_finalize
     integer :: ie
-    call MPI_Barrier(global_comm, ie)
+    call MPI_Barrier(domain_comm, ie)
     if (ie/=0) call error_stop("Error when waiting before finalizing MPI.")
     call MPI_Finalize(ie)
     if (ie/=0) call error_stop("Error finalizing MPI.")
@@ -439,17 +1006,17 @@ contains
     real(real32) :: res
     real(real32),intent(in) :: x
     integer, intent(in) :: op, comm
-    integer ie
+    integer :: ie
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         real(real32) :: SENDBUF, RECVBUF
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
       end subroutine
     end interface
     
-    call MPI_AllReduce(x, res, &
+    call MPI_Allreduce(x, res, &
                        count=1, datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_32.")
@@ -459,17 +1026,17 @@ contains
     real(real64) :: res
     real(real64),intent(in) :: x
     integer, intent(in) :: op, comm
-    integer ie
+    integer :: ie
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         real(real64) :: SENDBUF, RECVBUF
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
       end subroutine
     end interface
     
-    call MPI_AllReduce(x, res, &
+    call MPI_Allreduce(x, res, &
                        count=1, datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_64.")
@@ -479,17 +1046,17 @@ contains
     real(real32),intent(in) :: x(:)
     real(real32) :: res(size(x))
     integer, intent(in) :: op, comm
-    integer ie
+    integer :: ie
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
         real(real32) :: SENDBUF(count), RECVBUF(count)
       end subroutine
     end interface
     
-    call MPI_AllReduce(x, res, &
+    call MPI_Allreduce(x, res, &
                        count=size(x), datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_32.")
@@ -499,17 +1066,17 @@ contains
     real(real64),intent(in) :: x(:)
     real(real64) :: res(size(x))
     integer, intent(in) :: op, comm
-    integer ie
+    integer :: ie
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
         real(real64) :: SENDBUF(count), RECVBUF(count)
       end subroutine
     end interface
     
-    call MPI_AllReduce(x, res, &
+    call MPI_Allreduce(x, res, &
                        count=size(x), datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_64.")
@@ -519,17 +1086,17 @@ contains
     logical :: res
     logical,intent(in) :: x
     integer, intent(in) :: op, comm
-    integer ie
+    integer :: ie
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         logical :: SENDBUF, RECVBUF
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
       end subroutine
     end interface
     
-    call MPI_AllReduce(x, res, &
+    call MPI_Allreduce(x, res, &
                        count=1, datatype=MPI_LOGICAL, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_logical.")
@@ -539,18 +1106,38 @@ contains
     integer :: res
     integer,intent(in) :: x
     integer, intent(in) :: op, comm
-    integer ie
+    integer :: ie
     
     interface
-      subroutine MPI_ALLREDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
         integer :: SENDBUF, RECVBUF
         integer :: COUNT, DATATYPE, OP, COMM, IERROR
       end subroutine
     end interface
     
-    call MPI_AllReduce(x, res, &
+    call MPI_Allreduce(x, res, &
                        count=1, datatype=MPI_INTEGER, op=op, &
+                       comm=comm, ierror=ie)
+    if (ie/=0) call error_stop("Error in par_co_reduce_logical.")
+  end function
+
+  function par_co_reduce_int_1d(x,op,comm) result(res)
+    integer,intent(in) :: x(:)
+    integer :: res(size(x))
+    integer, intent(in) :: op, comm
+    integer :: ie
+    
+    interface
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+        import
+        integer :: COUNT, DATATYPE, OP, COMM, IERROR
+        integer :: SENDBUF(count), RECVBUF(count)
+      end subroutine
+    end interface
+    
+    call MPI_Allreduce(x, res, &
+                       count=size(x), datatype=MPI_INTEGER, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_logical.")
   end function
@@ -558,56 +1145,64 @@ contains
   function par_co_min_32(x) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
-    integer ie
+    integer :: ie
     
-    res = par_co_reduce(x, MPI_MIN, global_comm)
+    res = par_co_reduce(x, MPI_MIN, domain_comm)
   end function
 
   function par_co_min_64(x) result(res)
     real(real64) :: res
     real(real64),intent(in) :: x
-    integer ie
+    integer :: ie
     
-    res = par_co_reduce(x, MPI_MIN, global_comm)
+    res = par_co_reduce(x, MPI_MIN, domain_comm)
   end function
 
   function par_co_min_int(x) result(res)
     integer :: res
     integer,intent(in) :: x
-    integer ie
+    integer :: ie
     
-    res = par_co_reduce(x, MPI_MIN, global_comm)
+    res = par_co_reduce(x, MPI_MIN, domain_comm)
   end function
 
   function par_co_max_32(x) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
-    integer ie
+    integer :: ie
     
-    res = par_co_reduce(x, MPI_MAX, global_comm)
+    res = par_co_reduce(x, MPI_MAX, domain_comm)
   end function
 
   function par_co_max_64(x) result(res)
     real(real64) :: res
     real(real64),intent(in) :: x
-    integer ie
+    integer :: ie
     
-    res = par_co_reduce(x, MPI_MAX, global_comm)
+    res = par_co_reduce(x, MPI_MAX, domain_comm)
   end function
 
   function par_co_sum_int(x) result(res)
     integer :: res
     integer,intent(in) :: x
-    integer ie
+    integer :: ie
     
-    res = par_co_reduce(x, MPI_SUM, global_comm)
+    res = par_co_reduce(x, MPI_SUM, domain_comm)
+  end function
+
+  function par_co_sum_int_1d(x) result(res)
+    integer,intent(in) :: x(:)
+    integer :: res(size(x))
+    integer :: ie
+    
+    res = par_co_reduce(x, MPI_SUM, domain_comm)
   end function
 
   function par_co_sum_int_comm(x, comm) result(res)
     integer :: res
     integer,intent(in) :: x
     integer, intent(in) :: comm
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, comm)
   end function
@@ -615,24 +1210,40 @@ contains
   function par_co_sum_32(x) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
-    integer ie
+    integer :: ie
     
-    res = par_co_reduce(x, MPI_SUM, global_comm)
+    res = par_co_reduce(x, MPI_SUM, domain_comm)
+  end function
+
+  function par_co_sum_64_1d(x) result(res)
+    real(real64),intent(in) :: x(:)
+    real(real64) :: res(size(x))
+    integer :: ie
+    
+    res = par_co_reduce(x, MPI_SUM, domain_comm)
+  end function
+
+  function par_co_sum_32_1d(x) result(res)
+    real(real32),intent(in) :: x(:)
+    real(real32) :: res(size(x))
+    integer :: ie
+    
+    res = par_co_reduce(x, MPI_SUM, domain_comm)
   end function
 
   function par_co_sum_64(x) result(res)
     real(real64) :: res
     real(real64),intent(in) :: x
-    integer ie
+    integer :: ie
     
-    res = par_co_reduce(x, MPI_SUM, global_comm)
+    res = par_co_reduce(x, MPI_SUM, domain_comm)
   end function
 
   function par_co_sum_32_comm(x, comm) result(res)
     real(real32) :: res
     real(real32),intent(in) :: x
     integer, intent(in) :: comm
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, comm)
   end function
@@ -641,7 +1252,7 @@ contains
     real(real64) :: res
     real(real64),intent(in) :: x
     integer, intent(in) :: comm
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, comm)
   end function
@@ -650,7 +1261,7 @@ contains
     real(real32),intent(in) :: x(:)
     real(real32) :: res(size(x))
     integer, intent(in) :: comm
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, comm)
   end function
@@ -659,7 +1270,7 @@ contains
     real(real64),intent(in) :: x(:)
     real(real64) :: res(size(x))
     integer, intent(in) :: comm
-    integer ie
+    integer :: ie
     
     res = par_co_reduce(x, MPI_SUM, comm)
   end function
@@ -667,23 +1278,67 @@ contains
   function par_co_any(x) result(res)
     logical :: res
     logical,intent(in) :: x
-    integer ie
+    integer :: ie
     
-    res = par_co_reduce(x, MPI_LOR, global_comm)
+    res = par_co_reduce(x, MPI_LOR, domain_comm)
   end function
 
 
   function par_co_all(x) result(res)
     logical :: res
     logical,intent(in) :: x
-    integer ie
+    integer :: ie
     
-    res = par_co_reduce(x, MPI_LAND, global_comm)
+    res = par_co_reduce(x, MPI_LAND, domain_comm)
   end function
+
+  
+  function par_co_sum_plane_xy_32(x) result(res)
+    real(real32) :: res
+    real(real32),intent(in) :: x
+
+    res =  par_co_sum_32_comm(x, comm_plane_xy)
+  end function
+
+  function par_co_sum_plane_xy_64(x) result(res)
+    real(real64) :: res
+    real(real64),intent(in) :: x
+
+    res =  par_co_sum_64_comm(x, comm_plane_xy)
+  end function
+
+  function par_co_sum_plane_yz_32(x) result(res)
+    real(real32) :: res
+    real(real32),intent(in) :: x
+
+    res =  par_co_sum_32_comm(x, comm_plane_yz)
+  end function
+
+  function par_co_sum_plane_yz_64(x) result(res)
+    real(real64) :: res
+    real(real64),intent(in) :: x
+
+    res =  par_co_sum_64_comm(x, comm_plane_yz)
+  end function
+
+  function par_co_sum_plane_xz_32(x) result(res)
+    real(real32) :: res
+    real(real32),intent(in) :: x
+
+    res =  par_co_sum_32_comm(x, comm_plane_xz)
+  end function
+
+  function par_co_sum_plane_xz_64(x) result(res)
+    real(real64) :: res
+    real(real64),intent(in) :: x
+
+    res =  par_co_sum_64_comm(x, comm_plane_xz)
+  end function
+
 
   subroutine par_sum_to_master_horizontal_32_1d(x)
     real(real32), intent(inout) :: x(:)
-    integer ie
+    integer :: ie
     interface
       subroutine MPI_REDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, ROOT, COMM, IERROR)
         import
@@ -701,7 +1356,7 @@ contains
 
   subroutine par_sum_to_master_horizontal_64_1d(x)
     real(real64), intent(inout) :: x(:)
-    integer ie
+    integer :: ie
     interface
       subroutine MPI_REDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, ROOT, COMM, IERROR)
         import
@@ -717,7 +1372,71 @@ contains
     end if
   end subroutine
 
-  subroutine par_broadcast_from_top_real32(x)
+
+
+
+
+  subroutine par_broadcast_from_last_x_real32(x)
+    real(real32), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real32) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real32, nxims-1, comm_row_x, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_last_x_real64(x)
+    real(real64), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real64) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real64, nxims-1, comm_row_x, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_last_y_real32(x)
+    real(real32), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real32) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real32, nyims-1, comm_row_y, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_last_y_real64(x)
+    real(real64), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real64) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real64, nyims-1, comm_row_y, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_last_z_real32(x)
     real(real32), intent(inout) :: x
     integer :: ie
     interface
@@ -732,7 +1451,7 @@ contains
     if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
   end subroutine
 
-  subroutine par_broadcast_from_top_real64(x)
+  subroutine par_broadcast_from_last_z_real64(x)
     real(real64), intent(inout) :: x
     integer :: ie
     interface
@@ -747,4 +1466,4 @@ contains
     if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
   end subroutine
 
-end module
+end module custom_par

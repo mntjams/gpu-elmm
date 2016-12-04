@@ -145,7 +145,7 @@ contains
       
     end if
 
-    call PreparePuffs(Scalar, RK_stage, RK_stages, time, dt)
+    call PreparePuffs(Scalar, RK_stage, RK_stages, time_stepping%time, time_stepping%dt)
 
     do sc = 1, num_of_scalars
       call stage(Scalar(:,:,:,sc), Scalar_2(:,:,:,sc), Scalar_adv(:,:,:,sc), &
@@ -169,8 +169,10 @@ contains
         procedure(boundary_interface) :: boundary_procedure
         procedure(extra_interface) :: extra_procedure
         real(knd), intent(out), contiguous, optional :: flux_profile(0:)
-        integer i,j,k
+        integer :: i,j,k
 
+
+        call boundary_procedure(Array)
 
         if (RK_stage>1) then
 
@@ -223,7 +225,7 @@ contains
 
         call TemperatureVolumeSources(Temperature_adv)
 
-        if (TempBtype(To)==AUTOMATICFLUX) then
+        if (TempBtype(To)==BC_AUTOMATIC_FLUX) then
           first = min(Prnz*5/6, Prnz-5)
           last = Prnz-5
           sideTemp(To) = sum(temperature_flux_profile(first:last)) / (last-first+1)
@@ -250,7 +252,7 @@ contains
 
         call MoistureVolumeSources(Moisture_adv)
 
-        if (MoistBtype(To)==AUTOMATICflux) then
+        if (MoistBtype(To)==BC_AUTOMATIC_FLUX) then
           first = min(Prnz*5/6, Prnz-5)
           last = Prnz-5
           sideMoist(To) = sum(moisture_flux_profile(first:last)) / (last-first+1)
@@ -1097,7 +1099,8 @@ contains
     Ay = 1 / (2 * dymin**2)
     Az = 1 / (2 * dzmin**2)
 
-    !$omp parallel do private(i, j, k, bi, bj, bk) schedule(runtime) collapse(3)
+    !$omp parallel private(i, j, k, bi, bj, bk, xi, yj, zk)
+    !$omp do schedule(runtime) collapse(3)
     do bk = 1, Prnz, tnz
      do bj = 1, Prny, tny
       do bi = 1, Prnx, tnx
@@ -1124,9 +1127,8 @@ contains
       end do
      end do
     end do
-    !$omp end parallel do
-    
-    !$omp parallel private(i, xi, yj, zk)
+    !$omp end do
+
     !$omp do
     do i = 1, size(Scflx_points)
       xi = Scflx_points(i)%xi
@@ -1603,7 +1605,7 @@ contains
 
   pure real(knd) function DepositionVelocity(dp, rhop, press, temp, z, z0, zL, ustar) !Kharchenko
     real(knd), intent(in) :: dp, rhop, press, temp, z, z0, zL, ustar
-    real(dbl) visc, us, Intz, Intexp, BD, tp
+    real(dbl) :: visc, us, Intz, Intexp, BD, tp
     real(dbl), parameter :: zexp = 0.01
 
     us = SedimVelocity(dp, rhop, press, temp)
@@ -1901,6 +1903,7 @@ contains
 
 
   subroutine InitHydrostaticPressure(Pr, Temperature, Moisture)
+    use Pressure
     real(knd), contiguous, intent(out) :: Pr(1:,1:,1:)
     real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:)
     real(knd) :: t_virt, t_virt_prev, p
@@ -1912,7 +1915,7 @@ contains
     end interface
 
 
-    p = bottom_pressure
+    p = pressure_solution%bottom_pressure
 
     do k = 1, Prnz
      t_virt = sum(TempIn(1:Prny,k))/Prny
@@ -1924,13 +1927,13 @@ contains
                   / temperature_ref
 
     end do
-    top_pressure = p
+    pressure_solution%top_pressure = p
 
 
     do j = 1, Vny+1
       do i = 1, Unx+1
         t_virt_prev = theta_v(i,j,Prnz)
-        Pr(i,j,Prnz) = top_pressure - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
+        Pr(i,j,Prnz) = pressure_solution%top_pressure - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
                 ( t_virt_prev - temperature_ref ) &
                 / temperature_ref
         do k = Prnz-1, 1, -1
@@ -1972,7 +1975,7 @@ contains
 
 
   subroutine InitSubsidenceProfile
-    integer k
+    integer :: k
 
     if (SubsidenceGradient/=0) then
       allocate(SubsidenceProfile(0:Prnz))
@@ -1982,72 +1985,5 @@ contains
     end if
   end subroutine InitSubsidenceProfile
 
-
-
-
-  subroutine Release(Scalar, released)
-    real(knd), contiguous, intent(inout) :: Scalar(-1:,-1:,-1:,-1:)
-    logical, intent(inout)   :: released
-    real(knd) :: xc, yc, xs, xf, ys, yf, zs, zf, dxp, dyp, dzp, ct, cr, xp, yp, zp, p
-    integer :: i, j, k, xi, yj, zk, nprobx, nproby, nprobz
-    ct = 7
-    cr = 1.5
-    xc = 3*cos((x_axis_azimuth-70)*pi/180.)
-    yc = 3*sin((x_axis_azimuth-70)*pi/180.)
-    xs = xc-cr
-    ys = yc-cr
-    zs = 0
-    xf = xc+cr
-    yf = yc+cr
-    zf = ct
-
-    nprobx = 100
-    nproby = 100
-    nprobz = 100
-
-    dxp = (xf-xs) / nprobx
-    dyp = (yf-ys) / nproby
-    dzp = (zf-zs) / nprobz
-
-    if (num_of_scalars >=4 ) then
-     if (time > (end_time-start_time)/3._knd) then
-      Scalar = 0
-      p = 0
-      do k = 0, nprobz
-       zp = zs + k * dzp
-       do j = 0, nproby
-        yp = ys + j * dyp
-        do i = 0, nprobx
-          xp = xs + i * dxp
-
-          call GridCoords(xi, yj, zk, xp, yp, zp)
-
-          if ((xp-xc)**2 + (yp-yc)**2 < cr**2) then
-            if   (zp < ct*0.2) then
-             Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:) * 0.2
-             p = p + 1
-            else if (zp < ct*0.4) then
-             Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:) * 0.8
-             p = p + 1
-            else if (zp < ct*0.6) then
-             Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:) * 1.25
-             p = p + 1
-            else if (zp < ct*0.8) then
-             Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:) + percdistrib(:) * 1.75
-             p = p + 1
-            else if (zp <= ct) then
-             Scalar(xi,yj,zk,:) = Scalar(xi,yj,zk,:)  +percdistrib(:) * 1.1
-             p = p + 1
-            end if
-          end if
-        end do
-       end do
-      end do
-      Scalar = totalscalsource * Scalar / p
-      Scalar = Scalar / (dxmin*dymin*dzmin)
-      released = .true.
-     end if
-    end if
-  endsubroutine Release
 
 end module Scalars

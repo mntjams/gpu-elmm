@@ -155,8 +155,10 @@ else:
   else:
     fast_flag = ' -O5 -ffast-math -fno-protect-parens'
     c_check_flag = '  -fbacktrace -g -Wall -Wno-unused -Wno-maybe-uninitialized'
-    check_flag = c_check_flag + ' -fbacktrace -Waliasing -Wimplicit-interface -Wsurprising -Wno-unused-dummy-argument -Wno-aliasing  -fcheck=all  -Werror'
-
+    check_flag = c_check_flag + ' -fbacktrace -Waliasing -Wsurprising -Wno-unused-dummy-argument -Wno-aliasing  -fcheck=all  -Werror'
+    if mpi!='yes':
+      check_flag += ' -Wimplicit-interface'
+      
   if str(sanitize)=='yes':
     fast_flag += ' -fsanitize=address -fsanitize=undefined -fsanitize=address -fsanitize=unreachable -fsanitize=null -fsanitize=signed-integer-overflow'
     
@@ -335,6 +337,9 @@ if str(mpi)=='yes':
   objs += env.Object(target = target_dir + 'custom_mpi',       source = 'custom_mpi.f90')
   objs += env.Object(target = target_dir + 'exchange_mpi',     source = 'exchange_mpi.f90')
   objs += env.Object(target = target_dir + 'exchange_mpi_derived_types', source = 'exchange_mpi_derived_types.f90')
+  objs += env.Object(target = target_dir + 'domains_bc_types_mpi', source = 'domains_bc_types_mpi.f90')
+  objs += env.Object(target = target_dir + 'domains_bc_init_mpi', source = 'domains_bc_init_mpi.f90')
+  objs += env.Object(target = target_dir + 'domains_bc_mpi', source = 'domains_bc_mpi.f90')
 else:
   objs += env.Object(target = target_dir + 'dummy_par',        source = 'dummy_par.f90') 
 

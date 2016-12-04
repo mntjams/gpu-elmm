@@ -60,13 +60,63 @@ module Parameters
   
   integer :: offset_to_global_x = 0, offset_to_global_y = 0, offset_to_global_z = 0
   integer :: gPrns(3), offsets_to_global(3) = 0
+
+
+  !the domain's (global) extents
+  real(knd) :: gxmin, gxmax, gymin, gymax, gzmin, gzmax
+
+  !the image's extents
+  real(knd) :: im_xmin, im_xmax, im_ymin, im_ymax, im_zmin, im_zmax
+
+  real(knd), allocatable :: xU(:), xPr(:), yV(:), yPr(:), zW(:), zPr(:)          !coordinates of grid points
+  real(knd), allocatable :: dxU(:), dxPr(:), dyV(:), dyPr(:), dzW(:), dzPr(:)    !dxPr(i)=xU(i)-xU(i-1), dxU(i)=xPr(i+1)-xPr(i)
+
+
+
+
+
+
+
   
+  type time_step_control
+    integer   :: max_number_of_time_steps = 2**30 !maximum number of time steps
 
-  integer   :: max_number_of_time_steps    !maximum number of time steps
+    logical   :: variable_time_steps = .true.
 
-  real(TIM) :: start_time, end_time
+    logical   :: enable_U_scaling = .false. !enables that the constant time step to be computed from 
+                                           ! U_time_scaling and from CFL
+    logical   :: enable_CFL_check = .false. !enables check of maximum CFL 
+                                           ! U_time_scaling and from CFL
+    real(tim) :: dt_constant = 0
 
-  real(knd) :: dxmin, dymin, dzmin, CFL, Uref  !minimum grid spacing, dimensions of the domain
+    real(tim) :: dt
+
+    real(tim) :: dt_max           !minimal time step for diagnosing diverging simulation
+    
+    real(tim) :: dt_min           !maximum time step, larger value will not be used
+    
+    real(knd) :: U_scaling(3) = 0 !velocity vector used to compute constant_U
+
+    real(knd) :: U_max(3) = 0     !velocity used to compute minimal_dt
+
+    real(knd) :: U_min(3) = 0     !velocity used to compute minimal_dt
+
+    real(knd) :: CFL = 0.3        !CFL used to compute dt, or computed dt if CFL is fixed
+
+    real(knd) :: CFL_max = 0      !CFL which will result in diagnosing the simulation as diverging
+
+    real(tim) :: effective_time   !the time including the partial time-steps during Runge-Kutta stages
+
+    real(tim) :: time             !time of the start of the time step
+
+    real(tim) :: start_time, end_time
+
+  end type
+
+  type(time_step_control) :: time_stepping
+
+
+  real(knd) :: dxmin, dymin, dzmin  !minimum grid spacing, dimensions of the domain
 
 
   real(knd) :: molecular_viscosity = 1._knd / 70000
@@ -84,9 +134,6 @@ module Parameters
 
   real(knd) :: grav_acc = 0, Coriolis_parameter = 0
 
-  real(knd) :: top_pressure !mean pressure at the top boundary - calculated
-  real(knd) :: bottom_pressure = 101325.0
-
   real(knd) :: ShearInletTypeParameter, Uinlet
 
   real(knd) :: z0W, z0E, z0S, z0N, z0B, z0T
@@ -97,12 +144,10 @@ module Parameters
 
   integer :: scalsourcetype
 
-
   real(knd) :: epsCN, epsPoisson, eps, debugparam
-  real(TIM) :: time
-  real(TIM) :: timefram1, timefram2, timeavg1, timeavg2
 
-  integer :: poisson_solver
+  real(tim) :: timefram1, timefram2, timeavg1, timeavg2
+
   integer :: advection_method
   integer :: frames
   integer :: steady
@@ -124,7 +169,6 @@ module Parameters
 
   integer :: partdistrib, computedeposition, computegravsettling
   integer :: maxCNiter, maxPOISSONiter, endstep
-  integer :: projectiontype, correctcompatibility = 0
 
   integer :: inlettype, gridtype, profiletype
 
@@ -133,10 +177,11 @@ module Parameters
 
   real(knd), allocatable :: TempIn(:,:), MoistIn(:,:)
 
-  real(knd) :: gxmin, gxmax, gymin, gymax, gzmin, gzmax
 
-  real(knd), allocatable :: xU(:), xPr(:), yV(:), yPr(:), zW(:), zPr(:)          !coordinates of grid points
-  real(knd), allocatable :: dxU(:), dxPr(:), dyV(:), dyPr(:), dzW(:), dzPr(:)    !dxPr(i)=xU(i)-xU(i-1), dxU(i)=xPr(i+1)-xPr(i)
+
+
+
+
 
   real(knd) :: x_axis_azimuth = 90!true geographic heading of the x axis in degrees
 
@@ -173,14 +218,23 @@ module Parameters
 
 
   integer, parameter :: ScalarTypeTemperature = 1, &
-                       ScalarTypeMoisture = 2, &
-                       ScalarTypePassive = 3
+                        ScalarTypeMoisture = 2, &
+                        ScalarTypePassive = 3
 
-  integer, parameter :: NOSLIP=1, FREESLIP=2, PERIODIC=3, DIRICHLET=4, NEUMANN=5, CONSTFLUX=6, &  !boundary condition types
-                        TURBULENTINLET=7, INLETFROMFILE=10, RADIATION=7, &
-                        MO_TEMPERATURE=10, &
-                        AUTOMATICFLUX=11, &
-                        MPI_BOUNDS=1000, MPI_BOUNDARY=1000, MPI_PERIODIC=1001
+  integer, parameter :: BC_NOSLIP=1, BC_FREESLIP=2, BC_PERIODIC=3, BC_DIRICHLET=4, BC_NEUMANN=5, BC_CONSTFLUX=6, &  !boundary condition types
+                        BC_TURBULENT_INLET=7, BC_INLET_FROM_FILE=8, &
+                        BC_MO_TEMPERATURE=10, &
+                        BC_AUTOMATIC_FLUX=11, &
+                        BC_MPI_BOUNDS_MIN=1000, BC_MPI_BOUNDS_MAX=1010, BC_MPI_BOUNDARY=1000, BC_MPI_PERIODIC=1001, &
+                        BC_DOMAIN_BOUNDS_MIN=2000, BC_DOMAIN_BOUNDS_MAX=2010, &
+                        BC_DOMAIN_NESTED=2001, BC_DOMAIN_COPY=2002, BC_DOMAIN_NESTED_TURBULENT=2003
+
+  !set by user
+  logical :: enable_fixed_flow_rate = .false.
+  !set from boundary conditions automatically
+  logical :: flow_rate_x_fixed = .false., flow_rate_y_fixed = .false.
+  real(knd) :: flow_rate_x, flow_rate_y
+
   !inlet types
   integer, parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
                         ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5, &

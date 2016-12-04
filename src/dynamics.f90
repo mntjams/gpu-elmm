@@ -71,7 +71,7 @@ contains
 
     !$omp parallel
     if (enable_pr_gradient_x_profile) then
-       !$omp do
+      !$omp do
       do k = 1, Unz
         do j = 1, Uny
           do i = 1, Unx
@@ -155,7 +155,7 @@ contains
     real(knd) :: flux
     integer :: first,last
     
-    if (Btype(To)==AUTOMATICFLUX) then
+    if (Btype(To)==BC_AUTOMATIC_FLUX) then
       first = min(Prnz*5/6,Prnz-5)
       last = Prnz-5
       
@@ -411,50 +411,77 @@ contains
 
 
 
-  subroutine TimeStepLength(U, V, W, dt)
+  subroutine TimeStepLength(U, V, W, t_s)
     use ieee_arithmetic
 #ifdef PAR
     use custom_par
 #endif
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)  :: U,V,W
-    real(tim), intent(out) :: dt
+    type(time_step_control), intent(inout) :: t_s
     integer :: i,j,k
-    real(knd) :: m, p
+    real(knd) :: U_dx_max, p
     logical :: nan
     
     nan = .false.
-    m = 0
-    !$omp parallel do private(i,j,k,p) reduction(max:m) reduction(.or.:nan)
-    do k = 1, Prnz
-      do j = 1, Prny
-        do i = 1, Prnx
-          !For scalar advection the sum proved to be necessary when the flow is not aligned to grid.
-          p =     max( abs(U(i,j,k)), abs(U(i-1,j,k)) ) / dxmin
-          p = p + max( abs(V(i,j,k)), abs(V(i,j-1,k)) ) / dymin
-          p = p + max( abs(W(i,j,k)), abs(W(i,j,k-1)) ) / dzmin
-          
-          m = max(m,p)
-          if (ieee_is_nan(p)) nan = .true.
-        end do
-      end do
-    end do
-    !$omp end parallel do
 
-    if (nan) then
-      dt = tiny(dt)
-    else if (m>0) then
-      dt = min(CFL/m, min(dxmin,dymin,dzmin)/Uref)
-    else
-      dt = min(dxmin,dymin,dzmin) / Uref
-    end if
+    if (t_s%variable_time_steps) then
 
-    if (steady/=1 .and. dt+time>end_time)  dt = end_time-time
-    
+      call get_U_dx_max
+ 
+      if (nan) then
+        t_s%dt = tiny(t_s%dt)
+      else if (U_dx_max > 0) then
+        t_s%dt = min(t_s%CFL / U_dx_max, t_s%dt_max)
+      else
+        t_s%dt = t_s%dt_max
+      end if
+
 #ifdef PAR
-    dt = par_co_min(dt)
+      t_s%dt = par_co_min(t_s%dt)
 #endif
 
-  endsubroutine TimeStepLength
+    else
+
+      if (t_s%enable_CFL_check) call get_U_dx_max
+
+      if (nan) U_dx_max = huge(U_dx_max)
+
+      t_s%dt = t_s%dt_constant
+
+      t_s%CFL = U_dx_max * t_s%dt
+
+#ifdef PAR
+      if (t_s%enable_CFL_check) t_s%CFL = par_co_max(t_s%CFL)
+#endif
+
+    end if
+
+    if (time_stepping%variable_time_steps .and. steady /= 1 .and. t_s%dt + t_s%time > t_s%end_time)  &
+      t_s%dt = t_s%end_time - t_s%time
+    
+
+  contains
+
+    subroutine get_U_dx_max
+      U_dx_max = 0
+      !$omp parallel do private(i,j,k,p) reduction(max:U_dx_max) reduction(.or.:nan)
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            !For scalar advection the sum proved to be necessary when the flow is not aligned to grid.
+            p =     max( abs(U(i,j,k)), abs(U(i-1,j,k)) ) / dxmin
+            p = p + max( abs(V(i,j,k)), abs(V(i,j-1,k)) ) / dymin
+            p = p + max( abs(W(i,j,k)), abs(W(i,j,k-1)) ) / dzmin
+            
+            U_dx_max = max(U_dx_max, p)
+            if (ieee_is_nan(p)) nan = .true.
+          end do
+        end do
+      end do
+      !$omp end parallel do
+    end subroutine
+
+  end subroutine TimeStepLength
 
 
 
@@ -1072,8 +1099,8 @@ contains
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U2, V2, W2, U3, V3, W3
     real(knd), intent(in) :: coef
-    real(knd) recdxmin2,recdymin2,recdzmin2                                                               !reciprocal values of dx**2
-    real(knd) Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
+    real(knd) :: recdxmin2,recdymin2,recdzmin2                                                               !reciprocal values of dx**2
+    real(knd) :: Ap,p,S,Suavg,Svavg,Swavg,Su,Sv,Sw
     integer :: i,j,k,bi,bj,bk,l
     integer, save :: called = 0
     integer :: tnx, tny, tnz, tnx2, tny2, tnz2
@@ -1765,7 +1792,69 @@ contains
 
 
 
+  subroutine CorrectFlowRate(U, V)
+    use custom_par
 
+    real(knd), intent(inout), contiguous, dimension(-2:,-2:,-2:) :: U, V
+
+    real(knd) :: rate_actual
+    real(knd) :: pr_gradient_diff
+    integer :: i, j, k
+
+    if (flow_rate_x_fixed) then
+      if (iim==nxims) then
+        rate_actual = sum(U(Unx, 1:Uny, 1:Unz)) * dymin * dzmin
+#ifdef PAR        
+        rate_actual = par_co_sum_plane_yz(rate_actual)
+#endif
+      end if
+
+#ifdef PAR        
+      call par_broadcast_from_last_x(rate_actual)
+#endif
+      pr_gradient_diff = (rate_actual - flow_rate_x) / ( dymin * dzmin * gPrny * gPrnz)
+
+      !$omp parallel do private(i,j,k)
+      do k = 1, Unz
+        do j = 1, Uny
+          do i = 1, Unx
+            U(i,j,k) = U(i,j,k) -  pr_gradient_diff
+          end do
+        end do
+      end do
+      !$omp end parallel do
+
+      pr_gradient_x = pr_gradient_x + pr_gradient_diff
+    end if
+
+      
+    if (flow_rate_y_fixed) then
+      if (jim==nyims) then
+        rate_actual = sum(V(1:Vnx, Vny, 1:Vnz)) * dxmin * dzmin
+#ifdef PAR        
+        rate_actual = par_co_sum_plane_xz(rate_actual)
+#endif
+      end if
+
+#ifdef PAR        
+      call par_broadcast_from_last_y(rate_actual)
+#endif
+      pr_gradient_diff = (rate_actual - flow_rate_y) / (dxmin * dzmin * gPrnx * gPrnz)
+
+      !$omp parallel do private(i,j,k)
+      do k = 1, Vnz
+        do j = 1, Vny
+          do i = 1, Vnx
+            V(i,j,k) = V(i,j,k) - pr_gradient_diff
+          end do
+        end do
+      end do
+      !$omp end parallel do
+
+      pr_gradient_y = pr_gradient_y + pr_gradient_diff
+    end if
+      
+  end subroutine CorrectFlowRate
 
 
 

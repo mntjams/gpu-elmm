@@ -7,7 +7,7 @@ module Filters
 
   private
 
-  public filtertype, filter_ratios, Filter, FilterTopHat
+  public filtertype, filter_ratios, Filter, FilterTopHat, FilterTopHatSimple
 
   integer :: filtertype = 1
 
@@ -37,22 +37,22 @@ contains
     !Shift of the region boundaries at the walls.
     !We do not want to get the outside points into the stencil.
     !It causes too large difference between the original and filtered value.
-    if (Btype(We)==NOSLIP.or.Btype(We)==DIRICHLET) then
+    if (Btype(We)==BC_NOSLIP.or.Btype(We)==BC_DIRICHLET) then
       mini = mini + 1
     end if
-    if (Btype(Ea)==NOSLIP.or.Btype(Ea)==DIRICHLET) then
+    if (Btype(Ea)==BC_NOSLIP.or.Btype(Ea)==BC_DIRICHLET) then
       maxi = maxi - 1
     end if
-    if (Btype(So)==NOSLIP.or.Btype(So)==DIRICHLET) then
+    if (Btype(So)==BC_NOSLIP.or.Btype(So)==BC_DIRICHLET) then
       minj = minj + 1
     end if
-    if (Btype(No)==NOSLIP.or.Btype(No)==DIRICHLET) then
+    if (Btype(No)==BC_NOSLIP.or.Btype(No)==BC_DIRICHLET) then
       maxj = maxj - 1
     end if
-    if (Btype(Bo)==NOSLIP.or.Btype(Bo)==DIRICHLET) then
+    if (Btype(Bo)==BC_NOSLIP.or.Btype(Bo)==BC_DIRICHLET) then
       mink = mink + 1
     end if
-    if (Btype(To)==NOSLIP.or.Btype(To)==DIRICHLET) then
+    if (Btype(To)==BC_NOSLIP.or.Btype(To)==BC_DIRICHLET) then
       maxk = maxk - 1
     end if
     
@@ -160,6 +160,62 @@ contains
     end do
     !$omp end parallel
   end subroutine 
+
+
+  subroutine FilterTopHatSimple(Uf, U)
+    use ArrayUtilities, only: set
+    real(knd), dimension(0:,0:,0:), intent(out)  :: Uf
+    real(knd), dimension(0:,0:,0:), intent(in)  :: U
+    integer :: i, j, k, bi, bj, bk
+    integer :: mini, minj, mink
+    integer :: maxi, maxj, maxk
+
+    real(knd) :: tmp(0:max(ubound(U,1), ubound(U,2), ubound(U,3)))
+
+    mini = 1
+    maxi = ubound(U,1) - 1
+    minj = 1
+    maxj = ubound(U,2) - 1
+    mink = 1
+    maxk = ubound(U,3) - 1
+
+    Uf = U
+
+    !$omp parallel private(i, j, k, tmp) shared(U, mini, maxi, minj, maxj, mink, maxk)
+       
+    !filter by the separable kernel in all three directions
+    
+    !$omp do collapse(2) schedule(dynamic,4)
+    do k = mink, maxk
+      do j = minj, maxj
+        tmp(:ubound(U,1)) = U(:,j,k)
+        do i = mini, maxi
+            Uf(i,j,k) = 0.25 * (tmp(i+1) + 2 * tmp(i) + tmp(i-1))
+        end do
+      end do
+    end do
+
+    !$omp do schedule(dynamic)
+    do k = mink, maxk
+      do i = mini, maxi
+        tmp(:ubound(U,2)) = Uf(i,:,k)
+        do j = minj, maxj
+            Uf(i,j,k) = 0.25 * (tmp(j+1) + 2 * tmp(j) + tmp(j-1))
+        end do
+      end do
+    end do
+
+    !$omp do collapse(2) schedule(guided)
+    do j = minj, maxj
+      do i = mini, maxi
+        tmp(:ubound(U,3)) = Uf(i,j,:)
+        do k = mink, maxk
+            Uf(i,j,k) = 0.25 * (tmp(k+1) + 2 * tmp(k) + tmp(k-1))
+        end do
+      end do
+    end do
+    !$omp end parallel
+  end subroutine FilterTopHatSimple
 
 
   

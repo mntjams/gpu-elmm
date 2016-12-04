@@ -1,5 +1,6 @@
 module SolarRadiation
   use Parameters
+  use Pressure, only: pressure_solution
   
   implicit none
   
@@ -27,7 +28,7 @@ contains
   subroutine InitSolarRadiation
     real(knd) :: horiz_component, horiz_angle
     real(knd) :: azimuth, z
-    integer i
+    integer :: i
       
     sun_azimuth = 237
     sun_elevation = 53
@@ -77,7 +78,7 @@ contains
     real(knd) :: wv_press, atmosphere_emissivity
     
     wv_press = moisture_ref / (moisture_ref + 0.622) * &
-                               bottom_pressure
+                               pressure_solution%bottom_pressure
     
     atmosphere_emissivity = 0.23 + &
                0.44 * (wv_press / temperature_ref)**(0.125_knd)

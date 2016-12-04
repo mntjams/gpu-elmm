@@ -56,7 +56,8 @@ contains
       do i = 1, Prnx
         if (self%GeometricShape%Inside(xPr(i), yPr(j))) then
           if (Prtype(i,j,Prnz)>0) cycle
-          if (Prtype(i,j,1)<=0 .and. Btype(Bo)>=MPI_BOUNDS) cycle
+          if (Prtype(i,j,1)<=0 .and. &
+              (Btype(Bo)>=BC_MPI_BOUNDS_MIN .and. Btype(Bo)<=BC_MPI_BOUNDS_MAX)) cycle
 
           do k = 1, Prnz
             if (Prtype(i,j,k)<=0) then

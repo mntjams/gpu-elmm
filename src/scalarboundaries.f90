@@ -21,7 +21,7 @@ contains
     real(knd),intent(in)    :: side(6)
     real(knd),intent(in),optional :: in(-1:,-1:)
     real(knd),intent(in),allocatable,optional :: BsideArr(:,:), BsideFlArr(:,:)
-    integer i,j,k,nx,ny,nz
+    integer :: i,j,k,nx,ny,nz
 
     nx = Prnx
     ny = Prny
@@ -31,7 +31,7 @@ contains
     call par_exchange_Sc_x(arr,btype)
 #endif
     
-    if (btype(We)==DIRICHLET) then
+    if (btype(We)==BC_DIRICHLET) then
       do k = 1,nz
         do j = 1,ny
           if (present(in)) then
@@ -43,21 +43,21 @@ contains
           end if
         end do
       end do
-    else if (btype(We)==PERIODIC) then
+    else if (btype(We)==BC_PERIODIC) then
       do k = 1,nz
         do j = 1,ny
          arr(0,j,k)  = arr(nx,j,k)
          arr(-1,j,k) = arr(nx-1,j,k)
         end do
       end do
-    else if (btype(We)==NEUMANN) then
+    else if (btype(We)==BC_NEUMANN) then
       do k = 1,nz
         do j = 1,ny
           arr(0,j,k)  = arr(1,j,k) - side(We)*dxU(0)
           arr(-1,j,k) = arr(1,j,k) - side(We)*(dxU(0)+dxU(-1))
         end do
       end do
-    else if (btype(We)==CONSTFLUX) then
+    else if (btype(We)==BC_CONSTFLUX) then
       do k = 1,nz
         do j = 1,ny
           arr(0,j,k)  = arr(1,j,k) + &
@@ -65,7 +65,8 @@ contains
           arr(-1,j,k) = arr(0,j,k) - (arr(1,j,k)-arr(0,j,k))
         end do
       end do
-    else if (btype(We)<MPI_BOUNDS) then
+    else if (((btype(We)<BC_MPI_BOUNDS_MIN) .or. (btype(We)>BC_MPI_BOUNDS_MAX)) .and. &
+             ((btype(We)<BC_DOMAIN_BOUNDS_MIN) .or. (btype(We)>BC_DOMAIN_BOUNDS_MAX))) then
       do k = 1,nz
         do j = 1,ny
           arr(0,j,k)  = arr(1,j,k)
@@ -74,28 +75,28 @@ contains
       end do
     end if
 
-    if (btype(Ea)==DIRICHLET) then
+    if (btype(Ea)==BC_DIRICHLET) then
       do k = 1,nz
         do j = 1,ny
           arr(nx+1,j,k) = side(Ea) - (arr(nx,j,k)-side(Ea))
           arr(nx+2,j,k) = side(Ea) - (arr(nx-1,j,k)-side(Ea))
         end do
       end do
-    else if (btype(Ea)==PERIODIC) then
+    else if (btype(Ea)==BC_PERIODIC) then
       do k = 1,nz
         do j = 1,ny
           arr(nx+1,j,k) = arr(1,j,k)
           arr(nx+2,j,k) = arr(2,j,k)
         end do
       end do
-    else if (btype(Ea)==NEUMANN) then
+    else if (btype(Ea)==BC_NEUMANN) then
       do k = 1,nz
         do j = 1,ny
           arr(nx+1,j,k) = arr(nx,j,k) + side(Ea)*dxU(nx+1)
           arr(nx+2,j,k) = arr(nx,j,k) + side(Ea)*(dxU(nx+1)+dxU(nx+2))
         end do
       end do
-    else if (btype(Ea)==CONSTFLUX) then
+    else if (btype(Ea)==BC_CONSTFLUX) then
       do k = 1,nz
         do j = 1,ny
           arr(nx+1,j,k) = arr(nx,j,k) - &
@@ -103,7 +104,7 @@ contains
           arr(nx+2,j,k) = arr(nx+1,j,k) - (arr(nx,j,k)-arr(nx+1,j,k))
         end do
       end do
-    else if (btype(Ea)<MPI_BOUNDS) then
+    else if ((btype(Ea)<BC_MPI_BOUNDS_MIN) .or. (btype(Ea)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
         do j = 1,ny
           arr(nx+1,j,k) = arr(nx,j,k)
@@ -116,28 +117,28 @@ contains
     call par_exchange_Sc_y(arr,btype)
 #endif
     
-    if (btype(So)==DIRICHLET) then
+    if (btype(So)==BC_DIRICHLET) then
       do k = 1,nz
         do i=-1,nx+2
           arr(i,0,k)  = side(So) - (arr(i,1,k)-side(So))
           arr(i,-1,k) = side(So) - (arr(i,2,k)-side(So))
         end do
       end do
-    else if (btype(So)==PERIODIC) then
+    else if (btype(So)==BC_PERIODIC) then
       do k = 1,nz
         do i=-1,nx+2
           arr(i,0,k)  = arr(i,ny,k)
           arr(i,-1,k) = arr(i,ny-1,k)
         end do
       end do
-    else if (btype(So)==NEUMANN) then
+    else if (btype(So)==BC_NEUMANN) then
       do k = 1,nz
         do i=-1,nx+2
           arr(i,0,k)  = arr(i,1,k) - side(So)*dyV(0)
           arr(i,-1,k) = arr(i,1,k) - side(So)*(dyV(0)+dyV(-1))
         end do
       end do
-    else if (btype(So)==CONSTFLUX) then
+    else if (btype(So)==BC_CONSTFLUX) then
       do k = 1,nz
         do i=-1,nx+2
           arr(i,0,k)  = arr(i,1,k) + &
@@ -145,7 +146,7 @@ contains
           arr(i,-1,k) = arr(i,0,k) - (arr(i,1,k)-arr(i,0,k))
         end do
       end do
-    else if (btype(So)<MPI_BOUNDS) then
+    else if ((btype(So)<BC_MPI_BOUNDS_MIN) .or. (btype(So)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
         do i=-1,nx+2
           arr(i,0,k)  = arr(i,1,k)
@@ -154,28 +155,28 @@ contains
       end do
     end if
 
-    if (btype(No)==DIRICHLET) then
+    if (btype(No)==BC_DIRICHLET) then
       do k = 1,nz
         do i=-1,nx+2
            arr(i,ny+1,k) = side(No) - (arr(i,ny,k)-side(No))
            arr(i,ny+2,k) = side(No) - (arr(i,ny-1,k)-side(No))
          end do
        end do
-    else if (btype(No)==PERIODIC) then
+    else if (btype(No)==BC_PERIODIC) then
       do k = 1,nz
         do i=-1,nx+2
           arr(i,ny+1,k) = arr(i,1,k)
           arr(i,ny+2,k) = arr(i,2,k)
         end do
       end do
-    else if (btype(No)==NEUMANN) then
+    else if (btype(No)==BC_NEUMANN) then
       do k = 1,nz
         do i=-1,nx+2
           arr(i,ny+1,k) = arr(i,ny,k) + side(No)*dyV(ny+1)
           arr(i,ny+2,k) = arr(i,ny,k) + side(No)*(dyV(ny+1)+dyV(ny+2))
         end do
       end do
-    else if (btype(No)==CONSTFLUX) then
+    else if (btype(No)==BC_CONSTFLUX) then
       do k = 1,nz
         do i=-1,nx+2
           arr(i,ny+1,k) = arr(i,ny+1,k) - &
@@ -183,7 +184,7 @@ contains
           arr(i,ny+2,k) = arr(i,ny+1,k) - (arr(i,ny,k)-arr(i,ny+1,k))
         end do
       end do
-    else if (btype(No)<MPI_BOUNDS) then
+    else if ((btype(No)<BC_MPI_BOUNDS_MIN) .or. (btype(No)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
         do i=-1,ny+2
           arr(i,ny+1,k) = arr(i,ny,k)
@@ -196,28 +197,28 @@ contains
     call par_exchange_Sc_z(arr,btype)
 #endif
     
-    if (btype(Bo)==DIRICHLET) then
+    if (btype(Bo)==BC_DIRICHLET) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,nz+1) = side(Bo) - (arr(i,j,1)-side(Bo))
           arr(i,j,nz+2) = side(Bo) - (arr(i,j,2)-side(Bo))
         end do
       end do
-    else if (btype(Bo)==PERIODIC) then
+    else if (btype(Bo)==BC_PERIODIC) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,0)  = arr(i,j,nz)
           arr(i,j,-1) = arr(i,j,nz-1)
         end do
       end do
-    else if (btype(Bo)==NEUMANN) then
+    else if (btype(Bo)==BC_NEUMANN) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,0)  = arr(i,j,1) - side(Bo)*dzW(0)
           arr(i,j,-1) = arr(i,j,1) - side(Bo)*(dzW(0)+dzW(-1))
         end do
       end do
-    else if (btype(Bo)==CONSTFLUX) then
+    else if (btype(Bo)==BC_CONSTFLUX) then
       do j=-1,ny+2
         do i=-1,nx+2
             arr(i,j,0) = arr(i,j,1) + &
@@ -225,7 +226,7 @@ contains
           arr(i,j,-1) = arr(i,j,0)-(arr(i,j,1)-arr(i,j,0))
         end do
       end do
-    else if (btype(Bo)<MPI_BOUNDS) then
+    else if ((btype(Bo)<BC_MPI_BOUNDS_MIN) .or. (btype(Bo)>BC_MPI_BOUNDS_MAX)) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,0)  = arr(i,j,1)
@@ -234,28 +235,28 @@ contains
       end do
     end if
 
-    if (btype(To)==DIRICHLET) then
+    if (btype(To)==BC_DIRICHLET) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,nz+1) = side(To) - (arr(i,j,nz)-side(To))
           arr(i,j,nz+2) = side(To) - (arr(i,j,nz-1)-side(To))
         end do
       end do
-    else if (btype(To)==PERIODIC) then
+    else if (btype(To)==BC_PERIODIC) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,nz+1) = arr(i,j,1)
           arr(i,j,nz+2) = arr(i,j,2)
         end do
       end do
-    else if (btype(To)==NEUMANN) then
+    else if (btype(To)==BC_NEUMANN) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,nz+1) = arr(i,j,nz) + side(To)*dzW(nz+1)
           arr(i,j,nz+2) = arr(i,j,nz) + side(To)*(dzW(nz+1)+dzW(nz+2))
         end do
       end do
-    else if (btype(To)==CONSTFLUX.or.btype(To)==AUTOMATICFLUX) then
+    else if (btype(To)==BC_CONSTFLUX.or.btype(To)==BC_AUTOMATIC_FLUX) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,nz+1) = arr(i,j,nz) - &
@@ -263,7 +264,7 @@ contains
           arr(i,j,nz+2) = arr(i,j,nz+1) - (arr(i,j,nz)-arr(i,j,nz+1))
         end do
       end do
-    else if (btype(To)<MPI_BOUNDS) then
+    else if ((btype(To)<BC_MPI_BOUNDS_MIN) .or. (btype(To)>BC_MPI_BOUNDS_MAX)) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,nz+1) = arr(i,j,nz)
@@ -289,23 +290,38 @@ contains
 
 
   subroutine BoundTemperature(Temperature)
+#ifdef PAR
+    use domains_bc_par
+#endif
     real(knd),intent(inout) :: Temperature(-1:,-1:,-1:)
     
+#ifdef PAR
+    call par_update_domain_bounds_temperature(Temperature, time_stepping%effective_time)
+#endif
+
     call CommonBase(Temperature,TempBtype,sideTemp,TempIn,BsideTArr,BsideTFLArr)
 
   end subroutine BoundTemperature
 
 
   subroutine BoundMoisture(Moisture)
+#ifdef PAR
+    use domains_bc_par
+#endif
     real(knd),intent(inout) :: Moisture(-1:,-1:,-1:)
 
+#ifdef PAR
+    call par_update_domain_bounds_moisture(Moisture, time_stepping%effective_time)
+#endif
+
     call CommonBase(Moisture,MoistBtype,sideMoist)
+
   end subroutine BoundMoisture
 
 
   subroutine BoundViscosity(Nu)
     real(knd),contiguous,intent(inout) :: Nu(-1:,-1:,-1:)
-    integer i,j,k,nx,ny,nz
+    integer :: i,j,k,nx,ny,nz
 
     nx = Prnx
     ny = Prny
@@ -315,14 +331,14 @@ contains
     call par_exchange_Sc_x(Nu, Btype)
 #endif
 
-    if (Btype(Ea)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC) then
       do k = 1,nz
        do j = 1,ny
          Nu(0,j,k) = Nu(nx,j,k)
          Nu(nx+1,j,k) = Nu(1,j,k)
        end do
       end do
-    else if (Btype(Ea)<MPI_BOUNDS) then
+    else if ((Btype(Ea)<BC_MPI_BOUNDS_MIN) .or. (Btype(Ea)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
        do j = 1,ny
          Nu(0,j,k) = Nu(1,j,k)
@@ -335,14 +351,14 @@ contains
     call par_exchange_Sc_y(Nu, Btype)
 #endif
 
-    if (Btype(No)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC) then
       do k = 1,nz
        do i = 0,nx+1
          Nu(i,0,k) = Nu(i,ny,k)
          Nu(i,ny+1,k) = Nu(i,1,k)
        end do
       end do
-    else if (Btype(No)<MPI_BOUNDS) then
+    else if ((Btype(No)<BC_MPI_BOUNDS_MIN) .or. (Btype(No)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
        do i = 0,nx+1
          Nu(i,0,k) = Nu(i,1,k)
@@ -355,14 +371,14 @@ contains
     call par_exchange_Sc_z(Nu, Btype)
 #endif
 
-    if (Btype(To)==PERIODIC) then
+    if (Btype(To)==BC_PERIODIC) then
       do j = 0,ny+1
        do i = 0,nx+1
          Nu(i,j,0) = Nu(i,j,nz)
          Nu(i,j,nz+1) = Nu(i,j,1)
        end do
       end do
-    else if (Btype(To)<MPI_BOUNDS) then
+    else if ((Btype(To)<BC_MPI_BOUNDS_MIN) .or. (Btype(To)>BC_MPI_BOUNDS_MAX)) then
       do j = 0,ny+1
        do i = 0,nx+1
          Nu(i,j,0) = Nu(i,j,1)

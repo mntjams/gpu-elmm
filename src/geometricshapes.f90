@@ -91,23 +91,23 @@ module GeometricShapes
   end interface
 
   type,extends(GeometricShape) :: Line
-    real(knd) xc,yc,zc
-    real(knd) a,b,c
+    real(knd) :: xc,yc,zc
+    real(knd) :: a,b,c
   contains
     procedure :: InsideEps => Line_Inside
     procedure :: Closest => Line_Closest
   end type
 
   type,extends(GeometricShape) :: Ray
-    real(knd) xc,yc,zc
-    real(knd) a,b,c
+    real(knd) :: xc,yc,zc
+    real(knd) :: a,b,c
   contains
     procedure :: InsideEps => Ray_Inside
     procedure :: Closest => Ray_Closest
   end type
   
   type,extends(GeometricShape) :: Plane
-    real(knd) a,b,c,d      !ax+by+cz+d/=0 for inner half-space
+    real(knd) :: a,b,c,d      !ax+by+cz+d/=0 for inner half-space
     logical gl             !T > in ineq. above F < in ineq. above
    contains
     procedure :: InsideEps => Plane_Inside
@@ -140,7 +140,7 @@ module GeometricShapes
 
 
   type,extends(GeometricShape) :: Sphere
-    real(knd) xc,yc,zc,r
+    real(knd) :: xc,yc,zc,r
   contains
     procedure,private :: InsideEps => Sphere_Inside
     procedure :: Closest => Sphere_Closest
@@ -149,7 +149,7 @@ module GeometricShapes
 
 
   type,extends(GeometricShape) :: Ellipsoid
-    real(knd) xc,yc,zc,a,b,c
+    real(knd) :: xc,yc,zc,a,b,c
   contains
     procedure,private :: InsideEps => Ellipsoid_Inside
     procedure :: Closest => Ellipsoid_Closest
@@ -159,9 +159,9 @@ module GeometricShapes
 
 
   type,extends(GeometricShape) :: CylJacket
-    real(knd) xc,yc,zc
-    real(knd) a,b,c
-    real(knd) r
+    real(knd) :: xc,yc,zc
+    real(knd) :: a,b,c
+    real(knd) :: r
   contains
     procedure :: InsideEps => CylJacket_Inside
     procedure :: Closest => CylJacket_Closest
@@ -181,7 +181,7 @@ module GeometricShapes
   type TerrainPoint
     real(knd) :: elev = 0
     logical :: rough = .false.
-    real(knd) z0
+    real(knd) :: z0
   end type
 
 
@@ -371,7 +371,7 @@ contains
   
    real(knd) function LineDist(x,y,z,xl,yl,zl,a,b,c)
     real(knd),intent(in) :: x,y,z,xl,yl,zl,a,b,c
-    real(knd) t
+    real(knd) :: t
 
     if (((a/=0).or.(b/=0)).or.(c/=0)) then
      t = (a*(x-xl)+b*(y-yl)+c*(z-zl))/(a**2+b**2+c**2)
@@ -434,7 +434,7 @@ contains
     class(Line),intent(in) :: self
     real(knd),intent(out)  :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
-    real(knd) t
+    real(knd) :: t
 
     if (self%a/=0 .or. self%b/=0 .or. self%c/=0) then
       t = ( self%a*(x-self%xc) + self%b*(y-self%yc) + self%c*(z-self%zc) ) / (self%a**2 + self%b**2 + self%c**2)
@@ -508,7 +508,7 @@ contains
     class(Ray),intent(in) :: self
     real(knd),intent(out)  :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
-    real(knd) t
+    real(knd) :: t
 
     if (self%a/=0 .or. self%b/=0 .or. self%c/=0) then
       t = ( self%a*(x-self%xc) + self%b*(y-self%yc) + self%c*(z-self%zc) ) / (self%a**2 + self%b**2 + self%c**2)
@@ -637,7 +637,7 @@ contains
     class(Plane),intent(in) :: self
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) ::x,y,z
-    real(knd) t
+    real(knd) :: t
 
     if (abs(self%a)>tiny(1._knd).or. &
         abs(self%b)>tiny(1._knd).or. &
@@ -695,7 +695,7 @@ contains
     class(ConvexPolyhedron),intent(in) :: self
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in) :: eps
-    integer i
+    integer :: i
 
     if (self%nplanes>0) then
       ins = .true.
@@ -932,8 +932,8 @@ contains
     class(ConvexPolyhedron),intent(in) :: self
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
-    real(knd) dists(self%nplanes),xP(self%nplanes),yP(self%nplanes),zP(self%nplanes),minv
-    integer inearest,i
+    real(knd) :: dists(self%nplanes),xP(self%nplanes),yP(self%nplanes),zP(self%nplanes),minv
+    integer :: inearest,i
 
     dists = huge(minv)
     do i = 1,self%nplanes
@@ -1128,7 +1128,7 @@ contains
     class(Sphere),intent(in) :: self
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
-    real(knd) t,a,b,c
+    real(knd) :: t,a,b,c
 
     a = x - self%xc
     b = y - self%yc
@@ -1142,8 +1142,8 @@ contains
   logical function Sphere_IntersectsRay(self,r) result(res)
      class(Sphere),intent(in) :: self
      class(Ray),intent(in) :: r
-     real(knd) rc(3),rv(3) !transformed ray center and vector
-     real(knd) a,b,c,D,t1,t2
+     real(knd) :: rc(3),rv(3) !transformed ray center and vector
+     real(knd) :: a,b,c,D,t1,t2
      
      rc = [r%xc - self%xc, r%yc - self%yc, r%zc - self%zc]
      rv = [r%a, r%b, r%c]
@@ -1210,7 +1210,7 @@ contains
     class(Ellipsoid),intent(in) :: self
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
-    real(knd) t,a,b,c !auxiliary ray parameters
+    real(knd) :: t,a,b,c !auxiliary ray parameters
 
     ! NOT EXACT!
     a = (x - self%xc)/self%a
@@ -1300,7 +1300,7 @@ contains
     class(CylJacket),intent(in) :: self
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
-    real(knd) t,xl,yl,zl,a,b,c
+    real(knd) :: t,xl,yl,zl,a,b,c
 
     call Closest(Line(self%xc,self%yc,self%zc,self%a,self%b,self%c),xl,yl,zl,x,y,z)
 
@@ -1339,7 +1339,7 @@ contains
    class(Cylinder),intent(in) :: self
    real(knd),intent(out) :: xnear,ynear,znear
    real(knd),intent(in) :: x,y,z
-   real(knd) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
+   real(knd) :: xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
 
    !!!Only for Planes perpendicular to jacket!!!!
 
@@ -1394,7 +1394,7 @@ contains
     class(Cylinder),intent(in) :: self
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
-    real(knd) xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
+    real(knd) :: xJ,yJ,zJ,xP1,yP1,zP1,xP2,yP2,zP2
 
     if (allocated(self%Plane1)) then
       call self%Plane1%Closest(xP1,yP1,zP1,x,y,z)
@@ -1441,8 +1441,8 @@ contains
   subroutine Terrain_GridCoords(x2,y2,xi,yj,comp)
     real(knd),intent(in) :: x2,y2
     integer,intent(out) :: xi,yj,comp
-    real(knd) x,y,distPr,distU,distV
-    integer xPri,yPrj,xUi,yVj,i
+    real(knd) :: x,y,distPr,distU,distV
+    integer :: xPri,yPrj,xUi,yVj,i
 
     x = x2
     y = y2
@@ -2034,7 +2034,7 @@ contains
     class(LinearTransform),intent(in) :: self
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
-    real(knd) xyz(3),xyznear(3)
+    real(knd) :: xyz(3),xyznear(3)
 
     xyz = matmul(self%inv_matrix, [x,y,z])
     
@@ -2056,7 +2056,7 @@ contains
     class(LinearTransform),intent(in) :: self
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
-    real(knd) xyz(3),xyznear(3)
+    real(knd) :: xyz(3),xyznear(3)
 
     xyz = matmul(self%inv_matrix, [x,y,z])
     
@@ -2078,7 +2078,7 @@ contains
   logical function LinearTransform_IntersectsRay(self,r) result(res)
     class(LinearTransform),intent(in) :: self
     class(Ray),intent(in) :: r
-    real(knd) xyz(3),abc(3)
+    real(knd) :: xyz(3),abc(3)
     
     xyz = matmul(self%inv_matrix, [r%xc, r%yc, r%zc])
     abc = matmul(self%inv_matrix, [r%a, r%b, r%c])
@@ -2211,7 +2211,7 @@ contains
   logical function Union_in_bbox(self,x,y,z,eps) result(in)
     class(Union),intent(in) :: self
     real(knd),intent(in) :: x,y,z,eps
-    integer i
+    integer :: i
     
     in = any([ ( self%items(i)%in_bbox(x,y,z,eps), i=1,self%size ) ])
 
@@ -2222,7 +2222,7 @@ contains
     class(Union),intent(in) :: self
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in) ::eps
-    integer i
+    integer :: i
     
     ins = any([ ( self%items(i)%InsideEps(x,y,z,eps), i=1,self%size ) ])
     
@@ -2234,7 +2234,7 @@ contains
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
     real(knd) :: xs(self%size),ys(self%size),zs(self%size)
-    integer i
+    integer :: i
 
     do i=1,self%size
       call self%items(i)%Closest(xs(i),ys(i),zs(i),x,y,z)
@@ -2252,7 +2252,7 @@ contains
     real(knd),intent(out) :: xnear,ynear,znear
     real(knd),intent(in) :: x,y,z
     real(knd) :: xs(self%size),ys(self%size),zs(self%size)
-    integer i
+    integer :: i
     !FIXME: this will work assuming we are close enough to the boundary
     do i=1,self%size
       call self%items(i)%Closest(xs(i),ys(i),zs(i),x,y,z)
@@ -2268,7 +2268,7 @@ contains
   logical function Union_IntersectsRay(self,r) result(res)
     class(Union),intent(in) :: self
     class(Ray),intent(in) :: r
-    integer i
+    integer :: i
     
     res = any([ ( self%items(i)%IntersectsRay(Ray(r%xc,r%yc,r%zc,r%a,r%b,r%c)), &
                   i=1,self%size ) ])
@@ -2301,7 +2301,7 @@ contains
     use Strings, only: upcase
     type(Union) :: res    
     character(*),intent(in) :: filename
-    integer unit,io
+    integer :: unit,io
     character(180) :: line
     type(ConvexPolyhedron) :: poly
     type(ConvexPolyhedron),allocatable :: items(:)
@@ -2351,7 +2351,7 @@ contains
       subroutine ReadPolyhedron(poly,restline)
         type(ConvexPolyhedron),intent(out) :: poly
         character(*),intent(in)  :: restline
-        integer nPlanes,i,io
+        integer :: nPlanes,i,io
 
         read(restline,*,iostat=io) nPlanes
 
@@ -2375,7 +2375,7 @@ contains
         use Strings
         type(Plane),intent(out) :: Pl
         character(180) :: line
-        integer io
+        integer :: io
 
         read(unit,'(a)',iostat=io) line
         if (io/=0) then
@@ -2621,7 +2621,7 @@ contains
     use Strings, only: upcase
     class(GeometricShape),allocatable,intent(out) :: res(:)
     character(*),intent(in) :: filename
-    integer unit,io
+    integer :: unit,io
     character(180) :: line
     type(ConvexPolyhedron) :: poly
     type(ConvexPolyhedron),allocatable :: items(:)
@@ -2667,7 +2667,7 @@ contains
       subroutine ReadPolyhedron(poly,restline)
         type(ConvexPolyhedron),intent(out) :: poly
         character(*),intent(in)  :: restline
-        integer nPlanes,i,io
+        integer :: nPlanes,i,io
 
         read(restline,*,iostat=io) nPlanes
 
@@ -2691,7 +2691,7 @@ contains
         use Strings
         type(Plane),intent(out) :: Pl
         character(180) :: line
-        integer io
+        integer :: io
 
         read(unit,'(a)',iostat=io) line
         if (io/=0) then
@@ -2747,7 +2747,7 @@ module Body_class
 
 
   type,abstract :: Body
-     integer numofbody
+     integer :: numofbody
      class(GeometricShape),allocatable :: GeometricShape
   contains
      procedure :: Inside => CInside  !Hack around yet inidentified problem in GCC.
@@ -2768,8 +2768,8 @@ contains
     class(Body),intent(in) :: self
     real(knd),intent(in) :: x,y,z
     real(knd),intent(in),optional :: eps
-    real(knd) x2,y2,z2
-    real(knd) lx,ly,lz
+    real(knd) :: x2,y2,z2
+    real(knd) :: lx,ly,lz
 
     if (.not.allocated(self%GeometricShape)) then
       CInside = .false.
@@ -2782,13 +2782,13 @@ contains
       ly = yV(Prny) - yV(0)
       lz = zW(Prnz) - zW(0)
 
-      if (Btype(Ea)==PERIODIC.and.x2>xU(Prnx+1)) x2 = x2-lx
-      if (Btype(No)==PERIODIC.and.y2>yV(Prny+1)) y2 = y2-ly
-      if (Btype(To)==PERIODIC.and.z2>zW(Prnz+1)) z2 = z2-lz
+      if (Btype(Ea)==BC_PERIODIC.and.x2>xU(Prnx+1)) x2 = x2-lx
+      if (Btype(No)==BC_PERIODIC.and.y2>yV(Prny+1)) y2 = y2-ly
+      if (Btype(To)==BC_PERIODIC.and.z2>zW(Prnz+1)) z2 = z2-lz
 
-      if (Btype(We)==PERIODIC.and.x2<xU(0)) x2 = x2+lx
-      if (Btype(So)==PERIODIC.and.y2<yV(0)) y2 = y2+ly
-      if (Btype(Bo)==PERIODIC.and.z2<zW(0)) z2 = z2+lz
+      if (Btype(We)==BC_PERIODIC.and.x2<xU(0)) x2 = x2+lx
+      if (Btype(So)==BC_PERIODIC.and.y2<yV(0)) y2 = y2+ly
+      if (Btype(Bo)==BC_PERIODIC.and.z2<zW(0)) z2 = z2+lz
       CInside = self%GeometricShape%Inside(x2,y2,z2,eps)
 
     end if
@@ -2820,18 +2820,14 @@ contains
 
 
   real(knd) function ClosestOnLineOut(self,x,y,z,x2,y2,z2) result(t)
-  !Find t, such that x+(x2-x)*t lies on the boundary of the SB
-  ! x lies inside SB
+    !Find t, such that x+(x2-x)*t lies on the boundary of the SB
+    ! x lies inside SB
     class(Body),intent(in) :: self
     real(knd),intent(in) :: x,y,z,x2,y2,z2
-    real(knd) t1,t2
-    integer i
+    real(knd) :: t1,t2
+    integer :: i
     
-real(knd) b(3)
-if (debuglevel>0) then
-  call self%Closest(b(1),b(2),b(3),x2,y2,z2)
-  print *,"near",b
-end if
+
     t1 = 0
     t2 = 1
     !First, find a point lying outside. We should have the right direction.
@@ -2848,7 +2844,7 @@ end if
     endif
     
     t = (t1+t2)/2._knd
-if (debuglevel>0) print *,"*",t
+
     do i = 1,20         !The bisection method with maximum 20 iterations (should be well enough)
      if (self%Inside(x+(x2-x)*t,y+(y2-y)*t,z+(z2-z)*t,0._knd)) then
       t1 = t
@@ -2856,10 +2852,10 @@ if (debuglevel>0) print *,"*",t
       t2 = t
      endif
      t = (t1+t2)/2._knd
-if (debuglevel>0) print *,"**",t
+
      if (abs(t1-t2)<MIN(dxmin/1000._knd,dymin/1000._knd,dzmin/1000._knd))   exit
     enddo
-if (debuglevel>0) print *,"ins",self%Inside(x+(x2-x)*t*0.9,y+(y2-y)*t*0.9,z+(z2-z)*t*0.9,0._knd)
+
   end function ClosestOnLineOut
   
 

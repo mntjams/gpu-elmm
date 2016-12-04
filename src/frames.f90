@@ -12,11 +12,11 @@ module StaggeredFrames
 
 
   type i3
-    integer i,j,k
+    integer :: i,j,k
   end type
 
   type r3
-    real(knd) x,y,z
+    real(knd) :: x,y,z
   end type
 
   type irange
@@ -88,9 +88,9 @@ contains
   subroutine assign3to1(A1,A3)
     real(knd),intent(out) :: A1(1:)
     real(knd),intent(in)  :: A3(1:,1:,1:)
-    integer j,k
-    integer s1,s2,s3 !sizes
-    integer off2,off3 !offsets
+    integer :: j,k
+    integer :: s1,s2,s3 !sizes
+    integer :: off2,off3 !offsets
 
     !if s1*s2*s3 /= size(A1) let it fail by the Fortran runtime library
 
@@ -392,7 +392,7 @@ contains
     use iso_c_binding, only: c_loc, c_funloc
     use stop_procedures, only: error_stop
     class(TStaggeredFrameDomain),target,asynchronous,intent(inout) :: D
-    integer err
+    integer :: err
     
     err = 1
 

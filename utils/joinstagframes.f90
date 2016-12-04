@@ -215,9 +215,9 @@ module Types
   implicit none
 
   type grid
-    integer nx,ny,nz
-    integer offx,offy,offz
-    integer unit
+    integer :: nx,ny,nz
+    integer :: offx,offy,offz
+    integer :: unit
     real(rp),allocatable :: x(:),y(:),z(:)
     character(100) :: fname
   contains
@@ -397,9 +397,9 @@ program joinvtkframes
   do
     filename = 'frame-'//domain//'-'//itoa(i)//'.unf'
     cmd = 'joinvtk '//filename//' '//arg
-    print *, "trying:",cmd
+
     call execute_command_line(cmd, exitstat=stat)
-    print *,"status:",stat
+
     if (stat/=0) exit
     i = i + 1
   end do

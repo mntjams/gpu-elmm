@@ -33,6 +33,8 @@ program CLMM
 
   integer(dbl) :: time_steps_timer_count_1, time_steps_timer_count_2
 
+  logical :: error_exit = .false.
+
 
   call par_init
 
@@ -54,42 +56,68 @@ program CLMM
   call AllocateOutputs
 
   call par_sync_out("Setting up initial conditions...")
-  call InitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,dt)
+  call InitialConditions(U, V, W, Pr, &
+                         Temperature ,Moisture, Scalar, &
+                         time_stepping%dt)
 
-  time = start_time
+  time_stepping%time = time_stepping%start_time
   time_step = 0
 
-  call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
+  call OutTStep(U, V, W, Pr, &
+                Temperature, Moisture, Scalar, &
+                time_stepping%dt, delta)
   
   init_phase = .false.
   run_phase = .true.
 
   call system_clock(count_rate = timer_rate)
 
-  if (end_time > start_time) then
+  if (time_stepping%end_time > time_stepping%start_time) then
 
     call par_sync_out("Computing...")
 
-    do time_step = 1, max_number_of_time_steps
+    time_step = 1
+
+    do
 
       call system_clock(count = time_steps_timer_count_1)
 
+#ifdef PAR
       if (master) then
-        write (*,*) "tstep:",time_step
+        if (enable_multiple_domains) then
+          write (*,'(a,i0,a,i12,a,f12.6)') "domain: ", domain_index, &
+                                           " tstep: ", time_step, &
+                                           " time: ",  time_stepping%time
+        else
+          write (*,'(a,i12,a,f12.6)') "tstep: ", time_step, "time: ", time_stepping%time
+        end if
+      end if
+#else
+      write (*,'(a,i12,a,f12.6)') "tstep: ", time_step, "time: ", time_stepping%time
+#endif
+
+
+
+      call TMarchRK3(U, V, W, Pr, &
+                     Temperature, Moisture, Scalar, &
+                     delta)
+
+
+
+      if (time_stepping%variable_time_steps) then
+        time_stepping%time = time_stepping%time + time_stepping%dt
+      else
+        time_stepping%time = time_stepping%start_time + time_step * time_stepping%dt
+        if (abs(time_stepping%time - time_stepping%end_time)<time_stepping%dt/10) then
+          time_stepping%time = time_stepping%end_time
+        end if
       end if
 
 
 
-
-      call TMarchRK3(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
-
-
-
-
-      time = time + dt
-
-
-      call OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
+      call OutTStep(U, V, W, Pr, &
+                    Temperature, Moisture, Scalar, &
+                    time_stepping%dt, delta)
 
 
       call system_clock(count = time_steps_timer_count_2)
@@ -104,15 +132,31 @@ program CLMM
         exit
       endif
 
-      if ((steady==0) .and. (time>=end_time)) then
+      if ((steady==0) .and. (time_stepping%time>=time_stepping%end_time)) then
         if (master) write (*,*) "Time limit reached."
         exit
       endif
 
-      if (time_step>=3 .and. dt < abs(CFL*min(dxmin,dymin,dzmin)/Uinlet/300._knd)) then
+      if (time_step>=3 .and. &
+          time_stepping%variable_time_steps .and. &
+          time_stepping%dt < time_stepping%dt_min) then
         if (master) write (*,*) "Solution diverged."
+        error_exit = .true.
         exit
       endif
+
+      if (time_step>=3 .and. &
+          .not.time_stepping%variable_time_steps .and. &
+          time_stepping%enable_CFL_check .and. &
+          time_stepping%CFL > time_stepping%CFL_max) then
+        if (master) write (*,*) "Solution diverged."
+        error_exit = .true.
+        exit
+      endif
+
+      time_step = time_step + 1
+      
+      if (time_step > time_stepping%max_number_of_time_steps) exit
 
     enddo
 
@@ -136,8 +180,13 @@ program CLMM
 
   call DeallocateGlobals
 
-  call par_finalize
-
+#ifdef PAR
+  if (error_exit .and. enable_multiple_domains .and. number_of_domains>1) then
+    call error_stop("Error, one of the domains stopped.")
+  else
+    call par_finalize
+  end if
+#endif
 
 
 contains

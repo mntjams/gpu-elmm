@@ -3,10 +3,10 @@ module TimeSteps
   use Parameters
   use Dynamics
   use Boundaries, only: BoundUVW, Bound_Q
-  use Pressure, only: PressureCorrection
+  use Pressure, only: PressureCorrection, pressure_solution, POISSON_SOLVER_NONE
   use Outputs, only: current_profiles
   use Scalars, only: ScalarRK3
-  use Turbinlet, only: GetTurbulentInlet, GetInletFromFile
+  use Turbinlet, only: default_turbulence_generator, GetInletFromFile
   use Sponge, only: enable_top_sponge, enable_out_sponge, SpongeTop, SpongeOut
 
   implicit none
@@ -19,14 +19,15 @@ module TimeSteps
 contains
 
 
-  subroutine TMarchRK3(U, V, W, Pr, Temperature, Moisture, Scalar, dt, delta)
+  subroutine TMarchRK3(U, V, W, Pr, Temperature, Moisture, Scalar, delta)
     use RK3
 #ifdef PAR
     use custom_par
+    use domains_bc_par
 #endif
     real(knd), allocatable, intent(inout) :: U(:,:,:), V(:,:,:) ,W(:,:,:), Pr(:,:,:)
     real(knd), allocatable, intent(inout) :: Temperature(:,:,:), Moisture(:,:,:), Scalar(:,:,:,:)
-    real(knd), intent(out) :: dt, delta
+    real(knd), intent(out) :: delta
 
     integer :: RK_stage
     integer, save :: called = 0
@@ -38,6 +39,14 @@ contains
       subroutine CustomTimeStepProcedure
       end subroutine
     end interface
+#endif
+
+    time_stepping%effective_time = time_stepping%time
+
+#ifdef PAR
+    !uses previous dt (it should be fixed anyway, but...)
+    call par_exchange_domain_bounds(U, V, W, Temperature, Moisture, Scalar, &
+                                    time_stepping%time, time_stepping%dt)
 #endif
 
     if (called==0) then
@@ -66,18 +75,23 @@ contains
     end if
 
 
-    if ((Btype(We)==TurbulentInlet) .or. (Btype(Ea)==TurbulentInlet)) then
-      call GetTurbulentInlet(dt)
-    else if (Btype(We)==InletFromFile) then
-      call GetInletFromFile(time)
+    if ((Btype(We)==BC_TURBULENT_INLET) .or. (Btype(Ea)==BC_TURBULENT_INLET)) then
+      call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+    else if (Btype(We)==BC_INLET_FROM_FILE) then
+      call GetInletFromFile(time_stepping%time)
     end if
 
+    call TimeStepLength(U, V, W, time_stepping)
 
-    call TimeStepLength(U, V, W, dt)
-
-
-
-    if (master) write (*,'(a,f12.6,a,es12.4)') " time: ", time," dt: ", dt
+    if (master) then
+      if (time_stepping%variable_time_steps) then
+        write (*,'(a,f12.6,a,es12.4)') "  dt: ", time_stepping%dt
+      else
+        if (time_stepping%enable_CFL_check) then
+          write (*,'(a,f12.6,a,f6.3)') "  CFL: ", time_stepping%CFL
+        end if
+      end if
+    end if
     
 #ifdef  CUSTOM_TIMESTEP_PROCEDURE
     call CustomTimeStepProcedure
@@ -88,6 +102,11 @@ contains
 
       if (debugparam>1.and.master) call system_clock(count=time1)
 
+      time_stepping%effective_time = time_stepping%time + 2 * sum(RK_alpha(1:RK_stage-1)) * time_stepping%dt      
+
+#ifdef PAR
+      call par_update_pr_gradient(time_stepping%effective_time)
+#endif
 
       call SubgridStresses(U, V, W, Pr, Temperature)
 
@@ -96,18 +115,17 @@ contains
                       U2, V2, W2, &
                       Ustar, Vstar, Wstar, &
                       Temperature, Moisture, &
-                      RK_beta, RK_rho, RK_stage, dt)
+                      RK_beta, RK_rho, RK_stage, time_stepping%dt)
 
       call ScalarRK3(U, V, W, &
                      Temperature, Moisture, Scalar, &
-                     RK_stage, dt, &
+                     RK_stage, time_stepping%dt, &
                      current_profiles%tempfl, current_profiles%moistfl)
 
       call OtherTerms(U, V, W, &
                       U2, V2, W2, &
                       Pr, &
-                      2*RK_alpha(RK_stage)*dt)
-
+                      2*RK_alpha(RK_stage)*time_stepping%dt)
 
       if (enable_top_sponge)  then
 
@@ -119,9 +137,23 @@ contains
           call SpongeOut(U2, V2, W2, temperature)
       end if
 
-
+      if (enable_fixed_flow_rate) call CorrectFlowRate(U2, V2)
 
       call BoundUVW(U2, V2, W2)
+
+
+      time_stepping%effective_time = time_stepping%time + 2 * sum(RK_alpha(1:RK_stage)) * time_stepping%dt      
+
+#ifdef PAR
+      !Does nudging of the solution to the parent boundary solution in the relaxation zones.
+      call par_domain_bound_relaxation(U2, V2, W2, Temperature, Moisture, Scalar, time_stepping%effective_time)
+#endif
+
+
+#ifdef PAR
+      if (RK_stage==RK_stages) call par_domain_two_way_nesting_feedback(U2, V2, W2, Temperature, Moisture, Scalar, &
+                                            time_stepping%time, time_stepping%dt)
+#endif
 
       call IBMomentum(U2, V2, W2)
 
@@ -130,8 +162,9 @@ contains
       end if
 
 
-      if (poisson_solver>0) then
-        call PressureCorrection(U2, V2, W2, Pr, Q, 2*RK_alpha(RK_stage)*dt)
+
+      if (pressure_solution%poisson_solver > POISSON_SOLVER_NONE) then
+        call PressureCorrection(U2, V2, W2, Pr, Q, 2*RK_alpha(RK_stage)*time_stepping%dt)
       end if
 
 
@@ -185,7 +218,7 @@ contains
       end if
 
     end do
-
+    
 
   end subroutine TMarchRK3
 

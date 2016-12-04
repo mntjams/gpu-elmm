@@ -89,7 +89,7 @@ contains
   subroutine TFrameBase_SaveTimes(D)
     class(TFrameBase),intent(in) :: D
     character(2512) :: file_name
-    integer i
+    integer :: i
 
     file_name = trim(D%base_name)//"-times.txt"
 
@@ -139,7 +139,7 @@ contains
   
   subroutine TFrameBase_Wait(D)
     class(TFrameBase),asynchronous,intent(inout) :: D
-    integer err
+    integer :: err
 
     call pthread_join_opaque(D%threadptr,err)
 

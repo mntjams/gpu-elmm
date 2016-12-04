@@ -343,7 +343,7 @@ contains
     use Sort
     type(WMPoint),allocatable,dimension(:),target,intent(inout)  :: WMPoints
     type(WMPoint),allocatable,dimension(:) :: TMP
-    integer i,n
+    integer :: i,n
 
     !Choose the one closer to a wall. If of the same distance, choose the later one.
     !For wider compatibility we do not use MOLD= or SOURCE= in allocate.
@@ -417,9 +417,13 @@ contains
   subroutine GetOutsideBoundariesWM(nscalars)
     integer, intent(in) :: nscalars
 
-    call GetOutsideBoundariesWM_UVW
+    if (wallmodeltype/=0) then
 
-    call GetOutsideBoundariesWM_Pr(nscalars)
+      call GetOutsideBoundariesWM_UVW
+
+      call GetOutsideBoundariesWM_Pr(nscalars)
+
+    end if
 
   end subroutine
 
@@ -439,7 +443,7 @@ contains
 
     !type==0 below, therefore we need 
     ! type of free bounderies not to be -1
-    if (Btype(We)==NOSLIP) then
+    if (Btype(We)==BC_NOSLIP) then
       do k = 1,Prnz
        do j = 1,Prny
          if (Prtype(1,j,k)==0) then
@@ -459,7 +463,7 @@ contains
       end do
     end if
 
-    if (Btype(Ea)==NOSLIP) then
+    if (Btype(Ea)==BC_NOSLIP) then
       do k = 1,Prnz
        do j = 1,Prny
          if (Prtype(Prnx,j,k)==0) then
@@ -479,7 +483,7 @@ contains
       end do
     end if
 
-    if (Btype(So)==NOSLIP.or.(Btype(So)==DIRICHLET.and.sideU(2,So)==0)) then
+    if (Btype(So)==BC_NOSLIP.or.(Btype(So)==BC_DIRICHLET.and.sideU(2,So)==0)) then
       do k = 1,Prnz
        do i = 1,Prnx
          if (Prtype(i,1,k)==0) then
@@ -491,7 +495,7 @@ contains
            WMP%distz = 0
            WMP%ustar = 1
 
-           if (Btype(So)==DIRICHLET) then
+           if (Btype(So)==BC_DIRICHLET) then
              WMP%wallu = sideU(1,So)
              WMP%wallv = 0
              WMP%wallw = sideU(3,So)
@@ -505,7 +509,7 @@ contains
       end do
     end if
 
-    if (Btype(No)==NOSLIP.or.(Btype(No)==DIRICHLET.and.sideU(2,No)==0)) then
+    if (Btype(No)==BC_NOSLIP.or.(Btype(No)==BC_DIRICHLET.and.sideU(2,No)==0)) then
       do k = 1,Prnz
        do i = 1,Prnx
          if (Prtype(i,Prny,k)==0) then
@@ -517,7 +521,7 @@ contains
            WMP%distz = 0
            WMP%ustar = 1
 
-           if (Btype(No)==DIRICHLET) then
+           if (Btype(No)==BC_DIRICHLET) then
              WMP%wallu = sideU(1,No)
              WMP%wallv = 0
              WMP%wallw = sideU(3,No)
@@ -531,7 +535,7 @@ contains
       end do
     end if
 
-    if (Btype(Bo)==NOSLIP.or.(Btype(Bo)==DIRICHLET.and.sideU(3,Bo)==0)) then
+    if (Btype(Bo)==BC_NOSLIP.or.(Btype(Bo)==BC_DIRICHLET.and.sideU(3,Bo)==0)) then
       do j = 1,Prny
        do i = 1,Prnx
          if (Prtype(i,j,1)==0) then
@@ -544,7 +548,7 @@ contains
            WMP%distz = zW(0) - zPr(1)
            WMP%ustar = 1
 
-           if (Btype(Bo)==DIRICHLET) then
+           if (Btype(Bo)==BC_DIRICHLET) then
              WMP%wallu = sideU(1,Bo)
              WMP%wallv = sideU(2,Bo)
              WMP%wallw = 0
@@ -553,18 +557,18 @@ contains
            WMP%z0 = z0B
            WMP%z0H = WMP%z0
 
-           if (TempBtype(Bo)==CONSTFLUX) then
+           if (TempBtype(Bo)==BC_CONSTFLUX) then
              WMP%temperature_flux = sideTemp(Bo)
            else
              WMP%temperature_flux = 0
            end if
 
-           if (TempBtype(Bo)==DIRICHLET) then
+           if (TempBtype(Bo)==BC_DIRICHLET) then
              WMP%temperature = sideTemp(Bo)
              WMP%prescribed_temperature = .true.
            end if
 
-           if (MoistBtype(Bo)==CONSTFLUX) then
+           if (MoistBtype(Bo)==BC_CONSTFLUX) then
              WMP%moisture_flux = sideMoist(Bo)
            end if
 
@@ -574,17 +578,17 @@ contains
        end do
       end do
 
-      if (TempBtype(Bo)==CONSTFLUX.or.TempBtype(Bo)==DIRICHLET) then
+      if (TempBtype(Bo)==BC_CONSTFLUX.or.TempBtype(Bo)==BC_DIRICHLET) then
         TempBtype(Bo) = 0
       end if
 
-      if (MoistBtype(Bo)==CONSTFLUX) then
+      if (MoistBtype(Bo)==BC_CONSTFLUX) then
         MoistBtype(Bo) = 0
       end if
 
     end if
 
-    if (Btype(To)==NOSLIP.or.(Btype(To)==DIRICHLET.and.sideU(3,To)==0)) then
+    if (Btype(To)==BC_NOSLIP.or.(Btype(To)==BC_DIRICHLET.and.sideU(3,To)==0)) then
 
       do j = 1,Prny
        do i = 1,Prnx
@@ -597,28 +601,28 @@ contains
            WMP%distz = zW(Wnz+1) - zPr(Prnz)
            WMP%ustar = 1
 
-           if (Btype(To)==DIRICHLET) then
+           if (Btype(To)==BC_DIRICHLET) then
              WMP%wallu = sideU(1,To)
              WMP%wallv = sideU(2,To)
              WMP%wallw = 0
            end if
-
+            
            WMP%z0 = z0T
            WMP%z0H = WMP%z0
 
-           if (TempBtype(Bo)==CONSTFLUX) then
-             WMP%temperature_flux = sideTemp(Bo)
+           if (TempBtype(To)==BC_CONSTFLUX) then
+             WMP%temperature_flux = - sideTemp(To)
            else
              WMP%temperature_flux = 0
            end if
 
-           if (TempBtype(To)==DIRICHLET) then
-             WMP%temperature = -sideTemp(To)
+           if (TempBtype(To)==BC_DIRICHLET) then
+             WMP%temperature = sideTemp(To)
              WMP%prescribed_temperature = .true.
            end if
 
-           if (MoistBtype(To)==CONSTFLUX) then
-             WMP%moisture_flux = -sideMoist(To)
+           if (MoistBtype(To)==BC_CONSTFLUX) then
+             WMP%moisture_flux = - sideMoist(To)
            end if
 
            call AddWMPoint(WMP)
@@ -626,11 +630,11 @@ contains
        end do
       end do
 
-      if (TempBtype(To)==CONSTFLUX.or.TempBtype(To)==DIRICHLET) then
+      if (TempBtype(To)==BC_CONSTFLUX.or.TempBtype(To)==BC_DIRICHLET) then
         TempBtype(To) = 0
       end if
 
-      if (MoistBtype(To)==CONSTFLUX) then
+      if (MoistBtype(To)==BC_CONSTFLUX) then
         MoistBtype(To) = 0
       end if
 
@@ -658,7 +662,7 @@ contains
 
       !type==0 below, therefore we need 
       ! type of free bounderies not to be -1
-      if (Btype(We)==NOSLIP) then
+      if (Btype(We)==BC_NOSLIP) then
         do k = 1,nz
          do j = 1,ny
            if (Xtype(1,j,k)==0.and.Xtype(0,j,k)<=0) then
@@ -678,7 +682,7 @@ contains
         end do
       end if
 
-      if (Btype(Ea)==NOSLIP) then
+      if (Btype(Ea)==BC_NOSLIP) then
         do k = 1,nz
          do j = 1,ny
            if (Xtype(nx,j,k)==0.and.Xtype(nx+1,j,k)<=0) then
@@ -698,7 +702,7 @@ contains
         end do
       end if
 
-      if (Btype(So)==NOSLIP.or.(Btype(So)==DIRICHLET.and.sideU(2,So)==0)) then
+      if (Btype(So)==BC_NOSLIP.or.(Btype(So)==BC_DIRICHLET.and.sideU(2,So)==0)) then
         do k = 1,nz
          do i = 1,nx
            if (Xtype(i,1,k)==0.and.Xtype(i,0,k)<=0) then
@@ -710,7 +714,7 @@ contains
              p%distz = 0
              p%ustar = 1
 
-             if (Btype(So)==DIRICHLET) then
+             if (Btype(So)==BC_DIRICHLET) then
                p%wallu = sideU(1,So)
                p%wallv = 0
                p%wallw = sideU(3,So)
@@ -724,7 +728,7 @@ contains
         end do
       end if
 
-      if (Btype(No)==NOSLIP.or.(Btype(No)==DIRICHLET.and.sideU(2,No)==0)) then
+      if (Btype(No)==BC_NOSLIP.or.(Btype(No)==BC_DIRICHLET.and.sideU(2,No)==0)) then
         do k = 1,nz
          do i = 1,nx
            if (Xtype(i,ny,k)==0.and.Xtype(i,ny+1,k)<=0) then
@@ -736,7 +740,7 @@ contains
              p%distz = 0
              p%ustar = 1
 
-             if (Btype(No)==DIRICHLET) then
+             if (Btype(No)==BC_DIRICHLET) then
                p%wallu = sideU(1,No)
                p%wallv = 0
                p%wallw = sideU(3,No)
@@ -750,7 +754,7 @@ contains
         end do
       end if
 
-      if (Btype(Bo)==NOSLIP.or.(Btype(Bo)==DIRICHLET.and.sideU(3,Bo)==0)) then
+      if (Btype(Bo)==BC_NOSLIP.or.(Btype(Bo)==BC_DIRICHLET.and.sideU(3,Bo)==0)) then
         do j = 1,ny
          do i = 1,nx
            if (Xtype(i,j,1)==0.and.Xtype(i,j,0)<=0) then
@@ -763,7 +767,7 @@ contains
              p%distz = zW(0) - z(1)
              p%ustar = 1
 
-             if (Btype(Bo)==DIRICHLET) then
+             if (Btype(Bo)==BC_DIRICHLET) then
                p%wallu = sideU(1,Bo)
                p%wallv = sideU(2,Bo)
                p%wallw = 0
@@ -772,13 +776,13 @@ contains
              p%z0 = z0B
              p%z0H = p%z0
 
-             if (TempBtype(Bo)==CONSTFLUX) then
+             if (TempBtype(Bo)==BC_CONSTFLUX) then
                p%temperature_flux = sideTemp(Bo)
              else
                p%temperature_flux = 0
              end if
 
-             if (TempBtype(Bo)==DIRICHLET) then
+             if (TempBtype(Bo)==BC_DIRICHLET) then
                p%temperature = sideTemp(Bo)
                p%prescribed_temperature = .true.
              end if
@@ -790,7 +794,7 @@ contains
         end do
       end if
 
-      if (Btype(To)==NOSLIP.or.(Btype(To)==DIRICHLET.and.sideU(3,To)==0)) then
+      if (Btype(To)==BC_NOSLIP.or.(Btype(To)==BC_DIRICHLET.and.sideU(3,To)==0)) then
 
         do j = 1,ny
          do i = 1,nx
@@ -803,7 +807,7 @@ contains
              p%distz = zW(Wnz+1) - z(nz)
              p%ustar = 1
 
-             if (Btype(To)==DIRICHLET) then
+             if (Btype(To)==BC_DIRICHLET) then
                p%wallu = sideU(1,To)
                p%wallv = sideU(2,To)
                p%wallw = 0
@@ -812,13 +816,13 @@ contains
              p%z0 = z0T
              p%z0H = p%z0
              
-             if (TempBtype(To)==CONSTFLUX) then
+             if (TempBtype(To)==BC_CONSTFLUX) then
                p%temperature_flux = - sideTemp(To)
              else
                p%temperature_flux = 0
              end if
 
-             if (TempBtype(To)==DIRICHLET) then
+             if (TempBtype(To)==BC_DIRICHLET) then
                p%temperature = sideTemp(To)
                p%prescribed_temperature = .true.
              end if
@@ -1254,7 +1258,7 @@ contains
     real(knd),parameter :: yplcrit = 11.225_knd
     real(knd),parameter :: ustar_div = 1000
     real(knd) :: ustar1,ustar2,ustar_lam
-    integer i
+    integer :: i
     integer,parameter :: maxiter = 30
 
     !u/u_* = z * u_* / nu  +  dp/dx * z**2 / (2 * u_*)
@@ -1306,9 +1310,9 @@ contains
       pure function newguess(ustar)
          !linearize the function by letting the ustar in log constant
          !  and solve the quadratic equation for the larger root
-         real(knd) newguess
+         real(knd) :: newguess
          real(knd),intent(in) :: ustar
-         real(knd) a,b,c,D
+         real(knd) :: a,b,c,D
          !u/u_* = dp/dx * z / (k (u_*)**2)  + (1/k) * ln(z * u_* / nu) + B
 
          a = log(ustar*dist / molecular_viscosity) / 0.41_knd + 5.2_knd
@@ -1333,7 +1337,7 @@ contains
     real(knd),intent(out)   :: visc
     real(knd),intent(inout) :: ustar
     real(knd),intent(in)    :: distvect(3),uvect(3),walluvect(3),prgradvect(3)
-    real(knd) vect(3),vel,dist,prgrad
+    real(knd) :: vect(3),vel,dist,prgrad
 
     dist = sqrt(sum(distvect**2))
 
@@ -1398,7 +1402,7 @@ contains
 
   pure real(knd) function PsiM_MO(zeta)
     real(knd),intent(in):: zeta
-    real(knd) x
+    real(knd) :: x
 
     if (zeta<0) then
       x = (1-15._knd*zeta)**(1/4._knd)
@@ -1411,7 +1415,7 @@ contains
 
   pure real(knd) function PsiH_MO(zeta)
     real(knd),intent(in):: zeta
-    real(knd) x
+    real(knd) :: x
 
     if (zeta<0) then
       x = (1-15._knd*zeta)**(1/4._knd)
@@ -1438,7 +1442,7 @@ contains
 
   pure real(knd) function PsiH_MO_mod(zeta) result(res)
     real(knd),intent(in):: zeta
-    real(knd) x
+    real(knd) :: x
     !For L defined without k!
     if (zeta<0) then
       x = (1-6._knd*zeta)**(1/4._knd)
@@ -1464,8 +1468,8 @@ contains
     real(knd),parameter  :: yplcrit = 11.225_knd
     real(knd),intent(in) :: vel,dist,z0,temperature_flux
     real(knd),intent(in) :: temperature_ref,grav_acc
-    real(knd) ustar2,zL,zL2,Psi
-    integer i
+    real(knd) :: ustar2,zL,zL2,Psi
+    integer :: i
 
     if (dist<=z0) then
 
@@ -1524,7 +1528,7 @@ contains
     real(knd),parameter :: k_U = 0.4_knd
     real(knd),parameter :: k_T = 0.47_knd
     real(knd) :: zL, zL0, psi_m, psi_h
-    integer i
+    integer :: i
 
     call WMRoughUstar(ustar,vel,dist,z0)
 
@@ -1574,7 +1578,7 @@ contains
     real(knd),intent(inout) :: ustar
     real(knd),intent(in)    :: z0,temperature_flux
     real(knd),intent(in)    :: distvect(3),uvect(3)
-    real(knd) vect(3),vel,dist
+    real(knd) :: vect(3),vel,dist
 
     dist = norm2(distvect)
 
@@ -1613,7 +1617,7 @@ contains
     real(knd),intent(in)    :: z0,temperature_flux
     real(knd),intent(in)    :: distvect(3),uvect(3)
     real(knd),intent(out)   :: tan_vect(3)
-    real(knd) vel,dist
+    real(knd) :: vel,dist
 
     call vel_and_dist(tan_vect, dist, uvect, [0._knd,0._knd,0._knd], distvect)
 
@@ -1636,7 +1640,7 @@ contains
     real(knd),intent(in)    :: z0,z0H
     real(knd),intent(in)    :: tempdif ! temperature difference surface - nearest point
     real(knd),intent(in)    :: distvect(3),uvect(3)
-    real(knd) vect(3),vel,dist
+    real(knd) :: vect(3),vel,dist
 
     dist = sqrt(sum(distvect**2))
 
@@ -1665,7 +1669,7 @@ contains
     real(knd),intent(in)    :: tempdif ! temperature difference surface - nearest point
     real(knd),intent(in)    :: distvect(3),uvect(3)
     real(knd),intent(out)   :: tan_vect(3)
-    real(knd) vel,dist
+    real(knd) :: vel,dist
 
     call vel_and_dist(tan_vect, dist, uvect, [0._knd,0._knd,0._knd], distvect)
 
@@ -1681,12 +1685,12 @@ contains
 
   pure subroutine BOUND_temperature_flux(Nu)
     real(knd),intent(inout):: Nu(-1:,-1:)
-    integer i,j,nx,ny
+    integer :: i,j,nx,ny
 
     nx = Prnx
     ny = Prny
 
-    if (Btype(Ea)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC) then
       do j = 1,ny
         Nu(0,j) = Nu(nx,j)
         Nu(nx+1,j) = Nu(1,j)
@@ -1698,7 +1702,7 @@ contains
       end do
     end if
 
-    if (Btype(No)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC) then
       do i = 1,nx
         Nu(i,0) = Nu(i,ny)
         Nu(i,ny+1) = Nu(i,1)
@@ -1720,7 +1724,7 @@ contains
     integer :: i, j, k
     type(WMPointUVW), pointer :: pts(:)
 
-    if (enable_buoyancy.and.TempBtype(Bo)==MO_TEMPERATURE) then
+    if (enable_buoyancy.and.TempBtype(Bo)==BC_MO_TEMPERATURE) then
       do i = 1, size(WMPoints)
         if (WMPoints(i)%zk==1) then
           WMPoints(i)%temperature_flux = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&
@@ -1751,7 +1755,7 @@ contains
     integer,intent(in)    :: i,j,k
     real(knd),intent(in)  :: Pr(1:,1:,1:)
     integer,intent(in)    :: Prtype(0:,0:,0:)
-    integer n
+    integer :: n
 
     prgrad = 0
 
@@ -1798,10 +1802,10 @@ contains
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
     real(knd),dimension(1:,1:,1:),   intent(in) :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
-    integer i, xi, yj, zk
-    real(knd) tdif
-    real(knd) dist(3), vel(3), wallvel(3), prgrad(3)
-    real(knd) visc
+    integer :: i, xi, yj, zk
+    real(knd) :: tdif
+    real(knd) :: dist(3), vel(3), wallvel(3), prgrad(3)
+    real(knd) :: visc
 
     !$omp parallel do private(i,xi,yj,zk,tdif, vel, wallvel, dist, prgrad, visc) schedule(guided,5)
     do i = 1,size(WMPoints)
@@ -1830,7 +1834,7 @@ contains
          if (enable_buoyancy .and. WMPoints(i)%prescribed_temperature) then
 
 #ifdef CUSTOM_SURFACE_TEMPERATURE
-           WMPoints(i)%temperature = SurfaceTemperature(xPr(xi), yPr(yj), zPr(zk), time)
+           WMPoints(i)%temperature = SurfaceTemperature(xPr(xi), yPr(yj), zPr(zk), time_stepping%time)
 #endif
            tdif = Temperature(xi,yj,zk) - WMPoints(i)%temperature
 
@@ -1920,7 +1924,7 @@ contains
       integer, intent(in) :: component, direction
       real(knd), intent(in) :: x(:), y(:), z(:)
       integer :: point, xi, yj, zk
-      real(knd) dist(3), vel(3), wallvel(3), tan_vect(3), mag, drec(6), temp
+      real(knd) :: dist(3), vel(3), wallvel(3), tan_vect(3), mag, drec(6), temp
       type(WMPointUVW), pointer :: p
       real(knd), parameter :: eps = 0.0001_knd
       
@@ -1955,7 +1959,7 @@ contains
                p%temperature = SurfaceTemperature(x(xi)+dist(1), &
                                                   y(yj)+dist(2), &
                                                   z(zk)+dist(3), &
-                                                  time)
+                                                  time_stepping%time)
 #endif
                
                temp = local_value(Temperature, component, xi, yj, zk)

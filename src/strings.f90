@@ -76,14 +76,23 @@ contains
     character,pointer :: s
     integer, intent(out) :: ierr
     character(char_len) :: token
-    integer :: i,pos
+    integer :: stream_len, i, pos
     logical :: in_string
+
+    character, parameter :: tab = achar(9)
 
     in_string = .false.
     pos = 1
     token = ''
     
-    do i = 1, len_trim(stream)
+    i = 0
+
+    stream_len = len_trim(stream)
+
+    do
+
+      i = i + 1
+      if (i > stream_len) exit
 
       s => stream(i:i)
 
@@ -100,7 +109,7 @@ contains
         
       else
        
-        if (s=='('.or.s==')') then
+        if (s=='('.or.s==')'.or.s=='['.or.s==']') then
           if (pos>1) call res%add(token)
           token = s
           call send
@@ -117,11 +126,11 @@ contains
             pos = pos + 1
             in_string = .true.
           end if
-        else if (s==' ') then
+        else if (s==' ' .or. s==tab .or. s==new_line('a')) then
           if (pos>1) call send
         else if (s=='!') then
           if (pos>1) call send
-          exit
+          call skip_line
         else
           token(pos:pos) = s
           pos = pos + 1
@@ -143,29 +152,108 @@ contains
       pos = 1
     end subroutine
 
+    subroutine skip_line
+      do
+        if ((stream(i:i)/=new_line('a')) .and. (i<stream_len)) then
+          i = i + 1
+        else
+          exit
+        end if
+      end do
+    end subroutine
+
   end subroutine tokenize
 
 end module Strings
 
 
 
-module ParseTrees
 
+module ParseTrees_Fields
   use Strings
 
   use str_lists, only: str_list => list, char_len
+
+  type field_names
+    character(char_len) :: name
+    class(*), pointer :: var
+  end type
+
+  type field_names_a
+    character(char_len) :: name
+    class(*), pointer :: var(:)
+  end type
+
+  type field_names_a_int_alloc
+    character(char_len) :: name
+    integer, allocatable :: var(:)
+  end type
+
+  interface field_names
+    procedure field_names_init
+  end interface
+
+  interface field_names_a
+    procedure field_names_init
+  end interface
+
+  interface field_names_a_int_alloc
+    procedure field_names_a_int_alloc_init
+  end interface
+
+contains
+
+  function field_names_init(name, var) result(res)
+    type(field_names) :: res
+    character(*) :: name
+    class(*), target, intent(in) :: var
+
+    res%name = name
+    res%var => var
+  end function
+
+  function field_names_a_init(name, var) result(res)
+    type(field_names_a) :: res
+    character(*) :: name
+    class(*), target, intent(in) :: var(:)
+
+    res%name = name
+    res%var => var
+  end function
+
+  function field_names_a_int_alloc_init(name) result(res)
+    type(field_names_a_int_alloc) :: res
+    character(*) :: name
+
+    res%name = name
+  end function
+
+
+end module ParseTrees_Fields
+
+
+
+
+module ParseTrees
+
+  use ParseTrees_Fields
 
   implicit none
 
   private
 
-  public tree_object, tree_object_field, tree_object_fields, parse_file
+  public field_names, field_names_a, field_names_a_int_alloc
+  public field_names_init, field_names_a_init, field_names_a_int_alloc_init
+
+  public tree_object, tree_object_field, tree_object_fields, parse_file, char_len
 
   type tree_object_field
     character(char_len) :: name
+    logical :: is_array = .false.
     logical :: is_object = .false.
     character(char_len) :: value
     type(tree_object), pointer :: object_value => null()
+    character(char_len), allocatable :: array_value(:)
   end type
 
   type tree_object_fields
@@ -248,7 +336,7 @@ contains
     do
       read(unit,'(a)',iostat=io) line
       if (io/=0) exit
-      stream = stream // ' ' // trim(adjustl(line))
+      stream = stream // ' ' // trim(adjustl(line)) // new_line('a')
     end do
 
     call tokenize(stream, token_list, stat)
@@ -278,6 +366,48 @@ contains
 
   contains
 
+    recursive subroutine get_array(array, pos, stat)
+      character(char_len), allocatable :: array(:)
+      integer, intent(inout) :: pos
+      integer, intent(out) :: stat
+      character(char_len) :: str
+
+      if (pos+1 > size(tokens)) then
+        !need 2 tokens for an empty array
+        stat = 4
+        return
+      end if
+
+      allocate(array(0))
+      pos = pos + 1
+      do
+        if (tokens(pos) == ']') exit
+
+        call get_string(str, pos, stat)
+
+        array = [array, str]
+
+        if (stat /= 0) return
+
+        if (tokens(pos) /= ']' .and. tokens(pos) /= ',') then
+          write(*,*) "Error in '" // &
+                     fname // &
+                     "', expected '" // &
+                     ",' or ']" // &
+                     "' read '" // &
+                     downcase(tokens(pos)) // &
+                     "' instead."
+          stat = 1
+        else if (tokens(pos) == ',') then
+          pos = pos + 1
+        end if
+        if (stat /= 0) return
+      end do
+
+      call check_string(']', pos, stat)
+
+    end subroutine
+
     recursive subroutine get_object(object, pos, stat)
       type(tree_object) :: object
       integer, intent(inout) :: pos
@@ -296,6 +426,9 @@ contains
         call get_object_fields(object%fields, pos, stat)
         if (stat /= 0) return
         call check_string(')', pos, stat)
+      else
+        stat = 3
+        return
       end if
     end subroutine
 
@@ -361,10 +494,13 @@ contains
       call get_string(field%name, pos, stat)
       call check_string('=', pos, stat)
 
-      if (tokens(pos+1) == '(') then
+      if (tokens(pos+1) == '(' .or. tokens(pos+1) == '[') then
         field%is_object = .true.
         allocate(field%object_value)
         call get_object(field%object_value, pos, stat)
+      else if (tokens(pos) == '[') then
+        field%is_array = .true.
+        call get_array(field%array_value, pos, stat)
       else
         call get_string(field%value, pos, stat)
       end if
@@ -384,5 +520,6 @@ contains
     end subroutine
 
   end subroutine parse_file
+
 
 end module ParseTrees

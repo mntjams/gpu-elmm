@@ -158,9 +158,9 @@ contains
       end do
     end do
     !$omp end parallel do
-    if (Btype(Ea)==PERIODIC) ACoarse(0,:,:) = ACoarse(nx,:,:)
-    if (Btype(No)==PERIODIC) ACoarse(:,0,:) = ACoarse(:,ny,:)
-    if (Btype(To)==PERIODIC) ACoarse(:,:,0) = ACoarse(:,:,nz)
+    if (Btype(Ea)==BC_PERIODIC) ACoarse(0,:,:) = ACoarse(nx,:,:)
+    if (Btype(No)==BC_PERIODIC) ACoarse(:,0,:) = ACoarse(:,ny,:)
+    if (Btype(To)==BC_PERIODIC) ACoarse(:,:,0) = ACoarse(:,:,nz)
 
  end subroutine Restrict
 
@@ -176,7 +176,7 @@ contains
     integer :: i,j,k
 
 
-     if (Btype(We)==PERIODIC) then
+     if (Btype(We)==BC_PERIODIC) then
       do k = 0,nz
        do j = 0,ny                      !Periodic BC
         Phi(-1,j,k) = Phi(nx-1,j,k)
@@ -190,7 +190,7 @@ contains
       end do
      end if
 
-     if (Btype(Ea)==PERIODIC) then
+     if (Btype(Ea)==BC_PERIODIC) then
       do k = 0,nz
        do j = 0,ny                      !Periodic BC
         Phi(nx+1,j,k) = Phi(1,j,k)
@@ -204,7 +204,7 @@ contains
       end do
      end if
 
-     if (Btype(So)==PERIODIC) then
+     if (Btype(So)==BC_PERIODIC) then
      do k = 0,nz
        do i=-1,nx+1                      !Periodic BC
         Phi(i,-1,k) = Phi(i,ny-1,k)
@@ -218,7 +218,7 @@ contains
       end do
      end if
 
-     if (Btype(No)==PERIODIC) then
+     if (Btype(No)==BC_PERIODIC) then
      do k = 0,nz
        do i=-1,nx+1                      !Periodic BC
         Phi(i,ny+1,k) = Phi(i,1,k)
@@ -232,7 +232,7 @@ contains
       end do
      end if
 
-     if (Btype(Bo)==PERIODIC) then
+     if (Btype(Bo)==BC_PERIODIC) then
       do j=-1,ny+1
        do i=-1,nx+1                      !Periodic BC
         Phi(i,j,-1) = Phi(i,j,nz-1)
@@ -246,7 +246,7 @@ contains
       end do
      end if
 
-     if (Btype(To)==PERIODIC) then
+     if (Btype(To)==BC_PERIODIC) then
       do j=-1,ny+1
        do i=-1,nx+1                      !Periodic BC
         Phi(i,j,nz+1) = Phi(i,j,1)
@@ -288,17 +288,17 @@ contains
       ny = CoefMG(level)%ny
       nz = CoefMG(level)%nz
 
-      if (Btype(Ea)==PERIODIC) then
+      if (Btype(Ea)==BC_PERIODIC) then
         nulx = 1
       else
         nulx = 0
       end if
-      if (Btype(No)==PERIODIC) then
+      if (Btype(No)==BC_PERIODIC) then
         nuly = 1
       else
         nuly = 0
       end if
-      if (Btype(To)==PERIODIC) then
+      if (Btype(To)==BC_PERIODIC) then
         nulz = 1
       else
         nulz = 0
@@ -332,42 +332,42 @@ contains
             if (i>nulx) then
                       age(l,ind(level,nulx,nuly,nulz,i-1,j,k)) = CoefMG(level)%Aw
                       Ap = Ap+CoefMG(level)%Aw
-            else if (Btype(We)==PERIODIC) then
+            else if (Btype(We)==BC_PERIODIC) then
                       age(l,ind(level,nulx,nuly,nulz,nx,j,k)) = CoefMG(level)%Aw
                       Ap = Ap+CoefMG(level)%Aw
             end if
             if (i<nx) then
                       age(l,ind(level,nulx,nuly,nulz,i+1,j,k)) = CoefMG(level)%Ae
                       Ap = Ap+CoefMG(level)%Ae
-            else if (Btype(Ea)==PERIODIC) then
+            else if (Btype(Ea)==BC_PERIODIC) then
                       age(l,ind(level,nulx,nuly,nulz,nulx,j,k)) = CoefMG(level)%Ae
                       Ap = Ap+CoefMG(level)%Ae
             end if
             if (j>nuly) then
                       age(l,ind(level,nulx,nuly,nulz,i,j-1,k)) = CoefMG(level)%As
                       Ap = Ap+CoefMG(level)%As
-            else if (Btype(So)==PERIODIC) then
+            else if (Btype(So)==BC_PERIODIC) then
                       age(l,ind(level,nulx,nuly,nulz,i,ny,k)) = CoefMG(level)%As
                       Ap = Ap+CoefMG(level)%As
             end if
             if (j<ny) then
                       age(l,ind(level,nulx,nuly,nulz,i,j+1,k)) = CoefMG(level)%An
                       Ap = Ap+CoefMG(level)%An
-            else if (Btype(No)==PERIODIC) then
+            else if (Btype(No)==BC_PERIODIC) then
                       age(l,ind(level,nulx,nuly,nulz,i,nuly,k)) = CoefMG(level)%An
                       Ap = Ap+CoefMG(level)%An
             end if
             if (k>nulz) then
                       age(l,ind(level,nulx,nuly,nulz,i,j,k-1)) = CoefMG(level)%Ab
                       Ap = Ap+CoefMG(level)%Ab
-            else if (Btype(Bo)==PERIODIC) then
+            else if (Btype(Bo)==BC_PERIODIC) then
                       age(l,ind(level,nulx,nuly,nulz,i,j,nz)) = CoefMG(level)%Ab
                       Ap = Ap+CoefMG(level)%Ab
             end if
             if (k<nz) then
                       age(l,ind(level,nulx,nuly,nulz,i,j,k+1)) = CoefMG(level)%At
                       Ap = Ap+CoefMG(level)%At
-            else if (Btype(To)==PERIODIC) then
+            else if (Btype(To)==BC_PERIODIC) then
                       age(l,ind(level,nulx,nuly,nulz,i,j,nulz)) = CoefMG(level)%At
                       Ap = Ap+CoefMG(level)%At
             end if
@@ -423,13 +423,13 @@ contains
       end do
     end do
 
-    if (Btype(Ea)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC) then
       PhiMG(level)%Arr(0,:,:) = PhiMG(level)%Arr(nx,:,:)
     end if
-    if (Btype(No)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC) then
       PhiMG(level)%Arr(:,0,:) = PhiMG(level)%Arr(:,ny,:)
     end if
-    if (Btype(To)==PERIODIC) then
+    if (Btype(To)==BC_PERIODIC) then
       PhiMG(level)%Arr(:,:,0) = PhiMG(level)%Arr(:,:,nz)
     end if
 
@@ -451,17 +451,17 @@ contains
      ny = CoefMG(level)%ny
      nz = CoefMG(level)%nz
 
-     if (Btype(Ea)==PERIODIC) then
+     if (Btype(Ea)==BC_PERIODIC) then
       nulx = 1
      else
       nulx = 0
      end if
-     if (Btype(No)==PERIODIC) then
+     if (Btype(No)==BC_PERIODIC) then
       nuly = 1
      else
       nuly = 0
      end if
-     if (Btype(To)==PERIODIC) then
+     if (Btype(To)==BC_PERIODIC) then
       nulz = 1
      else
       nulz = 0
@@ -494,42 +494,42 @@ contains
                 if (i>nulx) then
                           age(l,ind(level,nulx,nuly,nulz,i-1,j,k)) = CoefMG(level)%Aw
                           Ap = Ap+CoefMG(level)%Aw
-                else if (Btype(We)==PERIODIC) then
+                else if (Btype(We)==BC_PERIODIC) then
                           age(l,ind(level,nulx,nuly,nulz,nx,j,k)) = CoefMG(level)%Aw
                           Ap = Ap+CoefMG(level)%Aw
                 end if
                 if (i<nx) then
                           age(l,ind(level,nulx,nuly,nulz,i+1,j,k)) = CoefMG(level)%Ae
                           Ap = Ap+CoefMG(level)%Ae
-                else if (Btype(Ea)==PERIODIC) then
+                else if (Btype(Ea)==BC_PERIODIC) then
                           age(l,ind(level,nulx,nuly,nulz,nulx,j,k)) = CoefMG(level)%Ae
                           Ap = Ap+CoefMG(level)%Ae
                 end if
                 if (j>nuly) then
                           age(l,ind(level,nulx,nuly,nulz,i,j-1,k)) = CoefMG(level)%As
                           Ap = Ap+CoefMG(level)%As
-                else if (Btype(So)==PERIODIC) then
+                else if (Btype(So)==BC_PERIODIC) then
                           age(l,ind(level,nulx,nuly,nulz,i,ny,k)) = CoefMG(level)%As
                           Ap = Ap+CoefMG(level)%As
                 end if
                 if (j<ny) then
                           age(l,ind(level,nulx,nuly,nulz,i,j+1,k)) = CoefMG(level)%An
                           Ap = Ap+CoefMG(level)%An
-                else if (Btype(No)==PERIODIC) then
+                else if (Btype(No)==BC_PERIODIC) then
                           age(l,ind(level,nulx,nuly,nulz,i,nuly,k)) = CoefMG(level)%An
                           Ap = Ap+CoefMG(level)%An
                 end if
                 if (k>nulz) then
                           age(l,ind(level,nulx,nuly,nulz,i,j,k-1)) = CoefMG(level)%Ab
                           Ap = Ap+CoefMG(level)%Ab
-                else if (Btype(Bo)==PERIODIC) then
+                else if (Btype(Bo)==BC_PERIODIC) then
                           age(l,ind(level,nulx,nuly,nulz,i,j,nz)) = CoefMG(level)%Ab
                           Ap = Ap+CoefMG(level)%Ab
                 end if
                 if (k<nz) then
                           age(l,ind(level,nulx,nuly,nulz,i,j,k+1)) = CoefMG(level)%At
                           Ap = Ap+CoefMG(level)%At
-                else if (Btype(To)==PERIODIC) then
+                else if (Btype(To)==BC_PERIODIC) then
                           age(l,ind(level,nulx,nuly,nulz,i,j,nulz)) = CoefMG(level)%At
                           Ap = Ap+CoefMG(level)%At
                 end if
@@ -579,13 +579,13 @@ contains
       end do
     end do
 
-    if (Btype(Ea)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC) then
       PhiMG(level)%Arr(0,:,:) = PhiMG(level)%Arr(nx,:,:)
     end if
-    if (Btype(No)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC) then
       PhiMG(level)%Arr(:,0,:) = PhiMG(level)%Arr(:,ny,:)
     end if
-    if (Btype(To)==PERIODIC) then
+    if (Btype(To)==BC_PERIODIC) then
       PhiMG(level)%Arr(:,:,0) = PhiMG(level)%Arr(:,:,nz)
     end if
 
@@ -610,17 +610,17 @@ contains
      ny = CoefMG(level)%ny
      nz = CoefMG(level)%nz
 
-     if (Btype(Ea)==PERIODIC) then
+     if (Btype(Ea)==BC_PERIODIC) then
       nulx = 1
      else
       nulx = 0
      end if
-     if (Btype(No)==PERIODIC) then
+     if (Btype(No)==BC_PERIODIC) then
       nuly = 1
      else
       nuly = 0
      end if
-     if (Btype(To)==PERIODIC) then
+     if (Btype(To)==BC_PERIODIC) then
       nulz = 1
      else
       nulz = 0
@@ -646,42 +646,42 @@ contains
                 if (i>nulx) then
                           age(l,ind(level,nulx,nuly,nulz,i-1,j,k)) = CoefMG(level)%Aw
                           Ap = Ap+CoefMG(level)%Aw
-                else if (Btype(We)==PERIODIC) then
+                else if (Btype(We)==BC_PERIODIC) then
                           age(l,ind(level,nulx,nuly,nulz,nx,j,k)) = CoefMG(level)%Aw
                           Ap = Ap+CoefMG(level)%Aw
                 end if
                 if (i<nx) then
                           age(l,ind(level,nulx,nuly,nulz,i+1,j,k)) = CoefMG(level)%Ae
                           Ap = Ap+CoefMG(level)%Ae
-                else if (Btype(Ea)==PERIODIC) then
+                else if (Btype(Ea)==BC_PERIODIC) then
                           age(l,ind(level,nulx,nuly,nulz,nulx,j,k)) = CoefMG(level)%Ae
                           Ap = Ap+CoefMG(level)%Ae
                 end if
                 if (j>nuly) then
                           age(l,ind(level,nulx,nuly,nulz,i,j-1,k)) = CoefMG(level)%As
                           Ap = Ap+CoefMG(level)%As
-                else if (Btype(So)==PERIODIC) then
+                else if (Btype(So)==BC_PERIODIC) then
                           age(l,ind(level,nulx,nuly,nulz,i,ny,k)) = CoefMG(level)%As
                           Ap = Ap+CoefMG(level)%As
                 end if
                 if (j<ny) then
                           age(l,ind(level,nulx,nuly,nulz,i,j+1,k)) = CoefMG(level)%An
                           Ap = Ap+CoefMG(level)%An
-                else if (Btype(No)==PERIODIC) then
+                else if (Btype(No)==BC_PERIODIC) then
                           age(l,ind(level,nulx,nuly,nulz,i,nuly,k)) = CoefMG(level)%An
                           Ap = Ap+CoefMG(level)%An
                 end if
                 if (k>nulz) then
                           age(l,ind(level,nulx,nuly,nulz,i,j,k-1)) = CoefMG(level)%Ab
                           Ap = Ap+CoefMG(level)%Ab
-                else if (Btype(Bo)==PERIODIC) then
+                else if (Btype(Bo)==BC_PERIODIC) then
                           age(l,ind(level,nulx,nuly,nulz,i,j,nz)) = CoefMG(level)%Ab
                           Ap = Ap+CoefMG(level)%Ab
                 end if
                 if (k<nz) then
                           age(l,ind(level,nulx,nuly,nulz,i,j,k+1)) = CoefMG(level)%At
                           Ap = Ap+CoefMG(level)%At
-                else if (Btype(To)==PERIODIC) then
+                else if (Btype(To)==BC_PERIODIC) then
                           age(l,ind(level,nulx,nuly,nulz,i,j,nulz)) = CoefMG(level)%At
                           Ap = Ap+CoefMG(level)%At
                 end if
@@ -764,13 +764,13 @@ contains
            end do
         end do
 
-    if (Btype(Ea)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC) then
      PhiMG(level)%Arr(0,:,:) = PhiMG(level)%Arr(nx,:,:)
     end if
-    if (Btype(No)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC) then
      PhiMG(level)%Arr(:,0,:) = PhiMG(level)%Arr(:,ny,:)
     end if
-    if (Btype(To)==PERIODIC) then
+    if (Btype(To)==BC_PERIODIC) then
      PhiMG(level)%Arr(:,:,0) = PhiMG(level)%Arr(:,:,nz)
     end if
 
@@ -800,42 +800,42 @@ contains
                 if (i>0) then
                           p = p+PhiMG(level)%Arr(i-1,j,k)*CoefMG(level)%Aw
                           Ap = Ap+CoefMG(level)%Aw
-                else if (Btype(We)==PERIODIC) then
+                else if (Btype(We)==BC_PERIODIC) then
                           p = p+PhiMG(level)%Arr(CoefMG(level)%nx-1,j,k)*CoefMG(level)%Aw
                           Ap = Ap+CoefMG(level)%Aw
                 end if
                 if (i<CoefMG(level)%nx) then
                           p = p+PhiMG(level)%Arr(i+1,j,k)*CoefMG(level)%Ae
                           Ap = Ap+CoefMG(level)%Ae
-                else if (Btype(Ea)==PERIODIC) then
+                else if (Btype(Ea)==BC_PERIODIC) then
                           p = p+PhiMG(level)%Arr(1,j,k)*CoefMG(level)%Ae
                           Ap = Ap+CoefMG(level)%Ae
                 end if
                 if (j>0) then
                           p = p+PhiMG(level)%Arr(i,j-1,k)*CoefMG(level)%As
                           Ap = Ap+CoefMG(level)%As
-                else if (Btype(So)==PERIODIC) then
+                else if (Btype(So)==BC_PERIODIC) then
                           p = p+PhiMG(level)%Arr(i,CoefMG(level)%ny-1,k)*CoefMG(level)%As
                           Ap = Ap+CoefMG(level)%As
                 end if
                 if (j<CoefMG(level)%ny) then
                           p = p+PhiMG(level)%Arr(i,j+1,k)*CoefMG(level)%An
                           Ap = Ap+CoefMG(level)%An
-                else if (Btype(No)==PERIODIC) then
+                else if (Btype(No)==BC_PERIODIC) then
                           p = p+PhiMG(level)%Arr(i,1,k)*CoefMG(level)%An
                           Ap = Ap+CoefMG(level)%An
                 end if
                 if (k>0) then
                           p = p+PhiMG(level)%Arr(i,j,k-1)*CoefMG(level)%Ab
                           Ap = Ap+CoefMG(level)%Ab
-                else if (Btype(Bo)==PERIODIC) then
+                else if (Btype(Bo)==BC_PERIODIC) then
                           p = p+PhiMG(level)%Arr(i,j,CoefMG(level)%nz-1)*CoefMG(level)%Ab
                           Ap = Ap+CoefMG(level)%Ab
                 end if
                 if (k<CoefMG(level)%nz) then
                           p = p+PhiMG(level)%Arr(i,j,k+1)*CoefMG(level)%At
                           Ap = Ap+CoefMG(level)%At
-                else if (Btype(To)==PERIODIC) then
+                else if (Btype(To)==BC_PERIODIC) then
                           p = p+PhiMG(level)%Arr(i,j,1)*CoefMG(level)%At
                           Ap = Ap+CoefMG(level)%At
                 end if
@@ -856,42 +856,42 @@ contains
                 if (i>0) then
                           p = p+PhiMG(level)%Arr(i-1,j,k)*CoefMG(level)%Aw
                           Ap = Ap+CoefMG(level)%Aw
-                else if (Btype(We)==PERIODIC) then
+                else if (Btype(We)==BC_PERIODIC) then
                           p = p+PhiMG(level)%Arr(CoefMG(level)%nx-1,j,k)*CoefMG(level)%Aw
                           Ap = Ap+CoefMG(level)%Aw
                 end if
                 if (i<CoefMG(level)%nx) then
                           p = p+PhiMG(level)%Arr(i+1,j,k)*CoefMG(level)%Ae
                           Ap = Ap+CoefMG(level)%Ae
-                else if (Btype(Ea)==PERIODIC) then
+                else if (Btype(Ea)==BC_PERIODIC) then
                           p = p+PhiMG(level)%Arr(1,j,k)*CoefMG(level)%Ae
                           Ap = Ap+CoefMG(level)%Ae
                 end if
                 if (j>0) then
                           p = p+PhiMG(level)%Arr(i,j-1,k)*CoefMG(level)%As
                           Ap = Ap+CoefMG(level)%As
-                else if (Btype(So)==PERIODIC) then
+                else if (Btype(So)==BC_PERIODIC) then
                           p = p+PhiMG(level)%Arr(i,CoefMG(level)%ny-1,k)*CoefMG(level)%As
                           Ap = Ap+CoefMG(level)%As
                 end if
                 if (j<CoefMG(level)%ny) then
                           p = p+PhiMG(level)%Arr(i,j+1,k)*CoefMG(level)%An
                           Ap = Ap+CoefMG(level)%An
-                else if (Btype(No)==PERIODIC) then
+                else if (Btype(No)==BC_PERIODIC) then
                           p = p+PhiMG(level)%Arr(i,1,k)*CoefMG(level)%An
                           Ap = Ap+CoefMG(level)%An
                 end if
                 if (k>0) then
                           p = p+PhiMG(level)%Arr(i,j,k-1)*CoefMG(level)%Ab
                           Ap = Ap+CoefMG(level)%Ab
-                else if (Btype(Bo)==PERIODIC) then
+                else if (Btype(Bo)==BC_PERIODIC) then
                           p = p+PhiMG(level)%Arr(i,j,CoefMG(level)%nz-1)*CoefMG(level)%Ab
                           Ap = Ap+CoefMG(level)%Ab
                 end if
                 if (k<CoefMG(level)%nz) then
                           p = p+PhiMG(level)%Arr(i,j,k+1)*CoefMG(level)%At
                           Ap = Ap+CoefMG(level)%At
-                else if (Btype(To)==PERIODIC) then
+                else if (Btype(To)==BC_PERIODIC) then
                           p = p+PhiMG(level)%Arr(i,j,1)*CoefMG(level)%At
                           Ap = Ap+CoefMG(level)%At
                 end if
@@ -925,42 +925,42 @@ contains
           if (i>0) then
                     p = p+PhiMG(level)%Arr(i-1,j,k)*CoefMG(level)%Aw
                     Ap = Ap+CoefMG(level)%Aw
-          else if (Btype(We)==PERIODIC) then
+          else if (Btype(We)==BC_PERIODIC) then
                     p = p+PhiMG(level)%Arr(CoefMG(level)%nx-1,j,k)*CoefMG(level)%Aw
                     Ap = Ap+CoefMG(level)%Aw
           end if
           if (i<CoefMG(level)%nx) then
                     p = p+PhiMG(level)%Arr(i+1,j,k)*CoefMG(level)%Ae
                     Ap = Ap+CoefMG(level)%Ae
-          else if (Btype(Ea)==PERIODIC) then
+          else if (Btype(Ea)==BC_PERIODIC) then
                     p = p+PhiMG(level)%Arr(1,j,k)*CoefMG(level)%Ae
                     Ap = Ap+CoefMG(level)%Ae
           end if
           if (j>0) then
                     p = p+PhiMG(level)%Arr(i,j-1,k)*CoefMG(level)%As
                     Ap = Ap+CoefMG(level)%As
-          else if (Btype(So)==PERIODIC) then
+          else if (Btype(So)==BC_PERIODIC) then
                     p = p+PhiMG(level)%Arr(i,CoefMG(level)%ny-1,k)*CoefMG(level)%As
                     Ap = Ap+CoefMG(level)%As
           end if
           if (j<CoefMG(level)%ny) then
                     p = p+PhiMG(level)%Arr(i,j+1,k)*CoefMG(level)%An
                     Ap = Ap+CoefMG(level)%An
-          else if (Btype(No)==PERIODIC) then
+          else if (Btype(No)==BC_PERIODIC) then
                     p = p+PhiMG(level)%Arr(i,1,k)*CoefMG(level)%An
                     Ap = Ap+CoefMG(level)%An
           end if
           if (k>0) then
                     p = p+PhiMG(level)%Arr(i,j,k-1)*CoefMG(level)%Ab
                     Ap = Ap+CoefMG(level)%Ab
-          else if (Btype(Bo)==PERIODIC) then
+          else if (Btype(Bo)==BC_PERIODIC) then
                     p = p+PhiMG(level)%Arr(i,j,CoefMG(level)%nz-1)*CoefMG(level)%Ab
                     Ap = Ap+CoefMG(level)%Ab
           end if
           if (k<CoefMG(level)%nz) then
                     p = p+PhiMG(level)%Arr(i,j,k+1)*CoefMG(level)%At
                     Ap = Ap+CoefMG(level)%At
-          else if (Btype(To)==PERIODIC) then
+          else if (Btype(To)==BC_PERIODIC) then
                     p = p+PhiMG(level)%Arr(i,j,1)*CoefMG(level)%At
                     Ap = Ap+CoefMG(level)%At
           end if
@@ -1054,17 +1054,17 @@ contains
     mgeps = epsPoisson
     Phi = 0
 
-    if (Btype(Ea)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC) then
       sx = 1
     else
       sx = 0
     end if
-    if (Btype(No)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC) then
       sy = 1
     else
       sy = 0
     end if
-    if (Btype(To)==PERIODIC) then
+    if (Btype(To)==BC_PERIODIC) then
       sz = 1
     else
       sz = 0
@@ -1121,15 +1121,15 @@ contains
     PhiMG(LMG)%Arr(0+sx:nx,0+sy:ny,0+sz:nz) = Phi(1:Prnx,1:Prny,1:Prnz)
     RHSMG(LMG)%Arr(0+sx:nx,0+sy:ny,0+sz:nz) = RHS(1:Prnx,1:Prny,1:Prnz)
 
-    if (Btype(Ea)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC) then
       RHSMG(LMG)%Arr(0,:,:) = RHSMG(LMG)%Arr(Prnx,:,:)
       PhiMG(LMG)%Arr(0,:,:) = PhiMG(LMG)%Arr(Prnx,:,:)
     end if
-    if (Btype(No)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC) then
       RHSMG(LMG)%Arr(:,0,:) = RHSMG(LMG)%Arr(:,Prny,:)
       PhiMG(LMG)%Arr(:,0,:) = PhiMG(LMG)%Arr(:,Prny,:)
     end if
-    if (Btype(To)==PERIODIC) then
+    if (Btype(To)==BC_PERIODIC) then
       RHSMG(LMG)%Arr(:,:,0) = RHSMG(LMG)%Arr(:,:,Prnz)
       PhiMG(LMG)%Arr(:,:,0) = PhiMG(LMG)%Arr(:,:,Prnz)
     end if
