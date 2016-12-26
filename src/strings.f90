@@ -176,16 +176,19 @@ module ParseTrees_Fields
 
   type field_names
     character(char_len) :: name
+    !not nullified bucause of a bug in GCC 5.3
     class(*), pointer :: var
   end type
 
   type field_names_a
     character(char_len) :: name
+    !not nullified bucause of a bug in GCC 5.3
     class(*), pointer :: var(:)
   end type
 
   type field_names_a_int_alloc
     character(char_len) :: name
+    !not nullified bucause of a bug in GCC 5.3
     integer, allocatable :: var(:)
   end type
 
@@ -245,7 +248,8 @@ module ParseTrees
   public field_names, field_names_a, field_names_a_int_alloc
   public field_names_init, field_names_a_init, field_names_a_int_alloc_init
 
-  public tree_object, tree_object_field, tree_object_fields, parse_file, char_len
+  public tree_object, tree_object_field, tree_object_fields, tree_object_ptr, &
+         parse_file, char_len
 
   type tree_object_field
     character(char_len) :: name
@@ -266,6 +270,10 @@ module ParseTrees
   contains
     procedure :: move_from => tree_object_move
     procedure :: finalize => tree_object_finalize
+  end type
+  
+  type tree_object_ptr
+    type(tree_object), pointer :: ptr => null()
   end type
 
 contains
@@ -413,13 +421,20 @@ contains
       integer, intent(inout) :: pos
       integer, intent(out) :: stat
 
-      if (pos+2 > size(tokens)) then
-        !need 3 tokens for an empty object
+      if (pos+1 > size(tokens)) then
+        !need 2 tokens for an empty anonymous object
         stat = 2
         return
       end if
 
-      if (tokens(pos+1)=='(') then
+      if (tokens(pos)=='(') then
+        !anonymous object
+        object%name = ""
+        pos = pos + 1
+        call get_object_fields(object%fields, pos, stat)
+        if (stat /= 0) return
+        call check_string(')', pos, stat)
+      else if (tokens(pos+1)=='(') then
         call get_string(object%name, pos, stat)
         if (stat /= 0) return
         pos = pos + 1 !checked above
@@ -494,7 +509,7 @@ contains
       call get_string(field%name, pos, stat)
       call check_string('=', pos, stat)
 
-      if (tokens(pos+1) == '(' .or. tokens(pos+1) == '[') then
+      if (tokens(pos) == '(' .or. tokens(pos+1) == '(') then
         field%is_object = .true.
         allocate(field%object_value)
         call get_object(field%object_value, pos, stat)
