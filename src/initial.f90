@@ -54,8 +54,6 @@ contains
  subroutine ReadConfiguration
    use StaggeredFrames, only: rrange, TFrameTimes, TSaveFlags, &
                               TStaggeredFrameDomain,  AddDomain
-   use VTKFrames, only: TFrameFlags, &
-                              TFrameDomain,  AddDomain
    use PoisFFT, only: PoisFFT_NeumannStag, PoisFFT_Periodic
    use Sponge, only: enable_out_sponge, enable_top_sponge, enable_top_sponge_scalar
    integer ::  lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
@@ -151,10 +149,6 @@ contains
    if (master) write(*,*) "maxCNiter=",maxCNiter
    call get(epsCN)
    if (master) write(*,*) "epsCN=",epsCN
-   call get(maxPOISSONiter)
-   if (master) write(*,*) "maxPOISSONiter=",maxPOISSONiter
-   call get(epsPOISSON)
-   if (master) write(*,*) "epsPOISSON=",epsPOISSON
    call get(debugparam)
    if (master) write(*,*) "debug parameter=",debugparam
    close(unit)
@@ -827,7 +821,7 @@ contains
 
 
    !both procedures below use the name of the output directory (affected by MPI)
-   call read_frames
+   call get_frames("frames.conf")
    
    call read_staggered_frames
 
@@ -1077,53 +1071,6 @@ contains
        read(unit,nml = output,iostat = io,iomsg = msg)
      end subroutine
      
-     subroutine read_frames  
-       open(unit,file="frames.conf",status="old",action="read",iostat = io)
-       if (io==0) then
-       
-         call get(frame_times%nframes)
-         
-         if (frame_times%nframes>0) then
-           call get(frame_times%start)
-           call get(frame_times%end)
-           read(unit,fmt='(/)')
-
-           read(unit,*) frame_flags%U
-           call get(frame_flags%vorticity)
-           call get(frame_flags%Pr)
-           call get(frame_flags%lambda2)
-           call get(frame_flags%scalars)
-           if (num_of_scalars < 1) frame_flags%scalars = 0
-           call get(frame_flags%sumscalars)
-           if (num_of_scalars < 1) frame_flags%sumscalars = 0
-           call get(frame_flags%temperature)
-           if (.not.enable_buoyancy) frame_flags%temperature = 0
-           call get(frame_flags%moisture)
-           if (.not.enable_buoyancy) frame_flags%moisture = 0
-           call get(frame_flags%temperature_flux)
-           if (.not.enable_buoyancy) frame_flags%temperature_flux = 0
-           call get(frame_flags%scalar_flux)
-           if (num_of_scalars < 1) frame_flags%scalar_flux = 0
-
-           call get(numframeslices)
-
-           do i = 1, numframeslices
-             call get(dimension)
-             call get(direction)
-             call get(position)
-             call AddDomain(TFrameDomain(achar(iachar('a')+i-1), &
-                            dimension, direction, position, &
-                            frame_times, frame_flags))
-           end do
-         end if
-
-         close(unit)
-       else
-         frames = 0
-         if (master) write (*,*) "frames.conf not found, no vtk frames will be saved."
-       end if
-     end subroutine read_frames
-
      subroutine read_staggered_frames
        open(unit,file="stagframes.conf",status="old",action="read",iostat = io)
        if (io==0) then
@@ -1164,12 +1111,12 @@ contains
 
   !TODO: This subroutine should be in module ParseTrees, but bug https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64589
   ! prevents this until moving to GCC
-  subroutine get_object_field_values(tree, object_name, stat, &
-                                     fields, fields_a, fields_a_int_alloc)
+  subroutine find_object_get_field_values(tree, object_name, stat, &
+                                     fields, &
+                                     fields_a, &
+                                     fields_a_int_alloc)
     use Strings
     use ParseTrees
-    !To extract values of variables from the parse tree
-    use iso_fortran_env, only: real32, real64, int32, int64
     type(tree_object), intent(in) :: tree(:)
     character(*), intent(in) :: object_name
     integer, intent(out) :: stat
@@ -1188,99 +1135,135 @@ contains
     stat = 1
 
     do iobj = 1, size(tree)
-      call get_object(tree(iobj))
-    end do
     
-  contains
-
-    subroutine get_object(obj)
-      type(tree_object), intent(in) :: obj
-      integer :: i, j
-
-      if (downcase(obj%name)==object_name) then
+      if (downcase(tree(iobj)%name)==object_name) then
         stat = stat - 1
+        call get_object_field_values(tree(iobj), stat, &
+                                     fields, &
+                                     fields_a, &
+                                     fields_a_int_alloc)
+        if (stat>1) return
+      end if
+      
+    end do
 
-        if (allocated(obj%fields%array)) then
+  end subroutine find_object_get_field_values
 
-          associate(obj_fields => obj%fields%array)
+
+
+
+  subroutine get_object_field_values(obj, stat, &
+                        fields, &
+                        fields_a, &
+                        fields_a_int_alloc)
+    use Strings
+    use ParseTrees
+    !To extract values of variables from the parse tree
+    use iso_fortran_env, only: real32, real64, int32, int64
+    type(tree_object), intent(in) :: obj
+    integer, intent(out) :: stat
+    !stat 0    .. success
+    !stat < 0  .. multiple definitions of object named object_name
+    !stat 2    .. inconsistent number of components in an array in fields_a
+    !stat 11   .. unexpected type of variable in fields
+    !stat 12   .. unexpected type of variable in fields_a
+    type(field_names), intent(in), optional :: fields(:)
+    type(field_names_a), intent(in), optional :: fields_a(:)
+    type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
+
+    integer :: i, j
+
+
+    if (allocated(obj%fields%array)) then
+
+      associate(obj_fields => obj%fields%array)
 
 fields_do:  do j = 1, size(obj_fields)
-             
-              do i = 1, size(fields)
-                if (obj_fields(j)%name == fields(i)%name) then
-                  select type (var => fields(i)%var)
-                    type is (integer)
-                      read(obj_fields(j)%value, *) var
-                    type is (real(real32))
-                      read(obj_fields(j)%value, *) var
-                    type is (real(real64))
-                      read(obj_fields(j)%value, *) var
-                    type is (logical)
-                      read(obj_fields(j)%value, *) var
-                    class default
-                      stat = 11
-                      return
-                  end select
-                  cycle fields_do
-                end if
-              end do
-
-
-              do i = 1, size(fields_a)
-                if (obj_fields(j)%name == fields_a(i)%name) then
-
-                  if (size(fields_a(i)%var)/=size(obj_fields(j)%array_value)) then
-! uncomment to get details when debugging
-!                     write(*,*) "Error, expecting", &
-!                                 size(fields_a(i)%var), &
-!                                 "vector components", &
-!                                 "but", &
-!                                 size(obj_fields(j)%array_value), &
-!                                 "components present."
-                    stat = 2
+         
+          do i = 1, size(fields)
+            if (obj_fields(j)%name == fields(i)%name) then
+              select type (var => fields(i)%var)
+                type is (tree_object_ptr)
+                  if (.not.obj_fields(j)%is_object .or. &
+                      .not.associated(obj_fields(j)%object_value)) then
+                    stat = 13
                     return
                   end if
+                  var%ptr => obj_fields(j)%object_value
+                type is (integer)
+                  read(obj_fields(j)%value, *) var
+                type is (real(real32))
+                  read(obj_fields(j)%value, *) var
+                type is (real(real64))
+                  read(obj_fields(j)%value, *) var
+                type is (logical)
+                  read(obj_fields(j)%value, *) var
+                type is (character(*))
+                  read(obj_fields(j)%value, *) var
+                class default
+                  stat = 11
+                  return
+              end select
+              cycle fields_do
+            end if
+          end do
 
-                  select type (var => fields_a(i)%var)
-                    type is (integer)
-                      read(obj_fields(j)%array_value, *) var
-                    type is (real(real32))
-                      read(obj_fields(j)%array_value, *) var
-                    type is (real(real64))
-                      read(obj_fields(j)%array_value, *) var
-                    type is (logical)
-                      read(obj_fields(j)%array_value, *) var
-                    class default
-                      stat = 12
-                      return
-                  end select
-                  cycle fields_do
-                end if
-              end do
+
+         do i = 1, size(fields_a)
+            if (obj_fields(j)%name == fields_a(i)%name) then
+              if (.not.obj_fields(j)%is_array .or. &
+                  .not.allocated(obj_fields(j)%array_value)) then
+! uncomment to get details when debugging
+                write(*,*) "Error, expecting an array in '",trim(fields_a(i)%name),"'."
+                stat = 2
+                return
+              end if
+              if (size(fields_a(i)%var)/=size(obj_fields(j)%array_value)) then
+! uncomment to get details when debugging
+                write(*,*) "Error, expecting", &
+                           size(fields_a(i)%var), &
+                           "vector components", &
+                           "but", &
+                           size(obj_fields(j)%array_value), &
+                           "components present."
+                stat = 3
+                return
+              end if
+
+              select type (var => fields_a(i)%var)
+                type is (integer)
+                  read(obj_fields(j)%array_value, *) var
+                type is (real(real32))
+                  read(obj_fields(j)%array_value, *) var
+                type is (real(real64))
+                  read(obj_fields(j)%array_value, *) var
+                type is (logical)
+                  read(obj_fields(j)%array_value, *) var
+                class default
+                  stat = 12
+                  return
+              end select
+              cycle fields_do
+            end if
+          end do
 
 
-              do i = 1, size(fields_a_int_alloc)
-                if (obj_fields(j)%name == fields_a_int_alloc(i)%name) then
-                  allocate(fields_a_int_alloc(i)%var(size(obj_fields(j)%array_value)))
-                  if (size(fields_a_int_alloc(i)%var)>0) &
-                    read(obj_fields(j)%array_value, *) fields_a_int_alloc(i)%var
-                end if
-              end do
+          do i = 1, size(fields_a_int_alloc)
+            if (obj_fields(j)%name == fields_a_int_alloc(i)%name) then
+              allocate(fields_a_int_alloc(i)%var(size(obj_fields(j)%array_value)))
+              if (size(fields_a_int_alloc(i)%var)>0) &
+                read(obj_fields(j)%array_value, *) fields_a_int_alloc(i)%var
+            end if
+          end do
 
-            end do fields_do
+        end do fields_do
 
-          end associate
+      end associate
 
-        end if
-
-      end if
-    end subroutine get_object
-
+    end if
   end subroutine get_object_field_values
 
-
-
-
+    
 
   subroutine get_area_sources(fname)
     use Strings
@@ -1618,17 +1601,17 @@ fields_do:  do j = 1, size(obj_fields)
 
       if (allocated(tree)) then
 
-        call get_object_field_values(tree, "average_profiles", stat, &
+        call find_object_get_field_values(tree, "average_profiles", stat, &
                                      fields_avg)
 
         if (stat<=0) enable_profiles = .true.
 
-        call get_object_field_values(tree, "instantaneous_profiles", stat, &
+        call find_object_get_field_values(tree, "instantaneous_profiles", stat, &
                                      fields_inst)
 
         if (stat<=0) enable_profiles = .true.
 
-        call get_object_field_values(tree, "running_average_profiles", stat, &
+        call find_object_get_field_values(tree, "running_average_profiles", stat, &
                                      fields_running)
 
         if (stat<=0) enable_profiles = .true.
@@ -1688,10 +1671,19 @@ fields_do:  do j = 1, size(obj_fields)
     if (stat==0) then
 
       if (allocated(tree)) then
-        call get_object_field_values(tree, "time_stepping", stat, &
+        call find_object_get_field_values(tree, "time_stepping", stat, &
                                      fields = names, fields_a = names_a)
 
-        if (stat<=0) call init
+        if (stat<=0) then
+          call init
+        else if (stat==1) then
+          write(*,*) "Error, no time_stepping object in " // fname
+          call error_stop
+        else
+          write(*,*) "Error, parsing time_stepping() in " // fname
+          write(*,*) "Status:", stat
+          call error_stop
+        endif
 
         do iobj = 1, size(tree)
           call tree(iobj)%finalize
@@ -1811,7 +1803,7 @@ fields_do:  do j = 1, size(obj_fields)
 
       if (allocated(tree)) then
 
-        call get_object_field_values(tree, "pressure_solution", stat, &
+        call find_object_get_field_values(tree, "pressure_solution", stat, &
                                      fields = names, fields_a = names_a)
 
         if (stat<=0) call init
@@ -1846,6 +1838,136 @@ fields_do:  do j = 1, size(obj_fields)
     end subroutine
 
   end subroutine get_pressure_solution
+  
+  
+  
+  subroutine get_frames(fname)
+    use Strings
+    use ParseTrees
+    use Frames_common
+    use VTKFrames
+    character(*), intent(in) :: fname
+    type(TFrameTimes), target :: timing
+    type(TFrameFlags), target :: flags
+    integer, target :: dimension, direction
+    real(knd), target :: position
+    real(knd), target :: interval
+    character(char_len), target :: label, direction_ch
+    type(tree_object_ptr), target :: flags_ptr
+
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: iobj, ivtk, stat
+
+    type(field_names) :: names_vtk(9), names_flags_vtk(11)
+
+
+    names_vtk = [field_names_init("dimension", dimension), &
+                 field_names_init("position",  position), &
+                 field_names_init("label",     label), &
+                 field_names_init("direction", direction_ch), &
+                 field_names_init("start",     timing%start), &
+                 field_names_init("end",       timing%end), &
+                 field_names_init("n",         timing%nframes), &
+                 field_names_init("interval",  interval), &
+                 field_names_init("flags",     flags_ptr)]
+                 
+
+    names_flags_vtk = [field_names_init("U", flags%U), &
+                       field_names_init("vorticity",  flags%vorticity), &
+                       field_names_init("Pr",  flags%Pr), &
+                       field_names_init("lambda2",  flags%lambda2), &
+                       field_names_init("scalars",  flags%scalars), &
+                       field_names_init("sumscalars",  flags%sumscalars), &
+                       field_names_init("temperature",  flags%temperature), &
+                       field_names_init("moisture",  flags%moisture), &
+                       field_names_init("temperature_flux",  flags%temperature_flux), &
+                       field_names_init("moisture_flux",  flags%moisture_flux), &
+                       field_names_init("scalar_flux",  flags%scalar_flux)]
+                 
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat/=0) then
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+    end if
+  
+    if (.not.allocated(tree)) then
+      write(*,*) "Error, no content in " // fname
+      call error_stop
+    end if
+    
+    ivtk = 0
+
+    do iobj = 1, size(tree)
+    
+      if (downcase(tree(iobj)%name)=="vtk_frame_domain") then
+      
+        label = ""
+        timing%start = 0; timing%end = 0; timing%nframes = 0
+        interval = 0
+        flags_ptr%ptr => null()
+        
+        call get_object_field_values(tree(iobj), stat, &
+                                     fields = names_vtk)
+        
+        if (associated(flags_ptr%ptr)) then
+          call get_object_field_values(flags_ptr%ptr, stat, &
+                                       fields = names_flags_vtk)
+        end if
+        
+        call init_vtk_domain
+        
+      end if
+      
+      call tree(iobj)%finalize
+    end do
+    
+
+  contains
+
+    subroutine init_vtk_domain
+      ivtk = ivtk + 1
+      
+      if (label=="") label = achar(iachar('a')+ivtk-1)
+      
+      if (downcase(direction_ch(1:1))=="x") then
+        direction = 1
+      else if (downcase(direction_ch(1:1))=="y") then
+        direction = 2
+      else if (downcase(direction_ch(1:1))=="z") then
+        direction = 3
+      else
+        read(direction_ch,*,iostat=stat) direction
+        if (stat/=0) then
+          call error_stop("Error, unrecognized value of direction in vtk_frame_domain '"//trim(label)//"'.")
+        end if
+      end if
+      
+      if (timing%nframes==0.and.interval>0) then     
+        timing%nframes = int((timing%end - timing%start) / interval) + 1
+        timing%end = timing%start + interval * (timing%nframes - 1)
+      end if
+    
+      if (num_of_scalars < 1) flags%scalars = 0
+      if (num_of_scalars < 1) flags%sumscalars = 0
+      if (.not.enable_buoyancy) flags%temperature = 0
+      if (.not.enable_moisture) flags%moisture = 0
+      if (.not.enable_buoyancy) flags%temperature_flux = 0
+      if (.not.enable_moisture) flags%moisture_flux = 0
+      if (num_of_scalars < 1) flags%scalar_flux = 0
+
+      call AddDomain(TFrameDomain(label, &
+                                  dimension, direction, position, &
+                                  timing, flags))
+                       
+    end subroutine
+    
+  end subroutine get_frames
   
   
   
@@ -1898,7 +2020,7 @@ fields_do:  do j = 1, size(obj_fields)
 
       if (allocated(tree)) then
 
-        call get_object_field_values(tree, "domains", stat, &
+        call find_object_get_field_values(tree, "domains", stat, &
                                      fields = names, fields_a = names_a, fields_a_int_alloc = names_a_int_alloc)
 
         if (stat<=0) call init
