@@ -68,7 +68,6 @@ contains
    type(rrange) :: range
    type(TFrameTimes) :: frame_times
    type(TSaveFlags) :: frame_save_flags
-   type(TFrameFlags) :: frame_flags
    character(10) :: domain_label
    integer :: num_staggered_domains
    integer :: number_of_probes, number_of_scalar_probes
