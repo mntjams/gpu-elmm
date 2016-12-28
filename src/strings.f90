@@ -192,6 +192,12 @@ module ParseTrees_Fields
     integer, allocatable :: var(:)
   end type
 
+  type field_names_str
+    character(char_len) :: name
+    !workaround of BUG https://gcc.gnu.org/bugzilla/show_bug.cgi?id=60359 fixed in GCC 4.9
+    character(char_len), pointer :: var => null()
+  end type
+
   interface field_names
     procedure field_names_init
   end interface
@@ -245,7 +251,7 @@ module ParseTrees
 
   private
 
-  public field_names, field_names_a, field_names_a_int_alloc
+  public field_names, field_names_a, field_names_a_int_alloc, field_names_str
   public field_names_init, field_names_a_init, field_names_a_int_alloc_init
 
   public tree_object, tree_object_field, tree_object_fields, tree_object_ptr, &

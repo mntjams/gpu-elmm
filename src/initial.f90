@@ -1113,7 +1113,8 @@ contains
   subroutine find_object_get_field_values(tree, object_name, stat, &
                                      fields, &
                                      fields_a, &
-                                     fields_a_int_alloc)
+                                     fields_a_int_alloc, &
+                                     fields_str)
     use Strings
     use ParseTrees
     type(tree_object), intent(in) :: tree(:)
@@ -1128,6 +1129,7 @@ contains
     type(field_names), intent(in), optional :: fields(:)
     type(field_names_a), intent(in), optional :: fields_a(:)
     type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
+    type(field_names_str), intent(in), optional :: fields_str(:)
 
     integer :: iobj
 
@@ -1140,7 +1142,8 @@ contains
         call get_object_field_values(tree(iobj), stat, &
                                      fields, &
                                      fields_a, &
-                                     fields_a_int_alloc)
+                                     fields_a_int_alloc, &
+                                     fields_str)
         if (stat>1) return
       end if
       
@@ -1154,7 +1157,8 @@ contains
   subroutine get_object_field_values(obj, stat, &
                         fields, &
                         fields_a, &
-                        fields_a_int_alloc)
+                        fields_a_int_alloc, &
+                        fields_str)
     use Strings
     use ParseTrees
     !To extract values of variables from the parse tree
@@ -1169,6 +1173,7 @@ contains
     type(field_names), intent(in), optional :: fields(:)
     type(field_names_a), intent(in), optional :: fields_a(:)
     type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
+    type(field_names_str), intent(in), optional :: fields_str(:)
 
     integer :: i, j
 
@@ -1179,81 +1184,99 @@ contains
 
 fields_do:  do j = 1, size(obj_fields)
          
-          do i = 1, size(fields)
-            if (obj_fields(j)%name == fields(i)%name) then
-              select type (var => fields(i)%var)
-                type is (tree_object_ptr)
-                  if (.not.obj_fields(j)%is_object .or. &
-                      .not.associated(obj_fields(j)%object_value)) then
-                    stat = 13
+          !workaround of 60359, see also below
+          if (present(fields_str)) then
+            do i = 1, size(fields_str)
+              if (obj_fields(j)%name == fields_str(i)%name) then                
+                read(obj_fields(j)%value, *) fields_str(i)%var
+                if (obj_fields(j)%name=="direction") print *, fields_str(i)%var
+                cycle fields_do
+              end if
+            end do
+          end if
+
+
+          if (present(fields)) then
+            do i = 1, size(fields)
+              if (obj_fields(j)%name == fields(i)%name) then
+                select type (var => fields(i)%var)
+                  type is (tree_object_ptr)
+                    if (.not.obj_fields(j)%is_object .or. &
+                        .not.associated(obj_fields(j)%object_value)) then
+                      stat = 13
+                      return
+                    end if
+                    var%ptr => obj_fields(j)%object_value
+                  type is (integer)
+                    read(obj_fields(j)%value, *) var
+                  type is (real(real32))
+                    read(obj_fields(j)%value, *) var
+                  type is (real(real64))
+                    read(obj_fields(j)%value, *) var
+                  type is (logical)
+                    read(obj_fields(j)%value, *) var
+  !BUG https://gcc.gnu.org/bugzilla/show_bug.cgi?id=60359 fixed in GCC 4.9
+  !                 type is (character(*))
+  !                   read(obj_fields(j)%value, *) var
+                  class default
+                    stat = 11
                     return
-                  end if
-                  var%ptr => obj_fields(j)%object_value
-                type is (integer)
-                  read(obj_fields(j)%value, *) var
-                type is (real(real32))
-                  read(obj_fields(j)%value, *) var
-                type is (real(real64))
-                  read(obj_fields(j)%value, *) var
-                type is (logical)
-                  read(obj_fields(j)%value, *) var
-                type is (character(*))
-                  read(obj_fields(j)%value, *) var
-                class default
-                  stat = 11
-                  return
-              end select
-              cycle fields_do
-            end if
-          end do
-
-
-         do i = 1, size(fields_a)
-            if (obj_fields(j)%name == fields_a(i)%name) then
-              if (.not.obj_fields(j)%is_array .or. &
-                  .not.allocated(obj_fields(j)%array_value)) then
-! uncomment to get details when debugging
-                write(*,*) "Error, expecting an array in '",trim(fields_a(i)%name),"'."
-                stat = 2
-                return
+                end select
+                cycle fields_do
               end if
-              if (size(fields_a(i)%var)/=size(obj_fields(j)%array_value)) then
-! uncomment to get details when debugging
-                write(*,*) "Error, expecting", &
-                           size(fields_a(i)%var), &
-                           "vector components", &
-                           "but", &
-                           size(obj_fields(j)%array_value), &
-                           "components present."
-                stat = 3
-                return
-              end if
+            end do
+          end if
 
-              select type (var => fields_a(i)%var)
-                type is (integer)
-                  read(obj_fields(j)%array_value, *) var
-                type is (real(real32))
-                  read(obj_fields(j)%array_value, *) var
-                type is (real(real64))
-                  read(obj_fields(j)%array_value, *) var
-                type is (logical)
-                  read(obj_fields(j)%array_value, *) var
-                class default
-                  stat = 12
+         if (present(fields_a)) then
+           do i = 1, size(fields_a)
+              if (obj_fields(j)%name == fields_a(i)%name) then
+                if (.not.obj_fields(j)%is_array .or. &
+                    .not.allocated(obj_fields(j)%array_value)) then
+  ! uncomment to get details when debugging
+                  write(*,*) "Error, expecting an array in '",trim(fields_a(i)%name),"'."
+                  stat = 2
                   return
-              end select
-              cycle fields_do
-            end if
-          end do
+                end if
+                if (size(fields_a(i)%var)/=size(obj_fields(j)%array_value)) then
+  ! uncomment to get details when debugging
+                  write(*,*) "Error, expecting", &
+                             size(fields_a(i)%var), &
+                             "vector components", &
+                             "but", &
+                             size(obj_fields(j)%array_value), &
+                             "components present."
+                  stat = 3
+                  return
+                end if
 
+                select type (var => fields_a(i)%var)
+                  type is (integer)
+                    read(obj_fields(j)%array_value, *) var
+                  type is (real(real32))
+                    read(obj_fields(j)%array_value, *) var
+                  type is (real(real64))
+                    read(obj_fields(j)%array_value, *) var
+                  type is (logical)
+                    read(obj_fields(j)%array_value, *) var
+                  class default
+                    stat = 12
+                    return
+                end select
+                cycle fields_do
+              end if
+            end do
+          end if
 
-          do i = 1, size(fields_a_int_alloc)
-            if (obj_fields(j)%name == fields_a_int_alloc(i)%name) then
-              allocate(fields_a_int_alloc(i)%var(size(obj_fields(j)%array_value)))
-              if (size(fields_a_int_alloc(i)%var)>0) &
-                read(obj_fields(j)%array_value, *) fields_a_int_alloc(i)%var
-            end if
-          end do
+          
+          if (present(fields_a_int_alloc)) then
+            do i = 1, size(fields_a_int_alloc)
+              if (obj_fields(j)%name == fields_a_int_alloc(i)%name) then
+                allocate(fields_a_int_alloc(i)%var(size(obj_fields(j)%array_value)))
+                if (size(fields_a_int_alloc(i)%var)>0) &
+                  read(obj_fields(j)%array_value, *) fields_a_int_alloc(i)%var
+              end if
+            end do
+          end if
 
         end do fields_do
 
@@ -1858,13 +1881,16 @@ fields_do:  do j = 1, size(obj_fields)
     logical :: ex
     integer :: iobj, ivtk, stat
 
-    type(field_names) :: names_vtk(9), names_flags_vtk(11)
+    type(field_names) :: names_vtk(7), names_flags_vtk(11)
+    
+    type(field_names_str) :: names_str(2)
+    
+    names_str = [field_names_str("label", label), &
+                 field_names_str("direction", direction_ch)]
 
 
     names_vtk = [field_names_init("dimension", dimension), &
                  field_names_init("position",  position), &
-                 field_names_init("label",     label), &
-                 field_names_init("direction", direction_ch), &
                  field_names_init("start",     timing%start), &
                  field_names_init("end",       timing%end), &
                  field_names_init("n",         timing%nframes), &
@@ -1907,16 +1933,24 @@ fields_do:  do j = 1, size(obj_fields)
       if (downcase(tree(iobj)%name)=="vtk_frame_domain") then
       
         label = ""
+        direction_ch = ""
         timing%start = 0; timing%end = 0; timing%nframes = 0
         interval = 0
         flags_ptr%ptr => null()
         
         call get_object_field_values(tree(iobj), stat, &
-                                     fields = names_vtk)
+                                     fields = names_vtk, fields_str = names_str)
+                                     
+        if (stat/=0) then
+          call error_stop("Error interpretting fields in vtk_frame_domain '"//trim(label)//"'.")
+        end if
         
         if (associated(flags_ptr%ptr)) then
           call get_object_field_values(flags_ptr%ptr, stat, &
                                        fields = names_flags_vtk)
+          if (stat/=0) then
+            call error_stop("Error interpretting flags object in vtk_frame_domain '"//trim(label)//"'.")
+          end if
         end if
         
         call init_vtk_domain
@@ -1934,17 +1968,27 @@ fields_do:  do j = 1, size(obj_fields)
       
       if (label=="") label = achar(iachar('a')+ivtk-1)
       
+      if (dimension==0) then
+        dimension = 2
+      else if (dimension < 2 .or. dimension > 3) then
+        call error_stop("Error, dimension must be 2 or 3 in vtk_frame_domain '"//trim(label)//"'.")
+      end if
+      
       if (downcase(direction_ch(1:1))=="x") then
         direction = 1
       else if (downcase(direction_ch(1:1))=="y") then
         direction = 2
       else if (downcase(direction_ch(1:1))=="z") then
         direction = 3
-      else
+      else if (len_trim(direction_ch) > 0) then
         read(direction_ch,*,iostat=stat) direction
-        if (stat/=0) then
-          call error_stop("Error, unrecognized value of direction in vtk_frame_domain '"//trim(label)//"'.")
-        end if
+        if (stat/=0) &
+          call error_stop("Error, unrecognized value of direction in vtk_frame_domain '"//trim(label)// &
+                          "'. Got:`"//trim(direction_ch)//"`.")
+        if (direction < 1 .or. direction > 3) &
+          call error_stop("Invalid value of direction in vtk_frame_domain '"//trim(label)//"'. Expected 1, 2 or 3.")
+      else if (dimension==2) then
+        call error_stop("Error, direction must be specified for 2D vtk_frame_domain '"//trim(label)//"'.")
       end if
       
       if (timing%nframes==0.and.interval>0) then     
@@ -1959,7 +2003,7 @@ fields_do:  do j = 1, size(obj_fields)
       if (.not.enable_buoyancy) flags%temperature_flux = 0
       if (.not.enable_moisture) flags%moisture_flux = 0
       if (num_of_scalars < 1) flags%scalar_flux = 0
-
+      
       call AddDomain(TFrameDomain(label, &
                                   dimension, direction, position, &
                                   timing, flags))
