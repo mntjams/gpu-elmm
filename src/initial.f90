@@ -1189,7 +1189,6 @@ fields_do:  do j = 1, size(obj_fields)
             do i = 1, size(fields_str)
               if (obj_fields(j)%name == fields_str(i)%name) then                
                 read(obj_fields(j)%value, *) fields_str(i)%var
-                if (obj_fields(j)%name=="direction") print *, fields_str(i)%var
                 cycle fields_do
               end if
             end do
