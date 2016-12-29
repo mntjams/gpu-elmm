@@ -102,6 +102,11 @@ contains
           token(pos:pos) = s
           call send
           in_string = .false.
+        else if (pos > len(token)) then
+          !TODO: remove when moving to allocatable strings
+          !consider enabling strings across multiple tokens
+          ierr = 2
+          return
         else
           token(pos:pos) = s
           pos = pos + 1
@@ -356,6 +361,11 @@ contains
     call tokenize(stream, token_list, stat)
 
     if (stat/=0) then
+      select case (stat)
+        case (2)
+          write(*,*) "Error, unterminated string or string too long in file ", trim(fname)
+      end select
+
       call token_list%finalize
       return
     end if
