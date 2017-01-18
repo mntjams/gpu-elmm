@@ -21,7 +21,7 @@ module domains_bc_types
     real(tim) :: time = -tiny(1.0_tim)
 
     !the ratio of grid resolutions between parent and child domains
-    integer :: spatial_ratio = 3
+    integer :: spatial_ratio = 1
     !The buffers are transferred every `time_step_ratio` time steps
     integer :: time_step_ratio = 1
     !count in a cycle depending on time_step_ratio for child domains
