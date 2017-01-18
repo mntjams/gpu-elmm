@@ -1126,10 +1126,10 @@ contains
     !stat 2    .. inconsistent number of components in an array in fields_a
     !stat 11   .. unexpected type of variable in fields
     !stat 12   .. unexpected type of variable in fields_a
-    type(field_names), intent(in), optional :: fields(:)
-    type(field_names_a), intent(in), optional :: fields_a(:)
+    type(field_names), intent(inout), optional :: fields(:)
+    type(field_names_a), intent(inout), optional :: fields_a(:)
     type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
-    type(field_names_str), intent(in), optional :: fields_str(:)
+    type(field_names_str), intent(inout), optional :: fields_str(:)
 
     integer :: iobj
 
@@ -1170,10 +1170,10 @@ contains
     !stat 2    .. inconsistent number of components in an array in fields_a
     !stat 11   .. unexpected type of variable in fields
     !stat 12   .. unexpected type of variable in fields_a
-    type(field_names), intent(in), optional :: fields(:)
-    type(field_names_a), intent(in), optional :: fields_a(:)
+    type(field_names), intent(inout), optional :: fields(:)
+    type(field_names_a), intent(inout), optional :: fields_a(:)
     type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
-    type(field_names_str), intent(in), optional :: fields_str(:)
+    type(field_names_str), intent(inout), optional :: fields_str(:)
 
     integer :: i, j
 
@@ -1189,7 +1189,6 @@ fields_do:  do j = 1, size(obj_fields)
             do i = 1, size(fields_str)
               if (obj_fields(j)%name == fields_str(i)%name) then                
                 read(obj_fields(j)%value, *) fields_str(i)%var
-                if (obj_fields(j)%name=="direction") print *, fields_str(i)%var
                 cycle fields_do
               end if
             end do
@@ -2025,12 +2024,13 @@ fields_do:  do j = 1, size(obj_fields)
     logical :: ex
     integer :: iobj, stat
 
-    type(field_names) :: names(7)
+    type(field_names) :: names(8)
     type(field_names_a) :: names_a(2)
     type(field_names_a_int_alloc) :: names_a_int_alloc(1)
     
     logical, target :: enable_multiple_domains_l = .false.
     logical, target :: is_two_way_nested_l = .false.
+    logical, target :: receive_initial_conditions_from_parent_l = .false.
     integer, target :: number_of_domains_l = -99
     integer, target :: domain_index_l = -99
     integer, target :: parent_domain_l = -99
@@ -2042,6 +2042,7 @@ fields_do:  do j = 1, size(obj_fields)
 
     names = [field_names_init("enable_multiple_domains", enable_multiple_domains_l), &
              field_names_init("is_two_way_nested",   is_two_way_nested_l), &
+             field_names_init("receive_initial_conditions",   receive_initial_conditions_from_parent_l), &
              field_names_init("domain_index",   domain_index_l), &
              field_names_init("parent_domain",   parent_domain_l), &
              field_names_init("number_of_domains",   number_of_domains_l), &
@@ -2117,6 +2118,8 @@ fields_do:  do j = 1, size(obj_fields)
           call error_stop("Error, child_domains shall be specified if domain_index < number_of_domains. &
                           & It may be empty.")
         end if
+        
+        receive_initial_conditions_from_parent = receive_initial_conditions_from_parent_l
           
         is_this_domain_two_way_nested = is_two_way_nested_l
 
