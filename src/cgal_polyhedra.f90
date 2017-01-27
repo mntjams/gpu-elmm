@@ -85,20 +85,18 @@ contains
 
 
   subroutine cgal_polyhedron_read(ptree, fname)
-#ifdef PAR
-    use custom_par, only: master
-#endif
     type(c_ptr),intent(out) :: ptree
     character(*),intent(in) :: fname
     integer(c_int) :: ierr
     integer :: imaster
     
-    imaster = 0
-#ifdef PAR
-    if (master)  imaster = 1
-#endif
+    if (master) then
+      imaster = 1
+    else
+      imaster = 0
+    end if
 
-    call polyhedron_from_file(ptree, fname//c_null_char, imaster, ierr)
+    call polyhedron_from_file(ptree, trim(fname)//c_null_char, imaster, ierr)
     
     if (ierr==1) then
       call error_stop("Error reading file "//fname//", it appears to be empty.")
