@@ -312,6 +312,14 @@ module GeometricShapes
     module procedure Union_Init_File
   end interface
   
+  interface GeometricShape
+    module procedure GeometricShape_FromFile
+  end interface
+  
+  type top_points_container
+    real(knd), allocatable :: points(:,:)
+  end type
+  
   real(knd),parameter :: unit_matrix_3(3,3) = reshape(source=[0,0,1,0,1,0,0,0,1], &
                                                       shape=[3,3])
 
@@ -980,7 +988,7 @@ contains
     character(*),intent(in) :: filename
 
     call cgal_polyhedron_read(self%cgalptr, filename)
-    
+  
     if (.not.c_associated(self%cgalptr)) then
       write(*,*) "Error reading polyhedron from ",filename
       call error_stop
@@ -2293,10 +2301,36 @@ contains
       res = Union_Init_Obst(filename)
     else if (filename(l-4:l)=='.geom') then
       res = Union_Init_Geom(filename)
+    else if (filename(l-4:l)=='.ltop') then
+      res = Union_Init_TopPoints(filename,.false.)
+    else if (filename(l-4:l)=='.rtop') then
+      res = Union_Init_TopPoints(filename,.true.)
     end if
   end function
   
-     
+  
+  function Union_Init_TopPoints(filename, right) result(res)
+    use Strings, only: upcase
+    type(Union) :: res    
+    character(*),intent(in) :: filename
+    logical, intent(in) :: right
+    type(top_points_container), allocatable :: top_points(:)
+    integer :: i
+    
+    top_points = TopPoints(filename, right)
+    
+    allocate(ConvexPolyhedron :: res%items(size(top_points)))
+    
+    select type(items => res%items)
+      type is (ConvexPolyhedron)
+        do i = 1, size(top_points)
+          items(i) = ConvexPolyhedron_FromTopPoints(top_points(i)%points)
+        end do
+    end select
+    
+  end function Union_Init_TopPoints
+  
+  
   function Union_Init_Obst(filename) result(res)
     use Strings, only: upcase
     type(Union) :: res    
@@ -2725,6 +2759,125 @@ contains
         end if
       end subroutine
   end subroutine
+  
+  
+  function TopPoints(filename, right) result(res)
+    type(top_points_container), allocatable :: res(:)
+    character(*),intent(in) :: filename
+    logical, intent(in) :: right
+    logical :: ex, body_opened
+    real(knd), allocatable :: points(:,:)
+    integer :: u, stat
+
+    allocate(res(0))
+    
+    inquire(file=filename,exist=ex)
+
+    if (ex) then
+      
+      open(newunit=u, file=filename)
+      
+      body_opened = .false.
+      do
+        call next_line(stat)
+        if (stat>0) exit
+      end do
+      
+      close(u)
+    else
+      call error_stop("Error, file "//filename//" does not exist.")
+    end if
+
+  contains
+    subroutine next_line(stat)
+      integer, intent(out) :: stat
+      character(1024) :: line
+      integer :: io
+      
+      read(u,'(a)', iostat=io) line
+      
+      if (io/=0) then
+        if (body_opened) call close_body
+        stat = 1
+        return
+      end if
+      
+      if (len_trim(line)==0) then  
+        if (body_opened) call close_body
+        stat = 3
+        return
+      end if
+        
+      call next_point(line, stat)
+    end subroutine
+    
+    subroutine next_point(line, stat)
+      character(*), intent(in) :: line
+      integer, intent(out) :: stat
+      real(knd) :: point(3)
+      real(knd), allocatable :: tmp(:,:)
+      integer :: io
+      
+      read(line,*,iostat=io) point
+      if (io/=0) then
+        stat = 2
+        return
+      end if
+     
+      if (.not.body_opened) then
+        body_opened = .true.
+        allocate(points(3,1))
+      else
+        tmp = points
+        deallocate(points)
+        allocate(points(3,size(tmp,2)+1))
+        points(:,1:size(tmp,2)) = tmp
+      end if
+      points(:,size(points,2)) = point
+      
+      stat = 0
+    end subroutine
+    
+    subroutine close_body
+      !assume z0 the same as for the lower boundary
+      if (right) then
+        res = [res, top_points_container(points)]
+      else
+        res = [res, top_points_container(points(:,size(points,2):1:-1))]
+      end if
+
+      deallocate(points)
+      body_opened = .false.
+    end subroutine
+
+  end function TopPoints
+  
+  
+  function GeometricShape_FromFile(filename) result(res)
+    use Strings
+    class(GeometricShape), allocatable :: res
+    character(*), intent(in) :: filename
+    character(5) :: suffix
+    logical :: ex
+
+    inquire(file=filename,exist=ex)
+
+    if (.not.ex) &
+      call error_stop("Error, obstacle file '"//trim(filename)//"' does not exist.")
+    
+    suffix = filename(index(filename,'.',back=.true.):)
+
+    if (suffix=='.obst'.or.suffix=='.geom') then
+      allocate(res, source = Union(filename))
+    else if (suffix=='.off') then
+      allocate(res, source = Polyhedron(filename))
+    else if (suffix=='.ltop'.or.suffix=='.rtop') then
+      allocate(res, source = Union(filename))
+    else
+      write(*,*) "Unknown file format for geometric shape '"//suffix//"'."
+      call error_stop
+    end if
+  end function
 
 end module GeometricShapes
 
