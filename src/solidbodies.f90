@@ -17,6 +17,7 @@ module SolidBodies
   type, extends(Body) :: SolidBody
     logical   :: rough = .false.                             !T rough surface, F flat surface
     real(knd) :: z0 = 0                                      !roughness parameter
+    real(knd) :: z0H = 0                                      !roughness parameter
     real(knd) :: temperature_flux = 0
     real(knd) :: moisture_flux = 0
     !other scalar fluxes assumed zero
@@ -202,10 +203,7 @@ contains
   subroutine ReadSolidBodiesFromFile(filename)
     use Strings
     character(*),intent(in) :: filename
-    integer :: l
     character(5) :: suffix
-    
-    l = len(filename)
     
     suffix = filename(index(filename,'.',back=.true.):)
 
@@ -409,16 +407,22 @@ contains
 
   end subroutine
   
-  function SolidBody_Init(gs, z0, temperature_flux, moisture_flux) result(res)
+  function SolidBody_Init(gs, z0, z0H, temperature_flux, moisture_flux) result(res)
     type(SolidBody) :: res
     class(GeometricShape), intent(in) :: gs
-    real(knd), optional, intent(in) :: z0, temperature_flux, moisture_flux
+    real(knd), optional, intent(in) :: z0, z0H, temperature_flux, moisture_flux
     
     allocate(res%GeometricShape, source=gs)
     if (present(z0)) res%z0 = z0
+    if (present(z0H)) then
+      res%z0H = z0H
+    else
+      res%z0H = res%z0
+    end if
     res%rough = res%z0 > 0
     if (present(temperature_flux)) res%temperature_flux = temperature_flux
     if (present(moisture_flux)) res%moisture_flux = moisture_flux
   end function
+
 
 end module SolidBodies
