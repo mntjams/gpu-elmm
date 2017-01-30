@@ -219,12 +219,15 @@ contains
     end forall
     !$omp end  workshare nowait
     
+
     if (allocated(g%Uinavg)) then
       !$omp workshare
-      g%compat = sum(g%Uinavg(1:Prny,1:Prnz))
+      g%compat = sum(g%Uinavg(1:Uny,1:Unz))
       !$omp end  workshare
     else
+      !$omp single
       g%compat = 0
+      !$omp end single
     end if
     !$omp end  parallel
 #ifdef PAR
@@ -326,27 +329,20 @@ contains
       !$omp end parallel do
     end if
 
-    if (g%direction==We .or. g%direction==Ea) then
-      !$omp parallel workshare
-      p = sum(Uin(1:Prny,1:Prnz))
-      !$omp end parallel workshare
-    else if (g%direction==So .or. g%direction==No) then
-      !$omp parallel workshare
-      p = sum(Vin(1:Prny,1:Prnz))
-      !$omp end parallel workshare
-    end if
+    !$omp parallel workshare
+    p = sum(Uin(1:Uny,1:Unz))
+    !$omp end parallel workshare
 
-    if (g%direction==We .or. g%direction==Ea .or. &
-        g%direction==So .or. g%direction==No) then
+
 #ifdef PAR
-      p = par_co_sum(p)
+    p = par_co_sum(p)
 #endif
-      p = g%compat / p                  !To ensure the g%compatibility condition.
+    p = g%compat / p                  !To ensure the g%compatibility condition.
 
-      call multiply(Uin, p)
-      call multiply(Vin, p)
-      call multiply(Win, p)
-    end if
+    call multiply(Uin, p)
+    call multiply(Vin, p)
+    call multiply(Win, p)
+
 
 
     call BoundUin(1, Uin)
@@ -532,6 +528,10 @@ contains
         g%Vinavg = g%Uinavg * sin(windangle / 180._knd * pi)
         g%Uinavg = g%Uinavg * cos(windangle / 180._knd * pi)
     end if
+    
+    where(Utype(0,:,:) > 0) g%Uinavg = 0
+    where(Vtype(0,:,:) > 0) g%Vinavg = 0
+    where(Wtype(0,:,:) > 0) g%Winavg = 0
 
   end subroutine turbulence_generator_init_mean_profiles
 
