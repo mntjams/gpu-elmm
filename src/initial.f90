@@ -15,7 +15,8 @@ module Initial
   use Subgrid
   use Turbinlet, only: default_turbulence_generator, GetInletFromFile
   use SolarRadiation, only: InitSolarRadiation
-  use SolidBodies, only: obstacles_file, roughness_file, displacement_file, InitSolidBodies
+  use SolidBodies, only: obstacles_file, &
+                         InitSolidBodies
   use ImmersedBoundary, only: GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
   use VolumeSources!, only: InitVolumeSources, InitVolumeSourceBodies, ScalarFlVolume, ScalarFlVolumesContainer
   use AreaSources, only: InitAreaSources
@@ -78,8 +79,6 @@ contains
    integer :: masssourc
 
    real(knd) :: Re = 70000, Prandtl = 0.7!1/molecular viscosity, viscosity/thermal diffusivity
-
-   namelist /obstacles/ obstacles_file, roughness_file, displacement_file
 
    interface get
      procedure chget1
@@ -596,18 +595,7 @@ contains
    end if
 
 
-   open(unit,file="obstacles.conf",status="old",action="read",iostat = io)
-   if (io==0) then
-     read(unit,nml=obstacles,iostat=io,iomsg=msg)
-     if (io/=0) then
-       if (master) write(*,*) io,"Error reading from obstacles.conf."
-       if (master) write(*,*) msg
-       if (master) write(*,*) command_line
-     end if
-     close(unit)
-   end if
-
-   if (master) write(*,*) "num_of_scalars",num_of_scalars
+   if (master) write(*,*) "num_of_scalars", num_of_scalars
 
    call parse_command_line
 
@@ -1126,10 +1114,10 @@ contains
     !stat 2    .. inconsistent number of components in an array in fields_a
     !stat 11   .. unexpected type of variable in fields
     !stat 12   .. unexpected type of variable in fields_a
-    type(field_names), intent(in), optional :: fields(:)
-    type(field_names_a), intent(in), optional :: fields_a(:)
+    type(field_names), intent(inout), optional :: fields(:)
+    type(field_names_a), intent(inout), optional :: fields_a(:)
     type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
-    type(field_names_str), intent(in), optional :: fields_str(:)
+    type(field_names_str), intent(inout), optional :: fields_str(:)
 
     integer :: iobj
 
@@ -1170,10 +1158,10 @@ contains
     !stat 2    .. inconsistent number of components in an array in fields_a
     !stat 11   .. unexpected type of variable in fields
     !stat 12   .. unexpected type of variable in fields_a
-    type(field_names), intent(in), optional :: fields(:)
-    type(field_names_a), intent(in), optional :: fields_a(:)
+    type(field_names), intent(inout), optional :: fields(:)
+    type(field_names_a), intent(inout), optional :: fields_a(:)
     type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
-    type(field_names_str), intent(in), optional :: fields_str(:)
+    type(field_names_str), intent(inout), optional :: fields_str(:)
 
     integer :: i, j
 
@@ -1283,6 +1271,166 @@ fields_do:  do j = 1, size(obj_fields)
 
     end if
   end subroutine get_object_field_values
+  
+  
+  
+  subroutine get_obstacles(fname)
+    use Strings
+    use ParseTrees
+    use GeometricShapes
+    use SolidBodies
+    use ArrayUtilities, only: cross_product
+    
+    character(*), intent(in) :: fname
+
+    type(tree_object), allocatable :: tree(:)
+
+    type(field_names) :: names_base(4)
+    type(field_names_a) :: names_plane_a(5)
+    
+    type(field_names_str) :: names_file_str(1)
+    
+    type obstacle_cfg
+      real(knd) :: z0 = -1, z0H = -1
+      real(knd) :: moisture_flux = 0, temperature_flux = 0
+    end type
+    
+    type :: file_cfg
+      character(char_len) :: file = ""
+    end type
+    
+    type :: plane_cfg
+      real(knd) :: point1(3) = 0, point2(3) = 0, point3(3) = 0
+      real(knd) :: point(3) = 0, vec(3) = 0
+    end type
+    
+    type(obstacle_cfg) :: base
+    type(file_cfg), target :: o_file
+    type(plane_cfg), target :: o_plane
+    
+    logical :: ex
+    integer :: iobj, stat
+    
+    real(knd) :: vec(3)
+    
+    class(GeometricShape), allocatable :: gs
+    
+    names_base = [field_names_init("z0",  base%z0), &
+                  field_names_init("z0H", base%z0H), &
+                  field_names_init("temperature_flux", base%temperature_flux), &
+                  field_names_init("moisture_flux",    base%moisture_flux)]
+
+    names_file_str = [field_names_str("file", o_file%file)]
+
+    names_plane_a = [field_names_a_init("point1", o_plane%point1), &
+                     field_names_a_init("point2", o_plane%point2), &
+                     field_names_a_init("point3", o_plane%point3), &
+                     field_names_a_init("point",  o_plane%point), &
+                     field_names_a_init("vec",    o_plane%vec)]
+
+                 
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat/=0) then
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+    end if
+  
+    if (.not.allocated(tree)) then
+      write(*,*) "Error, no content in " // fname
+      call error_stop
+    end if
+
+    do iobj = 1, size(tree)
+    
+      base = obstacle_cfg()
+    
+      if (downcase(tree(iobj)%name)=="obstacle_file") then
+      
+        o_file = file_cfg()
+        
+        call get_object_field_values(tree(iobj), stat, &
+                                     fields_str = names_file_str)
+                                     
+        if (stat/=0) then
+          call error_stop("Error interpretting obstacle_file fields in " // trim(fname))
+        end if
+        
+        
+        allocate(gs, source=GeometricShape(o_file%file))
+        
+        
+      else if (downcase(tree(iobj)%name)=="plane") then
+      
+        o_plane = plane_cfg()
+        
+        call get_object_field_values(tree(iobj), stat, &
+                                     fields_a = names_plane_a)
+                                     
+        if (stat/=0) then
+          call error_stop("Error interpretting plane fields in " // trim(fname))
+        end if
+        
+        
+        if (any(o_plane%point1/=0) .or. &
+            any(o_plane%point2/=0)   .or. &
+            any(o_plane%point3/=0)) then
+            
+          vec = cross_product(o_plane%point3-o_plane%point2, o_plane%point1-o_plane%point2)
+          
+          if (norm2(vec)<epsilon(vec)) then
+            write(*,*) "Error, plane points:"
+            write(*,*) "point1:",o_plane%point1
+            write(*,*) "point2:",o_plane%point2
+            write(*,*) "point3:",o_plane%point3
+            write(*,*) "defined in file '",trim(fname),"',"
+            write(*,*) "lie on a single line." 
+            call error_stop
+          end if
+            
+          allocate(gs, source = Plane(point1 = o_plane%point1, &
+                                      point2 = o_plane%point2, &
+                                      point3 = o_plane%point3))
+        else if (any(o_plane%vec>0)) then
+          allocate(gs, source = Plane(point = o_plane%point, &
+                                      vec   = o_plane%vec))
+        else
+          call error_stop("Error, unable to interpret plane orientation in file '"//trim(fname)//"'.")
+        end if
+        
+      else 
+        call error_stop("Error, unknown object type '"//trim(tree(iobj)%name)//"' in file '"//trim(fname)//"'.")
+      end if
+      
+      if (allocated(gs)) then
+        if (base%z0 >= 0 .and. base%z0H >= 0) then
+          call AddSolidBody(SolidBody(gs, &
+                                      z0 = base%z0, z0H = base%z0H, &
+                                      temperature_flux = base%temperature_flux, &
+                                      moisture_flux = base%moisture_flux))
+        else if (base%z0 >= 0) then
+          call AddSolidBody(SolidBody(gs, &
+                                      z0 = base%z0, &
+                                      temperature_flux = base%temperature_flux, &
+                                      moisture_flux = base%moisture_flux))
+        else
+          call AddSolidBody(SolidBody(gs, &
+                                      temperature_flux = base%temperature_flux, &
+                                      moisture_flux = base%moisture_flux))
+        end if
+      
+        deallocate(gs)
+      end if
+      
+      call tree(iobj)%finalize
+    end do
+    
+  end subroutine get_obstacles
+  
 
     
 
@@ -2024,12 +2172,13 @@ fields_do:  do j = 1, size(obj_fields)
     logical :: ex
     integer :: iobj, stat
 
-    type(field_names) :: names(7)
+    type(field_names) :: names(8)
     type(field_names_a) :: names_a(2)
     type(field_names_a_int_alloc) :: names_a_int_alloc(1)
     
     logical, target :: enable_multiple_domains_l = .false.
     logical, target :: is_two_way_nested_l = .false.
+    logical, target :: receive_initial_conditions_from_parent_l = .false.
     integer, target :: number_of_domains_l = -99
     integer, target :: domain_index_l = -99
     integer, target :: parent_domain_l = -99
@@ -2041,6 +2190,7 @@ fields_do:  do j = 1, size(obj_fields)
 
     names = [field_names_init("enable_multiple_domains", enable_multiple_domains_l), &
              field_names_init("is_two_way_nested",   is_two_way_nested_l), &
+             field_names_init("receive_initial_conditions",   receive_initial_conditions_from_parent_l), &
              field_names_init("domain_index",   domain_index_l), &
              field_names_init("parent_domain",   parent_domain_l), &
              field_names_init("number_of_domains",   number_of_domains_l), &
@@ -2116,6 +2266,8 @@ fields_do:  do j = 1, size(obj_fields)
           call error_stop("Error, child_domains shall be specified if domain_index < number_of_domains. &
                           & It may be empty.")
         end if
+        
+        receive_initial_conditions_from_parent = receive_initial_conditions_from_parent_l
           
         is_this_domain_two_way_nested = is_two_way_nested_l
 
@@ -3281,7 +3433,9 @@ fields_do:  do j = 1, size(obj_fields)
     end if
 
     call par_sync_out("  ...preparing solid bodies.")
-   !prepare the geometry of the solid bodies
+    !read solid bodies in obstacles.conf
+    call get_obstacles("obstacles.conf")
+    !prepare the geometry of the solid bodies
     call InitSolidBodies
 
     call par_sync_out("  ...volume source bodies.")

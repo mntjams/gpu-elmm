@@ -99,7 +99,7 @@ module Parameters
 
     real(knd) :: U_max(3) = 0     !velocity used to compute minimal_dt
 
-    real(knd) :: U_min(3) = 0     !velocity used to compute minimal_dt
+    real(knd) :: U_min(3) = 0     !velocity used to compute maximal_dt
 
     real(knd) :: CFL = 0.3        !CFL used to compute dt, or computed dt if CFL is fixed
 

@@ -60,10 +60,10 @@ module custom_par
   logical :: receive_initial_conditions_from_parent = .true.
 
   !ratio of grid sizes between the outer domain and this domain
-  integer :: domain_spatial_ratio = 3
+  integer :: domain_spatial_ratio = 1
 
   !ratio of time-step size between the outer domain and this domain
-  integer :: domain_time_step_ratio = 3
+  integer :: domain_time_step_ratio = 1
 
   
   type domain_proc_grid
@@ -87,7 +87,7 @@ module custom_par
   !is this domain double nested in its parent?
   logical, allocatable :: domain_is_domain_two_way_nested(:)
 
-  !index, boundary
+  !boundary, domain index
   logical, allocatable :: domain_is_boundary_nested(:,:)
 
   type domain_computational_grids
@@ -95,6 +95,8 @@ module custom_par
     real(knd) :: dx, dy, dz
     !numbers of cells
     integer   :: nx, ny, nz
+    !spatial ratio relative to the parent of this domain (if applicable)
+    integer   :: spatial_ratio
     !offsets to global grid numbering in the domain offsets_x(nxims), offsets_y(nyims), offsets_z(nzims)
     integer, allocatable :: offsets_x(:), offsets_y(:), offsets_z(:)
     !numbers of cells nxs(nxims), nys(nyims), nzs(nzims)
@@ -642,6 +644,8 @@ contains
     domain_grids(domain_index)%nx = gPrnx
     domain_grids(domain_index)%ny = gPrny
     domain_grids(domain_index)%nz = gPrnz
+    
+    domain_grids(domain_index)%spatial_ratio = domain_spatial_ratio
 
     do dom = 1, number_of_domains
       call MPI_Bcast(domain_grids(dom)%xmin, 1, &
@@ -669,6 +673,9 @@ contains
       call MPI_Bcast(domain_grids(dom)%ny, 1, &
                      MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
       call MPI_Bcast(domain_grids(dom)%nz, 1, &
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
+
+      call MPI_Bcast(domain_grids(dom)%spatial_ratio, 1, &
                      MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
 
     end do

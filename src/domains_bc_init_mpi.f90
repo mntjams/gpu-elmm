@@ -321,7 +321,11 @@ contains
         b%comm = world_comm
         b%remote_rank = domain_ranks_grid(domain)%arr(im(1),im(2),im(3))
         b%remote_domain = domain
+        
         b%direction = dir
+        
+        b%spatial_ratio = domain_grids(domain)%spatial_ratio
+
         b%enabled = .true.
 
         !get the child image extent
@@ -1224,9 +1228,11 @@ contains
       b%remote_image = im
       b%remote_rank = domain_ranks_grid(child_domain)%arr(im(1),im(2),im(3))
 
-      b%is_two_way_nested = domain_is_domain_two_way_nested(child_domain)
+      b%spatial_ratio = domain_grids(child_domain)%spatial_ratio
 
-      !get the child image extent
+      b%is_two_way_nested = domain_is_domain_two_way_nested(child_domain)
+      
+      !Get the child image extent.
       cxmin = domain_grids(child_domain)%xmins(im(1))
       cxmax = domain_grids(child_domain)%xmaxs(im(1))
       cymin = domain_grids(child_domain)%ymins(im(2))
@@ -1234,72 +1240,121 @@ contains
       czmin = domain_grids(child_domain)%zmins(im(3))
       czmax = domain_grids(child_domain)%zmaxs(im(3))
 
-      !find the child grid indexes
+      !Find the child grid indexes.
       cxi1 = x_coord(cxmin)
       cxi2 = x_coord(cxmax)
       cyj1 = y_coord(cymin)
       cyj2 = y_coord(cymax)
       czk1 = z_coord(czmin)
       czk2 = z_coord(czmax)
-
-      !check that child image does not exceed this (parent) image
-      if (cxmin < im_xmin - dxmin/100) then
+      
+      !Check that grid cell dimensions correspond to the specified spatial refinement ratio.
+      if (abs(dxmin/domain_grids(child_domain)%dx - b%spatial_ratio) > epsilon(real(b%spatial_ratio,knd))) then
+        write(*,*) "Error, inconsistent specification of the grid refinement ratio and cell sizes of domain ",child_domain,"."
+        write(*,*) "spatial_ratio specified:",b%spatial_ratio
+        write(*,*) "parent dx:",dxmin
+        write(*,*) "child dx:",domain_grids(child_domain)%dx
+        write(*,*) "ratio:",dxmin/domain_grids(child_domain)%dx
+        call error_stop()
+      end if
+      if (abs(dymin/domain_grids(child_domain)%dy - b%spatial_ratio) > epsilon(real(b%spatial_ratio,knd))) then
+        write(*,*) "Error, inconsistent specification of the grid refinement ratio and cell sizes of domain ",child_domain,"."
+        write(*,*) "spatial_ratio specified:",b%spatial_ratio
+        write(*,*) "parent dy:",dymin
+        write(*,*) "child dy:",domain_grids(child_domain)%dy
+        call error_stop()
+      end if
+      if (abs(dzmin/domain_grids(child_domain)%dz - b%spatial_ratio) > epsilon(real(b%spatial_ratio,knd))) then
+        write(*,*) "Error, inconsistent specification of the grid refinement ratio and cell sizes of domain ",child_domain,"."
+        write(*,*) "spatial_ratio specified:",b%spatial_ratio
+        write(*,*) "parent dz:",dzmin
+        write(*,*) "child dz:",domain_grids(child_domain)%dz
+        call error_stop()
+      end if
+      
+      
+      !Check that child image does not exceed this (parent) image.
+      !It may exceed it if no neighbouring boundary is nested and two-way nesing is disabled.
+      if ((cxmin < im_xmin - dxmin/100) .and. &
+          (b%is_two_way_nested  .or. &
+           any(domain_is_boundary_nested([We,So,No,Bo,To],child_domain)))) then
         write(*,*) "Child image",im,"has lower x bound", cxmin, &
                    " which is lower than the lower x bound", im_xmin , &
                    "of parent image",iim,jim,kim
         call error_stop()
       end if
-      if (cxmax > im_xmax + dxmin/100) then
+      if ((cxmax > im_xmax + dxmin/100) .and. &
+          (b%is_two_way_nested  .or. &
+           any(domain_is_boundary_nested([Ea,So,No,Bo,To],child_domain)))) then
         write(*,*) "Child image",im,"has upper x bound", cxmax, &
                    " which is higher than the upper x bound", im_xmax , &
                    "of parent image",iim,jim,kim
         call error_stop()
       end if
-      if (cymin < im_ymin - dymin/100) then
+      if ((cymin < im_ymin - dymin/100) .and. &
+          (b%is_two_way_nested  .or. &
+           any(domain_is_boundary_nested([We,Ea,So,Bo,To],child_domain)))) then
         write(*,*) "Child image",im,"has lower y bound", cymin, &
                    " which is lower than the lower y bound", im_ymin , &
                    "of parent image",iim,jim,kim
         call error_stop()
       end if
-      if (cymax > im_ymax + dymin/100) then
+      if ((cymax > im_ymax + dymin/100) .and. &
+          (b%is_two_way_nested  .or. &
+           any(domain_is_boundary_nested([We,Ea,No,Bo,To],child_domain)))) then
         write(*,*) "Child image",im,"has upper y bound", cymax, &
                    " which is higher than the upper y bound", im_ymax , &
                    "of parent image",iim,jim,kim
         call error_stop()
       end if
-      if (czmin < im_zmin - dzmin/100) then
+      if ((czmin < im_zmin - dzmin/100) .and. &
+          (b%is_two_way_nested  .or. &
+           any(domain_is_boundary_nested([We,Ea,So,No,Bo],child_domain)))) then
         write(*,*) "Child image",im,"has lower z bound", czmin, &
                    " which is lower than the lower z bound", im_zmin , &
                    "of parent image",iim,jim,kim
         call error_stop()
       end if
-      if (czmax > im_zmax + dzmin/100) then
+      if ((czmax > im_zmax + dzmin/100) .and. &
+          (b%is_two_way_nested  .or. &
+           any(domain_is_boundary_nested([We,Ea,So,No,To],child_domain)))) then
         write(*,*) "Child image",im,"has upper z bound", czmax, &
                    " which is higher than the upper z bound", im_zmax , &
                    "of parent image",iim,jim,kim
         call error_stop()
       end if
-
-      !check that the grids are aligned
-      if (.not.(abs(cxi1*dxmin + im_xmin - cxmin) < dxmin/100)) &
+      
+      
+      
+      !Check that the grids are aligned.
+      !Disregard if the boundary is outside of the parent domain (checked above).
+      if ((cxmin>im_xmin-dxmin/10 .and. cxmin<im_xmax+dxmin/10) .and. &
+          .not.(abs(cxi1*dxmin + im_xmin - cxmin) < dxmin/100)) &
         call error_stop("The west boundary of domains "//itoa(domain_index)// &
                         " and "//itoa(child_domain)//" is not aligned.")
-      if (.not.(abs(cxi2*dxmin + im_xmin - cxmax) < dxmin/100)) &
+      if ((cxmax>im_xmin-dxmin/10 .and. cxmax<im_xmax+dxmin/10) .and. &
+          .not.(abs(cxi2*dxmin + im_xmin - cxmax) < dxmin/100)) &
         call error_stop("The east boundary of domains "//itoa(domain_index)// &
                         " and "//itoa(child_domain)//" is not aligned.")
-      if (.not.(abs(cyj1*dymin + im_ymin - cymin) < dymin/100)) &
+      if ((cymin>im_ymin-dymin/10 .and. cymin<im_ymax+dymin/10) .and. &
+          .not.(abs(cyj1*dymin + im_ymin - cymin) < dymin/100)) &
         call error_stop("The south boundary of domains "//itoa(domain_index)// &
                         " and "//itoa(child_domain)//" is not aligned.")
-      if (.not.(abs(cyj2*dymin + im_ymin - cymax) < dymin/100)) &
+      if ((cymax>im_ymin-dymin/10 .and. cymax<im_ymax+dymin/10) .and. &
+          .not.(abs(cyj2*dymin + im_ymin - cymax) < dymin/100)) &
         call error_stop("The north boundary of domains "//itoa(domain_index)// &
                         " and "//itoa(child_domain)//" is not aligned.")
-      if (.not.(abs(czk1*dzmin + im_zmin - czmin) < dzmin/100)) &
+      if ((czmin>im_zmin-dzmin/10 .and. czmin<im_zmax+dzmin/10) .and. &
+          .not.(abs(czk1*dzmin + im_zmin - czmin) < dzmin/100)) &
         call error_stop("The bottom boundary of domains "//itoa(domain_index)// &
                         " and "//itoa(child_domain)//" is not aligned.")
-      if (.not.(abs(czk2*dzmin + im_zmin - czmax) < dzmin/100)) &
+      if ((czmax>im_zmin-dzmin/10 .and. czmax<im_zmax+dzmin/10) .and. &
+          .not.(abs(czk2*dzmin + im_zmin - czmax) < dzmin/100)) &
         call error_stop("The top boundary of domains "//itoa(domain_index)// &
                         " and "//itoa(child_domain)//" is not aligned.")
 
+
+      
 
       !corresponds to index 0 on the child grid
       b%i1 = cxi1

@@ -378,7 +378,7 @@ contains
      num_of_scalars = 0
    end if
 
-   where (Btype==TURBULENTINLET.or.Btype==INLETFROMFILE) Btype = NEUMANN
+   where (Btype==BC_TURBULENT_INLET.or.Btype==BC_INLET_FROM_FILE) Btype = BC_NEUMANN
 
    if (staggered == 1) then
      Prnx = g%nx
@@ -588,7 +588,7 @@ program interpolate_new_grid
 
   
   if (staggered==1) then
-    if (enable_bc.and.Btype(Ea)==PERIODIC) then
+    if (enable_bc.and.Btype(Ea)==BC_PERIODIC) then
       lo = old%x(1) - old%dx
       up = old%x(old%nx)
       new%dx = (up - lo) / new%nx
@@ -614,7 +614,7 @@ program interpolate_new_grid
   end if
   
   if (staggered==2) then
-    if (enable_bc.and.Btype(No)==PERIODIC) then
+    if (enable_bc.and.Btype(No)==BC_PERIODIC) then
       lo = old%y(1) - old%dy
       up = old%y(old%ny)
       new%dy = (up - lo) / new%ny
@@ -640,7 +640,7 @@ program interpolate_new_grid
   end if
 
   if (staggered==3) then
-    if (enable_bc.and.Btype(To)==PERIODIC) then
+    if (enable_bc.and.Btype(To)==BC_PERIODIC) then
       lo = old%z(1) - old%dz
       up = old%z(old%nz)
       new%dz = (up - lo) / new%nz
@@ -967,7 +967,7 @@ contains
     ny = old%ny
     nz = old%nz
     
-    if (Btype(Ea)==PERIODIC) then
+    if (Btype(Ea)==BC_PERIODIC) then
       do k = 1,nz
        do j = 1,ny
          a(-2:0,j,k) = a(nx-2:nx,j,k)
@@ -983,7 +983,7 @@ contains
       end do
     end if
 
-    if (Btype(No)==PERIODIC) then
+    if (Btype(No)==BC_PERIODIC) then
       do k = 1,nz
        do i = -2,nx+3
          a(i,-2:0,k) = a(i,ny-2:ny,k)
@@ -999,7 +999,7 @@ contains
       end do
     end if
     
-    if (Btype(To)==PERIODIC) then
+    if (Btype(To)==BC_PERIODIC) then
       do j = -2,ny+3
        do i = -2,nx+3
          a(i,j,-2:0) = a(i,j,nz-2:nz)
