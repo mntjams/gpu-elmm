@@ -86,14 +86,14 @@ program CLMM
       if (master) then
         if (enable_multiple_domains) then
           write (*,'(a,i0,a,i12,a,f12.6)') "domain: ", domain_index, &
-                                           " tstep: ", time_step, &
-                                           " time: ",  time_stepping%time
+                                           "   tstep: ", time_step, &
+                                           "   time: ",  time_stepping%time
         else
-          write (*,'(a,i12,a,f12.6)') "tstep: ", time_step, "time: ", time_stepping%time
+          write (*,'(a,i12,a,f12.6)') "tstep: ", time_step, "   time: ", time_stepping%time
         end if
       end if
 #else
-      write (*,'(a,i12,a,f12.6)') "tstep: ", time_step, "time: ", time_stepping%time
+      write (*,'(a,i12,a,f12.6)') "tstep: ", time_step, "   time: ", time_stepping%time
 #endif
 
 
