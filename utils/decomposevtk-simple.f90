@@ -235,7 +235,7 @@ program decomposevtk
   call GetEndianness
 
   if (command_argument_count()<2) then
-    write(*,*) "Usage: joinvtk file_name npx,npy,npz"
+    write(*,*) "Usage: joinvtk file_name npx,npy,npz nx,ny,nz"
     stop 1
   end if
  
