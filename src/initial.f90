@@ -1810,11 +1810,15 @@ fields_do:  do j = 1, size(obj_fields)
     integer :: iobj, stat
 
     logical, target :: constant_time_steps = .false.
+    
+    character(char_len), target :: clock_time_limit_str = ""
 
-    type(field_names) :: names(12)
+    type(field_names) :: names(13)
     type(field_names_a) :: names_a(3)
+    type(field_names_str) :: names_str(1)
 
     names = [field_names_init("max_number_of_time_steps",   t_s%max_number_of_time_steps), &
+             field_names_init("check_period",               t_s%check_period), &
              field_names_init("variable_time_steps",        t_s%variable_time_steps), &
              field_names_init("constant_time_steps",        constant_time_steps), &
              field_names_init("enable_U_scaling",           t_s%enable_U_scaling), &
@@ -1830,6 +1834,8 @@ fields_do:  do j = 1, size(obj_fields)
     names_a = [field_names_a_init("U_scaling", t_s%U_scaling), &
                field_names_a_init("U_max",     t_s%U_max), &
                field_names_a_init("U_min",     t_s%U_min)]
+               
+    names_str = [field_names_str("clock_time_limit", clock_time_limit_str)]
 
     inquire(file=fname, exist=ex)
 
@@ -1841,7 +1847,7 @@ fields_do:  do j = 1, size(obj_fields)
 
       if (allocated(tree)) then
         call find_object_get_field_values(tree, "time_stepping", stat, &
-                                     fields = names, fields_a = names_a)
+                                     fields = names, fields_a = names_a, fields_str = names_str)
 
         if (stat<=0) then
           call init
@@ -1872,6 +1878,7 @@ fields_do:  do j = 1, size(obj_fields)
   contains
 
     subroutine init
+      integer :: l, mult, stat
 
       if (t_s%dt_constant > 0) constant_time_steps = .true.
 
@@ -1928,7 +1935,35 @@ fields_do:  do j = 1, size(obj_fields)
 
       end if
       
+      l = len_trim(clock_time_limit_str)
+      if (l > 0) then
+        clock_time_limit_str = downcase(clock_time_limit_str)
+        
+        select case (clock_time_limit_str(l:l))
+          case ('s')
+            mult = 1
+          case ('m')
+            mult = 60
+          case ('h')
+            mult = 3600
+          case ('d')
+            mult = 86400
+          case ('w')
+            mult = 604800
+          case default
+            call error_stop("Error, clock_time_limit requires units: s, m, h, d or w.")
+        end select
     
+        read(clock_time_limit_str(1:l-1),*, iostat=stat) time_stepping%clock_time_limit
+        
+        if (stat/=0) then
+          write(*,*) "Error interpretting the clock_time_limit value. Received: '",clock_time_limit_str(1:l-1),"'."
+          call error_stop()
+        end if
+        
+        time_stepping%clock_time_limit = time_stepping%clock_time_limit * mult
+      end if
+
     end subroutine
 
   end subroutine get_time_stepping

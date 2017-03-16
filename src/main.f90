@@ -31,7 +31,12 @@ program CLMM
 
   real(knd) :: time_step_time
 
-  integer(dbl) :: time_steps_timer_count_1, time_steps_timer_count_2
+  integer(dbl) :: time_steps_timer_count_start, &
+                  time_steps_timer_count_1, &
+                  time_steps_timer_count_2, &
+                  timer_max_count
+  
+  integer(dbl) :: timer_count_time_limit
 
   logical :: error_exit = .false.
 
@@ -41,6 +46,9 @@ program CLMM
   call GetEndianness
 
 
+  call system_clock(count = time_steps_timer_count_start)  
+  
+  
   call par_sync_out("Reading parameters...")
   call ReadConfiguration
 
@@ -60,6 +68,9 @@ program CLMM
                          Temperature ,Moisture, Scalar, &
                          time_stepping%dt)
 
+
+  call InitTimer
+
   time_stepping%time = time_stepping%start_time
   time_step = 0
 
@@ -69,8 +80,6 @@ program CLMM
   
   init_phase = .false.
   run_phase = .true.
-
-  call system_clock(count_rate = timer_rate)
 
   if (time_stepping%end_time > time_stepping%start_time) then
 
@@ -153,6 +162,18 @@ program CLMM
         error_exit = .true.
         exit
       endif
+      
+      !don't check that often to avoid synchronizing unnecesarilly
+      if (mod(time_step,time_stepping%check_period)==0) then
+        if (master) then
+          error_exit = time_steps_timer_count_2 - time_steps_timer_count_start > timer_count_time_limit
+          if (error_exit) write(*,*) "Maximum clock time exceeded."
+        end if
+        
+        call par_co_broadcast(error_exit, master_im)
+        
+        if (error_exit) exit
+      end if
 
       time_step = time_step + 1
       
@@ -271,6 +292,16 @@ contains
     if (allocated(BsideMFlArr)) deallocate(BsideMFlArr)
 
 
+  end subroutine
+  
+  
+  subroutine InitTimer
+    call system_clock(count_rate = timer_rate)
+    call system_clock(count_max = timer_max_count)   
+    timer_count_time_limit = int( min(time_stepping%clock_time_limit &
+                                        * real(timer_rate, knd),  &
+                                      real(timer_max_count, knd) * 0.999_dbl) &
+                                , dbl)  
   end subroutine
 
 

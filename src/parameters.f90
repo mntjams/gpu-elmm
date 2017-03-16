@@ -80,6 +80,11 @@ module Parameters
   
   type time_step_control
     integer   :: max_number_of_time_steps = 2**30 !maximum number of time steps
+    
+    integer :: check_period = 100 !how often check for a change in the input file 
+                                  !or if the time limit has been exceeded
+                                  
+    real(knd) :: clock_time_limit = huge(1._tim)
 
     logical   :: variable_time_steps = .true.
 
