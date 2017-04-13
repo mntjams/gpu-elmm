@@ -1285,6 +1285,7 @@ fields_do:  do j = 1, size(obj_fields)
 
     type(tree_object), allocatable :: tree(:)
 
+    type(field_names) :: names_bbox(6)
     type(field_names) :: names_base(4)
     type(field_names_a) :: names_plane_a(5)
     
@@ -1304,6 +1305,13 @@ fields_do:  do j = 1, size(obj_fields)
       real(knd) :: point(3) = 0, vec(3) = 0
     end type
     
+    type :: bbox_cfg
+      real(knd) :: xmin = -huge(1._knd)/2, xmax = huge(1._knd)
+      real(knd) :: ymin = -huge(1._knd)/2, ymax = huge(1._knd)
+      real(knd) :: zmin = -huge(1._knd)/2, zmax = huge(1._knd)
+    end type
+    
+    type(bbox_cfg) :: o_bbox
     type(obstacle_cfg) :: base
     type(file_cfg), target :: o_file
     type(plane_cfg), target :: o_plane
@@ -1315,6 +1323,13 @@ fields_do:  do j = 1, size(obj_fields)
     
     class(GeometricShape), allocatable :: gs
     
+    names_bbox = [field_names_init("xmin", o_bbox%xmin), &
+                  field_names_init("xmax", o_bbox%xmax), &
+                  field_names_init("ymin", o_bbox%ymin), &
+                  field_names_init("ymax", o_bbox%ymax), &
+                  field_names_init("zmin", o_bbox%zmin), &
+                  field_names_init("zmax", o_bbox%zmax)]
+
     names_base = [field_names_init("z0",  base%z0), &
                   field_names_init("z0H", base%z0H), &
                   field_names_init("temperature_flux", base%temperature_flux), &
@@ -1349,7 +1364,18 @@ fields_do:  do j = 1, size(obj_fields)
     
       base = obstacle_cfg()
     
-      if (downcase(tree(iobj)%name)=="obstacle_file") then
+      if (downcase(tree(iobj)%name)=="obstacles_bbox") then
+      
+         call get_object_field_values(tree(iobj), stat, &
+                                     fields = names_bbox)
+                                     
+        if (stat/=0) then
+          call error_stop("Error interpretting obstacle_file fields in " // trim(fname))
+        end if
+        
+        call init_bbox
+        
+     else if (downcase(tree(iobj)%name)=="obstacle_file") then
       
         o_file = file_cfg()
         
@@ -1428,6 +1454,17 @@ fields_do:  do j = 1, size(obj_fields)
       
       call tree(iobj)%finalize
     end do
+    
+  contains
+  
+    subroutine init_bbox
+      if (o_bbox%xmin > -huge(1._knd)/2) obstacles_bbox(We) = o_bbox%xmin
+      if (o_bbox%xmax <  huge(1._knd)/2) obstacles_bbox(Ea) = o_bbox%xmax
+      if (o_bbox%ymin > -huge(1._knd)/2) obstacles_bbox(So) = o_bbox%ymin
+      if (o_bbox%ymax <  huge(1._knd)/2) obstacles_bbox(No) = o_bbox%ymax
+      if (o_bbox%zmin > -huge(1._knd)/2) obstacles_bbox(Bo) = o_bbox%zmin
+      if (o_bbox%zmax <  huge(1._knd)/2) obstacles_bbox(To) = o_bbox%zmax
+    end subroutine
     
   end subroutine get_obstacles
   
