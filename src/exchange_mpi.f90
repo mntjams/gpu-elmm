@@ -4,7 +4,8 @@ module exchange_par
                         nxims, nyims, nzims, iim, jim, kim, myrank
 
 #ifdef MPI
-  use custom_mpi, only: MPI_knd, MPI_STATUS_SIZE, MPI_REQUEST_NULL
+  use custom_mpi, only: MPI_knd, MPI_STATUS_SIZE, MPI_REQUEST_NULL, &
+                        MPI_STATUS_IGNORE, MPI_STATUSES_IGNORE
 #endif
 
   use Parameters, only: We, Ea, So, No, Bo, To, BC_MPI_PERIODIC
@@ -78,11 +79,11 @@ contains
     integer, intent(in), optional :: dir
     integer :: ierr
     logical :: xdir, ydir, zdir
-    integer :: requests(12), statuses(MPI_STATUS_SIZE,12)
+    integer :: requests(12)
     
     requests = MPI_REQUEST_NULL
     
-    ierr = 0; statuses = 0
+    ierr = 0
     
     if (present(dir)) then
       xdir = .false.
@@ -174,7 +175,7 @@ contains
       end if
     end if
     
-    call MPI_Waitall(size(requests), requests, statuses, ierr)
+    call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, ierr)
     
   contains
   
@@ -314,7 +315,7 @@ contains
     logical :: oddx, oddy, oddz, evenx, eveny, evenz
     integer :: ierr
     integer :: nx, ny, nz
-    integer :: requests(12), statuses(MPI_STATUS_SIZE,12)
+    integer :: requests(12)
     
     requests = MPI_REQUEST_NULL
     
@@ -367,7 +368,7 @@ contains
       end if
     end if
 
-    call MPI_Waitall(size(requests), requests, statuses, ierr)    
+    call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, ierr)    
     
   contains
   
@@ -445,7 +446,7 @@ contains
                           nx=>Prnx, ny=>Prny, nz=>Prnz, Btype
     real(knd), intent(inout), contiguous :: Phi(0:,0:,0:)
     integer :: ierr
-    integer :: requests(12), statuses(MPI_STATUS_SIZE,12)
+    integer :: requests(12)
     real(knd) :: tmp_w(ny,nz), tmp_e(ny,nz), &
                  tmp_s(nx+2,nz), tmp_n(nx+2,nz), &
                  tmp_b(nx+2,ny+2), tmp_t(nx+2,ny+2)
@@ -453,7 +454,7 @@ contains
     
     requests = MPI_REQUEST_NULL
 
-    ierr = 0; statuses = 0
+    ierr = 0
     
     update = .false.
     
@@ -512,7 +513,7 @@ contains
       end if
     end if
     
-    call MPI_Waitall(6, requests(7:12), statuses(:,7:12), ierr)
+    call MPI_Waitall(6, requests(7:12), MPI_STATUSES_IGNORE, ierr)
     
     if (update(We)) Phi(1,1:ny,1:nz) = Phi(1,1:ny,1:nz) + tmp_w
     if (update(Ea)) Phi(nx,1:ny,1:nz) = Phi(nx,1:ny,1:nz) + tmp_e
@@ -521,7 +522,7 @@ contains
     if (update(Bo)) Phi(0:nx+1,0:ny+1,1) = Phi(0:nx+1,0:ny+1,1) + tmp_b
     if (update(To)) Phi(0:nx+1,0:ny+1,nz) = Phi(0:nx+1,0:ny+1,nz) + tmp_t
     
-    call MPI_Waitall(6, requests(1:6), statuses(:,1:6), ierr)
+    call MPI_Waitall(6, requests(1:6), MPI_STATUSES_IGNORE, ierr)
 
   contains
   
@@ -626,10 +627,10 @@ contains
     integer, intent(in) :: Btype(6)
     integer, intent(in) :: lby, lbz, widthy, widthz
     logical :: oddy, oddz, eveny, evenz
-    integer :: ierr, tag, status(MPI_STATUS_SIZE)
+    integer :: ierr, tag
     logical :: ydir, zdir
     
-    ierr = 0; status=0; tag = 1500
+    ierr = 0; tag = 1500
     
     oddy = mod(jim,2) == 1
     eveny = .not. oddy
@@ -736,7 +737,7 @@ contains
       real(knd), intent(out) :: a(:,:)
       integer, intent(in) :: from
 
-      call MPI_Recv(a, size(a) , MPI_KND, from, tag, domain_comm, status, ierr)
+      call MPI_Recv(a, size(a) , MPI_KND, from, tag, domain_comm, MPI_STATUS_IGNORE, ierr)
       if (ierr/=0) stop "error receiving MPI message."
     end subroutine
     

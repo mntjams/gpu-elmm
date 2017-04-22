@@ -131,6 +131,9 @@ module custom_par
 
   integer :: my_world_im, my_world_rank
   
+  !domain master image numbers in the domain communicator
+  integer, parameter :: master_im = 1
+  integer, parameter :: master_rank = 0
   
   integer, parameter :: world_comm = MPI_COMM_WORLD
   integer :: domain_comm = MPI_COMM_WORLD
@@ -202,6 +205,13 @@ module custom_par
   interface par_sum_to_master_horizontal
     module procedure par_sum_to_master_horizontal_32_1d
     module procedure par_sum_to_master_horizontal_64_1d
+  end interface
+
+  interface par_co_broadcast
+    module procedure par_co_broadcast_real32
+    module procedure par_co_broadcast_real64
+    module procedure par_co_broadcast_int
+    module procedure par_co_broadcast_logical
   end interface
 
   interface par_broadcast_from_last_x
@@ -814,7 +824,7 @@ contains
 
     myrank = myim - 1
 
-    master = (myrank==0)
+    master = (myim == master_im)
 
     my_world_im = par_this_image(world_comm)
 
@@ -1380,6 +1390,70 @@ contains
   end subroutine
 
 
+
+  subroutine par_co_broadcast_real32(x, source_image)
+    real(real32), intent(inout) :: x
+    integer, intent(in) :: source_image
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real32) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real32, source_image-1, domain_comm, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_co_broadcast_real64(x, source_image)
+    real(real64), intent(inout) :: x
+    integer, intent(in) :: source_image
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real64) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real64, source_image-1, domain_comm, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_co_broadcast_int(x, source_image)
+    integer, intent(inout) :: x
+    integer, intent(in) :: source_image
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        integer ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_INTEGER, source_image-1, domain_comm, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_co_broadcast_logical(x, source_image)
+    logical, intent(inout) :: x
+    integer, intent(in) :: source_image
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        logical ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_LOGICAL, source_image-1, domain_comm, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
 
 
 

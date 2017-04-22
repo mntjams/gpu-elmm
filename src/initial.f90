@@ -1285,6 +1285,7 @@ fields_do:  do j = 1, size(obj_fields)
 
     type(tree_object), allocatable :: tree(:)
 
+    type(field_names) :: names_bbox(6)
     type(field_names) :: names_base(4)
     type(field_names_a) :: names_plane_a(5)
     
@@ -1304,6 +1305,13 @@ fields_do:  do j = 1, size(obj_fields)
       real(knd) :: point(3) = 0, vec(3) = 0
     end type
     
+    type :: bbox_cfg
+      real(knd) :: xmin = -huge(1._knd)/2, xmax = huge(1._knd)
+      real(knd) :: ymin = -huge(1._knd)/2, ymax = huge(1._knd)
+      real(knd) :: zmin = -huge(1._knd)/2, zmax = huge(1._knd)
+    end type
+    
+    type(bbox_cfg) :: o_bbox
     type(obstacle_cfg) :: base
     type(file_cfg), target :: o_file
     type(plane_cfg), target :: o_plane
@@ -1315,6 +1323,13 @@ fields_do:  do j = 1, size(obj_fields)
     
     class(GeometricShape), allocatable :: gs
     
+    names_bbox = [field_names_init("xmin", o_bbox%xmin), &
+                  field_names_init("xmax", o_bbox%xmax), &
+                  field_names_init("ymin", o_bbox%ymin), &
+                  field_names_init("ymax", o_bbox%ymax), &
+                  field_names_init("zmin", o_bbox%zmin), &
+                  field_names_init("zmax", o_bbox%zmax)]
+
     names_base = [field_names_init("z0",  base%z0), &
                   field_names_init("z0H", base%z0H), &
                   field_names_init("temperature_flux", base%temperature_flux), &
@@ -1349,7 +1364,18 @@ fields_do:  do j = 1, size(obj_fields)
     
       base = obstacle_cfg()
     
-      if (downcase(tree(iobj)%name)=="obstacle_file") then
+      if (downcase(tree(iobj)%name)=="obstacles_bbox") then
+      
+         call get_object_field_values(tree(iobj), stat, &
+                                     fields = names_bbox)
+                                     
+        if (stat/=0) then
+          call error_stop("Error interpretting obstacle_file fields in " // trim(fname))
+        end if
+        
+        call init_bbox
+        
+     else if (downcase(tree(iobj)%name)=="obstacle_file") then
       
         o_file = file_cfg()
         
@@ -1428,6 +1454,17 @@ fields_do:  do j = 1, size(obj_fields)
       
       call tree(iobj)%finalize
     end do
+    
+  contains
+  
+    subroutine init_bbox
+      if (o_bbox%xmin > -huge(1._knd)/2) obstacles_bbox(We) = o_bbox%xmin
+      if (o_bbox%xmax <  huge(1._knd)/2) obstacles_bbox(Ea) = o_bbox%xmax
+      if (o_bbox%ymin > -huge(1._knd)/2) obstacles_bbox(So) = o_bbox%ymin
+      if (o_bbox%ymax <  huge(1._knd)/2) obstacles_bbox(No) = o_bbox%ymax
+      if (o_bbox%zmin > -huge(1._knd)/2) obstacles_bbox(Bo) = o_bbox%zmin
+      if (o_bbox%zmax <  huge(1._knd)/2) obstacles_bbox(To) = o_bbox%zmax
+    end subroutine
     
   end subroutine get_obstacles
   
@@ -1810,11 +1847,15 @@ fields_do:  do j = 1, size(obj_fields)
     integer :: iobj, stat
 
     logical, target :: constant_time_steps = .false.
+    
+    character(char_len), target :: clock_time_limit_str = ""
 
-    type(field_names) :: names(12)
+    type(field_names) :: names(13)
     type(field_names_a) :: names_a(3)
+    type(field_names_str) :: names_str(1)
 
     names = [field_names_init("max_number_of_time_steps",   t_s%max_number_of_time_steps), &
+             field_names_init("check_period",               t_s%check_period), &
              field_names_init("variable_time_steps",        t_s%variable_time_steps), &
              field_names_init("constant_time_steps",        constant_time_steps), &
              field_names_init("enable_U_scaling",           t_s%enable_U_scaling), &
@@ -1830,6 +1871,8 @@ fields_do:  do j = 1, size(obj_fields)
     names_a = [field_names_a_init("U_scaling", t_s%U_scaling), &
                field_names_a_init("U_max",     t_s%U_max), &
                field_names_a_init("U_min",     t_s%U_min)]
+               
+    names_str = [field_names_str("clock_time_limit", clock_time_limit_str)]
 
     inquire(file=fname, exist=ex)
 
@@ -1841,7 +1884,7 @@ fields_do:  do j = 1, size(obj_fields)
 
       if (allocated(tree)) then
         call find_object_get_field_values(tree, "time_stepping", stat, &
-                                     fields = names, fields_a = names_a)
+                                     fields = names, fields_a = names_a, fields_str = names_str)
 
         if (stat<=0) then
           call init
@@ -1872,6 +1915,7 @@ fields_do:  do j = 1, size(obj_fields)
   contains
 
     subroutine init
+      integer :: l, mult, stat
 
       if (t_s%dt_constant > 0) constant_time_steps = .true.
 
@@ -1928,7 +1972,35 @@ fields_do:  do j = 1, size(obj_fields)
 
       end if
       
+      l = len_trim(clock_time_limit_str)
+      if (l > 0) then
+        clock_time_limit_str = downcase(clock_time_limit_str)
+        
+        select case (clock_time_limit_str(l:l))
+          case ('s')
+            mult = 1
+          case ('m')
+            mult = 60
+          case ('h')
+            mult = 3600
+          case ('d')
+            mult = 86400
+          case ('w')
+            mult = 604800
+          case default
+            call error_stop("Error, clock_time_limit requires units: s, m, h, d or w.")
+        end select
     
+        read(clock_time_limit_str(1:l-1),*, iostat=stat) time_stepping%clock_time_limit
+        
+        if (stat/=0) then
+          write(*,*) "Error interpretting the clock_time_limit value. Received: '",clock_time_limit_str(1:l-1),"'."
+          call error_stop()
+        end if
+        
+        time_stepping%clock_time_limit = time_stepping%clock_time_limit * mult
+      end if
+
     end subroutine
 
   end subroutine get_time_stepping
