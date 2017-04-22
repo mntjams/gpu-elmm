@@ -169,9 +169,9 @@ program CLMM
           error_exit = time_steps_timer_count_2 - time_steps_timer_count_start > timer_count_time_limit
           if (error_exit) write(*,*) "Maximum clock time exceeded."
         end if
-        
+#ifdef PAR        
         call par_co_broadcast(error_exit, master_im)
-        
+#endif        
         if (error_exit) exit
       end if
 
