@@ -1753,7 +1753,7 @@ contains
   pure recursive subroutine WallPrGradient(prgrad,i,j,k,Pr,Prtype)
     real(knd),intent(out) :: prgrad(3)
     integer,intent(in)    :: i,j,k
-    real(knd),intent(in)  :: Pr(1:,1:,1:)
+    real(knd),intent(in)  :: Pr(0:,0:,0:)
     integer,intent(in)    :: Prtype(0:,0:,0:)
     integer :: n
 

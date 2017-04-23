@@ -58,7 +58,7 @@ contains
 
 
   subroutine PressureGrad(Pr, U, V, W, coef)
-    real(knd), intent(inout), contiguous :: Pr(1:,1:,1:)
+    real(knd), intent(inout), contiguous :: Pr(0:,0:,0:)
     real(knd), intent(inout), contiguous, dimension(-2:,-2:,-2:) :: U,V,W
     real(knd), intent(in)    :: coef
     real(knd) :: A, Ax, Ay, Az
@@ -594,7 +594,7 @@ contains
     use Scalars, only: ComputeTDiff
 
     real(knd), contiguous, intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(knd), contiguous, intent(in) :: Pr(1:,1:,1:)
+    real(knd), contiguous, intent(in) :: Pr(0:,0:,0:)
     real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:)
     integer :: i
 

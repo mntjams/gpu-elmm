@@ -2448,7 +2448,7 @@ contains
 
   subroutine Output(U,V,W,Pr,Temperature,Moisture,Scalar)
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U,V,W
-    real(knd),contiguous,intent(inout) :: Pr(1:,1:,1:)
+    real(knd),contiguous,intent(inout) :: Pr(0:,0:,0:)
     real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Scalar(-1:,-1:,-1:,:)

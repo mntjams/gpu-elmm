@@ -92,7 +92,7 @@ contains
     integer(int64), save :: time1, time2, time3, time4
 
     if (called==0) then
-      allocate(Phi(0:Prnx+1,0:Prny+1,0:Prnz+1))
+      allocate(Phi(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
       allocate(RHS(0:Prnx+1,0:Prny+1,0:Prnz+1))
       Phi = 0
 
@@ -324,13 +324,14 @@ contains
 #ifdef PAR
     use custom_par, only: kim, nzims, &
                           par_co_max, par_broadcast_from_last_z, par_co_sum_plane_xy
+    use exchange_par, only: par_exchange_UVW
 #endif
     real(knd), intent(inout) :: U(-2:,-2:,-2:)
     real(knd), intent(inout) :: V(-2:,-2:,-2:)
     real(knd), intent(inout) :: W(-2:,-2:,-2:)
-    real(knd), intent(inout) :: Pr(1:,1:,1:)
+    real(knd), intent(inout) :: Pr(0:,0:,0:)
     real(knd), allocatable, intent(in) :: Q(:,:,:)
-    real(knd), intent(inout) :: Phi(0:,0:,0:)
+    real(knd), intent(inout) :: Phi(-1:,-1:,-1:)
     real(knd), intent(in)    :: dt2,dt3
     real(knd) :: Phi_ref,Au,Av,Aw,dxmin2,dymin2,dzmin2,S,p
     integer   :: i,j,k

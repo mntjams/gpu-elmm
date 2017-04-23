@@ -2366,7 +2366,7 @@ fields_do:  do j = 1, size(obj_fields)
   subroutine ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,scalars_optional)
     use Endianness
     real(knd), intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(knd), intent(inout) :: Pr(1:,1:,1:)
+    real(knd), intent(inout) :: Pr(0:,0:,0:)
     real(knd), intent(inout) :: Temperature(-1:,-1:,-1:)
     real(knd), intent(inout) :: Moisture(-1:,-1:,-1:)
     real(knd), intent(inout) :: Scalar(-1:,-1:,-1:,:)
@@ -2609,7 +2609,7 @@ fields_do:  do j = 1, size(obj_fields)
     use domains_bc_par, only: par_receive_initial_conditions, par_send_initial_conditions
 #endif
     use ArrayUtilities
-    real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+    real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(0:,0:,0:)
     real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
     real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
@@ -2623,7 +2623,7 @@ fields_do:  do j = 1, size(obj_fields)
     interface
       subroutine CustomInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
         use Parameters
-        real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+        real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(0:,0:,0:)
         real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
         real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
         real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)

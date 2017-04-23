@@ -18,7 +18,7 @@ contains
 #endif
 
     type(PoisFFT_Solver),save :: Solver
-    real(knd),dimension(0:,0:,0:),intent(inout) :: Phi
+    real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Phi
     real(knd),dimension(0:,0:,0:),intent(in) :: RHS
     logical, save :: called = .false.
 
@@ -72,7 +72,7 @@ contains
 #endif
     !Solves Poisson equation using Successive over-relaxation
 
-    real(knd),dimension(0:,0:,0:),intent(inout) :: Phi
+    real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Phi
     real(knd),dimension(0:,0:,0:),intent(in) :: RHS
     integer,save :: called=0
     integer :: nx,ny,nz,i,j,k,l
