@@ -2018,10 +2018,11 @@ fields_do:  do j = 1, size(obj_fields)
     logical :: ex
     integer :: iobj, stat
 
-    type(field_names) :: names(10)
+    type(field_names) :: names(11)
     type(field_names_a) :: names_a(1)
 
     names = [field_names_init("check_mass_flux", p_s%check_mass_flux), &
+             field_names_init("report_mass_flux", p_s%report_mass_flux), &
              field_names_init("correct_mass_flux_west",   p_s%correct_mass_flux(We)), &
              field_names_init("correct_mass_flux_east",   p_s%correct_mass_flux(Ea)), &
              field_names_init("correct_mass_flux_south",  p_s%correct_mass_flux(So)), &

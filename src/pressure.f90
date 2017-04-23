@@ -22,6 +22,7 @@ module Pressure
 
   type pressure_solution_control
     logical :: check_mass_flux = .false.
+    logical :: report_mass_flux = .false.
     logical :: correct_mass_flux(6) = .false.
     integer :: poisson_solver = POISSON_SOLVER_POISFFT
     logical :: check_divergence = .false.
@@ -111,7 +112,7 @@ contains
 
     if (debugparam>1 .and. called>1) call system_clock(count=time2)
 
-    if (any(pressure_solution%correct_mass_flux)) then
+    if (pressure_solution%report_mass_flux .and. pressure_solution%check_mass_flux) then
       if (master) write(*,*) "total mass flux:", mass_flux
     end if
 
@@ -218,72 +219,72 @@ contains
           end do
         end do
       end if
-    end if
     
-    flux = flux * bound_cell_area
+      flux = flux * bound_cell_area
     
 
 #ifdef PAR
-    !TODO: only the relevant planes
-    flux = par_co_sum(flux)
+      !TODO: only the relevant planes
+      flux = par_co_sum(flux)
 #endif
 
-    df = sum(flux)
+      df = sum(flux)
+      
+      mass_flux = df
+      
+      do side = We, To
+        if (pressure_solution%correct_mass_flux(side)) then
+          df_side(side) = df * bound_area(side) / correction_area
+          df_side(side) = df_side(side) / bound_cell_area(side)
+          
+          df_side(side) = df_side(side) / bound_n_free(side)
+        end if
+      end do
     
-    mass_flux = df
-    
-    do side = We, To
-      if (pressure_solution%correct_mass_flux(side)) then
-        df_side(side) = df * bound_area(side) / correction_area
-        df_side(side) = df_side(side) / bound_cell_area(side)
-        
-        df_side(side) = df_side(side) / bound_n_free(side)
+      if (pressure_solution%correct_mass_flux(We)) then
+        do k = 1, Unz
+          do j = 1, Uny
+            if (Utype(0,j,k)<=0) U(0,j,k) = U(0,j,k) - df_side(We)
+          end do
+        end do
       end if
-    end do
-  
-    if (pressure_solution%correct_mass_flux(We)) then
-      do k = 1, Unz
-        do j = 1, Uny
-          if (Utype(0,j,k)<=0) U(0,j,k) = U(0,j,k) - df_side(We)
-        end do
-      end do
-    end if
-    if (pressure_solution%correct_mass_flux(Ea)) then
-      do k = 1, Unz
-        do j = 1, Uny
-          if (Utype(Prnx,j,k)<=0) U(Prnx,j,k) = U(Prnx,j,k) + df_side(Ea)
-        end do
-      end do
-    end if
-    if (pressure_solution%correct_mass_flux(So)) then
-        do k = 1, Vnz
-          do i = 1, Vnx
-            if (Vtype(i,0,k)<=0) V(i,0,k) = V(i,0,k) - df_side(So)
+      if (pressure_solution%correct_mass_flux(Ea)) then
+        do k = 1, Unz
+          do j = 1, Uny
+            if (Utype(Prnx,j,k)<=0) U(Prnx,j,k) = U(Prnx,j,k) + df_side(Ea)
           end do
         end do
-    end if
-    if (pressure_solution%correct_mass_flux(No)) then
-        do k = 1, Vnz
-          do i = 1, Vnx
-            if (Vtype(i,Prny,k)<=0) V(i,Prny,k) = V(i,Prny,k) + df_side(No)
+      end if
+      if (pressure_solution%correct_mass_flux(So)) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              if (Vtype(i,0,k)<=0) V(i,0,k) = V(i,0,k) - df_side(So)
+            end do
           end do
-        end do
-    end if
-    if (pressure_solution%correct_mass_flux(Bo)) then
-        do j = 1, Wny
-          do i = 1, Wnx
-            if (Wtype(i,j,0)<=0) W(i,j,0) = W(i,j,0) - df_side(Bo)
+      end if
+      if (pressure_solution%correct_mass_flux(No)) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              if (Vtype(i,Prny,k)<=0) V(i,Prny,k) = V(i,Prny,k) + df_side(No)
+            end do
           end do
-        end do
-    end if
-    if (pressure_solution%correct_mass_flux(To)) then
-        do j = 1, Wny
-          do i = 1, Wnx
-            if (Wtype(i,j,Prnz)<=0) W(i,j,Prnz) = W(i,j,Prnz) + df_side(To)
+      end if
+      if (pressure_solution%correct_mass_flux(Bo)) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              if (Wtype(i,j,0)<=0) W(i,j,0) = W(i,j,0) - df_side(Bo)
+            end do
           end do
-        end do
-    end if
-    
+      end if
+      if (pressure_solution%correct_mass_flux(To)) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              if (Wtype(i,j,Prnz)<=0) W(i,j,Prnz) = W(i,j,Prnz) + df_side(To)
+            end do
+          end do
+      end if
+
+    end if !check mass flux    
 
     if (allocated(Q)) then
       !$omp parallel do private(i,j,k)
@@ -452,7 +453,9 @@ contains
 
     !$omp end parallel
 
-    call BoundUVW(U, V, W)
+#ifdef PAR    
+    call par_exchange_UVW(U, V, W)
+#endif
 
     call Bound_Pr(Pr)
 
