@@ -12,7 +12,8 @@ implicit none
          GridCoords, GridCoords_interp, GridCoords_interp_U, GridCoords_interp_V, GridCoords_interp_W, &
          InDomain,&
          BoundUVW, BoundU, Bound_Phi, Bound_Pr, Bound_Q,&
-         ShearInlet, ParabolicInlet, ConstantInlet
+         ShearInlet, ParabolicInlet, ConstantInlet, &
+         par_exchange_UVW
 
   interface GridCoords
     module procedure GridCoords_scalar

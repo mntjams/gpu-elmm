@@ -3,10 +3,8 @@ module exchange_par
                         w_rank, e_rank, s_rank, n_rank, b_rank, t_rank, neigh_ranks ,&
                         nxims, nyims, nzims, iim, jim, kim, myrank
 
-#ifdef MPI
   use custom_mpi, only: MPI_knd, MPI_STATUS_SIZE, MPI_REQUEST_NULL, &
                         MPI_STATUS_IGNORE, MPI_STATUSES_IGNORE
-#endif
 
   use Parameters, only: We, Ea, So, No, Bo, To, BC_MPI_PERIODIC
 
@@ -22,6 +20,7 @@ module exchange_par
   public par_exchange_boundaries, par_exchange_boundaries_yz, par_exchange_Pr, &
          par_exchange_Q, par_exchange_Sc_x, par_exchange_Sc_y, par_exchange_Sc_z, &
          par_exchange_U_x, par_exchange_U_y, par_exchange_U_z, &
+         par_exchange_UVW, &
          par_init_exchange
 
   interface
@@ -263,7 +262,13 @@ contains
   end subroutine par_exchange_boundaries
   
   
-  
+  subroutine par_exchange_UVW(U, V, W)
+    use Parameters, only: Btype
+    real(knd), intent(inout), contiguous :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    call par_exchange_boundaries(U, Btype, 1)
+    call par_exchange_boundaries(V, Btype, 2)
+    call par_exchange_boundaries(W, Btype, 3)
+  end subroutine
 
   subroutine par_exchange_U_x(U, component)
     use Parameters, only: Btype
