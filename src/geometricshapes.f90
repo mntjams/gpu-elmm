@@ -2296,7 +2296,7 @@ contains
     character(*),intent(in) :: filename
     integer :: l
     
-    l = len(filename)
+    l = len_trim(filename)
     if (filename(l-4:l)=='.obst') then
       res = Union_Init_Obst(filename)
     else if (filename(l-4:l)=='.geom') then
