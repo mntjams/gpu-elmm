@@ -984,6 +984,7 @@ contains
      end subroutine
 
      subroutine parse_command_line
+      use Strings, only: itoa
 #ifdef PAR
        use custom_par
 #endif
@@ -1000,12 +1001,12 @@ contains
          msg = ''
          read(command_line,nml = cmd,iostat = io,iomsg = msg)
          if (io/=0) then
-           if (master) write(*,*) io,"Error parsing command line."
-           if (master) write(*,*) msg
-           if (master) write(*,*) command_line
+           if (master) write(*,*) "Command line: ",trim(command_line)
+           call error_stop("Error parsing the command line or cmd.conf, error: "// itoa(io) // &
+                           " " // msg)
          end if
        else
-         if (master) write(*,*) io,"Error getting command line."
+         call error_stop("Error reading the command line or cmd.conf, error: "// itoa(io))
        end if
      end subroutine
 
