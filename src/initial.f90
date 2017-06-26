@@ -1056,6 +1056,11 @@ contains
        namelist /output/ store, display
 
        read(unit,nml = output,iostat = io,iomsg = msg)
+       if (io /= 0) then
+         write(*,*) "Error reading namelist from output.conf:"
+         write(*,*) trim(msg)
+         stop
+       end if
      end subroutine
      
      subroutine read_staggered_frames

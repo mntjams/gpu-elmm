@@ -25,20 +25,26 @@ contains
     integer(int64), save :: trate
     integer(int64)       :: t1, t2
 
-
+    integer :: discretization
+    
+    if (discretization_order == 4) then
+      discretization = PoisFFT_FiniteDifference4
+    else
+      discretization = PoisFFT_FiniteDifference2
+    end if
 
     if (.not.called) then
 #ifdef PAR
       Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
                                [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
                                PoissonBtype, &
-                               PoisFFT_FiniteDifference2, &
+                               discretization, &
                                gPrns,offsets_to_global,poisfft_comm)
 #else
       Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
                                [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
                                PoissonBtype, &
-                               PoisFFT_FiniteDifference2)
+                               discretization)
 #endif
       called = .true.
 

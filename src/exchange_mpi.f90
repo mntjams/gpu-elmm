@@ -17,7 +17,7 @@ module exchange_par
   
   private
   
-  public par_exchange_boundaries, par_exchange_boundaries_yz, &
+  public par_exchange_boundaries, par_exchange_boundaries_yz, par_exchange_Pr, &
          par_exchange_Q, par_exchange_Sc_x, par_exchange_Sc_y, par_exchange_Sc_z, &
          par_exchange_U_x, par_exchange_U_y, par_exchange_U_z, &
          par_exchange_UVW, &
@@ -65,8 +65,8 @@ contains
     call init_mpi_derived_types(send_mpi_types(:,2), recv_mpi_types(:,2), Vnx, Vny, Vnz, -2, 3)
     call init_mpi_derived_types(send_mpi_types(:,3), recv_mpi_types(:,3), Wnx, Wny, Wnz, -2, 3)  
     call init_mpi_derived_types(send_mpi_types(:,4), recv_mpi_types(:,4), Prnx, Prny, Prnz, -1, 2)
-    call init_mpi_derived_types(send_mpi_types(:,5), recv_mpi_types(:,5), Prnx, Prny, Prnz, 0, 1)
-    call init_mpi_derived_types_Q(send_mpi_types(:,6), recv_mpi_types(:,6), Prnx, Prny, Prnz)
+    call init_mpi_derived_types_Pr(send_mpi_types(:,6), recv_mpi_types(:,6), Prnx, Prny, Prnz, Unx+3, Vny+3, Wnz+3)
+    call init_mpi_derived_types_Q(send_mpi_types(:,7), recv_mpi_types(:,7), Prnx, Prny, Prnz)
   end subroutine
 
   
@@ -316,9 +316,157 @@ contains
   
   
   
+  subroutine par_exchange_Pr(Phi)
+    use Parameters, only: We, Ea, So, No, Bo, To, BC_MPI_PERIODIC, Prnx, Prny, Prnz, Btype
+    real(knd), intent(inout), contiguous :: Phi(0:,0:,0:)
+    integer :: ierr
+    integer :: nx, ny, nz
+    integer :: requests(12)
+    
+    requests = MPI_REQUEST_NULL
+
+    !internal boundaries
+    call send_w
+    call send_e
+    call send_s
+    call send_n
+    call send_b
+    call send_t
+
+    call recv_w
+    call recv_e
+    call recv_s
+    call recv_n
+    call recv_b
+    call recv_t
+   
+
+    !global domain boundaries
+    if (Btype(We)==BC_MPI_PERIODIC.or.Btype(Ea)==BC_MPI_PERIODIC) then
+      if (iim==1) then
+        call send(Phi, We)
+      else if (iim==nxims) then
+        call recv(Phi, Ea)
+      end if     
+    end if
+
+    if (Btype(So)==BC_MPI_PERIODIC.or.Btype(No)==BC_MPI_PERIODIC) then
+      if (jim==1) then
+        call send(Phi, So)
+      else if (jim==nyims) then
+        call recv(Phi, No)
+      end if
+    end if
+          
+    if (Btype(Bo)==BC_MPI_PERIODIC.or.Btype(To)==BC_MPI_PERIODIC) then
+      if (kim==1) then
+        call send(Phi, Bo)
+      else if (kim==nzims) then
+        call recv(Phi, To)
+      end if
+    end if
+
+    call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, ierr)    
+    
+  contains
   
   
+    subroutine send(a, side)
+      real(knd), contiguous, intent(in) :: a(:,:,:)
+      integer, intent(in) :: side
+
+      call MPI_ISend(a, 1, send_mpi_types(side, 6), neigh_ranks(side), &
+                     1000+8, domain_comm, requests(side), ierr)
+      if (ierr/=0) stop "error sending MPI message."
+    end subroutine
+    
+    subroutine recv(a, side)
+      real(knd), intent(out) :: a(:,:,:)
+      integer, intent(in) :: side
+
+      call MPI_IRecv(a, 1, recv_mpi_types(side, 6), neigh_ranks(side), &
+                     1000+8, domain_comm, requests(side+6), ierr)
+      if (ierr/=0) stop "error receiving MPI message."
+    end subroutine
+    
+
+    subroutine send_w
+      if (iim>1) then
+        call send(Phi, We)
+      end if
+    end subroutine
+     
+    subroutine recv_w
+      if (iim>1) then
+        call recv(Phi, We)
+      end if
+    end subroutine
+     
+    subroutine send_e
+      if (iim<nxims) then
+        call send(Phi, Ea)
+      end if
+    end subroutine
+    
+    subroutine recv_e
+      if (iim<nxims) then
+        call recv(Phi, Ea)
+      end if
+    end subroutine
+    
+    subroutine send_s
+      if (jim>1) then
+        call send(Phi, So)
+      end if
+    end subroutine
+
+    subroutine recv_s
+      if (jim>1) then
+        call recv(Phi, So)
+      end if
+    end subroutine
+
+    subroutine send_n
+      if (jim<nyims) then
+        call send(Phi, No)
+      end if
+    end subroutine
+    
+    subroutine recv_n
+      if (jim<nyims) then
+        call recv(Phi, No)
+      end if
+    end subroutine
+    
+    subroutine send_b
+      if (kim>1) then
+        call send(Phi, Bo)
+      end if
+    end subroutine
+    
+    subroutine recv_b
+      if (kim>1) then
+        call recv(Phi, Bo)
+      end if
+    end subroutine
+    
+    subroutine send_t
+      if (kim<nzims) then
+        call send(Phi, To)
+      end if
+    end subroutine
+    
+    subroutine recv_t
+      if (kim<nzims) then
+        call recv(Phi, To)
+      end if
+    end subroutine
+    
+  end subroutine par_exchange_Pr
   
+ 
+
+ 
   
   
   subroutine par_exchange_Q(Phi)
@@ -411,7 +559,7 @@ contains
       real(knd), contiguous, intent(in) :: a(:,:,:)
       integer, intent(in) :: side
 
-      call MPI_ISend(a, 1, send_mpi_types(side, 6), neigh_ranks(side), &
+      call MPI_ISend(a, 1, send_mpi_types(side, 7), neigh_ranks(side), &
                      1000+7 , domain_comm, requests(side), ierr)
       if (ierr/=0) stop "error sending MPI message."
     end subroutine

@@ -218,7 +218,7 @@ contains
     allocate(U(-2:Unx+3,-2:Uny+3,-2:Unz+3))
     allocate(V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
     allocate(W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-    allocate(Pr(0:Prnx+1,0:Prny+1,0:Prnz+1))
+    allocate(Pr(0:Unx+2,0:Vny+2,0:Wnz+2))
 
     U = 0
     V = 0
