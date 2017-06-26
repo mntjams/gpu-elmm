@@ -916,6 +916,11 @@ contains
           end do
         end do
       end do
+    else
+    
+      allocate(Scflx_points(0))
+      allocate(Scfly_points(0))
+      allocate(Scflz_points(0))
 
     end if
 
