@@ -97,31 +97,37 @@ contains
       s => stream(i:i)
 
       if (in_string) then
-       
+        !we are inside a string opened previously by "
+        
+        ! " finishes the string and is not counted to it if not escaped by '\'
         if (s=='"'.and.stream(i-1:i-1)/='\') then
           token(pos:pos) = s
           call send
           in_string = .false.
+        ! the token length exceeded the fixed limit (the limit exists due to gfortran limitations)
         else if (pos > len(token)) then
           !TODO: remove when moving to allocatable strings
           !consider enabling strings across multiple tokens
           ierr = 2
           return
+        ! add the character to the string
         else
           token(pos:pos) = s
           pos = pos + 1
         end if
         
       else
-       
+        ! parantheses are tokens of length 1
         if (s=='('.or.s==')'.or.s=='['.or.s==']') then
           if (pos>1) call res%add(token)
           token = s
           call send
+        ! , and = are tokens of length 1
         else if (s==','.or.s=='=') then
           if (pos>1) call res%add(token)
           token = s
           call send
+        ! " delimits a string
         else if (s=='"') then
           if (pos>1) then
             ierr = 1
@@ -131,11 +137,14 @@ contains
             pos = pos + 1
             in_string = .true.
           end if
+        ! whitespace ends a token
         else if (s==' ' .or. s==tab .or. s==new_line('a')) then
           if (pos>1) call send
-        else if (s=='!') then
+        ! comments
+        else if (s=='!'.or.s=='#') then
           if (pos>1) call send
           call skip_line
+        ! add the character to the current token
         else
           token(pos:pos) = s
           pos = pos + 1
