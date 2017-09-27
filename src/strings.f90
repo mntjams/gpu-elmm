@@ -383,6 +383,13 @@ contains
     call token_list%finalize
 
     allocate(tree(0))
+
+    if (size(tokens)<=0) then
+      !the file is empty or contains just comments
+      stat = 0
+      return
+    end if
+    
     pos = 1
     do
       call get_object(object, pos, stat)
