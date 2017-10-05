@@ -995,8 +995,12 @@ contains
     integer :: tnx, tny, tnz
     
     real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+    real(knd), parameter :: D0 = -1._knd / 24, D1 = 9._knd / 8
 
     integer, parameter :: narr = 3
+    
+    !for the include files
+    integer :: ip
        
     tnx = tilenx(narr)
     tny = tileny(narr)
@@ -1043,6 +1047,11 @@ contains
     end do
     !$omp end do
     
+#define comp 1
+#define dir 1
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
     
     !$omp do schedule(runtime) collapse(3)
     do bk = 1, Unz, tnz
@@ -1076,7 +1085,12 @@ contains
     end do
     !$omp end do
                
-               
+#define comp 1
+#define dir 2
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+                   
     !$omp do schedule(runtime) collapse(3)
     do bk = 0, Unz+2, tnz
      do bj = 1, Uny, tny
@@ -1109,7 +1123,12 @@ contains
     end do
     !$omp end do
 
-    
+#define comp 1
+#define dir 3
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+        
     
     
     
@@ -1146,7 +1165,12 @@ contains
     end do
     !$omp end do
              
-                              
+#define comp 2
+#define dir 1
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+                                  
     !$omp do schedule(runtime) collapse(3)
     do bk = 1, Vnz, tnz
      do bj = 0, Vny+2, tny
@@ -1177,8 +1201,13 @@ contains
      end do
     end do
     !$omp end do
-
-    
+             
+#define comp 2
+#define dir 2
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+                                  
     !$omp do schedule(runtime) collapse(3)
     do bk = 0, Vnz+2, tnz
      do bj = 1, Vny, tny
@@ -1210,6 +1239,13 @@ contains
      end do
     end do
     !$omp end do
+             
+#define comp 2
+#define dir 3
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+                                  
 
     
     
@@ -1247,8 +1283,13 @@ contains
      end do
     end do
     !$omp end do
-
-    
+             
+#define comp 3
+#define dir 1
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+                                  
     !$omp do schedule(runtime) collapse(3)
     do bk = 1, Wnz, tnz
      do bj = 0, Wny+2, tny
@@ -1280,8 +1321,13 @@ contains
      end do
     end do
     !$omp end do
-
-    
+             
+#define comp 3
+#define dir 2
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+                                  
     !$omp do schedule(runtime) collapse(3)
     do bk = 0, Wnz+2, tnz
      do bj = 1, Wny, tny
@@ -1312,6 +1358,15 @@ contains
      end do
     end do
     !$omp end do
+             
+#define comp 3
+#define dir 3
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+
+
+
     !$omp end parallel
 
   end subroutine MomentumDiffusion_nobranch_4ord
