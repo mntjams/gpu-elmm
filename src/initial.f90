@@ -2775,7 +2775,7 @@ fields_do:  do j = 1, size(obj_fields)
                     x = xPr(i)
                     y = yPr(j)
                     z = zPr(k)
-                    Pr(i,j,k) = (Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
+                    Pr(i,j,k) = (Uinlet/16._knd)*((2+cos(2*(-y)))*(cos(2*(z))+cos(2*(x)))-2)
              end do
             end do
            end do
