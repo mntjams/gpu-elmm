@@ -1249,7 +1249,7 @@ contains
       czk2 = z_coord(czmax)
       
       !Check that grid cell dimensions correspond to the specified spatial refinement ratio.
-      if (abs(dxmin/domain_grids(child_domain)%dx - b%spatial_ratio) > epsilon(real(b%spatial_ratio,knd))) then
+      if (abs(dxmin/domain_grids(child_domain)%dx - b%spatial_ratio) > 100*epsilon(1.0_real32)) then
         write(*,*) "Error, inconsistent specification of the grid refinement ratio and cell sizes of domain ",child_domain,"."
         write(*,*) "spatial_ratio specified:",b%spatial_ratio
         write(*,*) "parent dx:",dxmin
@@ -1257,14 +1257,14 @@ contains
         write(*,*) "ratio:",dxmin/domain_grids(child_domain)%dx
         call error_stop()
       end if
-      if (abs(dymin/domain_grids(child_domain)%dy - b%spatial_ratio) > epsilon(real(b%spatial_ratio,knd))) then
+      if (abs(dymin/domain_grids(child_domain)%dy - b%spatial_ratio) > 100*epsilon(1.0_real32)) then
         write(*,*) "Error, inconsistent specification of the grid refinement ratio and cell sizes of domain ",child_domain,"."
         write(*,*) "spatial_ratio specified:",b%spatial_ratio
         write(*,*) "parent dy:",dymin
         write(*,*) "child dy:",domain_grids(child_domain)%dy
         call error_stop()
       end if
-      if (abs(dzmin/domain_grids(child_domain)%dz - b%spatial_ratio) > epsilon(real(b%spatial_ratio,knd))) then
+      if (abs(dzmin/domain_grids(child_domain)%dz - b%spatial_ratio) > 100*epsilon(1.0_real32)) then
         write(*,*) "Error, inconsistent specification of the grid refinement ratio and cell sizes of domain ",child_domain,"."
         write(*,*) "spatial_ratio specified:",b%spatial_ratio
         write(*,*) "parent dz:",dzmin
