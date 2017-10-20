@@ -104,7 +104,8 @@ contains
           arr(nx+2,j,k) = arr(nx+1,j,k) - (arr(nx,j,k)-arr(nx+1,j,k))
         end do
       end do
-    else if ((btype(Ea)<BC_MPI_BOUNDS_MIN) .or. (btype(Ea)>BC_MPI_BOUNDS_MAX)) then
+    else if (((btype(Ea)<BC_MPI_BOUNDS_MIN) .or. (btype(Ea)>BC_MPI_BOUNDS_MAX)) .and. &
+             ((btype(Ea)<BC_DOMAIN_BOUNDS_MIN) .or. (btype(Ea)>BC_DOMAIN_BOUNDS_MAX))) then
       do k = 1,nz
         do j = 1,ny
           arr(nx+1,j,k) = arr(nx,j,k)
@@ -146,7 +147,8 @@ contains
           arr(i,-1,k) = arr(i,0,k) - (arr(i,1,k)-arr(i,0,k))
         end do
       end do
-    else if ((btype(So)<BC_MPI_BOUNDS_MIN) .or. (btype(So)>BC_MPI_BOUNDS_MAX)) then
+    else if ((btype(So)<BC_MPI_BOUNDS_MIN) .or. (btype(So)>BC_MPI_BOUNDS_MAX) .and. &
+             ((btype(So)<BC_DOMAIN_BOUNDS_MIN) .or. (btype(So)>BC_DOMAIN_BOUNDS_MAX))) then
       do k = 1,nz
         do i=-1,nx+2
           arr(i,0,k)  = arr(i,1,k)
@@ -184,7 +186,8 @@ contains
           arr(i,ny+2,k) = arr(i,ny+1,k) - (arr(i,ny,k)-arr(i,ny+1,k))
         end do
       end do
-    else if ((btype(No)<BC_MPI_BOUNDS_MIN) .or. (btype(No)>BC_MPI_BOUNDS_MAX)) then
+    else if (((btype(No)<BC_MPI_BOUNDS_MIN) .or. (btype(No)>BC_MPI_BOUNDS_MAX)) .and. &
+             ((btype(No)<BC_DOMAIN_BOUNDS_MIN) .or. (btype(No)>BC_DOMAIN_BOUNDS_MAX))) then    
       do k = 1,nz
         do i=-1,ny+2
           arr(i,ny+1,k) = arr(i,ny,k)
@@ -226,7 +229,8 @@ contains
           arr(i,j,-1) = arr(i,j,0)-(arr(i,j,1)-arr(i,j,0))
         end do
       end do
-    else if ((btype(Bo)<BC_MPI_BOUNDS_MIN) .or. (btype(Bo)>BC_MPI_BOUNDS_MAX)) then
+    else if (((btype(Bo)<BC_MPI_BOUNDS_MIN) .or. (btype(Bo)>BC_MPI_BOUNDS_MAX)) .and. &
+             ((btype(Bo)<BC_DOMAIN_BOUNDS_MIN) .or. (btype(Bo)>BC_DOMAIN_BOUNDS_MAX))) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,0)  = arr(i,j,1)
@@ -264,7 +268,8 @@ contains
           arr(i,j,nz+2) = arr(i,j,nz+1) - (arr(i,j,nz)-arr(i,j,nz+1))
         end do
       end do
-    else if ((btype(To)<BC_MPI_BOUNDS_MIN) .or. (btype(To)>BC_MPI_BOUNDS_MAX)) then
+    else if (((btype(To)<BC_MPI_BOUNDS_MIN) .or. (btype(To)>BC_MPI_BOUNDS_MAX)) .and. &
+             ((btype(To)<BC_DOMAIN_BOUNDS_MIN) .or. (btype(To)>BC_DOMAIN_BOUNDS_MAX))) then
       do j=-1,ny+2
         do i=-1,nx+2
           arr(i,j,nz+1) = arr(i,j,nz)
