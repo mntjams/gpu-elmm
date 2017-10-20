@@ -1077,31 +1077,49 @@ contains
           associate(b => domain_bc_recv_buffers(bi))
             if (b%enabled) then
 
-              where (Utype(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)<=0) &
-                U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = b%U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)                 
+              where (Utype(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)<=0)
+                U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = b%U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)
+              else where
+                U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = 0
+              end where
 
-              where (Vtype(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)<=0) &
+              where (Vtype(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)<=0)
                 V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = b%V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)
+              else where
+                V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = 0
+              end where
 
-              where (Wtype(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)<=0) &
+              where (Wtype(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)<=0)
                 W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = b%W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)
+              else where
+                W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = 0
+              end where
 
 
               if (eff_time > b%time) then
                 t_diff = eff_time - b%time
 
-                where (Utype(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)<=0) &
+                where (Utype(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2)<=0)
                   U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) + &
                                                          b%dU_dt(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) * t_diff
+                else where
+                  U(b%bUi1:b%bUi2,b%bUj1:b%bUj2,b%bUk1:b%bUk2) = 0
+                end where
                   
 
-                where (Vtype(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)<=0) &
+                where (Vtype(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2)<=0)
                   V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) + &
                                                          b%dV_dt(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) * t_diff
+                else where
+                  V(b%bVi1:b%bVi2,b%bVj1:b%bVj2,b%bVk1:b%bVk2) = 0
+                end where
 
-                where (Wtype(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)<=0) &
+                where (Wtype(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2)<=0)
                   W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) + &
                                                          b%dW_dt(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) * t_diff
+                else where
+                  W(b%bWi1:b%bWi2,b%bWj1:b%bWj2,b%bWk1:b%bWk2) = 0
+                end where
               end if
 
             end if
@@ -1119,21 +1137,21 @@ contains
                   do k = b%bUk1, b%bUk2
                     do j = b%bUj1, b%bUj2
                       do i = b%bUi1, b%bUi2
-                        U(i,j,k) = U(i,j,k) + b%U_turb(j,k)
+                        if (Utype(i,j,k)<=0) U(i,j,k) = U(i,j,k) + b%U_turb(j,k)
                       end do
                     end do
                   end do
                   do k = b%bVk1, b%bVk2
                     do j = b%bVj1, b%bVj2
                       do i = b%bVi1, b%bVi2
-                        V(i,j,k) = V(i,j,k) + b%V_turb(j,k)
+                        if (Vtype(i,j,k)<=0) V(i,j,k) = V(i,j,k) + b%V_turb(j,k)
                       end do
                     end do
                   end do
                   do k = b%bWk1, b%bWk2
                     do j = b%bWj1, b%bWj2
                       do i = b%bWi1, b%bWi2
-                        W(i,j,k) = W(i,j,k) + b%W_turb(j,k)
+                        if (Wtype(i,j,k)<=0) W(i,j,k) = W(i,j,k) + b%W_turb(j,k)
                       end do
                     end do
                   end do
@@ -1141,21 +1159,21 @@ contains
                   do k = b%bUk1, b%bUk2
                     do j = b%bUj1, b%bUj2
                       do i = b%bUi1, b%bUi2
-                        U(i,j,k) = U(i,j,k) + b%U_turb(i,k)
+                        if (Utype(i,j,k)<=0) U(i,j,k) = U(i,j,k) + b%U_turb(i,k)
                       end do
                     end do
                   end do
                   do k = b%bVk1, b%bVk2
                     do j = b%bVj1, b%bVj2
                       do i = b%bVi1, b%bVi2
-                        V(i,j,k) = V(i,j,k) + b%V_turb(i,k)
+                        if (Vtype(i,j,k)<=0) V(i,j,k) = V(i,j,k) + b%V_turb(i,k)
                       end do
                     end do
                   end do
                   do k = b%bWk1, b%bWk2
                     do j = b%bWj1, b%bWj2
                       do i = b%bWi1, b%bWi2
-                        W(i,j,k) = W(i,j,k) + b%W_turb(i,k)
+                        if (Wtype(i,j,k)<=0) W(i,j,k) = W(i,j,k) + b%W_turb(i,k)
                       end do
                     end do
                   end do
