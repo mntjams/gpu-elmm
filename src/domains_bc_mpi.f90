@@ -1519,145 +1519,236 @@ contains
     subroutine relax_domain_We(b)
       class(dom_bc_buffer_refined), intent(in) :: b
       integer :: width
-      integer :: i
+      integer :: i, scal
 
       width = b%spatial_ratio * 2
 
-      !$omp parallel do private(i)
+      !$omp parallel private(i)
+      !$omp do
       do i = 1, width
-        U(i,1:Uny,1:Unz) = ca(i) * U(i,1:Uny,1:Unz) + &
+        where (Utype(i,1:Uny,1:Unz)<=0) &
+          U(i,1:Uny,1:Unz) = ca(i) * U(i,1:Uny,1:Unz) + &
                 cb(i) * (b%U(i,1:Uny,1:Unz) + t_diff * b%dU_dt(i,1:Uny,1:Unz))
 
-
-        V(i,1:Vny,1:Vnz) = ca(i) * V(i,1:Vny,1:Vnz) + &
+        where (Vtype(i,1:Vny,1:Vnz)<=0) &
+          V(i,1:Vny,1:Vnz) = ca(i) * V(i,1:Vny,1:Vnz) + &
                 cb(i) * (b%V(i,1:Vny,1:Vnz) + t_diff * b%dV_dt(i,1:Vny,1:Vnz))
 
-
-        W(i,1:Wny,1:Wnz) = ca(i) * W(i,1:Wny,1:Wnz) + &
+        where (Wtype(i,1:Wny,1:Wnz)<=0) &
+          W(i,1:Wny,1:Wnz) = ca(i) * W(i,1:Wny,1:Wnz) + &
                 cb(i) * (b%W(i,1:Wny,1:Wnz) + t_diff * b%dW_dt(i,1:Wny,1:Wnz))
       end do
+      !$omp end do nowait
+      
+      !$omp do collapse(2)
+      do scal = 1, num_of_scalars
+        do i = 1, width
+          where (Prtype(i,1:Prny,1:Prnz)<=0) &
+            Scalar(i,1:Prny,1:Prnz,scal) = ca(i) * Scalar(i,1:Prny,1:Prnz,scal) + &
+                  cb(i) * (b%Scalar(i,1:Prny,1:Prnz,scal) + t_diff * b%dScalar_dt(i,1:Prny,1:Prnz,scal))
+        end do
+      end do
+      !$omp end parallel
     end subroutine
 
     subroutine relax_domain_Ea(b)
       class(dom_bc_buffer_refined), intent(in) :: b
       integer :: width
-      integer :: i, wi
+      integer :: i, wi, scal
 
       width = b%spatial_ratio * 2
 
-      !$omp parallel do private(i, wi)
+      !$omp parallel private(i, wi)
+      !$omp do
       do wi = 1, width
         i = Unx - wi + 1
-        U(i,1:Uny,1:Unz) = ca(wi) * U(i,1:Uny,1:Unz) + &
-                           cb(wi) * (b%U(i,1:Uny,1:Unz) + &
-                                     t_diff * b%dU_dt(i,1:Uny,1:Unz))
+        where (Utype(i,1:Uny,1:Unz)<=0) &
+          U(i,1:Uny,1:Unz) = ca(wi) * U(i,1:Uny,1:Unz) + &
+                             cb(wi) * (b%U(i,1:Uny,1:Unz) + &
+                                       t_diff * b%dU_dt(i,1:Uny,1:Unz))
 
         i = Vnx - wi + 1
-        V(i,1:Vny,1:Vnz) = ca(wi) * V(i,1:Vny,1:Vnz) + &
-                           cb(wi) * (b%V(i,1:Vny,1:Vnz) + &
-                                     t_diff * b%dV_dt(i,1:Vny,1:Vnz))
+        where (Vtype(i,1:Vny,1:Vnz)<=0) &
+          V(i,1:Vny,1:Vnz) = ca(wi) * V(i,1:Vny,1:Vnz) + &
+                             cb(wi) * (b%V(i,1:Vny,1:Vnz) + &
+                                       t_diff * b%dV_dt(i,1:Vny,1:Vnz))
 
         i = Wnx - wi + 1
-        W(i,1:Wny,1:Wnz) = ca(wi) * W(i,1:Wny,1:Wnz) + &
-                           cb(wi) * (b%W(i,1:Wny,1:Wnz) + &
-                                     t_diff * b%dW_dt(i,1:Wny,1:Wnz))
+        where (Wtype(i,1:Wny,1:Wnz)<=0) &
+          W(i,1:Wny,1:Wnz) = ca(wi) * W(i,1:Wny,1:Wnz) + &
+                             cb(wi) * (b%W(i,1:Wny,1:Wnz) + &
+                                       t_diff * b%dW_dt(i,1:Wny,1:Wnz))
       end do
+      !$omp end do nowait
+      
+      !$omp do collapse(2)
+      do scal = 1, num_of_scalars
+        do wi = 1, width
+          i = Prnx - wi + 1
+          where (Prtype(i,1:Prny,1:Prnz)<=0) &
+            Scalar(i,1:Prny,1:Prnz,scal) = ca(wi) * Scalar(i,1:Prny,1:Prnz,scal) + &
+                  cb(wi) * (b%Scalar(i,1:Prny,1:Prnz,scal) + t_diff * b%dScalar_dt(i,1:Prny,1:Prnz,scal))
+        end do
+      end do
+      !$omp end parallel
     end subroutine
 
     subroutine relax_domain_So(b)
       class(dom_bc_buffer_refined), intent(in) :: b
       integer :: width
-      integer :: i
+      integer :: i, scal
 
       width = b%spatial_ratio * 2
 
-      !$omp parallel do private(i)
+      !$omp parallel private(i)
+      !$omp do
       do i = 1, width
-        U(1:Unx,i,1:Unz) = ca(i) * U(1:Unx,i,1:Unz) + &
+        where (Utype(1:Unx,i,1:Unz)<=0) &
+          U(1:Unx,i,1:Unz) = ca(i) * U(1:Unx,i,1:Unz) + &
                 cb(i) * (b%U(1:Unx,i,1:Unz) + t_diff * b%dU_dt(1:Unx,i,1:Unz))
 
 
-        V(1:Vnx,i,1:Vnz) = ca(i) * V(1:Vnx,i,1:Vnz) + &
+        where (Vtype(1:Vnx,i,1:Vnz)<=0) &
+          V(1:Vnx,i,1:Vnz) = ca(i) * V(1:Vnx,i,1:Vnz) + &
                 cb(i) * (b%V(1:Vnx,i,1:Vnz) + t_diff * b%dV_dt(1:Vnx,i,1:Vnz))
 
 
-        W(1:Wnx,i,1:Wnz) = ca(i) * W(1:Wnx,i,1:Wnz) + &
+        where (Wtype(1:Wnx,i,1:Wnz)<=0) &
+          W(1:Wnx,i,1:Wnz) = ca(i) * W(1:Wnx,i,1:Wnz) + &
                 cb(i) * (b%W(1:Wnx,i,1:Wnz) + t_diff * b%dW_dt(1:Wnx,i,1:Wnz))
       end do
+      !$omp end do nowait
+      
+      !$omp do collapse(2)
+      do scal = 1, num_of_scalars
+        do i = 1, width
+          where (Prtype(1:Prnx,i,1:Prnz)<=0) &
+            Scalar(1:Prnx,i,1:Prnz,scal) = ca(i) * Scalar(1:Prnx,i,1:Prnz,scal) + &
+                  cb(i) * (b%Scalar(1:Prnx,i,1:Prnz,scal) + t_diff * b%dScalar_dt(1:Prnx,i,1:Prnz,scal))
+        end do
+      end do
+      !$omp end parallel
     end subroutine
 
     subroutine relax_domain_No(b)
       class(dom_bc_buffer_refined), intent(in) :: b
       integer :: width
-      integer :: i, wi
+      integer :: i, wi, scal
 
       width = b%spatial_ratio * 2
 
-      !$omp parallel do private(i, wi)
+      !$omp parallel private(i, wi)
+      !$omp do
       do wi = 1, width
         i = Uny - wi + 1
-        U(1:Unx,i,1:Unz) = ca(wi) * U(1:Unx,i,1:Unz) + &
-                           cb(wi) * (b%U(1:Unx,i,1:Unz) + &
-                                     t_diff * b%dU_dt(1:Unx,i,1:Unz))
+        where (Utype(1:Unx,i,1:Unz)<=0) &
+          U(1:Unx,i,1:Unz) = ca(wi) * U(1:Unx,i,1:Unz) + &
+                             cb(wi) * (b%U(1:Unx,i,1:Unz) + &
+                                       t_diff * b%dU_dt(1:Unx,i,1:Unz))
 
         i = Vny - wi + 1
-        V(1:Vnx,i,1:Vnz) = ca(wi) * V(1:Vnx,i,1:Vnz) + &
-                           cb(wi) * (b%V(1:Vnx,i,1:Vnz) + &
-                                     t_diff * b%dV_dt(1:Vnx,i,1:Vnz))
+        where (Vtype(1:Vnx,i,1:Vnz)<=0) &
+          V(1:Vnx,i,1:Vnz) = ca(wi) * V(1:Vnx,i,1:Vnz) + &
+                             cb(wi) * (b%V(1:Vnx,i,1:Vnz) + &
+                                       t_diff * b%dV_dt(1:Vnx,i,1:Vnz))
 
         i = Wny - wi + 1
-        W(1:Wnx,i,1:Wnz) = ca(wi) * W(1:Wnx,i,1:Wnz) + &
-                           cb(wi) * (b%W(1:Wnx,i,1:Wnz) + &
-                                     t_diff * b%dW_dt(1:Wnx,i,1:Wnz))
+        where (Wtype(1:Wnx,i,1:Wnz)<=0) &
+          W(1:Wnx,i,1:Wnz) = ca(wi) * W(1:Wnx,i,1:Wnz) + &
+                             cb(wi) * (b%W(1:Wnx,i,1:Wnz) + &
+                                       t_diff * b%dW_dt(1:Wnx,i,1:Wnz))
       end do
+      !$omp end do nowait
+      
+      !$omp do collapse(2)
+      do scal = 1, num_of_scalars
+        do wi = 1, width
+          i = Prny - wi + 1
+          where (Prtype(1:Prnx,i,1:Prnz)<=0) &
+            Scalar(1:Prnx,i,1:Prnz,scal) = ca(wi) * Scalar(1:Prnx,i,1:Prnz,scal) + &
+                  cb(wi) * (b%Scalar(1:Prnx,i,1:Prnz,scal) + t_diff * b%dScalar_dt(1:Prnx,i,1:Prnz,scal))
+        end do
+      end do
+      !$omp end parallel
     end subroutine
 
     subroutine relax_domain_Bo(b)
       class(dom_bc_buffer_refined), intent(in) :: b
       integer :: width
-      integer :: i
+      integer :: i, scal
 
       width = b%spatial_ratio * 2
 
-      !$omp parallel do private(i)
+      !$omp parallel private(i)
+      !$omp do
       do i = 1, width
-        U(1:Unx,1:Uny,i) = ca(i) * U(1:Unx,1:Uny,i) + &
+        where (Utype(1:Unx,1:Uny,i)<=0) &
+          U(1:Unx,1:Uny,i) = ca(i) * U(1:Unx,1:Uny,i) + &
                 cb(i) * (b%U(1:Unx,1:Uny,i) + t_diff * b%dU_dt(1:Unx,1:Uny,i))
 
 
-        V(1:Vnx,1:Vny,i) = ca(i) * V(1:Vnx,1:Vny,i) + &
+        where (Vtype(1:Vnx,1:Vny,i)<=0) &
+          V(1:Vnx,1:Vny,i) = ca(i) * V(1:Vnx,1:Vny,i) + &
                 cb(i) * (b%V(1:Vnx,1:Vny,i) + t_diff * b%dV_dt(1:Vnx,1:Vny,i))
 
 
-        W(1:Wnx,1:Wny,i) = ca(i) * W(1:Wnx,1:Wny,i) + &
+        where (Wtype(1:Wnx,1:Wny,i)<=0) &
+          W(1:Wnx,1:Wny,i) = ca(i) * W(1:Wnx,1:Wny,i) + &
                 cb(i) * (b%W(1:Wnx,1:Wny,i) + t_diff * b%dW_dt(1:Wnx,1:Wny,i))
       end do
+      !$omp end do nowait
+      
+      !$omp do collapse(2)
+      do scal = 1, num_of_scalars
+        do i = 1, width
+          where (Prtype(1:Prnx,1:Prny,i)<=0) &
+            Scalar(1:Prnx,1:Prny,i,scal) = ca(i) * Scalar(1:Prnx,1:Prny,i,scal) + &
+                  cb(i) * (b%Scalar(1:Prnx,1:Prny,i,scal) + t_diff * b%dScalar_dt(1:Prnx,1:Prny,i,scal))
+        end do
+      end do
+      !$omp end parallel
     end subroutine
 
     subroutine relax_domain_To(b)
       class(dom_bc_buffer_refined), intent(in) :: b
       integer :: width
-      integer :: i, wi
+      integer :: i, wi, scal
 
       width = b%spatial_ratio * 2
 
-      !$omp parallel do private(i, wi)
+      !$omp parallel private(i, wi)
+      !$omp do
       do wi = 1, width
         i = Unz - wi + 1
-        U(1:Unx,1:Uny,i) = ca(wi) * U(1:Unx,1:Uny,i) + &
-                           cb(wi) * (b%U(1:Unx,1:Uny,i) + &
-                                     t_diff * b%dU_dt(1:Unx,1:Uny,i))
+        where (Utype(1:Unx,1:Uny,i)<=0) &
+          U(1:Unx,1:Uny,i) = ca(wi) * U(1:Unx,1:Uny,i) + &
+                             cb(wi) * (b%U(1:Unx,1:Uny,i) + &
+                                       t_diff * b%dU_dt(1:Unx,1:Uny,i))
 
         i = Vnz - wi + 1
-        V(1:Vnx,1:Vny,i) = ca(wi) * V(1:Vnx,1:Vny,i) + &
-                           cb(wi) * (b%V(1:Vnx,1:Vny,i) + &
-                                     t_diff * b%dV_dt(1:Vnx,1:Vny,i))
+        where (Vtype(1:Vnx,1:Vny,i)<=0) &
+          V(1:Vnx,1:Vny,i) = ca(wi) * V(1:Vnx,1:Vny,i) + &
+                             cb(wi) * (b%V(1:Vnx,1:Vny,i) + &
+                                       t_diff * b%dV_dt(1:Vnx,1:Vny,i))
 
         i = Wnz - wi + 1
-        W(1:Wnx,1:Wny,i) = ca(wi) * W(1:Wnx,1:Wny,i) + &
-                           cb(wi) * (b%W(1:Wnx,1:Wny,i) + &
-                                     t_diff * b%dW_dt(1:Wnx,1:Wny,i))
+        where (Wtype(1:Wnx,1:Wny,i)<=0) &
+          W(1:Wnx,1:Wny,i) = ca(wi) * W(1:Wnx,1:Wny,i) + &
+                             cb(wi) * (b%W(1:Wnx,1:Wny,i) + &
+                                       t_diff * b%dW_dt(1:Wnx,1:Wny,i))
       end do
+      !$omp end do nowait
+      
+      !$omp do collapse(2)
+      do scal = 1, num_of_scalars
+        do wi = 1, width
+          i = Prnz - wi + 1
+          where (Prtype(1:Prnx,1:Prny,i)<=0) &
+            Scalar(1:Prnx,1:Prny,i,scal) = ca(wi) * Scalar(1:Prnx,1:Prny,i,scal) + &
+                  cb(wi) * (b%Scalar(1:Prnx,1:Prny,i,scal) + t_diff * b%dScalar_dt(1:Prnx,1:Prny,i,scal))
+        end do
+      end do
+      !$omp end parallel
     end subroutine
 
     pure function ca_table(width) result(res)
