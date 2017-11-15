@@ -1392,8 +1392,11 @@ fields_do:  do j = 1, size(obj_fields)
         end if
         
         
-        allocate(gs, source=GeometricShape(o_file%file))
-        
+        allocate(Polyhedron :: gs)
+        select type (gs)
+          type is (Polyhedron)
+            gs = Polyhedron(o_file%file)
+        end select        
         
       else if (downcase(tree(iobj)%name)=="plane") then
       
