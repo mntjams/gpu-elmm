@@ -995,7 +995,7 @@ contains
     integer :: tnx, tny, tnz
     
     real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
-    real(knd), parameter :: D0 = -1._knd / 24, D1 = 9._knd / 8
+    real(knd), parameter :: D0 = 13._knd / 12, D1 = -1._knd / 24
 
     integer, parameter :: narr = 3
     
@@ -1164,13 +1164,13 @@ contains
      end do
     end do
     !$omp end do
-             
+
 #define comp 2
 #define dir 1
 #include "wmfluxes-nobranch-inc-4ord.f90"
 #undef dir
 #undef comp
-                                  
+                       
     !$omp do schedule(runtime) collapse(3)
     do bk = 1, Vnz, tnz
      do bj = 0, Vny+2, tny
