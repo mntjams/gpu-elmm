@@ -1013,7 +1013,7 @@ implicit none
      end do
     else if ((Btype(So)<BC_MPI_BOUNDS_MIN) .or. (Btype(So)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
-      do j = 1, ny
+      do i = 1, nx
        Pr(i,0,k) = Pr(i,j,k) - 3 * (Pr(i,2,k) - Pr(i,1,k))
       end do
      end do
@@ -1027,7 +1027,7 @@ implicit none
      end do
     else if ((Btype(No)<BC_MPI_BOUNDS_MIN) .or. (Btype(No)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
-      do j = 1, ny
+      do i = 1, nx
        Pr(i,ny+1,k) = Pr(i,ny-2,k) - 3 * (Pr(i,ny-1,k) - Pr(i,ny,k))
       end do
      end do
@@ -1040,8 +1040,8 @@ implicit none
       end do
      end do
     else if ((Btype(Bo)<BC_MPI_BOUNDS_MIN) .or. (Btype(Bo)>BC_MPI_BOUNDS_MAX)) then
-     do k = 1, nz
-      do j = 1, ny
+     do j = 1, ny
+      do i = 1, nx
        Pr(i,j,0) = Pr(i,j,3) - 3 * (Pr(i,j,2) - Pr(i,j,1))
       end do
      end do
@@ -1054,8 +1054,8 @@ implicit none
       end do
      end do
     else if ((Btype(To)<BC_MPI_BOUNDS_MIN) .or. (Btype(To)>BC_MPI_BOUNDS_MAX)) then
-     do k = 1, nz
-      do j = 1, ny
+     do j = 1, ny
+      do i = 1, nx
        Pr(i,j,nz+1) = Pr(i,j,nz-2) - 3 * (Pr(i,j,nz-1) - Pr(i,j,nz))
       end do
      end do
