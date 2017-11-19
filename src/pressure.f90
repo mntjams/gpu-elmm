@@ -78,7 +78,7 @@ contains
 
   subroutine PressureCorrection(U,V,W,Pr,Q,coef)                    !Pressure correction
     real(knd), dimension(-2:,-2:,-2:), intent(inout)     :: U, V, W !Phi is computed in Poisson eq. with div of U in RHS
-    real(knd), dimension(1:,1:,1:), intent(inout)        :: Pr      !Depend ing on active projection method Phi becomes new pressure
+    real(knd), dimension(-1:,-1:,-1:), intent(inout)        :: Pr      !Depend ing on active projection method Phi becomes new pressure
     real(knd), dimension(:,:,:), allocatable, intent(in) :: Q       !or is added to last pressure
     real(knd), intent(in) :: coef
                                                            !U,V,W velocity field for correction
@@ -374,7 +374,7 @@ contains
     real(knd), intent(inout) :: U(-2:,-2:,-2:)
     real(knd), intent(inout) :: V(-2:,-2:,-2:)
     real(knd), intent(inout) :: W(-2:,-2:,-2:)
-    real(knd), intent(inout) :: Pr(0:,0:,0:)
+    real(knd), intent(inout) :: Pr(-1:,-1:,-1:)
     real(knd), allocatable, intent(in) :: Q(:,:,:)
     real(knd), intent(inout) :: Phi(-1:,-1:,-1:)
     real(knd), intent(in)    :: dt2,dt3
@@ -539,6 +539,8 @@ contains
     call Bound_Pr(Pr)
 
     if (pressure_solution%check_divergence) then
+      call BoundUVW(U,V,W)
+      
       S = 0
       
       if (discretization_order == 4) then
@@ -551,7 +553,7 @@ contains
                  p = ( C1*(U(i,j,k)-U(i-1,j,k)) - C3*(U(i+1,j,k)-U(i-2,j,k)) ) / dxmin &
                    + ( C1*(V(i,j,k)-V(i,j-1,k)) - C3*(V(i,j+1,k)-V(i,j-2,k)) ) / dymin &
                    + ( C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k+1)-W(i,j,k-2)) ) / dzmin
-                 S = max(S, abs(p - Q(i,j,k)))
+                 S = max(S, abs(p - Q(i,j,k)))              
               end do
             end do
           end do

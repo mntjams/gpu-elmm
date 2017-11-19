@@ -1680,7 +1680,7 @@ contains
 
 
   subroutine par_receive_initial_conditions(receive, U, V, W, Pr, Temperature, Moisture, Scalar)
-    real(knd), intent(inout) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:) ,W(-2:,-2:,-2:), Pr(:,:,:)
+    real(knd), intent(inout) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:) ,W(-2:,-2:,-2:), Pr(-1:,-1:,-1:)
     real(knd), intent(inout) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
     logical, intent(in) :: receive
     integer :: err
@@ -1698,7 +1698,7 @@ contains
 
   subroutine receive_and_interpolate(b, U, V, W, Pr, Temperature, Moisture, Scalar)
     type(dom_child_buffer), intent(inout) :: b
-    real(knd), intent(inout) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:) ,W(-2:,-2:,-2:), Pr(:,:,:)
+    real(knd), intent(inout) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:) ,W(-2:,-2:,-2:), Pr(-1:,-1:,-1:)
     real(knd), intent(inout) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
     real(knd), allocatable :: tmp(:,:,:)
     integer :: n
@@ -1919,7 +1919,7 @@ contains
   
   
   subroutine par_send_initial_conditions(U, V, W, Pr, Temperature, Moisture, Scalar)
-    real(knd), intent(in) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:) ,W(-2:,-2:,-2:), Pr(:,:,:)
+    real(knd), intent(in) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:) ,W(-2:,-2:,-2:), Pr(-1:,-1:,-1:)
     real(knd), intent(in) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,:)
 
     real(knd), allocatable :: tmp(:,:,:)

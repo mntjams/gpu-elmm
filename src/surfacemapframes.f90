@@ -185,7 +185,7 @@ contains
   subroutine SaveSurfaceFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
     real(knd),intent(in) :: time
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    real(knd),contiguous,intent(in) :: Pr(0:,0:,0:), &
+    real(knd),contiguous,intent(in) :: Pr(-1:,-1:,-1:), &
                                        Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
                                        Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
     integer :: i
@@ -234,7 +234,7 @@ contains
     !Fill the output buffers for asynchronous output
     class(TSurfaceFrameDomain),intent(inout) :: D
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    real(knd),contiguous,intent(in) :: Pr(0:,0:,0:), Viscosity(-1:,-1:,-1:), &
+    real(knd),contiguous,intent(in) :: Pr(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
                                        Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), &
                                        Scalar(-1:,-1:,-1:,1:)
     integer :: i,j,l

@@ -1758,7 +1758,7 @@ contains
   pure recursive subroutine WallPrGradient(prgrad,i,j,k,Pr,Prtype)
     real(knd),intent(out) :: prgrad(3)
     integer,intent(in)    :: i,j,k
-    real(knd),intent(in)  :: Pr(0:,0:,0:)
+    real(knd),intent(in)  :: Pr(-1:,-1:,-1:)
     integer,intent(in)    :: Prtype(0:,0:,0:)
     integer :: n
 
@@ -1805,7 +1805,7 @@ contains
 
   subroutine ComputeViscsWM(U,V,W,Pr,Temperature)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-    real(knd),dimension(1:,1:,1:),   intent(in) :: Pr
+    real(knd),dimension(-1:,-1:,-1:),   intent(in) :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
     integer :: i, xi, yj, zk
     real(knd) :: tdif
@@ -1890,7 +1890,7 @@ contains
 
   subroutine ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-    real(knd),dimension(1:,1:,1:),   intent(in) :: Pr
+    real(knd),dimension(-1:,-1:,-1:),   intent(in) :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
 
 

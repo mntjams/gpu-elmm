@@ -40,7 +40,7 @@
 
       !$omp do
       do i = 1, size(VxpWMpoints)
-
+      
             wrk(VxpWMpoints(i)%xi+1,VxpWMpoints(i)%yj,VxpWMpoints(i)%zk) = &
             wrk(VxpWMpoints(i)%xi+1,VxpWMpoints(i)%yj,VxpWMpoints(i)%zk) + &
   (nu((VxpWMpoints(i)%xi)+1,(VxpWMpoints(i)%yj)+1,VxpWMpoints(i)%zk)+&
@@ -108,7 +108,6 @@
 
       !$omp do
       do i = 1, size(VypWMpoints)
-
             wrk(VypWMpoints(i)%xi,VypWMpoints(i)%yj+1,VypWMpoints(i)%zk) = &
             wrk(VypWMpoints(i)%xi,VypWMpoints(i)%yj+1,VypWMpoints(i)%zk) + &
   nu(VypWMpoints(i)%xi,(VypWMpoints(i)%yj)+1,VypWMpoints(i)%zk) * &
@@ -209,4 +208,4 @@
 
       end do
       !$omp end do
-      
+     

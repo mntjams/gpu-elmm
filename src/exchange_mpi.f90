@@ -65,7 +65,7 @@ contains
     call init_mpi_derived_types(send_mpi_types(:,2), recv_mpi_types(:,2), Vnx, Vny, Vnz, -2, 3)
     call init_mpi_derived_types(send_mpi_types(:,3), recv_mpi_types(:,3), Wnx, Wny, Wnz, -2, 3)  
     call init_mpi_derived_types(send_mpi_types(:,4), recv_mpi_types(:,4), Prnx, Prny, Prnz, -1, 2)
-    call init_mpi_derived_types_Pr(send_mpi_types(:,6), recv_mpi_types(:,6), Prnx, Prny, Prnz, Unx+3, Vny+3, Wnz+3)
+    call init_mpi_derived_types(send_mpi_types(:,6), recv_mpi_types(:,6), Prnx, Prny, Prnz, -1, 2)
     call init_mpi_derived_types_Q(send_mpi_types(:,7), recv_mpi_types(:,7), Prnx, Prny, Prnz)
   end subroutine
 

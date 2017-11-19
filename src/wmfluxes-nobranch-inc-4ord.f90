@@ -62,7 +62,7 @@
         i = p%xi
         j = p%yj
         k = p%zk
-        
+
         wrk(i,j,k) = &
           wrk(i,j,k) + (D1*Fl(i-1,j,k) + D0*Fl(i,j,k) + D1*Fl(i+1,j,k))
 

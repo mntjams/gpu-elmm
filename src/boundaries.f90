@@ -965,7 +965,7 @@ implicit none
 
   
   subroutine Bound_Pr(Pr)
-    real(knd), intent(inout) :: Pr(0:,0:,0:)
+    real(knd), intent(inout) :: Pr(-1:,-1:,-1:)
     integer :: i, j, k, nx, ny, nz
 
     nx = Prnx

@@ -1904,7 +1904,7 @@ contains
 
   subroutine InitHydrostaticPressure(Pr, Temperature, Moisture)
     use Pressure
-    real(knd), contiguous, intent(out) :: Pr(0:,0:,0:)
+    real(knd), contiguous, intent(out) :: Pr(-1:,-1:,-1:)
     real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:)
     real(knd) :: t_virt, t_virt_prev, p
     integer :: i, j, k
