@@ -152,6 +152,8 @@ module Parameters
   real(knd) :: epsCN, epsPoisson, eps, debugparam
 
   real(tim) :: timefram1, timefram2, timeavg1, timeavg2
+  
+  integer :: discretization_order = 4
 
   integer :: advection_method
   integer :: frames

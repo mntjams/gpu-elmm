@@ -916,6 +916,11 @@ contains
           end do
         end do
       end do
+    else
+    
+      allocate(Scflx_points(0))
+      allocate(Scfly_points(0))
+      allocate(Scflz_points(0))
 
     end if
 
@@ -1753,7 +1758,7 @@ contains
   pure recursive subroutine WallPrGradient(prgrad,i,j,k,Pr,Prtype)
     real(knd),intent(out) :: prgrad(3)
     integer,intent(in)    :: i,j,k
-    real(knd),intent(in)  :: Pr(1:,1:,1:)
+    real(knd),intent(in)  :: Pr(-1:,-1:,-1:)
     integer,intent(in)    :: Prtype(0:,0:,0:)
     integer :: n
 
@@ -1800,7 +1805,7 @@ contains
 
   subroutine ComputeViscsWM(U,V,W,Pr,Temperature)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-    real(knd),dimension(1:,1:,1:),   intent(in) :: Pr
+    real(knd),dimension(-1:,-1:,-1:),   intent(in) :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
     integer :: i, xi, yj, zk
     real(knd) :: tdif
@@ -1815,12 +1820,6 @@ contains
       zk = WMPoints(i)%zk
 
       dist = [WMPoints(i)%distx, WMPoints(i)%disty, WMPoints(i)%distz]
-
-      if (norm2(dist)<(dxmin*dymin*dzmin)**(1._knd/3)/20) then
-        write(*,*) "ijk",xi,yj,zk
-        write(*,*) "dist",dist
-        call error_stop("Error, WM point can not be exactly on the wall!")
-      end if
 
       vel(1) = (U(xi,yj,zk)+U(xi-1,yj,zk))/2._knd
       vel(2) = (V(xi,yj,zk)+V(xi,yj-1,zk))/2._knd
@@ -1891,7 +1890,7 @@ contains
 
   subroutine ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-    real(knd),dimension(1:,1:,1:),   intent(in) :: Pr
+    real(knd),dimension(-1:,-1:,-1:),   intent(in) :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
 
 
@@ -1926,7 +1925,7 @@ contains
       integer :: point, xi, yj, zk
       real(knd) :: dist(3), vel(3), wallvel(3), tan_vect(3), mag, drec(6), temp
       type(WMPointUVW), pointer :: p
-      real(knd), parameter :: eps = 0.0001_knd
+      real(knd), parameter :: eps = sqrt(epsilon(1._knd))
       
       drec = [1/dxmin, 1/dxmin, 1/dymin, 1/dymin, 1/dzmin, 1/dzmin]
 
@@ -1940,12 +1939,6 @@ contains
           zk = p%zk
 
           dist = [p%distx, p%disty, p%distz]
-
-          if (norm2(dist)<(dxmin*dymin*dzmin)**(1._knd/3)/20) then
-            write(*,*) "ijk",xi,yj,zk
-            write(*,*) "dist",dist
-            call error_stop("Error, WM point UVW can not be exactly on the wall!")
-          end if
 
           vel = local_velocity(U,V,W,component,xi,yj,zk)
 

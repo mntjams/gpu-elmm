@@ -451,14 +451,14 @@ contains
    end if
 
    if (store%tke==1) then
-     allocate(tke(1:time_series_max_length))
+     allocate(tke(0:time_series_max_length))
      tke = huge(1.0_knd)
    end if
 
-   if (store%delta_time==1) then
+   if (store%dissip==1) then
      allocate(dissip(1:time_series_max_length))
      dissip = huge(1.0_knd)
-     dissip(0)=0
+     dissip(1) = 0
    end if
 
    if (wallmodeltype>0.and.(display%ustar==1.or.store%ustar==1)) then
@@ -735,7 +735,7 @@ contains
   subroutine OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
     use Wallmodels, only: ComputeViscsWM
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)   :: U,V,W
-    real(knd),dimension(1:,1:,1:),contiguous,intent(in)      :: Pr
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)      :: Pr
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)   :: Temperature
     real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)   :: Moisture
     real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: Scalar
@@ -910,10 +910,10 @@ contains
     end do
 
     if (store%tke==1) then
-      tke(step)=totke(U,V,W)
+      tke(step)=TotKE(U,V,W)
     end if
 
-    if (store%tke==1.and.store%dissip==1.and.step>0) then
+    if (store%tke==1.and.store%dissip==1.and.step>1) then
       dissip(step)=(tke(step-1)-tke(step))/(times(step)-times(step-1))
     end if
 
@@ -1444,12 +1444,13 @@ contains
 
   subroutine OutputOut(U,V,W,Pr,Temperature,Moisture)
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    real(knd),dimension(1:,1:,1:),contiguous,intent(in) :: Pr
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Pr
     real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
     character(70) :: str
     real(real32),allocatable :: tmp(:,:,:,:)
     integer :: i,j,k,unit
+    real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
 
     if (store%out==1) then
 
@@ -1522,20 +1523,31 @@ contains
          write(unit) "LOOKUP_TABLE default", lf
 
          if (gridtype==uniformgrid) then
-           write(unit) BigEnd(real((U(1:Prnx,1:Prny,1:Prnz) - &
-                                       U(0:Prnx-1,1:Prny,1:Prnz))/dxmin + &
-                                    (V(1:Prnx,1:Prny,1:Prnz) - &
-                                       V(1:Prnx,0:Prny-1,1:Prnz))/dymin + &
-                                    (W(1:Prnx,1:Prny,1:Prnz) - &
-                                       W(1:Prnx,1:Prny,0:Prnz-1))/dzmin &
-                               , real32))
+           if (discretization_order == 4) then
+             write(unit) BigEnd(real( &
+                     ( C1*(U(1:Prnx,1:Prny,1:Prnz)-U(0:Prnx-1,1:Prny,1:Prnz)) - &
+                       C3*(U(2:Prnx+1,1:Prny,1:Prnz)-U(-1:Prnx-2,1:Prny,1:Prnz)) ) / dxmin &
+                   + ( C1*(V(1:Prnx,1:Prny,1:Prnz)-V(1:Prnx,0:Prny-1,1:Prnz)) - &
+                       C3*(V(1:Prnx,2:Prny+1,1:Prnz)-V(1:Prnx,-1:Prny-2,1:Prnz)) ) / dymin &
+                   + ( C1*(W(1:Prnx,1:Prny,1:Prnz)-W(1:Prnx,1:Prny,0:Prnz-1)) - &
+                       C3*(W(1:Prnx,1:Prny,2:Prnz+1)-W(1:Prnx,1:Prny,-1:Prnz-2)) ) / dzmin &
+                                , real32))
+           else
+             write(unit) BigEnd(real((U(1:Prnx,1:Prny,1:Prnz) - &
+                                      U(0:Prnx-1,1:Prny,1:Prnz))/dxmin + &
+                                     (V(1:Prnx,1:Prny,1:Prnz) - &
+                                      V(1:Prnx,0:Prny-1,1:Prnz))/dymin + &
+                                     (W(1:Prnx,1:Prny,1:Prnz) - &
+                                      W(1:Prnx,1:Prny,0:Prnz-1))/dzmin &
+                                , real32))
+           end if
          else
            do k = 1,Prnz
             do j = 1,Prny
              do i = 1,Prnx
                write(unit) BigEnd(real((U(i,j,k)-U(i-1,j,k))/(dxPr(i)) + &
-                                        (V(i,j,k)-V(i,j-1,k))/(dyPr(j)) + &
-                                        (W(i,j,k)-W(i,j,k-1))/(dzPr(k)), real32))
+                                       (V(i,j,k)-V(i,j-1,k))/(dyPr(j)) + &
+                                       (W(i,j,k)-W(i,j,k-1))/(dzPr(k)), real32))
              end do
             end do
            end do
@@ -2448,7 +2460,7 @@ contains
 
   subroutine Output(U,V,W,Pr,Temperature,Moisture,Scalar)
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U,V,W
-    real(knd),contiguous,intent(inout) :: Pr(1:,1:,1:)
+    real(knd),contiguous,intent(inout) :: Pr(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
     real(knd),contiguous,intent(in) :: Scalar(-1:,-1:,-1:,:)

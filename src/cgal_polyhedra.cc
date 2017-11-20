@@ -29,14 +29,22 @@ typedef CGAL::Bbox_3 Bbox_3;
 
 typedef struct {double x,y,z;} d3;
 
-typedef struct {Polyhedron *poly; Tree *tree;} Polytree;
+typedef struct {
+    Polyhedron *poly=nullptr; 
+    Tree *tree=nullptr;
+    bool infinity_outside; //whether consider infinity as outside or inside
+} Polytree;
 
 using std::cout;
 using std::endl;
 
 extern "C" {
  
-  void polyhedron_from_file (Polytree  **pptree, const char *fname, int verbose, int * const ierr){
+  void polyhedron_from_file(Polytree  ** const pptree, 
+                            const char * const fname,
+                            const bool         verbose,
+                            const bool         infinity_outside,
+                            int * const        ierr){
     Polyhedron *polyhedron = new Polyhedron;
     
     std::ifstream in(fname);
@@ -71,12 +79,13 @@ extern "C" {
     *pptree = new Polytree;
     (*pptree)->poly = polyhedron;
     (*pptree)->tree = tree;
+    (*pptree)->infinity_outside = infinity_outside;
     
     *ierr = 0;
     
   }
   
-  void polyhedron_closest (const Polytree *ptree, const d3 *query, d3 *near){
+  void polyhedron_closest(const Polytree *ptree, const d3 *query, d3 *const near){
     Point query_point(query->x,query->y,query->z);
     
     Point closest = ptree->tree->closest_point(query_point);
@@ -124,7 +133,11 @@ extern "C" {
       if (distinct) n_dist += 1;
     }
 
-    return n_dist%2 == 1;
+    if (ptree->infinity_outside) {
+      return n_dist%2 == 1;
+    } else{
+      return n_dist%2 == 0;
+    }
   }
   
   bool polyhedron_intersects_ray(const Polytree *ptree, const d3 *origin, const d3 *vec){

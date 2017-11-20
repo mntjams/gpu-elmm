@@ -18,27 +18,33 @@ contains
 #endif
 
     type(PoisFFT_Solver),save :: Solver
-    real(knd),dimension(0:,0:,0:),intent(inout) :: Phi
+    real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Phi
     real(knd),dimension(0:,0:,0:),intent(in) :: RHS
     logical, save :: called = .false.
 
     integer(int64), save :: trate
     integer(int64)       :: t1, t2
 
-
+    integer :: discretization
+    
+    if (discretization_order == 4) then
+      discretization = PoisFFT_FiniteDifference4
+    else
+      discretization = PoisFFT_FiniteDifference2
+    end if
 
     if (.not.called) then
 #ifdef PAR
       Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
                                [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
                                PoissonBtype, &
-                               PoisFFT_FiniteDifference2, &
+                               discretization, &
                                gPrns,offsets_to_global,poisfft_comm)
 #else
       Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
                                [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
                                PoissonBtype, &
-                               PoisFFT_FiniteDifference2)
+                               discretization)
 #endif
       called = .true.
 
@@ -72,7 +78,7 @@ contains
 #endif
     !Solves Poisson equation using Successive over-relaxation
 
-    real(knd),dimension(0:,0:,0:),intent(inout) :: Phi
+    real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Phi
     real(knd),dimension(0:,0:,0:),intent(in) :: RHS
     integer,save :: called=0
     integer :: nx,ny,nz,i,j,k,l

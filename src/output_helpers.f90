@@ -18,21 +18,25 @@ contains
     lz = zW(Prnz) - zW(0)
 
     res = 0
-    Um = 0
-    Vm = 0
-    Wm = 0
+
     !$omp parallel do private(i,j,k) reduction(+:res)
     do k = 1,Prnz
      do j = 1,Prny
       do i = 1,Prnx
-       res = res + (((U(i-1,j,k)+U(i,j,k))/2._knd-Um)**2+&
-                       ((V(i,j-1,k)+V(i,j,k))/2._knd-Vm)**2+&
-                       ((W(i,j,k-1)+W(i,j,k))/2._knd-Wm)**2)
+       res = res + (U(i-1,j,k) + U(i,j,k))**2 + &
+                   (V(i,j-1,k) + V(i,j,k))**2 + &
+                   (W(i,j,k-1) + W(i,j,k))**2
       end do
      end do
     end do
     !$omp end parallel do
-    res = res*lx*ly*lz/2
+    
+    !2**2 for the average above, 2 from the definition of kinetic energy
+    res = res / 8
+    !average
+    res = res / (Prnx*Prny*Prnz)
+    !integrate
+    res = res*lx*ly*lz
   end function TotKE
 
   pure real(knd) function VorticityMag(i,j,k,U,V,W) result(res)

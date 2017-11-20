@@ -69,6 +69,7 @@ contains
           p%distx = nearx-xPr(i)
           p%disty = neary-yPr(j)
           p%distz = nearz-zPr(k)
+          
           if (p%distx==0.and.p%disty==0.and.p%distz==0) then
             write(*,*) "Prtype(i,j,k)", Prtype(i,j,k)
             write(*,*) "i,j,k", i,j,k
@@ -77,6 +78,16 @@ contains
             write(*,*) "nearx, neary, nearz", nearx, neary, nearz
             call error_stop("zero distance WM point")
           end if
+          
+          if ((abs(p%distx)<dxmin/20) .and. &
+              (abs(p%disty)<dymin/20) .and. &
+              (abs(p%distz)<dzmin/20)) then
+            write(*,*) "ijk", p%xi, p%yj, p%zk
+            write(*,*) "dist dx, dy, dz", p%distx, p%disty, p%distz
+            write(*,*) "grid dx, dy, dz", dxmin, dymin, dzmin
+            call error_stop("Error, WM point is too close to the wall!")
+          end if
+                
           p%ustar = 1
           
           !HACK
@@ -246,6 +257,15 @@ contains
                     end if
                     
                 end select
+                
+                if ((abs(distvec(1))<dxmin/20) .and. &
+                    (abs(distvec(2))<dymin/20) .and. &
+                    (abs(distvec(3))<dzmin/20)) then
+                  write(*,*) "ijk", p%xi, p%yj, p%zk
+                  write(*,*) "dist dx, dy, dz", distvec
+                  write(*,*) "grid dx, dy, dz", dxmin, dymin, dzmin
+                  call error_stop("Error, WM point UVW is too close to the wall!")
+                end if
                 
                 p%z0H = p%z0
                 

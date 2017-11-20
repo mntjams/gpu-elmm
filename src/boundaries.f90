@@ -867,7 +867,7 @@ implicit none
 
 
   subroutine Bound_Phi(Phi)
-    real(knd), intent(inout) :: Phi(0:,0:,0:)
+    real(knd), intent(inout) :: Phi(-1:,-1:,-1:)
     integer :: i, j, k, nx, ny, nz
 
     nx = Prnx
@@ -875,19 +875,19 @@ implicit none
     nz = Prnz
 
 #ifdef PAR
-    call par_exchange_boundaries(Phi, Btype, 5)
+    call par_exchange_boundaries(Phi, Btype, 4)
 #endif
     
     if (Btype(We)==BC_PERIODIC) then
      do k = 1, nz
       do j = 1, ny                      !Periodic BC
-       Phi(0,j,k) = Phi(nx,j,k)
+       Phi(-1:0,j,k) = Phi(nx-1:nx,j,k)
       end do
      end do
     else if ((Btype(We)<BC_MPI_BOUNDS_MIN) .or. (Btype(We)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do j = 1, ny                      !Other BCs
-       Phi(0,j,k) = Phi(1,j,k)
+       Phi(-1:0,j,k) = Phi(2:1:-1,j,k)
       end do
      end do
     end if
@@ -895,13 +895,13 @@ implicit none
     if (Btype(Ea)==BC_PERIODIC) then
      do k = 1, nz
       do j = 1, ny                      !Periodic BC
-       Phi(nx+1,j,k) = Phi(1,j,k)
+       Phi(nx+1:nx+2,j,k) = Phi(1:2,j,k)
       end do
      end do
     else if ((Btype(Ea)<BC_MPI_BOUNDS_MIN) .or. (Btype(Ea)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do j = 1, ny                      !Other BCs
-       Phi(nx+1,j,k) = Phi(nx,j,k)
+       Phi(nx+1:nx+2,j,k) = Phi(nx:nx-1:-1,j,k)
       end do
      end do
     end if
@@ -909,13 +909,13 @@ implicit none
     if (Btype(So)==BC_PERIODIC) then
      do k = 1, nz
       do i = 1, nx                      !Periodic BC
-       Phi(i,0,k) = Phi(i,ny,k)
+       Phi(i,-1:0,k) = Phi(i,ny-1:ny,k)
       end do
      end do
     else if ((Btype(So)<BC_MPI_BOUNDS_MIN) .or. (Btype(So)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do i = 1, nx                      !Other BCs
-       Phi(i,0,k) = Phi(i,1,k)
+       Phi(i,-1:0,k) = Phi(i,2:1:-1,k)
       end do
      end do
     end if
@@ -923,13 +923,13 @@ implicit none
     if (Btype(No)==BC_PERIODIC) then
     do k = 1, nz
       do i = 1, nx                      !Periodic BC
-       Phi(i,ny+1,k) = Phi(i,1,k)
+       Phi(i,ny+1:ny+2,k) = Phi(i,1:2,k)
       end do
      end do
     else if ((Btype(No)<BC_MPI_BOUNDS_MIN) .or. (Btype(No)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do i = 1, nx                      !Other BCs
-       Phi(i,ny+1,k) = Phi(i,ny,k)
+       Phi(i,ny+1:ny+2,k) = Phi(i,ny:ny-1:-1,k)
       end do
      end do
     end if
@@ -937,13 +937,13 @@ implicit none
     if (Btype(Bo)==BC_PERIODIC) then
      do j = 1, ny
       do i = 1, nx                      !Periodic BC
-       Phi(i,j,0) = Phi(i,j,nz)
+       Phi(i,j,-1:0) = Phi(i,j,nz-1:nz)
       end do
      end do
     else if ((Btype(Bo)<BC_MPI_BOUNDS_MIN) .or. (Btype(Bo)>BC_MPI_BOUNDS_MAX)) then
      do j = 1, ny
       do i = 1, nx                      !Other BCs
-       Phi(i,j,0) = Phi(i,j,1)
+       Phi(i,j,-1:0) = Phi(i,j,2:1:-1)
       end do
      end do
     end if
@@ -951,13 +951,13 @@ implicit none
     if (Btype(To)==BC_PERIODIC) then
      do j = 1, ny
       do i = 1, nx                      !Periodic BC
-       Phi(i,j,nz+1) = Phi(i,j,1)
+       Phi(i,j,nz+1:nz+2) = Phi(i,j,1:2)
       end do
      end do
     else if ((Btype(To)<BC_MPI_BOUNDS_MIN) .or. (Btype(To)>BC_MPI_BOUNDS_MAX)) then
      do j = 1, ny
       do i = 1, nx                      !Other BCs
-       Phi(i,j,nz+1) = Phi(i,j,nz)
+       Phi(i,j,nz+1:nz+2) = Phi(i,j,nz:nz-1:-1)
       end do
      end do
     end if
@@ -965,7 +965,7 @@ implicit none
 
   
   subroutine Bound_Pr(Pr)
-    real(knd), intent(inout) :: Pr(1:,1:,1:)
+    real(knd), intent(inout) :: Pr(-1:,-1:,-1:)
     integer :: i, j, k, nx, ny, nz
 
     nx = Prnx
@@ -976,47 +976,90 @@ implicit none
     call par_exchange_Pr(Pr)
 #endif
 
+    !extrapolate so that the 4th order gradient reduces to 2nd order
     if (Btype(We)==BC_PERIODIC) then
      do k = 1, nz
       do j = 1, ny
-       Pr(nx+1,j,k) = Pr(1,j,k)
+       Pr(0,j,k) = Pr(nx,j,k)
+      end do
+     end do
+    else if ((Btype(We)<BC_MPI_BOUNDS_MIN) .or. (Btype(We)>BC_MPI_BOUNDS_MAX)) then
+     do k = 1, nz
+      do j = 1, ny
+       Pr(0,j,k) = Pr(3,j,k) - 3 * (Pr(2,j,k) - Pr(1,j,k))
       end do
      end do
     end if
+    
+    if (Btype(Ea)==BC_PERIODIC) then
+     do k = 1, nz
+      do j = 1, ny
+       Pr(nx+1:nx+2,j,k) = Pr(1:2,j,k)
+      end do
+     end do
+    else if ((Btype(Ea)<BC_MPI_BOUNDS_MIN) .or. (Btype(Ea)>BC_MPI_BOUNDS_MAX)) then
+     do k = 1, nz
+      do j = 1, ny
+       Pr(nx+1,j,k) = Pr(nx-2,j,k) - 3 * (Pr(nx-1,j,k) - Pr(nx,j,k))
+      end do
+     end do
+    end if
+    
+    if (Btype(So)==BC_PERIODIC) then
+     do k = 1, nz
+      do i = 1, nx
+       Pr(i,0,k) = Pr(i,ny,k)
+      end do
+     end do
+    else if ((Btype(So)<BC_MPI_BOUNDS_MIN) .or. (Btype(So)>BC_MPI_BOUNDS_MAX)) then
+     do k = 1, nz
+      do i = 1, nx
+       Pr(i,0,k) = Pr(i,j,k) - 3 * (Pr(i,2,k) - Pr(i,1,k))
+      end do
+     end do
+    end if
+    
     if (Btype(No)==BC_PERIODIC) then
      do k = 1, nz
       do i = 1, nx
-       Pr(i,ny+1,k) = Pr(i,1,k)
+       Pr(i,ny+1:ny+2,k) = Pr(i,1:2,k)
+      end do
+     end do
+    else if ((Btype(No)<BC_MPI_BOUNDS_MIN) .or. (Btype(No)>BC_MPI_BOUNDS_MAX)) then
+     do k = 1, nz
+      do i = 1, nx
+       Pr(i,ny+1,k) = Pr(i,ny-2,k) - 3 * (Pr(i,ny-1,k) - Pr(i,ny,k))
       end do
      end do
     end if
+    
+    if (Btype(Bo)==BC_PERIODIC) then
+     do j = 1, ny
+      do i = 1, nx
+       Pr(i,j,0) = Pr(i,j,nz)
+      end do
+     end do
+    else if ((Btype(Bo)<BC_MPI_BOUNDS_MIN) .or. (Btype(Bo)>BC_MPI_BOUNDS_MAX)) then
+     do j = 1, ny
+      do i = 1, nx
+       Pr(i,j,0) = Pr(i,j,3) - 3 * (Pr(i,j,2) - Pr(i,j,1))
+      end do
+     end do
+    end if
+    
     if (Btype(To)==BC_PERIODIC) then
      do j = 1, ny
       do i = 1, nx
-       Pr(i,j,nz+1) = Pr(i,j,1)
+       Pr(i,j,nz+1:nz+2) = Pr(i,j,1:2)
+      end do
+     end do
+    else if ((Btype(To)<BC_MPI_BOUNDS_MIN) .or. (Btype(To)>BC_MPI_BOUNDS_MAX)) then
+     do j = 1, ny
+      do i = 1, nx
+       Pr(i,j,nz+1) = Pr(i,j,nz-2) - 3 * (Pr(i,j,nz-1) - Pr(i,j,nz))
       end do
      end do
     end if
-
-    if (Btype(We)==BC_PERIODIC.and.Btype(No)==BC_PERIODIC) then
-     do k = 1, nz
-        Pr(nx+1,ny+1,k) = Pr(1,1,k)
-     end do
-    end if
-
-     if (Btype(We)==BC_PERIODIC.and.Btype(To)==BC_PERIODIC) then
-     do j = 1, ny
-        Pr(nx+1,j,nz+1) = Pr(1,j,1)
-     end do
-    end if
-
-    if (Btype(No)==BC_PERIODIC.and.Btype(To)==BC_PERIODIC) then
-     do i = 1, nx
-        Pr(i,ny+1,nz+1) = Pr(i,1,1)
-     end do
-    end if
-
-    if (Btype(We)==BC_PERIODIC.and.Btype(No)==BC_PERIODIC.and.Btype(To)==BC_PERIODIC)  Pr(nx+1,ny+1,nz+1) = Pr(1,1,1)
 
   end subroutine Bound_Pr
 

@@ -242,7 +242,7 @@ contains
 
   subroutine OtherTerms(U, V, W, U2, V2, W2, Pr, coef)
     real(knd), contiguous,  intent(inout) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
-    real(knd), contiguous,  intent(inout) :: Pr(1:,1:,1:)
+    real(knd), contiguous,  intent(inout) :: Pr(-1:,-1:,-1:)
     real(knd), allocatable, intent(inout) :: U2(:,:,:), V2(:,:,:), W2(:,:,:)
     real(knd), intent(in) :: coef
 

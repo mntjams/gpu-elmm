@@ -149,7 +149,7 @@ program CLMM
       if (time_step>=3 .and. &
           time_stepping%variable_time_steps .and. &
           time_stepping%dt < time_stepping%dt_min) then
-        if (master) write (*,*) "Solution diverged."
+        if (master) write (*,*) "Solution diverged. 1"
         error_exit = .true.
         exit
       endif
@@ -158,7 +158,7 @@ program CLMM
           .not.time_stepping%variable_time_steps .and. &
           time_stepping%enable_CFL_check .and. &
           time_stepping%CFL > time_stepping%CFL_max) then
-        if (master) write (*,*) "Solution diverged."
+        if (master) write (*,*) "Solution diverged. 2"
         error_exit = .true.
         exit
       endif
@@ -218,7 +218,7 @@ contains
     allocate(U(-2:Unx+3,-2:Uny+3,-2:Unz+3))
     allocate(V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
     allocate(W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-    allocate(Pr(1:Unx+1,1:Vny+1,1:Wnz+1))
+    allocate(Pr(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
 
     U = 0
     V = 0

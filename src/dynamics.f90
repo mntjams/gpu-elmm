@@ -58,11 +58,12 @@ contains
 
 
   subroutine PressureGrad(Pr, U, V, W, coef)
-    real(knd), intent(inout), contiguous :: Pr(1:,1:,1:)
+    real(knd), intent(inout), contiguous :: Pr(-1:,-1:,-1:)
     real(knd), intent(inout), contiguous, dimension(-2:,-2:,-2:) :: U,V,W
     real(knd), intent(in)    :: coef
     real(knd) :: A, Ax, Ay, Az
     integer :: i,j,k
+    real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
 
     A = -coef
     Ax = - coef / dxmin
@@ -114,33 +115,71 @@ contains
       !$omp end do
     end if
 
-    !$omp do
-    do k = 1, Unz
-      do j = 1, Uny
-        do i = 1, Unx
-          U(i,j,k) = U(i,j,k) + Ax * (Pr(i+1,j,k)-Pr(i,j,k))
+    if (discretization_order==4) then
+      !grad p_i = 9/8 (p_i+1 - p_i) / dx  - 1/8 (p_i+2 - p_i-1) / 3*dx
+    
+      !$omp do
+      do k = 1, Unz
+        do j = 1, Uny
+          do i = 1, Unx
+            U(i,j,k) = U(i,j,k) + &
+                   Ax * ( (Pr(i+1,j,k) - Pr(i  ,j,k)) * C1 - &
+                          (Pr(i+2,j,k) - Pr(i-1,j,k)) * C3 )
+          end do
         end do
       end do
-    end do
-    !$omp end do nowait
-    !$omp do
-    do k = 1, Vnz
-      do j = 1, Vny
-        do i = 1, Vnx
-          V(i,j,k) = V(i,j,k) + Ay * (Pr(i,j+1,k)-Pr(i,j,k))
+      !$omp end do nowait
+      !$omp do
+      do k = 1, Vnz
+        do j = 1, Vny
+          do i = 1, Vnx
+            V(i,j,k) = V(i,j,k) + &
+                   Ay * ( (Pr(i,j+1,k) - Pr(i,j  ,k)) * C1 - &
+                          (Pr(i,j+2,k) - Pr(i,j-1,k)) * C3 )
+          end do
         end do
       end do
-    end do
-    !$omp end do nowait
-    !$omp do
-    do k = 1, Wnz
-      do j = 1, Wny
-        do i = 1, Wnx
-          W(i,j,k) = W(i,j,k) + Az * (Pr(i,j,k+1)-Pr(i,j,k))
+      !$omp end do nowait
+      !$omp do
+      do k = 1, Wnz
+        do j = 1, Wny
+          do i = 1, Wnx
+            W(i,j,k) = W(i,j,k) + &
+                   Az * ( (Pr(i,j,k+1) - Pr(i,j,k  )) * C1 - &
+                          (Pr(i,j,k+2) - Pr(i,j,k-1)) * C3 )
+          end do
         end do
       end do
-    end do
-    !$omp end do nowait
+      !$omp end do nowait
+    else
+      !$omp do
+      do k = 1, Unz
+        do j = 1, Uny
+          do i = 1, Unx
+            U(i,j,k) = U(i,j,k) + Ax * (Pr(i+1,j,k)-Pr(i,j,k))
+          end do
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do
+      do k = 1, Vnz
+        do j = 1, Vny
+          do i = 1, Vnx
+            V(i,j,k) = V(i,j,k) + Ay * (Pr(i,j+1,k)-Pr(i,j,k))
+          end do
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do
+      do k = 1, Wnz
+        do j = 1, Wny
+          do i = 1, Wnx
+            W(i,j,k) = W(i,j,k) + Az * (Pr(i,j,k+1)-Pr(i,j,k))
+          end do
+        end do
+      end do
+      !$omp end do nowait
+    end if
     !$omp end parallel
   end subroutine PressureGrad
 
@@ -347,7 +386,13 @@ contains
 
     call StressBoundaryFlux(Ustar, Vstar, dt)
 
-    if (explicit_diffusion) call MomentumDiffusion_nobranch(Ustar, Vstar, Wstar, U, V, W)
+    if (explicit_diffusion) then
+      if (discretization_order>=3) then
+        call MomentumDiffusion_nobranch_4ord(Ustar, Vstar, Wstar, U, V, W)
+      else
+        call MomentumDiffusion_nobranch(Ustar, Vstar, Wstar, U, V, W)
+      end if
+    end if
 
 
     !$omp parallel private(i,j,k)
@@ -494,6 +539,8 @@ contains
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature, Moisture
     real(knd) :: A, A2
     integer :: i, j, k
+    ! Wolfram: InterpolatingPolynomial[{{-1.5,a},{-0.5,b},{0.5,c},{1.5,d}},x] /. x = 0
+    real(knd), parameter :: C0 = 9._knd / 16, C1 = - 1._knd / 16
 
 
     if (enable_moisture) then
@@ -503,21 +550,44 @@ contains
         A = grav_acc / temperature_ref
         A2 = A / 2._KND
 
-        call apply_moist(1)
-        call apply_moist(2)
+        if (discretization_order==4) then
+          call error_stop("not yet implemented")
+        else
+          call apply_moist(1)
+          call apply_moist(2)
+        end if
       end if
     else
       A = grav_acc / temperature_ref
       A2 = A / 2._KND
-      !$omp parallel do private(i,j,k)
-      do k = 1, Wnz
-        do j = 1, Wny
-          do i = 1, Wnx
-            W(i,j,k) = W(i,j,k) + A2 * (Temperature(i,j,k+1)+Temperature(i,j,k)) - A * temperature_ref
+      if (discretization_order==4) then
+        !$omp parallel do private(i,j,k)
+        do k = 1, Wnz
+          do j = 1, Wny
+            do i = 1, Wnx
+              !deconvolution of Temperature: e.g., in Hokpunna, Manhart, (2010), JCP 229
+              W(i,j,k) = W(i,j,k) + &
+                A2 * ( C1 * Temperature(i,j,k+2) + &
+                       C0 * Temperature(i,j,k+1) + &
+                       C0 * Temperature(i,j,k)   + &
+                       C1 * Temperature(i,j,k-1) ) - &
+                A * temperature_ref
+            end do
           end do
         end do
-      end do
-      !$omp end parallel do
+        !$omp end parallel do
+      else
+        !$omp parallel do private(i,j,k)
+        do k = 1, Wnz
+          do j = 1, Wny
+            do i = 1, Wnx
+              W(i,j,k) = W(i,j,k) + A2 * (Temperature(i,j,k+1)+Temperature(i,j,k)) - &
+              A * temperature_ref
+            end do
+          end do
+        end do
+        !$omp end parallel do
+      end if
     end if
 
     contains
@@ -594,7 +664,7 @@ contains
     use Scalars, only: ComputeTDiff
 
     real(knd), contiguous, intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(knd), contiguous, intent(in) :: Pr(1:,1:,1:)
+    real(knd), contiguous, intent(in) :: Pr(-1:,-1:,-1:)
     real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:)
     integer :: i
 
@@ -905,6 +975,401 @@ contains
     !$omp end parallel
 
   end subroutine MomentumDiffusion_nobranch
+
+
+
+
+
+
+
+
+
+  subroutine MomentumDiffusion_nobranch_4ord(U2,V2,W2,U,V,W)
+    use Parameters, nu => Viscosity
+    use Wallmodels
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: U,V,W
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U2,V2,W2
+    real(knd), dimension(:,:,:), allocatable :: Fl
+    real(knd) :: recdxmin2, recdymin2, recdzmin2
+    integer :: i,j,k,bi,bj,bk
+    integer :: tnx, tny, tnz
+    
+    real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+    real(knd), parameter :: D0 = 13._knd / 12, D1 = -1._knd / 24
+
+    integer, parameter :: narr = 3
+    
+    !for the include files
+    integer :: ip
+       
+    tnx = tilenx(narr)
+    tny = tileny(narr)
+    tnz = tilenz(narr)
+       
+    recdxmin2 = 1._knd / dxmin**2
+    recdymin2 = 1._knd / dymin**2
+    recdzmin2 = 1._knd / dzmin**2
+    
+    if (.not.allocated(Fl)) &
+      allocate(Fl(-1:max(Unx,Vnx,Wnx)+2, &
+                  -1:max(Uny,Vny,Wny)+2, &
+                  -1:max(Unz,Vnz,Wnz)+2))
+
+    !$omp parallel private(i,j,k,bi,bj,bk)
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Unz, tnz
+     do bj = 1, Uny, tny
+      do bi = 0, Unx+2, tnx
+       do k = bk, min(bk+tnz-1,Unz)
+        do j = bj, min(bj+tny-1,Uny)
+         do i = bi, min(bi+tnx-1,Unx+2)
+           Fl(i,j,k) = nu(i,j,k) * (C1*(U(i,j,k)-U(i-1,j,k)) - C3*(U(i+1,j,k)-U(i-2,j,k))) * recdxmin2
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Unz, tnz
+     do bj = 1, Uny, tny
+      do bi = 1, Unx, tnx
+       do k = bk, min(bk+tnz-1,Unz)
+        do j = bj, min(bj+tny-1,Uny)
+         do i = bi, min(bi+tnx-1,Unx)
+           U2(i,j,k) = U2(i,j,k) + (C1*(Fl(i+1,j,k)-Fl(i,j,k)) - C3*(Fl(i+2,j,k)-Fl(i-1,j,k)))
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+    
+#define comp 1
+#define dir 1
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+    
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Unz, tnz
+     do bj = 0, Uny+2, tny
+      do bi = 1, Unx, tnx
+       do k = bk, min(bk+tnz-1,Unz)
+        do j = bj, min(bj+tny-1,Uny+2)
+         do i = bi, min(bi+tnx-1,Unx)
+           Fl(i,j,k) = 0.25_knd * (nu(i+1,j,k)+nu(i+1,j-1,k)+nu(i,j,k)+nu(i,j-1,k)) * &
+               (C1*(U(i,j,k)-U(i,j-1,k)) - C3*(U(i,j+1,k)-U(i,j-2,k))) * recdymin2
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Unz, tnz
+     do bj = 1, Uny, tny
+      do bi = 1, Unx, tnx
+       do k = bk, min(bk+tnz-1,Unz)
+        do j = bj, min(bj+tny-1,Uny)
+         do i = bi, min(bi+tnx-1,Unx)
+           U2(i,j,k) = U2(i,j,k) + (C1*(Fl(i,j+1,k)-Fl(i,j,k)) - C3*(Fl(i,j+2,k)-Fl(i,j-1,k)))
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+               
+#define comp 1
+#define dir 2
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+                   
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 0, Unz+2, tnz
+     do bj = 1, Uny, tny
+      do bi = 1, Unx, tnx
+       do k = bk, min(bk+tnz-1,Unz+2)
+        do j = bj, min(bj+tny-1,Uny)
+         do i = bi, min(bi+tnx-1,Unx)
+           Fl(i,j,k) = 0.25_knd * (nu(i+1,j,k)+nu(i+1,j,k-1)+nu(i,j,k)+nu(i,j,k-1)) * &
+               (C1*(U(i,j,k)-U(i,j,k-1)) - C3*(U(i,j,k+1)-U(i,j,k-2))) * recdzmin2
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Unz, tnz
+     do bj = 1, Uny, tny
+      do bi = 1, Unx, tnx
+       do k = bk, min(bk+tnz-1,Unz)
+        do j = bj, min(bj+tny-1,Uny)
+         do i = bi, min(bi+tnx-1,Unx)
+           U2(i,j,k) = U2(i,j,k) + (C1*(Fl(i,j,k+1)-Fl(i,j,k)) - C3*(Fl(i,j,k+2)-Fl(i,j,k-1)))
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+
+#define comp 1
+#define dir 3
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+        
+    
+    
+    
+
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Vnz, tnz
+     do bj = 1, Vny, tny
+      do bi = 0, Vnx+2, tnx
+       do k = bk, min(bk+tnz-1,Vnz)
+        do j = bj, min(bj+tny-1,Vny)
+         do i = bi, min(bi+tnx-1,Vnx+2)
+           Fl(i,j,k) = 0.25_knd * (nu(i,j+1,k)+nu(i,j,k)+nu(i-1,j+1,k)+nu(i-1,j,k)) * &
+               (C1*(V(i,j,k)-V(i-1,j,k)) - C3*(V(i+1,j,k)-V(i-2,j,k))) * recdxmin2
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Vnz, tnz
+     do bj = 1, Vny, tny
+      do bi = 1, Vnx, tnx
+       do k = bk, min(bk+tnz-1,Vnz)
+        do j = bj, min(bj+tny-1,Vny)
+         do i = bi, min(bi+tnx-1,Vnx)
+           V2(i,j,k) = V2(i,j,k) + (C1*(Fl(i+1,j,k)-Fl(i,j,k)) - C3*(Fl(i+2,j,k)-Fl(i-1,j,k))) 
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+
+#define comp 2
+#define dir 1
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+                       
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Vnz, tnz
+     do bj = 0, Vny+2, tny
+      do bi = 1, Vnx, tnx
+       do k = bk, min(bk+tnz-1,Vnz)
+        do j = bj, min(bj+tny-1,Vny+2)
+         do i = bi, min(bi+tnx-1,Vnx)
+           Fl(i,j,k) = nu(i,j,k) * (C1*(V(i,j,k)-V(i,j-1,k)) - C3*(V(i,j+1,k)-V(i,j-2,k))) * recdymin2
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Vnz, tnz
+     do bj = 1, Vny, tny
+      do bi = 1, Vnx, tnx
+       do k = bk, min(bk+tnz-1,Vnz)
+        do j = bj, min(bj+tny-1,Vny)
+         do i = bi, min(bi+tnx-1,Vnx)
+           V2(i,j,k) = V2(i,j,k) + (C1*(Fl(i,j+1,k)-Fl(i,j,k)) - C3*(Fl(i,j+2,k)-Fl(i,j-1,k)))
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+             
+#define comp 2
+#define dir 2
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+                                  
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 0, Vnz+2, tnz
+     do bj = 1, Vny, tny
+      do bi = 1, Vnx, tnx
+       do k = bk, min(bk+tnz-1,Vnz+2)
+        do j = bj, min(bj+tny-1,Vny)
+         do i = bi, min(bi+tnx-1,Vnx)
+           Fl(i,j,k) = 0.25_knd * (nu(i,j+1,k)+nu(i,j+1,k-1)+nu(i,j,k)+nu(i,j,k-1)) * &
+               (C1*(V(i,j,k)-V(i,j,k-1)) - C3*(V(i,j,k+1)-V(i,j,k-2))) * recdzmin2
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Vnz, tnz
+     do bj = 1, Vny, tny
+      do bi = 1, Vnx, tnx
+       do k = bk, min(bk+tnz-1,Vnz)
+        do j = bj, min(bj+tny-1,Vny)
+         do i = bi, min(bi+tnx-1,Vnx)
+           V2(i,j,k) = V2(i,j,k) + (C1*(Fl(i,j,k+1)-Fl(i,j,k)) - C3*(Fl(i,j,k+2)-Fl(i,j,k-1)))
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+             
+#define comp 2
+#define dir 3
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+                                  
+
+    
+    
+    
+
+
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Wnz, tnz
+     do bj = 1, Wny, tny
+      do bi = 0, Wnx+2, tnx
+       do k = bk, min(bk+tnz-1,Wnz)
+        do j = bj, min(bj+tny-1,Wny)
+         do i = bi, min(bi+tnx-1,Wnx+2)
+           Fl(i,j,k) = 0.25_knd * (nu(i,j,k+1)+nu(i,j,k)+nu(i-1,j,k+1)+nu(i-1,j,k)) * &
+               (C1*(W(i,j,k)-W(i-1,j,k)) - C3*(W(i+1,j,k)-W(i-2,j,k))) * recdxmin2
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Wnz, tnz
+     do bj = 1, Wny, tny
+      do bi = 1, Wnx, tnx
+       do k = bk, min(bk+tnz-1,Wnz)
+        do j = bj, min(bj+tny-1,Wny)
+         do i = bi, min(bi+tnx-1,Wnx)
+           W2(i,j,k) = W2(i,j,k) + (C1*(Fl(i+1,j,k)-Fl(i,j,k)) - C3*(Fl(i+2,j,k)-Fl(i-1,j,k)))
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+             
+#define comp 3
+#define dir 1
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+                                  
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Wnz, tnz
+     do bj = 0, Wny+2, tny
+      do bi = 1, Wnx, tnx
+       do k = bk, min(bk+tnz-1,Wnz)
+        do j = bj, min(bj+tny-1,Wny+2)
+         do i = bi, min(bi+tnx-1,Wnx)
+           Fl(i,j,k) = 0.25_knd * (nu(i,j,k+1)+nu(i,j-1,k+1)+nu(i,j,k)+nu(i,j-1,k)) * &
+               (C1*(W(i,j,k)-W(i,j-1,k)) - C3*(W(i,j+1,k)-W(i,j-2,k))) * recdymin2
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Wnz, tnz
+     do bj = 1, Wny, tny
+      do bi = 1, Wnx, tnx
+       do k = bk, min(bk+tnz-1,Wnz)
+        do j = bj, min(bj+tny-1,Wny)
+         do i = bi, min(bi+tnx-1,Wnx)
+           W2(i,j,k) = W2(i,j,k) + (C1*(Fl(i,j+1,k)-Fl(i,j,k)) - C3*(Fl(i,j+2,k)-Fl(i,j-1,k)))
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+             
+#define comp 3
+#define dir 2
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+                                  
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 0, Wnz+2, tnz
+     do bj = 1, Wny, tny
+      do bi = 1, Wnx, tnx
+       do k = bk, min(bk+tnz-1,Wnz+2)
+        do j = bj, min(bj+tny-1,Wny)
+         do i = bi, min(bi+tnx-1,Wnx)
+           Fl(i,j,k) = nu(i,j,k) * (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k+1)-W(i,j,k-2))) * recdzmin2
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+    !$omp do schedule(runtime) collapse(3)
+    do bk = 1, Wnz, tnz
+     do bj = 1, Wny, tny
+      do bi = 1, Wnx, tnx
+       do k = bk, min(bk+tnz-1,Wnz)
+        do j = bj, min(bj+tny-1,Wny)
+         do i = bi, min(bi+tnx-1,Wnx)
+           W2(i,j,k) = W2(i,j,k) + (C1*(Fl(i,j,k+1)-Fl(i,j,k)) - C3*(Fl(i,j,k+2)-Fl(i,j,k-1)))
+         end do
+        end do
+       end do
+      end do
+     end do
+    end do
+    !$omp end do
+             
+#define comp 3
+#define dir 3
+#include "wmfluxes-nobranch-inc-4ord.f90"
+#undef dir
+#undef comp
+
+
+
+    !$omp end parallel
+
+  end subroutine MomentumDiffusion_nobranch_4ord
 
 
 

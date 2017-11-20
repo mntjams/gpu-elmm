@@ -1057,6 +1057,11 @@ contains
        namelist /output/ store, display
 
        read(unit,nml = output,iostat = io,iomsg = msg)
+       if (io /= 0) then
+         write(*,*) "Error reading namelist from output.conf:"
+         write(*,*) trim(msg)
+         stop
+       end if
      end subroutine
      
      subroutine read_staggered_frames
@@ -1388,8 +1393,11 @@ fields_do:  do j = 1, size(obj_fields)
         end if
         
         
-        allocate(gs, source=GeometricShape(o_file%file))
-        
+        allocate(Polyhedron :: gs)
+        select type (gs)
+          type is (Polyhedron)
+            gs = Polyhedron(o_file%file)
+        end select        
         
       else if (downcase(tree(iobj)%name)=="plane") then
       
@@ -2019,10 +2027,11 @@ fields_do:  do j = 1, size(obj_fields)
     logical :: ex
     integer :: iobj, stat
 
-    type(field_names) :: names(10)
+    type(field_names) :: names(11)
     type(field_names_a) :: names_a(1)
 
     names = [field_names_init("check_mass_flux", p_s%check_mass_flux), &
+             field_names_init("report_mass_flux", p_s%report_mass_flux), &
              field_names_init("correct_mass_flux_west",   p_s%correct_mass_flux(We)), &
              field_names_init("correct_mass_flux_east",   p_s%correct_mass_flux(Ea)), &
              field_names_init("correct_mass_flux_south",  p_s%correct_mass_flux(So)), &
@@ -2366,7 +2375,7 @@ fields_do:  do j = 1, size(obj_fields)
   subroutine ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,scalars_optional)
     use Endianness
     real(knd), intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(knd), intent(inout) :: Pr(1:,1:,1:)
+    real(knd), intent(inout) :: Pr(-1:,-1:,-1:)
     real(knd), intent(inout) :: Temperature(-1:,-1:,-1:)
     real(knd), intent(inout) :: Moisture(-1:,-1:,-1:)
     real(knd), intent(inout) :: Scalar(-1:,-1:,-1:,:)
@@ -2609,7 +2618,7 @@ fields_do:  do j = 1, size(obj_fields)
     use domains_bc_par, only: par_receive_initial_conditions, par_send_initial_conditions
 #endif
     use ArrayUtilities
-    real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+    real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(-1:,-1:,-1:)
     real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
     real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
     real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
@@ -2623,7 +2632,7 @@ fields_do:  do j = 1, size(obj_fields)
     interface
       subroutine CustomInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
         use Parameters
-        real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(1:,1:,1:)
+        real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(-1:,-1:,-1:)
         real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
         real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
         real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
@@ -2770,7 +2779,7 @@ fields_do:  do j = 1, size(obj_fields)
                     x = xPr(i)
                     y = yPr(j)
                     z = zPr(k)
-                    Pr(i,j,k) = (Uinlet/16._knd)*((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
+                    Pr(i,j,k) = (Uinlet/16._knd)*((2+cos(2*(-y)))*(cos(2*(z))+cos(2*(x)))-2)
              end do
             end do
            end do
