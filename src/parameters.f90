@@ -153,7 +153,7 @@ module Parameters
 
   real(tim) :: timefram1, timefram2, timeavg1, timeavg2
   
-  integer :: discretization_order = 4
+  integer :: discretization_order = 2
 
   integer :: advection_method
   integer :: frames
