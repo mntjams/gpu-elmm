@@ -130,7 +130,7 @@ contains
                  BoundTemperature, TemperatureExtra, &
                  temperature_flux_profile)
       
-      where (Prtype>0) Temperature(0:Prnx+1,0:Prny+1,0:Prnz+1) = temperature_ref
+      where (Prtype(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)>0) Temperature = temperature_ref
       
     end if
 
@@ -141,7 +141,7 @@ contains
                  BoundMoisture, MoistureExtra, &
                  moisture_flux_profile)
       
-      where (Prtype>0) Moisture(0:Prnx+1,0:Prny+1,0:Prnz+1) = moisture_ref
+      where (Prtype(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)>0) Moisture = moisture_ref
       
     end if
 
