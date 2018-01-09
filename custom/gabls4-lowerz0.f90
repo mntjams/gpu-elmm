@@ -424,9 +424,7 @@ subroutine CustomTimeStepOutput
   uu_part = current_profiles%uu(1:Prnz)
   vv_part = current_profiles%vv(1:Prnz)
   ww_part = current_profiles%ww(1:Prnz)
-  uu_part = uu_part + current_profiles%uusgs(1:Prnz)
-  vv_part = vv_part + current_profiles%vvsgs(1:Prnz)
-  ww_part = ww_part + current_profiles%wwsgs(1:Prnz)
+
   tkesgs_part = current_profiles%tkesgs(1:Prnz)
   
   call par_sum_to_master_horizontal(uu_part)
@@ -466,9 +464,7 @@ subroutine CustomTimeStepOutput
   uu = current_profiles%uu(1:Prnz)
   vv = current_profiles%vv(1:Prnz)
   ww = current_profiles%ww(1:Prnz)
-  uu = uu + current_profiles%uusgs(1:Prnz)
-  vv = vv + current_profiles%vvsgs(1:Prnz)
-  ww = ww + current_profiles%wwsgs(1:Prnz)
+
   uu = uu / n
   vv = vv / n
   ww = ww / n
