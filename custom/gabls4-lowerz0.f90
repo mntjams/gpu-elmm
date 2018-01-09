@@ -698,13 +698,13 @@ subroutine CustomBoundaryConditions
   
   integer :: i, j
   
-  WMPoints%z0 = 0.01
-  WMPoints%z0H = 0.001
+  WMPoints%z0 = 0.001
+  WMPoints%z0H = 0.0001
   
   do j = 1, 3
     do i = 1, 6
-      WMPointsUVW(i,j)%points%z0 = 0.01
-      WMPointsUVW(i,j)%points%z0H = 0.001
+      WMPointsUVW(i,j)%points%z0 = 0.001
+      WMPointsUVW(i,j)%points%z0H = 0.0001
     end do
   end do
 
