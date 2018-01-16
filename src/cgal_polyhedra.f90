@@ -92,7 +92,7 @@ contains
     integer(c_int) :: ierr
     logical(c_bool) :: inf_out
     
-    inf_out = .false.
+    inf_out = .true.
     if (present(infinity_outside)) inf_out = infinity_outside
 
     call polyhedron_from_file(ptree, trim(fname)//c_null_char, logical(master, c_bool), inf_out, ierr)
