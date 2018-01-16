@@ -17,7 +17,11 @@ contains
     integer                  :: neighbours(3,6)
     real(knd)     :: dist,nearx,neary,nearz
     integer       :: i,j,k,m,n,o,r
-    integer       :: nb
+    integer       :: nb    
+    real(knd) :: min_wall_distance
+    
+    !This must not be stricter than the threshold in FindInsideCells.
+    min_wall_distance = (dxmin*dymin*dzmin)**(1._knd/3)/20
 
     if (wallmodeltype==0) return
 
@@ -52,8 +56,8 @@ contains
            if ((Prtype(i+m,j+n,k+o)>0).and.Prtype(i+m,j+n,k+o)/=nb.and.(sum(abs([m,n,o]))==1)) then
              call SetCurrentSB(SB,Prtype(i+m,j+n,k+o))
              call SB%Closest(nearx,neary,nearz,xPr(i),yPr(j),zPr(k))
-             if (sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)<dist) then
-              dist = sqrt((nearx-xPr(i))**2+(neary-yPr(j))**2+(nearz-zPr(k))**2)
+             if (norm2([nearx-xPr(i),neary-yPr(j),nearz-zPr(k)])<dist) then
+              dist = norm2([nearx-xPr(i),neary-yPr(j),nearz-zPr(k)])
               nb = Prtype(i+m,j+n,k+o)
              end if
            end if
@@ -70,7 +74,9 @@ contains
           p%disty = neary-yPr(j)
           p%distz = nearz-zPr(k)
           
-          if (p%distx==0.and.p%disty==0.and.p%distz==0) then
+          dist = norm2([p%distx,p%disty,p%distz])
+          
+          if (dist==0) then
             write(*,*) "Prtype(i,j,k)", Prtype(i,j,k)
             write(*,*) "i,j,k", i,j,k
             write(*,*) "xPr(i), yPr(j), zPr(k)", xPr(i), yPr(j), zPr(k)
@@ -79,9 +85,7 @@ contains
             call error_stop("zero distance WM point")
           end if
           
-          if ((abs(p%distx)<dxmin/20) .and. &
-              (abs(p%disty)<dymin/20) .and. &
-              (abs(p%distz)<dzmin/20)) then
+          if (dist<min_wall_distance) then
             write(*,*) "ijk", p%xi, p%yj, p%zk
             write(*,*) "dist dx, dy, dz", p%distx, p%disty, p%distz
             write(*,*) "grid dx, dy, dz", dxmin, dymin, dzmin
@@ -132,6 +136,10 @@ contains
   subroutine GetSolidBodiesWM_UVW
     integer                  :: neighbours(3,MINUSX:PLUSZ)
     real(knd), target        :: r_neighbours(3,MINUSX:PLUSZ)
+    real(knd) :: min_wall_distance
+    
+    !This must not be stricter than the threshold in FindInsideCells.
+    min_wall_distance = (dxmin*dymin*dzmin)**(1._knd/3)/20
 
     if (wallmodeltype==0) return
 
@@ -163,9 +171,6 @@ contains
       real(knd), pointer, contiguous :: dirvec(:)
       real(knd)     :: nearx, neary, nearz, t, dist, distvec(3)
       integer       :: i, j, k, m, n, o, dir
-      real(knd) :: delta
-
-      delta = (dxmin*dymin*dzmin)**(1._knd/3)/20
       
       !See above in GetSolidBodiesWM why no OpenMP.
 
@@ -203,10 +208,13 @@ contains
                   if (norm2(distvec)<dist) then
                     !Potentially problematic
                     !write(*,'(a)',advance="no") '.'
-                    if (norm2(distvec) < delta) then
+                    if (norm2(distvec) < min_wall_distance) then
                       !Really problematic
-                      write(*,*) "Warning, inconsistent processing of geometry, point",i,j,k,"dir",dir
-                      write(*,*) norm2(distvec), dist, delta
+                      write(*,*) "Warning, inconsistent processing of geometry detected in GetSolidBodiesWM_UVW,"
+                      write(*,*) "point",i,j,k,"dir",dir
+                      write(*,*) "distance on line out",norm2(distvec)
+                      write(*,*) "distance",dist
+                      write(*,*) "minimal allowed distance", min_wall_distance
                       call SB%Closest(nearx ,neary, nearz, x(i), y(j), z(k))
                   
                       distvec = [nearx - x(i), neary - y(j), nearz - z(k)]
@@ -258,10 +266,11 @@ contains
                     
                 end select
                 
-                if ((abs(distvec(1))<dxmin/20) .and. &
-                    (abs(distvec(2))<dymin/20) .and. &
-                    (abs(distvec(3))<dzmin/20)) then
+                if (norm2(distvec) < min_wall_distance) then
+                  write(*,*) "component", component
                   write(*,*) "ijk", p%xi, p%yj, p%zk
+                  write(*,*) "x, y, z", x(i),y(j),z(k)
+                  write(*,*) "wall x, y, z", nearx, neary, nearz
                   write(*,*) "dist dx, dy, dz", distvec
                   write(*,*) "grid dx, dy, dz", dxmin, dymin, dzmin
                   call error_stop("Error, WM point UVW is too close to the wall!")
