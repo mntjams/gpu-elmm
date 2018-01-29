@@ -840,6 +840,36 @@ contains
                           Wnz = Prnz-1
    end if
    
+   if (Unx<=0) then
+#ifdef PAR
+     if (enable_multiple_domains) &
+       write(*,*) "Error on domain:",domain_index
+     write(*,*) "Error on image:",iim,jim,kim
+#endif
+     call error_stop("Error: Unx must be larger than zero, &
+       &check the number of grid cells the boundary conditions in the x direction.")
+   end if
+   
+   if (Vny<=0) then   
+#ifdef PAR
+     if (enable_multiple_domains) &
+       write(*,*) "Error on domain:",domain_index
+     write(*,*) "Error on image:",iim,jim,kim
+#endif
+     call error_stop("Error: Vny must be larger than zero, &
+       &check the number of grid cells and the boundary conditions in the y direction.")
+   end if
+   
+   if (Wnz<=0) then   
+#ifdef PAR
+     if (enable_multiple_domains) &
+       write(*,*) "Error on domain:",domain_index
+     write(*,*) "Error on image:",iim,jim,kim
+#endif
+     call error_stop("Error: Wnz must be larger than zero, &
+       &check  the number of grid cells and the boundary conditions in the z direction.")
+   end if
+   
    
 #ifdef PAR
    call par_init_exchange

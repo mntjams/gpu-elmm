@@ -735,20 +735,20 @@ contains
 
     do dom = 1, number_of_domains
       call MPI_Bcast(domain_grids(dom)%nxs, size(domain_grids(dom)%nxs), &
-                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
       call MPI_Bcast(domain_grids(dom)%nys, size(domain_grids(dom)%nys), &
-                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
       call MPI_Bcast(domain_grids(dom)%nzs, size(domain_grids(dom)%nzs), &
-                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
     end do
 
     do dom = 1, number_of_domains
       call MPI_Bcast(domain_grids(dom)%offsets_x, size(domain_grids(dom)%offsets_x), &
-                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
       call MPI_Bcast(domain_grids(dom)%offsets_y, size(domain_grids(dom)%offsets_y), &
-                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
       call MPI_Bcast(domain_grids(dom)%offsets_z, size(domain_grids(dom)%offsets_z), &
-                     MPI_KND, sum(domain_nims(1:dom-1)), world_comm, ie)
+                     MPI_INTEGER, sum(domain_nims(1:dom-1)), world_comm, ie)
     end do
 
     do dom = 1, number_of_domains
@@ -846,8 +846,15 @@ contains
     
     if (product(npxyz)/=nims) then
       if (master) then
-        write(*,*) "Could not decompose the processes to N x N grid."
-        write(*,*) "Try a perfect square for number of processes."
+        if (enable_multiple_domains) then
+          write(*,'(*(g0))') " Error on domain ", domain_index
+        else
+          write(*,'(*(g0))') " Error:"
+        end if
+        write(*,'(*(g0))') " Could not decompose the processes to Nx x Ny x Nz process grid."
+        write(*,'(*(g0))') " Grid tried: ", npxyz(1), " x ", npxyz(2), " x ", npxyz(3), ' = ', product(npxyz)
+        write(*,'(*(g0))') " Number of processes: ", nims
+        write(*,'(*(g0))') " Supply the requested process grid as 'ELMM npxyz=1,Ny,Nz'."
       end if
       call error_stop(25)
     end if
