@@ -184,8 +184,18 @@ program CLMM
   endif
 
   call par_sync_all
-  if (master .and. time_steps_time>0) write(*,*) "Total wall clock time for time steps", time_steps_time
-  if (master .and. poisson_solver_time>0) write(*,*) "Wall clock time for Poisson solver", poisson_solver_time
+  if (master .and. time_steps_time>0) &
+    write(*,'(1x,a,f0.2)') "Total wall clock time for time steps: ", time_steps_time
+  if (master .and. poisson_solver_time>0) &
+    write(*,'(1x,a,f0.2)') "Wall clock time for Poisson solver: ", poisson_solver_time
+#ifdef PAR
+  block
+    use domains_bc_par
+    if (master .and. enable_multiple_domains .and. time_communicating_domains>0) &
+      write(*,'(1x,a,i0,a,f0.2)') "Wall clock time waiting and communicating with other domains on domain ", &
+        domain_index,": ",poisson_solver_time
+  end block
+#endif
   call par_sync_all
 
   call Dynamics_Deallocate
