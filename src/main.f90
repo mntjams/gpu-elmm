@@ -193,7 +193,7 @@ program CLMM
     use domains_bc_par
     if (master .and. enable_multiple_domains .and. time_communicating_domains>0) &
       write(*,'(1x,a,i0,a,f0.2)') "Wall clock time waiting and communicating with other domains on domain ", &
-        domain_index,": ",poisson_solver_time
+        domain_index,": ",time_communicating_domains
   end block
 #endif
   call par_sync_all
