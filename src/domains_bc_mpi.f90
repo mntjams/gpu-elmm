@@ -38,7 +38,7 @@ module domains_bc_par
   ! to ease finding the right buffer to a given nested boundary 
   type(dom_bc_buffer_turbulence_generator), allocatable :: domain_bc_recv_buffers(:)
   
-  real(knd), protected :: time_communicating_domains = 0
+  real(dbl), protected :: time_communicating_domains = 0
 
 contains
 
@@ -272,7 +272,7 @@ contains
     end if
 
     call system_clock(count=t2)
-    time_communicating_domains = time_communicating_domains + real(t2-t1, knd)/timer_rate
+    time_communicating_domains = time_communicating_domains + real(t2-t1, dbl)/real(timer_rate,dbl)
     
   contains
 
@@ -2249,7 +2249,7 @@ contains
     end if
     
     call system_clock(count=t2)
-    time_communicating_domains = time_communicating_domains + real(t2-t1, knd)/timer_rate
+    time_communicating_domains = time_communicating_domains + real(t2-t1, dbl)/real(timer_rate,dbl)
     
   contains
   
