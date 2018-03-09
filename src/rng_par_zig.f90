@@ -182,7 +182,8 @@ contains
     integer(int32) :: x
 
     if (kpar >= par_n) then
-        write(*,*) 'thread number exceeds initialized max: ',kpar,par_n-1
+        write(*,*) 'RNG Error: thread number',kpar, 'exceeds initialized max: ',par_n-1
+        write(*,*) 'or RNG not initialized.'
         stop
     endif
     
@@ -203,7 +204,8 @@ contains
     integer(int32) :: iz, hz
 
     if (kpar >= par_n) then
-        write(*,*) 'thread number exceeds initialized max: ',kpar,par_n
+        write(*,*) 'RNG Error: thread number',kpar, 'exceeds initialized max: ',par_n-1
+        write(*,*) 'or RNG not initialized.'
         stop
     endif
     
@@ -255,7 +257,8 @@ contains
     integer(int32) :: iz, jz
 
     if (kpar >= par_n) then
-        write(*,*) 'thread number exceeds initialized max: ',kpar,par_n-1
+        write(*,*) 'RNG Error: thread number',kpar, 'exceeds initialized max: ',par_n-1
+        write(*,*) 'or RNG not initialized.'
         stop
     endif
 

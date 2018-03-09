@@ -102,9 +102,6 @@ contains
    output_dir = "output/"
 
 
-   call init_random_seed
-
-
    call newunit(unit)
   
    !try read scratch_dir from environment, command line has priority
@@ -802,6 +799,9 @@ contains
    y0 = im_ymin
    z0 = im_zmin
 #endif
+
+
+   call init_random_seed
 
 
    call get_pressure_solution("pressure_solution.conf", pressure_solution)
@@ -3612,7 +3612,7 @@ fields_do:  do j = 1, size(obj_fields)
     call CustomBoundaryConditions
 #endif
 
-        call par_sync_out("boundary conditions set.")
+    call par_sync_out("boundary conditions set.")
     
   contains
   
@@ -3840,8 +3840,11 @@ fields_do:  do j = 1, size(obj_fields)
     use custom_par
 #endif
     integer :: i
-    integer(int32),dimension(:),allocatable :: seed
+    integer(int32), allocatable :: seed(:)
     integer :: nt
+    
+    !just some initial entropy for a reproducible random sequence
+    integer, parameter :: base = -1140444627 
     
     nt = 1
     !$omp parallel
@@ -3851,9 +3854,9 @@ fields_do:  do j = 1, size(obj_fields)
     allocate(seed(nt))
 
 #ifdef PAR
-    seed = [( 1000 * i + myrank, i=1,size(seed) )]
+    seed = [( base + 100000 * i + my_world_rank, i=1,size(seed) )]
 #else
-    seed = [( 1000 * i, i=1,size(seed) )]
+    seed = [( base + 100000 * i, i=1,size(seed) )]
 #endif
 
     call rng_init(nt, seed)
