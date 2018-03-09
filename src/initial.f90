@@ -847,7 +847,7 @@ contains
      write(*,*) "Error on image:",iim,jim,kim
 #endif
      call error_stop("Error: Unx must be larger than zero, &
-       &check the number of grid cells the boundary conditions in the x direction.")
+       &check the number of grid cells and the boundary conditions in the x direction.")
    end if
    
    if (Vny<=0) then   

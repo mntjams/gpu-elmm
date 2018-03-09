@@ -88,7 +88,15 @@ contains
         write (*,'(a,f12.6,a,es12.4)') "  dt: ", time_stepping%dt
       else
         if (time_stepping%enable_CFL_check) then
-          write (*,'(a,f12.6,a,f6.3)') "  CFL: ", time_stepping%CFL
+#ifdef PAR
+          if (enable_multiple_domains) then
+            write (*,'(a,i0,a,f6.3)') "  domain: ", domain_index,"   CFL: ", time_stepping%CFL
+          else
+            write (*,'(a,f6.3)') "  CFL: ", time_stepping%CFL
+          end if
+#else
+          write (*,'(a,f6.3)') "  CFL: ", time_stepping%CFL
+#endif          
         end if
       end if
     end if

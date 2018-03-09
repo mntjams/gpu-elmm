@@ -21,7 +21,8 @@ module domains_bc_par
          par_send_initial_conditions, &
          par_domain_two_way_nesting_feedback, &
          domain_spatial_ratio, &
-         domain_time_step_ratio
+         domain_time_step_ratio, &
+         time_communicating_domains
 
 
 
@@ -36,6 +37,8 @@ module domains_bc_par
   !receive buffers should be indexed with the index of the domain side (West to Top)
   ! to ease finding the right buffer to a given nested boundary 
   type(dom_bc_buffer_turbulence_generator), allocatable :: domain_bc_recv_buffers(:)
+  
+  real(dbl), protected :: time_communicating_domains = 0
 
 contains
 
@@ -61,6 +64,9 @@ contains
     integer, allocatable :: requests(:)
     integer :: di, i, j, k, scal
     integer :: ie
+    integer(int64) :: t1, t2, timer_rate
+    
+    call system_clock(count=t1, count_rate=timer_rate)
 
     send_l = .true.
     receive_l = .true.
@@ -265,6 +271,9 @@ contains
       
     end if
 
+    call system_clock(count=t2)
+    time_communicating_domains = time_communicating_domains + real(t2-t1, dbl)/real(timer_rate,dbl)
+    
   contains
 
     subroutine send_arrays(b)
@@ -2105,6 +2114,9 @@ contains
     integer :: di, i, j, k, n, scal
     integer :: m(6), tmp_lb(3)
     integer :: err
+    integer(int64) :: t1, t2, timer_rate
+    
+    call system_clock(count=t1, count_rate=timer_rate)
                                             
     if (parent_domain>0) then
       associate(b=>domain_child_buffer)
@@ -2234,7 +2246,10 @@ contains
           end do
         end if
       end do
-    end if       
+    end if
+    
+    call system_clock(count=t2)
+    time_communicating_domains = time_communicating_domains + real(t2-t1, dbl)/real(timer_rate,dbl)
     
   contains
   
