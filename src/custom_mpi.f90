@@ -856,7 +856,7 @@ contains
         write(*,'(*(g0))') " Number of processes: ", nims
         write(*,'(*(g0))') " Supply the requested process grid as 'ELMM npxyz=1,Ny,Nz'."
       end if
-      call error_stop(25)
+      call error_stop("Invalid process grid.")
     end if
 
     !The number of images does not have to be 1 necesarilly, but it is 
@@ -895,7 +895,7 @@ contains
     ng = gPrns
 
     call PoisFFT_LocalGridSize(3,ng,cart_comm,nxyz,off,nxyz2,nsxyz2)
-    if (any(nxyz/=nxyz2).or.any(off/=nsxyz2)) call error_stop(40)
+    if (any(nxyz/=nxyz2).or.any(off/=nsxyz2)) call error_stop("Process grid not supported by the FFT library.")
     
     call MPI_Barrier(domain_comm, ie)
     if (ie/=0) call error_stop("Error in MPI Barrier.")
