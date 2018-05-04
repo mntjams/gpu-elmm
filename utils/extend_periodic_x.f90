@@ -277,7 +277,9 @@ program extend_periodic_x
 
   new%fname = dir_name // '/' // base_name
 
-  new%x = [old%x, old%x + old%dx*old%nx]
+  allocate(new%x(new%nx))
+  new%x(1:old%nx) = old%x
+  new%x(old%nx+1:) = [(new%x(old%nx)+it*old%dx, it = 1, new%nx-old%nx)]
   new%y = old%y
   new%z = old%z
 
