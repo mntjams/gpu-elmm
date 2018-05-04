@@ -253,7 +253,7 @@ program extend_periodic_x
   
   if (command_argument_count()>=2) then
     call get_command_argument(2, value=arg)
-    read(n_times,*,iostat=io) arg
+    read(arg,*,iostat=io) n_times
     if (io/=0) then
       write(*,*) "Error reading the number of repetitions."
       write(*,*) "Usage: extend_periodic_x file_name n_times"
