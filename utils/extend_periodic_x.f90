@@ -235,20 +235,33 @@ program extend_periodic_x
   character(:), allocatable :: file_name, base_name, dir_name, title, bc_dir
   
   integer :: it, io, status, arg_len
-
-  real(rp) :: lo, up
+  
+  integer :: n_times = 2
 
   call GetEndianness
 
   if (command_argument_count()<1) then
-    write(*,*) "Usage: extend_periodic_x file_name"
+    write(*,*) "Usage: extend_periodic_x file_name [n_times]"
     stop 1
   end if
  
   call get_command_argument(1, length=arg_len)
   allocate(character(arg_len) :: file_name)
+  
   call get_command_argument(1, value=file_name)
   base_name = trim(file_name(scan(file_name,'/',back=.true.) + 1 :  ))
+  
+  if (command_argument_count()>=2) then
+    call get_command_argument(2, value=arg)
+    read(n_times,*,iostat=io) arg
+    if (io/=0) then
+      write(*,*) "Error reading the number of repetitions."
+      write(*,*) "Usage: extend_periodic_x file_name n_times"
+      stop
+    end if
+  else
+    n_times = 2
+  end if
 
   dir_name = "extended"
 
@@ -258,7 +271,7 @@ program extend_periodic_x
 
   call old%read_header
 
-  new%nx = 2 * old%nx
+  new%nx = n_times * old%nx
   new%ny = old%ny
   new%nz = old%nz
 
@@ -290,11 +303,13 @@ program extend_periodic_x
     call get_buffer(status, old_sc, old_vec)
     
     if (status==SCALAR) then
-      new_sc(1:old%nx,:,:) = old_sc
-      new_sc(old%nx+1:,:,:) = old_sc
-    else if (STATUS==VECTOR) then
-      new_vec(:,1:old%nx,:,:) = old_vec
-      new_vec(:,old%nx+1:,:,:) = old_vec
+      do it = 1, n_times
+        new_sc(1+(it-1)*old%nx:it*old%nx,:,:) = old_sc
+      end do
+    else if (status==VECTOR) then
+      do it = 1, n_times
+        new_vec(:,1+(it-1)*old%nx:it*old%nx,:,:) = old_vec
+      end do
     end if
 
     call save_buffer(status,title, new_sc, new_vec)
