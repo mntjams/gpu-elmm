@@ -63,6 +63,8 @@ module VTKFrames
 
   integer :: frame_unit = 1999000
   
+  logical :: vtk_frames_par_IO = .false.
+  
 contains
 
   elemental logical function InDomain(D) result(res)
@@ -523,8 +525,6 @@ contains
 
     write(file_name,'(a,i0,a)') trim(D%base_name)//"-",D%frame_number,trim(D%suffix)
 
-!     write(*,*) "Saving VTK frame:",file_name,"   time:",time
-
     if (littleendian) then
       if (allocated(D%Pr))            D%Pr = SwapB(D%Pr)
       if (allocated(D%U))             D%U = SwapB(D%U)
@@ -677,7 +677,7 @@ contains
         type is (TFrameDomain)
           call SaveBuffers(c_loc(Dnp))
         class default
-          call error_stop("Error: wrog type of D in TFrameDomain_DoSave.")
+          call error_stop("Error: wrong type of D in TFrameDomain_DoSave.")
       end select
 !     end if
 
