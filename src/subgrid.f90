@@ -452,7 +452,7 @@ module Subgrid
       use custom_par
 #endif
       use Tiling, only: tilenx, tileny, tilenz
-      use Outputs, only: enable_profiles, current_profiles
+      use VerticalProfiles, only: enable_profiles, current_profiles
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
       real(knd), parameter :: Csig = 1.04_knd
