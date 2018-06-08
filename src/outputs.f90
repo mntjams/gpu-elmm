@@ -25,16 +25,8 @@ module Outputs
          OutTStep, Output, AllocateOutputs, ReadProbes,  &
          ProfileSwitches, current_profiles, profiles_config, enable_profiles
          
-  type ProfileSwitches
-    real(knd) :: average_start = 0, average_end = -1
-    real(knd) :: instant_start = 0, instant_end = -1, instant_interval = huge(1.0_knd)
-    real(knd) :: running_start = 0, running_end = -1, running_interval = huge(1.0_knd)
-  end type
-  
   type(ProfileSwitches) :: profiles_config
-  logical :: enable_profiles = .false.
   
-  type(Profiles) :: current_profiles
   type(TimeAveragedProfiles), allocatable :: average_profiles
   type(InstantaneousProfiles), allocatable :: instant_profiles
   type(TimeAveragedProfiles), allocatable :: running_average_profiles(:)
@@ -2521,6 +2513,7 @@ contains
 
   subroutine StressProfiles(U,V,W)
     use Filters, only: filtertype, filter_ratios
+    use Subgrid, only: TKEDissipation
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     integer   :: i,j,k
     real(knd) :: S, width
@@ -2540,6 +2533,20 @@ contains
        end do
       end do
       current_profiles%tkesgs(k) = S
+    end do
+    !$omp end do nowait
+
+    !$omp do
+    do k = 1,Prnz
+      S = 0
+      do j = 1,Prny
+       do i = 1,Prnx
+         if (Prtype(i,j,k)<=0) then
+           S = S + TKEDissipation(i, j, k, U, V, W)
+         end if
+       end do
+      end do
+      current_profiles%dissip(k) = S
     end do
     !$omp end do nowait
 

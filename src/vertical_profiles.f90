@@ -8,7 +8,8 @@ module VerticalProfiles
 
   type Profiles
     real(knd), dimension(:), allocatable :: u, v, uu, vv, ww, &
-                                            uusgs, vvsgs, wwsgs, tkesgs, &
+                                            uusgs, vvsgs, wwsgs, &
+                                            tkesgs, dissip, &
                                             temp, tempfl, &
                                             tempflsgs, tt, &
                                             moist, moistfl, &
@@ -49,6 +50,18 @@ module VerticalProfiles
     procedure :: Save => TimeAveragedProfiles_Save
     procedure :: ForceSave => TimeAveragedProfiles_ForceSave
   end type
+  
+  
+  type ProfileSwitches
+    real(knd) :: average_start = 0, average_end = -1
+    real(knd) :: instant_start = 0, instant_end = -1, instant_interval = huge(1.0_knd)
+    real(knd) :: running_start = 0, running_end = -1, running_interval = huge(1.0_knd)
+  end type
+  
+  type(Profiles) :: current_profiles
+  
+  logical :: enable_profiles = .false.
+  
   
   real(knd), dimension(:), allocatable :: n_all_Pr, n_free_Pr, n_free_U, n_free_V, n_free_W, &
                                           n_free_PrW, n_free_UW, n_free_VW, n_free_UW_sgs, n_free_VW_sgs
@@ -190,7 +203,7 @@ contains
     allocate(self%uw(0:Prnz), self%uwsgs(0:Prnz))
     allocate(self%vw(0:Prnz), self%vwsgs(0:Prnz))
     
-    allocate(self%tkesgs(1:Prnz))
+    allocate(self%tkesgs(1:Prnz), self%dissip(1:Prnz))
 
     allocate(self%temp(1:Prnz), self%tempfl(0:Prnz))
     allocate(self%tempflsgs(0:Prnz), self%tt(1:Prnz))
@@ -211,6 +224,7 @@ contains
     self%wwsgs = 0
     
     self%tkesgs = 0
+    self%dissip = 0
     
     self%uw = 0
     self%vw = 0
@@ -269,6 +283,7 @@ contains
     call ReduceProfile(p%vvsgs,  n_free_V(1:Vnz))
     call ReduceProfile(p%wwsgs,  n_free_W(0:Prnz))
     call ReduceProfile(p%tkesgs, n_free_Pr(1:Prnz))
+    call ReduceProfile(p%dissip, n_free_Pr(1:Prnz))
     call ReduceProfile(p%uw,     n_free_UW)
     call ReduceProfile(p%vw,     n_free_VW)
     call ReduceProfile(p%uwsgs,  n_free_UW_sgs)
@@ -341,6 +356,12 @@ contains
       do k = 1,Prnz
        write(unit,*) zPr(k), (p%uu(k)+p%vv(k)+(p%ww(k-1)+p%ww(k))/2) / 2, &
                              p%tkesgs(k)
+      end do
+      close(unit)
+
+       open(unit, file = dir // "profdissip" // nth_char // ".txt")
+      do k = 1,Prnz
+       write(unit,*) zPr(k), p%dissip(k)
       end do
       close(unit)
 
@@ -512,6 +533,7 @@ contains
     self%vvsgs = self%vvsgs + current%vvsgs * weight
     self%wwsgs = self%wwsgs + current%wwsgs * weight
     self%tkesgs = self%tkesgs + current%tkesgs * weight
+    self%dissip = self%dissip + current%dissip * weight
 
     if (enable_buoyancy) then
       self%temp = self%temp + current%temp * weight

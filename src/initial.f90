@@ -3840,23 +3840,24 @@ fields_do:  do j = 1, size(obj_fields)
     use custom_par
 #endif
     integer :: i
-    integer(int32), allocatable :: seed(:)
+    integer(int64) :: seed(2)
     integer :: nt
     
-    !just some initial entropy for a reproducible random sequence
-    integer, parameter :: base = -1140444627 
+    ! Just some initial entropy for a reproducible random sequence
+    integer(int64), parameter :: base(2) = [int(Z'1DADBEEFBAADD0D0', int64), &
+                                            int(Z'5BADD0D0DEADBEEF', int64)]
     
     nt = 1
     !$omp parallel
     !$ nt = omp_get_num_threads()
     !$omp end parallel
-    
-    allocate(seed(nt))
 
 #ifdef PAR
-    seed = [( base + 100000 * i + my_world_rank, i=1,size(seed) )]
+    ! Jump nthread-times for each image so that each image
+    ! has a disjunct set of random sequences for its threads.
+    seed = rng_jump(seed, nt*(image_index-1))
 #else
-    seed = [( base + 100000 * i, i=1,size(seed) )]
+    seed = base
 #endif
 
     call rng_init(nt, seed)
