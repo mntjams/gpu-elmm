@@ -3852,12 +3852,12 @@ fields_do:  do j = 1, size(obj_fields)
     !$ nt = omp_get_num_threads()
     !$omp end parallel
 
+    seed = base
+    
 #ifdef PAR
     ! Jump nthread-times for each image so that each image
     ! has a disjunct set of random sequences for its threads.
-    seed = rng_jump(seed, nt*(image_index-1))
-#else
-    seed = base
+    call rng_jump(seed, nt*(myim-1))
 #endif
 
     call rng_init(nt, seed)
