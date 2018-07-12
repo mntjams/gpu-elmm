@@ -2134,17 +2134,18 @@ fields_do:  do j = 1, size(obj_fields)
     character(*), intent(in) :: fname
     type(TFrameTimes), target :: timing
     type(TFrameFlags), target :: flags
-    integer, target :: dimension, direction
+    integer, target :: dimension, direction    
     real(knd), target :: position
     real(knd), target :: interval
     character(char_len), target :: label, direction_ch
     type(tree_object_ptr), target :: flags_ptr
+    logical, target :: distributed ! whether small distributed vtk files for each image should be forced
 
     type(tree_object), allocatable :: tree(:)
     logical :: ex
     integer :: iobj, ivtk, stat
 
-    type(field_names) :: names_vtk(7), names_flags_vtk(11)
+    type(field_names) :: names_vtk(8), names_flags_vtk(11)
     
     type(field_names_str) :: names_str(2)
     
@@ -2152,13 +2153,14 @@ fields_do:  do j = 1, size(obj_fields)
                  field_names_str("direction", direction_ch)]
 
 
-    names_vtk = [field_names_init("dimension", dimension), &
-                 field_names_init("position",  position), &
-                 field_names_init("start",     timing%start), &
-                 field_names_init("end",       timing%end), &
-                 field_names_init("n",         timing%nframes), &
-                 field_names_init("interval",  interval), &
-                 field_names_init("flags",     flags_ptr)]
+    names_vtk = [field_names_init("dimension",   dimension), &
+                 field_names_init("position",    position), &
+                 field_names_init("start",       timing%start), &
+                 field_names_init("end",         timing%end), &
+                 field_names_init("n",           timing%nframes), &
+                 field_names_init("interval",    interval), &
+                 field_names_init("flags",       flags_ptr), &
+                 field_names_init("distributed", distributed)]
                  
 
     names_flags_vtk = [field_names_init("U", flags%U), &
@@ -2199,6 +2201,7 @@ fields_do:  do j = 1, size(obj_fields)
         direction_ch = ""
         timing%start = 0; timing%end = 0; timing%nframes = 0
         interval = 0
+        distributed = .false.
         flags_ptr%ptr => null()
         
         call get_object_field_values(tree(iobj), stat, &
@@ -2268,14 +2271,18 @@ fields_do:  do j = 1, size(obj_fields)
       if (num_of_scalars < 1) flags%scalar_flux = 0
       
 #ifdef PAR
-      call AddDomain(TFrameDomain_ParallelIO(label, &
-                                  dimension, direction, position, &
-                                  timing, flags))
-#else
-      call AddDomain(TFrameDomain(label, &
-                                  dimension, direction, position, &
-                                  timing, flags))
-#endif                   
+      if (.not.(distributed.or.nims==1)) then
+        call AddDomain(TFrameDomain_ParallelIO(label, &
+                                    dimension, direction, position, &
+                                    timing, flags))
+      else
+#endif
+        call AddDomain(TFrameDomain(label, &
+                                    dimension, direction, position, &
+                                    timing, flags))
+#ifdef PAR
+      end if
+#endif      
     end subroutine
     
   end subroutine get_frames
