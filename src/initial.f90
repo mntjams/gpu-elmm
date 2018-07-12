@@ -100,6 +100,7 @@ contains
 
    image_input_dir = "input/"
    output_dir = "output/"
+   shared_output_dir = "output/"
 
 
    call newunit(unit)
@@ -2127,6 +2128,9 @@ fields_do:  do j = 1, size(obj_fields)
     use ParseTrees
     use Frames_common
     use VTKFrames
+#ifdef PAR
+    use Frames_ParallelIO
+#endif
     character(*), intent(in) :: fname
     type(TFrameTimes), target :: timing
     type(TFrameFlags), target :: flags
@@ -2263,10 +2267,15 @@ fields_do:  do j = 1, size(obj_fields)
       if (.not.enable_moisture) flags%moisture_flux = 0
       if (num_of_scalars < 1) flags%scalar_flux = 0
       
+#ifdef PAR
+      call AddDomain(TFrameDomain_ParallelIO(label, &
+                                  dimension, direction, position, &
+                                  timing, flags))
+#else
       call AddDomain(TFrameDomain(label, &
                                   dimension, direction, position, &
                                   timing, flags))
-                       
+#endif                   
     end subroutine
     
   end subroutine get_frames
@@ -3104,6 +3113,9 @@ fields_do:  do j = 1, size(obj_fields)
 
   subroutine InitBoundaryConditions
     use VTKFrames, only: InitVTKFrames
+#ifdef PAR
+    use Frames_ParallelIO, only: InitFrames_ParallelIO
+#endif
     use SurfaceFrames, only: InitSurfaceFrames
     use custom_par
     
@@ -3604,6 +3616,10 @@ fields_do:  do j = 1, size(obj_fields)
     !filter out frames outside the domain
     call par_sync_out("  ...preparing VTK frames.")
     call InitVTKFrames
+#ifdef PAR    
+    call par_sync_out("  ...preparing ParallelIO frames.")
+    call InitFrames_ParallelIO
+#endif    
     call par_sync_out("  ...preparing constant height frames.")
     call InitSurfaceFrames
    

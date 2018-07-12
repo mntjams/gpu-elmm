@@ -10,9 +10,12 @@ module Outputs
   use Turbinlet, only: turb_gen => default_turbulence_generator
   use Endianness
   use FreeUnit
-  use VTKFrames
-  use SurfaceFrames
-  use StaggeredFrames
+  use VTKFrames, only: SaveVTKFrames, FinalizeVTKFrames
+#ifdef PAR
+  use Frames_ParallelIO, only: SaveFrames_ParallelIO, FinalizeFrames_ParallelIO
+#endif
+  use SurfaceFrames, only: SaveSurfaceFrames, FinalizeSurfaceFrames
+  use StaggeredFrames, only: SaveStaggeredFrames, FinalizeStaggeredFrames
   use Output_helpers
   use VerticalProfiles
   
@@ -1138,6 +1141,10 @@ contains
 
 
     call SaveVTKFrames(time_stepping%time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    
+#ifdef PAR
+    call SaveFrames_ParallelIO(time_stepping%time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+#endif
 
     call SaveSurfaceFrames(time_stepping%time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
 
@@ -2492,6 +2499,10 @@ contains
     call OutputProfiles
 
     call FinalizeVTKFrames
+    
+#ifdef PAR
+    call FinalizeFrames_ParallelIO
+#endif
 
     call FinalizeSurfaceFrames
 

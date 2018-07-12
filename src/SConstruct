@@ -404,6 +404,7 @@ objs += env.Object(target = target_dir + 'frames_common',      source = 'frames_
 objs += env.Object(target = target_dir + 'frames',             source = 'frames.f90')
 objs += env.Object(target = target_dir + 'output_helpers',     source = 'output_helpers.f90')
 objs += env.Object(target = target_dir + 'vtkframes',          source = 'vtkframes.f90')
+objs += env.Object(target = target_dir + 'frames_parallelIO',  source = 'frames_parallelIO.f90')
 objs += env.Object(target = target_dir + 'surfacemapframes',   source = 'surfacemapframes.f90')
 objs += env.Object(target = target_dir + 'vertical_profiles',  source = 'vertical_profiles.f90')
 objs += env.Object(target = target_dir + 'outputs',            source = 'outputs.f90')
