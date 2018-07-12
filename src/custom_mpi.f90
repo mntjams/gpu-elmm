@@ -25,6 +25,11 @@ module custom_par
   implicit none
 
   private :: MPI_knd, MPI_real32, MPI_real64, MPI_IN_PLACE_real32, MPI_IN_PLACE_real64  
+  
+  integer, parameter :: PAR_COMM_NULL = MPI_COMM_NULL
+  integer, parameter :: PAR_DATATYPE_NULL = MPI_DATATYPE_NULL
+  integer, parameter :: PAR_KND = MPI_KND
+  integer, protected :: PAR_TRIPLET = MPI_DATATYPE_NULL
 
   logical :: enable_multiple_domains = .false.
   
@@ -393,6 +398,10 @@ contains
     my_world_im = par_this_image(world_comm)
     my_world_rank = my_world_im - 1
     
+    call MPI_Type_contiguous(3, MPI_KND, PAR_TRIPLET, ie)
+    if (ie/=0) call error_stop("Error in MPI_Type_contiguous")
+    call MPI_Type_commit(PAR_TRIPLET, ie)
+    if (ie/=0) call error_stop("Error in MPI_Type_commit")
 
   contains
 
