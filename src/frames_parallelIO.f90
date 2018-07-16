@@ -22,7 +22,9 @@ module Frames_ParallelIO
     
     logical :: master = .false.
     
-    integer :: glob_scalar_storage_size, glob_vector_storage_size
+    integer :: glob_scalar_storage_size = 0, glob_vector_storage_size = 0
+    
+    integer :: number_of_arrays = 0
     
     integer :: comm = PAR_COMM_NULL
     integer :: par_datatype_scalar = PAR_DATATYPE_NULL, par_datatype_vector = PAR_DATATYPE_NULL
@@ -192,8 +194,6 @@ contains
     class(TFrameDomain_ParallelIO), intent(inout), target :: D
     integer :: plane_type = PAR_DATATYPE_NULL, vec_plane_type = PAR_DATATYPE_NULL
     integer :: plane_size, vec_plane_size, scalar_size, vector_size
-    integer, allocatable :: types(:), lengths(:)
-    integer(c_intptr_t), allocatable :: offsets(:)
     integer, dimension(3) :: ng, nxyz, off
     integer :: mini, maxi, minj, maxj, mink, maxk
     integer :: ie
@@ -255,94 +255,6 @@ contains
                                  storage_size(1_real32) / CHARACTER_STORAGE_SIZE
     D%glob_vector_storage_size = 3 * D%glob_scalar_storage_size
     
-!     allocate(lengths(0), offsets(0), types(0))
-!     cnt = 0
-!     
-!     if (D%flags%Pr==1) then
-!       lengths = [lengths, 1]
-!       offsets = [offsets, transfer(c_loc(D%Pr(mini, minj, mink)) - c_loc(D%flags), c_intptr_t)]
-!       types = [types, scalar_type]
-!       cnt = cnt + 1
-!     end if
-!     
-!     if (D%flags%lambda2==1) then
-!       lengths = [lengths, 1]
-!       offsets = [offsets, transfer(c_loc(D%lambda2(mini, minj, mink)) - c_loc(D%flags), c_intptr_t)]
-!       types = [types, scalar_type]
-!       cnt = cnt + 1
-!     end if
-!     
-!     if (D%flags%scalars==1) then
-!       lengths = [lengths, num_of_scalars]
-!       offsets = [offsets, transfer(c_loc(D%Scalar(mini, minj, mink, 1)) - c_loc(D%flags), c_intptr_t)]
-!       types = [types, scalar_type]
-!       cnt = cnt + 1
-!     else if (D%flags%sumscalars==1.and.num_of_scalars>0) then
-!       lengths = [lengths, 1]
-!       offsets = [offsets, transfer(c_loc(D%Scalar(mini, minj, mink, 1)) - c_loc(D%flags), c_intptr_t)]
-!       types = [types, scalar_type]
-!       cnt = cnt + 1
-!     end if
-!     
-!     if (enable_buoyancy.and.D%flags%temperature==1) then
-!       lengths = [lengths, 1]
-!       offsets = [offsets, transfer(c_loc(D%Temperature(mini, minj, mink)) - c_loc(D%flags), c_intptr_t)]
-!       types = [types, scalar_type]
-!       cnt = cnt + 1
-!     end if
-!     
-!     if (enable_buoyancy.and.D%flags%moisture==1) then
-!       lengths = [lengths, 1]
-!       offsets = [offsets, transfer(c_loc(D%Moisture(mini, minj, mink)) - c_loc(D%flags), c_intptr_t)]
-!       types = [types, scalar_type]
-!       cnt = cnt + 1
-!     end if
-!     
-!     if (enable_buoyancy.and.D%flags%temperature_flux==1) then
-!       lengths = [lengths, 1]
-!       offsets = [offsets, transfer(c_loc(D%TemperatureFl(mini, minj, mink)) - c_loc(D%flags), c_intptr_t)]
-!       types = [types, scalar_type]
-!       cnt = cnt + 1
-!     end if
-!     
-!     if (enable_buoyancy.and.D%flags%moisture_flux==1) then
-!       lengths = [lengths, 1]
-!       offsets = [offsets, transfer(c_loc(D%MoistureFl(mini, minj, mink)) - c_loc(D%flags), c_intptr_t)]
-!       types = [types, scalar_type]
-!       cnt = cnt + 1
-!     end if
-!     
-!     if (D%flags%scalar_flux==1) then
-!       if (D%flags%scalars==1) then
-!         lengths = [lengths, num_of_scalars]
-!         offsets = [offsets, transfer(c_loc(D%ScalarFl(mini, minj, mink, 1)) - c_loc(D%flags), c_intptr_t)]
-!         types = [types, scalar_type]
-!         cnt = cnt + 1
-!       elseif (D%flags%sumscalars==1.and.num_of_scalars>0) then
-!         lengths = [lengths, 1]
-!         offsets = [offsets, transfer(c_loc(D%ScalarFl(mini, minj, mink, 1)) - c_loc(D%flags), c_intptr_t)]
-!         types = [types, scalar_type]
-!         cnt = cnt + 1
-!       end if
-!     end if
-!     
-!     if (D%flags%U==1) then
-!       lengths = [lengths, 3]
-!       offsets = [offsets, transfer(c_loc(D%U(1,mini, minj, mink)) - c_loc(D%flags), c_intptr_t)]
-!       types = [types, scalar_type]
-!       cnt = cnt + 1
-!     end if
-!     
-!     if (D%flags%vorticity==1) then
-!       lengths = [lengths, 3]
-!       offsets = [offsets, transfer(c_loc(D%Vorticity(1,mini, minj, mink)) - c_loc(D%flags), c_intptr_t)]
-!       types = [types, scalar_type]
-!       cnt = cnt + 1
-!     end if
-!     
-!     call MPI_Type_create_struct(cnt, lengths, offsets, types, D%par_datatype_scalar, ie)
-!     call MPI_Type_commit(D%par_datatype_scalar, ie)
-    
   end subroutine TFrameDomain_ParallelIO_ParallelDatatypes
   
   
@@ -396,6 +308,8 @@ contains
       end if
     end if
     
+    D%number_of_arrays = 0
+    
     write(D%unit) nxs
     
     write(D%unit) xs
@@ -405,11 +319,13 @@ contains
     if (D%flags%Pr==1) then
       write(D%unit) scalar_flag
       write(D%unit) "p", lf
+      D%number_of_arrays = D%number_of_arrays + 1
     end if
 
     if (D%flags%lambda2==1) then
       write(D%unit) scalar_flag
       write(D%unit) "lambda2", lf
+      D%number_of_arrays = D%number_of_arrays + 1
     end if
 
     if (D%flags%scalars==1) then
@@ -418,30 +334,36 @@ contains
         write(scalname(7:8),"(I2.2)") sc
         write(D%unit) scalar_flag
         write(D%unit) scalname , lf
+        D%number_of_arrays = D%number_of_arrays + 1
       end do
     elseif (D%flags%sumscalars==1.and.num_of_scalars>0) then
       write(D%unit) scalar_flag
       write(D%unit) "scalar", lf
+      D%number_of_arrays = D%number_of_arrays + 1
     end if
 
     if (enable_buoyancy.and.D%flags%temperature==1) then
       write(D%unit) scalar_flag
       write(D%unit) "temperature", lf
+      D%number_of_arrays = D%number_of_arrays + 1
     end if
 
     if (enable_moisture.and.D%flags%moisture==1) then
       write(D%unit) scalar_flag
       write(D%unit) "moisture", lf
+      D%number_of_arrays = D%number_of_arrays + 1
     end if
 
     if (enable_buoyancy.and.D%flags%temperature_flux==1) then
       write(D%unit) scalar_flag
       write(D%unit) "temperature_flux"
+      D%number_of_arrays = D%number_of_arrays + 1
     end if
 
     if (enable_buoyancy.and.D%flags%moisture_flux==1) then
       write(D%unit) scalar_flag
       write(D%unit) "moisture_flux", lf
+      D%number_of_arrays = D%number_of_arrays + 1
     end if
 
     if (D%flags%scalar_flux==1) then
@@ -451,21 +373,25 @@ contains
         do sc = 1,num_of_scalars
           write(scalname(7:8),"(I2.2)") sc
           write(D%unit) scalname, lf
+          D%number_of_arrays = D%number_of_arrays + 1
         end do
       elseif (D%flags%sumscalars==1.and.num_of_scalars>0) then
         write(D%unit) scalar_flag
         write(D%unit) "scalar_flux", lf
+        D%number_of_arrays = D%number_of_arrays + 1
       end if
     end if
 
     if (D%flags%U==1) then
       write(D%unit) vector_flag
       write(D%unit) "u", lf
+      D%number_of_arrays = D%number_of_arrays + 1
     end if
 
     if (D%flags%vorticity==1) then
       write(D%unit) vector_flag
       write(D%unit) "vorticity", lf
+      D%number_of_arrays = D%number_of_arrays + 1
     end if
     close(D%unit)
   end subroutine  TFrameDomain_ParallelIO_SaveHeader
@@ -476,12 +402,15 @@ contains
     use iso_c_binding, only: c_f_pointer
     use custom_par
     type(c_ptr),value :: Dptr
-    type(TFrameDomain_ParallelIO),pointer :: D
+    type(TFrameDomain_ParallelIO), pointer :: D
     character(2512) :: file_name
     character(70) :: str
     character(8) ::  scalname
     integer :: sc, ie
     integer(MPI_OFFSET_KIND) :: pos
+    integer :: view
+    integer, allocatable :: requests(:)
+    integer :: ireq
 
     scalname = "scalar00"
     file_name = ""
@@ -506,7 +435,14 @@ contains
       if (ie/=0) call error_stop("file open after delete", ie)
     end if
     
+#if NONBLOCKING_MPI_IO    
+    allocate(requests(D%number_of_arrays))
+    requests = MPI_REQUEST_NULL
+    ireq = 0
+#endif    
+    
     pos = 0
+    view = 0
 
     if (D%flags%Pr==1) then
       call save_scalar(D%Pr)
@@ -560,27 +496,45 @@ contains
       call save_vector(D%vorticity)
     end if
     
-    
-    
-    
+#ifdef NONBLOCKING_MPI_IO    
+    call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, ie)
+#endif
     
     call MPI_File_close(D%unit, ie)
   contains
     subroutine save_scalar(sc)
       real(knd), intent(in), contiguous :: sc(:,:,:)
-      call MPI_File_set_view(D%unit, pos, D%par_datatype_scalar, &
-                            D%par_filetype_scalar, "native", MPI_INFO_NULL, ie)
+      if (view/=1) then
+        call MPI_File_set_view(D%unit, pos, D%par_datatype_scalar, &
+                               D%par_filetype_scalar, "native", MPI_INFO_NULL, ie)
+        view = 1
+      end if
+      
+#ifdef NONBLOCKING_MPI_IO    
+      ireq = ireq + 1
+      call MPI_File_iwrite_all(D%unit, sc, 1, D%par_datatype_scalar, requests(ireq), ie)
+#else
       call MPI_File_write_all(D%unit, sc, 1, D%par_datatype_scalar, MPI_STATUS_IGNORE, ie)
+#endif
 
       pos = pos + D%glob_scalar_storage_size
     end subroutine
     
     subroutine save_vector(vec)
       real(knd), intent(in), contiguous :: vec(:,:,:,:)
-      call MPI_File_set_view(D%unit, pos, D%par_datatype_vector, &
-                            D%par_filetype_vector, "native", MPI_INFO_NULL, ie)
+      
+      if (view/=2) then
+        call MPI_File_set_view(D%unit, pos, D%par_datatype_vector, &
+                               D%par_filetype_vector, "native", MPI_INFO_NULL, ie)
+        view = 2
+      end if
 
+#ifdef NONBLOCKING_MPI_IO    
+      ireq = ireq + 1
+      call MPI_File_iwrite_all(D%unit, vec, 1, D%par_datatype_vector, requests(ireq), ie)
+#else
       call MPI_File_write_all(D%unit, vec, 1, D%par_datatype_vector, MPI_STATUS_IGNORE, ie)
+#endif
 
       pos = pos + D%glob_vector_storage_size
     end subroutine
