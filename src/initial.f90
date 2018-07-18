@@ -9,7 +9,8 @@ module Initial
   use Boundaries
   use ScalarBoundaries
   use Outputs, only: store, display, probes, scalar_probes, ReadProbes, &
-                     ProfileSwitches, profiles_config, enable_profiles
+                     ProfileSwitches, profiles_config, enable_profiles, &
+                     CreateOutputDirectories
   use Scalars
   use Filters, only: filtertype, filter_ratios
   use Subgrid
@@ -3620,6 +3621,10 @@ fields_do:  do j = 1, size(obj_fields)
     !add puff sources, each containing one or more points
     call InitPuffSources
     
+    call par_sync_out("  ...creating output directories.")
+
+    call CreateOutputDirectories
+   
     !filter out frames outside the domain
     call par_sync_out("  ...preparing VTK frames.")
     call InitVTKFrames
