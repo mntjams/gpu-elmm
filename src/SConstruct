@@ -317,7 +317,7 @@ if str(mpi)=='yes':
 objs += env.Object(target = target_dir + 'P/precisions',       source = '../../PoisFFT/src/precisions.f90')
 objs += env.Object(target = target_dir + 'P/parameters',       source = '../../PoisFFT/src/parameters.f90')
 objs += env.Object(target = target_dir + 'P/fft',              source = '../../PoisFFT/src/fft.f90', 
-                   F90FLAGS = filter(lambda flag: flag !='-ipo' , env['F90FLAGS']))
+                   F90FLAGS = list(filter(lambda flag: flag !='-ipo' , env['F90FLAGS'])))
 Depends(objs[-1], '../../PoisFFT/src/fft-inc.f90')
 Depends(objs[-1], '../../PoisFFT/src/plan_new-inc.f90')
 Depends(objs[-1], '../../PoisFFT/src/allocate_fftw-inc.f90')
@@ -352,10 +352,10 @@ objs += env.Object(target = target_dir + 'interpolation',      source = 'interpo
 objs += env.Object(target = target_dir + 'strings',            source = 'strings.f90')
 objs += env.Object(target = target_dir + 'lists',              source = 'lists.f90')
 objs += env.Object(target = target_dir + 'alternate_ieee_isnan', source = 'alternate_ieee_isnan.f90',
-                   F90FLAGS = filter(lambda flag: not ( flag.startswith('-O') or
+                   F90FLAGS = list(filter(lambda flag: not ( flag.startswith('-O') or
                                                        flag.startswith('-flto') or
                                                        flag.startswith('-ffast-math') )
-                                     , env['F90FLAGS']))
+                                     , env['F90FLAGS'])))
 objs += env.Object(target = target_dir + 'endianness',         source = 'endianness.f90')
 objs += env.Object(target = target_dir + 'freeunit',           source = 'freeunit.f90')
 objs += env.Object(target = target_dir + 'arrayutilities',     source = 'arrayutilities.f90')
@@ -365,7 +365,7 @@ objs += env.Object(target = target_dir + 'limiters',           source = 'limiter
 objs += env.Object(target = target_dir + 'multigrid',          source = 'multigrid.f90')
 objs += env.Object(target = target_dir + 'multigrid2d',        source = 'multigrid2d.f90')
 objs += env.Object(target = target_dir + 'solarradiation',     source = 'solarradiation.f90')
-objs += env.Object(target = target_dir + 'wallmodels',         source = 'wallmodels.f90', F90FLAGS = filter(lambda flag: flag !='-flto' , env['F90FLAGS']))
+objs += env.Object(target = target_dir + 'wallmodels',         source = 'wallmodels.f90', F90FLAGS = list(filter(lambda flag: flag !='-flto' , env['F90FLAGS'])))
 objs += env.Object(target = target_dir + 'volumesources',      source = 'volumesources.f90')
 objs += env.Object(target = target_dir + 'areasources',        source = 'areasources.f90')
 objs += env.Object(target = target_dir + 'linesources',        source = 'linesources.f90')
@@ -422,7 +422,7 @@ objs += env.Object(target = target_dir + 'tsteps',             source = 'tsteps.
 #objs += env.Object(target = target_dir + 'tsteps',             source = 'verification.f90')
 objs += env.Object(target = target_dir + 'main',               source = 'main.f90')
 
-objs = filter(lambda o: str(o)[-4:] != '.mod', objs)
+objs = list(filter(lambda o: str(o)[-4:] != '.mod', objs))
 
 t = env.Program(target = target_dir + 'ELMM', source= objs + SBfile + PBfile)
 
