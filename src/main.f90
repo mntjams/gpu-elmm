@@ -115,6 +115,9 @@ program CLMM
 
       if (time_stepping%variable_time_steps) then
         time_stepping%time = time_stepping%time + time_stepping%dt
+        if (abs(time_stepping%time - time_stepping%end_time)<5*spacing(time_stepping%end_time)) then
+          time_stepping%time = time_stepping%end_time
+        end if
       else
         time_stepping%time = time_stepping%start_time + time_step * time_stepping%dt
         if (abs(time_stepping%time - time_stepping%end_time)<time_stepping%dt/10) then
