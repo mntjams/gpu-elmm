@@ -10,9 +10,12 @@ module Outputs
   use Turbinlet, only: turb_gen => default_turbulence_generator
   use Endianness
   use FreeUnit
-  use VTKFrames
-  use SurfaceFrames
-  use StaggeredFrames
+  use VTKFrames, only: SaveVTKFrames, FinalizeVTKFrames
+#ifdef PAR
+  use Frames_ParallelIO, only: SaveFrames_ParallelIO, FinalizeFrames_ParallelIO
+#endif
+  use SurfaceFrames, only: SaveSurfaceFrames, FinalizeSurfaceFrames
+  use StaggeredFrames, only: SaveStaggeredFrames, FinalizeStaggeredFrames
   use Output_helpers
   use VerticalProfiles
   
@@ -22,19 +25,11 @@ module Outputs
 
   private
   public store, display, probes, scalar_probes,  &
-         OutTStep, Output, AllocateOutputs, ReadProbes,  &
+         OutTStep, Output, CreateOutputDirectories, AllocateOutputs, ReadProbes,  &
          ProfileSwitches, current_profiles, profiles_config, enable_profiles
          
-  type ProfileSwitches
-    real(knd) :: average_start = 0, average_end = -1
-    real(knd) :: instant_start = 0, instant_end = -1, instant_interval = huge(1.0_knd)
-    real(knd) :: running_start = 0, running_end = -1, running_interval = huge(1.0_knd)
-  end type
-  
   type(ProfileSwitches) :: profiles_config
-  logical :: enable_profiles = .false.
   
-  type(Profiles) :: current_profiles
   type(TimeAveragedProfiles), allocatable :: average_profiles
   type(InstantaneousProfiles), allocatable :: instant_profiles
   type(TimeAveragedProfiles), allocatable :: running_average_profiles(:)
@@ -194,439 +189,443 @@ contains
       close(unit)
     end if
   end subroutine
+  
 
+  subroutine CreateOutputDirectories
+    use custom_par
+    
+    integer :: j, k, u, io
+  
+#if defined(_WIN32) || defined(_WIN64)
+    call system("mkdir "//output_dir)
+#else
+    do j = 1, nims
+      call par_sync_all()
+      
+      if (myim==j) then
+        do k = 1, 10
+          call system("mkdir -p "//output_dir)
+          open(newunit=u, file=output_dir//"test", status="replace", iostat=io)
+          if (io==0) then
+            close(u, status="delete")
+            exit
+          end if
+          call sleep(1)
+          
+          if (k==10) call error_stop("Error, unable to create "//output_dir)
+        end do
+      end if
+      
+      call par_sync_all()
+    end do
+#endif
+  end subroutine
 
 
   subroutine AllocateOutputs
     use custom_par
     use Strings
     use Wallmodels
-    integer :: j, k, u, io
+    
+    integer :: k
 
-   call GetEndianness
+    call GetEndianness
 
-   call par_sync_out("  ...creating output directories.")
+    if (store%avg_U==0.and.store%avg_UU_prime>1) store%avg_U = 1
 
-#if defined(_WIN32) || defined(_WIN64)
-   call system("mkdir "//output_dir)
-#else
-   do j = 1, nims
-     call par_sync_all()
-     
-     if (myim==j) then
-       do k = 1, 10
-         call system("mkdir -p "//output_dir)
-         open(newunit=u, file=output_dir//"test", status="replace", iostat=io)
-         if (io==0) then
-           close(u, status="delete")
-           exit
-         end if
-         call sleep(1)
-         
-         if (k==10) call error_stop("Error, unable to create "//output_dir)
-       end do
-     end if
-     
-     call par_sync_all()
-   end do
-#endif
+    call par_sync_out("  ...allocating arrays for 3D statistics.")
 
+    if (averaging==1) then
+      if (store%avg_U>0) then
+        allocate(U_avg(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+        allocate(V_avg(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+        allocate(W_avg(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+        U_avg = 0
+        V_avg = 0
+        W_avg = 0
+      end if
 
-   if (store%avg_U==0.and.store%avg_UU_prime>1) store%avg_U = 1
+      if (store%avg_UU_prime>0) then
+        allocate(UU_prime(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+        allocate(VV_prime(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+        allocate(WW_prime(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+        allocate(UV_prime(1:Prnx,1:Prny,1:Prnz))
+        allocate(UW_prime(1:Prnx,1:Prny,1:Prnz))
+        allocate(VW_prime(1:Prnx,1:Prny,1:Prnz))
+        UU_prime = 0
+        VV_prime = 0
+        WW_prime = 0
+        UV_prime = 0
+        UW_prime = 0
+        VW_prime = 0
+        allocate(TKE_prime_sgs(1:Prnx,1:Prny,1:Prnz))
+        allocate(UU_prime_sgs(-2:Unx+3,-2:Uny+3,-2:Unz+3))
+        allocate(VV_prime_sgs(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
+        allocate(WW_prime_sgs(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
+        allocate(UV_prime_sgs(1:Prnx,1:Prny,1:Prnz))
+        allocate(UW_prime_sgs(1:Prnx,1:Prny,1:Prnz))
+        allocate(VW_prime_sgs(1:Prnx,1:Prny,1:Prnz))
+        TKE_prime_sgs = 0
+        UU_prime_sgs = 0
+        VV_prime_sgs = 0
+        WW_prime_sgs = 0
+        UV_prime_sgs = 0
+        UW_prime_sgs = 0
+        VW_prime_sgs = 0
+      end if
 
-   call par_sync_out("  ...allocating arrays for 3D statistics.")
+      if (store%avg_Pr==1) then
+        allocate(Pr_avg(1:Prnx,1:Prny,1:Prnz))
+        Pr_avg = 0
+      end if
 
-   if (averaging==1) then
-     if (store%avg_U>0) then
-       allocate(U_avg(-2:Unx+3,-2:Uny+3,-2:Unz+3))
-       allocate(V_avg(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
-       allocate(W_avg(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-       U_avg = 0
-       V_avg = 0
-       W_avg = 0
-     end if
+      if (enable_buoyancy.and.store%avg_temperature==1) then
+        allocate(Temperature_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+        Temperature_avg = 0
+      end if
 
-     if (store%avg_UU_prime>0) then
-       allocate(UU_prime(-2:Unx+3,-2:Uny+3,-2:Unz+3))
-       allocate(VV_prime(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
-       allocate(WW_prime(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-       allocate(UV_prime(1:Prnx,1:Prny,1:Prnz))
-       allocate(UW_prime(1:Prnx,1:Prny,1:Prnz))
-       allocate(VW_prime(1:Prnx,1:Prny,1:Prnz))
-       UU_prime = 0
-       VV_prime = 0
-       WW_prime = 0
-       UV_prime = 0
-       UW_prime = 0
-       VW_prime = 0
-       allocate(TKE_prime_sgs(1:Prnx,1:Prny,1:Prnz))
-       allocate(UU_prime_sgs(-2:Unx+3,-2:Uny+3,-2:Unz+3))
-       allocate(VV_prime_sgs(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
-       allocate(WW_prime_sgs(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
-       allocate(UV_prime_sgs(1:Prnx,1:Prny,1:Prnz))
-       allocate(UW_prime_sgs(1:Prnx,1:Prny,1:Prnz))
-       allocate(VW_prime_sgs(1:Prnx,1:Prny,1:Prnz))
-       TKE_prime_sgs = 0
-       UU_prime_sgs = 0
-       VV_prime_sgs = 0
-       WW_prime_sgs = 0
-       UV_prime_sgs = 0
-       UW_prime_sgs = 0
-       VW_prime_sgs = 0
-     end if
-
-     if (store%avg_Pr==1) then
-       allocate(Pr_avg(1:Prnx,1:Prny,1:Prnz))
-       Pr_avg = 0
-     end if
-
-     if (enable_buoyancy.and.store%avg_temperature==1) then
-       allocate(Temperature_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-       Temperature_avg = 0
-     end if
-
-     if (enable_moisture.and.store%avg_moisture==1) then
-       allocate(Moisture_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-       Moisture_avg = 0
-     end if
-   end if
-
-   if (num_of_scalars>0.and.store%scalars_avg==1) then
-     allocate(Scalar_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
-     Scalar_avg = 0
-   else
-     allocate(Scalar_avg(0,0,0,0))
-   end if
-   
-   if (num_of_scalars>0.and.store%scalars_variance==1) then
-     allocate(Scalar_variance(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
-     Scalar_variance = 0
-   else
-     allocate(Scalar_variance(0,0,0,0))
-   end if
-
-   if (num_of_scalars>0.and.store%scalars_max==1) then
-     allocate(Scalar_max(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
-     Scalar_max = 0
-   else
-     allocate(Scalar_max(0,0,0,0))
-   end if
-
-   if (num_of_scalars>0.and.store%scalars_intermitency==1) then
-     allocate(Scalar_intermitency(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
-     Scalar_intermitency = 0
-   else
-     allocate(Scalar_intermitency(0,0,0,0))
-   end if
-
-   if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
-     allocate(Scalar_fl_U_avg(Unx,Uny,Unz,num_of_scalars))
-     allocate(Scalar_fl_V_avg(Vnx,Vny,Vnz,num_of_scalars))
-     allocate(Scalar_fl_W_avg(Wnx,Wny,Wnz,num_of_scalars))
-     Scalar_fl_U_avg = 0
-     Scalar_fl_V_avg = 0
-     Scalar_fl_W_avg = 0
-   end if
-
-   
-   call par_sync_out("  ...preparing probes.")
-
-   do k = 1,size(probes)
-     associate(p => probes(k))
-       p%number = k
-       
-       p%inside = InDomain(p%x,p%y,p%z)
-       
-       call GridCoords_interp(p%i,p%j,p%k,p%x,p%y,p%z)
-
-       p%i = max(p%i,1)
-       p%j = max(p%j,1)
-       p%k = max(p%k,1)
-       p%i = min(p%i,Prnx)
-       p%j = min(p%j,Prny)
-       p%k = min(p%k,Prnz)
-
-       call GridCoords_interp_U(p%Ui,p%Uj,p%Uk,p%x,p%y,p%z)
-       call GridCoords_interp_V(p%Vi,p%Vj,p%Vk,p%x,p%y,p%z)
-       call GridCoords_interp_W(p%Wi,p%Wj,p%Wk,p%x,p%y,p%z)
-
-       if (Utype(p%Ui, p%Uj, p%Uk)>0) then
-         do
-           p%Uk = p%Uk + 1
-           if (Utype(p%Ui, p%Uj, p%Uk)<=0 .or. p%Uk>=Unz) exit
-         end do
-       end if
-
-       if (Vtype(p%Vi, p%Vj, p%Vk)>0) then
-         do
-           p%Vk = p%Vk + 1
-           if (Vtype(p%Vi, p%Vj, p%Vk)<=0 .or. p%Vk>=Vnz) exit
-         end do
-       end if
-
-       if (Wtype(p%Wi, p%Wj, p%Wk)>0) then
-         do
-           p%Wk = p%Wk + 1
-           if (Wtype(p%Wi, p%Wj, p%Wk)<=0 .or. p%Wk>=Wnz) exit
-         end do
-       end if
-
-     end associate
-   end do
-   
-   do k = 1,size(scalar_probes)
-     associate(p => scalar_probes(k))
-       p%number = k
-       
-       p%inside = InDomain(p%x,p%y,p%z)
-       
-       call GridCoords(p%i,p%j,p%k,p%x,p%y,p%z)
-
-       p%i = max(p%i,1)
-       p%j = max(p%j,1)
-       p%k = max(p%k,1)
-       p%i = min(p%i,Prnx)
-       p%j = min(p%j,Prny)
-       p%k = min(p%k,Prnz)
-
-       if (Prtype(p%i, p%j, p%k)>0) then
-         do
-           p%k = p%k + 1
-           if (Prtype(p%i, p%j, p%k)<=0 .or. p%k>=Prnz) exit
-         end do
-       end if
-     end associate
-   end do
-
-
-   probes = pack(probes, probes%inside)
-
-   scalar_probes = pack(scalar_probes, scalar_probes%inside)
-
-     
-   call par_sync_out("  ...allocating probe time series.")
-
-   if (size(probes)>0) then
-
-     allocate(U_time(size(probes),1:time_series_max_length), &
-              V_time(size(probes),1:time_series_max_length), &
-              W_time(size(probes),1:time_series_max_length))
-     U_time = huge(1.0_knd)
-     V_time = huge(1.0_knd)
-     W_time = huge(1.0_knd)
-
-     if (store%probes_fluxes==1) then
-       allocate(momentum_fluxes_time(6,size(probes),1:time_series_max_length))
-       momentum_fluxes_time = huge(1.0_knd)
-       allocate(momentum_fluxes_sgs_time(6,size(probes),1:time_series_max_length))
-       momentum_fluxes_sgs_time = huge(1.0_knd)
-       allocate(scalar_fluxes_time(3,1:num_of_scalars,size(probes),1:time_series_max_length))
-       scalar_fluxes_time = huge(1.0_knd)
-     else
-       allocate(momentum_fluxes_time(0,0,0))
-       allocate(momentum_fluxes_sgs_time(0,0,0))
-       allocate(scalar_fluxes_time(0,0,0,0))
-     end if
-
-     if (enable_buoyancy) then
-       allocate(temp_time(size(probes),1:time_series_max_length))
-       temp_time = huge(1.0_knd)
-     end if
-
-     if (enable_moisture) then
-       allocate(moist_time(size(probes),1:time_series_max_length))
-       moist_time = huge(1.0_knd)
-     end if
-
-   end if
-
-   call par_sync_out("  ...allocating global time series.")
-
-   allocate(times(1:time_series_max_length))
-   times = huge(1.0_knd)   
-
-   if (store%delta_time==1) then
-     allocate(delta_time(1:time_series_max_length))
-     delta_time = huge(1.0_knd)
-   end if
-
-   if (store%tke==1) then
-     allocate(tke(0:time_series_max_length))
-     tke = huge(1.0_knd)
-   end if
-
-   if (store%dissip==1) then
-     allocate(dissip(1:time_series_max_length))
-     dissip = huge(1.0_knd)
-     dissip(1) = 0
-   end if
-
-   if (wallmodeltype>0.and.(display%ustar==1.or.store%ustar==1)) then
-     allocate(ustar(2,1:time_series_max_length))
-     ustar = huge(1.0)
-   end if
-
-   if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==BC_MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
-     allocate(tstar(2,1:time_series_max_length))
-     tstar = huge(1.0)
-   end if
-
-   if (num_of_scalars>0) then
-     if (store%scalsum_time==1.or.store%scaltotsum_time==1) then
-       allocate(scalsum_time(1:num_of_scalars,1:time_series_max_length))
-       scalsum_time = huge(1.0_knd)
-     end if
-
-     if (size(scalar_probes)>0) then
-       allocate(scalp_time(1:num_of_scalars,1:size(scalar_probes),1:time_series_max_length))
-       scalp_time = huge(1.0_knd)
+      if (enable_moisture.and.store%avg_moisture==1) then
+        allocate(Moisture_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+        Moisture_avg = 0
+      end if
     end if
-   end if
 
-   if (flow_rate_x_fixed) then
-     allocate(pr_gradient_x_time(1:time_series_max_length))
-     pr_gradient_x_time = huge(1.0_knd)
-   end if
+    if (num_of_scalars>0.and.store%scalars_avg==1) then
+      allocate(Scalar_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+      Scalar_avg = 0
+    else
+      allocate(Scalar_avg(0,0,0,0))
+    end if
+    
+    if (num_of_scalars>0.and.store%scalars_variance==1) then
+      allocate(Scalar_variance(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+      Scalar_variance = 0
+    else
+      allocate(Scalar_variance(0,0,0,0))
+    end if
 
-   if (flow_rate_y_fixed) then
-     allocate(pr_gradient_y_time(1:time_series_max_length))
-     pr_gradient_y_time = huge(1.0_knd)
-   end if
+    if (num_of_scalars>0.and.store%scalars_max==1) then
+      allocate(Scalar_max(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+      Scalar_max = 0
+    else
+      allocate(Scalar_max(0,0,0,0))
+    end if
 
-   if (enable_profiles) then
+    if (num_of_scalars>0.and.store%scalars_intermitency==1) then
+      allocate(Scalar_intermitency(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+      Scalar_intermitency = 0
+    else
+      allocate(Scalar_intermitency(0,0,0,0))
+    end if
 
-     call par_sync_out("  ...preparing profiles.")
+    if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
+      allocate(Scalar_fl_U_avg(Unx,Uny,Unz,num_of_scalars))
+      allocate(Scalar_fl_V_avg(Vnx,Vny,Vnz,num_of_scalars))
+      allocate(Scalar_fl_W_avg(Wnx,Wny,Wnz,num_of_scalars))
+      Scalar_fl_U_avg = 0
+      Scalar_fl_V_avg = 0
+      Scalar_fl_W_avg = 0
+    end if
 
-     if (.not.allocated(times)) allocate(times(1:time_series_max_length))
-   
-     call current_profiles%allocate
-     
-     profiles_config%average_end = min(profiles_config%average_end, time_stepping%end_time)
-     profiles_config%running_end = min(profiles_config%running_end, time_stepping%end_time)
-     profiles_config%instant_end = min(profiles_config%instant_end, time_stepping%end_time)
-     
-     profiles_config%average_start = max(profiles_config%average_start, time_stepping%start_time)
-     profiles_config%running_start = max(profiles_config%running_start, time_stepping%start_time)
-     profiles_config%instant_start = max(profiles_config%instant_start, time_stepping%start_time)
-     
-     if (profiles_config%average_end > profiles_config%average_start) then
-       average_profiles = TimeAveragedProfiles(profiles_config%average_start, &
-                                               profiles_config%average_end, &
-                                               "average_profiles/")
-     end if
-   
-     if (profiles_config%running_end > profiles_config%running_start .and. &
-         profiles_config%running_interval > 0) then
-         
-       allocate(running_average_profiles( &
-                  ceiling( (profiles_config%running_end - profiles_config%running_start) / &
-                           profiles_config%running_interval)))
-       do k = 1, size(running_average_profiles)
-          running_average_profiles(k) = &
-            TimeAveragedProfiles(profiles_config%running_start + (k-1)*profiles_config%running_interval, &
-                                 profiles_config%running_start + k*profiles_config%running_interval, &
-                                 "average_profiles-"//itoa(k)//"/")
-       end do
-       
-     end if
-   
-     if (profiles_config%instant_end > profiles_config%instant_start) then
-       instant_profiles = &
-         InstantaneousProfiles(profiles_config%instant_start, &
-                               profiles_config%instant_end, &
-                               profiles_config%instant_interval, &
-                               "instant_profiles/")
-     end if
-   
-     allocate(n_free_U(0:Unz+1))
-     allocate(n_free_V(0:Vnz+1))
-     allocate(n_free_W(0:Wnz+1))
-     allocate(n_free_Pr(0:Prnz+1))
-     allocate(n_all_Pr(0:Prnz+1))
-     allocate(n_free_PrW(0:Prnz))
-     allocate(n_free_UW(0:Prnz))
-     allocate(n_free_VW(0:Prnz))
-     allocate(n_free_UW_sgs(0:Prnz))
-     allocate(n_free_VW_sgs(0:Prnz))
-     do k = 0, Unz+1
-       n_free_U(k) = count(Utype(1:Unx,1:Uny,k) <= 0)
-     end do
-     do k = 0, Vnz+1
-       n_free_V(k) = count(Vtype(1:Vnx,1:Vny,k) <= 0)
-     end do
-     do k = 0, Wnz+1
-       n_free_W(k) = count(Wtype(1:Wnx,1:Wny,k) <= 0)
-     end do
-     do k = 0, Prnz+1
-       n_free_Pr(k) = count(Prtype(1:Prnx,1:Prny,k) <= 0)
-     end do
-     do k = 0, Prnz+1
-       n_all_Pr(k) = gPrnx * gPrny
-     end do
-     do k = 0, Prnz
-       n_free_PrW(k) = count(Prtype(1:Prnx,1:Prny,k+1) <= 0 .or. Prtype(1:Prnx,1:Prny,k) <= 0)
-     end do
-     do k = 0, Prnz
-       n_free_UW(k) = count((Utype(1:Unx,1:Uny,k+1)<=0.or.Utype(1:Unx,1:Uny,k)<=0) .and. &
-                         (Wtype(2:Unx+1,1:Uny,k)<=0.or.Wtype(1:Unx,1:Uny,k)<=0))
-     end do
-     do k = 0, Prnz
-       n_free_VW(k) = count((Vtype(1:Vnx,1:Vny,k+1)<=0.or.Vtype(1:Vnx,1:Vny,k)<=0) .and. &
-                         (Wtype(1:Vnx,2:Vny+1,k)<=0.or.Wtype(1:Vnx,1:Vny,k)<=0))
-     end do
-     do k = 0, Prnz
-       n_free_UW_sgs(k) = count((Utype(1:Unx,1:Uny,k+1)<=0.or.Utype(1:Unx,1:Uny,k)<=0) .and. &
-                         (Wtype(2:Unx+1,1:Uny,k)<=0.or.Wtype(1:Unx,1:Uny,k)<=0))
-     end do
-     do k = 0, Prnz
-       n_free_VW_sgs(k) = count((Vtype(1:Vnx,1:Vny,k+1)<=0.or.Vtype(1:Vnx,1:Vny,k)<=0))
-     end do
-     
-     if (kim==1) then
-       n_free_PrW_surf = 0
-       do k = 1, size(WMPoints)
-        if (WMPoints(k)%zk==1.and.Prtype(WMPoints(k)%xi,WMPoints(k)%yj,1)<=0) then
-          n_free_PrW_surf = n_free_PrW_surf + 1
+    
+    call par_sync_out("  ...preparing probes.")
+
+    do k = 1,size(probes)
+      associate(p => probes(k))
+        p%number = k
+        
+        p%inside = InDomain(p%x,p%y,p%z)
+        
+        call GridCoords_interp(p%i,p%j,p%k,p%x,p%y,p%z)
+
+        p%i = max(p%i,1)
+        p%j = max(p%j,1)
+        p%k = max(p%k,1)
+        p%i = min(p%i,Prnx)
+        p%j = min(p%j,Prny)
+        p%k = min(p%k,Prnz)
+
+        call GridCoords_interp_U(p%Ui,p%Uj,p%Uk,p%x,p%y,p%z)
+        call GridCoords_interp_V(p%Vi,p%Vj,p%Vk,p%x,p%y,p%z)
+        call GridCoords_interp_W(p%Wi,p%Wj,p%Wk,p%x,p%y,p%z)
+
+        if (Utype(p%Ui, p%Uj, p%Uk)>0) then
+          do
+            p%Uk = p%Uk + 1
+            if (Utype(p%Ui, p%Uj, p%Uk)<=0 .or. p%Uk>=Unz) exit
+          end do
         end if
-       end do
-     endif
+
+        if (Vtype(p%Vi, p%Vj, p%Vk)>0) then
+          do
+            p%Vk = p%Vk + 1
+            if (Vtype(p%Vi, p%Vj, p%Vk)<=0 .or. p%Vk>=Vnz) exit
+          end do
+        end if
+
+        if (Wtype(p%Wi, p%Wj, p%Wk)>0) then
+          do
+            p%Wk = p%Wk + 1
+            if (Wtype(p%Wi, p%Wj, p%Wk)<=0 .or. p%Wk>=Wnz) exit
+          end do
+        end if
+
+      end associate
+    end do
+    
+    do k = 1,size(scalar_probes)
+      associate(p => scalar_probes(k))
+        p%number = k
+        
+        p%inside = InDomain(p%x,p%y,p%z)
+        
+        call GridCoords(p%i,p%j,p%k,p%x,p%y,p%z)
+
+        p%i = max(p%i,1)
+        p%j = max(p%j,1)
+        p%k = max(p%k,1)
+        p%i = min(p%i,Prnx)
+        p%j = min(p%j,Prny)
+        p%k = min(p%k,Prnz)
+
+        if (Prtype(p%i, p%j, p%k)>0) then
+          do
+            p%k = p%k + 1
+            if (Prtype(p%i, p%j, p%k)<=0 .or. p%k>=Prnz) exit
+          end do
+        end if
+      end associate
+    end do
+
+
+    probes = pack(probes, probes%inside)
+
+    scalar_probes = pack(scalar_probes, scalar_probes%inside)
+
+      
+    call par_sync_out("  ...allocating probe time series.")
+
+    if (size(probes)>0) then
+
+      allocate(U_time(size(probes),1:time_series_max_length), &
+                V_time(size(probes),1:time_series_max_length), &
+                W_time(size(probes),1:time_series_max_length))
+      U_time = huge(1.0_knd)
+      V_time = huge(1.0_knd)
+      W_time = huge(1.0_knd)
+
+      if (store%probes_fluxes==1) then
+        allocate(momentum_fluxes_time(6,size(probes),1:time_series_max_length))
+        momentum_fluxes_time = huge(1.0_knd)
+        allocate(momentum_fluxes_sgs_time(6,size(probes),1:time_series_max_length))
+        momentum_fluxes_sgs_time = huge(1.0_knd)
+        allocate(scalar_fluxes_time(3,1:num_of_scalars,size(probes),1:time_series_max_length))
+        scalar_fluxes_time = huge(1.0_knd)
+      else
+        allocate(momentum_fluxes_time(0,0,0))
+        allocate(momentum_fluxes_sgs_time(0,0,0))
+        allocate(scalar_fluxes_time(0,0,0,0))
+      end if
+
+      if (enable_buoyancy) then
+        allocate(temp_time(size(probes),1:time_series_max_length))
+        temp_time = huge(1.0_knd)
+      end if
+
+      if (enable_moisture) then
+        allocate(moist_time(size(probes),1:time_series_max_length))
+        moist_time = huge(1.0_knd)
+      end if
+
+    end if
+
+    call par_sync_out("  ...allocating global time series.")
+
+    allocate(times(1:time_series_max_length))
+    times = huge(1.0_knd)   
+
+    if (store%delta_time==1) then
+      allocate(delta_time(1:time_series_max_length))
+      delta_time = huge(1.0_knd)
+    end if
+
+    if (store%tke==1) then
+      allocate(tke(0:time_series_max_length))
+      tke = huge(1.0_knd)
+    end if
+
+    if (store%dissip==1) then
+      allocate(dissip(1:time_series_max_length))
+      dissip = huge(1.0_knd)
+      dissip(1) = 0
+    end if
+
+    if (wallmodeltype>0.and.(display%ustar==1.or.store%ustar==1)) then
+      allocate(ustar(2,1:time_series_max_length))
+      ustar = huge(1.0)
+    end if
+
+    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==BC_MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
+      allocate(tstar(2,1:time_series_max_length))
+      tstar = huge(1.0)
+    end if
+
+    if (num_of_scalars>0) then
+      if (store%scalsum_time==1.or.store%scaltotsum_time==1) then
+        allocate(scalsum_time(1:num_of_scalars,1:time_series_max_length))
+        scalsum_time = huge(1.0_knd)
+      end if
+
+      if (size(scalar_probes)>0) then
+        allocate(scalp_time(1:num_of_scalars,1:size(scalar_probes),1:time_series_max_length))
+        scalp_time = huge(1.0_knd)
+      end if
+    end if
+
+    if (flow_rate_x_fixed) then
+      allocate(pr_gradient_x_time(1:time_series_max_length))
+      pr_gradient_x_time = huge(1.0_knd)
+    end if
+
+    if (flow_rate_y_fixed) then
+      allocate(pr_gradient_y_time(1:time_series_max_length))
+      pr_gradient_y_time = huge(1.0_knd)
+    end if
+
+    if (enable_profiles) then
+
+      call par_sync_out("  ...preparing profiles.")
+
+      if (.not.allocated(times)) allocate(times(1:time_series_max_length))
+    
+      call current_profiles%allocate
+      
+      profiles_config%average_end = min(profiles_config%average_end, time_stepping%end_time)
+      profiles_config%running_end = min(profiles_config%running_end, time_stepping%end_time)
+      profiles_config%instant_end = min(profiles_config%instant_end, time_stepping%end_time)
+      
+      profiles_config%average_start = max(profiles_config%average_start, time_stepping%start_time)
+      profiles_config%running_start = max(profiles_config%running_start, time_stepping%start_time)
+      profiles_config%instant_start = max(profiles_config%instant_start, time_stepping%start_time)
+      
+      if (profiles_config%average_end > profiles_config%average_start) then
+        average_profiles = TimeAveragedProfiles(profiles_config%average_start, &
+                                                profiles_config%average_end, &
+                                                "average_profiles/")
+      end if
+    
+      if (profiles_config%running_end > profiles_config%running_start .and. &
+          profiles_config%running_interval > 0) then
+          
+        allocate(running_average_profiles( &
+                    ceiling( (profiles_config%running_end - profiles_config%running_start) / &
+                            profiles_config%running_interval)))
+        do k = 1, size(running_average_profiles)
+            running_average_profiles(k) = &
+              TimeAveragedProfiles(profiles_config%running_start + (k-1)*profiles_config%running_interval, &
+                                  profiles_config%running_start + k*profiles_config%running_interval, &
+                                  "average_profiles-"//itoa(k)//"/")
+        end do
+        
+      end if
+    
+      if (profiles_config%instant_end > profiles_config%instant_start) then
+        instant_profiles = &
+          InstantaneousProfiles(profiles_config%instant_start, &
+                                profiles_config%instant_end, &
+                                profiles_config%instant_interval, &
+                                "instant_profiles/")
+      end if
+    
+      allocate(n_free_U(0:Unz+1))
+      allocate(n_free_V(0:Vnz+1))
+      allocate(n_free_W(0:Wnz+1))
+      allocate(n_free_Pr(0:Prnz+1))
+      allocate(n_all_Pr(0:Prnz+1))
+      allocate(n_free_PrW(0:Prnz))
+      allocate(n_free_UW(0:Prnz))
+      allocate(n_free_VW(0:Prnz))
+      allocate(n_free_UW_sgs(0:Prnz))
+      allocate(n_free_VW_sgs(0:Prnz))
+      do k = 0, Unz+1
+        n_free_U(k) = count(Utype(1:Unx,1:Uny,k) <= 0)
+      end do
+      do k = 0, Vnz+1
+        n_free_V(k) = count(Vtype(1:Vnx,1:Vny,k) <= 0)
+      end do
+      do k = 0, Wnz+1
+        n_free_W(k) = count(Wtype(1:Wnx,1:Wny,k) <= 0)
+      end do
+      do k = 0, Prnz+1
+        n_free_Pr(k) = count(Prtype(1:Prnx,1:Prny,k) <= 0)
+      end do
+      do k = 0, Prnz+1
+        n_all_Pr(k) = gPrnx * gPrny
+      end do
+      do k = 0, Prnz
+        n_free_PrW(k) = count(Prtype(1:Prnx,1:Prny,k+1) <= 0 .or. Prtype(1:Prnx,1:Prny,k) <= 0)
+      end do
+      do k = 0, Prnz
+        n_free_UW(k) = count((Utype(1:Unx,1:Uny,k+1)<=0.or.Utype(1:Unx,1:Uny,k)<=0) .and. &
+                          (Wtype(2:Unx+1,1:Uny,k)<=0.or.Wtype(1:Unx,1:Uny,k)<=0))
+      end do
+      do k = 0, Prnz
+        n_free_VW(k) = count((Vtype(1:Vnx,1:Vny,k+1)<=0.or.Vtype(1:Vnx,1:Vny,k)<=0) .and. &
+                          (Wtype(1:Vnx,2:Vny+1,k)<=0.or.Wtype(1:Vnx,1:Vny,k)<=0))
+      end do
+      do k = 0, Prnz
+        n_free_UW_sgs(k) = count((Utype(1:Unx,1:Uny,k+1)<=0.or.Utype(1:Unx,1:Uny,k)<=0) .and. &
+                          (Wtype(2:Unx+1,1:Uny,k)<=0.or.Wtype(1:Unx,1:Uny,k)<=0))
+      end do
+      do k = 0, Prnz
+        n_free_VW_sgs(k) = count((Vtype(1:Vnx,1:Vny,k+1)<=0.or.Vtype(1:Vnx,1:Vny,k)<=0))
+      end do
+      
+      if (kim==1) then
+        n_free_PrW_surf = 0
+        do k = 1, size(WMPoints)
+          if (WMPoints(k)%zk==1.and.Prtype(WMPoints(k)%xi,WMPoints(k)%yj,1)<=0) then
+            n_free_PrW_surf = n_free_PrW_surf + 1
+          end if
+        end do
+      endif
 
 #ifdef PAR
-     n_free_U = par_co_sum(n_free_U, comm = comm_plane_xy)
-     n_free_V = par_co_sum(n_free_V, comm = comm_plane_xy)
-     n_free_W = par_co_sum(n_free_W, comm = comm_plane_xy)
-     n_free_Pr = par_co_sum(n_free_Pr, comm = comm_plane_xy)
-     n_free_PrW = par_co_sum(n_free_PrW, comm = comm_plane_xy)
-     n_free_PrW_surf = par_co_sum(n_free_PrW_surf, comm = comm_plane_xy)
-     n_free_UW = par_co_sum(n_free_UW, comm = comm_plane_xy)
-     n_free_VW = par_co_sum(n_free_VW, comm = comm_plane_xy)
-     n_free_UW_sgs = par_co_sum(n_free_UW_sgs, comm = comm_plane_xy)
-     n_free_VW_sgs = par_co_sum(n_free_VW_sgs, comm = comm_plane_xy)
+      n_free_U = par_co_sum(n_free_U, comm = comm_plane_xy)
+      n_free_V = par_co_sum(n_free_V, comm = comm_plane_xy)
+      n_free_W = par_co_sum(n_free_W, comm = comm_plane_xy)
+      n_free_Pr = par_co_sum(n_free_Pr, comm = comm_plane_xy)
+      n_free_PrW = par_co_sum(n_free_PrW, comm = comm_plane_xy)
+      n_free_PrW_surf = par_co_sum(n_free_PrW_surf, comm = comm_plane_xy)
+      n_free_UW = par_co_sum(n_free_UW, comm = comm_plane_xy)
+      n_free_VW = par_co_sum(n_free_VW, comm = comm_plane_xy)
+      n_free_UW_sgs = par_co_sum(n_free_UW_sgs, comm = comm_plane_xy)
+      n_free_VW_sgs = par_co_sum(n_free_VW_sgs, comm = comm_plane_xy)
 #endif
 
-     
-   else
-   
-     if (Btype(To)==BC_AUTOMATIC_FLUX) then
-       allocate(current_profiles%uw(0:Prnz), current_profiles%uwsgs(0:Prnz))
-       allocate(current_profiles%vw(0:Prnz), current_profiles%vwsgs(0:Prnz))
-     end if
-     
-     if (TempBtype(To)==BC_AUTOMATIC_FLUX) then
-       allocate(current_profiles%tempfl(0:Prnz), current_profiles%tempflsgs(0:Prnz))
-     else
-       !to avoid the necessity of an allocatable dummy argument
-       allocate(current_profiles%tempfl(0))
-     end if
+      
+    else
+    
+      if (Btype(To)==BC_AUTOMATIC_FLUX) then
+        allocate(current_profiles%uw(0:Prnz), current_profiles%uwsgs(0:Prnz))
+        allocate(current_profiles%vw(0:Prnz), current_profiles%vwsgs(0:Prnz))
+      end if
+      
+      if (TempBtype(To)==BC_AUTOMATIC_FLUX) then
+        allocate(current_profiles%tempfl(0:Prnz), current_profiles%tempflsgs(0:Prnz))
+      else
+        !to avoid the necessity of an allocatable dummy argument
+        allocate(current_profiles%tempfl(0))
+      end if
 
-     if (MoistBtype(To)==BC_AUTOMATIC_FLUX) then
-       allocate(current_profiles%moistfl(0:Prnz), current_profiles%moistflsgs(0:Prnz))
-     else
-       !to avoid the necessity of an allocatable dummy argument
-       allocate(current_profiles%moistfl(0))
-     end if
+      if (MoistBtype(To)==BC_AUTOMATIC_FLUX) then
+        allocate(current_profiles%moistfl(0:Prnz), current_profiles%moistflsgs(0:Prnz))
+      else
+        !to avoid the necessity of an allocatable dummy argument
+        allocate(current_profiles%moistfl(0))
+      end if
 
-   end if
+    end if
 
   end subroutine AllocateOutputs
 
@@ -1146,6 +1145,10 @@ contains
 
 
     call SaveVTKFrames(time_stepping%time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    
+#ifdef PAR
+    call SaveFrames_ParallelIO(time_stepping%time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+#endif
 
     call SaveSurfaceFrames(time_stepping%time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
 
@@ -2500,6 +2503,10 @@ contains
     call OutputProfiles
 
     call FinalizeVTKFrames
+    
+#ifdef PAR
+    call FinalizeFrames_ParallelIO
+#endif
 
     call FinalizeSurfaceFrames
 
@@ -2521,6 +2528,7 @@ contains
 
   subroutine StressProfiles(U,V,W)
     use Filters, only: filtertype, filter_ratios
+    use Subgrid, only: TKEDissipation
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     integer   :: i,j,k
     real(knd) :: S, width
@@ -2540,6 +2548,20 @@ contains
        end do
       end do
       current_profiles%tkesgs(k) = S
+    end do
+    !$omp end do nowait
+
+    !$omp do
+    do k = 1,Prnz
+      S = 0
+      do j = 1,Prny
+       do i = 1,Prnx
+         if (Prtype(i,j,k)<=0) then
+           S = S + TKEDissipation(i, j, k, U, V, W)
+         end if
+       end do
+      end do
+      current_profiles%dissip(k) = S
     end do
     !$omp end do nowait
 

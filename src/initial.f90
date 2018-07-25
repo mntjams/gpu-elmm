@@ -9,7 +9,8 @@ module Initial
   use Boundaries
   use ScalarBoundaries
   use Outputs, only: store, display, probes, scalar_probes, ReadProbes, &
-                     ProfileSwitches, profiles_config, enable_profiles
+                     ProfileSwitches, profiles_config, enable_profiles, &
+                     CreateOutputDirectories
   use Scalars
   use Filters, only: filtertype, filter_ratios
   use Subgrid
@@ -100,6 +101,7 @@ contains
 
    image_input_dir = "input/"
    output_dir = "output/"
+   shared_output_dir = "output/"
 
 
    call newunit(unit)
@@ -2127,20 +2129,24 @@ fields_do:  do j = 1, size(obj_fields)
     use ParseTrees
     use Frames_common
     use VTKFrames
+#ifdef PAR
+    use Frames_ParallelIO
+#endif
     character(*), intent(in) :: fname
     type(TFrameTimes), target :: timing
     type(TFrameFlags), target :: flags
-    integer, target :: dimension, direction
+    integer, target :: dimension, direction    
     real(knd), target :: position
     real(knd), target :: interval
     character(char_len), target :: label, direction_ch
     type(tree_object_ptr), target :: flags_ptr
+    logical, target :: distributed ! whether small distributed vtk files for each image should be forced
 
     type(tree_object), allocatable :: tree(:)
     logical :: ex
     integer :: iobj, ivtk, stat
 
-    type(field_names) :: names_vtk(7), names_flags_vtk(11)
+    type(field_names) :: names_vtk(8), names_flags_vtk(11)
     
     type(field_names_str) :: names_str(2)
     
@@ -2148,13 +2154,14 @@ fields_do:  do j = 1, size(obj_fields)
                  field_names_str("direction", direction_ch)]
 
 
-    names_vtk = [field_names_init("dimension", dimension), &
-                 field_names_init("position",  position), &
-                 field_names_init("start",     timing%start), &
-                 field_names_init("end",       timing%end), &
-                 field_names_init("n",         timing%nframes), &
-                 field_names_init("interval",  interval), &
-                 field_names_init("flags",     flags_ptr)]
+    names_vtk = [field_names_init("dimension",   dimension), &
+                 field_names_init("position",    position), &
+                 field_names_init("start",       timing%start), &
+                 field_names_init("end",         timing%end), &
+                 field_names_init("n",           timing%nframes), &
+                 field_names_init("interval",    interval), &
+                 field_names_init("flags",       flags_ptr), &
+                 field_names_init("distributed", distributed)]
                  
 
     names_flags_vtk = [field_names_init("U", flags%U), &
@@ -2195,6 +2202,7 @@ fields_do:  do j = 1, size(obj_fields)
         direction_ch = ""
         timing%start = 0; timing%end = 0; timing%nframes = 0
         interval = 0
+        distributed = .false.
         flags_ptr%ptr => null()
         
         call get_object_field_values(tree(iobj), stat, &
@@ -2263,10 +2271,19 @@ fields_do:  do j = 1, size(obj_fields)
       if (.not.enable_moisture) flags%moisture_flux = 0
       if (num_of_scalars < 1) flags%scalar_flux = 0
       
-      call AddDomain(TFrameDomain(label, &
-                                  dimension, direction, position, &
-                                  timing, flags))
-                       
+#ifdef PAR
+      if (.not.(distributed.or.nims==1)) then
+        call AddDomain(TFrameDomain_ParallelIO(label, &
+                                    dimension, direction, position, &
+                                    timing, flags))
+      else
+#endif
+        call AddDomain(TFrameDomain(label, &
+                                    dimension, direction, position, &
+                                    timing, flags))
+#ifdef PAR
+      end if
+#endif      
     end subroutine
     
   end subroutine get_frames
@@ -3104,6 +3121,9 @@ fields_do:  do j = 1, size(obj_fields)
 
   subroutine InitBoundaryConditions
     use VTKFrames, only: InitVTKFrames
+#ifdef PAR
+    use Frames_ParallelIO, only: InitFrames_ParallelIO
+#endif
     use SurfaceFrames, only: InitSurfaceFrames
     use custom_par
     
@@ -3601,9 +3621,17 @@ fields_do:  do j = 1, size(obj_fields)
     !add puff sources, each containing one or more points
     call InitPuffSources
     
+    call par_sync_out("  ...creating output directories.")
+
+    call CreateOutputDirectories
+   
     !filter out frames outside the domain
     call par_sync_out("  ...preparing VTK frames.")
     call InitVTKFrames
+#ifdef PAR    
+    call par_sync_out("  ...preparing ParallelIO frames.")
+    call InitFrames_ParallelIO
+#endif    
     call par_sync_out("  ...preparing constant height frames.")
     call InitSurfaceFrames
    
@@ -3840,23 +3868,24 @@ fields_do:  do j = 1, size(obj_fields)
     use custom_par
 #endif
     integer :: i
-    integer(int32), allocatable :: seed(:)
+    integer(int64) :: seed(2)
     integer :: nt
     
-    !just some initial entropy for a reproducible random sequence
-    integer, parameter :: base = -1140444627 
+    ! Just some initial entropy for a reproducible random sequence
+    integer(int64), parameter :: base(2) = [int(Z'1DADBEEFBAADD0D0', int64), &
+                                            int(Z'5BADD0D0DEADBEEF', int64)]
     
     nt = 1
     !$omp parallel
     !$ nt = omp_get_num_threads()
     !$omp end parallel
-    
-    allocate(seed(nt))
 
+    seed = base
+    
 #ifdef PAR
-    seed = [( base + 100000 * i + my_world_rank, i=1,size(seed) )]
-#else
-    seed = [( base + 100000 * i, i=1,size(seed) )]
+    ! Jump nthread-times for each image so that each image
+    ! has a disjunct set of random sequences for its threads.
+    call rng_jump(seed, nt*(myim-1))
 #endif
 
     call rng_init(nt, seed)
