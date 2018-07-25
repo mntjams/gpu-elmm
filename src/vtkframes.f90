@@ -45,9 +45,11 @@ module VTKFrames
     
     character(4)  :: suffix = ".vtk"
   contains
+    procedure :: InDomain => TFrameDomain_InDomain
     procedure :: Fill => TFrameDomain_Fill
     procedure :: DoSave => TFrameDomain_DoSave
     procedure :: SetRest => TFrameDomain_SetRest
+    procedure :: Finalize => TFrameDomain_Finalize
   end type TFrameDomain
   
   interface TFrameDomain
@@ -58,7 +60,7 @@ module VTKFrames
     module procedure AddFrameDomain
   end interface
   
-  type(TFrameDomain), allocatable :: FrameDomains(:)
+  type(TFrameDomain), allocatable, target :: FrameDomains(:)
   
   character, parameter :: lf = achar(10)
 
@@ -66,31 +68,6 @@ module VTKFrames
   
 contains
 
-  elemental logical function InDomain(D) result(res)
-    type(TFrameDomain), intent(in) :: D
-    
-    if (D%dimension==3) then
-      res = .true.
-    else if (D%dimension==2) then
-      if (D%direction==1) then
-        res = (D%position>=xU(0) .and. &
-               (D%position<xU(Prnx) .or. &
-                (D%position==xU(Prnx).and.Btype(Ea)/=BC_MPI_BOUNDARY)))
-      else if (D%direction==2) then   
-        res = (D%position>=yV(0) .and. &
-               (D%position<yV(Prny) .or. &
-                (D%position==yV(Prny).and.Btype(No)/=BC_MPI_BOUNDARY)))
-      else if (D%direction==3) then   
-        res = (D%position>=zW(0) .and. &
-               (D%position<zW(Prnz) .or. &
-                (D%position==zW(Prnz).and.Btype(To)/=BC_MPI_BOUNDARY)))
-      else
-        res = .false.
-      end if
-    else
-      res = .false.
-    end if
-  end function
   
   
 
@@ -98,13 +75,13 @@ contains
     integer :: i
   
     if (allocated(FrameDomains)) then
-      FrameDomains = pack(FrameDomains, InDomain(FrameDomains))
+      FrameDomains = pack(FrameDomains, FrameDomains%InDomain())
       
       do i=1, size(FrameDomains)
         call FrameDomains(i)%SetRest(num_of_scalars)
       end do
     end if
-  
+   
   end subroutine
 
   
@@ -132,7 +109,65 @@ contains
     call add_element_fd(FrameDomains, D)
 
   end subroutine
+   
   
+  
+  subroutine SaveVTKFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    real(knd),intent(in) :: time
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
+    real(knd),contiguous,intent(in) :: Pr(-1:,-1:,-1:), &
+                                       Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
+                                       Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
+    integer :: i
+    
+    if (allocated(FrameDomains)) then
+      do i=1,size(FrameDomains)
+        call FrameDomains(i)%Save(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+      end do
+    end if
+  end subroutine
+
+  subroutine FinalizeVTKFrames
+    integer :: i
+    if (allocated(FrameDomains)) then
+      do i=1,size(FrameDomains)
+        call FrameDomains(i)%Finalize
+      end do
+      deallocate(FrameDomains)
+    end if
+  end subroutine  
+  
+  
+  
+  
+  
+  
+  
+  function TFrameDomain_Init(label,dimension,direction,position,time_params,frame_flags) result(D)
+    type(TFrameDomain) :: D
+    character(*) :: label
+    integer,intent(in) :: dimension,direction
+    real(knd),intent(in) :: position
+    type(TFrameTimes),intent(in) :: time_params
+    type(TFrameFlags),intent(in) :: frame_flags
+
+    D%base_name = trim(output_dir)//"frame-"//label
+
+    D%frame_times = time_params
+
+    D%flags = frame_flags
+
+    D%unit = frame_unit
+    frame_unit = frame_unit + 1
+
+    D%dimension = dimension
+    D%direction = direction
+    D%position = position
+
+  end function
+  
+  
+ 
   
 
   subroutine TFrameDomain_SetRest(D, num_of_scalars)
@@ -258,65 +293,32 @@ contains
   end subroutine TFrameDomain_SetRest
   
   
-  
-  
-  
-  
-  
-  
-  subroutine SaveVTKFrames(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
-    real(knd),intent(in) :: time
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    real(knd),contiguous,intent(in) :: Pr(-1:,-1:,-1:), &
-                                       Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
-                                       Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
-    integer :: i
+  elemental logical function TFrameDomain_InDomain(D) result(res)
+    class(TFrameDomain), intent(in) :: D
     
-    if (allocated(FrameDomains)) then
-      do i=1,size(FrameDomains)
-        call FrameDomains(i)%Save(time, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
-      end do
+    if (D%dimension==3) then
+      res = .true.
+    else if (D%dimension==2) then
+      if (D%direction==1) then
+        res = (D%position>=xU(0) .and. &
+               (D%position<xU(Prnx) .or. &
+                (D%position==xU(Prnx).and.Btype(Ea)/=BC_MPI_BOUNDARY)))
+      else if (D%direction==2) then   
+        res = (D%position>=yV(0) .and. &
+               (D%position<yV(Prny) .or. &
+                (D%position==yV(Prny).and.Btype(No)/=BC_MPI_BOUNDARY)))
+      else if (D%direction==3) then   
+        res = (D%position>=zW(0) .and. &
+               (D%position<zW(Prnz) .or. &
+                (D%position==zW(Prnz).and.Btype(To)/=BC_MPI_BOUNDARY)))
+      else
+        res = .false.
+      end if
+    else
+      res = .false.
     end if
-  end subroutine
-
-  subroutine FinalizeVTKFrames
-    integer :: i
-    if (allocated(FrameDomains)) then
-      do i=1,size(FrameDomains)
-        call FrameDomains(i)%Finalize
-      end do
-      deallocate(FrameDomains)
-    end if
-  end subroutine  
-  
-  
-  
-  
-  
-  
-  
-  function TFrameDomain_Init(label,dimension,direction,position,time_params,frame_flags) result(D)
-    type(TFrameDomain) :: D
-    character(*) :: label
-    integer,intent(in) :: dimension,direction
-    real(knd),intent(in) :: position
-    type(TFrameTimes),intent(in) :: time_params
-    type(TFrameFlags),intent(in) :: frame_flags
-
-    D%base_name = trim(output_dir)//"frame-"//label
-
-    D%frame_times = time_params
-
-    D%flags = frame_flags
-
-    D%unit = frame_unit
-    frame_unit = frame_unit + 1
-
-    D%dimension = dimension
-    D%direction = direction
-    D%position = position
-
   end function
+  
   
   
   
@@ -525,7 +527,6 @@ contains
   end subroutine TFrameDomain_Fill
   
   
-  
   recursive subroutine SaveBuffers(Dptr) bind(C)
     use iso_c_binding, only: c_f_pointer
     type(c_ptr),value :: Dptr
@@ -542,8 +543,6 @@ contains
     call c_f_pointer(Dptr, D)
 
     write(file_name,'(a,i0,a)') trim(D%base_name)//"-",D%frame_number,trim(D%suffix)
-
-!     write(*,*) "Saving VTK frame:",file_name,"   time:",time
 
     if (littleendian) then
       if (allocated(D%Pr))            D%Pr = SwapB(D%Pr)
@@ -612,7 +611,7 @@ contains
        write(D%unit) "LOOKUP_TABLE default", lf
        write(D%unit) D%Scalar(:,:,:,sc), lf
       end do
-    elseif (D%flags%sumscalars==1.and.num_of_scalars==1) then
+    elseif (D%flags%sumscalars==1.and.num_of_scalars>0) then
       write(D%unit) "SCALARS ", "scalar" , " float", lf
       write(D%unit) "LOOKUP_TABLE default", lf
       write(D%unit) D%Scalar(:,:,:,1), lf
@@ -678,7 +677,7 @@ contains
 
   end subroutine SaveBuffers
   
-
+  
   subroutine TFrameDomain_DoSave(D)
     use iso_c_binding, only: c_loc, c_funloc
     use stop_procedures, only: error_stop
@@ -704,7 +703,7 @@ contains
         type is (TFrameDomain)
           call SaveBuffers(c_loc(Dnp))
         class default
-          call error_stop("Error: wrog type of D in TFrameDomain_DoSave.")
+          call error_stop("Error: wrong type of D in TFrameDomain_DoSave.")
       end select
 !     end if
 
@@ -721,5 +720,6 @@ contains
 
   end subroutine
 
-    
+  
+  
 end module VTKFrames

@@ -6,7 +6,7 @@ module Subgrid
   implicit none
 
   private
-  public :: sgstype, SubgridModel
+  public :: sgstype, SubgridModel, TKEDissipation
 
   real(knd),parameter :: CSmag = 0.122_knd
 
@@ -18,16 +18,16 @@ module Subgrid
   contains
 
     subroutine SGS_Smag(U,V,W,filter_ratio)  !Standard Smagorinsky model with implicit filtering
-     use ArrayUtilities,only: add
-     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-     real(knd),intent(in) :: filter_ratio
+     use ArrayUtilities, only: add
+     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
+     real(knd), intent(in) :: filter_ratio
      integer :: i,j,k
 
       !$omp parallel do private(i,j,k)
-      do k = 1,Prnz
-       do j = 1,Prny
-        do i = 1,Prnx
-          Viscosity(i,j,k) = NuSmag(i,j,k,U,V,W,filter_ratio)
+      do k = 1, Prnz
+       do j = 1, Prny
+        do i = 1, Prnx
+          Viscosity(i,j,k) = NuSmag(i, j, k, U, V, W, filter_ratio)
         end do
        end do
       end do
@@ -41,15 +41,15 @@ module Subgrid
 
 
 
-    real(knd) function NuSmag(i,j,k,U,V,W,filter_ratio)    !subgrid viscosity for Smagorinsky with implicit filtering
-      integer,intent(in) :: i,j,k
-      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-      real(knd),intent(in) :: filter_ratio
+    real(knd) function NuSmag(i, j, k, U, V, W, filter_ratio)    !subgrid viscosity for Smagorinsky with implicit filtering
+      integer, intent(in) :: i, j, k
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(in) :: filter_ratio
       real(knd) :: S(1:3,1:3)
       real(knd) :: width,Sbar
 
       width = filter_ratio * (dxPr(i)*dyPr(j)*dzPr(k))**(1._knd/3._knd)
-      call StrainIJ(i,j,k,U,V,W,S)
+      call StrainIJ(i, j, k, U, V, W, S)
       Sbar = Strainu(S)
       NuSmag = Sbar*(width*CSmag)**2
     endfunction NuSmag
@@ -59,21 +59,21 @@ module Subgrid
 
 
     subroutine SGS_StabSmag(U,V,W,Temperature,filter_ratio)  !Smagorinsky with a stability correction Brown et al. (1994)
-      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-      real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
-      real(knd),intent(in) :: filter_ratio
-      real(knd) :: Ri,l,l0
-      real(knd) :: width,Sbar
-      real(knd),parameter :: CS = 0.17_knd
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature
+      real(knd), intent(in) :: filter_ratio
+      real(knd) :: Ri, l, l0
+      real(knd) :: width, Sbar
+      real(knd), parameter :: CS = 0.17_knd
       real(knd) :: S(1:3,1:3)
       integer :: i,j,k
 
-      do k = 1,Prnz
-       do j = 1,Prny
-        do i = 1,Prnx
+      do k = 1, Prnz
+       do j = 1, Prny
+        do i = 1 , Prnx
           width = filter_ratio * (dxPr(i)*dyPr(j)*dzPr(k))**(1._knd/3._knd)
 
-          call StrainIJ(i,j,k,U,V,W,S)
+          call StrainIJ(i, j, k, U, V, W, S)
           Sbar = Strainu(S)
 
           Ri = Rig(i,j,k,U,V,temperature)
@@ -95,8 +95,8 @@ module Subgrid
 
 
     pure real(knd) function Fm(Ri)       !Adjustment function for stability
-      real(knd),intent(in) :: Ri           !Pointwise Richarson number
-      real(knd),parameter :: Ric = 0.25_knd
+      real(knd), intent(in) :: Ri           !Pointwise Richarson number
+      real(knd), parameter :: Ric = 0.25_knd
 
       if (Ri>=Ric) then
        Fm  =  0
@@ -108,8 +108,8 @@ module Subgrid
     end function Fm
 
     pure real(knd) function Fh(Ri)       !Adjustment function for stability
-      real(knd),intent(in) :: Ri           !Pointwise Richarson number
-      real(knd),parameter :: Ric = 0.25_knd
+      real(knd), intent(in) :: Ri           !Pointwise Richarson number
+      real(knd), parameter :: Ric = 0.25_knd
 
       if (Ri>=Ric) then
        Fh  =  0
@@ -120,8 +120,8 @@ module Subgrid
       end if
     end function Fh
 
-    pure real(knd) function WallDamp(l0,z0,z) !Wall damping for Smagorinsky model
-      real(knd),intent(in) :: l0,z0,z
+    pure real(knd) function WallDamp(l0, z0, z) !Wall damping for Smagorinsky model
+      real(knd), intent(in) :: l0, z0, z
 
       WallDamp= 1._knd / (&
                     1._knd/l0**2  +  1._knd/(0.4_knd*(z+z0))**2 &
@@ -129,11 +129,11 @@ module Subgrid
     end function WallDamp
 
 
-    pure real(knd) function Rig(i,j,k,U,V,temperature)
-      integer,intent(in) :: i,j,k
-      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V
-      real(knd),dimension(-1:,-1:,-1:),intent(in) :: temperature
-      real(knd) :: num,denom
+    pure real(knd) function Rig(i, j, k, U, V, temperature)
+      integer, intent(in) :: i, j, k
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V
+      real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: temperature
+      real(knd) :: num, denom
 
       num = (grav_acc/temperature_ref) * &
             (temperature(i,j,k+1)-temperature(i,j,k-1)) / (zPr(k+1)-zPr(k-1))
@@ -156,13 +156,13 @@ module Subgrid
 
 
     pure real(knd) function Strainu(S)      !Magnitude of the strain rate tensor.
-      real(knd),intent(in) :: S(1:3,1:3)
+      real(knd), intent(in) :: S(1:3,1:3)
       integer ::ii,jj
 
       Strainu = 0
-      do jj = 1,3
-       do ii = 1,3
-        Strainu = Strainu+S(ii,jj)*S(ii,jj)
+      do jj = 1, 3
+       do ii = 1, 3
+        Strainu = Strainu + S(ii,jj)*S(ii,jj)
        end do
       end do
       Strainu = SQRT(2._knd*Strainu)
@@ -170,10 +170,10 @@ module Subgrid
 
 
 
-    pure subroutine StrainIJ(i,j,k,U,V,W,S)     !Computes components of the strain rate tensor.
-      real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-      real(knd),intent(out) :: S(1:3,1:3)
-      integer,intent(in) :: i,j,k
+    pure subroutine StrainIJ(i, j, k, U, V, W, S)     !Computes components of the strain rate tensor.
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
+      real(knd), intent(out) :: S(1:3,1:3)
+      integer, intent(in) :: i,j,k
       real(knd) :: D(1:3,1:3)
       integer ::ii,jj
 
@@ -195,20 +195,41 @@ module Subgrid
       if (j>-1.and.k>-1.and.j<Wny+3.and.k<Wnz+4)&
          D(3,2) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(2._knd*(yPr(j+1)-yPr(j-1)))
 
-      do jj = 1,3
-       do ii = 1,3
+      do jj = 1, 3
+       do ii = 1, 3
         S(ii,jj) = (D(ii,jj)+D(jj,ii))
        end do
       end do
       S = S/2._knd
     endsubroutine StrainIJ
+    
+    
+    
+    pure function TKEDissipation(i, j, k, U, V, W) result(res)
+      !includes resolved and subgrid
+      ! epsilon =  2*nu*Sij*Sij where Sij = (di_uj + dj_ui)/2
+      real(knd) :: res
+      integer, intent(in) :: i,j,k
+      real(knd), dimension(-2:,-2:,-2:), intent(in) :: U,V,W
+      real(knd) :: S(1:3,1:3)
+      integer :: ii, jj
+      
+      call StrainIJ(i, j, k, U, V, W, S)
+      res = 0
+      do jj = 1, 3
+        do ii = 1, 3
+          res = res + S(ii,jj)*S(ii,jj)
+        end do
+      end do
+      res = 2 * Viscosity(i,j,k) * res
+    end function
 
 
 
 
     subroutine SGS_Vreman(U,V,W,filter_ratio)   !Vreman subgrid model (Physics of Fluids, 2004)
       use Tiling, only: tilenx, tileny, tilenz
-      real(knd), dimension(-2:,-2:,-2:), intent(in) :: U, V, W
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
       real(knd) :: aa, bb
       real(knd), dimension(1:3,1:3) :: a, b
@@ -235,9 +256,9 @@ module Subgrid
       do bk = 1, Prnz, tnz
        do bj = 1, Prny, tny
         do bi = 1, Prnx, tnx
-         do k = bk, min(bk+tnz-1,Prnz)
-          do j = bj, min(bj+tny-1,Prny)
-           do i = bi, min(bi+tnx-1,Prnx)
+         do k = bk, min(bk+tnz-1, Prnz)
+          do j = bj, min(bj+tny-1, Prny)
+           do i = bi, min(bi+tnx-1, Prnx)
              a(1,1) = (U(i,j,k)-U(i-1,j,k))/dxmin
              a(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(4._knd*dymin)
              a(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(4._knd*dzmin)
@@ -288,13 +309,13 @@ module Subgrid
 
 
 
-    subroutine SGS_Sigma(U,V,W,filter_ratio)
+    subroutine SGS_Sigma(U, V, W, filter_ratio)
       !from Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
       use Tiling, only: tilenx, tileny, tilenz
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
       real(knd), parameter :: Csig = 1.04_knd
-      integer   :: i,j,k,bi,bj,bk
+      integer   :: i, j, k, bi, bj, bk
       real(knd) :: width, C, D, g(3,3), s1, s2, s3
       integer, parameter :: sigma_knd = knd
       integer :: tnx, tny, tnz
@@ -312,11 +333,11 @@ module Subgrid
       do bk = 1, Prnz, tnz
        do bj = 1, Prny, tny
         do bi = 1, Prnx, tnx
-         do k = bk, min(bk+tnz-1,Prnz)
-          do j = bj, min(bj+tny-1,Prny)
-           do i = bi ,min(bi+tnx-1,Prnx)
+         do k = bk, min(bk+tnz-1, Prnz)
+          do j = bj, min(bj+tny-1, Prny)
+           do i = bi, min(bi+tnx-1, Prnx)
 
-            call GradientTensorUG(g,i,j,k)
+            call GradientTensorUG(g, i, j, k)
 
             call Sigmas(s1,s2,s3,g)
 
@@ -336,9 +357,9 @@ module Subgrid
 
     contains
 
-      pure subroutine GradientTensorUG(g,i,j,k)
-        real(knd),intent(out) :: g(3,3)
-        integer,intent(in) :: i,j,k
+      pure subroutine GradientTensorUG(g ,i, j, k)
+        real(knd), intent(out) :: g(3,3)
+        integer, intent(in) :: i, j, k
 
         g(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
         g(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) / (4._knd*dymin)
@@ -359,8 +380,8 @@ module Subgrid
         !via Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
         use ieee_arithmetic
 
-        real(knd),intent(out) :: s1,s2,s3
-        real(knd),intent(in)  :: grads(3,3)
+        real(knd), intent(out) :: s1, s2, s3
+        real(knd), intent(in)  :: grads(3,3)
 
         real(sigma_knd) :: trG2, i1, i2, i3, a1, a2, a3, c, G(3,3)
 
@@ -409,7 +430,7 @@ module Subgrid
 
 
       pure function det3x3(A) result (res)
-        real(sigma_knd),intent(in) :: A(3,3)
+        real(sigma_knd), intent(in) :: A(3,3)
         real(sigma_knd) :: res
 
         res =   A(1,1) * A(2,2) * A(3,3)  &
@@ -431,11 +452,11 @@ module Subgrid
       use custom_par
 #endif
       use Tiling, only: tilenx, tileny, tilenz
-      use Outputs, only: enable_profiles, current_profiles
+      use VerticalProfiles, only: enable_profiles, current_profiles
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
       real(knd), parameter :: Csig = 1.04_knd
-      integer   :: i,j,k,bi,bj,bk
+      integer   :: i, j, k, bi, bj, bk
       real(knd) :: width, C, Pr_sgs, D, g(3,3), s1, s2, s3
       integer, parameter :: sigma_knd = knd
 
@@ -470,7 +491,7 @@ module Subgrid
       do bk = 1, Prnz, tnz
        do bj = 1, Prny, tny
         do bi = 1, Prnx, tnx
-         do k = bk, min(bk+tnz-1,Prnz)
+         do k = bk, min(bk+tnz-1, Prnz)
          
           if (enable_stability_correction) then
             call stability_correction_L_MO(k, width, C, Pr_sgs)
@@ -479,10 +500,10 @@ module Subgrid
             C = (Csig*width)**2
           end if
             
-          do j = bj, min(bj+tny-1,Prny)
-           do i = bi ,min(bi+tnx-1,Prnx)
+          do j = bj, min(bj+tny-1, Prny)
+           do i = bi, min(bi+tnx-1, Prnx)
 
-            call GradientTensorUG(g,i,j,k)
+            call GradientTensorUG(g, i, j, k)
 
             call Sigmas(s1,s2,s3,g)
 
@@ -505,9 +526,9 @@ module Subgrid
 
     contains
 
-      pure subroutine GradientTensorUG(g,i,j,k)
-        real(knd),intent(out) :: g(3,3)
-        integer,intent(in) :: i,j,k
+      pure subroutine GradientTensorUG(g, i, j, k)
+        real(knd), intent(out) :: g(3,3)
+        integer, intent(in) :: i, j, k
 
         g(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
         g(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) / (4._knd*dymin)
@@ -523,13 +544,13 @@ module Subgrid
       end subroutine GradientTensorUG
 
 
-      pure subroutine Sigmas(s1,s2,s3,grads)
+      pure subroutine Sigmas(s1, s2, s3, grads)
         !from Hasan, Basser, Parker, Alexander, http://dx.doi.org/10.1006/jmre.2001.2400
         !via Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
         use ieee_arithmetic
 
-        real(knd),intent(out) :: s1,s2,s3
-        real(knd),intent(in)  :: grads(3,3)
+        real(knd), intent(out) :: s1, s2, s3
+        real(knd), intent(in)  :: grads(3,3)
 
         real(sigma_knd) :: trG2, i1, i2, i3, a1, a2, a3, c, G(3,3)
 
@@ -569,7 +590,7 @@ module Subgrid
 
 
       pure function det3x3(A) result (res)
-        real(sigma_knd),intent(in) :: A(3,3)
+        real(sigma_knd), intent(in) :: A(3,3)
         real(sigma_knd) :: res
 
         res =   A(1,1) * A(2,2) * A(3,3)  &
@@ -611,15 +632,15 @@ module Subgrid
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       
       if (sgstype==SmagorinskyModel) then
-                        call SGS_Smag(U,V,W,filter_ratios(filtertype))
+                        call SGS_Smag(U, V, W, filter_ratios(filtertype))
       else if (sgstype==SigmaModel) then
-                        call SGS_Sigma(U,V,W,filter_ratios(filtertype))
+                        call SGS_Sigma(U, V, W, filter_ratios(filtertype))
       else if (sgstype==VremanModel) then
-                        call SGS_Vreman(U,V,W,filter_ratios(filtertype))
+                        call SGS_Vreman(U, V, W, filter_ratios(filtertype))
       else if (sgstype==StabSubgridModel) then
-                        call SGS_Sigma_stability(U,V,W,filter_ratios(filtertype))
+                        call SGS_Sigma_stability(U, V, W, filter_ratios(filtertype))
       else if (sgstype==MixedTimeScaleModel) then
-                        call SGS_MixedTimeScale(U,V,W)
+                        call SGS_MixedTimeScale(U, V, W)
       else
 
         Viscosity = molecular_viscosity

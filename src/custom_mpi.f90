@@ -25,6 +25,11 @@ module custom_par
   implicit none
 
   private :: MPI_knd, MPI_real32, MPI_real64, MPI_IN_PLACE_real32, MPI_IN_PLACE_real64  
+  
+  integer, parameter :: PAR_COMM_NULL = MPI_COMM_NULL
+  integer, parameter :: PAR_DATATYPE_NULL = MPI_DATATYPE_NULL
+  integer, parameter :: PAR_KND = MPI_KND
+  integer, protected :: PAR_TRIPLET = MPI_DATATYPE_NULL
 
   logical :: enable_multiple_domains = .false.
   
@@ -149,6 +154,9 @@ module custom_par
   
   integer :: comm_plane_yz = MPI_COMM_NULL, comm_plane_xz = MPI_COMM_NULL, comm_plane_xy = MPI_COMM_NULL
   integer :: comm_row_x = MPI_COMM_NULL, comm_row_y = MPI_COMM_NULL, comm_row_z = MPI_COMM_NULL
+  integer :: my_plane_yz_im, my_plane_xz_im, my_plane_xy_im, my_row_x_im, my_row_y_im, my_row_z_im
+  
+  
   integer :: cart_comm_dim = -1
   integer, allocatable :: images_grid(:,:,:), ranks_grid(:,:,:)
   
@@ -387,11 +395,22 @@ contains
     call MPI_Comm_size(world_comm, world_comm_size, ie)
     if (ie/=0) call error_stop("Error calling MPI_Comm_size")
     
+    my_world_im = par_this_image(world_comm)
+    my_world_rank = my_world_im - 1
     
+    call MPI_Type_contiguous(3, MPI_KND, PAR_TRIPLET, ie)
+    if (ie/=0) call error_stop("Error in MPI_Type_contiguous")
+    call MPI_Type_commit(PAR_TRIPLET, ie)
+    if (ie/=0) call error_stop("Error in MPI_Type_commit")
+
   contains
 
     type(c_ptr) function my_loc(t)
       integer, intent(in), target :: t
+      
+      !This is not standard conforming.
+      !We assume the address here is the same as the address
+      ! that MPI_IN_PLACE uses when passed as an argument.
       my_loc = c_loc(t)
     end function
       
@@ -825,13 +844,6 @@ contains
     myrank = myim - 1
 
     master = (myim == master_im)
-
-    my_world_im = par_this_image(world_comm)
-
-    my_world_rank = my_world_im - 1
-    
-
-!     npxyz = [npx, npy, npz]
     
     if (any(npxyz<1)) then
       npxyz(1) = 1
@@ -1022,6 +1034,14 @@ contains
   
     call MPI_Cart_sub(cart_comm, [.true., .false., .false.], comm_row_z, ie)
     if (ie/=0) call error_stop("Error creating comm_plane_x.")
+    
+    my_plane_yz_im = par_this_image(comm_plane_yz)
+    my_plane_xz_im = par_this_image(comm_plane_xz)
+    my_plane_xy_im = par_this_image(comm_plane_xy)
+
+    my_row_x_im = par_this_image(comm_row_x)
+    my_row_y_im = par_this_image(comm_row_y)
+    my_row_z_im = par_this_image(comm_row_z)
 
   end subroutine
   
