@@ -77,12 +77,16 @@ contains
     if (allocated(Ap)) deallocate(Ap)
   end subroutine
 
-  subroutine ScalarRK3(U, V, W, Temperature, Moisture, Scalar, RK_stage, dt, &
-                temperature_flux_profile, moisture_flux_profile)
+  subroutine ScalarRK3(U, V, W, Pr, &
+                       Temperature, Moisture, Scalar, &
+                       RK_stage, dt, &
+                       temperature_flux_profile, moisture_flux_profile)
     use RK3
     use VolumeSources, only: ScalarVolumeSources
     use Puffs, only: DoPuffs, PreparePuffs
+    use WaterThermodynamics, only: compute_liquid_water_content
     real(knd), contiguous, intent(in)    :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)    :: Pr(-1:,-1:,-1:)
     real(knd), contiguous, intent(inout) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:)
     real(knd), contiguous, intent(inout) :: Scalar(-1:,-1:,-1:,1:)
     real(knd), intent(in)                :: dt
@@ -143,6 +147,10 @@ contains
       
       where (Prtype(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)>0) Moisture = moisture_ref
       
+    end if
+    
+    if (enable_liquid) then
+      call compute_liquid_water_content(Temperature, Moisture, Pr)
     end if
 
     call PreparePuffs(Scalar, RK_stage, RK_stages, time_stepping%time, time_stepping%dt)
@@ -1904,6 +1912,7 @@ contains
 
   subroutine InitHydrostaticPressure(Pr, Temperature, Moisture)
     use Pressure
+    use PhysicalProperties
     real(knd), contiguous, intent(out) :: Pr(-1:,-1:,-1:)
     real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:)
     real(knd) :: t_virt, t_virt_prev, p
@@ -1914,26 +1923,36 @@ contains
       procedure :: theta_v_Tq
     end interface
 
-
+    ! in Pascals
+    ! the pressure at the ground is used in configurations
     p = pressure_solution%bottom_pressure
 
     do k = 1, Prnz
-     t_virt = sum(TempIn(1:Prny,k))/Prny
+      t_virt = sum(TempIn(1:Prny,k))/Prny
 
-     if (enable_moisture) t_virt = theta_v(t_virt, sum(MoistIn(1:Prny,k))/Prny)
+      if (enable_moisture) t_virt = theta_v(t_virt, sum(MoistIn(1:Prny,k))/Prny)
 
-     p = p + grav_acc*dzPr(k) * &
-                  ( t_virt - temperature_ref ) &
-                  / temperature_ref
-
+      p = p + rho_air_ref * grav_acc*dzPr(k) * &
+                      ( t_virt ) &       ! not t_virt - temperature_ref, we need the hydrostatic pressure of the air
+                      / temperature_ref
     end do
+    !this will be used as a fixed reference in the simulation
     pressure_solution%top_pressure = p
+    
+    ! reference_pressure_z(k) does not contain any thermal stratification.
+    ! Its effect is explicitly simulated and contained in the Pr(i,j,k) field.
+    allocate(reference_pressure_z(1:Prnz))
+    reference_pressure_z(Prnz) = - rho_air_ref * (zW(Prnz+1)-zPr(Prnz))
+    do k = Prnz-1, 1, -1
+      reference_pressure_z(k) = reference_pressure_z(k+1) - rho_air_ref * grav_acc*dzW(k)
+    end do
+      
 
-
+    ! Pr(i,j,k) is the physical pressure in Pascals divided by rho_air_ref
     do j = 1, Vny+1
       do i = 1, Unx+1
         t_virt_prev = theta_v(i,j,Prnz)
-        Pr(i,j,Prnz) = pressure_solution%top_pressure - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
+        Pr(i,j,Prnz) = - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
                 ( t_virt_prev - temperature_ref ) &
                 / temperature_ref
         do k = Prnz-1, 1, -1

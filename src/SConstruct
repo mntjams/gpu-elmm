@@ -154,7 +154,7 @@ else:
     check_flag = '  -fbacktrace -g'
   else:
     fast_flag = ' -O5 -ffast-math -fno-protect-parens'
-    c_check_flag = '  -fbacktrace -g -Wall -Wno-unused -Wno-maybe-uninitialized'
+    c_check_flag = '  -fbacktrace -g -Wall -Wno-unused -Wno-maybe-uninitialized -Wno-uninitialized'
     check_flag = c_check_flag + ' -fbacktrace -Waliasing -Wsurprising -Wno-unused-dummy-argument -Wno-aliasing  -fcheck=all  -Werror'
     if mpi!='yes':
       check_flag += ' -Wimplicit-interface'
@@ -412,6 +412,7 @@ objs += env.Object(target = target_dir + 'pressure',           source = 'pressur
 objs += env.Object(target = target_dir + 'initial',            source = 'initial.f90')
 objs += env.Object(target = target_dir + 'advection',          source = 'advection.f90')
 objs += env.Object(target = target_dir + 'sponge',             source = 'sponge.f90')
+objs += env.Object(target = target_dir + 'water_thermodynamics',           source = 'water_thermodynamics.f90')
 objs += env.Object(target = target_dir + 'dynamics',           source = 'dynamics.f90')
 Depends(objs[-1], 'wmfluxes-inc.f90')
 Depends(objs[-1], 'wmfluxes-nobranch-U-inc.f90')

@@ -524,7 +524,7 @@ contains
     do k = 1, Prnz
       do j = 1, Prny
         do i = 1, Prnx
-          Pr(i,j,k) = Pr(i,j,k) - (Phi_ref - pressure_solution%top_pressure)
+          Pr(i,j,k) = Pr(i,j,k) - (Phi_ref)
         end do
       end do
     end do

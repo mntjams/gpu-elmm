@@ -224,7 +224,7 @@ contains
 
 
   subroutine AllocateGlobals
-
+    use WaterThermodynamics
     allocate(U(-2:Unx+3,-2:Uny+3,-2:Unz+3))
     allocate(V(-2:Vnx+3,-2:Vny+3,-2:Vnz+3))
     allocate(W(-2:Wnx+3,-2:Wny+3,-2:Wnz+3))
@@ -245,10 +245,18 @@ contains
 
     if (enable_moisture) then
       allocate(Moisture(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-      Moisture = 0
+      Moisture = 0      
     else
       allocate(Moisture(0,0,0))
     endif
+    
+    if (enable_liquid) then
+      allocate(LiquidWater(1:Prnx,1:Prny,1:Prnz))
+      Moisture = 0      
+    else
+      allocate(LiquidWater(0,0,0))
+    endif
+
 
     if (num_of_scalars>0) then
       allocate(Scalar(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))

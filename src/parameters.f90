@@ -169,7 +169,7 @@ module Parameters
 
   logical :: enable_buoyancy = .false. !1 if enabled, zero otherwise
   logical :: enable_moisture = .false.
-  logical :: enable_liquid   = .false. !enable condensation of water vapor
+  logical :: enable_liquid   = .true. !enable condensation of water vapor
   integer :: num_of_scalars  = 0
 
   logical :: enable_radiation = .false.
@@ -183,6 +183,8 @@ module Parameters
   real(knd), allocatable :: Uin(:,:), Vin(:,:), Win(:,:), Uoutb(:,:)
 
   real(knd), allocatable :: TempIn(:,:), MoistIn(:,:)
+  
+  real(knd), allocatable :: reference_pressure_z(:)
 
 
 
@@ -277,6 +279,8 @@ module PhysicalProperties
   real(knd), parameter :: Cp_air_ref = 1005 !J.kg^-1.K^-1
 
   real(knd), parameter :: Cv_air_ref = 718 !J.kg^-1.K^-1
+
+  real(knd), parameter :: Rd_air_ref = Cp_air_ref - Cv_air_ref !J.kg^-1.K^-1
 
   real(knd), parameter :: Lv_water_ref = 2442000 !J.kg^-1
 
