@@ -1932,9 +1932,11 @@ contains
 
       if (enable_moisture) t_virt = theta_v(t_virt, sum(MoistIn(1:Prny,k))/Prny)
 
-      p = p + rho_air_ref * grav_acc*dzPr(k) * &
-                      ( t_virt ) &       ! not t_virt - temperature_ref, we need the hydrostatic pressure of the air
-                      / temperature_ref
+      p = p - rho_air_ref * grav_acc*dzPr(k) * &
+              (1 - &
+                      ( temperature_ref - t_virt ) &
+                      / temperature_ref &
+              )
     end do
     !this will be used as a fixed reference in the simulation
     pressure_solution%top_pressure = p
@@ -1942,11 +1944,11 @@ contains
     ! reference_pressure_z(k) does not contain any thermal stratification.
     ! Its effect is explicitly simulated and contained in the Pr(i,j,k) field.
     allocate(reference_pressure_z(1:Prnz))
-    reference_pressure_z(Prnz) = - rho_air_ref * (zW(Prnz+1)-zPr(Prnz))
+    reference_pressure_z(Prnz) = pressure_solution%top_pressure - rho_air_ref * (zW(Prnz+1)-zPr(Prnz))
     do k = Prnz-1, 1, -1
-      reference_pressure_z(k) = reference_pressure_z(k+1) - rho_air_ref * grav_acc*dzW(k)
+      reference_pressure_z(k) = reference_pressure_z(k+1) + rho_air_ref * grav_acc*dzW(k)
     end do
-      
+print *,"reference pressure:", reference_pressure_z
 
     ! Pr(i,j,k) is the physical pressure in Pascals divided by rho_air_ref
     do j = 1, Vny+1
