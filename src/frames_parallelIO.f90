@@ -427,12 +427,14 @@ contains
       call MPI_Barrier(D%comm, ie)
       
       if (master) call MPI_File_delete(file_name,MPI_INFO_NULL, ie)
-      if (ie/=0) call error_stop("file delete", ie)
+      if (ie/=0) call error_stop("Error calling MPI_file_delete."//"file_name: '" &
+                                 //file_name//"' Error code:", ie)
       
       call MPI_Barrier(D%comm, ie)
       
       call MPI_File_open(D%comm,file_name, IOR(MPI_MODE_CREATE, MPI_MODE_WRONLY), MPI_INFO_NULL, D%unit, ie)
-      if (ie/=0) call error_stop("file open after delete", ie)
+      if (ie/=0) call error_stop("Error calling MPI_file_open, second try after delete."//"file_name: '" &
+                                 //file_name//"' Error code:" , ie)
     end if
     
 #if NONBLOCKING_MPI_IO    
