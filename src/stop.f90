@@ -34,7 +34,7 @@ contains
   subroutine error_stop_int(n)
     integer,intent(in) :: n
 
-    write(error_unit,'(*(g0))') "CLMM Abort: ", n
+    write(error_unit,'(*(g0))') "ELMM Abort: ", n
     
 #ifdef MPI
     call abort_mpi(n)
@@ -46,7 +46,7 @@ contains
   subroutine error_stop_char(ch)
     character(*),intent(in) :: ch
 
-    write(error_unit,'(*(g0))') "CLMM Abort: ", ch
+    write(error_unit,'(*(g0))') "ELMM Abort: ", ch
 
 #ifdef MPI
     call abort_mpi(1)
@@ -59,7 +59,7 @@ contains
     character(*),intent(in) :: ch
     integer,intent(in) :: n
     
-    write(error_unit,'(2g0,1x,g0)') "CLMM Abort: ", ch, n
+    write(error_unit,'(2g0,1x,g0)') "ELMM Abort: ", ch, n
 
 #ifdef MPI
     call abort_mpi(n)
