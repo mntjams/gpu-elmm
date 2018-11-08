@@ -3744,11 +3744,11 @@ fields_do:  do j = 1, size(obj_fields)
 
   subroutine SetNullifiedPoints
     integer :: i,j,k,n
-
+    
     !$omp parallel do reduction(+:nUnull)
     do k = 1, Unz
      do j = 1, Uny
-      do i = 1, Unx
+      do i = 1, Unx        
        if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
            .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
            .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  nUnull = nUnull+1
@@ -3767,7 +3767,7 @@ fields_do:  do j = 1, size(obj_fields)
        if (Utype(i,j,k)>0.and.Utype(i,j,k+1)>0.and.Utype(i,j,k-1)>0&
            .and.Utype(i,j-1,k)>0.and.Utype(i,j+1,k)>0&
            .and.Utype(i-1,j,k)>0.and.Utype(i+1,j,k)>0)  then
-            !$omp atomic
+
             n = n+1
             Unull(:,n) = [ i,j,k ]
 
