@@ -700,8 +700,59 @@ contains
     IBP%xi = xi
     IBP%yj = yj
     IBP%zk = zk
+    
 !HACK: last resort when encountering instabilities near boundaries
 ! call null_point; return
+
+    !HACK need to make sure we are not interpolating from the boundary buffer at least in
+    !some problematic cases which have to be researched and tested.
+    block
+      integer :: nx, ny, nz
+
+      select case (component)
+        case (1)
+          nx = Unx
+          ny = Uny
+          nz = Unz
+        case (2)
+          nx = Vnx
+          ny = Vny
+          nz = Vnz
+        case default
+          nx = Wnx
+          ny = Wny
+          nz = Wnz
+      end select
+      
+      if (Btype(We)>=BC_DOMAIN_BOUNDS_MIN .and. &
+          Btype(We)<=BC_DOMAIN_BOUNDS_MAX .and. &
+          xi<=1) then
+        call null_point; return
+      else if (Btype(Ea)>=BC_DOMAIN_BOUNDS_MIN .and. &
+          Btype(Ea)<=BC_DOMAIN_BOUNDS_MAX .and. &
+          xi>=nx) then
+        call null_point; return
+      else if (Btype(So)>=BC_DOMAIN_BOUNDS_MIN .and. &
+          Btype(So)<=BC_DOMAIN_BOUNDS_MAX .and. &
+          yj<=1) then
+        call null_point; return
+      else if (Btype(No)>=BC_DOMAIN_BOUNDS_MIN .and. &
+          Btype(No)<=BC_DOMAIN_BOUNDS_MAX .and. &
+          yj<=ny) then
+        call null_point; return
+      else if (Btype(Bo)>=BC_DOMAIN_BOUNDS_MIN .and. &
+          Btype(Bo)<=BC_DOMAIN_BOUNDS_MAX .and. &
+          zk<=1) then
+        call null_point; return
+      else if (Btype(To)>=BC_DOMAIN_BOUNDS_MIN .and. &
+          Btype(To)<=BC_DOMAIN_BOUNDS_MAX .and. &
+          zk>=nz) then
+        call null_point; return
+      end if
+
+    end block
+
+
     if (.not. SB%Inside(x,y,z,0._knd)) then
       call null_point
       return
