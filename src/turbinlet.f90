@@ -472,11 +472,17 @@ contains
   subroutine turbulence_generator_init_mean_profiles(g)
     class(turbulence_generator), intent(inout) :: g
     real(knd) :: Ustar_prof, utmp
-    integer :: k
+    integer :: k, maxj, maxk
 
-    allocate(g%Uinavg(-2:Uny+3,-2:Unz+3), g%Vinavg(-2:Vny+3,-2:Vnz+3), g%Winavg(-2:Wny+3,-2:Wnz+3))
-    g%Vinavg = 0
-    g%Winavg = 0
+    if (g%direction==2) then
+      allocate(g%Uinavg(-2:Unx+3,-2:Unz+3), g%Vinavg(-2:Vnx+3,-2:Vnz+3), g%Winavg(-2:Wnx+3,-2:Wnz+3))
+      g%Vinavg = 0
+      g%Winavg = 0
+    else
+      allocate(g%Uinavg(-2:Uny+3,-2:Unz+3), g%Vinavg(-2:Vny+3,-2:Vnz+3), g%Winavg(-2:Wny+3,-2:Wnz+3))
+      g%Vinavg = 0
+      g%Winavg = 0
+    end if
 
     if  (profiletype==CONSTPROF) then
 
@@ -525,10 +531,13 @@ contains
     end if
 
     if (windangle/=0) then
-        g%Vinavg = g%Uinavg * sin(windangle / 180._knd * pi)
-        g%Uinavg = g%Uinavg * cos(windangle / 180._knd * pi)
+      maxj = min(ubound(g%Uinavg,1),ubound(g%Vinavg,1))
+      maxk = min(ubound(g%Uinavg,2),ubound(g%Vinavg,2))
+        g%Vinavg(-2:maxj,-2:maxk) = &
+           g%Uinavg(-2:maxj,-2:maxk) * sin(windangle / 180._knd * pi)
+        g%Uinavg(:,:) = g%Uinavg * cos(windangle / 180._knd * pi)
     end if
-    
+
     where(Utype(0,:,:) > 0) g%Uinavg = 0
     where(Vtype(0,:,:) > 0) g%Vinavg = 0
     where(Wtype(0,:,:) > 0) g%Winavg = 0
