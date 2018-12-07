@@ -30,7 +30,7 @@ module custom_par
   integer, parameter :: PAR_DATATYPE_NULL = MPI_DATATYPE_NULL
   integer, parameter :: PAR_KND = MPI_KND
   integer, protected :: PAR_TRIPLET = MPI_DATATYPE_NULL
-
+  
   logical :: enable_multiple_domains = .false.
   
   !TODO: put current domain properties into a derived type
@@ -174,6 +174,9 @@ module custom_par
     module procedure par_co_min_32
     module procedure par_co_min_64
     module procedure par_co_min_int
+    module procedure par_co_min_32_comm
+    module procedure par_co_min_64_comm
+    module procedure par_co_min_int_comm
   end interface
   
   interface par_co_max
@@ -831,11 +834,11 @@ contains
     integer :: pos
     character(80) :: str_dir
 
-    if (enable_multiple_domains) then
+!     if (enable_multiple_domains) then
       call par_init_domains
-    else
-      domain_comm = world_comm
-    end if
+!     else
+!       domain_comm = world_comm
+!     end if
 
     nims = par_num_images()
 
@@ -939,7 +942,7 @@ contains
     im_ymax = im_ymin + Prny * dymin
     im_zmax = im_zmin + Prnz * dzmin
 
-    if (enable_multiple_domains) call par_init_domain_grids
+    call par_init_domain_grids
    
     
     output_dir = output_dir // "im-" // itoa(iim) // &
@@ -1208,6 +1211,32 @@ contains
     integer :: ie
     
     res = par_co_reduce(x, MPI_MIN, domain_comm)
+  end function
+
+  function par_co_min_32_comm(x, comm) result(res)
+    real(real32) :: res
+    real(real32),intent(in) :: x
+    integer, intent(in) :: comm
+    
+    res = par_co_reduce(x, MPI_MIN, comm)
+  end function
+
+  function par_co_min_64_comm(x, comm) result(res)
+    real(real64) :: res
+    real(real64),intent(in) :: x
+    integer, intent(in) :: comm
+    integer :: ie
+    
+    res = par_co_reduce(x, MPI_MIN, comm)
+  end function
+
+  function par_co_min_int_comm(x, comm) result(res)
+    integer :: res
+    integer,intent(in) :: x
+    integer, intent(in) :: comm
+    integer :: ie
+    
+    res = par_co_reduce(x, MPI_MIN, comm)
   end function
 
   function par_co_max_32(x) result(res)
