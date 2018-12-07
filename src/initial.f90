@@ -57,7 +57,8 @@ contains
    use StaggeredFrames, only: rrange, TFrameTimes, TSaveFlags, &
                               TStaggeredFrameDomain,  AddDomain
    use PoisFFT, only: PoisFFT_NeumannStag, PoisFFT_Periodic
-   use Sponge, only: enable_out_sponge, enable_top_sponge, enable_top_sponge_scalar
+   use Sponge, only: enable_out_sponge_x, enable_out_sponge_y, &
+                     enable_top_sponge, enable_top_sponge_scalar
    integer ::  lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
    real(knd) :: mgepsinnerGS
    integer ::  i,io,io2,itmp
@@ -405,8 +406,9 @@ contains
    call get(profiletype)
    call get(ShearInletTypeParameter)
    if (master) write(*,*) "G=",ShearInletTypeParameter
-   call get(Uinlet)
-   if (master) write(*,*) "Uinlet=",Uinlet
+   call get(Uinlet_vec)
+   Uinlet = norm2(Uinlet_vec)
+   if (master) write(*,*) "Uinlet=",Uinlet_vec
    call get(default_turbulence_generator%Ustar_surf_inlet)  !-<u'w'>
    call get(default_turbulence_generator%stress_gradient_inlet) !in relative part per 1m
    call get(default_turbulence_generator%z0_inlet)
@@ -423,10 +425,18 @@ contains
    call get(default_turbulence_generator%L_y)
    call get(default_turbulence_generator%L_z)
    close(unit)
-
+   
    default_turbulence_generator%relative_stress(2,1) = default_turbulence_generator%relative_stress(1,2)
    default_turbulence_generator%relative_stress(3,1) = default_turbulence_generator%relative_stress(1,3)
    default_turbulence_generator%relative_stress(3,2) = default_turbulence_generator%relative_stress(2,3)
+   
+   if (Btype(We)==BC_TURBULENT_INLET .or. Btype(Ea)==BC_TURBULENT_INLET) then
+     default_turbulence_generator%direction = 1
+   else if (Btype(So)==BC_TURBULENT_INLET .or. Btype(No)==BC_TURBULENT_INLET) then
+     default_turbulence_generator%direction = 2
+   else
+     default_turbulence_generator%direction = 0
+   end if
 
    open(unit,file="scalars.conf",status="old",action="read",iostat = io)
    if (io==0) then
@@ -1027,7 +1037,7 @@ contains
 #endif
                        obstacles_file, probes_file, scalar_probes_file, scratch_dir, &
                        enable_fixed_flow_rate, &
-                       enable_out_sponge, enable_top_sponge, enable_top_sponge_scalar
+                       enable_out_sponge_x, enable_out_sponge_y, enable_top_sponge, enable_top_sponge_scalar
 
        if (len_trim(command_line)>0) then
          msg = ''
@@ -2726,25 +2736,25 @@ fields_do:  do j = 1, size(obj_fields)
           enable_moisture.or. &
           num_of_scalars>0)        TDiff = molecular_diffusivity
 
-       call BoundUVW(U, V, W)
-       call Bound_Pr(Pr)
+        call BoundUVW(U, V, W)
+        call Bound_Pr(Pr)
 
     else   !init conditions not from file
 
-       call par_sync_out("  ...computing initial conditions.")
+        call par_sync_out("  ...computing initial conditions.")
 
 #ifdef PAR
-       if (parent_domain>0.and.receive_initial_conditions_from_parent) then
-         receive_ic = .true.
-       else
+        if (parent_domain>0.and.receive_initial_conditions_from_parent) then
+          receive_ic = .true.
+        else
 #endif
 
 
 #ifdef CUSTOM_INITIAL_CONDITIONS
-         call CustomInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
+        call CustomInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
 #else
 
-         if (task_type==2) then
+        if (task_type==2) then
            U(1:Unx,1:Uny,1:Unz) = 0
            do k = 1, Unz
             do j = 1, Uny
@@ -2787,7 +2797,7 @@ fields_do:  do j = 1, size(obj_fields)
             end do
            end do
 
-         elseif (task_type==3) then
+        elseif (task_type==3) then
            U(1:Unx,1:Uny,1:Unz) = 0
            do k = 1, Unz
             do j = 1, Uny
@@ -2831,54 +2841,135 @@ fields_do:  do j = 1, size(obj_fields)
             end do
            end do
 
-         elseif (InletType==TurbulentInletType) then
+        else if (InletType==TurbulentInletType) then
 
-           call par_sync_out("  ...computing turbulent initial conditions.")
+            call par_sync_out("  ...computing turbulent initial conditions.")
 
-           dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Uny,1:Unz)),avg(Vin(1:Vny,1:Vnz)))
+            dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Uny,1:Unz)),avg(Vin(1:Vny,1:Vnz)))
 
-           do i = 1, Prnx
-             
-             call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
-             
-             !$omp parallel private(j,k)
-             !$omp do collapse(2)
-             do k = 1, Unz
-              do j = 1, Uny
-                if (Utype(i,j,k)<=0) then
-                   U(i,j,k) = Uin(j,k)
-                else
-                   U(i,j,k) = 0
-                end if
+            if (default_turbulence_generator%direction==2) then
+              if (jim==1.and.Btype(So)==BC_TURBULENT_INLET) then
+            
+                do j = 1, Prny
+                  
+                  call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+
+                  !$omp parallel private(i,k)
+                  !$omp do collapse(2)
+                  do k = 1, Unz
+                    do i = 1, Unx
+                      if (Utype(i,j,k)<=0) then
+                        U(i,j,k) = Uin(i,k)
+                      else
+                        U(i,j,k) = 0
+                      end if
+                    end do
+                  end do
+                  !$omp end do nowait
+                  !$omp do collapse(2)
+                  do k = 1, Vnz
+                    do i = 1, Vnx
+                      if (Vtype(i,j,k)<=0) then
+                        V(i,j,k) = Vin(i,k)
+                      else
+                        V(i,j,k) = 0
+                      end if
+                    end do
+                  end do
+                  !$omp end do nowait
+                  !$omp do collapse(2)
+                  do k = 1, Wnz
+                    do i = 1, Wnx
+                      if (Wtype(i,j,k)<=0) then
+                        W(i,j,k) = Win(i,k)
+                      else
+                        W(i,j,k) = 0
+                      end if
+                    end do
+                  end do
+                  !$omp end do
+                  !$omp end parallel             
+                end do
+                
+                block
+                  use custom_par
+                  integer :: ierr, im
+                  do im = 2, nyims
+                    do j = 1, domain_grids(domain_index)%nys(im)
+                      call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+                      
+                      call MPI_Send(Uin(1:Unx,1:Unz), Unx*Unz, PAR_KND, &
+                                    ranks_grid(iim,im,kim), 111, domain_comm, ierr)
+                      call MPI_Send(Vin(1:Vnx,1:Vnz), Vnx*Vnz, PAR_KND, &
+                                    ranks_grid(iim,im,kim), 112, domain_comm, ierr)
+                      call MPI_Send(Win(1:Wnx,1:Wnz), Wnx*Wnz, PAR_KND, &
+                                    ranks_grid(iim,im,kim), 113, domain_comm, ierr)
+                    end do
+                  end do
+                end block
+                
+              else
+              
+                block
+                  use custom_par
+                  integer :: ierr, stat
+                  do j = 1, Prny
+                    call MPI_Recv(U(1:Unx,j,1:Unz), Unx*Unz, PAR_KND, &
+                                  ranks_grid(iim,1,kim), 111, domain_comm, stat, ierr)
+                    call MPI_Recv(V(1:Vnx,j,1:Vnz), Vnx*Vnz, PAR_KND, &
+                                  ranks_grid(iim,1,kim), 112, domain_comm, stat, ierr)
+                    call MPI_Recv(W(1:Wnx,j,1:Wnz), Wnx*Wnz, PAR_KND, &
+                                  ranks_grid(iim,1,kim), 113, domain_comm, stat, ierr)
+                  end do
+                end block
+                
+              end if
+              
+            else
+            
+              do i = 1, Prnx
+                
+                call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+                
+                !$omp parallel private(j,k)
+                !$omp do collapse(2)
+                do k = 1, Unz
+                  do j = 1, Uny
+                    if (Utype(i,j,k)<=0) then
+                      U(i,j,k) = Uin(j,k)
+                    else
+                      U(i,j,k) = 0
+                    end if
+                  end do
+                end do
+                !$omp end do nowait
+                !$omp do collapse(2)
+                do k = 1, Vnz
+                  do j = 1, Vny
+                    if (Vtype(i,j,k)<=0) then
+                      V(i,j,k) = Vin(j,k)
+                    else
+                      V(i,j,k) = 0
+                    end if
+                  end do
+                end do
+                !$omp end do nowait
+                !$omp do collapse(2)
+                do k = 1, Wnz
+                  do j = 1, Wny
+                    if (Wtype(i,j,k)<=0) then
+                      W(i,j,k) = Win(j,k)
+                    else
+                      W(i,j,k) = 0
+                    end if
+                  end do
+                end do
+                !$omp end do
+                !$omp end parallel
               end do
-             end do
-             !$omp end do nowait
-             !$omp do collapse(2)
-             do k = 1, Vnz
-              do j = 1, Vny
-                if (Vtype(i,j,k)<=0) then
-                   V(i,j,k) = Vin(j,k)
-                else
-                   V(i,j,k) = 0
-                end if
-              end do
-             end do
-             !$omp end do nowait
-             !$omp do collapse(2)
-             do k = 1, Wnz
-              do j = 1, Wny
-                if (Wtype(i,j,k)<=0) then
-                   W(i,j,k) = Win(j,k)
-                else
-                   W(i,j,k) = 0
-                end if
-              end do
-             end do
-             !$omp end do
-             !$omp end parallel
-           end do
+            end if
 
-         else
+        else
 
            call par_sync_out("  ...setting initial conditions.")
 
@@ -2923,69 +3014,69 @@ fields_do:  do j = 1, size(obj_fields)
            end do
            !$omp end do
            !$omp end parallel
-         end if  !task_type
+        end if  !task_type
 
 
 
-         if (num_of_scalars>0) then
-           call par_sync_out("  ...setting initial scalar values.")
-           !$omp parallel
-           !$omp workshare
-           SCALAR(1:Prnx,1:Prny,1:Prnz,:) = 0
-           !$omp end workshare
-           !$omp end parallel
-         end if
+        if (num_of_scalars>0) then
+          call par_sync_out("  ...setting initial scalar values.")
+          !$omp parallel
+          !$omp workshare
+          SCALAR(1:Prnx,1:Prny,1:Prnz,:) = 0
+          !$omp end workshare
+          !$omp end parallel
+        end if
 
-         if (enable_buoyancy.and.task_type==2) then
-           call par_sync_out("  ...setting initial temperature values.")
+        if (enable_buoyancy.and.task_type==2) then
+          call par_sync_out("  ...setting initial temperature values.")
 
-           do k = 0, Prnz+1
-            do j = 0, Prny+1
-             do i = 0, Prnx+1
-              x = xPr(i)
-              y = yPr(j)
-              z = zPr(k)
-              if ((x)**2+(y-0.5)**2<0.2_knd**2) then
-               temperature(i,j,k) = cos(sqrt(x**2+(y-0.5)**2)*pi/2/0.2_knd)**2
-              else
-               temperature(i,j,k) = 0
-              end if
-             end do
+          do k = 0, Prnz+1
+          do j = 0, Prny+1
+            do i = 0, Prnx+1
+            x = xPr(i)
+            y = yPr(j)
+            z = zPr(k)
+            if ((x)**2+(y-0.5)**2<0.2_knd**2) then
+              temperature(i,j,k) = cos(sqrt(x**2+(y-0.5)**2)*pi/2/0.2_knd)**2
+            else
+              temperature(i,j,k) = 0
+            end if
             end do
-           end do
+          end do
+          end do
 
-         elseif (enable_buoyancy.and.task_type==3) then
-           call par_sync_out("  ...setting initial temperature values.")
+        elseif (enable_buoyancy.and.task_type==3) then
+          call par_sync_out("  ...setting initial temperature values.")
 
-           do k = 0, Prnz+1
-            do j = 0, Prny+1
-             do i = 0, Prnx+1
-              x = xPr(i)
-              y = yPr(j)
-              z = zPr(k)
-              temperature(i,j,k) = temperature_ref + &
-                 (temperature_ref/100._knd) * ((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
-             end do
+          do k = 0, Prnz+1
+          do j = 0, Prny+1
+            do i = 0, Prnx+1
+            x = xPr(i)
+            y = yPr(j)
+            z = zPr(k)
+            temperature(i,j,k) = temperature_ref + &
+                (temperature_ref/100._knd) * ((2+cos(2*z))*(cos(2*(-y))+cos(2*(x)))-2)
             end do
-           end do
+          end do
+          end do
 
-         elseif (enable_buoyancy) then
-           call par_sync_out("  ...setting initial temperature values.")
+        elseif (enable_buoyancy) then
+          call par_sync_out("  ...setting initial temperature values.")
 
-           call InitScalarProfile(TempIn,TemperatureProfile,temperature_ref)
+          call InitScalarProfile(TempIn,TemperatureProfile,temperature_ref)
 
-           call InitScalar(TempIn,TemperatureProfile,Temperature)
+          call InitScalar(TempIn,TemperatureProfile,Temperature)
 
-         end if !buoyancy and task_type
+        end if !buoyancy and task_type
 
-         if (enable_moisture) then
-           call par_sync_out("  ...setting initial moisture values.")
+        if (enable_moisture) then
+          call par_sync_out("  ...setting initial moisture values.")
 
-           call InitScalarProfile(MoistIn,MoistureProfile,moisture_ref)
+          call InitScalarProfile(MoistIn,MoistureProfile,moisture_ref)
 
-           call InitScalar(MoistIn,MoistureProfile,Moisture)
+          call InitScalar(MoistIn,MoistureProfile,Moisture)
 
-         end if
+        end if
 
 !end not custom initial conditions
 #endif

@@ -3,6 +3,9 @@ module TurbInlet
   use Parameters
   use ArrayUtilities
   use rng_par_zig
+#ifdef PAR  
+  use custom_par, only: PAR_COMM_NULL
+#endif  
   !$ use omp_lib
   
   implicit none
@@ -39,11 +42,15 @@ module TurbInlet
     real(knd),allocatable,dimension(:,:)   :: Uinavg, Vinavg, Winavg !mean values of U,V,W at inflow
     real(knd),allocatable,dimension(:,:,:) :: transform_tensor
     real(knd),dimension(1:3,1:3) :: relative_stress
+#ifdef PAR    
+    integer :: comm = PAR_COMM_NULL
+#endif    
   contains
     procedure :: init => turbulence_generator_init
     procedure :: time_step => turbulence_generator_time_step
     procedure, private :: init_turbulence_profiles => turbulence_generator_init_turbulence_profiles
     procedure, private :: init_mean_profiles => turbulence_generator_init_mean_profiles
+    procedure, private :: bound_Uin => bound_Uin
   end type
 
   
@@ -67,19 +74,27 @@ contains
 
   subroutine turbulence_generator_init(g)
 #ifdef PAR
-    use custom_par, only: iim, jim, kim, nxims, nyims, nzims, par_co_sum, par_co_min
+    use custom_par, only: iim, jim, kim, nxims, nyims, nzims, par_co_sum, par_co_min, &
+                          comm_plane_xz,comm_plane_yz
     use exchange_par
 #endif
     class(turbulence_generator), intent(inout) :: g
     integer :: i, j, k
-    integer :: jlo, jup, klo, kup
+    integer :: jlo, jup, klo, kup, ny
     real(knd) :: bysum, bzsum
     integer :: tid
 
 #ifdef PAR
-    !should not happen for 2D decomposition in Y and Z
-    if (.not. (iim==1 .or. iim==nxims)) return
-    if (nxims > 1 .and. iim==nxims .and. Btype(Ea) /= TurbulentInletType) return
+    if (g%direction==2) then
+      if (.not. (jim==1 .or. jim==nyims)) return
+      if (nyims > 1 .and. jim==nyims .and. Btype(No) /= TurbulentInletType) return
+      g%comm = comm_plane_xz
+    else
+      !should not happen for 2D decomposition in Y and Z
+      if (.not. (iim==1 .or. iim==nxims)) return
+      if (nxims > 1 .and. iim==nxims .and. Btype(Ea) /= TurbulentInletType) return
+      g%comm = comm_plane_yz
+    end if
 #endif
 
     call g%init_turbulence_profiles
@@ -90,28 +105,37 @@ contains
     g%filtny = min(max(nint(g%L_y / dymin),1), ceiling(1._knd * gPrny / 3),Prny)
     g%filtnz = min(max(nint(g%L_z / dzmin),1), ceiling(1._knd * gPrnz / 3),Prnz)
 
-    g%filtny = par_co_min(g%filtny)
-    g%filtnz = par_co_min(g%filtnz)
+    g%filtny = par_co_min(g%filtny, g%comm)
+    g%filtnz = par_co_min(g%filtnz, g%comm)
 #else
     g%filtny = min(max(nint(g%L_y / dymin),1), ceiling(1._knd * Prny / 3))
     g%filtnz = min(max(nint(g%L_z / dzmin),1), ceiling(1._knd * Prnz / 3))
 #endif
 
+    if (g%direction==2) then
+      ny = Prnx
+    else
+       ny = Prny
+    end if
+    
     g%bigNy = 2 * g%filtny
     g%bigNz = 2 * g%filtnz
 
     jlo = -g%bigNy + 1
-    jup = Prny + g%bigNy
+    jup = ny + g%bigNy
 
     klo = -g%bigNz + 1
     kup = Prnz + g%bigNz
+      
+
+        
 
     allocate(g%Ru(jlo:jup,klo:kup,2))
     allocate(g%Rv(jlo:jup,klo:kup,2))
     allocate(g%Rw(jlo:jup,klo:kup,2))
-    allocate(g%Psiu(1:Prny,1:Prnz,1:2))
-    allocate(g%Psiv(1:Prny,1:Prnz,1:2))
-    allocate(g%Psiw(1:Prny,1:Prnz,1:2))
+    allocate(g%Psiu(1:ny,1:Prnz,1:2))
+    allocate(g%Psiv(1:ny,1:Prnz,1:2))
+    allocate(g%Psiw(1:ny,1:Prnz,1:2))
 
     !$omp parallel private(j,k,tid)
     tid = 0
@@ -138,17 +162,18 @@ contains
     !$omp end parallel
 
 
-    if ((Btype(So)==BC_PERIODIC).or.(Btype(No)==BC_PERIODIC)) then
+    if ((g%direction==2 .and. ((Btype(We)==BC_PERIODIC).or.(Btype(Ea)==BC_PERIODIC))) .or. &
+        (g%direction==1 .and. ((Btype(So)==BC_PERIODIC).or.(Btype(No)==BC_PERIODIC)))) then
       !$omp parallel workshare
       forall(k = klo:kup, j = jlo:0)
-         g%Ru(j,k,1:2) = g%Ru(j+Prny,k,1:2)
-         g%Rv(j,k,1:2) = g%Rv(j+Prny,k,1:2)
-         g%Rw(j,k,1:2) = g%Rw(j+Prny,k,1:2)
+        g%Ru(j,k,1:2) = g%Ru(j+ny,k,1:2)
+        g%Rv(j,k,1:2) = g%Rv(j+ny,k,1:2)
+        g%Rw(j,k,1:2) = g%Rw(j+ny,k,1:2)
       end forall
-      forall(k = klo:kup,j = Prny+1:jup)
-         g%Ru(j,k,1:2) = g%Ru(j-Prny,k,1:2)
-         g%Rv(j,k,1:2) = g%Rv(j-Prny,k,1:2)
-         g%Rw(j,k,1:2) = g%Rw(j-Prny,k,1:2)
+      forall(k = klo:kup,j = ny+1:jup)
+        g%Ru(j,k,1:2) = g%Ru(j-ny,k,1:2)
+        g%Rv(j,k,1:2) = g%Rv(j-ny,k,1:2)
+        g%Rw(j,k,1:2) = g%Rw(j-ny,k,1:2)
       end forall
       !$omp end  parallel workshare
     end if
@@ -156,27 +181,38 @@ contains
     if  ((Btype(Bo)==BC_PERIODIC).or.(Btype(To)==BC_PERIODIC)) then
       !$omp parallel workshare
       forall(k = klo:0, j = jlo:jup)
-         g%Ru(j,k,1:2) = g%Ru(j,k+Prnz,1:2)
-         g%Rv(j,k,1:2) = g%Rv(j,k+Prnz,1:2)
-         g%Rw(j,k,1:2) = g%Rw(j,k+Prnz,1:2)
+        g%Ru(j,k,1:2) = g%Ru(j,k+Prnz,1:2)
+        g%Rv(j,k,1:2) = g%Rv(j,k+Prnz,1:2)
+        g%Rw(j,k,1:2) = g%Rw(j,k+Prnz,1:2)
       end forall
       forall(k = Prnz+1:kup,j = jlo:jup)
-         g%Ru(j,k,1:2) = g%Ru(j,k-Prnz,1:2)
-         g%Rv(j,k,1:2) = g%Rv(j,k-Prnz,1:2)
-         g%Rw(j,k,1:2) = g%Rw(j,k-Prnz,1:2)
+        g%Ru(j,k,1:2) = g%Ru(j,k-Prnz,1:2)
+        g%Rv(j,k,1:2) = g%Rv(j,k-Prnz,1:2)
+        g%Rw(j,k,1:2) = g%Rw(j,k-Prnz,1:2)
       end forall
       !$omp end  parallel workshare
     end if
 
 #ifdef PAR
-    do i=1,2
-      call par_exchange_boundaries_yz(g%Ru(:,:,i), Prny, Prnz, Btype, &
-                                      jlo, klo, g%bigNy, g%bigNz)
-      call par_exchange_boundaries_yz(g%Rv(:,:,i), Prny, Prnz, Btype, &
-                                      jlo, klo, g%bigNy, g%bigNz)
-      call par_exchange_boundaries_yz(g%Rw(:,:,i), Prny, Prnz, Btype, &
-                                      jlo, klo, g%bigNy, g%bigNz)
-    end do
+    if (g%direction==2) then
+      do i=1,2
+        call par_exchange_boundaries_xz(g%Ru(:,:,i), ny, Prnz, Btype, &
+                                        jlo, klo, g%bigNy, g%bigNz)
+        call par_exchange_boundaries_xz(g%Rv(:,:,i), ny, Prnz, Btype, &
+                                        jlo, klo, g%bigNy, g%bigNz)
+        call par_exchange_boundaries_xz(g%Rw(:,:,i), ny, Prnz, Btype, &
+                                        jlo, klo, g%bigNy, g%bigNz)
+      end do
+    else
+      do i=1,2
+        call par_exchange_boundaries_yz(g%Ru(:,:,i), ny, Prnz, Btype, &
+                                        jlo, klo, g%bigNy, g%bigNz)
+        call par_exchange_boundaries_yz(g%Rv(:,:,i), ny, Prnz, Btype, &
+                                        jlo, klo, g%bigNy, g%bigNz)
+        call par_exchange_boundaries_yz(g%Rw(:,:,i), ny, Prnz, Btype, &
+                                        jlo, klo, g%bigNy, g%bigNz)
+      end do
+    end if
 #endif
 
 
@@ -201,7 +237,7 @@ contains
     g%expsz = g%expsz / bzsum
 
     !$omp parallel private(j,k)
-    !$omp do
+    !$omp do collapse(2)
     do k = -g%bigNz, g%bigNz
       do j = -g%bigNy, g%bigNy
          g%bfilt(j,k,1) = g%expsy(j) * g%expsz(k)
@@ -209,7 +245,7 @@ contains
     end do
     !$omp end  do
     !$omp workshare
-    forall(k = 1:Prnz, j = 1:Prny)
+    forall(k = 1:Prnz, j = 1:ny)
          g%Psiu(j,k,1) = sum(g%bfilt(-g%bigNy:g%bigNy,-g%bigNz:g%bigNz,1) * &
                              g%Ru(j-g%bigNy:j+g%bigNy,k-g%bigNz:k+g%bigNz,1))
          g%Psiv(j,k,1) = sum(g%bfilt(-g%bigNy:g%bigNy,-g%bigNz:g%bigNz,1) * &
@@ -220,7 +256,11 @@ contains
     !$omp end  workshare nowait
     
 
-    if (allocated(g%Uinavg)) then
+    if (allocated(g%Vinavg).and.g%direction==2) then
+      !$omp workshare
+      g%compat = sum(g%Vinavg(1:Vnx,1:Vnz))
+      !$omp end  workshare
+    else if (allocated(g%Uinavg)) then
       !$omp workshare
       g%compat = sum(g%Uinavg(1:Uny,1:Unz))
       !$omp end  workshare
@@ -231,7 +271,7 @@ contains
     end if
     !$omp end  parallel
 #ifdef PAR
-    g%compat = par_co_sum(g%compat)
+    g%compat = par_co_sum(g%compat, g%comm)
 #endif
 
   end subroutine
@@ -246,26 +286,37 @@ contains
     real(knd), intent(out) :: Uin(-2:,-2:), Vin(-2:,-2:), Win(-2:,-2:)
     real(knd), intent(in) :: dt
     integer :: i, j, k
-    integer :: jlo, jup, klo, kup
+    integer :: jlo, jup, klo, kup, ny
     real(knd) :: Ui, Vi, Wi, p
     integer :: tid
     
 #ifdef PAR
-    !should not happen for 2D decomposition in X and Y
-    if (.not. (iim==1 .or. iim==nxims)) return
-    if (nxims > 1 .and. iim==nxims .and. Btype(Ea) /= TurbulentInletType) return
+    if (g%direction==2) then
+      if (.not. (jim==1 .or. jim==nyims)) return
+      if (nyims > 1 .and. jim==nyims .and. Btype(No) /= TurbulentInletType) return
+    else
+      !should not happen for 2D decomposition in Y and Z
+      if (.not. (iim==1 .or. iim==nxims)) return
+      if (nxims > 1 .and. iim==nxims .and. Btype(Ea) /= TurbulentInletType) return
+    end if
 #endif
 
-    jlo = -g%bigNy + 1
-    jup = Prny + g%bigNy
+    if (g%direction==2) then
+      ny = Prnx
+    else
+      ny = Prny
+    end if
 
+    jlo = -g%bigNy + 1
+    jup = ny + g%bigNy
+    
     klo = -g%bigNz + 1
     kup = Prnz + g%bigNz
 
 
-    !$omp parallel do private(i,j,k,Ui,Vi,Wi)  
+    !$omp parallel do private(j,k,Ui,Vi,Wi)  
     do k = 1, Prnz
-      do j = 1, Prny
+      do j = 1, ny
          g%Psiu(j,k,2) = sum(g%bfilt(-g%bigNy:g%bigNy,-g%bigNz:g%bigNz,1) * &
                              g%Ru(j-g%bigNy:j+g%bigNy,k-g%bigNz:k+g%bigNz,2))
          g%Psiv(j,k,2) = sum(g%bfilt(-g%bigNy:g%bigNy,-g%bigNz:g%bigNz,1) * &
@@ -290,9 +341,9 @@ contains
     call set(Win, 0._knd)
 
     if (allocated(g%Uinavg) .and. allocated(g%Vinavg) .and. allocated(g%Winavg)) then
-      !$omp parallel do private(i,j,k,Ui,Vi,Wi)
+      !$omp parallel do private(j,k,Ui,Vi,Wi)
       do k = 1, Prnz
-       do j = 1, Prny
+       do j = 1, ny
         Ui = g%Psiu(j,k,1)
         Vi = g%Psiv(j,k,1)
         Wi = g%Psiw(j,k,1)
@@ -309,7 +360,7 @@ contains
       end do
       !$omp end parallel do
     else
-      !$omp parallel do private(i,j,k,Ui,Vi,Wi)
+      !$omp parallel do private(j,k,Ui,Vi,Wi)
       do k = 1, Prnz
        do j = 1, Prny
         Ui = g%Psiu(j,k,1)
@@ -329,13 +380,19 @@ contains
       !$omp end parallel do
     end if
 
-    !$omp parallel workshare
-    p = sum(Uin(1:Uny,1:Unz))
-    !$omp end parallel workshare
+    if (g%direction==2) then
+      !$omp parallel workshare
+      p = sum(Vin(1:Vnx,1:Vnz))
+      !$omp end parallel workshare      
+    else
+      !$omp parallel workshare
+      p = sum(Uin(1:Uny,1:Unz))
+      !$omp end parallel workshare
+    end if
 
 
 #ifdef PAR
-    p = par_co_sum(p)
+    p = par_co_sum(p, g%comm)
 #endif
     p = g%compat / p                  !To ensure the g%compatibility condition.
 
@@ -344,12 +401,11 @@ contains
     call multiply(Win, p)
 
 
+    call g%bound_Uin(1, Uin)
 
-    call BoundUin(1, Uin)
+    call g%bound_Uin(2, Vin)
 
-    call BoundUin(2, Vin)
-
-    call BoundUin(3, Win)
+    call g%bound_Uin(3, Win)
 
     !$omp parallel private(j,k,tid)
     tid = 0
@@ -365,31 +421,30 @@ contains
     end do
     !$omp end do
 
-    if ((Btype(So)==BC_PERIODIC) .or. (Btype(No)==BC_PERIODIC)) then
-      !workaround to a bug in Cray Fortran
-      !$omp single
-      i = Prny + 1
-      !$omp end single
+    if ((g%direction==2 .and. ((Btype(We)==BC_PERIODIC).or.(Btype(Ea)==BC_PERIODIC))) .or. &
+        (g%direction==1 .and. ((Btype(So)==BC_PERIODIC).or.(Btype(No)==BC_PERIODIC)))) then
 
       !$omp do collapse(2)
       do k = klo, kup
         do j = jlo, 0
-          g%Ru(j,k,1:2) = g%Ru(j+Prny,k,1:2)
-          g%Rv(j,k,1:2) = g%Rv(j+Prny,k,1:2)
-          g%Rw(j,k,1:2) = g%Rw(j+Prny,k,1:2)
+          g%Ru(j,k,1:2) = g%Ru(j+ny,k,1:2)
+          g%Rv(j,k,1:2) = g%Rv(j+ny,k,1:2)
+          g%Rw(j,k,1:2) = g%Rw(j+ny,k,1:2)
         end do
       end do
       !$omp end do nowait
       !$omp do collapse(2)
       do k = klo, kup
-        do j = i, jup
-          g%Ru(j,k,1:2) = g%Ru(j-Prny,k,1:2)
-          g%Rv(j,k,1:2) = g%Rv(j-Prny,k,1:2)
-          g%Rw(j,k,1:2) = g%Rw(j-Prny,k,1:2)
+        do j = ny+1, jup
+          g%Ru(j,k,1:2) = g%Ru(j-ny,k,1:2)
+          g%Rv(j,k,1:2) = g%Rv(j-ny,k,1:2)
+          g%Rw(j,k,1:2) = g%Rw(j-ny,k,1:2)
         end do
       end do
       !$omp end do
     end if
+    
+    
     if  ((Btype(Bo)==BC_PERIODIC) .or. (Btype(To)==BC_PERIODIC)) then
       !$omp do collapse(2)
       do k = klo, 0
@@ -413,14 +468,25 @@ contains
     !$omp end parallel
 
 #ifdef PAR
-    do i=1,2
-      call par_exchange_boundaries_yz(g%Ru(:,:,i), Prny, Prnz, Btype, &
-                                      jlo, klo, g%bigNy, g%bigNz)
-      call par_exchange_boundaries_yz(g%Rv(:,:,i), Prny, Prnz, Btype, &
-                                      jlo, klo, g%bigNy, g%bigNz)
-      call par_exchange_boundaries_yz(g%Rw(:,:,i), Prny, Prnz, Btype, &
-                                      jlo, klo, g%bigNy, g%bigNz)
-    end do
+    if (g%direction==2) then
+      do i=1,2
+        call par_exchange_boundaries_xz(g%Ru(:,:,i), ny, Prnz, Btype, &
+                                        jlo, klo, g%bigNy, g%bigNz)
+        call par_exchange_boundaries_xz(g%Rv(:,:,i), ny, Prnz, Btype, &
+                                        jlo, klo, g%bigNy, g%bigNz)
+        call par_exchange_boundaries_xz(g%Rw(:,:,i), ny, Prnz, Btype, &
+                                        jlo, klo, g%bigNy, g%bigNz)
+      end do
+    else
+      do i=1,2
+        call par_exchange_boundaries_yz(g%Ru(:,:,i), ny, Prnz, Btype, &
+                                        jlo, klo, g%bigNy, g%bigNz)
+        call par_exchange_boundaries_yz(g%Rv(:,:,i), ny, Prnz, Btype, &
+                                        jlo, klo, g%bigNy, g%bigNz)
+        call par_exchange_boundaries_yz(g%Rw(:,:,i), ny, Prnz, Btype, &
+                                        jlo, klo, g%bigNy, g%bigNz)
+      end do
+    end if
 #endif
 
   end subroutine turbulence_generator_time_step
@@ -441,7 +507,11 @@ contains
     integer :: j,k
 
     allocate(g%Ustar_inlet(1:Prnz))
-    allocate(g%transform_tensor(1:6,1:Prny,1:Prnz))
+    if (g%direction==2) then
+      allocate(g%transform_tensor(1:6,1:Prnx,1:Prnz))
+    else
+      allocate(g%transform_tensor(1:6,1:Prny,1:Prnz))
+    end if
     
     !constant stress assumption
     if ((profiletype==LOGPROF.and.g%Ustar_surf_inlet<=0).or.(profiletype==POWERPROF.and.g%Ustar_surf_inlet<=0)) then
@@ -455,17 +525,16 @@ contains
 
 
     do k = 1, Prnz
-     do j = 1, Prny  ! tt1 = a11,tt2 = a21,tt3 = a22, tt4 = a31, tt5 = a32, tt6 = a33
-        g%transform_tensor(1,j,k) = sqrt((g%Ustar_inlet(k)**2) * g%relative_stress(1,1))
-        g%transform_tensor(2,j,k) = (g%Ustar_inlet(k)**2) * g%relative_stress(2,1) / g%transform_tensor(1,j,k)
-        g%transform_tensor(3,j,k) = sqrt((g%Ustar_inlet(k)**2) * g%relative_stress(2,2) - g%transform_tensor(2,j,k)**2)
-        g%transform_tensor(4,j,k) = (g%Ustar_inlet(k)**2) * g%relative_stress(3,1) / g%transform_tensor(1,j,k)
-        g%transform_tensor(5,j,k) = ((g%Ustar_inlet(k)**2) * g%relative_stress(3,2)-&
-                                 g%transform_tensor(2,j,k) * g%transform_tensor(4,j,k)) / g%transform_tensor(3,j,k)
-        g%transform_tensor(6,j,k) = sqrt((g%Ustar_inlet(k)**2) * g%relative_stress(3,3)-&
-                                 g%transform_tensor(4,j,k)**2 - g%transform_tensor(5,j,k)**2)
+        ! tt1 = a11,tt2 = a21,tt3 = a22, tt4 = a31, tt5 = a32, tt6 = a33
+        g%transform_tensor(1,:,k) = sqrt((g%Ustar_inlet(k)**2) * g%relative_stress(1,1))
+        g%transform_tensor(2,:,k) = (g%Ustar_inlet(k)**2) * g%relative_stress(2,1) / g%transform_tensor(1,:,k)
+        g%transform_tensor(3,:,k) = sqrt((g%Ustar_inlet(k)**2) * g%relative_stress(2,2) - g%transform_tensor(2,:,k)**2)
+        g%transform_tensor(4,:,k) = (g%Ustar_inlet(k)**2) * g%relative_stress(3,1) / g%transform_tensor(1,:,k)
+        g%transform_tensor(5,:,k) = ((g%Ustar_inlet(k)**2) * g%relative_stress(3,2)-&
+                                 g%transform_tensor(2,:,k) * g%transform_tensor(4,:,k)) / g%transform_tensor(3,:,k)
+        g%transform_tensor(6,:,k) = sqrt((g%Ustar_inlet(k)**2) * g%relative_stress(3,3)-&
+                                 g%transform_tensor(4,:,k)**2 - g%transform_tensor(5,:,k)**2)
 
-     end do
     end do
   end subroutine
 
@@ -473,7 +542,8 @@ contains
     class(turbulence_generator), intent(inout) :: g
     real(knd) :: Ustar_prof, utmp
     integer :: k, maxj, maxk
-
+    logical :: fix_direction
+    
     if (g%direction==2) then
       allocate(g%Uinavg(-2:Unx+3,-2:Unz+3), g%Vinavg(-2:Vnx+3,-2:Vnz+3), g%Winavg(-2:Wnx+3,-2:Wnz+3))
       g%Vinavg = 0
@@ -488,9 +558,13 @@ contains
 
       do k = 1, Prnz
 
-        g%Uinavg(:,k) = Uinlet
+        g%Uinavg(:,k) = Uinlet_vec(1)
+        g%Vinavg(:,k) = Uinlet_vec(2)
+        g%Winavg(:,k) = Uinlet_vec(3)
 
       end do
+
+     fix_direction = .false.
 
     else if (profiletype==LOGPROF) then
 
@@ -505,7 +579,9 @@ contains
           g%Uinavg(:,k) = utmp
         end do
 
-      else
+        fix_direction = .true.
+        
+     else
 
         utmp = (g%Ustar_inlet(1) / Karman) * log(zPr(1) / g%z0_inlet)
         g%Uinavg(:,1) = utmp
@@ -516,6 +592,8 @@ contains
           g%Uinavg(:,k) = utmp
         end do
 
+        fix_direction = .true.
+        
       end  if
 
     else if (profiletype==POWERPROF) then
@@ -524,23 +602,37 @@ contains
         g%Uinavg(:,k) = g%U_ref_inlet * (zPr(k) / g%z_ref_inlet)**g%power_exponent_inlet
       end do
 
+      fix_direction = .false.
+
     else
 
       g%Uinavg = 0
 
     end if
 
-    if (windangle/=0) then
-      maxj = min(ubound(g%Uinavg,1),ubound(g%Vinavg,1))
-      maxk = min(ubound(g%Uinavg,2),ubound(g%Vinavg,2))
+    if (fix_direction) then
+      maxj = min(ubound(g%Uinavg,1),ubound(g%Vinavg,1),ubound(g%Winavg,1))
+      maxk = min(ubound(g%Uinavg,2),ubound(g%Vinavg,2),ubound(g%Winavg,2))
+      if (norm2(Uinlet_vec(2:3))>0) then
+        g%Vinavg(-2:maxj,-2:maxk) = (Uinlet_vec(2)/Uinlet) * g%Uinavg(-2:maxj,-2:maxk)
+        g%Winavg(-2:maxj,-2:maxk) = (Uinlet_vec(3)/Uinlet) * g%Uinavg(-2:maxj,-2:maxk)
+        g%Uinavg(-2:maxj,-2:maxk) = (Uinlet_vec(1)/Uinlet) * g%Uinavg(-2:maxj,-2:maxk)
+      else if (windangle/=0) then
         g%Vinavg(-2:maxj,-2:maxk) = &
-           g%Uinavg(-2:maxj,-2:maxk) * sin(windangle / 180._knd * pi)
+            g%Uinavg(-2:maxj,-2:maxk) * sin(windangle / 180._knd * pi)
         g%Uinavg(:,:) = g%Uinavg * cos(windangle / 180._knd * pi)
+      end if
     end if
 
-    where(Utype(0,:,:) > 0) g%Uinavg = 0
-    where(Vtype(0,:,:) > 0) g%Vinavg = 0
-    where(Wtype(0,:,:) > 0) g%Winavg = 0
+    if (g%direction==2) then
+      where(Utype(:,0,:) > 0) g%Uinavg = 0
+      where(Vtype(:,0,:) > 0) g%Vinavg = 0
+      where(Wtype(:,0,:) > 0) g%Winavg = 0
+    else
+      where(Utype(0,:,:) > 0) g%Uinavg = 0
+      where(Vtype(0,:,:) > 0) g%Vinavg = 0
+      where(Wtype(0,:,:) > 0) g%Winavg = 0
+    end if
 
   end subroutine turbulence_generator_init_mean_profiles
 
@@ -716,31 +808,53 @@ contains
   end subroutine ReadBC_INLET_FROM_FILE
 
 
-  subroutine BoundUin(component,Uin)
+  subroutine bound_Uin(g, component,Uin)
 #ifdef PAR
-    use exchange_par, only: par_exchange_boundaries_yz
+    use exchange_par, only: par_exchange_boundaries_xz, par_exchange_boundaries_yz
 #endif
+    class(turbulence_generator), intent(in) :: g
     integer,  intent(in)    :: component
     real(knd),intent(inout) :: Uin(-2:,-2:)
-    integer :: nx, ny, nz
-
-    if (component==1) then
-      nx = Unx
-      ny = Uny
-      nz = Unz
-    else if (component==2) then
-      nx = Vnx
-      ny = Vny
-      nz = Vnz
+    integer :: ny, nz, side_m, side_p
+    
+    if (g%direction==2) then
+      if (component==1) then
+        ny = Unx
+        nz = Unz
+      else if (component==2) then
+        ny = Vnx
+        nz = Vnz
+      else
+        ny = Wnx
+        nz = Wnz
+      end if
+      
+      side_m = We
+      side_p = Ea
     else
-      nx = Wnx
-      ny = Wny
-      nz = Wnz
+      if (component==1) then
+        ny = Uny
+        nz = Unz
+      else if (component==2) then
+        ny = Vny
+        nz = Vnz
+      else
+        ny = Wny
+        nz = Wnz
+      end if
+      
+      side_m = So
+      side_p = No
     end if
-
+   
 #ifdef PAR
-     call par_exchange_boundaries_yz(Uin, ny, nz, Btype, &
-                                     -2, -2, 2, 2)
+    if (g%direction==2) then
+      call par_exchange_boundaries_xz(Uin, ny, nz, Btype, &
+                                      -2, -2, 2, 2)
+    else
+      call par_exchange_boundaries_yz(Uin, ny, nz, Btype, &
+                                      -2, -2, 2, 2)
+    end if
 #endif
 
     if (Btype(Bo)==BC_DIRICHLET) then
@@ -791,15 +905,15 @@ contains
         Uin(1:ny,nz+1:nz+2) = Uin(1:ny,1:2)
     end if
 
-    if (Btype(So)==BC_DIRICHLET) then
+    if (Btype(side_m)==BC_DIRICHLET) then
       if (component==2) then
-        Uin(0,-1:nz+2) = sideU(component,So)
-        Uin(-1,-1:nz+2) = sideU(component,So)+(sideU(component,So)-Uin(1,-1:nz+2))
+        Uin(0,-1:nz+2) = sideU(component,side_m)
+        Uin(-1,-1:nz+2) = sideU(component,side_m)+(sideU(component,side_m)-Uin(1,-1:nz+2))
       else
-        Uin(0,-1:nz+2) = sideU(component,So)+(sideU(component,So)-Uin(1,-1:nz+2))
-        Uin(-1,-1:nz+2) = sideU(component,So)+(sideU(component,So)-Uin(2,-1:nz+2))
+        Uin(0,-1:nz+2) = sideU(component,side_m)+(sideU(component,side_m)-Uin(1,-1:nz+2))
+        Uin(-1,-1:nz+2) = sideU(component,side_m)+(sideU(component,side_m)-Uin(2,-1:nz+2))
       end if
-    else if (Btype(So)==BC_NOSLIP.or.(component==2.and.Btype(So)==BC_FREESLIP)) then
+    else if (Btype(side_m)==BC_NOSLIP.or.(component==2.and.Btype(side_m)==BC_FREESLIP)) then
       if (component==2) then
         Uin(0,-1:nz+2) = 0
         Uin(-1,-1:nz+2)=-Uin(1,-1:nz+2)
@@ -807,38 +921,38 @@ contains
         Uin(0,-1:nz+2)=-Uin(1,-1:nz+2)
         Uin(-1,-1:nz+2)=-Uin(2,-1:nz+2)
       end if
-    else if (Btype(So)==BC_NEUMANN.or.(component/=2.and.Btype(So)==BC_FREESLIP)) then
+    else if (Btype(side_m)==BC_NEUMANN.or.(component/=2.and.Btype(side_m)==BC_FREESLIP)) then
         Uin(0,-1:nz+2) = Uin(1,-1:nz+2)
         Uin(-1,-1:nz+2) = Uin(1,-1:nz+2)
-    else if (Btype(So)==BC_PERIODIC) then  !Periodic BC
+    else if (Btype(side_m)==BC_PERIODIC) then  !Periodic BC
         Uin(0,-1:nz+2) = Uin(ny,-1:nz+2)
         Uin(-1,-1:nz+2) = Uin(ny-1,-1:nz+2)
     end if
 
-    if (Btype(No)==BC_DIRICHLET) then
+    if (Btype(side_p)==BC_DIRICHLET) then
       if (component==2) then
-        Uin(ny+1,-1:nz+2) = sideU(component,No)
-        Uin(ny+2,-1:nz+2) = sideU(component,No)+(sideU(component,No)-Uin(ny,-1:nz+2))
+        Uin(ny+1,-1:nz+2) = sideU(component,side_p)
+        Uin(ny+2,-1:nz+2) = sideU(component,side_p)+(sideU(component,side_p)-Uin(ny,-1:nz+2))
       else
-        Uin(ny+1,-1:nz+2) = sideU(component,No)+(sideU(component,No)-Uin(ny,-1:nz+2))
-        Uin(ny+2,-1:nz+2) = sideU(component,No)+(sideU(component,No)-Uin(ny-1,-1:nz+2))
+        Uin(ny+1,-1:nz+2) = sideU(component,side_p)+(sideU(component,side_p)-Uin(ny,-1:nz+2))
+        Uin(ny+2,-1:nz+2) = sideU(component,side_p)+(sideU(component,side_p)-Uin(ny-1,-1:nz+2))
       end if
-    else if (Btype(No)==BC_NOSLIP.or.(component==2.and.Btype(So)==BC_FREESLIP)) then
+    else if (Btype(side_p)==BC_NOSLIP.or.(component==2.and.Btype(side_m)==BC_FREESLIP)) then
       if (component==2) then
         Uin(ny+1,-1:nz+2) = 0
         Uin(ny+2,-1:nz+2)=-Uin(ny,-1:nz+2)
       else
         Uin(ny+1:ny+2,-1:nz+2)=-Uin(ny:ny-1:-1,-1:nz+2)
       end if
-    else if (Btype(No)==BC_NEUMANN.or.(component/=2.and.Btype(No)==BC_FREESLIP)) then
+    else if (Btype(side_p)==BC_NEUMANN.or.(component/=2.and.Btype(side_p)==BC_FREESLIP)) then
         Uin(ny+1,-1:nz+2) = Uin(ny,-1:nz+2)
         Uin(ny+2,-1:nz+2) = Uin(ny,-1:nz+2)
-    else if (Btype(No)==BC_PERIODIC) then  !Periodic BC
+    else if (Btype(side_p)==BC_PERIODIC) then  !Periodic BC
         Uin(ny+1:ny+2,-1:nz+2) = Uin(1:2,-1:nz+2)
     end if
 
 
-  end  subroutine BoundUin
+  end  subroutine bound_Uin
 
 
 

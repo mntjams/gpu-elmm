@@ -9,7 +9,8 @@ module Sponge
   
   private
   
-  public :: enable_top_sponge, enable_out_sponge, enable_top_sponge_scalar, &
+  public :: enable_top_sponge, enable_top_sponge_scalar, &
+            enable_out_sponge_x, enable_out_sponge_y, &
             SpongeTop, SpongeOut, SpongeTopScalar, &
             top_sponge_bottom, sponge_to_profiles, &
             U_sponge_avg, V_sponge_avg, W_sponge_avg
@@ -17,6 +18,8 @@ module Sponge
   logical :: enable_top_sponge = .false.
   logical :: enable_top_sponge_scalar = .false.
   logical :: enable_out_sponge = .false.
+  logical :: enable_out_sponge_x = .false.
+  logical :: enable_out_sponge_y = .false.
 
   logical :: sponge_to_profiles = .false.
 
@@ -28,7 +31,7 @@ module Sponge
   
 contains
 
-  pure function DampF(x) result(res)
+  elemental function DampF(x) result(res)
     real(knd) :: res
     real(knd), intent(in) :: x
 
@@ -37,12 +40,12 @@ contains
     else if (x>=1) then
       res = 0
     else
-      res = (1 - 0.04_knd*x**2) * &
+      res = (1 - 0.1_knd*x**2) * &
               ( 1 - (1 - exp(10._knd*x**2)) / (1 - exp(10._knd)) )
     end if
   end function
   
-  pure function ScalarDampF(x) result(res)
+  elemental function ScalarDampF(x) result(res)
     real(knd) :: res
     real(knd), intent(in)::x
 
@@ -51,7 +54,7 @@ contains
     else if (x >= 1) then
       res = 0
     else
-      res = (1 - 0.04_knd*x**2) * &
+      res = (1 - 0.1_knd*x**2) * &
               ( 1 - (1 - exp(10._knd*x**2)) / (1 - exp(10._knd)) )
     end if
   end function
@@ -287,9 +290,16 @@ contains
   
   
   
-  
-
   subroutine SpongeOut(U, V, W, temperature)
+    real(knd), contiguous, intent(inout), dimension(-2:,-2:,-2:) :: U, V, W
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: temperature
+    
+    !NOTE: currently having both of them enabled will likely lead to strange results
+    if (enable_out_sponge_x) call SpongeOut_X(U, V, W, temperature)
+    if (enable_out_sponge_y) call SpongeOut_Y(U, V, W, temperature)
+  end subroutine
+
+  subroutine SpongeOut_X(U, V, W, temperature)
     real(knd), contiguous, intent(inout), dimension(-2:,-2:,-2:) :: U, V, W
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: temperature
     integer   :: i, j, k, bufn
@@ -298,15 +308,15 @@ contains
 
     !size end extent of the buffer region
     bufn = min(5, Prnx/4)
-    xs = xU(Prnx - bufn)
+    xs = xU(Prnx - bufn-2)
     xe = xU(Prnx)
 
     !extent of the probe region where the local average is taken from
     loU = max(2*Unx/3, Unx-50)
-    hiU = Unx-4
+    hiU = Unx-bufn-1
 
     lo = max(2*Prnx/3, Prnx-50)
-    hi = Prnx-4
+    hi = Prnx-bufn-1
 
     !$omp parallel private(i, j, k, p, xb, DF)
 
@@ -314,7 +324,7 @@ contains
     do k = 1, Unz
       do j = 1, Uny
         p = 0
-        do i = loU, hiU - 4
+        do i = loU, hiU
           p = p + U(i,j,k)
         end do
         p = p / (hiU - loU + 1)
@@ -381,7 +391,106 @@ contains
     end if
     !$omp end parallel
 
-  end subroutine SpongeOut
+  end subroutine SpongeOut_X
+
+
+  subroutine SpongeOut_Y(U, V, W, temperature)
+    use custom_par
+    real(knd), contiguous, intent(inout), dimension(-2:,-2:,-2:) :: U, V, W
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: temperature
+    integer   :: i, j, k, bufn
+    integer   :: hi, lo, loV, hiV
+    real(knd) :: p, ye, ys, yb, DF
+
+    !TODO: Properly parallelize for a sponge zone across several images
+    if (jim==nyims) then
+      !size end extent of the buffer region
+      bufn = min(5, gPrny/4, Prny/4)
+      ys = yV(Prny - bufn-2)
+      ye = yV(Prny)
+
+      !extent of the probe region where the local average is taken from
+      loV = max(2*gPrny/3-offset_to_global_y, gPrny-50-offset_to_global_y, 1)
+      hiV = Vny-bufn-1
+
+      lo = max(2*gPrny/3-offset_to_global_y, gPrny-50-offset_to_global_y, 1)
+      hi = Prny-bufn-1
+
+      !$omp parallel private(i, j, k, p, yb, DF)
+
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do i = 1, Unx
+          p = 0
+          do j = lo, hi
+            p = p + U(i,j,k)
+          end do
+          p = p / (hi - lo + 1)
+          do j = Uny - bufn, Uny + 1
+            yb = (yPr(j)-ys) / (ye-ys)       
+            DF = DampF(yb)
+            U(i,j,k) = p + DF * (U(i,j,k) - p)
+          end do
+        end do
+      end do
+      !$omp end do
+
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do i = 1, Vnx
+          p = 0
+          do j = loV, hiV
+            p = p + V(i,j,k)
+          end do
+          p = p / (hiV - loV + 1)
+          do j = Vny-bufn, Vny + 1
+            yb = (yV(j)-ys) / (ye-ys)
+            DF = DampF(yb)
+            V(i,j,k) = p + DF * (V(i,j,k) - p)
+          end do           
+        end do
+      end do
+      !$omp end do
+
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do i = 1, Wnx
+          p = 0
+          do j = lo, hi
+            p = p + W(i,j,k)
+          end do
+          p = p / (hi - lo + 1)
+          do j = Wny - bufn, Wny + 1
+            yb = (yPr(j)-ys) / (ye-ys)
+            DF = DampF(yb)
+            W(i,j,k) = p + DF * (W(i,j,k) - p)
+          end do
+        end do
+      end do
+      !$omp end do
+
+      if (enable_buoyancy) then
+        !$omp do collapse(2)
+        do k = 1, Prnz
+          do i = 1, Prny
+            p = 0
+            do j = lo, hi
+              p = p + temperature(i,j,k)
+            end do
+            p = p / (hi - lo + 1)
+            do j = Prny - bufn, Prny + 1
+              yb = (yPr(j)-ys) / (ye-ys)
+              DF = DampF(yb)
+              temperature(i,j,k) = p + DF * (temperature(i,j,k) - p)
+            end do
+          end do
+        end do
+        !$omp end do
+      end if
+      !$omp end parallel
+    end if
+
+  end subroutine SpongeOut_Y
 
 
 

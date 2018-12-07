@@ -139,7 +139,7 @@ module Parameters
 
   real(knd) :: grav_acc = 0, Coriolis_parameter = 0
 
-  real(knd) :: ShearInletTypeParameter, Uinlet
+  real(knd) :: ShearInletTypeParameter, Uinlet, Uinlet_vec(3)
 
   real(knd) :: z0W, z0E, z0S, z0N, z0B, z0T
 

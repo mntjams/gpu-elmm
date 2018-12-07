@@ -7,7 +7,8 @@ module TimeSteps
   use Outputs, only: current_profiles
   use Scalars, only: ScalarRK3
   use Turbinlet, only: default_turbulence_generator, GetInletFromFile
-  use Sponge, only: enable_top_sponge, enable_out_sponge, SpongeTop, SpongeOut
+  use Sponge, only: enable_top_sponge, enable_out_sponge_x, enable_out_sponge_y, &
+                    SpongeTop, SpongeOut
 
   implicit none
 
@@ -75,7 +76,7 @@ contains
     end if
 
 
-    if ((Btype(We)==BC_TURBULENT_INLET) .or. (Btype(Ea)==BC_TURBULENT_INLET)) then
+    if (any(Btype==BC_TURBULENT_INLET)) then
       call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
     else if (Btype(We)==BC_INLET_FROM_FILE) then
       call GetInletFromFile(time_stepping%time)
@@ -140,7 +141,7 @@ contains
           call SpongeTop(U2, V2, W2)
       end if
 
-      if (enable_out_sponge) then
+      if (enable_out_sponge_x .or. enable_out_sponge_y) then
 
           call SpongeOut(U2, V2, W2, temperature)
       end if
@@ -204,7 +205,7 @@ contains
 
 
 
-      if (enable_out_sponge) then
+      if (enable_out_sponge_x .or. enable_out_sponge_y) then
 
         call SpongeOut(U, V, W, temperature)
 

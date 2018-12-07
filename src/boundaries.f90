@@ -466,7 +466,7 @@ implicit none
       end do
     else if (Btype(We)==BC_TURBULENT_INLET.or.Btype(We)==BC_INLET_FROM_FILE) then
       if (reg/=intermediate) then
-       if (component==1) then
+        if (component==1) then
           do k = -1, nz+2
            do j = -1, ny+2
             U(0,j,k) = Uin(j,k)
@@ -659,6 +659,44 @@ implicit none
         U(i,-2,k) = U(i,ny-2,k)
        end do
       end do
+    else if (Btype(So)==BC_TURBULENT_INLET.or.Btype(So)==BC_INLET_FROM_FILE) then
+      if (reg/=intermediate) then
+        if (component==2) then        
+          do k = -1, nz+2
+           do i = -1, nx+2
+            U(i,0,k) = Uin(i,k)
+            U(i,-1,k) = Uin(i,k) + (Uin(i,k)-U(i,1,k))
+            U(i,-2,k) = Uin(i,k) + (Uin(i,k)-U(i,2,k))
+           end do
+          end do
+        else
+          do k = -1, nz+2
+           do i = -1, nx+2
+            U(i,0,k) = Uin(i,k) + (Uin(i,k)-U(i,1,k))
+            U(i,-1,k) = Uin(i,k) + (Uin(i,k)-U(i,2,k))
+            U(i,-2,k) = Uin(i,k) + (Uin(i,k)-U(i,3,k))
+           end do
+          end do
+        end if
+      else
+        if (component==2) then
+           do k = -1, nz+2
+            do i = -1, nx+2
+             U(0,j,k) = 0
+             U(-1,j,k) = -U(1,j,k)
+             U(-2,j,k) = -U(2,j,k)
+            end do
+           end do
+        else
+           do k = -1, nz+2
+            do i = -1, nx+2
+             U(i,0,k) = -U(i,1,k)
+             U(i,-1,k) = -U(i,2,k)
+             U(i,-2,k) = -U(i,3,k)
+            end do
+           end do
+        end if
+      end if
     end if
 
 
@@ -716,6 +754,44 @@ implicit none
         U(i,ny+3,k) = U(i,3,k)
        end do
       end do
+    else if (Btype(No)==BC_TURBULENT_INLET.or.Btype(No)==BC_INLET_FROM_FILE) then
+      if (reg/=intermediate) then
+        if (component==2) then
+          do k = -1, nz+2
+           do i = -1, nx+2
+            U(i,ny+1,k) = Uin(i,k)
+            U(i,ny+2,k) = Uin(i,k) + (Uin(i,k)-U(i,ny,k))
+            U(i,ny+3,k) = Uin(i,k) + (Uin(i,k)-U(i,ny-1,k))
+           end do
+          end do
+        else
+          do k = -1, nz+2
+           do i = -1, nx+2
+            U(i,ny+1,k) = Uin(i,k) + (Uin(i,k)-U(i,ny,k))
+            U(i,ny+2,k) = Uin(i,k) + (Uin(i,k)-U(i,ny-1,k))
+            U(i,ny+3,k) = Uin(i,k) + (Uin(i,k)-U(i,ny-2,k))
+           end do
+          end do
+        end if
+      else
+        if (component==2) then
+           do k = -1, nz+2
+            do i = -1, nx+2
+             U(i,ny+1,k) = 0
+             U(i,ny+2,k) = -U(i,ny,k)
+             U(i,ny+3,k) = -U(i,ny-1,k)
+            end do
+           end do
+        else
+           do k = -1, nz+2
+            do i = -1, nx+2
+             U(i,ny+1,k) = -U(i,ny,k)
+             U(i,ny+2,k) = -U(i,ny-1,k)
+             U(i,ny+3,k) = -U(i,ny-2,k)
+            end do
+           end do
+        end if
+      end if
     end if
     !$omp end parallel sections
 
