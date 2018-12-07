@@ -17,7 +17,8 @@ module exchange_par
   
   private
   
-  public par_exchange_boundaries, par_exchange_boundaries_yz, par_exchange_Pr, &
+  public par_exchange_boundaries, par_exchange_boundaries_xz, par_exchange_boundaries_yz, &
+         par_exchange_Pr, &
          par_exchange_Q, par_exchange_Sc_x, par_exchange_Sc_y, par_exchange_Sc_z, &
          par_exchange_U_x, par_exchange_U_y, par_exchange_U_z, &
          par_exchange_UVW, &
@@ -648,6 +649,172 @@ contains
 
   
   
+  subroutine par_exchange_boundaries_xz(Phi, nx, nz, Btype, lbx, lbz, widthx, widthz)
+    use Parameters, only: We, Ea, Bo, To, BC_MPI_PERIODIC
+    real(knd), intent(inout), contiguous :: Phi(lbx:, lbz:)
+    integer, intent(in) :: nx, nz
+    integer, intent(in) :: Btype(6)
+    integer, intent(in) :: lbx, lbz, widthx, widthz
+    logical :: oddx, oddz, evenx, evenz
+    integer :: ierr, tag
+    logical :: xdir, zdir
+    
+    ierr = 0; tag = 1500
+    
+    oddx = mod(iim,2) == 1
+    evenx = .not. oddx
+    
+    oddz = mod(kim,2) == 1
+    evenz = .not. oddz
+
+    !internal boundaries
+
+    tag = tag + 1
+    if (oddx) then
+      call send_w
+    else
+      call recv_e
+    end if
+    if (evenx) then
+      call send_w
+    else
+      call recv_e
+    end if
+
+    tag = tag + 1
+    if (oddx) then
+      call send_e
+    else
+      call recv_w
+    end if
+    if (evenx) then
+      call send_w
+    else
+      call recv_w
+    end if
+
+
+    tag = tag + 1
+    if (oddz) then
+      call send_b
+    else
+      call recv_t
+    end if
+    if (evenz) then
+      call send_b
+    else
+      call recv_t
+    end if
+
+    tag = tag + 1
+    if (oddz) then
+      call send_t
+    else
+      call recv_b
+    end if
+    if (evenz) then
+      call send_t
+    else
+      call recv_b
+    end if
+
+    !global domain boundaries
+
+    tag = tag + 1
+    if (Btype(We)==BC_MPI_PERIODIC.or.Btype(Ea)==BC_MPI_PERIODIC) then
+      if (iim==1) then
+        call send(Phi(1:0+widthx,1:nz), w_rank)
+      else if (iim==nxims) then
+        call recv(Phi(nx+1:nx+widthx,1:nz), e_rank)
+      end if
+      if (iim==nxims) then
+        call send(Phi(nx+1-widthx:nx,1:nz), e_rank)
+      else if (iim==1) then
+        call recv(Phi(1-widthx:0,1:nz), w_rank)
+      end if
+    end if
+
+
+
+    tag = tag + 1
+    if (Btype(Bo)==BC_MPI_PERIODIC.or.Btype(To)==BC_MPI_PERIODIC) then
+      if (kim==1) then
+        call send(Phi(1-widthx:nx+widthx,1:0+widthz), b_rank)
+      else if (kim==nzims) then
+        call recv(Phi(1-widthx:nx+widthx,nz+1:nz+widthz), t_rank)
+      end if
+      if (kim==nzims) then
+        call send(Phi(1-widthx:nx+widthx,nz+1-widthz:nz), t_rank)
+      else if (kim==1) then
+        call recv(Phi(1-widthx:nx+widthx,1-widthz:0), b_rank)
+      end if
+    end if
+
+    
+  contains
+  
+  
+    subroutine send(a,to)
+      real(knd), intent(in) :: a(:,:)
+      integer, intent(in) :: to
+      !Must be domain_comm, for `to` and `from` derived from `x_rank` to be valid!
+      call MPI_Send(a, size(a) , MPI_KND, to, tag, domain_comm, ierr)
+      if (ierr/=0) stop "error sending MPI message."
+    end subroutine
+    
+    subroutine recv(a,from)
+      real(knd), intent(out) :: a(:,:)
+      integer, intent(in) :: from
+
+      call MPI_Recv(a, size(a) , MPI_KND, from, tag, domain_comm, MPI_STATUS_IGNORE, ierr)
+      if (ierr/=0) stop "error receiving MPI message."
+    end subroutine
+    
+
+    subroutine send_w
+      if (iim>1) then
+        call send(Phi(1:0+widthx,1:nz), w_rank)
+      end if
+    end subroutine
+    subroutine recv_w
+      if (iim>1) then
+        call recv(Phi(1-widthx:0,1:nz), w_rank)
+      end if
+    end subroutine
+    subroutine send_e
+      if (iim<nxims) then
+        call send(Phi(nx+1-widthx:nx,1:nz), e_rank)
+      end if
+    end subroutine
+    subroutine recv_e
+      if (iim<nxims) then
+        call recv(Phi(nx+1:nx+widthx,1:nz), e_rank)
+      end if
+    end subroutine
+    subroutine send_b
+      if (kim>1) then
+        call send(Phi(1-widthx:nx+widthx,1:0+widthz), b_rank)
+      end if
+    end subroutine
+    subroutine recv_b
+      if (kim>1) then
+        call recv(Phi(1-widthx:nx+widthx,1-widthz:0), b_rank)
+      end if
+    end subroutine
+    subroutine send_t
+      if (kim<nzims) then
+        call send(Phi(1-widthx:nx+widthx,nz+1-widthz:nz), t_rank)
+      end if
+    end subroutine
+    subroutine recv_t
+      if (kim<nzims) then
+        call recv(Phi(1-widthx:nx+widthx,nz+1:nz+widthz), t_rank)
+      end if
+    end subroutine
+    
+  end subroutine par_exchange_boundaries_xz
+  
+  
   subroutine par_exchange_boundaries_yz(Phi, ny, nz, Btype, lby, lbz, widthy, widthz)
     use Parameters, only: So, No, Bo, To, BC_MPI_PERIODIC
     real(knd), intent(inout), contiguous :: Phi(lby:, lbz:)
@@ -658,7 +825,7 @@ contains
     integer :: ierr, tag
     logical :: ydir, zdir
     
-    ierr = 0; tag = 1500
+    ierr = 0; tag = 1600
     
     oddy = mod(jim,2) == 1
     eveny = .not. oddy
