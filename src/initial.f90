@@ -2912,7 +2912,7 @@ fields_do:  do j = 1, size(obj_fields)
               
                 block
                   use custom_par
-                  integer :: ierr, stat
+                  integer :: ierr, stat(MPI_STATUS_SIZE)
                   do j = 1, Prny
                     call MPI_Recv(U(1:Unx,j,1:Unz), Unx*Unz, PAR_KND, &
                                   ranks_grid(iim,1,kim), 111, domain_comm, stat, ierr)
