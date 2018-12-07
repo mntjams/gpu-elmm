@@ -133,7 +133,6 @@ contains
     end if
       
     read(g%hu) nxs
-    print *, nxs
     
     allocate(g%x(nxs(1)))
     allocate(g%y(nxs(2)))
