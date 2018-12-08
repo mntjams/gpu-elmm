@@ -2845,13 +2845,13 @@ fields_do:  do j = 1, size(obj_fields)
 
             call par_sync_out("  ...computing turbulent initial conditions.")
 
-            dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Uny,1:Unz)),avg(Vin(1:Vny,1:Vnz)))
-
             if (default_turbulence_generator%direction==2) then
               if (jim==1.and.Btype(So)==BC_TURBULENT_INLET) then
             
                 do j = 1, Prny
                   
+                  dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Unx,1:Unz)),avg(Vin(1:Vnx,1:Vnz)))
+
                   call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
 
                   !$omp parallel private(i,k)
@@ -2927,6 +2927,8 @@ fields_do:  do j = 1, size(obj_fields)
               
             else
             
+              dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Uny,1:Unz)),avg(Vin(1:Vny,1:Vnz)))
+
               do i = 1, Prnx
                 
                 call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
@@ -3553,8 +3555,11 @@ fields_do:  do j = 1, size(obj_fields)
 
     call par_sync_out("  ...getting inlet conditions.")
 
-
-    allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
+    if (default_turbulence_generator%direction==2) then
+      allocate(Uin(-2:Unx+3,-2:Unz+3),Vin(-2:Vnx+3,-2:Vnz+3),Win(-2:Wnx+3,-2:Wnz+3))
+    else
+      allocate(Uin(-2:Uny+3,-2:Unz+3),Vin(-2:Vny+3,-2:Vnz+3),Win(-2:Wny+3,-2:Wnz+3))
+    end if
     Uin = 0
     Vin = 0
     Win = 0
