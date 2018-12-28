@@ -682,9 +682,9 @@ implicit none
         if (component==2) then
            do k = -1, nz+2
             do i = -1, nx+2
-             U(0,j,k) = 0
-             U(-1,j,k) = -U(1,j,k)
-             U(-2,j,k) = -U(2,j,k)
+             U(i,0,k) = 0
+             U(i,-1,k) = -U(i,1,k)
+             U(i,-2,k) = -U(i,2,k)
             end do
            end do
         else
