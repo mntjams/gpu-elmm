@@ -2048,7 +2048,7 @@ fields_do:  do j = 1, size(obj_fields)
           write(*,*) "Error interpretting the clock_time_limit value. Received: '",clock_time_limit_str(1:l-1),"'."
           call error_stop()
         end if
-        
+        print *, time_stepping%clock_time_limit, mult
         time_stepping%clock_time_limit = time_stepping%clock_time_limit * mult
       end if
 
@@ -2890,7 +2890,7 @@ fields_do:  do j = 1, size(obj_fields)
                   !$omp end do
                   !$omp end parallel             
                 end do
-                
+#ifdef PAR                
                 block
                   use custom_par
                   integer :: ierr, im
@@ -2907,9 +2907,9 @@ fields_do:  do j = 1, size(obj_fields)
                     end do
                   end do
                 end block
-                
+#endif                
               else
-              
+#ifdef PAR              
                 block
                   use custom_par
                   integer :: ierr, stat(MPI_STATUS_SIZE)
@@ -2922,7 +2922,7 @@ fields_do:  do j = 1, size(obj_fields)
                                   ranks_grid(iim,1,kim), 113, domain_comm, stat, ierr)
                   end do
                 end block
-                
+#endif                
               end if
               
             else
