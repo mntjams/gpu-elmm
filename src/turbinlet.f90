@@ -394,11 +394,17 @@ contains
 #ifdef PAR
     p = par_co_sum(p, g%comm)
 #endif
-    p = g%compat / p                  !To ensure the g%compatibility condition.
+    p = p - g%compat                  !To ensure the g%compatibility condition.
+    
+    if (g%direction==2) then
+      p = p / (Vnx * Vnz)
+    else
+      p = p / (Uny * Unz)
+    end if
 
-    call multiply(Uin, p)
-    call multiply(Vin, p)
-    call multiply(Win, p)
+    call add(Uin, p)
+    call add(Vin, p)
+    call add(Win, p)
 
 
     call g%bound_Uin(1, Uin)

@@ -75,6 +75,9 @@ contains
 
 
   subroutine FindInsideCells
+#ifdef PAR
+    use custom_par
+#endif
     !find if the gridpoints lie inside a solid body and write its number
     !do not nullify the .type arrays, they could have been made nonzero by other unit
 
@@ -89,90 +92,118 @@ contains
       call SetVtype(SolidBodiesArray(nbody))
       call SetWtype(SolidBodiesArray(nbody))
     end do
-
-    contains
-
-      subroutine SetPrtype(CurrentSB)
-        type(SolidBody) :: CurrentSB
-        integer :: i,j,k
-
-        if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
     
-        !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = -2, Prnz+3
-          if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
-          do j = -2, Prny+3
-            if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
-            do i = -2, Prnx+3
-              if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
-              if (CurrentSB%Inside(xPr(i), yPr(j), zPr(k), delta)) &
-                        Prtype(i,j,k) = CurrentSB%numofbody
-            enddo
-          enddo
-        enddo
-        !$omp end parallel do
-      end subroutine
-
-      subroutine SetUtype(CurrentSB)
-        type(SolidBody) :: CurrentSB
-        integer :: i,j,k
-
-        if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
+    !set information about numbers of occupied points
+    n_free_im   = count(Prtype(1:Prnx,1:Prny,1:Prnz)==0)
+    n_free_im_U = count(Utype(1:Unx,1:Uny,1:Unz)==0)
+    n_free_im_V = count(Vtype(1:Vnx,1:Vny,1:Vnz)==0)
+    n_free_im_W = count(Wtype(1:Wnx,1:Wny,1:Wnz)==0)
     
-        !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = -2, Unz+3
-          if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle 
-          do j = -2, Uny+3
-            if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
-            do i = -2, Unx+3
-              if (xU(i) > obstacles_bbox(Ea) .or. xU(i) < obstacles_bbox(We)) cycle
-              if (CurrentSB%Inside(xU(i), yPr(j) ,zPr(k), delta)) &
-                         Utype(i,j,k) = CurrentSB%numofbody
-            enddo
-          enddo
-        enddo
-        !$omp end parallel do
-      end subroutine
-
-      subroutine SetVtype(CurrentSB)
-        type(SolidBody) :: CurrentSB
-        integer :: i,j,k
-
-        if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
+    n_full_im   = Prnx*Prny*Prnz - n_free_im
+    n_full_im_U = Unx*Uny*Unz - n_free_im_U
+    n_full_im_V = Vnx*Vny*Vnz - n_free_im_V
+    n_full_im_W = Wnx*Wny*Wnz - n_free_im_W
     
-        !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = -2, Vnz+3
-          if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
-          do j = -2, Vny+3
-            if (yV(j) > obstacles_bbox(No) .or. yV(j) < obstacles_bbox(So)) cycle
-            do i = -2, Vnx+3
-              if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
-              if (CurrentSB%Inside(xPr(i), yV(j), zPr(k), delta)) &
-                         Vtype(i,j,k) = CurrentSB%numofbody
-            enddo
+#ifdef PAR
+    n_free_domain   = par_co_sum(n_free_im)
+    n_free_domain_U = par_co_sum(n_free_im_U)
+    n_free_domain_V = par_co_sum(n_free_im_V)
+    n_free_domain_W = par_co_sum(n_free_im_W)
+#else    
+    n_free_domain   = n_free_im
+    n_free_domain_U = n_free_im_U
+    n_free_domain_V = n_free_im_V
+    n_free_domain_W = n_free_im_W
+#endif
+
+    n_full_domain   = gPrnx*gPrny*gPrnz - n_free_domain
+    n_full_domain_U = gUnx*gUny*gUnz - n_free_domain_U
+    n_full_domain_V = gVnx*gVny*gVnz - n_free_domain_V
+    n_full_domain_W = gWnx*gWny*gWnz - n_free_domain_W
+
+  contains
+
+    subroutine SetPrtype(CurrentSB)
+      type(SolidBody) :: CurrentSB
+      integer :: i,j,k
+
+      if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
+  
+      !$omp parallel do private(i,j,k) schedule(dynamic)
+      do k = -2, Prnz+3
+        if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
+        do j = -2, Prny+3
+          if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
+          do i = -2, Prnx+3
+            if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
+            if (CurrentSB%Inside(xPr(i), yPr(j), zPr(k), delta)) &
+                      Prtype(i,j,k) = CurrentSB%numofbody
           enddo
         enddo
-        !$omp end parallel do
-      end subroutine
+      enddo
+      !$omp end parallel do
+    end subroutine
 
-      subroutine SetWtype(CurrentSB)
-        type(SolidBody) :: CurrentSB
-        integer :: i,j,k
+    subroutine SetUtype(CurrentSB)
+      type(SolidBody) :: CurrentSB
+      integer :: i,j,k
 
-        !$omp parallel do private(i,j,k) schedule(dynamic)
-        do k = -2, Wnz+3
-          if (zW(k) > obstacles_bbox(To) .or. zW(k) < obstacles_bbox(Bo)) cycle
-          do j = -2, Wny+3
-            if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
-            do i = -2, Wnx+3
-              if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
-              if (CurrentSB%Inside(xPr(i), yPr(j), zW(k), delta)) &
-                         Wtype(i,j,k) = CurrentSB%numofbody
-            enddo
+      if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
+  
+      !$omp parallel do private(i,j,k) schedule(dynamic)
+      do k = -2, Unz+3
+        if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle 
+        do j = -2, Uny+3
+          if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
+          do i = -2, Unx+3
+            if (xU(i) > obstacles_bbox(Ea) .or. xU(i) < obstacles_bbox(We)) cycle
+            if (CurrentSB%Inside(xU(i), yPr(j) ,zPr(k), delta)) &
+                        Utype(i,j,k) = CurrentSB%numofbody
           enddo
         enddo
-        !$omp end parallel do
-      end subroutine
+      enddo
+      !$omp end parallel do
+    end subroutine
+
+    subroutine SetVtype(CurrentSB)
+      type(SolidBody) :: CurrentSB
+      integer :: i,j,k
+
+      if (CurrentSB%numofbody==0) call error_stop("Error, numofbody==0, did you use AddSolidBody()?")
+  
+      !$omp parallel do private(i,j,k) schedule(dynamic)
+      do k = -2, Vnz+3
+        if (zPr(k) > obstacles_bbox(To) .or. zPr(k) < obstacles_bbox(Bo)) cycle
+        do j = -2, Vny+3
+          if (yV(j) > obstacles_bbox(No) .or. yV(j) < obstacles_bbox(So)) cycle
+          do i = -2, Vnx+3
+            if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
+            if (CurrentSB%Inside(xPr(i), yV(j), zPr(k), delta)) &
+                        Vtype(i,j,k) = CurrentSB%numofbody
+          enddo
+        enddo
+      enddo
+      !$omp end parallel do
+    end subroutine
+
+    subroutine SetWtype(CurrentSB)
+      type(SolidBody) :: CurrentSB
+      integer :: i,j,k
+
+      !$omp parallel do private(i,j,k) schedule(dynamic)
+      do k = -2, Wnz+3
+        if (zW(k) > obstacles_bbox(To) .or. zW(k) < obstacles_bbox(Bo)) cycle
+        do j = -2, Wny+3
+          if (yPr(j) > obstacles_bbox(No) .or. yPr(j) < obstacles_bbox(So)) cycle
+          do i = -2, Wnx+3
+            if (xPr(i) > obstacles_bbox(Ea) .or. xPr(i) < obstacles_bbox(We)) cycle
+            if (CurrentSB%Inside(xPr(i), yPr(j), zW(k), delta)) &
+                        Wtype(i,j,k) = CurrentSB%numofbody
+          enddo
+        enddo
+      enddo
+      !$omp end parallel do
+    end subroutine
 
   end subroutine FindInsideCells
 

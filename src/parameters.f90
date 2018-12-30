@@ -198,6 +198,11 @@ module Parameters
   integer, allocatable, dimension(:,:) :: Unull, Vnull, Wnull                !indexes of points to be nulled every timestep
 
   integer   :: nUnull, nVnull, nWnull  !second dimension of arrays above (number of points)
+  
+  integer :: n_free_im, n_free_im_U, n_free_im_V, n_free_im_W
+  integer :: n_free_domain, n_free_domain_U, n_free_domain_V, n_free_domain_W
+  integer :: n_full_im, n_full_im_U, n_full_im_V, n_full_im_W
+  integer :: n_full_domain, n_full_domain_U, n_full_domain_V, n_full_domain_W
 
   logical   :: xgridfromfile, ygridfromfile, zgridfromfile
   integer   :: initcondsfromfile

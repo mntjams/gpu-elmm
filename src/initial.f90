@@ -1824,6 +1824,74 @@ fields_do:  do j = 1, size(obj_fields)
   end subroutine get_pressure_gradient
 
 
+  subroutine get_forcing(fname)
+    use Strings
+    use ParseTrees
+    use LinearForcing
+    character(*), intent(in) :: fname
+    real(knd), target :: constant = 0, tke0 = 0, epsilon0 = 0, Umean(3) = 0
+    logical, target :: enable = .false., &
+                       enable_tke0_epsilon0 = .false., &
+                       variable_means = .false.
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: i, stat
+    
+    type(field_names) :: fields(4)
+    type(field_names_a) :: fields_a(1)
+    
+    fields = [field_names_init("variable_means",       variable_means), &
+              field_names_init("forcing_constant",     constant), &
+              field_names_init("tke",                  tke0), &
+              field_names_init("epsilon",              epsilon0)]
+
+    fields_a = [field_names_a_init("Umean",     Umean)]
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+
+      if (allocated(tree)) then
+
+        call find_object_get_field_values(tree, "linear_forcing", stat, &
+                                     fields, fields_a)
+
+        if (stat<=0) call init
+        
+        do i = 1, size(tree)
+          call tree(i)%finalize
+        end do
+      end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+    
+  contains
+  
+    subroutine init
+      enable = .true.
+      
+      if (tke0>0 .and. epsilon0>0) then
+        enable_tke0_epsilon0 = .true.
+      else if (tke0>0 .or. epsilon0>0) then
+        call error_stop("Error in forcing.conf. Linear forcing requires both or &
+                         & none of tke and epsilon to be specified and nonzero.")
+      end if
+      
+      call init_linear_forcing(enable, enable_tke0_epsilon0, variable_means, &
+                               constant, tke0, epsilon0, Umean)
+    end subroutine
+    
+  end subroutine get_forcing
+
+
   subroutine get_profiles(fname, profiles_config, enable_profiles)
     use Strings
     use ParseTrees
@@ -2682,6 +2750,7 @@ fields_do:  do j = 1, size(obj_fields)
     real(knd), intent(out) :: dt
     integer :: i,j,k
     real(knd) :: p,x,y,z,x1,x2,y1,y2,z1,z2
+    real(knd) :: U_initial_scaling
     real(knd),allocatable :: Q(:,:,:)
     logical :: receive_ic
 
@@ -2844,14 +2913,24 @@ fields_do:  do j = 1, size(obj_fields)
         else if (InletType==TurbulentInletType) then
 
             call par_sync_out("  ...computing turbulent initial conditions.")
+            
+            U_initial_scaling = hypot(maxval(Uin),maxval(Vin))
+            
+            if (time_stepping%variable_time_steps) then
+              U_initial_scaling = max(U_initial_scaling, maxval(time_stepping%U_min))
+            end if
+            
+            dt = hypot(dxmin,dymin) / U_initial_scaling
+            
+            if (time_stepping%variable_time_steps) then
+              dt = min(dt, time_stepping%dt)
+            end if
 
             if (default_turbulence_generator%direction==2) then
               if (jim==1.and.Btype(So)==BC_TURBULENT_INLET) then
             
                 do j = 1, Prny
                   
-                  dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Unx,1:Unz)),avg(Vin(1:Vnx,1:Vnz)))
-
                   call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
 
                   !$omp parallel private(i,k)
@@ -2926,8 +3005,6 @@ fields_do:  do j = 1, size(obj_fields)
               end if
               
             else
-            
-              dt = hypot(dxmin,dymin) / hypot(avg(Uin(1:Uny,1:Unz)),avg(Vin(1:Vny,1:Vnz)))
 
               do i = 1, Prnx
                 
@@ -3552,7 +3629,13 @@ fields_do:  do j = 1, size(obj_fields)
     !Requires grid coordinates
     call get_geostrophic_wind("geostrophic_wind_profile.conf", geostrophic_wind)
 
+    
+    call par_sync_out("  ...reading forcing.conf")
 
+
+    call get_forcing("forcing.conf")
+    
+    
     call par_sync_out("  ...getting inlet conditions.")
 
     if (default_turbulence_generator%direction==2) then
