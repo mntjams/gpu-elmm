@@ -33,9 +33,11 @@ module domains_bc_types
     !makes sence when parent changes pressure-gradient dynamically
     logical :: exchange_pr_gradient_x = .false.
     logical :: exchange_pr_gradient_y = .false.
+    logical :: exchange_pr_gradient_z = .false.
 
     real(knd) :: pr_gradient_x = 0
     real(knd) :: pr_gradient_y = 0
+    real(knd) :: pr_gradient_z = 0
     real(knd) :: pr_gradient_x_dt = 0
     real(knd) :: pr_gradient_y_dt = 0
   end type

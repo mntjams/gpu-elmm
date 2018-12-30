@@ -164,6 +164,13 @@ contains
                         call send_scalar(b, 13, b%pr_gradient_y)
                         call send_scalar(b, 14, b%pr_gradient_y_dt)
                       end if
+
+                      if (b%exchange_pr_gradient_z) then
+                        b%pr_gradient_z_dt = (pr_gradient_z - b%pr_gradient_z) / dt
+                        b%pr_gradient_z = pr_gradient_z
+                        call send_scalar(b, 15, b%pr_gradient_z)
+                        call send_scalar(b, 16, b%pr_gradient_z_dt)
+                      end if
                     end associate
 
                   end do
@@ -202,6 +209,11 @@ contains
               if (b%exchange_pr_gradient_y) then
                 call recv_scalar(b, 13, b%pr_gradient_y)
                 call recv_scalar(b, 14, b%pr_gradient_y_dt)
+              end if
+
+              if (b%exchange_pr_gradient_z) then
+                call recv_scalar(b, 15, b%pr_gradient_z)
+                call recv_scalar(b, 16, b%pr_gradient_z_dt)
               end if
 
               b%time = time
@@ -1319,6 +1331,9 @@ contains
         end if
         if (b%exchange_pr_gradient_y) then
           pr_gradient_y = b%pr_gradient_y + b%pr_gradient_y_dt * t_diff
+        end if
+        if (b%exchange_pr_gradient_z) then
+          pr_gradient_z = b%pr_gradient_z + b%pr_gradient_z_dt * t_diff
         end if
       end associate
     end if

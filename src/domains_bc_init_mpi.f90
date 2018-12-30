@@ -282,6 +282,9 @@ outer:  do dkk = 1, domain_nzims(parent_domain)
 
         if (domain_child_buffer%exchange_pr_gradient_y) &
           enable_pr_gradient_y_uniform = .true.
+
+        if (domain_child_buffer%exchange_pr_gradient_z) &
+          enable_pr_gradient_z_uniform = .true.
       end if
 
     end if !enable_multiple_domains
@@ -1372,6 +1375,7 @@ contains
 
       b%exchange_pr_gradient_x = enable_fixed_flow_rate .and. flow_rate_x_fixed
       b%exchange_pr_gradient_y = enable_fixed_flow_rate .and. flow_rate_y_fixed
+      b%exchange_pr_gradient_z = enable_fixed_flow_rate .and. flow_rate_z_fixed
 
       call MPI_ISend(b%exchange_pr_gradient_x, 1, MPI_LOGICAL, &
                      b%remote_rank, 1, b%comm, &
@@ -1379,6 +1383,11 @@ contains
       requests = [requests, request]
 
       call MPI_ISend(b%exchange_pr_gradient_y, 1, MPI_LOGICAL, &
+                     b%remote_rank, 2, b%comm, &
+                     request, err)
+      requests = [requests, request]
+
+      call MPI_ISend(b%exchange_pr_gradient_z, 1, MPI_LOGICAL, &
                      b%remote_rank, 2, b%comm, &
                      request, err)
       requests = [requests, request]
@@ -1433,6 +1442,11 @@ contains
       requests = [requests, request]
 
       call MPI_IRecv(b%exchange_pr_gradient_y, 1, MPI_LOGICAL, &
+                     b%remote_rank, 2, b%comm, &
+                     request, err)
+      requests = [requests, request]
+
+      call MPI_IRecv(b%exchange_pr_gradient_z, 1, MPI_LOGICAL, &
                      b%remote_rank, 2, b%comm, &
                      request, err)
       requests = [requests, request]
