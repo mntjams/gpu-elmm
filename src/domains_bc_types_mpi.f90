@@ -40,6 +40,7 @@ module domains_bc_types
     real(knd) :: pr_gradient_z = 0
     real(knd) :: pr_gradient_x_dt = 0
     real(knd) :: pr_gradient_y_dt = 0
+    real(knd) :: pr_gradient_z_dt = 0
   end type
 
   !exchanges necessary information with the child domain

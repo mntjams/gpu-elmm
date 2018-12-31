@@ -133,6 +133,8 @@ module Parameters
 
   logical :: enable_pr_gradient_x_uniform = .false.
   logical :: enable_pr_gradient_y_uniform = .false.
+  logical :: enable_pr_gradient_z_uniform = .false.
+  
   logical :: enable_pr_gradient_x_profile = .false.
   logical :: enable_pr_gradient_y_profile = .false.
 
