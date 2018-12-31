@@ -114,7 +114,7 @@ contains
       end do
       !$omp end do
     end if
-
+    
     if (discretization_order==4) then
       !grad p_i = 9/8 (p_i+1 - p_i) / dx  - 1/8 (p_i+2 - p_i-1) / 3*dx
     
@@ -2260,10 +2260,10 @@ contains
 
 
 
-  subroutine CorrectFlowRate(U, V)
+  subroutine CorrectFlowRate(U, V, W)
     use custom_par
 
-    real(knd), intent(inout), contiguous, dimension(-2:,-2:,-2:) :: U, V
+    real(knd), intent(inout), contiguous, dimension(-2:,-2:,-2:) :: U, V, W
 
     real(knd) :: rate_actual
     real(knd) :: pr_gradient_diff
@@ -2320,6 +2320,33 @@ contains
       !$omp end parallel do
 
       pr_gradient_y = pr_gradient_y + pr_gradient_diff
+    end if
+
+      
+    if (flow_rate_z_fixed) then
+      if (kim==nzims) then
+        rate_actual = sum(W(1:Wnx, 1:Wny, Wnz)) * dxmin * dymin
+#ifdef PAR        
+        rate_actual = par_co_sum_plane_xy(rate_actual)
+#endif
+      end if
+
+#ifdef PAR        
+      call par_broadcast_from_last_z(rate_actual)
+#endif
+      pr_gradient_diff = (rate_actual - flow_rate_z) / (dxmin * dymin * gPrnx * gPrny)
+
+      !$omp parallel do private(i,j,k)
+      do k = 1, Wnz
+        do j = 1, Wny
+          do i = 1, Wnx
+            W(i,j,k) = W(i,j,k) - pr_gradient_diff
+          end do
+        end do
+      end do
+      !$omp end parallel do
+
+      pr_gradient_z = pr_gradient_z + pr_gradient_diff
     end if
       
   end subroutine CorrectFlowRate

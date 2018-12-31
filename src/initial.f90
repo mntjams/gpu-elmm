@@ -3265,7 +3265,7 @@ fields_do:  do j = 1, size(obj_fields)
      call BoundViscosity(Viscosity)
 
      call par_sync_out("  ...initializing fixed flow_rates.")
-     call InitFlowRates(U, V)
+     call InitFlowRates(U, V, W)
 
 #ifdef PAR
      if (enable_multiple_domains) then
@@ -3871,21 +3871,30 @@ fields_do:  do j = 1, size(obj_fields)
       flow_rate_y_fixed = par_co_any(flow_rate_y_fixed)     
 #endif
 
+      if (kim==nzims .and. Btype(To)==BC_PERIODIC) then
+        flow_rate_z_fixed = .true.
+      end if
+
+#ifdef PAR        
+      flow_rate_z_fixed = par_co_any(flow_rate_z_fixed)     
+#endif
+
     end if
 
   end subroutine
 
 
-  subroutine InitFlowRates(U, V)
+  subroutine InitFlowRates(U, V, W)
 #ifdef PAR
     use custom_par
 #endif
-    real(knd), intent(in), contiguous, dimension(-2:,-2:,-2:) :: U, V
+    real(knd), intent(in), contiguous, dimension(-2:,-2:,-2:) :: U, V, W
 
     if (enable_fixed_flow_rate) then
 
       if (flow_rate_x_fixed) then
-        if (initcondsfromfile==0.and.inlettype==TurbulentInletType) then
+        if (initcondsfromfile==0.and.inlettype==TurbulentInletType.and. &
+            default_turbulence_generator%direction==1) then
           flow_rate_x = sum(default_turbulence_generator%Uinavg(1:Uny, 1:Unz)) &
                         * dymin * dzmin
         else
@@ -3900,7 +3909,8 @@ fields_do:  do j = 1, size(obj_fields)
 
 
       if (flow_rate_y_fixed) then
-        if (initcondsfromfile==0.and.inlettype==TurbulentInletType) then
+        if (initcondsfromfile==0.and.inlettype==TurbulentInletType.and. &
+            default_turbulence_generator%direction==2) then
           !average V
           flow_rate_y = sum(default_turbulence_generator%Vinavg(1:Vny, 1:Vnz)) &
                         / (Vny*Vnz)
@@ -3912,6 +3922,16 @@ fields_do:  do j = 1, size(obj_fields)
 #ifdef PAR
         flow_rate_y = par_co_sum_plane_xz(flow_rate_y)
         call par_broadcast_from_last_y(flow_rate_y)
+#endif
+      end if
+      
+
+      if (flow_rate_z_fixed) then
+        flow_rate_z = sum(W(1:Wnx, 1:Wny, Wnz)) * dxmin * dymin
+
+#ifdef PAR
+        flow_rate_z = par_co_sum_plane_xy(flow_rate_z)
+        call par_broadcast_from_last_z(flow_rate_z)
 #endif
       end if
 

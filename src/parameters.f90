@@ -128,7 +128,7 @@ module Parameters
   real(knd) :: molecular_diffusivity = 1._knd / 70000 / 0.7 !default Prandtl number 0.7
 
 
-  real(knd) :: pr_gradient_x = 0, pr_gradient_y = 0
+  real(knd) :: pr_gradient_x = 0, pr_gradient_y = 0, pr_gradient_z = 0
   real(knd), allocatable :: pr_gradient_profile_x(:), pr_gradient_profile_y(:)
 
   logical :: enable_pr_gradient_x_uniform = .false.
@@ -244,8 +244,8 @@ module Parameters
   !set by user
   logical :: enable_fixed_flow_rate = .false.
   !set from boundary conditions automatically
-  logical :: flow_rate_x_fixed = .false., flow_rate_y_fixed = .false.
-  real(knd) :: flow_rate_x, flow_rate_y
+  logical :: flow_rate_x_fixed = .false., flow_rate_y_fixed = .false., flow_rate_z_fixed = .false.
+  real(knd) :: flow_rate_x, flow_rate_y, flow_rate_z
 
   !inlet types
   integer, parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
