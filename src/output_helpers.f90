@@ -7,15 +7,18 @@ contains
 
 
   function TotKE(U,V,W) result(res)
+#ifdef PAR
+  use custom_par
+#endif
     real(knd) :: res
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     real(knd) :: Um,Vm,Wm
     integer :: i,j,k
     real(knd) :: lx,ly,lz
 
-    lx = xU(Prnx) - xU(0)
-    ly = yV(Prny) - yV(0)
-    lz = zW(Prnz) - zW(0)
+    lx = gxmax - gxmin
+    ly = gymax - gymin
+    lz = gzmax - gzmin
 
     res = 0
 
@@ -31,11 +34,16 @@ contains
     end do
     !$omp end parallel do
     
+#ifdef PAR
+    res = par_co_sum(res)
+#endif    
+
     !2**2 for the average above, 2 from the definition of kinetic energy
-    res = res / 8
+    res = res / 8;print *,"*",res
     !average
-    res = res / (Prnx*Prny*Prnz)
+    res = res / (gPrnx*gPrny*gPrnz)
     !integrate
+
     res = res*lx*ly*lz
   end function TotKE
 
