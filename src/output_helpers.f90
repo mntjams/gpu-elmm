@@ -39,7 +39,7 @@ contains
 #endif    
 
     !2**2 for the average above, 2 from the definition of kinetic energy
-    res = res / 8;print *,"*",res
+    res = res / 8
     !average
     res = res / (gPrnx*gPrny*gPrnz)
     !integrate

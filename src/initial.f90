@@ -2116,7 +2116,7 @@ fields_do:  do j = 1, size(obj_fields)
           write(*,*) "Error interpretting the clock_time_limit value. Received: '",clock_time_limit_str(1:l-1),"'."
           call error_stop()
         end if
-        print *, time_stepping%clock_time_limit, mult
+
         time_stepping%clock_time_limit = time_stepping%clock_time_limit * mult
       end if
 
