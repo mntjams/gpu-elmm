@@ -105,9 +105,9 @@ contains
     real(knd) :: tke, c
   
     if (enable_forcing_variable_means)  call mean_UVW(Umean, U, V, W)
-    
+  
     call mean_TKE(tke, U, V, W, Umean)
-print *,tke
+
     tke = max(0.01_knd * forcing_tke0, min(100._knd * forcing_tke0, tke))
 
     c = forcing_tke0 / tke
@@ -227,7 +227,7 @@ print *,tke
         n_full_im_V==0.and. &
         n_full_im_W==0) then
         
-      !$omp parallel do private(i,j,k) collapse(3)
+      !$omp parallel do private(i,j,k) reduction(+:tke) collapse(3)
       do k = 1, Prnz
         do j = 1, Prny
           do i = 1, Prnx
@@ -241,7 +241,7 @@ print *,tke
       
       tke = tke / 8
     else
-      !$omp parallel do private(i,j,k) collapse(3)
+      !$omp parallel do private(i,j,k) reduction(+:tke) collapse(3)
       do k = 1, Prnz
         do j = 1, Prny
           do i = 1, Prnx
@@ -253,10 +253,10 @@ print *,tke
         end do
       end do
       !$omp end parallel do
-      
+     
       tke = tke / 8
     end if
-        
+       
 #ifdef PAR
     tke = par_co_sum(tke)
 #endif
