@@ -1832,15 +1832,17 @@ fields_do:  do j = 1, size(obj_fields)
     real(knd), target :: constant = 0, tke0 = 0, epsilon0 = 0, Umean(3) = 0
     logical, target :: enable = .false., &
                        enable_tke0_epsilon0 = .false., &
-                       variable_means = .false.
+                       variable_means = .false., &
+                       filter = .false.
     type(tree_object), allocatable :: tree(:)
     logical :: ex
     integer :: i, stat
     
-    type(field_names) :: fields(4)
+    type(field_names) :: fields(5)
     type(field_names_a) :: fields_a(1)
     
     fields = [field_names_init("variable_means",       variable_means), &
+              field_names_init("filter",               filter), &
               field_names_init("forcing_constant",     constant), &
               field_names_init("tke",                  tke0), &
               field_names_init("epsilon",              epsilon0)]
@@ -1885,7 +1887,7 @@ fields_do:  do j = 1, size(obj_fields)
                          & none of tke and epsilon to be specified and nonzero.")
       end if
       
-      call init_linear_forcing(enable, enable_tke0_epsilon0, variable_means, &
+      call init_linear_forcing(enable, enable_tke0_epsilon0, variable_means, filter, &
                                constant, tke0, epsilon0, Umean)
     end subroutine
     
