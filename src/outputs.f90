@@ -1774,20 +1774,58 @@ contains
                        Pr, Temperature, Moisture, &
                        UU, VV, WW, UV, UW, VW, &
                        TKE_sgs, UU_sgs, VV_sgs, WW_sgs, UV_sgs, UW_sgs, VW_sgs)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U, V, W
+    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U, V, W
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU, VV, WW
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV, UW, VW
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: TKE_sgs
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU_sgs, VV_sgs, WW_sgs
     real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV_sgs, UW_sgs, VW_sgs
-    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(in)    :: Pr
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Temperature
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)    :: Moisture
+    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: Pr
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(inout) :: Temperature
+    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(inout) :: Moisture
     character(70) :: str
     integer :: i,j,k,unit
     real(real32),allocatable :: tmp(:,:,:,:), sc_tmp(:,:,:)
+    real(knd) :: time_factor
 
-    if (averaging==1) then
+    if (averaging==1 .and. time_stepping%time > timeavg1) then
+      if (time_stepping%time < timeavg2) then
+        time_factor = (timeavg2 - timeavg1) / (time_stepping%time - timeavg1)
+        
+        U = U * time_factor
+        V = V * time_factor
+        W = W * time_factor
+        
+        if (store%avg_Pr==1) then
+          Pr = Pr * time_factor
+        end if
+
+        if (enable_buoyancy.and.store%avg_temperature==1) then
+          Temperature = Temperature * time_factor
+        end if
+
+        if (enable_moisture.and.store%avg_moisture==1) then
+          Moisture = Moisture * time_factor
+        end if                
+        
+        if (store%avg_UU_prime>0) then
+          UU = UU * time_factor
+          VV = VV * time_factor
+          WW = WW * time_factor
+          UV = UV * time_factor
+          UW = UW * time_factor
+          VW = VW * time_factor
+          UU_sgs = UU_sgs * time_factor
+          VV_sgs = VV_sgs * time_factor
+          WW_sgs = WW_sgs * time_factor
+          UV_sgs = UV_sgs * time_factor
+          UW_sgs = UW_sgs * time_factor
+          VW_sgs = VW_sgs * time_factor
+          TKE_sgs = TKE_sgs * time_factor
+        end if
+        
+      end if
+    
       if (store%avg_UU_prime>0) then
         UU = UU - U**2
         VV = VV - V**2
@@ -2034,19 +2072,30 @@ contains
   end subroutine OutputAvg
 
   subroutine OutputScalarStats(S_avg, S_var, S_max, S_int)
-    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: S_avg, S_max, S_int
-    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(inout) :: S_var
+    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(inout) :: S_avg, S_var
+    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: S_max, S_int
     character(70) :: str
     integer :: unit
+    real(knd) :: time_factor
 
-    if (store%scalars_variance==1) S_var = S_var - S_avg**2
-    
     if (averaging==1.and. &
          (store%scalars_avg==1.or. &
           store%scalars_max==1.or. &
           store%scalars_intermitency==1) &
-        .and. num_of_scalars>0) then
+        .and. num_of_scalars>0 &
+        .and. time_stepping%time > timeavg1) then
        
+      if (time_stepping%time < timeavg2) then
+        time_factor = (timeavg2 - timeavg1) / (time_stepping%time - timeavg1)
+        
+        S_avg = S_avg * time_factor
+        if (store%scalars_variance==1) then
+          S_var = S_var * time_factor
+        end if
+      end if
+      
+      if (store%scalars_variance==1) S_var = S_var - S_avg**2
+    
       open(newunit=unit,file=output_dir//"scalars_avg.vtk", &
         access='stream',status='replace',form="unformatted",action="write")
 
