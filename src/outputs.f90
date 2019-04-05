@@ -55,6 +55,10 @@ module Outputs
   real(knd),allocatable :: Scalar_fl_V_avg(:,:,:,:)
   real(knd),allocatable :: Scalar_fl_W_avg(:,:,:,:)
 
+  real(knd),allocatable :: Scalar_fl_U_sgs(:,:,:,:)
+  real(knd),allocatable :: Scalar_fl_V_sgs(:,:,:,:)
+  real(knd),allocatable :: Scalar_fl_W_sgs(:,:,:,:)
+
   real(TIM),allocatable,dimension(:) :: times                                !times of the timesteps
 
   real(knd),allocatable,dimension(:) :: delta_time, tke, dissip
@@ -134,6 +138,7 @@ module Outputs
 
     integer :: avg_UU_prime = 0 !1..only in  avg.vtk, 2..only in separate Xavg.vtk, 3..both
     integer :: avg_flux_scalar = 0
+    integer :: avg_flux_scalar_sgs = 0
 
     integer :: delta_time = 0
     integer :: tke = 0
@@ -325,6 +330,14 @@ contains
       Scalar_fl_U_avg = 0
       Scalar_fl_V_avg = 0
       Scalar_fl_W_avg = 0
+      if (store%avg_flux_scalar_sgs==1) then
+        allocate(Scalar_fl_U_sgs(Unx,Uny,Unz,num_of_scalars))
+        allocate(Scalar_fl_V_sgs(Vnx,Vny,Vnz,num_of_scalars))
+        allocate(Scalar_fl_W_sgs(Wnx,Wny,Wnz,num_of_scalars))
+        Scalar_fl_U_sgs = 0
+        Scalar_fl_V_sgs = 0
+        Scalar_fl_W_sgs = 0
+      end if
     end if
 
     
@@ -1024,34 +1037,24 @@ contains
                                U,V,W,time_weight, &
                                scalar_fluxes_time(:,i,:,step), &
                                scalar_probes%i, scalar_probes%j, scalar_probes%k)
-          call AddScalarDiffVector(Scalar_fl_U_avg(:,:,:,i), &
-                                Scalar_fl_V_avg(:,:,:,i), &
-                                Scalar_fl_W_avg(:,:,:,i), &
-                                Scalar(:,:,:,i),time_weight, &
-                                scalar_fluxes_time(:,i,:,step), &
-                                scalar_probes%i, scalar_probes%j, scalar_probes%k)
+          if (store%avg_flux_scalar_sgs==1) then
+            call AddScalarDiffVector(Scalar_fl_U_sgs(:,:,:,i), &
+                                  Scalar_fl_V_sgs(:,:,:,i), &
+                                  Scalar_fl_W_sgs(:,:,:,i), &
+                                  Scalar(:,:,:,i),time_weight, &
+                                  scalar_fluxes_time(:,i,:,step), &
+                                  scalar_probes%i, scalar_probes%j, scalar_probes%k)
+          else
+            call AddScalarDiffVector(Scalar_fl_U_avg(:,:,:,i), &
+                                  Scalar_fl_V_avg(:,:,:,i), &
+                                  Scalar_fl_W_avg(:,:,:,i), &
+                                  Scalar(:,:,:,i),time_weight, &
+                                  scalar_fluxes_time(:,i,:,step), &
+                                  scalar_probes%i, scalar_probes%j, scalar_probes%k)
+          end if
         end do
       end if
-
-    !UGLY HACK, dat pozor aby fungovalo kdyz nejsou alokovana pole!!!!!!!
-    else if (store%probes_fluxes==1) then
-      if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
-        do i=1,num_of_scalars
-          call AddScalarAdvVector(Scalar_fl_U_avg(:,:,:,i), &
-                               Scalar_fl_V_avg(:,:,:,i), &
-                               Scalar_fl_W_avg(:,:,:,i), &
-                               Scalar(:,:,:,i), &
-                               U,V,W,0._knd, &
-                               scalar_fluxes_time(:,i,:,step), &
-                               scalar_probes%i, scalar_probes%j, scalar_probes%k)
-          call AddScalarDiffVector(Scalar_fl_U_avg(:,:,:,i), &
-                                Scalar_fl_V_avg(:,:,:,i), &
-                                Scalar_fl_W_avg(:,:,:,i), &
-                                Scalar(:,:,:,i),0._knd, &
-                                scalar_fluxes_time(:,i,:,step), &
-                                scalar_probes%i, scalar_probes%j, scalar_probes%k)
-        end do
-      end if
+      
     end if
 
 
@@ -2404,9 +2407,24 @@ contains
     real(knd),allocatable :: Scalar_fl_V_turb(:,:,:,:)
     real(knd),allocatable :: Scalar_fl_W_turb(:,:,:,:)
     integer :: i
+    real(knd) :: time_factor
    
-    if (num_of_scalars>0.and.store%avg_flux_scalar==1) then
+    if (num_of_scalars>0 .and. store%avg_flux_scalar==1 .and. time_stepping%time > timeavg1) then
 
+      if (time_stepping%time < timeavg2) then
+        time_factor = (timeavg2 - timeavg1) / (time_stepping%time - timeavg1)
+        
+        Scalar_fl_U_avg = Scalar_fl_U_avg * time_factor
+        Scalar_fl_V_avg = Scalar_fl_V_avg * time_factor
+        Scalar_fl_W_avg = Scalar_fl_W_avg * time_factor
+        if (store%avg_flux_scalar_sgs==1) then
+          Scalar_fl_U_sgs = Scalar_fl_U_sgs * time_factor
+          Scalar_fl_V_sgs = Scalar_fl_V_sgs * time_factor
+          Scalar_fl_W_sgs = Scalar_fl_W_sgs * time_factor
+        end if
+      end if
+      
+      
       !FIXME: just to allocate, mold= does not work correctly as of gcc 4.8
 !       allocate(Scalar_fl_U_adv,mold=Scalar_fl_U_avg)
       Scalar_fl_U_adv = Scalar_fl_U_avg
@@ -2427,6 +2445,12 @@ contains
                              scalar_probes%i, scalar_probes%j, scalar_probes%k)
       end do
 
+      if (store%avg_flux_scalar_sgs==1) then
+        Scalar_fl_U_avg = Scalar_fl_U_avg + Scalar_fl_U_sgs
+        Scalar_fl_V_avg = Scalar_fl_V_avg + Scalar_fl_V_sgs
+        Scalar_fl_W_avg = Scalar_fl_W_avg + Scalar_fl_W_sgs
+      end if
+      
       Scalar_fl_U_turb = Scalar_fl_U_avg - Scalar_fl_U_adv
       Scalar_fl_V_turb = Scalar_fl_V_avg - Scalar_fl_V_adv
       Scalar_fl_W_turb = Scalar_fl_W_avg - Scalar_fl_W_adv
@@ -2435,28 +2459,32 @@ contains
       call SaveScalarVTKFluxes(Scalar_fl_U_avg, &
                                Scalar_fl_U_adv, &
                                Scalar_fl_U_turb, &
+                               Scalar_fl_U_sgs, &
                                output_dir//"scalflu.vtk",xU,yPr,zPr)
       call SaveScalarVTKFluxes(Scalar_fl_V_avg, &
                                Scalar_fl_V_adv, &
                                Scalar_fl_V_turb, &
+                               Scalar_fl_V_sgs, &
                                output_dir//"scalflv.vtk",xPr,yV,zPr)
       call SaveScalarVTKFluxes(Scalar_fl_W_avg, &
                                Scalar_fl_W_adv, &
                                Scalar_fl_W_turb, &
+                               Scalar_fl_W_sgs, &
                                output_dir//"scalflw.vtk",xPr,yPr,zW)
 
     end if
 
   end subroutine
 
-  subroutine SaveScalarVTKFluxes(Avg,Adv,Turb,file_name,x,y,z)
-    real(knd),dimension(:,:,:,:),contiguous,intent(in) :: Avg,Adv,Turb
-    character(*),intent(in) :: file_name
-    real(knd),allocatable,intent(in) :: x(:),y(:),z(:)
+  subroutine SaveScalarVTKFluxes(Avg,Adv,Turb,Sgs,file_name,x,y,z)
+    real(knd), dimension(:,:,:,:), contiguous, intent(in) :: Avg, Adv, Turb
+    real(knd), dimension(:,:,:,:), allocatable, intent(in) :: Sgs
+    character(*), intent(in) :: file_name
+    real(knd), allocatable, intent(in) :: x(:), y(:), z(:)
     integer :: nx,ny,nz
     character(70) :: str
     character(13) ::  scalname
-    integer :: l,unit
+    integer :: l, unit
 
     nx = size(Avg,1)
     ny = size(Avg,2)
@@ -2525,6 +2553,21 @@ contains
 
       write(unit) lf
     end do
+    
+    if (store%avg_flux_scalar_sgs==1) then
+      scalname = "scalfl-sgs-"
+
+      do l = 1,num_of_scalars
+        write(scalname(12:13),"(I2.2)") l
+        write(unit) "SCALARS ", scalname , " float", lf
+        write(unit) "LOOKUP_TABLE default", lf
+
+        write(unit) BigEnd(real(Sgs(:,:,:,l), real32))
+
+        write(unit) lf
+      end do
+    end if
+    
     close(unit)
   end subroutine SaveScalarVTKFluxes
 
