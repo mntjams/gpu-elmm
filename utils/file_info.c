@@ -1,4 +1,4 @@
-! from https://stackoverflow.com/a/31873672/721644
+// from https://stackoverflow.com/a/31873672/721644
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
