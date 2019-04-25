@@ -415,6 +415,7 @@ objs += env.Object(target = target_dir + 'advection',          source = 'advecti
 objs += env.Object(target = target_dir + 'linearforcing',      source = 'linearforcing.f90')
 objs += env.Object(target = target_dir + 'sponge',             source = 'sponge.f90')
 objs += env.Object(target = target_dir + 'dynamics',           source = 'dynamics.f90')
+objs += env.Object(target = target_dir + 'advection_varz',     source = 'advection_varz.f90')
 Depends(objs[-1], 'wmfluxes-inc.f90')
 Depends(objs[-1], 'wmfluxes-nobranch-U-inc.f90')
 Depends(objs[-1], 'wmfluxes-nobranch-V-inc.f90')
