@@ -236,19 +236,18 @@ program joinvtk
   
   call GetEndianness
 
-  if (command_argument_count()<2) then
+  if (command_argument_count()<1) then
     write(*,*) "Usage: joinvtk file_name npx,npy,npz"
     stop 1
   end if
  
   call get_command_argument(1, value=file_name)
 
-  call get_command_argument(2, value=arg)
-  read(arg,*,iostat=io) nxims, nyims, nzims
+  call get_command_argument(2, value=arg, status=io)
+  if (io==0) read(arg,*,iostat=io) nxims, nyims, nzims
   
   if (io/=0) then
-    write(*,*) "Error reading image grid shape, provide three integers 'npx,npy,npz'."
-    stop 2
+    call get_shape_from_directories()
   end if
   
   nims = nxims * nyims * nzims
@@ -489,6 +488,49 @@ contains
     else
       write(unit) vec,lf
     end if
+  end subroutine
+  
+  subroutine get_shape_from_directories()
+    use iso_c_binding
+    character(30) :: dirname
+    integer i
+    INTERFACE
+      SUBROUTINE file_info(filename,mode,exist,time) BIND(C,name="file_info")
+        USE iso_c_binding
+        CHARACTER(kind=C_CHAR),INTENT(in) :: filename(*)
+        INTEGER(C_INT),INTENT(out) :: mode,exist,time
+      END SUBROUTINE
+    END INTERFACE
+    integer(c_int) :: mode, ex, time
+
+    
+    i = 1
+    do
+      write(dirname,'(*(g0))') "im-",i,"-",1,"-",1,"/",achar(0)
+      call file_info(dirname,mode,ex,time)      
+      if (ex==0) exit
+      i = i + 1
+    end do
+    nxims = i-1
+    
+    i = 1
+    do
+      write(dirname,'(*(g0))') "im-",1,"-",i,"-",1,"/",achar(0)
+      call file_info(dirname,mode,ex,time)
+      if (ex==0) exit
+      i = i + 1
+    end do
+    nyims = i-1
+    
+    i = 1
+    do
+      write(dirname,'(*(g0))') "im-",1,"-",1,"-",i,"/",achar(0)
+      call file_info(dirname,mode,ex,time)
+      if (ex==0) exit
+      i = i + 1
+    end do
+    nzims = i-1
+  
   end subroutine
   
 end program
