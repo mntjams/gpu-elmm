@@ -765,7 +765,7 @@ contains
       !$omp parallel private (i,j,k,bi,bj,bk)
 
       !initital value using forward Euler
-      if (gridtype==uniformgrid) then
+      if (gridtype==GRID_UNIFORM) then
         !$omp do schedule(runtime) collapse(3)
         do bk = 1, Prnz, tnz
          do bj = 1, Prny, tny
@@ -832,7 +832,7 @@ contains
       call Scalar_ImmersedBoundaries(Scal3)
 
       !$omp parallel private(i,j,k,bi,bj,bk)
-      if (gridtype==uniformgrid) then
+      if (gridtype==GRID_UNIFORM) then
        !$omp do schedule(runtime) collapse(3)
        do bk = 1, Prnz, tnz
         do bj = 1, Prny, tny
@@ -884,7 +884,7 @@ contains
        S = 0
        call boundary_procedure(Scal2)
 
-       if (gridtype==uniformgrid) then
+       if (gridtype==GRID_UNIFORM) then
         !$omp parallel private(i,j,k,p) reduction(max:S)
         !$omp do schedule(runtime) collapse(3)
         do bk = 1, Prnz, tnz2

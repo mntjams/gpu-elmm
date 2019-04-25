@@ -255,7 +255,7 @@ module Parameters
                         GeostrophicInletType=6
   !inlet profile types
   integer, parameter :: CONSTPROF=1, LOGPROF=2, POWERPROF=3 
-  integer, parameter :: GENERALGRID=1, UNIFORMGRID=2
+  integer, parameter :: GRID_UNIFORM = 0, GRID_VARIABLE_Z = 1, GRID_GENERAL = 2
 
   !scalar source types
   integer, parameter :: PointSource=1, LineSource=2, AreaSource=3, VolumeSource=4

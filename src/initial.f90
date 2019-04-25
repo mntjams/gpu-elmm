@@ -761,10 +761,10 @@ contains
    end if
 
    if (.not.xgridfromfile.and..not.ygridfromfile.and..not.zgridfromfile) then
-     gridtype = UNIFORMGRID
+     gridtype = GRID_UNIFORM
      if (master) write(*,*) "Uniform grid"
    else
-     gridtype = GENERALGRID
+     gridtype = GRID_GENERAL
      if (master) write(*,*) "General grid not supported."; call error_stop
    end if
 
