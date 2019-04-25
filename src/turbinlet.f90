@@ -520,7 +520,8 @@ contains
     end if
     
     !constant stress assumption
-    if ((profiletype==LOGPROF.and.g%Ustar_surf_inlet<=0).or.(profiletype==POWERPROF.and.g%Ustar_surf_inlet<=0)) then
+    if ((profiletype==PROFILE_LOGARITHMIC .and. g%Ustar_surf_inlet<=0) .or. &
+        (profiletype==PROFILE_POWER_LAW .and. g%Ustar_surf_inlet<=0)) then
       g%Ustar_surf_inlet = abs(Karman * g%U_ref_inlet / log(g%z0_inlet / g%z_ref_inlet))
     end if
 
@@ -560,7 +561,7 @@ contains
       g%Winavg = 0
     end if
 
-    if  (profiletype==CONSTPROF) then
+    if  (profiletype==PROFILE_CONSTANT) then
 
       do k = 1, Prnz
 
@@ -572,7 +573,7 @@ contains
 
      fix_direction = .false.
 
-    else if (profiletype==LOGPROF) then
+    else if (profiletype==PROFILE_LOGARITHMIC) then
 
       if (g%U_ref_inlet/=0.and.g%z_ref_inlet>0) then
 
@@ -602,7 +603,7 @@ contains
         
       end  if
 
-    else if (profiletype==POWERPROF) then
+    else if (profiletype==PROFILE_POWER_LAW) then
 
       do k = 1, Prnz
         g%Uinavg(:,k) = g%U_ref_inlet * (zPr(k) / g%z_ref_inlet)**g%power_exponent_inlet
