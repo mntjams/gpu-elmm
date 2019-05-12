@@ -98,6 +98,9 @@ module custom_par
   type domain_computational_grids
     real(knd) :: xmin, xmax, ymin, ymax, zmin, zmax
     real(knd) :: dx, dy, dz
+    
+    real(knd) :: xPr(:), yPr(:), zPr(:), xU(:), yV(:), zW(:)
+    
     !numbers of cells
     integer   :: nx, ny, nz
     !spatial ratio relative to the parent of this domain (if applicable)
