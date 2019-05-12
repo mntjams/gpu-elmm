@@ -1,4 +1,4 @@
-module MomentumAdvection_varz
+module MomentumAdvection_variable_z
   use Parameters
   use Boundaries
   use ArrayUtilities
@@ -12,7 +12,7 @@ contains
 
 
 
-  subroutine CDUdiv_varz(U2, U, V, W)
+  subroutine CDUdiv_variable_z(U2, U, V, W)
     real(knd), contiguous, intent(out) :: U2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay
@@ -40,7 +40,7 @@ contains
                              + (Ay*(U(i,j+1,k) + U(i,j,k)) * (V(i+1,j,k) + V(i,j,k)) &
                               - Ay*(U(i,j,k) + U(i,j-1,k)) * (V(i+1,j-1,k) + V(i,j-1,k))) &
                              + ( (U(i,j,k+1) + U(i,j,k)) * (W(i+1,j,k) + W(i,j,k)) &
-                              - (U(i,j,k) + U(i,j,k-1)) * (W(i+1,j,k-1) + W(i,j,k-1))) / dzPr(k))
+                              - (U(i,j,k) + U(i,j,k-1)) * (W(i+1,j,k-1) + W(i,j,k-1))) / dzPr(k)/4)
               end do
             end do
           end do
@@ -55,7 +55,7 @@ contains
 
 
 
-  subroutine CDVdiv_varz(V2, U, V, W)
+  subroutine CDVdiv_variable_z(V2, U, V, W)
     real(knd), contiguous, intent(out) :: V2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay
@@ -83,7 +83,7 @@ contains
                               +(Ax*(V(i+1,j,k) + V(i,j,k)) * (U(i,j+1,k) + U(i,j,k)) &
                                -Ax*(V(i,j,k) + V(i-1,j,k)) * (U(i-1,j+1,k) + U(i-1,j,k))) &
                               +( (V(i,j,k+1) + V(i,j,k)) * (W(i,j+1,k) + W(i,j,k)) &
-                               -(V(i,j,k) + V(i,j,k-1)) * (W(i,j+1,k-1) + W(i,j,k-1))) / dzPr(k))
+                               -(V(i,j,k) + V(i,j,k-1)) * (W(i,j+1,k-1) + W(i,j,k-1))) / dzPr(k)/4)
               end do
             end do
           end do
@@ -97,7 +97,7 @@ contains
 
 
 
-  subroutine CDWdiv_varz(W2, U, V, W)
+  subroutine CDWdiv_variable_z(W2, U, V, W)
     real(knd), contiguous, intent(out) :: W2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay
@@ -121,7 +121,7 @@ contains
             do j = bj, min(bj+tny-1, Wny)
               do i = bi, min(bi+tnx-1, Wnx)
                 W2(i,j,k) = - (((W(i,j,k+1) + W(i,j,k)) * (W(i,j,k+1) + W(i,j,k)) &
-                              - (W(i,j,k) + W(i,j,k-1)) * (W(i,j,k) + W(i,j,k-1))) / dzW(k) &
+                              - (W(i,j,k) + W(i,j,k-1)) * (W(i,j,k) + W(i,j,k-1))) / dzW(k)/4 &
                              + (Ay*(W(i,j+1,k) + W(i,j,k)) * (V(i,j,k+1) + V(i,j,k)) &
                               - Ay*(W(i,j,k) + W(i,j-1,k)) * (V(i,j-1,k+1) + V(i,j-1,k))) &
                              + (Ax*(W(i+1,j,k) + W(i,j,k)) * (U(i,j,k+1) + U(i,j,k)) &
@@ -145,7 +145,7 @@ contains
 
 
 
-  subroutine CDUadv_varz(U2, U, V, W)
+  subroutine CDUadv_variable_z(U2, U, V, W)
     real(knd), contiguous, intent(out) :: U2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Vadv, Wadv
@@ -169,7 +169,7 @@ contains
             do j = bj, min(bj+tny-1, Uny)
               do i = bi, min(bi+tnx-1, Unx)
                 Vadv = ( V(i,j,k) + V(i+1,j,k) + V(i,j-1,k) + V(i+1,j-1,k) )
-                Wadv = ( W(i,j,k) + W(i+1,j,k) + W(i,j,k-1) + W(i+1,j,k-1) )
+                Wadv = ( W(i,j,k) + W(i+1,j,k) + W(i,j,k-1) + W(i+1,j,k-1) ) / 4
                 U2(i,j,k) = U2(i,j,k) &
                            - (Ax*(U(i+1,j,k)-U(i-1,j,k)) * U(i,j,k) &
                            +  Ay*(U(i,j+1,k)-U(i,j-1,k)) * Vadv&
@@ -187,7 +187,7 @@ contains
 
 
 
-  subroutine CDVadv_varz(V2, U, V, W)
+  subroutine CDVadv_variable_z(V2, U, V, W)
     real(knd), contiguous, intent(out) :: V2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Uadv, Wadv
@@ -211,7 +211,7 @@ contains
             do j = bj, min(bj+tny-1, Vny)
               do i = bi, min(bi+tnx-1, Vnx)
                 Uadv = ( U(i,j,k) + U(i,j+1,k) + U(i-1,j,k) + U(i-1,j+1,k) )
-                Wadv = ( W(i,j,k) + W(i,j+1,k) + W(i,j,k-1) + W(i,j+1,k-1) )
+                Wadv = ( W(i,j,k) + W(i,j+1,k) + W(i,j,k-1) + W(i,j+1,k-1) ) / 4
                 V2(i,j,k) = V2(i,j,k) &
                            - (Ax*(V(i+1,j,k)-V(i-1,j,k)) * Uadv&
                            +  Ay*(V(i,j+1,k)-V(i,j-1,k)) * V(i,j,k) &
@@ -229,7 +229,7 @@ contains
 
 
 
-  subroutine CDWadv_varz(W2, U, V, W)
+  subroutine CDWadv_variable_z(W2, U, V, W)
     real(knd), contiguous, intent(out) :: W2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd) :: Ax, Ay, Uadv, Vadv
@@ -281,13 +281,13 @@ contains
 
 
 
-  subroutine CDU_varz(U2, U, V, W)
+  subroutine CDU_variable_z(U2, U, V, W)
     real(knd), contiguous, intent(out) :: U2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
 
     call set(U2, 0)
-    call CDUdiv_varz(U2, U, V, W)
-    call CDUadv_varz(U2, U, V, W)
+    call CDUdiv_variable_z(U2, U, V, W)
+    call CDUadv_variable_z(U2, U, V, W)
     call multiply(U2, 0.5_knd)
   end subroutine
 
@@ -296,13 +296,13 @@ contains
 
 
 
-  subroutine CDV_varz(V2, U, V, W)
+  subroutine CDV_variable_z(V2, U, V, W)
     real(knd), contiguous, intent(out) :: V2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
 
     call set(V2, 0)
-    call CDVdiv_varz(V2, U, V, W)
-    call CDVadv_varz(V2, U, V, W)
+    call CDVdiv_variable_z(V2, U, V, W)
+    call CDVadv_variable_z(V2, U, V, W)
     call multiply(V2, 0.5_knd)
   end subroutine
 
@@ -310,16 +310,16 @@ contains
 
 
 
-  subroutine CDW_varz(W2, U, V, W)
+  subroutine CDW_variable_z(W2, U, V, W)
     real(knd), contiguous, intent(out) :: W2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
 
     call set(W2, 0)
-    call CDWdiv_varz(W2, U, V, W)
-    call CDWadv_varz(W2, U, V, W)
+    call CDWdiv_variable_z(W2, U, V, W)
+    call CDWadv_variable_z(W2, U, V, W)
     call multiply(W2, 0.5_knd)
   end subroutine
 
 
 
-end module MomentumAdvection_varz
+end module MomentumAdvection_variable_z
