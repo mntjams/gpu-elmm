@@ -89,6 +89,8 @@ program CLMM
 
     do
 
+      if (time_step > time_stepping%max_number_of_time_steps) exit
+
       call system_clock(count = time_steps_timer_count_1)
 
 #ifdef PAR
@@ -180,8 +182,6 @@ program CLMM
 
       time_step = time_step + 1
       
-      if (time_step > time_stepping%max_number_of_time_steps) exit
-
     enddo
 
   endif
