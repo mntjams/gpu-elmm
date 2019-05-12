@@ -63,7 +63,7 @@ module WMPoint_types
 
   type WMpointUVW   !points in which we apply wall model
   
-    real(knd) :: flux
+    real(knd) :: fluxp, fluxm
 
     integer   :: xi
     integer   :: yj
@@ -1982,21 +1982,59 @@ contains
 
              call WMFlatStress(p%ustar, &
                                dist, vel, wallvel, tan_vect = tan_vect)
-           end if
+          end if
 
-           mag = norm2(tan_vect)
+          mag = norm2(tan_vect)
 
-           if (mag>eps) then
+          if (mag>eps) then
+          
+            ! This is a bit ugly, but saves CPU cycles.
+            ! The actual fluxes are scaled by the ratio of the cell boundary area
+            !and the cell volume, which is the grid size perpendicular to the boundary.
+            ! It also enables the wmfluxes include files to be simpler.
+           
+            if (gridtype==GRID_VARIABLE_Z .and. direction==MINUSZ) then
+            
+              p%fluxp = (tan_vect(component) / mag) * p%ustar**2
+              p%fluxm = p%fluxp
+              if (component==1.or.component==2) then
+                p%fluxp = p%fluxp / dzPr(zk)
+                p%fluxm = p%fluxm / dzPr(zk-1)
+              else
+                p%fluxp = p%fluxp / dzW(zk)
+                p%fluxm = p%fluxm / dzW(zk-1)
+              end if
+              
+            else if (gridtype==GRID_VARIABLE_Z .and. direction==PLUSZ) then
+            
+              p%fluxp = (tan_vect(component) / mag) * p%ustar**2
+              p%fluxm = p%fluxp
+              if (component==1.or.component==2) then
+                p%fluxp = p%fluxp / dzPr(zk+1)
+                p%fluxm = p%fluxm / dzPr(zk)
+              else
+                p%fluxp = p%fluxp / dzW(zk+1)
+                p%fluxm = p%fluxm / dzW(zk)
+              end if
+              
+            else
+            
+              p%fluxp = (tan_vect(component) / mag) * p%ustar**2 * drec(direction)
+              p%fluxm = p%fluxp
+              
+            end if
 
-             p%flux = (tan_vect(component) / mag) * p%ustar**2 * drec(direction)
+            if (mod(direction,2)==1) then
+              p%fluxp = - p%fluxp
+              p%fluxm = - p%fluxm
+            end if
 
-             if (mod(direction,2)==1) p%flux = - p%flux
+          else
 
-           else
+             p%fluxp = 0
+             p%fluxm = p%fluxp
 
-             p%flux = 0
-
-           end if
+          end if
 
 !         end associate
 
