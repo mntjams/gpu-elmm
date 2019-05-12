@@ -71,6 +71,7 @@ module Parameters
   real(knd), allocatable :: xU(:), xPr(:), yV(:), yPr(:), zW(:), zPr(:)          !coordinates of grid points
   real(knd), allocatable :: dxU(:), dxPr(:), dyV(:), dyPr(:), dzW(:), dzPr(:)    !dxPr(i)=xU(i)-xU(i-1), dxU(i)=xPr(i+1)-xPr(i)
 
+  real(knd), allocatable :: gxU(:), gxPr(:), gyV(:), gyPr(:), gzW(:), gzPr(:)          !coordinates of grid points
 
 
 
