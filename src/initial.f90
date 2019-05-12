@@ -763,6 +763,9 @@ contains
    if (.not.xgridfromfile.and..not.ygridfromfile.and..not.zgridfromfile) then
      gridtype = GRID_UNIFORM
      if (master) write(*,*) "Uniform grid"
+   else if  (.not.xgridfromfile.and..not.ygridfromfile) then
+     gridtype = GRID_VARIABLE_Z
+     if (master) write(*,*) "Grid variable in z"
    else
      gridtype = GRID_GENERAL
      if (master) write(*,*) "General grid not supported."; call error_stop
