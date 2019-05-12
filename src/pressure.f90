@@ -122,7 +122,11 @@ contains
 
     else if (pressure_solution%poisson_solver==POISSON_SOLVER_POISFFT) then
 
-        call Poiss_PoisFFT(Phi,RHS)
+        if (gridtype==GRID_VARIABLE_Z) then
+          call Poiss_PoisFFT_variable_z(Phi,RHS)
+        else
+          call Poiss_PoisFFT(Phi,RHS)
+        end if
 
     else if (pressure_solution%poisson_solver==POISSON_SOLVER_MULTIGRID) then
 
@@ -329,33 +333,68 @@ contains
       
     else
     
-      if (allocated(Q)) then
-        !$omp parallel do private(i,j,k)
-        do k = 1, Prnz            !divergence of U -> RHS
-          do j = 1, Prny
-            do i = 1, Prnx
-               RHS(i,j,k) = (U(i,j,k) - U(i-1,j,k)) / dxmin &
-                          + (V(i,j,k) - V(i,j-1,k)) / dymin &
-                          + (W(i,j,k) - W(i,j,k-1)) / dzmin &
-                          - Q(i,j,k)
-               RHS(i,j,k) = RHS(i,j,k) * dt2_rec
+      if (gridtype==GRID_VARIABLE_Z) then
+      
+        if (allocated(Q)) then
+          !$omp parallel do private(i,j,k)
+          do k = 1, Prnz            !divergence of U -> RHS
+            do j = 1, Prny
+              do i = 1, Prnx
+                RHS(i,j,k) = (U(i,j,k) - U(i-1,j,k)) / dxmin &
+                            + (V(i,j,k) - V(i,j-1,k)) / dymin &
+                            + (W(i,j,k) - W(i,j,k-1)) / dzPr(k) &
+                            - Q(i,j,k)
+                RHS(i,j,k) = RHS(i,j,k) * dt2_rec
+              end do
             end do
           end do
-        end do
-        !$omp end parallel do
+          !$omp end parallel do
+        else
+          !$omp parallel do private(i,j,k)
+          do k = 1, Prnz            !divergence of U -> RHS
+            do j = 1, Prny
+              do i = 1, Prnx
+                RHS(i,j,k) = (U(i,j,k) - U(i-1,j,k)) / dxmin &
+                            + (V(i,j,k) - V(i,j-1,k)) / dymin &
+                            + (W(i,j,k) - W(i,j,k-1)) / dzPr(k)
+                RHS(i,j,k) = RHS(i,j,k) * dt2_rec
+              end do
+            end do
+          end do
+          !$omp end parallel do
+        end if
+
       else
-        !$omp parallel do private(i,j,k)
-        do k = 1, Prnz            !divergence of U -> RHS
-          do j = 1, Prny
-            do i = 1, Prnx
-               RHS(i,j,k) = (U(i,j,k) - U(i-1,j,k)) / dxmin &
-                          + (V(i,j,k) - V(i,j-1,k)) / dymin &
-                          + (W(i,j,k) - W(i,j,k-1)) / dzmin
-               RHS(i,j,k) = RHS(i,j,k) * dt2_rec
+      
+        if (allocated(Q)) then
+          !$omp parallel do private(i,j,k)
+          do k = 1, Prnz            !divergence of U -> RHS
+            do j = 1, Prny
+              do i = 1, Prnx
+                RHS(i,j,k) = (U(i,j,k) - U(i-1,j,k)) / dxmin &
+                            + (V(i,j,k) - V(i,j-1,k)) / dymin &
+                            + (W(i,j,k) - W(i,j,k-1)) / dzmin &
+                            - Q(i,j,k)
+                RHS(i,j,k) = RHS(i,j,k) * dt2_rec
+              end do
             end do
           end do
-        end do
-        !$omp end parallel do
+          !$omp end parallel do
+        else
+          !$omp parallel do private(i,j,k)
+          do k = 1, Prnz            !divergence of U -> RHS
+            do j = 1, Prny
+              do i = 1, Prnx
+                RHS(i,j,k) = (U(i,j,k) - U(i-1,j,k)) / dxmin &
+                            + (V(i,j,k) - V(i,j-1,k)) / dymin &
+                            + (W(i,j,k) - W(i,j,k-1)) / dzmin
+                RHS(i,j,k) = RHS(i,j,k) * dt2_rec
+              end do
+            end do
+          end do
+          !$omp end parallel do
+        end if
+        
       end if
       
     end if
@@ -423,7 +462,9 @@ contains
         end do
       end do
       !$omp end do nowait
+
     else
+      
       !$omp do
       do k = 1, Unz
         do j = 1, Uny
@@ -442,15 +483,27 @@ contains
         end do
       end do
       !$omp end do nowait
-      !$omp do
-      do k = 1, Wnz
-        do j = 1, Wny
-          do i = 1, Wnx
-            W(i,j,k) = W(i,j,k) - Aw * (Phi(i,j,k+1) - Phi(i,j,k))
+      if (gridtype==GRID_VARIABLE_Z) then
+        !$omp do
+        do k = 1, Wnz
+          do j = 1, Wny
+            do i = 1, Wnx
+              W(i,j,k) = W(i,j,k) - dt2 * (Phi(i,j,k+1) - Phi(i,j,k)) / dzW(k)
+            end do
           end do
         end do
-      end do
-      !$omp end do nowait
+        !$omp end do nowait
+      else
+        !$omp do
+        do k = 1, Wnz
+          do j = 1, Wny
+            do i = 1, Wnx
+              W(i,j,k) = W(i,j,k) - Aw * (Phi(i,j,k+1) - Phi(i,j,k))
+            end do
+          end do
+        end do
+        !$omp end do nowait
+      end if
     end if
 
     if (explicit_diffusion) then
@@ -574,35 +627,66 @@ contains
         end if
         
       else
-      
-        if (allocated(Q)) then
-          !$omp parallel do private(i,j,k,p) reduction(max:S)
-          do k = 1, Prnz            !divergence of U -> RHS
-            do j = 1, Prny
-              do i = 1, Prnx
-                 p =   (U(i,j,k) - U(i-1,j,k)) / (dxmin) &
-                     + (V(i,j,k) - V(i,j-1,k)) / (dymin) &
-                     + (W(i,j,k) - W(i,j,k-1)) / (dzmin) &
-                     - Q(i,j,k)
-                 S = max(S,abs(p))
+        if (gridtype==GRID_VARIABLE_Z) then
+          if (allocated(Q)) then
+            !$omp parallel do private(i,j,k,p) reduction(max:S)
+            do k = 1, Prnz            !divergence of U -> RHS
+              do j = 1, Prny
+                do i = 1, Prnx
+                  p =   (U(i,j,k) - U(i-1,j,k)) / (dxmin) &
+                      + (V(i,j,k) - V(i,j-1,k)) / (dymin) &
+                      + (W(i,j,k) - W(i,j,k-1)) / (dzPr(k)) &
+                      - Q(i,j,k)
+                  S = max(S,abs(p))
+                end do
               end do
             end do
-          end do
-          !$omp end parallel do
-        else
-          !$omp parallel do private(i,j,k,p) reduction(max:S)
-          do k = 1, Prnz            !divergence of U -> RHS
-            do j = 1, Prny
-              do i = 1, Prnx
-                 p =   (U(i,j,k) - U(i-1,j,k)) / (dxmin) &
-                     + (V(i,j,k) - V(i,j-1,k)) / (dymin) &
-                     + (W(i,j,k) - W(i,j,k-1)) / (dzmin)
+            !$omp end parallel do
+          else
+            !$omp parallel do private(i,j,k,p) reduction(max:S)
+            do k = 1, Prnz            !divergence of U -> RHS
+              do j = 1, Prny
+                do i = 1, Prnx
+                  p =   (U(i,j,k) - U(i-1,j,k)) / (dxmin) &
+                      + (V(i,j,k) - V(i,j-1,k)) / (dymin) &
+                      + (W(i,j,k) - W(i,j,k-1)) / (dzPr(k))
 
-                 S = max(S,abs(p))
+                  S = max(S,abs(p))
+                end do
               end do
             end do
-          end do
-          !$omp end parallel do
+            !$omp end parallel do
+          end if
+        else
+          if (allocated(Q)) then
+            !$omp parallel do private(i,j,k,p) reduction(max:S)
+            do k = 1, Prnz            !divergence of U -> RHS
+              do j = 1, Prny
+                do i = 1, Prnx
+                  p =   (U(i,j,k) - U(i-1,j,k)) / (dxmin) &
+                      + (V(i,j,k) - V(i,j-1,k)) / (dymin) &
+                      + (W(i,j,k) - W(i,j,k-1)) / (dzmin) &
+                      - Q(i,j,k)
+                  S = max(S,abs(p))
+                end do
+              end do
+            end do
+            !$omp end parallel do
+          else
+            !$omp parallel do private(i,j,k,p) reduction(max:S)
+            do k = 1, Prnz            !divergence of U -> RHS
+              do j = 1, Prny
+                do i = 1, Prnx
+                  p =   (U(i,j,k) - U(i-1,j,k)) / (dxmin) &
+                      + (V(i,j,k) - V(i,j-1,k)) / (dymin) &
+                      + (W(i,j,k) - W(i,j,k-1)) / (dzmin)
+
+                  S = max(S,abs(p))
+                end do
+              end do
+            end do
+            !$omp end parallel do
+          end if
         end if
         
       end if
