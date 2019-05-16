@@ -511,6 +511,8 @@ program block_grid
   
   call parse_block_config("grid_blocks.conf", blocks)
     
+  if (.not.allocated(blocks)) stop "Config file appears empty."
+  
   do iblock = 1, size(blocks)
     write(*,*) blocks(iblock)%lb
     do i=1, size(blocks(iblock)%z_u) 
