@@ -336,7 +336,10 @@ fields_do:  do j = 1, size(obj_fields)
                   return
                 end if
 
-                select type (var => fields_a(i)%var)
+                block
+                class(*), pointer :: var => null()
+                select type(var)
+!                 select type (var => fields_a(i)%var)
                   type is (integer)
                     read(obj_fields(j)%array_value, *) var
                   type is (real(real32))
@@ -349,6 +352,8 @@ fields_do:  do j = 1, size(obj_fields)
                     stat = 12
                     return
                 end select
+                end block
+                
                 cycle fields_do
               end if
             end do
@@ -390,12 +395,12 @@ fields_do:  do j = 1, size(obj_fields)
     real(rp), target :: start, end
     
     names = [field_names_init("lb",    b%lb), &
-                  field_names_init("ub",    b%ub), &
-                  field_names_init("start", start), &
-                  field_names_init("end",   end), &
-                  field_names_init("ratio", b%ratio), &
-                  field_names_init("ncells",b%ncells), &
-                  field_names_init("start_priority", s_p)]
+             field_names_init("ub",    b%ub), &
+             field_names_init("start", start), &
+             field_names_init("end",   end), &
+             field_names_init("ratio", b%ratio), &
+             field_names_init("ncells",b%ncells), &
+             field_names_init("start_priority", s_p)]
 
     inquire(file=fname, exist=ex)
 
@@ -420,8 +425,8 @@ fields_do:  do j = 1, size(obj_fields)
       s_p = .true.
       start = ieee_value(start, IEEE_QUIET_NAN)
       end = ieee_value(end, IEEE_QUIET_NAN)
-    
-      if (downcase(tree(iobj)%name)=="obstacles_bbox") then
+
+      if (downcase(tree(iobj)%name)=="block") then
       
          call get_object_field_values(tree(iobj), stat, &
                                      fields = names)
@@ -520,4 +525,6 @@ program block_grid
     end do
   end do
   write(*,*) blocks(size(blocks))%ub
+  
+  deallocate(blocks)
 end program 
