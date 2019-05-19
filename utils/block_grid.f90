@@ -29,7 +29,7 @@ contains
     res%ncells = ncells
     
     d = (ub - lb) / ncells
-    res%z_u = [(d*i, i = 1, ncells-1)]
+    res%z_u = lb + [(d*i, i = 1, ncells-1)]
 
   end function
 
@@ -75,7 +75,7 @@ contains
       res%z_u = lb + divisions(start, r, n)
     else
       r = 1/gratio(end, l, n, 1/r)
-      res%z_u = ub - divisions(end, r, n)
+      res%z_u = ub - divisions(end, 1/r, n)
       res%z_u = res%z_u(size(res%z_u):1:-1)
     end if
       
@@ -130,8 +130,9 @@ contains
     type(block) :: res
     real(rp), intent(in) :: lb, ub, end, ratio
     
-    res = block_start_ratio(lb, ub, end, ratio)
+    res = block_start_ratio(lb, ub, end, 1/ratio)
     res%z_u = ub - divisions(end, res%ratio, res%ncells)
+    res%ratio = 1 / res%ratio
     res%z_u = res%z_u(size(res%z_u):1:-1)
   end function
   
@@ -451,19 +452,19 @@ fields_do:  do j = 1, size(obj_fields)
       else if (iblock>1) then
         b%lb = blocks(iblock-1)%ub
       end if
-      if (isnan(b%lb)) then
+      if (isnan(b%ub)) then
         write(*,*) "Error, missing upper bound in " // fname
         call error_stop
       end if
-      
-      if (b%ncells > 0 .and. .not.isnan(b%ratio)) then
+    
+      if (b%ncells > 0 .and. b%ratio > 0) then
         b = block_ratio_ncells(b%lb, b%ub, b%ratio, b%ncells)
       else if (.not.isnan(start).and. .not.isnan(end)) then
         b = block_start_end(b%lb, b%ub, start, end, s_p)
-      else if (.not.isnan(start) .and. .not.isnan(b%ratio)) then
+      else if (.not.isnan(start) .and. b%ratio > 0) then
         b = block_start_ratio(b%lb, b%ub, start, b%ratio)
-      else if (.not.isnan(end) .and. .not.isnan(b%ratio)) then
-        b = block_end_ratio(b%lb, b%ub, start, b%ratio)
+      else if (.not.isnan(end) .and. b%ratio > 0) then
+        b = block_end_ratio(b%lb, b%ub, end, b%ratio)
       else if (b%ncells>0) then
         b = block_uniform(b%lb, b%ub, b%ncells)
       end if
@@ -515,7 +516,7 @@ program block_grid
   integer :: i, iblock
   
   call parse_block_config("grid_blocks.conf", blocks)
-    
+
   if (.not.allocated(blocks)) stop "Config file appears empty."
   
   do iblock = 1, size(blocks)
