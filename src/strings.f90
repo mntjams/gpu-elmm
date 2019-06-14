@@ -269,7 +269,8 @@ module ParseTrees
   public field_names_init, field_names_a_init, field_names_a_int_alloc_init
 
   public tree_object, tree_object_field, tree_object_fields, tree_object_ptr, &
-         parse_file, char_len
+         parse_file, find_object_get_field_values, get_object_field_values, &
+         char_len
 
   type tree_object_field
     character(char_len) :: name
@@ -567,6 +568,186 @@ contains
     end subroutine
 
   end subroutine parse_file
+  
+  
+  subroutine find_object_get_field_values(tree, object_name, stat, &
+                                     fields, &
+                                     fields_a, &
+                                     fields_a_int_alloc, &
+                                     fields_str)
+    type(tree_object), intent(in) :: tree(:)
+    character(*), intent(in) :: object_name
+    integer, intent(out) :: stat
+    !stat 0    .. success
+    !stat < 0  .. multiple definitions of object named object_name
+    !stat 1    .. object named object_name not found
+    !stat 2    .. inconsistent number of components in an array in fields_a
+    !stat 11   .. unexpected type of variable in fields
+    !stat 12   .. unexpected type of variable in fields_a
+    type(field_names), intent(inout), optional :: fields(:)
+    type(field_names_a), intent(inout), optional :: fields_a(:)
+    type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
+    type(field_names_str), intent(inout), optional :: fields_str(:)
+
+    integer :: iobj
+
+    stat = 1
+
+    do iobj = 1, size(tree)
+    
+      if (downcase(tree(iobj)%name)==object_name) then
+        stat = stat - 1
+        call get_object_field_values(tree(iobj), stat, &
+                                     fields, &
+                                     fields_a, &
+                                     fields_a_int_alloc, &
+                                     fields_str)
+        if (stat>1) return
+      end if
+      
+    end do
+
+  end subroutine find_object_get_field_values
+
+
+
+
+  subroutine get_object_field_values(obj, stat, &
+                        fields, &
+                        fields_a, &
+                        fields_a_int_alloc, &
+                        fields_str)
+    !To extract values of variables from the parse tree
+    use iso_fortran_env, only: real32, real64, int32, int64
+    type(tree_object), intent(in) :: obj
+    integer, intent(out) :: stat
+    !stat 0    .. success
+    !stat < 0  .. multiple definitions of object named object_name
+    !stat 2    .. inconsistent number of components in an array in fields_a
+    !stat 11   .. unexpected type of variable in fields
+    !stat 12   .. unexpected type of variable in fields_a
+    type(field_names), intent(inout), optional :: fields(:)
+    type(field_names_a), intent(inout), optional :: fields_a(:)
+    type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
+    type(field_names_str), intent(inout), optional :: fields_str(:)
+
+    integer :: i, j
+
+
+    if (allocated(obj%fields%array)) then
+
+      associate(obj_fields => obj%fields%array)
+
+fields_do:  do j = 1, size(obj_fields)
+         
+          !workaround of 60359, see also below
+          if (present(fields_str)) then
+            do i = 1, size(fields_str)
+              if (obj_fields(j)%name == fields_str(i)%name) then                
+                read(obj_fields(j)%value, *) fields_str(i)%var
+                cycle fields_do
+              end if
+            end do
+          end if
+
+
+          if (present(fields)) then
+            do i = 1, size(fields)
+              if (obj_fields(j)%name == fields(i)%name) then
+                select type (var => fields(i)%var)
+                  type is (tree_object_ptr)
+                    if (.not.obj_fields(j)%is_object .or. &
+                        .not.associated(obj_fields(j)%object_value)) then
+                      stat = 13
+                      return
+                    end if
+                    var%ptr => obj_fields(j)%object_value
+                  type is (integer)
+                    read(obj_fields(j)%value, *) var
+                  type is (real(real32))
+                    read(obj_fields(j)%value, *) var
+                  type is (real(real64))
+                    read(obj_fields(j)%value, *) var
+                  type is (logical)
+                    read(obj_fields(j)%value, *) var
+                  type is (character(*))
+                    read(obj_fields(j)%value, *) var
+                  class default
+                    stat = 11
+                    return
+                end select
+                cycle fields_do
+              end if
+            end do
+          end if
+
+         if (present(fields_a)) then
+           do i = 1, size(fields_a)
+              if (obj_fields(j)%name == fields_a(i)%name) then
+                if (.not.obj_fields(j)%is_array .or. &
+                    .not.allocated(obj_fields(j)%array_value)) then
+  ! uncomment to get details when debugging
+                  write(*,*) "Error, expecting an array in '",trim(fields_a(i)%name),"'."
+                  stat = 2
+                  return
+                end if
+                if (size(fields_a(i)%var)/=size(obj_fields(j)%array_value)) then
+  ! uncomment to get details when debugging
+                  write(*,*) "Error, expecting", &
+                             size(fields_a(i)%var), &
+                             "vector components", &
+                             "but", &
+                             size(obj_fields(j)%array_value), &
+                             "components present."
+                  stat = 3
+                  return
+                end if
+
+                !workaround of https://gcc.gnu.org/bugzilla/show_bug.cgi?id=90498
+                ! when fixes in the wild, use just
+                ! select type (var => fields_a(i)%var)
+                block
+                  class(*), pointer :: var(:)
+                  var => fields_a(i)%var
+                  
+                  select type (var)
+                    type is (integer)
+                      read(obj_fields(j)%array_value, *) var
+                    type is (real(real32))
+                      read(obj_fields(j)%array_value, *) var
+                    type is (real(real64))
+                      read(obj_fields(j)%array_value, *) var
+                    type is (logical)
+                      read(obj_fields(j)%array_value, *) var
+                    class default
+                      stat = 12
+                      return
+                  end select
+                end block
+                
+                cycle fields_do
+              end if
+            end do
+          end if
+
+          
+          if (present(fields_a_int_alloc)) then
+            do i = 1, size(fields_a_int_alloc)
+              if (obj_fields(j)%name == fields_a_int_alloc(i)%name) then
+                allocate(fields_a_int_alloc(i)%var(size(obj_fields(j)%array_value)))
+                if (size(fields_a_int_alloc(i)%var)>0) &
+                  read(obj_fields(j)%array_value, *) fields_a_int_alloc(i)%var
+              end if
+            end do
+          end if
+
+        end do fields_do
+
+      end associate
+
+    end if
+  end subroutine get_object_field_values
+  
 
 
 end module ParseTrees
