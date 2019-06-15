@@ -100,15 +100,15 @@ contains
 
    end interface
 
-   image_input_dir = "input/"
+   input_dir = "input/"
    output_dir = "output/"
    shared_output_dir = "output/"
 
 
    call newunit(unit)
   
-   !try read scratch_dir from environment, command line has priority
-   call get_scratch
+   !try read input/output_dir from environment, command line has priority
+   call get_io_dirs
 
 !    the command line arguments can also be specified in cmd.conf
    call read_cmd_conf
@@ -785,13 +785,6 @@ contains
    gzmax = z0 + lz
 
 
-   if (len_trim(scratch_dir)>0) then
-     if (scratch_dir(len_trim(scratch_dir):len_trim(scratch_dir))/="/") &
-       scratch_dir = trim(scratch_dir) // "/"
-     output_dir = trim(scratch_dir) // output_dir
-   end if
-
-
    im_xmin = gxmin
    im_ymin = gymin
    im_zmin = gzmin
@@ -1035,7 +1028,7 @@ contains
 #ifdef PAR
                        npxyz, domain_index, number_of_domains, &
 #endif
-                       obstacles_file, probes_file, scalar_probes_file, scratch_dir, &
+                       obstacles_file, probes_file, scalar_probes_file, input_dir, output_dir, &
                        enable_fixed_flow_rate, &
                        enable_out_sponge_x, enable_out_sponge_y, enable_top_sponge, enable_top_sponge_scalar
 
@@ -2334,9 +2327,9 @@ contains
 
     allocate(buffer(Prnx,Prny,Prnz))
 
-    open(newunit=unit,file=image_input_dir//"out.vtk",access="stream",status="old",action="read",iostat=file_stat)
+    open(newunit=unit,file=input_dir//"out.vtk",access="stream",status="old",action="read",iostat=file_stat)
 
-    if (file_stat/=0) call error_stop("Error opening "//image_input_dir//"out.vtk")
+    if (file_stat/=0) call error_stop("Error opening "//input_dir//"out.vtk")
 
     call skip_to("SCALARS p float",stat)
     if (stat/=0) then
@@ -2353,7 +2346,7 @@ contains
       call skip_to("SCALARS temperature float",stat)
       if (stat/=0) then
         call error_stop("No temperature field found in the initial conditions file " // &
-                        image_input_dir // "out.vtk")
+                        input_dir // "out.vtk")
       else
         call skip_line
         call skip_line
@@ -2366,7 +2359,7 @@ contains
       call skip_to("SCALARS moisture float",stat)
       if (stat/=0) then
         call error_stop("No moisture field found in the initial conditions file " // &
-                        image_input_dir // "out.vtk")
+                        input_dir // "out.vtk")
       else
         call skip_line
         call skip_line
@@ -2379,7 +2372,7 @@ contains
 
 
     if (num_of_scalars > 0) then
-      open(newunit=unit,file=image_input_dir//"scalars.vtk",access="stream",status="old",action="read",iostat=file_stat)
+      open(newunit=unit,file=input_dir//"scalars.vtk",access="stream",status="old",action="read",iostat=file_stat)
 
       if (file_stat/=0 .and. scalars_optional) then
         !TODO: check consistency between images?
@@ -2390,7 +2383,7 @@ contains
 
       else if (file_stat/=0) then
 
-        call error_stop("Error opening "//image_input_dir//"scalars.vtk")
+        call error_stop("Error opening "//input_dir//"scalars.vtk")
 
       else
 
@@ -2400,7 +2393,7 @@ contains
           call skip_line
           if (stat/=0) then
             call error_stop("scalar"//scalnum//" field not found in the initial conditions file " // &
-                            image_input_dir // "scalars.vtk")
+                            input_dir // "scalars.vtk")
           else
             call skip_line
             read(unit) buffer
@@ -2418,13 +2411,13 @@ contains
     deallocate(buffer)
 
 
-    inquire(file=image_input_dir//"U.vtk", exist=exU(1))
-    inquire(file=image_input_dir//"V.vtk", exist=exU(2))
-    inquire(file=image_input_dir//"W.vtk", exist=exU(3))
+    inquire(file=input_dir//"U.vtk", exist=exU(1))
+    inquire(file=input_dir//"V.vtk", exist=exU(2))
+    inquire(file=input_dir//"W.vtk", exist=exU(3))
     
     if (all(exU)) then
     
-      open(newunit=unit,file=image_input_dir//"U.vtk",access="stream",status="old",action="read")
+      open(newunit=unit,file=input_dir//"U.vtk",access="stream",status="old",action="read")
       call skip_to("SCALARS U float",stat)
       call skip_line
       call skip_line
@@ -2434,7 +2427,7 @@ contains
       deallocate(buffer)
       close(unit)
 
-      open(newunit=unit,file=image_input_dir//"V.vtk",access="stream",status="old",action="read")
+      open(newunit=unit,file=input_dir//"V.vtk",access="stream",status="old",action="read")
       call skip_to("SCALARS V float",stat)
       call skip_line
       call skip_line
@@ -2444,7 +2437,7 @@ contains
       deallocate(buffer)
       close(unit)
 
-      open(newunit=unit,file=image_input_dir//"W.vtk",access="stream",status="old",action="read")
+      open(newunit=unit,file=input_dir//"W.vtk",access="stream",status="old",action="read")
       call skip_to("SCALARS W float",stat)
       call skip_line
       call skip_line
@@ -2456,7 +2449,7 @@ contains
       
     else
     
-      open(newunit=unit,file=image_input_dir//"out.vtk",access="stream",status="old",action="read")
+      open(newunit=unit,file=input_dir//"out.vtk",access="stream",status="old",action="read")
       call skip_to("VECTORS u float",stat)
       call skip_line
       allocate(UVWbuffer(3, 1:Prnx, 1:Prny, 1:Prnz))
@@ -3868,16 +3861,23 @@ contains
 
 
 
-  subroutine get_scratch
+  subroutine get_io_dirs
     use strings, only: itoa
     integer :: l, stat
 
-    call get_environment_variable(name="SCRATCHDIR", length=l, status=stat)
+    call get_environment_variable(name="ELMM_OUTPUTDIR", length=l, status=stat)
 
-    if (stat==0 .and. l>0 .and. l<=len(scratch_dir)) then
-      call get_environment_variable(name="SCRATCHDIR", value=scratch_dir)
-    else if (stat==0 .and. l>len(scratch_dir)) then
-      call error_stop("SCRATCHDIR length exceeds variable length "//itoa(len(scratch_dir)))
+    if (stat==0 .and. l>0 .and. l<=len(input_dir)) then
+      call get_environment_variable(name="ELMM_OUTPUTDIR", value=output_dir)
+    else if (stat==0 .and. l>len(input_dir)) then
+      call error_stop("ELMM_OUTPUTDIR length exceeds variable length "//itoa(len(output_dir)))
+    end if
+
+    call get_environment_variable(name="ELMM_INPUTDIR")
+    if (stat==0 .and. l>0 .and. l<=len(input_dir)) then
+      call get_environment_variable(name="ELMM_INPUTDIR", value=input_dir)
+    else if (stat==0 .and. l>len(input_dir)) then
+      call error_stop("ELMM_INPUTDIR length exceeds variable length "//itoa(len(input_dir)))
     end if
   end subroutine
 

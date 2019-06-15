@@ -264,7 +264,7 @@ module Parameters
   
   logical :: init_phase = .true., run_phase = .false.
   
-  character(:), allocatable :: output_dir, shared_output_dir, image_input_dir
+  character(:), allocatable :: output_dir, shared_output_dir, input_dir
   character(2048) :: scratch_dir = ""
 
   integer(dbl) :: timer_rate
