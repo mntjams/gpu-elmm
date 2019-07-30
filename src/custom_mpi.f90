@@ -849,10 +849,7 @@ contains
     master = (myim == master_im)
     
     if (any(npxyz<1)) then
-      npxyz(1) = 1
-      npxyz(2) = nint(sqrt(real(nims)))
-      npxyz(3) = nims / npxyz(2)
-      if (master)    write (*,*) "Trying to decompose in",npxyz,"process grid."
+      call try_2d_decompose_process_grid
     end if
 
     nxims = npxyz(1)
@@ -867,7 +864,7 @@ contains
           write(*,'(*(g0))') " Error:"
         end if
         write(*,'(*(g0))') " Could not decompose the processes to Nx x Ny x Nz process grid."
-        write(*,'(*(g0))') " Grid tried: ", npxyz(1), " x ", npxyz(2), " x ", npxyz(3), ' = ', product(npxyz)
+        write(*,'(*(g0))') " Last grid tried: ", npxyz(1), " x ", npxyz(2), " x ", npxyz(3), ' = ', product(npxyz)
         write(*,'(*(g0))') " Number of processes: ", nims
         write(*,'(*(g0))') " Supply the requested process grid as 'ELMM npxyz=1,Ny,Nz'."
       end if
@@ -953,6 +950,25 @@ contains
                                            "-" // itoa(jim) // &
                                            "-" // itoa(kim) // "/"
 
+  contains
+  
+    subroutine try_2d_decompose_process_grid
+      integer :: i
+      npxyz(1) = 1
+      npxyz(2) = nint(sqrt(real(nims)))
+      npxyz(3) = nims / npxyz(2)
+      if (master)    write (*,*) "Trying to decompose in",npxyz,"process grid."
+      
+      if (product(npxyz) /= nims) then
+        do i = 1, min(4, npxyz(2) - 1)
+          npxyz(2) = npxyz(2) - 1
+          npxyz(3) = nims / npxyz(2)
+          if (master)    write (*,*) "Trying to decompose in",npxyz,"process grid."          
+          if (product(npxyz) == nims) exit
+        end do
+      end if
+    end subroutine try_2d_decompose_process_grid
+    
   end subroutine par_init_grid
 
   
