@@ -609,7 +609,6 @@ contains
       domain_ranks_grid(dom)%arr = 0
     end do
     domain_images_grid(domain_index)%arr(iim, jim, kim) = my_world_im
-!     domain_ranks_grid(domain_index)%arr(iim, jim, kim) = my_world_rank
 
     !instead of scatter due to the 3D topology
     call MPI_Allreduce(MPI_IN_PLACE, domain_images_grid(domain_index)%arr, &
