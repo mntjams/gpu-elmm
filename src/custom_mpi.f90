@@ -834,11 +834,7 @@ contains
     integer :: pos
     character(80) :: str_dir
 
-!     if (enable_multiple_domains) then
-      call par_init_domains
-!     else
-!       domain_comm = world_comm
-!     end if
+    call par_init_domains
 
     nims = par_num_images()
 
