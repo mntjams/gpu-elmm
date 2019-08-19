@@ -1334,27 +1334,33 @@ contains
       if ((cxmin>im_xmin-dxmin/10 .and. cxmin<im_xmax+dxmin/10) .and. &
           .not.(abs(cxi1*dxmin + im_xmin - cxmin) < dxmin/100)) &
         call error_stop("The west boundary of domains "//itoa(domain_index)// &
-                        " and "//itoa(child_domain)//" is not aligned.")
+                        " and "//itoa(child_domain)//" is not aligned &
+                       &or the image boundary divides a parent-domain cell")
       if ((cxmax>im_xmin-dxmin/10 .and. cxmax<im_xmax+dxmin/10) .and. &
           .not.(abs(cxi2*dxmin + im_xmin - cxmax) < dxmin/100)) &
         call error_stop("The east boundary of domains "//itoa(domain_index)// &
-                        " and "//itoa(child_domain)//" is not aligned.")
+                        " and "//itoa(child_domain)//" is not aligned &
+                       &or the image boundary divides a parent-domain cell")
       if ((cymin>im_ymin-dymin/10 .and. cymin<im_ymax+dymin/10) .and. &
           .not.(abs(cyj1*dymin + im_ymin - cymin) < dymin/100)) &
         call error_stop("The south boundary of domains "//itoa(domain_index)// &
-                        " and "//itoa(child_domain)//" is not aligned.")
+                        " and "//itoa(child_domain)//" is not aligned &
+                       &or the image boundary divides a parent-domain cell")
       if ((cymax>im_ymin-dymin/10 .and. cymax<im_ymax+dymin/10) .and. &
           .not.(abs(cyj2*dymin + im_ymin - cymax) < dymin/100)) &
         call error_stop("The north boundary of domains "//itoa(domain_index)// &
-                        " and "//itoa(child_domain)//" is not aligned.")
+                        " and "//itoa(child_domain)//" is not aligned &
+                       &or the image boundary divides a parent-domain cell")
       if ((czmin>im_zmin-dzmin/10 .and. czmin<im_zmax+dzmin/10) .and. &
           .not.(abs(czk1*dzmin + im_zmin - czmin) < dzmin/100)) &
         call error_stop("The bottom boundary of domains "//itoa(domain_index)// &
-                        " and "//itoa(child_domain)//" is not aligned.")
+                        " and "//itoa(child_domain)//" is not aligned &
+                       &or the image boundary divides a parent-domain cell")
       if ((czmax>im_zmin-dzmin/10 .and. czmax<im_zmax+dzmin/10) .and. &
           .not.(abs(czk2*dzmin + im_zmin - czmax) < dzmin/100)) &
         call error_stop("The top boundary of domains "//itoa(domain_index)// &
-                        " and "//itoa(child_domain)//" is not aligned.")
+                        " and "//itoa(child_domain)//" is not aligned &
+                       &or the image boundary divides a parent-domain cell")
 
 
       

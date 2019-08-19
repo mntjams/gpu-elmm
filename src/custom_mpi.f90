@@ -949,7 +949,7 @@ contains
                                  "-" // itoa(jim) // &
                                  "-" // itoa(kim) // "/"
 
-    image_input_dir = image_input_dir // "im-" // itoa(iim) // &
+    input_dir = input_dir // "im-" // itoa(iim) // &
                                            "-" // itoa(jim) // &
                                            "-" // itoa(kim) // "/"
 

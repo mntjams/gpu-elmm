@@ -558,7 +558,11 @@ program interpolate_new_grid
 
   call get_command_argument(2, value=arg)
   read(arg,*,iostat=io) new%nx, new%ny, new%nz
-
+  
+  if (new%nx<=0 .or. new%ny<=0 .or. new%nz<=0) then
+    write(*,*) "Error, supply three positive gride sizes as 'interpolate_new_grid file_name nx,ny,nz'."
+  end if
+  
   if (command_argument_count()>=3) then
     call get_command_argument(3, value=arg)
     enable_bc = arg == "-bc"
