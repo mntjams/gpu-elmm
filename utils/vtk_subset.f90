@@ -440,6 +440,12 @@ program vtk_subset
   nx_orig = in_g%nx
   ny_orig = in_g%ny
   nz_orig = in_g%nz
+  
+  if (nx_orig<=0 .or. ny_orig<=0 .or. nz_orig<=0) then
+    write(*,*) "Error: '"//in_name//"' does not exist or is empty."
+    stop
+  end if
+  
   allocate(sc(1:nx_orig,1:ny_orig,1:nz_orig))
   allocate(vec(1:3,1:nx_orig,1:ny_orig,1:nz_orig))
   
