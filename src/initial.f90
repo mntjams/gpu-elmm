@@ -1030,7 +1030,8 @@ contains
 #endif
                        obstacles_file, probes_file, scalar_probes_file, input_dir, output_dir, &
                        enable_fixed_flow_rate, &
-                       enable_out_sponge_x, enable_out_sponge_y, enable_top_sponge, enable_top_sponge_scalar
+                       enable_out_sponge_x, enable_out_sponge_y, enable_top_sponge, enable_top_sponge_scalar, &
+                       discretization_order
 
        if (len_trim(command_line)>0) then
          msg = ''
@@ -1712,6 +1713,7 @@ contains
     use ParseTrees
     character(*), intent(in) :: fname
     type(ProfileSwitches), intent(inout), target :: profiles_config
+    character(char_len), target :: average_end_str, instant_end_str, running_end_str
     logical, intent(inout), target :: enable_profiles
     type(tree_object), allocatable :: tree(:)
     logical :: ex
@@ -1721,14 +1723,14 @@ contains
 
 
     fields_avg = [field_names_init("start",     profiles_config%average_start), &
-                  field_names_init("end",       profiles_config%average_end)]
+                  field_names_init("end",       average_end_str)]
 
     fields_inst = [field_names_init("start",     profiles_config%instant_start), &
-                   field_names_init("end",       profiles_config%instant_end), &
+                   field_names_init("end",       instant_end_str), &
                    field_names_init("interval",  profiles_config%instant_interval)]
 
     fields_running = [field_names_init("start",     profiles_config%running_start), &
-                      field_names_init("end",       profiles_config%running_end), &
+                      field_names_init("end",       running_end_str), &
                       field_names_init("interval",  profiles_config%running_interval)]
 
     inquire(file=fname, exist=ex)
@@ -1744,17 +1746,44 @@ contains
         call find_object_get_field_values(tree, "average_profiles", stat, &
                                      fields_avg)
 
-        if (stat<=0) enable_profiles = .true.
+        if (stat<=0) then
+          enable_profiles = .true.
+          
+          if (downcase(average_end_str)=="end") then
+            profiles_config%average_end = time_stepping%end_time
+          else
+            call real_value(average_end_str, profiles_config%average_end)
+          end if
+          
+        end if
 
         call find_object_get_field_values(tree, "instantaneous_profiles", stat, &
                                      fields_inst)
 
-        if (stat<=0) enable_profiles = .true.
+        if (stat<=0) then
+          enable_profiles = .true.
+          
+          if (downcase(instant_end_str)=="end") then
+            profiles_config%instant_end = time_stepping%end_time
+          else
+            call real_value(instant_end_str, profiles_config%instant_end)
+          end if
+          
+        end if
 
         call find_object_get_field_values(tree, "running_average_profiles", stat, &
                                      fields_running)
 
-        if (stat<=0) enable_profiles = .true.
+        if (stat<=0) then
+          enable_profiles = .true.
+          
+          if (downcase(running_end_str)=="end") then
+            profiles_config%running_end = time_stepping%end_time
+          else
+            call real_value(running_end_str, profiles_config%running_end)
+          end if
+          
+        end if
 
         do i = 1, size(tree)
           call tree(i)%finalize
@@ -1768,6 +1797,18 @@ contains
 
     end if
     
+  contains
+    
+    subroutine real_value(str, x)
+      character(*), intent(in) :: str
+      real, intent(out) :: x
+      integer :: ie
+      read(str, *, iostat=ie) x
+      if (ie/=0) call error_stop("Error interpretting '"// &
+                                trim(str)// &
+                                "' as a real value in '"// &
+                                trim(fname)//"'.")
+    end subroutine
   end subroutine get_profiles
 
 
