@@ -450,7 +450,7 @@ contains
         yj = Vp(i)%yj
         zk = Vp(i)%zk
 
-        tmp = (C1*V(xi,yj-1,zk) + C0*V(xi,yj,zk) + C1*V(xi,yj+1,zk)) / dzmin
+        tmp = (C1*V(xi,yj-1,zk) + C0*V(xi,yj,zk) + C1*V(xi,yj+1,zk)) / dymin
         
         !$omp atomic
         Q(xi,yj,zk)   = Q(xi,yj,zk)   + tmp
