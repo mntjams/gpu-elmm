@@ -166,6 +166,8 @@ contains
 
       call IBMomentum(U2, V2, W2)
 
+      call BoundUVW(U2, V2, W2)
+
       if (enable_ibm_mass_sources) then
           call IBMassSources(Q, U2, V2, W2)
       end if
@@ -218,6 +220,8 @@ contains
       call BoundUVW(U, V, W)
 
       call IBMomentum(U, V, W)
+
+      call BoundUVW(U, V, W)
 
 
       if (debugparam>1.and.master) then
