@@ -420,49 +420,106 @@ contains
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
     real(knd), intent(out) :: Q(0:,0:,0:)
     integer :: i, xi, yj, zk
+    !deconvolution of the flux velocity
+    real(knd), parameter :: C0 = 26._knd / 24, C1 = -1._knd / 24
+    real(knd) :: tmp
 
     call set(Q, 0)
+    
+    if (discretization_order==4) then
+    
+      !$omp parallel
+      !$omp do private(xi, yj, zk, tmp)
+      do i = 1, ubound(Up, 1)
+        xi = Up(i)%xi
+        yj = Up(i)%yj
+        zk = Up(i)%zk
+        
+        tmp = (C1*U(xi-1,yj,zk) + C0*U(xi,yj,zk) + C1*U(xi+1,yj,zk)) / dxmin
+        
+        !$omp atomic
+        Q(xi,yj,zk)   = Q(xi,yj,zk)   + tmp
+        !$omp atomic
+        Q(xi+1,yj,zk) = Q(xi+1,yj,zk) - tmp
+      end do
+      !$omp end do
 
-    !$omp parallel
-    !$omp do private(xi, yj, zk)
-    do i = 1, ubound(Up, 1)
-      xi = Up(i)%xi
-      yj = Up(i)%yj
-      zk = Up(i)%zk
-      !$omp atomic
-      Q(xi,yj,zk)   = Q(xi,yj,zk)   + U(xi,yj,zk) / dxPr(xi)
-      !$omp atomic
-      Q(xi+1,yj,zk) = Q(xi+1,yj,zk) - U(xi,yj,zk) / dxPr(xi+1)
-    end do
-    !$omp end do
+      !$omp do private(xi, yj, zk, tmp)
+      do i = 1, ubound(Vp, 1)
+        xi = Vp(i)%xi
+        yj = Vp(i)%yj
+        zk = Vp(i)%zk
 
-    !$omp do private(xi, yj, zk)
-    do i = 1, ubound(Vp, 1)
-      xi = Vp(i)%xi
-      yj = Vp(i)%yj
-      zk = Vp(i)%zk
-
-      !$omp atomic
-      Q(xi,yj,zk)   = Q(xi,yj,zk)   + V(xi,yj,zk) / dyPr(yj)
-      !$omp atomic
-      Q(xi,yj+1,zk) = Q(xi,yj+1,zk) - V(xi,yj,zk) / dyPr(yj+1)
-    end do
-    !$omp end do
+        tmp = (C1*V(xi,yj-1,zk) + C0*V(xi,yj,zk) + C1*V(xi,yj+1,zk)) / dymin
+        
+        !$omp atomic
+        Q(xi,yj,zk)   = Q(xi,yj,zk)   + tmp
+        !$omp atomic
+        Q(xi,yj+1,zk) = Q(xi,yj+1,zk) - tmp
+      end do
+      !$omp end do
 
 
-    !$omp do private(xi, yj, zk)
-    do i = 1, ubound(Wp, 1)
-      xi = Wp(i)%xi
-      yj = Wp(i)%yj
-      zk = Wp(i)%zk
+      !$omp do private(xi, yj, zk, tmp)
+      do i = 1, ubound(Wp, 1)
+        xi = Wp(i)%xi
+        yj = Wp(i)%yj
+        zk = Wp(i)%zk
 
-      !$omp atomic
-      Q(xi,yj,zk)   = Q(xi,yj,zk)   + W(xi,yj,zk) / dzPr(zk)
-      !$omp atomic
-      Q(xi,yj,zk+1) = Q(xi,yj,zk+1) - W(xi,yj,zk) / dzPr(zk+1)
-    end do
-    !$omp end do
-    !$omp end parallel
+        tmp = (C1*W(xi,yj,zk-1) + C0*W(xi,yj,zk) + C1*W(xi,yj,zk+1)) / dzmin
+        
+        !$omp atomic
+        Q(xi,yj,zk)   = Q(xi,yj,zk)   + tmp
+        !$omp atomic
+        Q(xi,yj,zk+1) = Q(xi,yj,zk+1) - tmp
+      end do
+      !$omp end do
+      !$omp end parallel
+      
+    else
+
+      !$omp parallel
+      !$omp do private(xi, yj, zk)
+      do i = 1, ubound(Up, 1)
+        xi = Up(i)%xi
+        yj = Up(i)%yj
+        zk = Up(i)%zk
+        !$omp atomic
+        Q(xi,yj,zk)   = Q(xi,yj,zk)   + U(xi,yj,zk) / dxPr(xi)
+        !$omp atomic
+        Q(xi+1,yj,zk) = Q(xi+1,yj,zk) - U(xi,yj,zk) / dxPr(xi+1)
+      end do
+      !$omp end do
+
+      !$omp do private(xi, yj, zk)
+      do i = 1, ubound(Vp, 1)
+        xi = Vp(i)%xi
+        yj = Vp(i)%yj
+        zk = Vp(i)%zk
+
+        !$omp atomic
+        Q(xi,yj,zk)   = Q(xi,yj,zk)   + V(xi,yj,zk) / dyPr(yj)
+        !$omp atomic
+        Q(xi,yj+1,zk) = Q(xi,yj+1,zk) - V(xi,yj,zk) / dyPr(yj+1)
+      end do
+      !$omp end do
+
+
+      !$omp do private(xi, yj, zk)
+      do i = 1, ubound(Wp, 1)
+        xi = Wp(i)%xi
+        yj = Wp(i)%yj
+        zk = Wp(i)%zk
+
+        !$omp atomic
+        Q(xi,yj,zk)   = Q(xi,yj,zk)   + W(xi,yj,zk) / dzPr(zk)
+        !$omp atomic
+        Q(xi,yj,zk+1) = Q(xi,yj,zk+1) - W(xi,yj,zk) / dzPr(zk+1)
+      end do
+      !$omp end do
+      !$omp end parallel
+      
+    end if
 
     call Bound_Q(Q)
 

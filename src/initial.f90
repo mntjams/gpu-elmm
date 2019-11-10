@@ -1801,7 +1801,7 @@ contains
     
     subroutine real_value(str, x)
       character(*), intent(in) :: str
-      real, intent(out) :: x
+      real(knd), intent(out) :: x
       integer :: ie
       read(str, *, iostat=ie) x
       if (ie/=0) call error_stop("Error interpretting '"// &
