@@ -29,7 +29,11 @@ module custom_par
   integer, parameter :: PAR_COMM_NULL = MPI_COMM_NULL
   integer, parameter :: PAR_DATATYPE_NULL = MPI_DATATYPE_NULL
   integer, parameter :: PAR_KND = MPI_KND
+  integer, parameter :: PAR_REAL32 = MPI_real32
+  integer, parameter :: PAR_REAL64 = MPI_real64
   integer, protected :: PAR_TRIPLET = MPI_DATATYPE_NULL
+  integer, protected :: PAR_TRIPLET32 = MPI_DATATYPE_NULL
+  integer, protected :: PAR_TRIPLET64 = MPI_DATATYPE_NULL
   
   logical :: enable_multiple_domains = .false.
   
@@ -404,6 +408,16 @@ contains
     call MPI_Type_contiguous(3, MPI_KND, PAR_TRIPLET, ie)
     if (ie/=0) call error_stop("Error in MPI_Type_contiguous")
     call MPI_Type_commit(PAR_TRIPLET, ie)
+    if (ie/=0) call error_stop("Error in MPI_Type_commit")
+
+    call MPI_Type_contiguous(3, MPI_REAL32, PAR_TRIPLET32, ie)
+    if (ie/=0) call error_stop("Error in MPI_Type_contiguous")
+    call MPI_Type_commit(PAR_TRIPLET32, ie)
+    if (ie/=0) call error_stop("Error in MPI_Type_commit")
+
+    call MPI_Type_contiguous(3, MPI_REAL64, PAR_TRIPLET64, ie)
+    if (ie/=0) call error_stop("Error in MPI_Type_contiguous")
+    call MPI_Type_commit(PAR_TRIPLET64, ie)
     if (ie/=0) call error_stop("Error in MPI_Type_commit")
 
   contains
