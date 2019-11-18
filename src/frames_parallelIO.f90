@@ -208,11 +208,11 @@ contains
     ! To avoid the MPI integer size limitation.
     ! Not easily achievable on present hardware anyway.
     plane_size = (maxi - mini + 1) * (maxj - minj + 1)
-    call MPI_Type_contiguous(plane_size, PAR_KND, plane_type, ie)
+    call MPI_Type_contiguous(plane_size, PAR_REAL32, plane_type, ie)
     call MPI_Type_commit(plane_type, ie)
     
     vec_plane_size = (maxi - mini + 1) * (maxj - minj + 1)
-    call MPI_Type_contiguous(vec_plane_size, PAR_TRIPLET, vec_plane_type, ie)
+    call MPI_Type_contiguous(vec_plane_size, PAR_TRIPLET32, vec_plane_type, ie)
     call MPI_Type_commit(vec_plane_type, ie)
     
     scalar_size = maxk - mink + 1
@@ -244,11 +244,11 @@ contains
     
     
     call MPI_Type_create_subarray(3, ng, nxyz, off, &
-        MPI_ORDER_FORTRAN, PAR_KND, D%par_filetype_scalar, ie)
+        MPI_ORDER_FORTRAN, PAR_REAL32, D%par_filetype_scalar, ie)
     call MPI_Type_commit(D%par_filetype_scalar, ie)
 
     call MPI_Type_create_subarray(3, ng, nxyz, off, &
-        MPI_ORDER_FORTRAN, PAR_TRIPLET, D%par_filetype_vector, ie)
+        MPI_ORDER_FORTRAN, PAR_TRIPLET32, D%par_filetype_vector, ie)
     call MPI_Type_commit(D%par_filetype_vector, ie)
 
     D%glob_scalar_storage_size = product(ng) * &
@@ -268,7 +268,7 @@ contains
     class(TFrameDomain_ParallelIO), intent(inout), target :: D
     
     integer(int32) :: nxs(3)
-    real(real32), allocatable :: xs(:), ys(:), zs(:)
+    real(knd), allocatable :: xs(:), ys(:), zs(:)
     
     integer(int32), parameter :: scalar_flag = 1001, vector_flag = 1002
     
@@ -312,9 +312,9 @@ contains
     
     write(D%unit) nxs
     
-    write(D%unit) xs
-    write(D%unit) ys
-    write(D%unit) zs
+    write(D%unit) real(xs,real32)
+    write(D%unit) real(ys,real32)
+    write(D%unit) real(zs,real32)
     
     if (D%flags%Pr==1) then
       write(D%unit) scalar_flag
@@ -505,7 +505,7 @@ contains
     call MPI_File_close(D%unit, ie)
   contains
     subroutine save_scalar(sc)
-      real(knd), intent(in), contiguous :: sc(:,:,:)
+      real(real32), intent(in), contiguous :: sc(:,:,:)
       if (view/=1) then
         call MPI_File_set_view(D%unit, pos, D%par_datatype_scalar, &
                                D%par_filetype_scalar, "native", MPI_INFO_NULL, ie)
@@ -523,7 +523,7 @@ contains
     end subroutine
     
     subroutine save_vector(vec)
-      real(knd), intent(in), contiguous :: vec(:,:,:,:)
+      real(real32), intent(in), contiguous :: vec(:,:,:,:)
       
       if (view/=2) then
         call MPI_File_set_view(D%unit, pos, D%par_datatype_vector, &
