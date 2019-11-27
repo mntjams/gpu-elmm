@@ -17,7 +17,8 @@ contains
     real(knd), contiguous, intent(in) :: Pr(-1:,-1:,-1:)
     real(knd) :: p
     integer :: i, j, k
-    do k = 1, Prnz
+    
+    do k = 1, Wnz+1
       do j = 1, Prny
         do i = 1, Prnx
           p = reference_pressure_z(k) + Pr(i,j,k) * rho_air_ref
@@ -26,7 +27,7 @@ contains
           ! now the thermodynamic temperature can be computed if needed
         end do
       end do
-    end do                                                
+    end do
   end subroutine
 
   ! diagnostic function to compute the liquid water contant from the 

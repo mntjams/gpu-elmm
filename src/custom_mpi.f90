@@ -236,6 +236,20 @@ module custom_par
     module procedure par_broadcast_from_last_z_real32
     module procedure par_broadcast_from_last_z_real64
   end interface
+  
+  interface par_send
+    module procedure par_send_real32
+    module procedure par_send_real64
+    module procedure par_send_int
+    module procedure par_send_logical
+  end interface
+
+  interface par_recv
+    module procedure par_recv_real32
+    module procedure par_recv_real64
+    module procedure par_recv_int
+    module procedure par_recv_logical
+  end interface
 
 contains
 
@@ -1044,6 +1058,81 @@ contains
     my_row_z_im = par_this_image(comm_row_z)
 
   end subroutine
+  
+  
+  
+  
+  
+  
+  subroutine par_recv_real32(a, src)
+    real(real32), intent(out) :: a
+    integer, intent(in) :: src
+    integer :: ie
+    
+    call MPI_Recv(a, 1, MPI_real32, src-1, 111, domain_comm, MPI_STATUS_IGNORE, ie)
+  end subroutine
+
+  subroutine par_recv_real64(a, src)
+    real(real64), intent(out) :: a
+    integer, intent(in) :: src
+    integer :: ie
+    
+    call MPI_Recv(a, 1, MPI_real64, src-1, 111, domain_comm, MPI_STATUS_IGNORE, ie)
+  end subroutine
+
+  subroutine par_recv_int(a, src)
+    integer, intent(out) :: a
+    integer, intent(in) :: src
+    integer :: ie
+    
+    call MPI_Recv(a, 1, MPI_INTEGER, src-1, 111, domain_comm, MPI_STATUS_IGNORE, ie)
+  end subroutine
+
+  subroutine par_recv_logical(a, src)
+    logical, intent(out) :: a
+    integer, intent(in) :: src
+    integer :: ie
+    
+    call MPI_Recv(a, 1, MPI_LOGICAL, src-1, 111, domain_comm, MPI_STATUS_IGNORE, ie)
+  end subroutine
+
+
+  subroutine par_send_real32(a, dest)
+    real(real32), intent(out) :: a
+    integer, intent(in) :: dest
+    integer :: ie
+    
+    call MPI_Send(a, 1, MPI_real32, dest-1, 111, domain_comm, ie)
+  end subroutine
+
+  subroutine par_send_real64(a, dest)
+    real(real64), intent(out) :: a
+    integer, intent(in) :: dest
+    integer :: ie
+    
+    call MPI_Send(a, 1, MPI_real64, dest-1, 111, domain_comm, ie)
+  end subroutine
+
+  subroutine par_send_int(a, dest)
+    integer, intent(out) :: a
+    integer, intent(in) :: dest
+    integer :: ie
+    
+    call MPI_Send(a, 1, MPI_INTEGER, dest-1, 111, domain_comm, ie)
+  end subroutine
+
+  subroutine par_send_logical(a, dest)
+    logical, intent(out) :: a
+    integer, intent(in) :: dest
+    integer :: ie
+    
+    call MPI_Send(a, 1, MPI_LOGICAL, dest-1, 111, domain_comm, ie)
+  end subroutine
+
+
+  
+  
+  
   
   
   function par_co_reduce_32(x,op,comm) result(res)

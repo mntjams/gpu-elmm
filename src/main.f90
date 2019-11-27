@@ -254,7 +254,7 @@ contains
     endif
     
     if (enable_liquid) then
-      allocate(LiquidWater(1:Prnx,1:Prny,1:Prnz))
+      allocate(LiquidWater(1:Prnx,1:Prny,1:Wnz+1))
       Moisture = 0      
     else
       allocate(LiquidWater(0,0,0))
