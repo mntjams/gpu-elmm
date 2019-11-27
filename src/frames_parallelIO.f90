@@ -354,6 +354,12 @@ contains
       D%number_of_arrays = D%number_of_arrays + 1
     end if
 
+    if (enable_liquid.and.D%flags%liquid_water==1) then
+      write(D%unit) scalar_flag
+      write(D%unit) "liquid_water", lf
+      D%number_of_arrays = D%number_of_arrays + 1
+    end if
+
     if (enable_buoyancy.and.D%flags%temperature_flux==1) then
       write(D%unit) scalar_flag
       write(D%unit) "temperature_flux"
@@ -469,6 +475,10 @@ contains
 
     if (enable_moisture.and.D%flags%moisture==1) then
       call save_scalar(D%Moisture)
+    end if
+
+    if (enable_liquid.and.D%flags%liquid_water==1) then
+      call save_scalar(D%LiquidWater)
     end if
 
     if (enable_buoyancy.and.D%flags%temperature_flux==1) then

@@ -319,7 +319,7 @@ contains
     call par_update_domain_bounds_moisture(Moisture, time_stepping%effective_time)
 #endif
 
-    call CommonBase(Moisture,MoistBtype,sideMoist)
+    call CommonBase(Moisture,MoistBtype,sideMoist, MoistIn,BsideMArr,BsideMFLArr)
 
   end subroutine BoundMoisture
 

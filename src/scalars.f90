@@ -11,16 +11,17 @@ implicit none
   private
   public ScalarRK3, constPr_sgs, Rig, partdiam, partrho, percdistrib, &
      ComputeTDiff, &
-     TemperatureProfile, MoistureProfile, &
-     InitScalarProfile, InitScalar, InitHydrostaticPressure, &
-     SubsidenceProfile, SubsidenceGradient, InitSubsidenceProfile, &
+     TScalarProfile, &
+     TemperatureProfileObj, MoistureProfileObj, SubsidenceProfileObj, &
+     Interpolate1DProfile, InitScalarProfile, &
+     InitScalar, &
+     SubsidenceGradient, InitSubsidenceProfile, &
      AddScalarAdvVector, AddScalarDiffVector, &
      Scalars_Deallocate
 
 
   real(knd), dimension(:), allocatable :: partdiam, partrho, percdistrib !diameter of particles <=0 for gas
 
-  real(knd), dimension(:), allocatable :: SubsidenceProfile
   real(knd) :: SubsidenceGradient = 0
 
   type TScalarProfileSection
@@ -33,13 +34,15 @@ implicit none
   type TScalarProfile
     real(knd), allocatable :: points(:,:)
     type(TScalarProfileSection), allocatable :: sections(:)
-    integer   :: randomize
+    logical   :: randomize
     real(knd) :: randomizeTop
     real(knd) :: randomizeAmplitude
   end type
 
-  type(TScalarProfile) :: TemperatureProfile
-  type(TScalarProfile) :: MoistureProfile
+  type(TScalarProfile) :: TemperatureProfileObj
+  type(TScalarProfile) :: MoistureProfileObj
+
+  type(TScalarProfile) :: SubsidenceProfileObj
 
   real(knd), parameter :: constPr_sgs = 0.6 !constant (default) value of Pr_sgs, which may be further refined elsewhere
 
@@ -77,12 +80,16 @@ contains
     if (allocated(Ap)) deallocate(Ap)
   end subroutine
 
-  subroutine ScalarRK3(U, V, W, Temperature, Moisture, Scalar, RK_stage, dt, &
-                temperature_flux_profile, moisture_flux_profile)
+  subroutine ScalarRK3(U, V, W, Pr, &
+                       Temperature, Moisture, Scalar, &
+                       RK_stage, dt, &
+                       temperature_flux_profile, moisture_flux_profile)
     use RK3
     use VolumeSources, only: ScalarVolumeSources
     use Puffs, only: DoPuffs, PreparePuffs
+    use WaterThermodynamics, only: compute_liquid_water_content
     real(knd), contiguous, intent(in)    :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)    :: Pr(-1:,-1:,-1:)
     real(knd), contiguous, intent(inout) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:)
     real(knd), contiguous, intent(inout) :: Scalar(-1:,-1:,-1:,1:)
     real(knd), intent(in)                :: dt
@@ -144,6 +151,10 @@ contains
       where (Prtype(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)>0) Moisture = moisture_ref
       
     end if
+    
+    if (enable_liquid) then
+      call compute_liquid_water_content(Temperature, Moisture, Pr)
+    end if
 
     call PreparePuffs(Scalar, RK_stage, RK_stages, time_stepping%time, time_stepping%dt)
 
@@ -164,6 +175,7 @@ contains
                        scalar_type, btype, &
                        boundary_procedure, extra_procedure, &
                        flux_profile)
+        use Large_scale_processes, only: enable_subsidence_profile, apply_subsidence_profile
         real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Array, Array2, Array_adv
         integer, intent(in) :: scalar_type, btype(6)
         procedure(boundary_interface) :: boundary_procedure
@@ -185,8 +197,8 @@ contains
 
         end if
 
-        call AdvScalar(Array_adv, Array, U, V, W, dt, SubsidenceProfile, flux_profile)
-
+        call AdvScalar(Array_adv, Array, U, V, W, dt, flux_profile)
+        
         !$omp parallel do private(i,j,k)
         do k = 0, Prnz+1
           do j = 0, Prny+1
@@ -198,6 +210,8 @@ contains
         !$omp end parallel do
 
         if (explicit_scalar_diffusion) call ScalarDiffusion_nobranch(Array_adv, Array)
+
+        if (enable_subsidence_profile) call apply_subsidence_profile(Array_adv, Array)
 
         call extra_procedure
 
@@ -218,12 +232,18 @@ contains
         call boundary_procedure(Array)
 
       end subroutine
-
+      
       subroutine TemperatureExtra
+        use DiabaticProcesses
+        use Large_scale_processes
         use VolumeSources, only: TemperatureVolumeSources
         integer :: i, first, last
 
         call TemperatureVolumeSources(Temperature_adv)
+        
+        if (enable_diabatic_processes) call diabatic_heat_terms(Temperature_adv)
+
+        if (enable_large_scale_processes) call temperature_large_scale_terms(Temperature_adv)
 
         if (TempBtype(To)==BC_AUTOMATIC_FLUX) then
           first = min(Prnz*5/6, Prnz-5)
@@ -247,10 +267,13 @@ contains
       end subroutine
 
       subroutine MoistureExtra
+        use Large_scale_processes
         use VolumeSources, only: MoistureVolumeSources
         integer :: i, first, last
 
         call MoistureVolumeSources(Moisture_adv)
+        
+        if (enable_large_scale_processes) call moisture_large_scale_terms(Moisture_adv)
 
         if (MoistBtype(To)==BC_AUTOMATIC_FLUX) then
           first = min(Prnz*5/6, Prnz-5)
@@ -291,35 +314,27 @@ contains
 
 
 
-  subroutine AdvScalar(Scal2, Scal, U, V, W, dt, SubsidenceProfile, temperature_flux_profile)
+  subroutine AdvScalar(Scal2, Scal, U, V, W, dt, temperature_flux_profile)
   real(knd), contiguous, intent(out) :: Scal2(-1:,-1:,-1:)
   real(knd), contiguous, intent(in)  :: Scal(-1:,-1:,-1:)
   real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
   real(knd),             intent(in)  :: dt
-  real(knd), contiguous, intent(in)  :: SubsidenceProfile(0:)
   real(knd), contiguous, intent(out), optional :: temperature_flux_profile(0:)
-  real(knd), allocatable, save :: SubsidenceProfileLoc(:), temperature_flux_profileLoc(:)
+  real(knd), allocatable, save :: temperature_flux_profileLoc(:)
 
-    if (.not.allocated(SubsidenceProfileLoc)) then
-      allocate(SubsidenceProfileLoc(0:Prnz))
+    if (.not.allocated(temperature_flux_profileLoc)) then
       allocate(temperature_flux_profileLoc(0:Prnz))
-    end if
-
-    if (size(SubsidenceProfile)==size(SubsidenceProfileLoc)) then
-      SubsidenceProfileLoc = SubsidenceProfile
-    else
-      SubsidenceProfileLoc = 0
     end if
 
 #ifdef MODIFIED_KAPPA
     call KappaScalar_mod_delta(Scal2, Scal, &
                                U, V, W, &
                                dt, &
-                               SubsidenceProfileLoc, temperature_flux_profileLoc)
+                               temperature_flux_profileLoc)
 #else
     call KappaScalar(Scal2, Scal, &
                      U, V, W, &
-                     SubsidenceProfileLoc, temperature_flux_profileLoc)
+                     temperature_flux_profileLoc)
 #endif
 
     if (present(temperature_flux_profile)) then
@@ -365,13 +380,12 @@ contains
 
   subroutine KappaScalar(Scal2, Scal, &
                          U, V, W, &
-                         SubsidenceProfile, temperature_flux_profile)
+                         temperature_flux_profile)
     !Kappa scheme with flux limiter
     !Hunsdorfer et al. 1995, JCP
     real(knd), contiguous, intent(out) :: Scal2(-1:,-1:,-1:) 
     real(knd), contiguous, intent(in)  :: Scal(-1:,-1:,-1:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
-    real(knd), contiguous, intent(in)  :: SubsidenceProfile(0:)
     real(knd), contiguous, intent(out) :: temperature_flux_profile(0:)
     integer   :: i, j, k, l
     real(knd) :: Ax, Ay, Az              !Auxiliary variables to store muliplication constants for efficiency
@@ -501,7 +515,7 @@ contains
        do j = 1, Prny
         do i = 1, Prnx
           if (Scflz_mask(i,j,k)) then
-            vel = W(i,j,k) - SubsidenceProfile(k)
+            vel = W(i,j,k)
             if (vel>0) then
              flux = vel * (Scal(i,j,k) + (Scal(i,j,k)-Scal(i,j,k-1)) * Slope(i,j,k)/2._knd)
             else
@@ -539,7 +553,7 @@ contains
   subroutine KappaScalar_mod_delta(Scal2, Scal, &
                                    U, V, W, &
                                    dt, &
-                                   SubsidenceProfile, temperature_flux_profile) 
+                                   temperature_flux_profile) 
     !Kappa scheme with flux limiter
     !Hunsdorfer et al. 1995, JCP
     !delta modified for smaller Courant numbers according to Hunsdorfer et al.
@@ -547,7 +561,6 @@ contains
     real(knd), contiguous, intent(in)  :: Scal(-1:,-1:,-1:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd),             intent(in)  :: dt
-    real(knd), contiguous, intent(in)  :: SubsidenceProfile(0:)
     real(knd), contiguous, intent(out) :: temperature_flux_profile(0:)
     integer   :: i, j, k, l
     real(knd) :: Ax, Ay, Az              !Auxiliary variables to store muliplication constants for efficiency
@@ -680,7 +693,7 @@ contains
        do j = 1, Prny
         do i = 1, Prnx
           if (Scflz_mask(i,j,k)) then
-            vel = W(i,j,k) - SubsidenceProfile(k)
+            vel = W(i,j,k)
             if (vel>0) then
              flux = vel * (Scal(i,j,k) + (Scal(i,j,k)-Scal(i,j,k-1)) * Slope(i,j,k)/2._knd)
             else
@@ -1764,6 +1777,41 @@ contains
   end subroutine ComputeTDiff
 
 
+  subroutine Interpolate1DProfile(prof, prof_obj, lo, w_grid)
+    use Interpolation
+    real(knd), contiguous, intent(inout) :: prof(lo:)
+    type(TScalarProfile), intent(inout) :: prof_obj
+    integer, intent(in) :: lo
+    logical, optional :: w_grid
+    logical :: w_grid_loc
+    real(knd), allocatable :: coefs(:,:)
+    integer :: k, i_int, up
+    real(knd) :: z
+    
+    w_grid_loc = .false.
+    if (present(w_grid)) w_grid_loc = w_grid
+    
+    up = ubound(prof, 1)
+    
+    if (allocated(prof_obj%points)) then
+    
+      allocate(coefs(0:3,size(prof_obj%points,1)))
+      call linear_interpolation(prof_obj%points(:,1), prof_obj%points(:,2), coefs)
+      
+      i_int = 0
+      do k = lo, up
+        if (w_grid_loc) then
+          z = zW(k)
+        else
+          z = zPr(k)
+        end if
+        
+        prof(k) = linear_interpolation_eval(z, prof_obj%points(:,1), coefs, i_int)
+      end do
+    else
+      prof = 0
+    end if
+  end subroutine
 
   subroutine InitScalarProfile(ScalarIn, ScalarProfile, default_value)
     use Interpolation
@@ -1869,7 +1917,7 @@ contains
     real(knd) :: p
     integer   :: i, j, k, tid
 
-    if (ScalarProfile%randomize==1) then
+    if (ScalarProfile%randomize) then
       tid = 0
       !$omp parallel private(i,j,k,p,tid)
       !$ tid = omp_get_thread_num()
@@ -1902,86 +1950,30 @@ contains
   end subroutine InitScalar
 
 
-  subroutine InitHydrostaticPressure(Pr, Temperature, Moisture)
-    use Pressure
-    real(knd), contiguous, intent(out) :: Pr(-1:,-1:,-1:)
-    real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:)
-    real(knd) :: t_virt, t_virt_prev, p
-    integer :: i, j, k
-
-    interface theta_v
-      procedure :: theta_v_ijk
-      procedure :: theta_v_Tq
-    end interface
-
-
-    p = pressure_solution%bottom_pressure
-
-    do k = 1, Prnz
-     t_virt = sum(TempIn(1:Prny,k))/Prny
-
-     if (enable_moisture) t_virt = theta_v(t_virt, sum(MoistIn(1:Prny,k))/Prny)
-
-     p = p + grav_acc*dzPr(k) * &
-                  ( t_virt - temperature_ref ) &
-                  / temperature_ref
-
-    end do
-    pressure_solution%top_pressure = p
-
-
-    do j = 1, Vny+1
-      do i = 1, Unx+1
-        t_virt_prev = theta_v(i,j,Prnz)
-        Pr(i,j,Prnz) = pressure_solution%top_pressure - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
-                ( t_virt_prev - temperature_ref ) &
-                / temperature_ref
-        do k = Prnz-1, 1, -1
-          t_virt = theta_v(i,j,k)
-          Pr(i,j,k) = Pr(i,j,k+1) - &
-                 grav_acc*dzW(k) * &
-                ( (t_virt+t_virt_prev)/2._knd - temperature_ref ) &
-                / temperature_ref
-          t_virt_prev = t_virt
-        end do
-      end do
-    end do
-
-    contains
-
-      pure function theta_v_ijk(i,j,k) result(res)
-        real(knd) :: res
-        integer, intent(in) :: i,j,k
-
-        if (enable_moisture) then
-          res = Temperature(i,j,k) * (1._knd + 0.61_knd * Moisture(i,j,k))
-        else
-          res = Temperature(i,j,k)
-        end if
-      end function
-
-      pure function theta_v_tq(T, q) result(res)
-        real(knd) :: res
-        real(knd), intent(in) :: T, q
-
-        if (enable_moisture) then
-          res = T * (1._knd + 0.61_knd * q)
-        else
-          res = T
-        end if
-      end function
-
-  end subroutine
-
-
   subroutine InitSubsidenceProfile
+    use Large_scale_processes
+    !the subsidence profile contains velocities <w>
+    !positive means upwards
     integer :: k
 
-    if (SubsidenceGradient/=0) then
-      allocate(SubsidenceProfile(0:Prnz))
-      SubsidenceProfile = [ (zW(k) * SubsidenceGradient, k=0, Prnz) ]
+    if (allocated(SubsidenceProfileObj%points)) then
+    
+      enable_subsidence_profile = .true. 
+    
+      allocate(subsidence_profile(1:Prnz))
+      call Interpolate1DProfile(subsidence_profile, SubsidenceProfileObj, 1)  
+      
+    else if (SubsidenceGradient/=0) then
+    
+      enable_subsidence_profile = .true. 
+    
+      allocate(subsidence_profile(0:Prnz))
+      subsidence_profile = [ (- zPr(k) * SubsidenceGradient, k=0, Prnz) ]
+      
     else
-      allocate(SubsidenceProfile(0))
+    
+      enable_subsidence_profile = .false. 
+          
     end if
   end subroutine InitSubsidenceProfile
 

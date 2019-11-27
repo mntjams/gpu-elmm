@@ -214,7 +214,7 @@ contains
 
   subroutine Convection(U, V, W, U2, V2, W2, &
                         Ustar, Vstar, Wstar, &
-                        Temperature, Moisture, &
+                        Temperature, Moisture, Pr, &
                         beta, rho, RK_stage, dt)
     use MomentumAdvection
     use VolumeSources, only: ResistanceForce
@@ -225,6 +225,7 @@ contains
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: Ustar, Vstar ,Wstar
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)    :: Temperature
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)    :: Moisture
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)    :: Pr
     real(knd), dimension(1:3), intent(in) :: beta,rho
     integer,   intent(in) :: RK_stage
     real(knd), intent(in) :: dt
@@ -381,7 +382,7 @@ contains
 
     if (abs(Coriolis_parameter)>tiny(1._knd)) call CoriolisForce(Ustar, Vstar, U, V)
 
-    if (enable_buoyancy) call BuoyancyForce(Wstar, Temperature, Moisture)
+    if (enable_buoyancy) call BuoyancyForce(Wstar, Temperature, Moisture, Pr)
 
     call ResistanceForce(Ustar, Vstar, Wstar, U, V, W)
     
@@ -537,9 +538,11 @@ contains
 
 
 
-  subroutine BuoyancyForce(W, Temperature, Moisture)
+  subroutine BuoyancyForce(W, Temperature, Moisture, Pr)
+    use WaterThermodynamics, only: LiquidWater, compute_liquid_water_content
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: W
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature, Moisture
+    real(knd), contiguous, intent(in) :: Pr(-1:,-1:,-1:)
     real(knd) :: A, A2
     integer :: i, j, k
     ! Wolfram: InterpolatingPolynomial[{{-1.5,a},{-0.5,b},{0.5,c},{1.5,d}},x] /. x = 0
@@ -548,7 +551,16 @@ contains
 
     if (enable_moisture) then
       if (enable_liquid) then
-        call error_stop("Liquid water not implemented.")
+        call compute_liquid_water_content(Temperature, Moisture, Pr)
+        A = grav_acc / temperature_ref
+        A2 = A / 2._KND
+
+        if (discretization_order==4) then
+          call error_stop("not yet implemented")
+        else
+          call apply_liquid(1)
+          call apply_liquid(2)
+        end if
       else
         A = grav_acc / temperature_ref
         A2 = A / 2._KND
@@ -613,10 +625,54 @@ contains
         !$omp end parallel do
       end subroutine
 
+      subroutine apply_liquid(start)
+        integer, intent(in) :: start
+        integer :: i, j, k
+        real(knd) :: temperature_virt
+
+        !$omp parallel do private(i,j,k,temperature_virt)
+        do k = start, Wnz+1,2
+          do j = 1, Wny
+            do i = 1, Wnx
+              temperature_virt = theta_v_liquid(i,j,k)
+              W(i,j,k)   = W(i,j,k)   + A2 * temperature_virt - A * temperature_ref
+              W(i,j,k-1) = W(i,j,k-1) + A2 * temperature_virt
+            end do
+          end do
+        end do
+        !$omp end parallel do
+      end subroutine
+
       pure real(knd) function theta_v(i, j, k)
         integer, intent(in) :: i, j, k
 
-        theta_v = Temperature(i, j, k) * (1._knd + 0.61_knd * Moisture(i, j, k))
+        theta_v = Temperature(i,j,k) * (1._knd + 0.61_knd * Moisture(i,j,k))
+      end function
+
+      real(knd) function theta_v_liquid(i, j, k)
+        use PhysicalProperties
+        integer, intent(in) :: i, j, k
+        real(knd) :: theta, p, theta_t
+        real(knd), parameter :: reference_pressure = 100000
+        real(knd), parameter :: lw_min = 1e-8_knd
+        
+        if (LiquidWater(i,j,k) > lw_min) then
+          !pressure
+          p = reference_pressure_z(k) + Pr(i,j,k) * rho_air_ref
+          
+          !inv Exner
+          theta_t = (reference_pressure / p)**(Rd_air_ref / Cp_air_ref)
+
+          !pot. temperature from Betts
+          theta = Temperature(i,j,k) + &
+                  (Lv_water_ref / Cp_air_ref) * theta_t * LiquidWater(i,j,k)
+
+          theta_v_liquid = theta * &
+                    (1._knd + 0.61_knd * (Moisture(i,j,k) - LiquidWater(i,j,k)) -LiquidWater(i,j,k))
+        else
+          theta_v_liquid = theta_v(i, j, k)
+        end if
+                  
       end function
   end subroutine BuoyancyForce
 
@@ -660,7 +716,7 @@ contains
 
 
 
-  subroutine SubgridStresses(U,V,W,Pr,Temperature)
+  subroutine SubgridStresses(U,V,W,Pr,Temperature,Moisture)
     use Subgrid, only: SubgridModel, sgstype, StabSubgridModel
     use ImmersedBoundary, only: ScalFlIBPoints, TIBPoint_Viscosity
     use Wallmodels
@@ -669,12 +725,13 @@ contains
     real(knd), contiguous, intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd), contiguous, intent(in) :: Pr(-1:,-1:,-1:)
     real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in) :: Moisture(-1:,-1:,-1:)
     integer :: i
 
 
     if (wallmodeltype>0) then
                       !resulting Viscosity intentionally overwritten
-                      call ComputeViscsWM(U,V,W,Pr,Temperature)
+                      call ComputeViscsWM(U,V,W,Pr,Temperature,Moisture)
     end if
     
 
@@ -682,7 +739,7 @@ contains
 
 
     if (wallmodeltype>0) then
-                    call ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
+                    call ComputeUVWFluxesWM(U,V,W,Pr,Temperature,Moisture)
     end if
 
     call BoundViscosity(Viscosity)

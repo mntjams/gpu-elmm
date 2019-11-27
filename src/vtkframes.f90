@@ -22,6 +22,7 @@ module VTKFrames
     integer :: sumscalars = 0
     integer :: temperature = 1
     integer :: moisture = 1
+    integer :: liquid_water = 1
     integer :: temperature_flux = 0
     integer :: moisture_flux = 0
     integer :: scalar_flux = 0
@@ -38,7 +39,7 @@ module VTKFrames
     
     real(real32), allocatable :: Pr(:,:,:)
     real(real32), allocatable :: U(:,:,:,:)
-    real(real32), allocatable :: Temperature(:,:,:), Moisture(:,:,:), Scalar(:,:,:,:)
+    real(real32), allocatable :: Temperature(:,:,:), Moisture(:,:,:), LiquidWater(:,:,:), Scalar(:,:,:,:)
     real(real32), allocatable :: TemperatureFl(:,:,:), MoistureFl(:,:,:), ScalarFl(:,:,:,:)
     real(real32), allocatable :: Lambda2(:,:,:), Vorticity(:,:,:,:)
     
@@ -262,6 +263,10 @@ contains
       allocate(D%Moisture(mini:maxi,minj:maxj,mink:maxk))
     end if
 
+    if (enable_liquid.and.D%flags%liquid_water==1) then
+      allocate(D%LiquidWater(mini:maxi,minj:maxj,mink:maxk))
+    end if
+
     if (enable_buoyancy.and.D%flags%temperature_flux==1) then
       allocate(D%TemperatureFl(mini:maxi,minj:maxj,mink:maxk))
     end if
@@ -320,6 +325,7 @@ contains
   
 
   subroutine TFrameDomain_Fill(D, U, V, W, Pr, Viscosity, Temperature, Moisture, Scalar)
+    use WaterThermodynamics, only: LiquidWater
     use Output_helpers, only: Lambda2, ScalarVerticalFlux
     !Fill the output buffers for asynchronous output
     class(TFrameDomain),intent(inout) :: D
@@ -406,6 +412,20 @@ contains
             D%Moisture(i,j,k) = real(Moisture(i,j,k), real32)
           else
             D%Moisture(i,j,k) = real(moisture_ref, real32)
+          end if
+        end do
+       end do
+      end do
+    end if
+
+    if (enable_liquid.and.D%flags%liquid_water==1) then
+      do k = mink,maxk
+       do j = minj,maxj
+        do i = mini,maxi
+          if (Prtype(i,j,k)<=0) then
+            D%LiquidWater(i,j,k) = real(LiquidWater(i,j,k), real32)
+          else
+            D%LiquidWater(i,j,k) = real(0, real32)
           end if
         end do
        end do
@@ -529,6 +549,7 @@ contains
       if (allocated(D%U))             D%U = SwapB(D%U)
       if (allocated(D%Temperature))   D%Temperature = SwapB(D%Temperature)
       if (allocated(D%Moisture))      D%Moisture = SwapB(D%Moisture)
+      if (allocated(D%LiquidWater))   D%LiquidWater = SwapB(D%LiquidWater)
       if (allocated(D%Scalar))        D%Scalar = SwapB(D%Scalar)
       if (allocated(D%TemperatureFl)) D%TemperatureFl = SwapB(D%TemperatureFl)
       if (allocated(D%MoistureFl))    D%MoistureFl = SwapB(D%MoistureFl)
@@ -606,6 +627,12 @@ contains
       write(D%unit) "SCALARS moisture float", lf
       write(D%unit) "LOOKUP_TABLE default", lf
       write(D%unit) D%Moisture, lf
+    end if
+
+    if (enable_liquid.and.D%flags%liquid_water==1) then
+      write(D%unit) "SCALARS liquid_water float", lf
+      write(D%unit) "LOOKUP_TABLE default", lf
+      write(D%unit) D%LiquidWater, lf
     end if
 
     if (enable_buoyancy.and.D%flags%temperature_flux==1) then
@@ -692,8 +719,7 @@ contains
     call D%SaveTimes
 
   end subroutine
-  
-  
+
   
   
 end module VTKFrames

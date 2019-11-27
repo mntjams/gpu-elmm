@@ -5,6 +5,7 @@ module Outputs
   use Wallmodels, only: GroundDeposition, &
                         GroundUstar, GroundUstarUVW, &
                         GroundTFlux, GroundTFluxUVW, &
+                        GroundMFlux, GroundMFluxUVW, &
                         wallmodeltype
   use ImmersedBoundary
   use Turbinlet, only: turb_gen => default_turbulence_generator
@@ -65,7 +66,7 @@ module Outputs
 
   real(knd),allocatable,dimension(:) :: pr_gradient_x_time, pr_gradient_y_time, pr_gradient_z_time
 
-  real(knd),allocatable,dimension(:,:) :: ustar, tstar                        !first index differentiates flux from friction number
+  real(knd),allocatable,dimension(:,:) :: ustar, tstar, mstar                !first index differentiates flux from friction number
                                                                              !second index is time
   real(knd),allocatable,dimension(:,:) :: U_time,V_time,W_time,temp_time,moist_time  !position, time
 
@@ -147,6 +148,7 @@ module Outputs
     integer :: scaltotsum_time = 0
     integer :: ustar = 1
     integer :: tstar = 1
+    integer :: mstar = 1
     
     integer :: probes_fluxes = 0
   end type TOutputSwitches
@@ -157,6 +159,7 @@ module Outputs
     integer :: delta = 0
     integer :: ustar = 0
     integer :: tstar = 0
+    integer :: mstar = 0
   end type
 
   type(TDisplaySwitches),save :: display
@@ -478,9 +481,14 @@ contains
       ustar = huge(1.0)
     end if
 
-    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==BC_MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
+    if (wallmodeltype>0.and.enable_buoyancy.and.(display%tstar==1.or.store%tstar==1)) then
       allocate(tstar(2,1:time_series_max_length))
       tstar = huge(1.0)
+    end if
+
+    if (wallmodeltype>0.and.enable_buoyancy.and.(display%mstar==1.or.store%mstar==1)) then
+      allocate(mstar(2,1:time_series_max_length))
+      mstar = huge(1.0)
     end if
 
     if (num_of_scalars>0) then
@@ -715,6 +723,10 @@ contains
       call create(output_dir//"tflux.unf")
     end if
 
+    if (wallmodeltype>0.and.enable_buoyancy.and.allocated(mstar).and.store%tstar==1) then
+      call create(output_dir//"mflux.unf")
+    end if
+
 
     if (flow_rate_x_fixed) then
       call create(output_dir//"pr_gradient_x.unf")
@@ -789,7 +801,7 @@ contains
     ! We compute the subgrid stresses from the eddy viscosity even at the walls
     ! We should not set also TDiff
     if (wallmodeltype>0.and.(store%probes_fluxes==1.or.enable_profiles)) then
-      call ComputeViscsWM(U,V,W,Pr,Temperature)
+      call ComputeViscsWM(U,V,W,Pr,Temperature,Moisture)
     end if
 
     times(step) = time_stepping%time
@@ -1098,7 +1110,7 @@ contains
     end if
 
 
-    if (wallmodeltype>0.and.enable_buoyancy.and.TempBtype(Bo)==BC_MO_TEMPERATURE.and.(display%tstar==1.or.store%tstar==1)) then
+    if (wallmodeltype>0.and.enable_buoyancy.and.(display%tstar==1.or.store%tstar==1)) then
      S2 = GroundTFlux()
      S = - S2 /  ground_ustar_Pr
 
@@ -1115,6 +1127,27 @@ contains
 
      if (display%tstar==1) then
        if (master) write(*,'(*(a10,es15.3))') "TstarUVW:" ,S, "Tflux:", S2
+     end if
+
+    end if
+
+    if (wallmodeltype>0.and.enable_moisture.and.(display%mstar==1.or.store%mstar==1)) then
+     S2 = GroundMFlux()
+     S = - S2 /  ground_ustar_Pr
+
+     if (display%mstar==1) then
+       if (master) write(*,'(*(a10,es15.3))') "Mstar:", S, "Mflux:", S2
+     end if
+
+     if (store%mstar==1) then
+       mstar(:,step) = [ S2,S ]
+     end if
+
+     S2 = GroundMFluxUVW()
+     S = - S2 / ground_ustar_UVW 
+
+     if (display%mstar==1) then
+       if (master) write(*,'(*(a10,es15.3))') "MstarUVW:" ,S, "Mflux:", S2
      end if
 
     end if
@@ -1400,6 +1433,13 @@ contains
       open(unit,file=output_dir//"tflux.unf", &
            access="stream",status="old",position="append")
       write(unit) tstar(:,1:time_series_step)
+      close(unit)
+    end if
+
+    if (wallmodeltype>0.and.enable_moisture.and.allocated(mstar).and.store%mstar==1) then
+      open(unit,file=output_dir//"mflux.unf", &
+           access="stream",status="old",position="append")
+      write(unit) mstar(:,1:time_series_step)
       close(unit)
     end if
 

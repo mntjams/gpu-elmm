@@ -38,12 +38,15 @@ module WMPoint_types
     real(knd) :: z0 = 0
     real(knd) :: z0H = 0
     real(knd) :: ustar = 1
+    logical :: prescribed_ustar = .false.
 
     real(knd) :: temperature = 0
     real(knd) :: temperature_flux = 0
     logical :: prescribed_temperature = .false.
 
+    real(knd) :: moisture = 0
     real(knd) :: moisture_flux = 0
+    logical :: prescribed_moisture = .false.
 
     real(knd) :: div = 0 !divergence when zeroing out trans-boundary velocities
 
@@ -76,6 +79,7 @@ module WMPoint_types
     real(knd) :: z0 = 0
     real(knd) :: z0H = 0
     real(knd) :: ustar = 1
+    logical :: prescribed_ustar = .false.
 
     real(knd) :: wallu = 0
     real(knd) :: wallv = 0
@@ -85,6 +89,9 @@ module WMPoint_types
     real(knd) :: temperature_flux = 0
     logical :: prescribed_temperature = .false.
         
+    real(knd) :: moisture = 0
+    real(knd) :: moisture_flux = 0
+    logical :: prescribed_moisture = .false.    
   end type WMpointUVW
 
 end module
@@ -121,8 +128,10 @@ module Wallmodels
          AddWMPoint, AddWMPointUVW, &
          MoveWMPointsToArray, GetOutsideBoundariesWM, InitWMMasks, &
          ComputeViscsWM, ComputeUVWFluxesWM, DivergenceWM, &
-         InitTempFl, GroundDeposition, &
-         GroundUstar, GroundUstarUVW, GroundTFlux, GroundTFluxUVW, &
+         GroundDeposition, &
+         GroundUstar, GroundUstarUVW, &
+         GroundTFlux, GroundTFluxUVW, &
+         GroundMFlux, GroundMFluxUVW, &
          wallmodeltype
 
   integer, parameter, public :: MINUSX = 1, PLUSX = 2, MINUSY = 3, PLUSY = 4, MINUSZ = 5, PLUSZ = 6
@@ -570,6 +579,13 @@ contains
 
            if (MoistBtype(Bo)==BC_CONSTFLUX) then
              WMP%moisture_flux = sideMoist(Bo)
+          else
+             WMP%moisture_flux = 0
+           end if
+
+           if (MoistBtype(Bo)==BC_DIRICHLET) then
+             WMP%moisture = sideMoist(Bo)
+             WMP%prescribed_moisture = .true.
            end if
 
            call AddWMPoint(WMP)
@@ -623,6 +639,11 @@ contains
 
            if (MoistBtype(To)==BC_CONSTFLUX) then
              WMP%moisture_flux = - sideMoist(To)
+           end if
+
+           if (MoistBtype(To)==BC_DIRICHLET) then
+             WMP%moisture = sideMoist(To)
+             WMP%prescribed_moisture = .true.
            end if
 
            call AddWMPoint(WMP)
@@ -787,6 +808,17 @@ contains
                p%prescribed_temperature = .true.
              end if
 
+             if (MoistBtype(Bo)==BC_CONSTFLUX) then
+               p%moisture_flux = sideMoist(Bo)
+             else
+               p%moisture_flux = 0
+             end if
+
+             if (MoistBtype(Bo)==BC_DIRICHLET) then
+               p%moisture = sideMoist(Bo)
+               p%prescribed_moisture = .true.
+             end if
+
              call AddWMPointUVW(p, component, Bo)
 
            end if
@@ -825,6 +857,17 @@ contains
              if (TempBtype(To)==BC_DIRICHLET) then
                p%temperature = sideTemp(To)
                p%prescribed_temperature = .true.
+             end if
+             
+             if (MoistBtype(To)==BC_CONSTFLUX) then
+               p%moisture_flux = - sideMoist(To)
+             else
+               p%moisture_flux = 0
+             end if
+
+             if (MoistBtype(To)==BC_DIRICHLET) then
+               p%moisture = sideMoist(To)
+               p%prescribed_moisture = .true.
              end if
              
              call AddWMPointUVW(p, component, To)
@@ -1525,7 +1568,7 @@ contains
 
 
 
-  pure subroutine WM_MO_Dirichlet_ustar_tfl(ustar,temperature_flux,vel,dist,z0,z0H,tempdif)
+  pure subroutine WM_MO_Dirichlet_ustar_tfl(ustar,temperature_flux,dist,z0,z0H,vel,tempdif)
     real(knd),intent(inout) :: ustar,temperature_flux
     real(knd),intent(in) :: vel,dist,z0,z0H,tempdif
     real(knd),parameter :: eps = 1e-3_knd
@@ -1571,6 +1614,74 @@ contains
        end if
     end if
   end subroutine WM_MO_Dirichlet_ustar_tfl
+
+
+
+
+  pure subroutine WM_MO_Dirichlet_ustar_tfl_mfl(ustar, temperature_flux, moisture_flux, &
+                                                dist, z0, z0H, &
+                                                vel, &
+                                                temp, surf_temp, &
+                                                moist, surf_moist)
+    real(knd),intent(inout) :: ustar, temperature_flux, moisture_flux
+    real(knd),intent(in) :: vel, dist, z0, z0H
+    real(knd),intent(in) :: temp, surf_temp, moist, surf_moist
+    real(knd),parameter :: eps = 1e-3_knd
+    real(knd),parameter :: yplcrit = 11.225_knd
+    real(knd),parameter :: k_U = 0.4_knd
+    real(knd),parameter :: k_T = 0.47_knd, k_Q = k_T
+    real(knd),parameter :: e_coef = 0.61_knd
+    real(knd) :: zL, zL0, psi_m, psi_h, psi_e
+    real(knd) :: tempdif, moistdif, virt_flux
+    integer :: i
+
+    tempdif = temp - surf_temp
+    moistdif = moist - surf_moist
+    
+    call WMRoughUstar(ustar,vel,dist,z0)
+
+    if (dist<=z0) then
+
+      temperature_flux = - molecular_diffusivity * tempdif / dist
+      moisture_flux = - molecular_diffusivity * moistdif / dist
+
+    else
+       psi_m = 0
+       psi_h = 0
+       psi_e = 0
+       zL0 = -10000._knd
+    
+       i = 0
+       do
+         i = i+1
+         
+         !assuming no saturation
+         virt_flux = temperature_flux * (1 + e_coef * moist) + &
+                     e_coef * temp * moisture_flux
+         
+         !L does not contain the Karman constant!
+         zL =  - dist * grav_acc * virt_flux / (temperature_ref * ustar**3)
+         
+         psi_m = PsiM_MO_mod(zL)
+         psi_h = PsiH_MO_mod(zL)
+         psi_e = psi_h
+         
+         ustar = vel * k_U / (log(dist/z0) - psi_m)
+         temperature_flux = - tempdif * ustar * k_T / (log(dist/z0H) - psi_h)
+         moisture_flux = - moistdif * ustar * k_Q / (log(dist/z0H) - psi_e)
+         
+         if  (i>1 .and. abs(zL-zL0)/max(abs(zL),1.e-4_knd)<eps) exit
+         if (i>=50.or.zL>10000) exit
+                 
+         zl0 = zL
+       end do
+
+       if (i>=50.or.zL>10000) then
+         ustar = sqrt(molecular_viscosity * vel / dist)
+         temperature_flux = - molecular_diffusivity * tempdif / dist
+       end if
+    end if
+  end subroutine WM_MO_Dirichlet_ustar_tfl_mfl
 
 
 
@@ -1653,7 +1764,7 @@ contains
 
     vel = sqrt(sum(vect**2))
 
-    call WM_MO_Dirichlet_ustar_tfl(ustar,temperature_flux,vel,dist,z0,z0H,tempdif)
+    call WM_MO_Dirichlet_ustar_tfl(ustar,temperature_flux,dist,z0,z0H,vel,tempdif)
 
     if (ustar<0) ustar = 0
 
@@ -1668,6 +1779,41 @@ contains
   end subroutine WM_MO_Dirichlet
 
 
+  pure subroutine WM_MO_Dirichlet_moist(visc, &
+                                        ustar, temperature_flux, moisture_flux, &
+                                        z0, z0H, &
+                                        temp, surf_temp, moist, surf_moist, &
+                                        distvect, uvect)
+    real(knd),intent(out)   :: visc
+    real(knd),intent(inout) :: ustar, temperature_flux, moisture_flux
+    real(knd),intent(in)    :: z0, z0H
+    real(knd),intent(in)    :: temp, surf_temp, moist, surf_moist
+    real(knd),intent(in)    :: distvect(3),uvect(3)
+    real(knd) :: vect(3),vel,dist
+
+    dist = sqrt(sum(distvect**2))
+
+    vect = uvect - dot_product(uvect, distvect) * distvect / dist**2  !tangential part
+
+    vel = sqrt(sum(vect**2))
+
+    call WM_MO_Dirichlet_ustar_tfl_mfl(ustar, temperature_flux, moisture_flux, &
+                                       dist, z0, z0H, &
+                                       vel, temp, surf_temp, moist, surf_moist)
+
+    if (ustar<0) ustar = 0
+
+    if ((vel>0.or.temperature_flux/=0)) then
+      visc = max(ustar*ustar*dist/vel, molecular_viscosity)
+    else if (molecular_viscosity > 0) then
+      visc = molecular_viscosity
+    else
+      visc = 0
+    end if
+
+  end subroutine WM_MO_Dirichlet_moist
+
+
   pure subroutine WM_MO_DirichletStress(ustar,temperature_flux,z0,z0H,tempdif,distvect,uvect,tan_vect)
     real(knd),intent(inout) :: ustar,temperature_flux
     real(knd),intent(in)    :: z0,z0H
@@ -1680,15 +1826,40 @@ contains
 
     vel = sqrt(sum(tan_vect**2))
 
-    call WM_MO_Dirichlet_ustar_tfl(ustar,temperature_flux,vel,dist,z0,z0H,tempdif)
+    call WM_MO_Dirichlet_ustar_tfl(ustar,temperature_flux,dist,z0,z0H,vel,tempdif)
 
     if (ustar<0) ustar = 0
 
   end subroutine WM_MO_DirichletStress
 
 
+  pure subroutine WM_MO_DirichletStress_moist(ustar, temperature_flux, moisture_flux, &
+                                              z0, z0H, &
+                                              temp, surf_temp, moist, surf_moist, &
+                                              distvect, uvect, tan_vect)
+    real(knd),intent(inout) :: ustar, temperature_flux, moisture_flux
+    real(knd),intent(in)    :: z0, z0H
+    real(knd),intent(in)    :: temp, surf_temp
+    real(knd),intent(in)    :: moist, surf_moist
+    real(knd),intent(in)    :: distvect(3), uvect(3)
+    real(knd),intent(out)   :: tan_vect(3)
+    real(knd) :: vel,dist
 
-  pure subroutine BOUND_temperature_flux(Nu)
+    call vel_and_dist(tan_vect, dist, uvect, [0._knd,0._knd,0._knd], distvect)
+
+    vel = sqrt(sum(tan_vect**2))
+
+    call WM_MO_Dirichlet_ustar_tfl_mfl(ustar, temperature_flux, moisture_flux, &
+                                      dist, z0, z0H, &
+                                      vel, temp, surf_temp, moist, surf_moist)
+
+    if (ustar<0) ustar = 0
+
+  end subroutine WM_MO_DirichletStress_moist
+
+
+
+  pure subroutine bound_temperature_flux(Nu)
     real(knd),intent(inout):: Nu(-1:,-1:)
     integer :: i,j,nx,ny
 
@@ -1718,41 +1889,9 @@ contains
         Nu(i,ny+1) = Nu(i,ny)
       end do
     end if
-  end subroutine BOUND_temperature_flux
+  end subroutine bound_temperature_flux
 
 
-
-
-
-  subroutine InitTempFL(Temperature)
-    real(knd),intent(in) :: Temperature(-1:,-1:,-1:)
-    integer :: i, j, k
-    type(WMPointUVW), pointer :: pts(:)
-
-    if (enable_buoyancy.and.TempBtype(Bo)==BC_MO_TEMPERATURE) then
-      do i = 1, size(WMPoints)
-        if (WMPoints(i)%zk==1) then
-          WMPoints(i)%temperature_flux = -TDiff(WMPoints(i)%xi,WMPoints(i)%yj,1)*&
-                       (temperature(WMPoints(i)%xi,WMPoints(i)%yj,1) - temperature(WMPoints(i)%xi,WMPoints(i)%yj,0))
-          WMPoints(i)%prescribed_temperature = .true.
-        end if   
-      end do
-      
-      do k = 1, size(WMPointsUVW,2)
-        do j = 1, size(WMPointsUVW,1)
-          pts => WMPointsUVW(j,k)%points
-          do i = 1, size(pts)
-            if (pts(i)%zk==1) then
-              pts(i)%temperature_flux = -TDiff(pts(i)%xi,pts(i)%yj,1)*&
-                           (temperature(pts(i)%xi,pts(i)%yj,1) - temperature(pts(i)%xi,pts(i)%yj,0))
-              pts(i)%prescribed_temperature = .true.
-            end if   
-          end do
-        end do
-      end do
-    end if
-
-  end subroutine InitTempFL
 
 
   pure recursive subroutine WallPrGradient(prgrad,i,j,k,Pr,Prtype)
@@ -1803,10 +1942,11 @@ contains
 
 
 
-  subroutine ComputeViscsWM(U,V,W,Pr,Temperature)
+  subroutine ComputeViscsWM(U,V,W,Pr,Temperature,Moisture)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
     real(knd),dimension(-1:,-1:,-1:),   intent(in) :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Moisture
     integer :: i, xi, yj, zk
     real(knd) :: tdif
     real(knd) :: dist(3), vel(3), wallvel(3), prgrad(3)
@@ -1830,16 +1970,35 @@ contains
 
       if (WMPoints(i)%z0>0) then
 
-         if (enable_buoyancy .and. WMPoints(i)%prescribed_temperature) then
+         if (WMPoints(i)%prescribed_ustar) then
+         
+           continue
+           
+         else if (enable_buoyancy .and. WMPoints(i)%prescribed_temperature) then
 
 #ifdef CUSTOM_SURFACE_TEMPERATURE
            WMPoints(i)%temperature = SurfaceTemperature(xPr(xi), yPr(yj), zPr(zk), time_stepping%time)
 #endif
            tdif = Temperature(xi,yj,zk) - WMPoints(i)%temperature
 
-           call WM_MO_Dirichlet(visc, WMPoints(i)%ustar, &
-                                WMPoints(i)%temperature_flux, &
-                                WMPoints(i)%z0, WMPoints(i)%z0H, tdif, dist, vel)
+           if (enable_moisture .and. WMPoints(i)%prescribed_temperature) then
+#ifdef CUSTOM_SURFACE_MOISTURE
+             WMPoints(i)%moisture = SurfaceMoisture(xPr(xi), yPr(yj), zPr(zk), time_stepping%time)
+#endif
+             
+             call WM_MO_Dirichlet_moist(visc, WMPoints(i)%ustar, &
+                                  WMPoints(i)%temperature_flux, &
+                                  WMPoints(i)%moisture_flux, &
+                                  WMPoints(i)%z0, WMPoints(i)%z0H, &
+                                  Temperature(xi,yj,zk), WMPoints(i)%temperature, &
+                                  Moisture(xi,yj,zk), WMPoints(i)%moisture, &
+                                  dist, vel)
+           else
+             call WM_MO_Dirichlet(visc, WMPoints(i)%ustar, &
+                                  WMPoints(i)%temperature_flux, &
+                                  WMPoints(i)%z0, WMPoints(i)%z0H, tdif, dist, vel)
+           end if
+
 
          else if (enable_buoyancy .and. WMPoints(i)%temperature_flux>0) then
 
@@ -1888,10 +2047,11 @@ contains
 
 
 
-  subroutine ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
+  subroutine ComputeUVWFluxesWM(U, V, W, Pr, Temperature, Moisture)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
     real(knd),dimension(-1:,-1:,-1:),   intent(in) :: Pr
     real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Moisture
 
 
     call fluxes(UxmWMpoints, 1, MINUSX, xU, yPr, zPr)
@@ -1923,7 +2083,7 @@ contains
       integer, intent(in) :: component, direction
       real(knd), intent(in) :: x(:), y(:), z(:)
       integer :: point, xi, yj, zk
-      real(knd) :: dist(3), vel(3), wallvel(3), tan_vect(3), mag, drec(6), temp
+      real(knd) :: dist(3), vel(3), wallvel(3), tan_vect(3), mag, drec(6), temp, moist
       type(WMPointUVW), pointer :: p
       real(knd), parameter :: eps = sqrt(epsilon(1._knd))
       
@@ -1946,57 +2106,79 @@ contains
 
           if (p%z0>0) then
 
-             if (enable_buoyancy .and. p%prescribed_temperature) then
+            if (p%prescribed_ustar) then
+            
+              continue
+              
+            else if (enable_buoyancy .and. p%prescribed_temperature) then
              
 #ifdef CUSTOM_SURFACE_TEMPERATURE
-               p%temperature = SurfaceTemperature(x(xi)+dist(1), &
-                                                  y(yj)+dist(2), &
-                                                  z(zk)+dist(3), &
-                                                  time_stepping%time)
+              p%temperature = SurfaceTemperature(x(xi)+dist(1), &
+                                                 y(yj)+dist(2), &
+                                                 z(zk)+dist(3), &
+                                                 time_stepping%time)
 #endif
+
+              temp = local_value(Temperature, component, xi, yj, zk)
+
+              if (enable_moisture) then
                
-               temp = local_value(Temperature, component, xi, yj, zk)
+#ifdef CUSTOM_SURFACE_MOISTURE
+                p%moisture = SurfaceMoisture(x(xi)+dist(1), &
+                                             y(yj)+dist(2), &
+                                             z(zk)+dist(3), &
+                                             time_stepping%time)
+#endif
 
-               call WM_MO_DirichletStress(p%ustar, p%temperature_flux, &
-                                          p%z0, p%z0H, temp-p%temperature, &
-                                          dist, vel, tan_vect)
+                moist = local_value(Moisture, component, xi, yj, zk)
 
-             else if (enable_buoyancy .and. p%temperature_flux>0) then
+                call WM_MO_DirichletStress_moist(p%ustar, p%temperature_flux, p%moisture_flux, &
+                                           p%z0, p%z0H, &
+                                           temp, p%temperature, moist, p%moisture, &
+                                           dist, vel, tan_vect)
+              else
+               
+                call WM_MO_DirichletStress(p%ustar, p%temperature_flux, &
+                                           p%z0, p%z0H, temp-p%temperature, &
+                                           dist, vel, tan_vect)
+              end if
+
+            else if (enable_buoyancy .and. p%temperature_flux>0) then
 !TODO: The temperature flux is always 0 now in momentum points, so no stability effect here!
 
                call WM_MO_FluxStress(p%ustar, p%temperature_flux, &
                                      p%z0, dist, vel, tan_vect)
 
-             else
+            else
 
                call WMRoughStress(p%ustar, p%z0, &
                                   dist, vel, wallvel, tan_vect = tan_vect)
-             end if
+            end if
 
           else
 
-             if (molecular_viscosity <= 0) then
+            if (molecular_viscosity <= 0) then
                call error_stop("The wall model requires positive viscosity or roughness length.")
-             end if
+            end if
 
 
-             call WMFlatStress(p%ustar, &
-                               dist, vel, wallvel, tan_vect = tan_vect)
-           end if
+            call WMFlatStress(p%ustar, &
+                              dist, vel, wallvel, tan_vect = tan_vect)
+          end if
 
-           mag = norm2(tan_vect)
+          mag = norm2(tan_vect)
 
-           if (mag>eps) then
+          if (mag>eps) then
 
              p%flux = (tan_vect(component) / mag) * p%ustar**2 * drec(direction)
 
              if (mod(direction,2)==1) p%flux = - p%flux
 
-           else
+          else
 
              p%flux = 0
 
-           end if
+          end if
 
 !         end associate
 
@@ -2152,6 +2334,41 @@ contains
       res = 0
     end if
   end function GroundTFluxUVW
+
+
+  pure real(knd) function GroundMFlux()
+    if (any(WMPoints%zk == 1)) then
+      GroundMFlux = sum(WMPoints%moisture_flux, mask = (WMPoints%zk == 1)) / count(WMPoints%zk == 1)
+    else
+      GroundMFlux = 0
+    end if
+  end function GroundMFlux
+  
+  
+  real(knd) function GroundMFluxUVW() result(res)
+    integer :: i, j, n
+
+    if (any(WMPoints%zk == 1)) then
+      res = 0
+      n = 0
+      do j = 1,2
+        do i = 1,6
+          associate(p => WMPointsUVW(i,j))
+            n = n +  count(p%points%zk == 1)
+            res = res + sum(p%points%moisture_flux, mask = (p%points%zk == 1))
+          end associate
+        end do
+      end do
+      if (n>0) then
+        res = res / n
+      else
+        res = 0
+      end if
+    else
+      res = 0
+    end if
+  end function GroundMFluxUVW
+
 
 
 

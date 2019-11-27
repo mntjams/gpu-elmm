@@ -117,16 +117,17 @@ contains
       call par_update_pr_gradient(time_stepping%effective_time)
 #endif
 
-      call SubgridStresses(U, V, W, Pr, Temperature)
+      call SubgridStresses(U, V, W, Pr, Temperature, Moisture)
 
 
       call Convection(U, V, W, &
                       U2, V2, W2, &
                       Ustar, Vstar, Wstar, &
                       Temperature, Moisture, &
+                      Pr, &
                       RK_beta, RK_rho, RK_stage, time_stepping%dt)
 
-      call ScalarRK3(U, V, W, &
+      call ScalarRK3(U, V, W, Pr, &
                      Temperature, Moisture, Scalar, &
                      RK_stage, time_stepping%dt, &
                      current_profiles%tempfl, current_profiles%moistfl)
