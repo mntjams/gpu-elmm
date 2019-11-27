@@ -7,7 +7,7 @@ module Pressure
   implicit none
 
   private
-  public InitPressureCorrection, PressureCorrection, &
+  public InitPressureCorrection, PressureCorrection, InitHydrostaticPressure, &
           pressure_solution, pressure_solution_control
   
   integer :: bound_n_free(6)
@@ -615,6 +615,235 @@ contains
     end if
 
   end subroutine PostPoisson
+
+
+  subroutine InitHydrostaticPressure(Pr, Temperature, Moisture)
+    use PhysicalProperties
+    real(knd), contiguous, intent(out) :: Pr(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:)
+    real(knd) :: t_virt, t_virt_prev, p
+    integer :: i, j, k
+
+    interface theta_v
+      procedure :: theta_v_ijk
+      procedure :: theta_v_Tq
+    end interface
+
+#ifdef PAR
+    call InitHydrostaticPressure_par(Pr, Temperature, Moisture)
+    return
+#endif
+    
+    ! in Pascals
+    ! the pressure at the ground is used in configurations
+    p = pressure_solution%bottom_pressure
+
+    do k = 1, Prnz
+      t_virt = sum(TempIn(1:Prny,k))/Prny
+
+      if (enable_moisture) t_virt = theta_v(t_virt, sum(MoistIn(1:Prny,k))/Prny)
+
+      p = p - rho_air_ref * grav_acc*dzPr(k) * &
+              (1 - &
+                      ( temperature_ref - t_virt ) &
+                      / temperature_ref &
+              )
+    end do
+    !this will be used as a fixed reference in the simulation
+    pressure_solution%top_pressure = p
+    if (master) write(*,*) "top_pressure:", pressure_solution%top_pressure
+
+    ! reference_pressure_z(k) does not contain any thermal stratification.
+    ! Its effect is explicitly simulated and contained in the Pr(i,j,k) field.
+    allocate(reference_pressure_z(1:Prnz))
+    
+    reference_pressure_z(Prnz) = pressure_solution%top_pressure + rho_air_ref * grav_acc*(zW(Prnz)-zPr(Prnz))
+
+    
+    
+    do k = Prnz-1, 1, -1
+      reference_pressure_z(k) = reference_pressure_z(k+1) + rho_air_ref * grav_acc*dzW(k)
+    end do
+
+
+
+    ! Pr(i,j,k) is the physical pressure in Pascals divided by rho_air_ref
+    do j = 1, Vny+1
+      do i = 1, Unx+1
+        t_virt_prev = theta_v(i,j,Prnz)
+        Pr(i,j,Prnz) = - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
+                ( t_virt_prev - temperature_ref ) &
+                / temperature_ref
+        do k = Prnz-1, 1, -1
+          t_virt = theta_v(i,j,k)
+          Pr(i,j,k) = Pr(i,j,k+1) - &
+                 grav_acc*dzW(k) * &
+                ( (t_virt+t_virt_prev)/2._knd - temperature_ref ) &
+                / temperature_ref
+          t_virt_prev = t_virt
+        end do
+      end do
+    end do
+
+
+  contains
+
+      pure function theta_v_ijk(i,j,k) result(res)
+        real(knd) :: res
+        integer, intent(in) :: i,j,k
+
+        if (enable_moisture) then
+          res = Temperature(i,j,k) * (1._knd + 0.61_knd * Moisture(i,j,k))
+        else
+          res = Temperature(i,j,k)
+        end if
+      end function
+
+      pure function theta_v_tq(T, q) result(res)
+        real(knd) :: res
+        real(knd), intent(in) :: T, q
+
+        if (enable_moisture) then
+          res = T * (1._knd + 0.61_knd * q)
+        else
+          res = T
+        end if
+      end function
+
+  end subroutine InitHydrostaticPressure
+
+#ifdef PAR
+  subroutine InitHydrostaticPressure_par(Pr, Temperature, Moisture)
+    use custom_par
+    use PhysicalProperties
+    real(knd), contiguous, intent(out) :: Pr(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:)
+    real(knd) :: t_virt, t_virt_prev, p
+    integer :: i, j, k
+    integer :: nz
+
+    interface theta_v
+      procedure :: theta_v_ijk
+      procedure :: theta_v_Tq
+    end interface
+
+    
+    ! in Pascals
+    ! the pressure at the ground is used in configurations
+    if (kim==1) then
+      p = pressure_solution%bottom_pressure
+    else
+      call par_recv(p, b_im)
+    end if
+
+    do k = 1, Prnz
+      t_virt = par_co_sum_plane_xy(sum(TempIn(1:Prny,k)))/gPrny
+
+      if (enable_moisture) t_virt = theta_v(t_virt, par_co_sum_plane_xy(sum(MoistIn(1:Prny,k)))/gPrny)
+
+      p = p - rho_air_ref * grav_acc*dzPr(k) * &
+              (1 - &
+                      ( temperature_ref - t_virt ) &
+                      / temperature_ref &
+              )
+    end do
+    !this will be used as a fixed reference in the simulation
+
+    if (kim == nzims) then
+      pressure_solution%top_pressure = p
+    else
+      call par_send(p, t_im)
+    end if
+    
+    call par_broadcast_from_last_z(pressure_solution%top_pressure)
+    
+    
+    if (master) write(*,*) "top_pressure:", pressure_solution%top_pressure
+  
+    
+    
+    ! reference_pressure_z(k) does not contain any thermal stratification.
+    ! Its effect is explicitly simulated and contained in the Pr(i,j,k) field.
+    allocate(reference_pressure_z(1:Wnz+1))
+    
+
+    if (kim == nzims) then    
+      reference_pressure_z(Prnz) = pressure_solution%top_pressure + rho_air_ref * grav_acc*(zW(Prnz)-zPr(Prnz))
+      nz = Prnz - 1
+    else
+      call par_recv(reference_pressure_z(Prnz+1), t_im)
+      nz = Prnz
+    end if
+    
+    do k = nz, 1, -1
+      reference_pressure_z(k) = reference_pressure_z(k+1) + rho_air_ref * grav_acc*dzW(k)
+    end do
+    
+    if (kim>1) call par_send(reference_pressure_z(1), b_im)
+
+
+
+    ! Pr(i,j,k) is the physical pressure in Pascals divided by rho_air_ref
+    do j = 1, Vny+1
+      do i = 1, Unx+1
+      
+        if (kim == nzims) then
+          t_virt_prev = theta_v(i,j,Prnz)
+          Pr(i,j,Prnz) = - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
+                  ( t_virt_prev - temperature_ref ) &
+                  / temperature_ref
+          nz = Prnz -1
+        else
+          call par_recv(Pr(i,j,Prnz+1), t_im)
+          call par_recv(t_virt_prev, t_im)
+          nz = Prnz
+        end if
+          
+        do k = nz, 1, -1
+          t_virt = theta_v(i,j,k)
+          Pr(i,j,k) = Pr(i,j,k+1) - &
+                 grav_acc*dzW(k) * &
+                ( (t_virt+t_virt_prev)/2._knd - temperature_ref ) &
+                / temperature_ref
+          t_virt_prev = t_virt
+        end do
+        
+        if (kim > 1) then
+          call par_send(Pr(i,j,1), b_im)
+          call par_send(t_virt_prev, b_im)
+        end if
+        
+      end do
+    end do
+
+
+  contains
+
+      pure function theta_v_ijk(i,j,k) result(res)
+        real(knd) :: res
+        integer, intent(in) :: i,j,k
+
+        if (enable_moisture) then
+          res = Temperature(i,j,k) * (1._knd + 0.61_knd * Moisture(i,j,k))
+        else
+          res = Temperature(i,j,k)
+        end if
+      end function
+
+      pure function theta_v_tq(T, q) result(res)
+        real(knd) :: res
+        real(knd), intent(in) :: T, q
+
+        if (enable_moisture) then
+          res = T * (1._knd + 0.61_knd * q)
+        else
+          res = T
+        end if
+      end function
+
+  end subroutine InitHydrostaticPressure_par
+#endif  
+
 
 
 end module Pressure
