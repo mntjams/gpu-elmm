@@ -312,17 +312,17 @@ contains
      open(unit,file="temp_profile.conf",status="old",action="read",iostat = io)
 
      if (io==0) then
-       call get(TemperatureProfile%randomize)
-       call get(TemperatureProfile%randomizeTop)
-       call get(TemperatureProfile%randomizeAmplitude)
+       call get(TemperatureProfileObj%randomize)
+       call get(TemperatureProfileObj%randomizeTop)
+       call get(TemperatureProfileObj%randomizeAmplitude)
        call get(itmp)
 
-       allocate(TemperatureProfile%Sections(max(itmp,0)))
+       allocate(TemperatureProfileObj%Sections(max(itmp,0)))
 
-       do i = 1, size(TemperatureProfile%Sections)
-         call get(TemperatureProfile%Sections(i)%top)
-         call get(TemperatureProfile%Sections(i)%jump)
-         call get(TemperatureProfile%Sections(i)%gradient)
+       do i = 1, size(TemperatureProfileObj%Sections)
+         call get(TemperatureProfileObj%Sections(i)%top)
+         call get(TemperatureProfileObj%Sections(i)%jump)
+         call get(TemperatureProfileObj%Sections(i)%gradient)
        end do
 
        close(unit)
@@ -330,9 +330,9 @@ contains
      else
 
        if (master) write(*,*) "Warning! Could not open file temp_profile.conf. Using defaults."
-       TemperatureProfile%randomize = 0
+       TemperatureProfileObj%randomize = .false.
 
-       allocate(TemperatureProfile%Sections(0))
+       allocate(TemperatureProfileObj%Sections(0))
 
      end if
 
@@ -370,17 +370,17 @@ contains
      open(unit,file="moist_profile.conf",status="old",action="read",iostat = io)
 
      if (io==0) then
-       call get(MoistureProfile%randomize)
-       call get(MoistureProfile%randomizeTop)
-       call get(MoistureProfile%randomizeAmplitude)
+       call get(MoistureProfileObj%randomize)
+       call get(MoistureProfileObj%randomizeTop)
+       call get(MoistureProfileObj%randomizeAmplitude)
        call get(itmp)
 
-       allocate(MoistureProfile%Sections(max(itmp,0)))
+       allocate(MoistureProfileObj%Sections(max(itmp,0)))
 
-       do i = 1, size(MoistureProfile%Sections)
-         call get(MoistureProfile%Sections(i)%top)
-         call get(MoistureProfile%Sections(i)%jump)
-         call get(MoistureProfile%Sections(i)%gradient)
+       do i = 1, size(MoistureProfileObj%Sections)
+         call get(MoistureProfileObj%Sections(i)%top)
+         call get(MoistureProfileObj%Sections(i)%jump)
+         call get(MoistureProfileObj%Sections(i)%gradient)
        end do
 
        close(unit)
@@ -388,9 +388,9 @@ contains
      else
 
        if (master) write(*,*) "Warning! Could not open file moist_profile.conf. Using defaults."
-       MoistureProfile%randomize = 0
+       MoistureProfileObj%randomize = .false.
 
-       allocate(MoistureProfile%Sections(0))
+       allocate(MoistureProfileObj%Sections(0))
 
      end if
 
@@ -2972,18 +2972,18 @@ fields_do:  do j = 1, size(obj_fields)
          elseif (enable_buoyancy) then
            call par_sync_out("  ...setting initial temperature values.")
 
-           call InitScalarProfile(TempIn,TemperatureProfile,temperature_ref)
+           call InitScalarProfile(TempIn,TemperatureProfileObj,temperature_ref)
 
-           call InitScalar(TempIn,TemperatureProfile,Temperature)
+           call InitScalar(TempIn,TemperatureProfileObj,Temperature)
 
          end if !buoyancy and task_type
 
          if (enable_moisture) then
            call par_sync_out("  ...setting initial moisture values.")
 
-           call InitScalarProfile(MoistIn,MoistureProfile,moisture_ref)
+           call InitScalarProfile(MoistIn,MoistureProfileObj,moisture_ref)
 
-           call InitScalar(MoistIn,MoistureProfile,Moisture)
+           call InitScalar(MoistIn,MoistureProfileObj,Moisture)
 
          end if
 
@@ -3081,14 +3081,11 @@ fields_do:  do j = 1, size(obj_fields)
        call BoundScalar(Scalar(:,:,:,i))
      end do
 
-     call par_sync_out("  ...setting initial temperature flux.")
-     call InitTempFl(Temperature)
-
      if (wallmodeltype>0) then
                     call par_sync_out("  ...computing wall model in scalar points.")
-                    call ComputeViscsWM(U,V,W,Pr,Temperature)
+                    call ComputeViscsWM(U,V,W,Pr,Temperature,Moisture)
                     call par_sync_out("  ...computing wall model in velocity points.")
-                    call ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
+                    call ComputeUVWFluxesWM(U,V,W,Pr,Temperature,Moisture)
      end if
 
      call par_sync_out("  ...setting viscosity in ghost cells.")
