@@ -116,7 +116,7 @@ contains
       call par_update_pr_gradient(time_stepping%effective_time)
 #endif
 
-      call SubgridStresses(U, V, W, Pr, Temperature)
+      call SubgridStresses(U, V, W, Pr, Temperature, Moisture)
 
 
       call Convection(U, V, W, &

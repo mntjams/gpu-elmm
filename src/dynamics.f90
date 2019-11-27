@@ -646,11 +646,30 @@ contains
         theta_v = Temperature(i,j,k) * (1._knd + 0.61_knd * Moisture(i,j,k))
       end function
 
-      pure real(knd) function theta_v_liquid(i, j, k)
+      real(knd) function theta_v_liquid(i, j, k)
+        use PhysicalProperties
         integer, intent(in) :: i, j, k
+        real(knd) :: theta, p, theta_t
+        real(knd), parameter :: reference_pressure = 100000
+        real(knd), parameter :: lw_min = 1e-8_knd
+        
+        if (LiquidWater(i,j,k) > lw_min) then
+          !pressure
+          p = reference_pressure_z(k) + Pr(i,j,k) * rho_air_ref
+          
+          !inv Exner
+          theta_t = (reference_pressure / p)**(Rd_air_ref / Cp_air_ref)
 
-        theta_v_liquid = Temperature(i,j,k) * &
-                  (1._knd + 0.61_knd * Moisture(i,j,k) - LiquidWater(i,j,k))
+          !pot. temperature from Betts
+          theta = Temperature(i,j,k) + &
+                  (Lv_water_ref / Cp_air_ref) * theta_t * LiquidWater(i,j,k)
+
+          theta_v_liquid = theta * &
+                    (1._knd + 0.61_knd * (Moisture(i,j,k) - LiquidWater(i,j,k)) -LiquidWater(i,j,k))
+        else
+          theta_v_liquid = theta_v(i, j, k)
+        end if
+                  
       end function
   end subroutine BuoyancyForce
 
@@ -694,7 +713,7 @@ contains
 
 
 
-  subroutine SubgridStresses(U,V,W,Pr,Temperature)
+  subroutine SubgridStresses(U,V,W,Pr,Temperature,Moisture)
     use Subgrid, only: SubgridModel, sgstype, StabSubgridModel
     use ImmersedBoundary, only: ScalFlIBPoints, TIBPoint_Viscosity
     use Wallmodels
@@ -703,12 +722,13 @@ contains
     real(knd), contiguous, intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd), contiguous, intent(in) :: Pr(-1:,-1:,-1:)
     real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in) :: Moisture(-1:,-1:,-1:)
     integer :: i
 
 
     if (wallmodeltype>0) then
                       !resulting Viscosity intentionally overwritten
-                      call ComputeViscsWM(U,V,W,Pr,Temperature)
+                      call ComputeViscsWM(U,V,W,Pr,Temperature,Moisture)
     end if
     
 
@@ -716,7 +736,7 @@ contains
 
 
     if (wallmodeltype>0) then
-                    call ComputeUVWFluxesWM(U,V,W,Pr,Temperature)
+                    call ComputeUVWFluxesWM(U,V,W,Pr,Temperature,Moisture)
     end if
 
     call BoundViscosity(Viscosity)
