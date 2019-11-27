@@ -171,7 +171,8 @@ else:
 
   env.Append(F90PATH = [target_dir,target_dir + '/P/'])
   
-  env.Append(FORTRANMODDIRPREFIX = '-J')
+  if '-J' not in env['FORTRANMODDIRPREFIX']:
+    env.Replace(FORTRANMODDIRPREFIX = '-J')
 
 if cray=='yes':
   env.Replace(ENV=os.environ)
