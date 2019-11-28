@@ -99,7 +99,7 @@ module custom_par
     real(knd) :: xmin, xmax, ymin, ymax, zmin, zmax
     real(knd) :: dx, dy, dz
     
-    real(knd) :: xPr(:), yPr(:), zPr(:), xU(:), yV(:), zW(:)
+    real(knd), allocatable :: xPr(:), yPr(:), zPr(:), xU(:), yV(:), zW(:)
     
     !numbers of cells
     integer   :: nx, ny, nz
