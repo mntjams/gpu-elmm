@@ -4,6 +4,8 @@ module PoissonSolvers
   use Multigrid,   only: PoissMG
   use Multigrid2D, only: PoissMG2d
 
+  implicit none
+
 
 contains
 
@@ -65,7 +67,71 @@ contains
       if (master.and.debugparam>1) write(*,*) "solver cpu time", real(t2-t1)/real(trate)
     end if
 
-  end subroutine
+  end subroutine Poiss_PoisFFT
+
+
+
+
+
+  subroutine Poiss_PoisFFT_variable_z(Phi,RHS)
+#ifdef DPREC
+    use PoisFFT, PoisFFT_Solver => PoisFFT_Solver3D_nonuniform_z_DP
+#else
+    use PoisFFT, PoisFFT_Solver => PoisFFT_Solver3D_nonuniform_z_SP
+#endif
+#ifdef PAR
+    use custom_par
+#endif
+
+    type(PoisFFT_Solver),save :: Solver
+    real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Phi
+    real(knd),dimension(0:,0:,0:),intent(in) :: RHS
+    logical, save :: called = .false.
+
+    integer(int64), save :: trate
+    integer(int64)       :: t1, t2
+
+    integer :: discretization
+
+    if (discretization_order == 4) then
+      discretization = PoisFFT_FiniteDifference4
+    else
+      discretization = PoisFFT_FiniteDifference2
+    end if
+
+    if (.not.called) then
+#ifdef PAR
+      Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
+                               [gxmax-gxmin,gymax-gymin], gzPr(1:gPrnz), gzW(0:gPrnz),  &
+                               PoissonBtype, &
+                               discretization, &
+                               gPrns,offsets_to_global,poisfft_comm)
+#else
+      Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
+                               [gxmax-gxmin,gymax-gymin], zPr(1:Prnz), zW(0:Prnz), &
+                               PoissonBtype, &
+                               discretization)
+#endif
+      called = .true.
+
+      call system_clock(count_rate=trate)
+
+    end if
+
+
+    call system_clock(count=t1)
+
+
+    call Execute(Solver,Phi,RHS)
+
+
+    call system_clock(count=t2)
+    if (master) then
+      poisson_solver_time = poisson_solver_time + real(t2-t1,dbl)/real(trate,dbl)
+      if (master.and.debugparam>1) write(*,*) "solver cpu time", real(t2-t1)/real(trate)
+    end if
+
+  end subroutine Poiss_PoisFFT_variable_z
 
 
 
@@ -126,42 +192,42 @@ contains
           do i=1+mod(j+k,2),nx,2
             p=0
             Ap=0
-            if (i>1.or.Btype(We)>=BC_MPI_BOUNDS) then
+            if (i>1.or.(Btype(We)>=BC_MPI_BOUNDS_MIN.and.Btype(We)<=BC_MPI_BOUNDS_MAX)) then
                       p=p+Phi(i-1,j,k)*Aw(i)
                       Ap=Ap+Aw(i)
             else if (Btype(We)==BC_PERIODIC) then
                       p=p+Phi(nx,j,k)*Aw(i)
                       Ap=Ap+Aw(i)
             end if
-            if (i<nx.or.Btype(Ea)>=BC_MPI_BOUNDS) then
+            if (i<nx.or.(Btype(Ea)>=BC_MPI_BOUNDS_MIN.and.Btype(Ea)<=BC_MPI_BOUNDS_MAX)) then
                       p=p+Phi(i+1,j,k)*Ae(i)
                       Ap=Ap+Ae(i)
-            else if (Btype(We)==BC_PERIODIC) then
+            else if (Btype(Ea)==BC_PERIODIC) then
                       p=p+Phi(1,j,k)*Ae(i)
                       Ap=Ap+Ae(i)
             end if
-            if (j>1.or.Btype(So)>=BC_MPI_BOUNDS) then
+            if (j>1.or.(Btype(So)>=BC_MPI_BOUNDS_MIN.and.Btype(So)<=BC_MPI_BOUNDS_MAX)) then
                       p=p+Phi(i,j-1,k)*As(j)
                       Ap=Ap+As(j)
-            else if (Btype(No)==BC_PERIODIC) then
+            else if (Btype(So)==BC_PERIODIC) then
                       p=p+Phi(i,ny,k)*As(j)
                       Ap=Ap+As(j)
             end if
-            if (j<ny.or.Btype(No)>=BC_MPI_BOUNDS) then
+            if (j<ny.or.(Btype(No)>=BC_MPI_BOUNDS_MIN.and.Btype(No)<=BC_MPI_BOUNDS_MAX)) then
                       p=p+Phi(i,j+1,k)*An(j)
                       Ap=Ap+An(j)
             else if (Btype(No)==BC_PERIODIC) then
                       p=p+Phi(i,1,k)*An(j)
                       Ap=Ap+An(j)
             end if
-            if (k>1.or.Btype(Bo)>=BC_MPI_BOUNDS) then
+            if (k>1.or.(Btype(Bo)>=BC_MPI_BOUNDS_MIN.and.Btype(Bo)<=BC_MPI_BOUNDS_MAX)) then
                       p=p+Phi(i,j,k-1)*Ab(k)
                       Ap=Ap+Ab(k)
-            else if (Btype(To)==BC_PERIODIC) then
+            else if (Btype(Bo)==BC_PERIODIC) then
                       p=p+Phi(i,j,nz)*Ab(k)
                       Ap=Ap+Ab(k)
             end if
-            if (k<nz.or.Btype(To)>=BC_MPI_BOUNDS) then
+            if (k<nz.or.(Btype(To)>=BC_MPI_BOUNDS_MIN.and.Btype(To)<=BC_MPI_BOUNDS_MAX)) then
                       p=p+Phi(i,j,k+1)*At(k)
                       Ap=Ap+At(k)
             else if (Btype(To)==BC_PERIODIC) then

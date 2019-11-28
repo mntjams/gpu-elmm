@@ -1588,7 +1588,7 @@ contains
          write(unit) "SCALARS div float", lf
          write(unit) "LOOKUP_TABLE default", lf
 
-         if (gridtype==uniformgrid) then
+         if (gridtype==GRID_UNIFORM) then
            if (discretization_order == 4) then
              write(unit) BigEnd(real( &
                      ( C1*(U(1:Prnx,1:Prny,1:Prnz)-U(0:Prnx-1,1:Prny,1:Prnz)) - &

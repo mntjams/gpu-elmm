@@ -1455,7 +1455,7 @@ contains
     x = x2
     y = y2
 
-    if (gridtype==uniformgrid) then
+    if (gridtype==GRID_UNIFORM) then
 
         xPri = min(max(nint( (x - xU(0))/dxmin + 0.5_knd ),1),Prnx+1)
 

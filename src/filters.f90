@@ -7,7 +7,7 @@ module Filters
 
   private
 
-  public filtertype, filter_ratios, Filter, FilterTopHat, FilterTopHatSimple
+  public filtertype, filter_ratios, Filter, FilterTopHat, FilterTopHatSimple, Filter3ord
 
   integer :: filtertype = 1
 

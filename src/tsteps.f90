@@ -294,7 +294,7 @@ contains
 
           !Performs the diffusion terms
 
-          if (gridtype==UNIFORMGRID) then
+          if (gridtype==GRID_UNIFORM) then
             call ImplicitDiffusion_Iterations(U, V, W, U2, V2, W2, U3, V3, W3, coef)
           else
             call error_stop("Non-uniform grid support was dropped.")

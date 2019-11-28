@@ -56,7 +56,7 @@ implicit none
     integer :: i
 
     
-    if (gridtype==uniformgrid) then
+    if (gridtype==GRID_UNIFORM) then
 
         xi = min( max(nint( (x - xU(0))/dxmin + 0.5_knd ),1) , Prnx)
         yj = min( max(nint( (y - yV(0))/dymin + 0.5_knd ),1) , Prny)

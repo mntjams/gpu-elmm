@@ -420,6 +420,8 @@ objs += env.Object(target = target_dir + 'linearforcing',      source = 'linearf
 objs += env.Object(target = target_dir + 'sponge',             source = 'sponge.f90')
 objs += env.Object(target = target_dir + 'water_thermodynamics',           source = 'water_thermodynamics.f90')
 objs += env.Object(target = target_dir + 'dynamics',           source = 'dynamics.f90')
+objs += env.Object(target = target_dir + 'advection_variable_zz',     source = 'advection_variable_z.f90')
+objs += env.Object(target = target_dir + 'momentum_diffusion', source = 'momentum_diffusion.f90',F90FLAGS=env['F90FLAGS'] + ['-ffree-line-length-0'])
 Depends(objs[-1], 'wmfluxes-inc.f90')
 Depends(objs[-1], 'wmfluxes-nobranch-U-inc.f90')
 Depends(objs[-1], 'wmfluxes-nobranch-V-inc.f90')

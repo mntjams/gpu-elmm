@@ -67,7 +67,7 @@
           wrk(i,j,k) + (D1*Fl(i-1,j,k) + D0*Fl(i,j,k) + D1*Fl(i+1,j,k))
 
         wrk(i,j,k) = &
-          wrk(i,j,k) + p%flux
+          wrk(i,j,k) + p%fluxp
 #undef p
       end do
       !$omp end do
@@ -82,7 +82,7 @@
           wrk(i-1,j,k) - (D1*Fl(i-1,j,k) + D0*Fl(i,j,k) + D1*Fl(i+1,j,k))
 
         wrk(i-1,j,k) = &
-          wrk(i-1,j,k) - p%flux
+          wrk(i-1,j,k) - p%fluxp
 #undef p
       end do
       !$omp end do
@@ -98,7 +98,7 @@
           wrk(i+1,j,k) + (D1*Fl(i,j,k) + D0*Fl(i+1,j,k) + D1*Fl(i+2,j,k))
 
         wrk(i+1,j,k) = &
-          wrk(i+1,j,k) + p%flux
+          wrk(i+1,j,k) + p%fluxp
 #undef p
       end do
       !$omp end do
@@ -113,7 +113,7 @@
           wrk(i,j,k) - (D1*Fl(i,j,k) + D0*Fl(i+1,j,k) + D1*Fl(i+2,j,k))
 
         wrk(i,j,k) = &
-          wrk(i,j,k) - p%flux
+          wrk(i,j,k) - p%fluxp
 #undef p
       end do
       !$omp end do
@@ -135,7 +135,7 @@
           wrk(i,j,k) + (D1*Fl(i,j-1,k) + D0*Fl(i,j,k) + D1*Fl(i,j+1,k))
 
         wrk(i,j,k) = &
-          wrk(i,j,k) + p%flux
+          wrk(i,j,k) + p%fluxp
 #undef p
       end do
       !$omp end do
@@ -150,7 +150,7 @@
           wrk(i,j-1,k) - (D1*Fl(i,j-1,k) + D0*Fl(i,j,k) + D1*Fl(i,j+1,k))
 
         wrk(i,j-1,k) = &
-          wrk(i,j-1,k) - p%flux
+          wrk(i,j-1,k) - p%fluxp
 #undef p
       end do
       !$omp end do
@@ -166,7 +166,7 @@
           wrk(i,j+1,k) + (D1*Fl(i,j,k) + D0*Fl(i,j+1,k) + D1*Fl(i,j+2,k))
 
         wrk(i,j+1,k) = &
-          wrk(i,j+1,k) + p%flux
+          wrk(i,j+1,k) + p%fluxp
 #undef p
       end do
       !$omp end do
@@ -181,7 +181,7 @@
           wrk(i,j,k) - (D1*Fl(i,j,k) + D0*Fl(i,j+1,k) + D1*Fl(i,j+2,k))
 
         wrk(i,j,k) = &
-          wrk(i,j,k) - p%flux
+          wrk(i,j,k) - p%fluxp
 #undef p
       end do
       !$omp end do
@@ -203,7 +203,7 @@
           wrk(i,j,k) + (D1*Fl(i,j,k-1) + D0*Fl(i,j,k) + D1*Fl(i,j,k+1))
 
         wrk(i,j,k) = &
-          wrk(i,j,k) + p%flux
+          wrk(i,j,k) + p%fluxp
 #undef p
       end do
       !$omp end do
@@ -218,7 +218,7 @@
           wrk(i,j,k-1) - (D1*Fl(i,j-1,k) + D0*Fl(i,j,k) + D1*Fl(i,j,k+1))
 
         wrk(i,j,k-1) = &
-          wrk(i,j,k-1) - p%flux
+          wrk(i,j,k-1) - p%fluxp
 #undef p
       end do
       !$omp end do
@@ -234,7 +234,7 @@
           wrk(i,j,k+1) + (D1*Fl(i,j,k) + D0*Fl(i,j,k+1) + D1*Fl(i,j,k+2))
 
         wrk(i,j,k+1) = &
-          wrk(i,j,k+1) + p%flux
+          wrk(i,j,k+1) + p%fluxp
 #undef p
       end do
       !$omp end do
@@ -249,7 +249,7 @@
           wrk(i,j,k) - (D1*Fl(i,j,k) + D0*Fl(i,j,k+1) + D1*Fl(i,j,k+2))
 
         wrk(i,j,k) = &
-          wrk(i,j,k) - p%flux
+          wrk(i,j,k) - p%fluxp
 #undef p
       end do
       !$omp end do

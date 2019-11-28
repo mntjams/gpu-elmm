@@ -9,8 +9,8 @@ module Kinds
 !   integer, parameter :: int8   = selected_int_kind(1)
 !   integer, parameter :: int32  = selected_int_kind(9)
 !   integer, parameter :: int64  = selected_int_kind(10)
-!   integer, parameter :: real32 = selected_real_kind(p=6, r=37)
-!   integer, parameter :: real64 = selected_real_kind(p=15, r=200)
+!   integer, parameter :: real32 = selected_real_kind(p = 6, r = 37)
+!   integer, parameter :: real64 = selected_real_kind(p = 15, r = 200)
 
   integer, parameter :: dbl = real64, sng = real32
 
@@ -71,6 +71,7 @@ module Parameters
   real(knd), allocatable :: xU(:), xPr(:), yV(:), yPr(:), zW(:), zPr(:)          !coordinates of grid points
   real(knd), allocatable :: dxU(:), dxPr(:), dyV(:), dyPr(:), dzW(:), dzPr(:)    !dxPr(i)=xU(i)-xU(i-1), dxU(i)=xPr(i+1)-xPr(i)
 
+  real(knd), allocatable :: gxU(:), gxPr(:), gyV(:), gyPr(:), gzW(:), gzPr(:)          !coordinates of grid points
 
 
 
@@ -211,7 +212,7 @@ module Parameters
   logical   :: xgridfromfile, ygridfromfile, zgridfromfile
   integer   :: initcondsfromfile
 
-  integer, parameter :: We=1, Ea=2, So=3, No=4, Bo=5, To=6
+  integer, parameter :: We = 1, Ea = 2, So = 3, No = 4, Bo = 5, To = 6
 
   real(knd) :: temperature_ref = 295
   real(knd) :: moisture_ref = 0.001 !TODO: compute from relative humidity
@@ -237,12 +238,12 @@ module Parameters
                         ScalarTypeMoisture = 2, &
                         ScalarTypePassive = 3
 
-  integer, parameter :: BC_NOSLIP=1, BC_FREESLIP=2, BC_PERIODIC=3, BC_DIRICHLET=4, BC_NEUMANN=5, BC_CONSTFLUX=6, &  !boundary condition types
-                        BC_TURBULENT_INLET=7, BC_INLET_FROM_FILE=8, &
-                        BC_AUTOMATIC_FLUX=9, &
-                        BC_MPI_BOUNDS_MIN=1000, BC_MPI_BOUNDS_MAX=1010, BC_MPI_BOUNDARY=1000, BC_MPI_PERIODIC=1001, &
-                        BC_DOMAIN_BOUNDS_MIN=2000, BC_DOMAIN_BOUNDS_MAX=2010, &
-                        BC_DOMAIN_NESTED=2001, BC_DOMAIN_COPY=2002, BC_DOMAIN_NESTED_TURBULENT=2003
+  integer, parameter :: BC_NOSLIP = 1, BC_FREESLIP = 2, BC_PERIODIC = 3, BC_DIRICHLET = 4, BC_NEUMANN = 5, BC_CONSTFLUX = 6, &  !boundary condition types
+                        BC_TURBULENT_INLET = 7, BC_INLET_FROM_FILE = 8, &
+                        BC_AUTOMATIC_FLUX = 9, &
+                        BC_MPI_BOUNDS_MIN = 1000, BC_MPI_BOUNDS_MAX = 1010, BC_MPI_BOUNDARY = 1000, BC_MPI_PERIODIC = 1001, &
+                        BC_DOMAIN_BOUNDS_MIN = 2000, BC_DOMAIN_BOUNDS_MAX = 2010, &
+                        BC_DOMAIN_NESTED = 2001, BC_DOMAIN_COPY = 2002, BC_DOMAIN_NESTED_TURBULENT = 2003
 
   !set by user
   logical :: enable_fixed_flow_rate = .false.
@@ -251,15 +252,15 @@ module Parameters
   real(knd) :: flow_rate_x, flow_rate_y, flow_rate_z
 
   !inlet types
-  integer, parameter :: ZeroInletType=0, ConstantInletType=1, ShearInletType=2, &
-                        ParabolicInletType=3, TurbulentInletType=4, FromFileInletType=5, &
-                        GeostrophicInletType=6
+  integer, parameter :: ZeroInletType = 0, ConstantInletType = 1, ShearInletType = 2, &
+                        ParabolicInletType = 3, TurbulentInletType = 4, FromFileInletType = 5, &
+                        GeostrophicInletType = 6
   !inlet profile types
-  integer, parameter :: CONSTPROF=1, LOGPROF=2, POWERPROF=3 
-  integer, parameter :: GENERALGRID=1, UNIFORMGRID=2
+  integer, parameter :: PROFILE_CONSTANT = 1, PROFILE_LOGARITHMIC = 2, PROFILE_POWER_LAW = 3 
+  integer, parameter :: GRID_UNIFORM = 0, GRID_VARIABLE_Z = 1, GRID_GENERAL = 2
 
   !scalar source types
-  integer, parameter :: PointSource=1, LineSource=2, AreaSource=3, VolumeSource=4
+  integer, parameter :: PointSource = 1, LineSource = 2, AreaSource = 3, VolumeSource = 4
 
   integer(c_int), bind(C, name="debuglevel") :: debuglevel = 0 !amount of information to write out
   

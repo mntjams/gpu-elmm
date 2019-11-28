@@ -55,7 +55,7 @@
 
             wrk(p%xi,p%yj,p%zk) = &
             wrk(p%xi,p%yj,p%zk) + &
-              p%flux
+              p%fluxp
 #undef p
       end do
       !$omp end do
@@ -68,7 +68,7 @@
 
             wrk(p%xi-1,p%yj,p%zk) = &
             wrk(p%xi-1,p%yj,p%zk) - &
-              p%flux
+              p%fluxp
 #undef p
       end do
       !$omp end do
@@ -82,7 +82,7 @@
 
             wrk(p%xi+1,p%yj,p%zk) = &
             wrk(p%xi+1,p%yj,p%zk) + &
-              p%flux
+              p%fluxp
 #undef p
       end do
       !$omp end do
@@ -95,7 +95,7 @@
 
             wrk(p%xi,p%yj,p%zk) = &
             wrk(p%xi,p%yj,p%zk) - &
-              p%flux
+              p%fluxp
 #undef p
       end do
       !$omp end do
@@ -109,7 +109,7 @@
 
             wrk(p%xi,p%yj,p%zk) = &
             wrk(p%xi,p%yj,p%zk) + &
-              p%flux
+              p%fluxp
 #undef p
       end do
       !$omp end do
@@ -122,7 +122,7 @@
 
             wrk(p%xi,p%yj-1,p%zk) = &
             wrk(p%xi,p%yj-1,p%zk) - &
-              p%flux
+              p%fluxp
 #undef p
       end do
       !$omp end do
@@ -136,7 +136,7 @@
 
             wrk(p%xi,p%yj+1,p%zk) = &
             wrk(p%xi,p%yj+1,p%zk) + &
-              p%flux
+              p%fluxp
 #undef p
       end do
       !$omp end do
@@ -149,7 +149,7 @@
 
             wrk(p%xi,p%yj,p%zk) = &
             wrk(p%xi,p%yj,p%zk) - &
-              p%flux
+              p%fluxp
 #undef p
       end do
       !$omp end do
@@ -163,7 +163,7 @@
 
             wrk(p%xi,p%yj,p%zk) = &
             wrk(p%xi,p%yj,p%zk) + &
-              p%flux
+              p%fluxp
 #undef p
       end do
       !$omp end do
@@ -176,7 +176,7 @@
 
             wrk(p%xi,p%yj,p%zk-1) = &
             wrk(p%xi,p%yj,p%zk-1) - &
-              p%flux
+              p%fluxp
 #undef p
       end do
       !$omp end do
@@ -189,7 +189,7 @@
 
             wrk(p%xi,p%yj,p%zk+1) = &
             wrk(p%xi,p%yj,p%zk+1) + &
-              p%flux
+              p%fluxp
 #undef p
       end do
       !$omp end do
@@ -202,7 +202,7 @@
 
             wrk(p%xi,p%yj,p%zk) = &
             wrk(p%xi,p%yj,p%zk) - &
-              p%flux
+              p%fluxp
 #undef p
       end do
       !$omp end do
