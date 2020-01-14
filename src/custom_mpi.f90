@@ -518,7 +518,7 @@ contains
                        MPI_INTEGER, MPI_SUM, world_comm, ie)
     if (ie/=0) call error_stop("Error calling MPI_Allreduce for domain_nims.")
                        
-    if (enable_multiple_domains .and. (domain_index) /= product(npxyz)) then
+    if (enable_multiple_domains .and. domain_nims(domain_index) /= product(npxyz)) then
       write(*,*) "Error, npxyz must be specified and equal to the number of MPI processes for each domain."
       write(*,*) domain_nims(domain_index), " /= ", npxyz(1) * npxyz(2) * npxyz(3), " for domain ", domain_index
       call error_stop()
