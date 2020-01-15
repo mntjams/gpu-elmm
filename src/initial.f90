@@ -400,7 +400,12 @@ contains
      MoistBtype = 0
 
    end if
+   
+   
+   ! Liquid water cannot be allowed if either of buoyancy and moisture is not.
+   if (.not.(enable_buoyancy.and.enable_moisture)) enable_liquid = .false.
 
+   
    open(unit,file="inlet.conf",status="old",action="read")
    call get(inlettype)
    call get(profiletype)
@@ -1034,6 +1039,7 @@ contains
                        obstacles_file, probes_file, scalar_probes_file, input_dir, output_dir, &
                        enable_fixed_flow_rate, &
                        enable_out_sponge_x, enable_out_sponge_y, enable_top_sponge, enable_top_sponge_scalar, &
+                       enable_liquid, &
                        discretization_order
 
        if (len_trim(command_line)>0) then
