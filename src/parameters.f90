@@ -172,7 +172,7 @@ module Parameters
 
   logical :: enable_buoyancy = .false. !1 if enabled, zero otherwise
   logical :: enable_moisture = .false.
-  logical :: enable_liquid   = .true. !enable condensation of water vapor
+  logical :: enable_liquid   = .false. !enable condensation of water vapor
   integer :: num_of_scalars  = 0
 
   logical :: enable_radiation = .false.
