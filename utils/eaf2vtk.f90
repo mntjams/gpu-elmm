@@ -85,6 +85,7 @@ module Types
     procedure :: open_frame
     procedure :: rewind_header
     procedure :: close_header, close_frame, close_vtk
+    final :: finalize
   end type
   
   interface grid
@@ -273,6 +274,11 @@ contains
     end if
   end subroutine
   
+  subroutine finalize(g)
+    type(grid) :: g
+    deallocate(g%vec)
+  end subroutine
+  
   subroutine rewind_header(g)
     class(grid), intent(inout) :: g
     read(g%hu,pos=g%header_pos)
@@ -295,19 +301,47 @@ contains
 end module Types
 
 
+module file_names
+  implicit none
+  
+  interface
+    function open_dir(dir_name) result(res) bind(C, name="open_dir")
+      use iso_c_binding
+      type(c_ptr) :: res
+      character(kind=c_char, len=1), intent(in) :: dir_name(*)
+    end function
+    
+    subroutine close_dir(dir) bind(C, name="close_dir")
+      use iso_c_binding
+      type(c_ptr), value :: dir
+    end subroutine
+    
+    subroutine next_file(dir, file_name, name_len) bind(C, name="next_file")
+      use iso_c_binding
+      type(c_ptr), value :: dir
+      character(kind=c_char, len=1), intent(out) :: file_name(256)
+      integer(c_int), intent(out) :: name_len
+    end subroutine
+  end interface
+end module
+
+
 program eaf2vtk
+  use iso_c_binding
   use Types
+  use file_names
   
   implicit none
   
-  character(:), allocatable :: file_name, base_name, series_name
+  character(:), allocatable :: file_name
   
   integer :: arg_len, status
   
-  type(grid), target :: g
-  
   logical :: ex
   integer :: file_num
+  
+  type(c_ptr) :: dir_ptr = c_null_ptr
+  integer(c_int) :: name_len
   
   call GetEndianness()
   
@@ -335,40 +369,59 @@ program eaf2vtk
   call get_command_argument(1, value=file_name)
   
   if (file_name=='all') then
-    write(*,*) "all not yet implemented."
-  else if (file_name(max(arg_len-3,1):arg_len)==".eaf") then
-    base_name = file_name(:arg_len-4)
-    series_name = base_name(:scan(base_name, "-", back=.true.)-1)
-    g = grid(series_name//".efh")
-    call g%save_header(base_name//".vtk")
-    call g%open_frame(file_name)
+  
+    deallocate(file_name)
+    allocate(character(256) :: file_name)
+    file_name(:) = ""
+    
+    dir_ptr = open_dir("."//c_null_char)
+    
     do
-      call g%process_next(status)
-      if (status==eof) exit
+      call next_file(dir_ptr, file_name, name_len)
+      print *, name_len
+      print *, "'",file_name,"'"
+      if (name_len > 4) then
+        if (file_name(name_len-3:name_len)==".efh") call process_series(file_name(:name_len-4))
+      else if (name_len<=0) then
+        exit
+      end if
     end do
     
-    call g%close_header
-    call g%close_frame
-    call g%close_vtk
+    call close_dir(dir_ptr);
+    
+  else if (file_name(max(arg_len-3,1):arg_len)==".eaf") then
+    call process_file(file_name)
   else
-    series_name = "frame-"//file_name
+    call process_series("frame-"//file_name)    
+  end if
+  
+  deallocate(file_name)
+  
+contains
+
+  subroutine process_series(series_name)
+    character(*), intent(in) :: series_name
+    character(:), allocatable :: fname, base_name
+    type(grid), target :: g
+  
+    
     g = grid(series_name//".efh")
     
     file_num = 0
     do
       base_name = series_name//"-"//itoa(file_num)
-      file_name = base_name//".eaf"
+      fname = base_name//".eaf"
       
-      inquire(file=file_name, exist=ex)
+      inquire(file=fname, exist=ex)
       if (.not.ex) exit
       
       write(*,'(a)',advance="no") achar(27)//"[2K"//achar(27)//"[1G"
-      write(*,'(a)',advance="no") file_name
+      write(*,'(a)',advance="no") fname
       
       call g%rewind_header
       
       call g%save_header(base_name//".vtk")
-      call g%open_frame(file_name)
+      call g%open_frame(fname)
       do
         call g%process_next(status)
         if (status==eof) exit
@@ -382,9 +435,26 @@ program eaf2vtk
     
     call g%close_header
     write(*,*)
-  end if
+  end subroutine
   
-contains
+  subroutine process_file(file_name)
+    character(*), intent(in) :: file_name
+    character(:), allocatable :: base_name
+    type(grid), target :: g
+  
+    base_name = file_name(:arg_len-4)
+    g = grid(base_name(:scan(base_name, "-", back=.true.)-1)//".efh")
+    call g%save_header(base_name//".vtk")
+    call g%open_frame(file_name)
+    do
+      call g%process_next(status)
+      if (status==eof) exit
+    end do
+    
+    call g%close_header
+    call g%close_frame
+    call g%close_vtk
+  end subroutine
   
   function itoa(i) result(res)
     character(:),allocatable :: res
