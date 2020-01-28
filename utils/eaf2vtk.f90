@@ -378,10 +378,11 @@ program eaf2vtk
     
     do
       call next_file(dir_ptr, file_name, name_len)
-      print *, name_len
-      print *, "'",file_name,"'"
       if (name_len > 4) then
-        if (file_name(name_len-3:name_len)==".efh") call process_series(file_name(:name_len-4))
+        if (file_name(name_len-3:name_len)==".efh") then
+          write(*,*) trim(file_name),":"
+          call process_series(file_name(:name_len-4))
+        end if
       else if (name_len<=0) then
         exit
       end if
