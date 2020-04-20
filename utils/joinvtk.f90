@@ -90,8 +90,7 @@ contains
   subroutine read_header(g)
     use Endianness
     class(grid),intent(inout) :: g
-    integer :: io,nx,ny,nz
-    character(5) :: ch5
+    integer :: io
     character(70) :: str
     character :: ch
 
@@ -104,34 +103,121 @@ contains
       return
     end if
 
-    read(g%unit,pos=162,iostat=io) ch5
-    if (io/=0) call error
-
-    read(ch5,'(i5)') g%nx
-    nx=g%nx
+    call skip_to("X_COORDINATES", io)
+    if (io/=0) then
+      print *,"Error, cannot find X_COORDINATES in '",g%fname,"'"
+      stop
+    end if
+    call get_number(g%nx)
+    call skip_line
+    
     allocate(g%x(g%nx))
-    read(g%unit,pos=219,iostat=io) g%x
+    read(g%unit,iostat=io) g%x
     g%x=BigEnd(g%x)
 
-    read(g%unit,pos=234+nx*4,iostat=io) ch5
-    read(ch5,'(i5)') g%ny
-    ny=g%ny
-
+    call skip_to("Y_COORDINATES", io)
+    if (io/=0) then
+      print *,"Error, cannot find Y_COORDINATES in '",g%fname,"'"
+      stop
+    end if
+    call get_number(g%ny)
+    call skip_line
+    
     allocate(g%y(g%ny))
-    read(g%unit,pos=291+nx*4,iostat=io) g%y
+    read(g%unit,iostat=io) g%y
     g%y=BigEnd(g%y)
 
-    read(g%unit,pos=306+nx*4+ny*4,iostat=io) ch5
-    read(ch5,'(i5)') g%nz
-    nz=g%nz
+    call skip_to("Z_COORDINATES", io)
+    if (io/=0) then
+      print *,"Error, cannot find Z_COORDINATES in '",g%fname,"'"
+      stop
+    end if
+    call get_number(g%nz)
+    call skip_line
+    
     allocate(g%z(g%nz))
-    read(g%unit,pos=363+nx*4+ny*4,iostat=io) g%z
+    read(g%unit,iostat=io) g%z
     g%z=BigEnd(g%z)
-    read(g%unit) ch,str
-    read(g%unit) ch
-    return
+    
+    call skip_line
+    call skip_line
     
   contains
+    subroutine skip_line
+      character :: ch
+      do
+        read(g%unit) ch
+        if (ch==new_line("a")) return
+      end do
+    end subroutine
+
+    subroutine get_number(n)
+      integer, intent(out) :: n
+      character :: ch
+      character(:), allocatable :: num_str
+      
+      do
+        read(g%unit) ch
+        if (ch/=' ') exit
+      end do
+      
+      num_str=ch
+      do
+        read(g%unit) ch
+        if (ch<'0' .or. ch>'9') exit
+        num_str = num_str // ch
+      end do
+
+      read(num_str,*) n
+    end subroutine
+
+    subroutine skip_to(str, stat)
+      character(*), intent(in) :: str
+      integer, intent(out) :: stat
+      character :: ch
+      integer :: io
+
+      do
+        read(g%unit, iostat=io) ch
+
+        if (io/=0) then
+          stat = 1
+          return
+        end if
+
+        if (ch==str(1:1)) then
+          call check(str(2:), stat)
+          if (stat == 0) return
+        end if
+
+      end do
+    end subroutine
+    
+    subroutine check(str, stat)
+      character(*), intent(in) :: str
+      integer, intent(out) :: stat
+      character :: ch
+      integer :: i, io
+
+      stat = 1
+      i = 0
+
+      do
+        i = i + 1
+
+        read(g%unit, iostat=io) ch
+
+        if (io/=0) return
+
+        if (ch/=str(i:i)) return
+
+        if (i==len(str)) then
+          stat = 0
+          return
+        end if
+      end do
+    end subroutine
+
     subroutine error()
       write(*,*) "Error reading from ",trim(g%fname)
       stop 2
@@ -148,39 +234,68 @@ contains
     integer :: io, n
     character(256) :: msg
     
-    vtype=""
-    read(g%unit,iostat=io,iomsg=msg) vtype
+    do
     
-    if (io==iostat_end) then
-      status = 0
-      return
-    else if (io/=0) then
-      write(*,'(*(g0))') io, trim(msg), "  ", g%fname, " ", "'",vtype,"'"
-      stop "Error reading title."
-    end if
+      call skip_to_letter(ch, io)
+      
+      vtype=ch
+      read(g%unit,iostat=io,iomsg=msg) vtype(2:)
+      
+      if (io==iostat_end) then
+        status = 0
+        return
+      else if (io/=0) then
+        write(*,'(*(g0))') io, trim(msg), "  ", g%fname, " ", "'",vtype,"'"
+        stop "Error reading title."
+      end if
+
+      if (vtype=='VECTORS') then
+        status = VECTOR
+        title = vtype
+        do
+          read(g%unit) ch
+          title = title // ch
+          if (ch==lf) exit
+        end do
+        
+        exit
+      else if (vtype=='SCALARS') then
+        status = SCALAR
+        title = vtype
+        n = 0
+        do
+          read(g%unit) ch
+          title = title // ch
+          if (ch==lf) n = n + 1
+          if (n==2) exit
+        end do
+        
+        exit
+      end if
+      
+    end do
     
-    if (vtype=='VECTORS') then
-      status = VECTOR
-      title = vtype
+  contains
+    subroutine skip_to_letter(ch, stat)
+      character, intent(out) :: ch
+      integer, intent(out) :: stat
+      integer :: io
+
       do
-        read(g%unit) ch
-        title = title // ch
-        if (ch==lf) exit
+        read(g%unit, iostat=io) ch
+
+        if (io/=0) then
+          stat = 1
+          return
+        end if
+
+        if ((ch>='a'.and.ch<='z').or.(ch>='A'.and.ch<='Z')) then
+          stat = 0 
+          return
+        end if
+
       end do
-    else if (vtype=='SCALARS') then
-      status = SCALAR
-      title = vtype
-      n = 0
-      do
-        read(g%unit) ch
-        title = title // ch
-        if (ch==lf) n = n + 1
-        if (n==2) exit
-      end do
-    else
-      write(*,'(*(g0))') "'",vtype,"'"
-      stop "Error reading title."
-    end if
+    end subroutine
   end subroutine
   
   subroutine read_scalar(g,buf)
