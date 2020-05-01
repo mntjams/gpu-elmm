@@ -217,11 +217,7 @@ contains
         end if
       end do
     end subroutine
-
-    subroutine error()
-      write(*,*) "Error reading from ",trim(g%fname)
-      stop 2
-    end subroutine    
+   
   end subroutine
   
   subroutine read_title(g,status,title)
@@ -231,15 +227,12 @@ contains
     character(:),allocatable,intent(out) :: title
     character(7) :: vtype
     character :: ch
-    integer :: io, n
+    integer :: io, n, lf_pos
     character(256) :: msg
-    
+  
     do
-    
-      call skip_to_letter(ch, io)
-      
-      vtype=ch
-      read(g%unit,iostat=io,iomsg=msg) vtype(2:)
+      vtype=""
+      read(g%unit,iostat=io,iomsg=msg) vtype
       
       if (io==iostat_end) then
         status = 0
@@ -248,8 +241,9 @@ contains
         write(*,'(*(g0))') io, trim(msg), "  ", g%fname, " ", "'",vtype,"'"
         stop "Error reading title."
       end if
-
+      
       if (vtype=='VECTORS') then
+      
         status = VECTOR
         title = vtype
         do
@@ -259,7 +253,9 @@ contains
         end do
         
         exit
+        
       else if (vtype=='SCALARS') then
+      
         status = SCALAR
         title = vtype
         n = 0
@@ -271,31 +267,38 @@ contains
         end do
         
         exit
+        
+      else
+        !if our vtype buffer contains the end-of-line LF character, move back just behind it
+        !otherwise skip to the nearest one
+        lf_pos = scan(vtype, achar(10),.true.)
+        if (lf_pos>0) then
+          call stream_back(len(vtype)-lf_pos+1)
+        else
+          call skip_line
+        end if
+        
       end if
-      
     end do
     
   contains
-    subroutine skip_to_letter(ch, stat)
-      character, intent(out) :: ch
-      integer, intent(out) :: stat
-      integer :: io
-
+  
+    subroutine skip_line
+      character :: ch
       do
-        read(g%unit, iostat=io) ch
-
-        if (io/=0) then
-          stat = 1
-          return
-        end if
-
-        if ((ch>='a'.and.ch<='z').or.(ch>='A'.and.ch<='Z')) then
-          stat = 0 
-          return
-        end if
-
+        read(g%unit) ch
+        if (ch==new_line("a")) return
       end do
     end subroutine
+    
+    subroutine stream_back(n)
+      integer, intent(in) :: n
+      integer :: pos
+      character :: dummy
+      inquire(unit=g%unit,pos=pos)
+      read(g%unit,pos=pos-n) dummy
+    end subroutine
+
   end subroutine
   
   subroutine read_scalar(g,buf)
