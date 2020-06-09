@@ -105,6 +105,12 @@ contains
     
   subroutine AddFrameDomain(D)
     type(TFrameDomain),intent(in) :: D
+    
+    if (allocated(FrameDomains)) then
+      if (any(FrameDomains%base_name==D%base_name)) &
+        call error_stop("Error, duplicate frame basename '"//trim(D%base_name)//"'. &
+                        &Check for duplicate frame labels.")
+    end if
 
     call add_element_fd(FrameDomains, D)
 
