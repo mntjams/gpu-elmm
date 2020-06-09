@@ -93,7 +93,7 @@ contains
     logical(c_bool) :: inf_out
     
     inf_out = .true.
-    if (present(infinity_outside)) inf_out = infinity_outside
+    if (present(infinity_outside)) inf_out = logical(infinity_outside, c_bool)
 
     call polyhedron_from_file(ptree, trim(fname)//c_null_char, logical(master, c_bool), inf_out, ierr)
     
