@@ -2084,17 +2084,34 @@ contains
     real(knd), target :: position
     real(knd), target :: interval
     character(char_len), target :: label, direction_ch
-    type(tree_object_ptr), target :: flags_ptr
+    type(tree_object_ptr), target :: flags_ptr, bbox_ptr
     logical, target :: distributed ! whether small distributed vtk files for each image should be forced
+
+    
+    type :: bbox_cfg
+      real(knd) :: xmin = -huge(1._knd)/2, xmax = huge(1._knd)
+      real(knd) :: ymin = -huge(1._knd)/2, ymax = huge(1._knd)
+      real(knd) :: zmin = -huge(1._knd)/2, zmax = huge(1._knd)
+    end type
+    
+    type(bounding_box) :: bbox
+
 
     type(tree_object), allocatable :: tree(:)
     logical :: ex
     integer :: iobj, ivtk, stat
 
-    type(field_names) :: names_vtk(8), names_flags_vtk(11)
+    type(field_names) :: names_vtk(9), names_flags_vtk(11), names_bbox(6)
     
     type(field_names_str) :: names_str(2)
     
+    names_bbox = [field_names_init("xmin", bbox%xmin), &
+                  field_names_init("xmax", bbox%xmax), &
+                  field_names_init("ymin", bbox%ymin), &
+                  field_names_init("ymax", bbox%ymax), &
+                  field_names_init("zmin", bbox%zmin), &
+                  field_names_init("zmax", bbox%zmax)]
+
     names_str = [field_names_str("label", label), &
                  field_names_str("direction", direction_ch)]
 
@@ -2106,7 +2123,8 @@ contains
                  field_names_init("n",           timing%nframes), &
                  field_names_init("interval",    interval), &
                  field_names_init("flags",       flags_ptr), &
-                 field_names_init("distributed", distributed)]
+                 field_names_init("distributed", distributed), &
+                 field_names_init("bbox",        bbox_ptr)]
                  
 
     names_flags_vtk = [field_names_init("U", flags%U), &
@@ -2165,8 +2183,19 @@ contains
           end if
         end if
         
-        call init_vtk_domain
+        if (associated(bbox_ptr%ptr)) then
+          call get_object_field_values(bbox_ptr%ptr, stat, &
+                                       fields = names_bbox)
+          if (stat/=0) then
+            call error_stop("Error interpretting bbox object in vtk_frame_domain '"//trim(label)//"'.")
+          end if
+        end if
         
+        if (associated(bbox_ptr%ptr)) then
+          call init_vtk_domain(bbox)
+        else
+          call init_vtk_domain
+        end if
       end if
       
       call tree(iobj)%finalize
@@ -2175,7 +2204,9 @@ contains
 
   contains
 
-    subroutine init_vtk_domain
+    subroutine init_vtk_domain(bbox)
+      type(bounding_box), optional, intent(in) :: bbox
+      
       ivtk = ivtk + 1
       
       if (label=="") label = achar(iachar('a')+ivtk-1)
@@ -2220,12 +2251,12 @@ contains
       if (.not.(distributed.or.nims==1)) then
         call AddDomain(TFrameDomain_ParallelIO(label, &
                                     dimension, direction, position, &
-                                    timing, flags))
+                                    timing, flags, bbox))
       else
 #endif
         call AddDomain(TFrameDomain(label, &
                                     dimension, direction, position, &
-                                    timing, flags))
+                                    timing, flags, bbox))
 #ifdef PAR
       end if
 #endif      

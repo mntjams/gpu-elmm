@@ -11,7 +11,6 @@ module VTKFrames
   private
   
   public TFrameFlags, TFrameDomain, AddDomain, SaveVTKFrames, FinalizeVTKFrames, InitVTKFrames, SaveBuffers
-
   
   type TFrameFlags
     integer :: U = 1
@@ -149,13 +148,14 @@ contains
   
   
   
-  function TFrameDomain_Init(label,dimension,direction,position,time_params,frame_flags) result(D)
+  function TFrameDomain_Init(label,dimension,direction,position,time_params,frame_flags,bbox) result(D)
     type(TFrameDomain) :: D
     character(*) :: label
     integer,intent(in) :: dimension,direction
     real(knd),intent(in) :: position
     type(TFrameTimes),intent(in) :: time_params
     type(TFrameFlags),intent(in) :: frame_flags
+    type(bounding_box), intent(in), optional :: bbox
 
     D%base_name = trim(output_dir)//"frame-"//label
 
@@ -169,6 +169,8 @@ contains
     D%dimension = dimension
     D%direction = direction
     D%position = position
+    
+    if (present(bbox)) D%bbox = bbox
 
   end function
   
@@ -181,6 +183,7 @@ contains
     class(TFrameDomain),intent(inout) :: D
     integer, intent(in) :: num_of_scalars
     integer :: mini,maxi,minj,maxj,mink,maxk
+    integer :: bb_mini,bb_maxi,bb_minj,bb_maxj,bb_mink,bb_maxk
 
     if (D%dimension==3) then
 
@@ -190,6 +193,20 @@ contains
       D%maxPrj = Prny
       D%minPrk = 1
       D%maxPrk = Prnz
+      
+      if (allocated(D%bbox)) then
+        call GridCoords(bb_mini, bb_minj, bb_mink, &
+                        D%bbox%xmin, D%bbox%ymin, D%bbox%zmin)
+        call GridCoords(bb_maxi, bb_maxj, bb_maxk, &
+                        D%bbox%xmax, D%bbox%ymax, D%bbox%zmax)
+                        
+        D%minPri = max(D%minPri, bb_mini)
+        D%minPrj = max(D%minPrj, bb_minj)
+        D%minPrk = max(D%minPrk, bb_mink)
+        D%maxPri = min(D%maxPri, bb_maxi)
+        D%maxPrj = min(D%maxPrj, bb_maxj)
+        D%maxPrk = min(D%maxPrk, bb_maxk)
+      end if
 
     else
 
@@ -303,7 +320,16 @@ contains
     class(TFrameDomain), intent(in) :: D
     
     if (D%dimension==3) then
-      res = .true.
+      if (allocated(D%bbox)) then
+        res = (D%bbox%xmin < im_xmax) .and. &
+              (D%bbox%ymin < im_ymax) .and. &
+              (D%bbox%zmin < im_zmax) .and. &
+              (D%bbox%xmax > im_xmin) .and. &
+              (D%bbox%ymax > im_ymin) .and. &
+              (D%bbox%zmax > im_zmin)
+      else
+        res = .true.
+      end if
     else if (D%dimension==2) then
       if (D%direction==1) then
         res = (D%position>=xU(0) .and. &

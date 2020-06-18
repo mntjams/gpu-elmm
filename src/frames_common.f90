@@ -8,6 +8,15 @@ module Frames_common
     real(knd) :: start, end
     integer :: nframes
   end type
+  
+  type bounding_box
+    real(knd) :: xmin = -huge(1._knd)/2, xmax = huge(1._knd)
+    real(knd) :: ymin = -huge(1._knd)/2, ymax = huge(1._knd)
+    real(knd) :: zmin = -huge(1._knd)/2, zmax = huge(1._knd)
+  end type
+
+  
+
 
   type, abstract :: TFrameBase
 
@@ -22,6 +31,10 @@ module Frames_common
     integer   :: sizePr
 
     real(knd),allocatable,dimension(:) :: xPr,yPr,zPr
+    
+    type(bounding_box), allocatable :: bbox
+    
+    logical :: active = .true.
 
     logical :: ranges_set = .false.
 

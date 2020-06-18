@@ -29,6 +29,9 @@ module Frames_ParallelIO
     integer :: comm = PAR_COMM_NULL
     integer :: par_datatype_scalar = PAR_DATATYPE_NULL, par_datatype_vector = PAR_DATATYPE_NULL
     integer :: par_filetype_scalar = PAR_DATATYPE_NULL, par_filetype_vector = PAR_DATATYPE_NULL
+    
+    integer :: ngxyz(3)
+    integer :: lo_ijk(3) = [1,1,1]
   contains
     procedure :: ParallelDatatypes => TFrameDomain_ParallelIO_ParallelDatatypes
     procedure :: SaveHeader => TFrameDomain_ParallelIO_SaveHeader
@@ -57,11 +60,11 @@ contains
     integer :: i
   
     if (allocated(FrameDomains_ParallelIO)) then
-      FrameDomains_ParallelIO = pack(FrameDomains_ParallelIO, FrameDomains_ParallelIO%InDomain())
-      
       do i=1, size(FrameDomains_ParallelIO)
         call FrameDomains_ParallelIO(i)%SetRest(num_of_scalars)
       end do
+      
+      FrameDomains_ParallelIO = pack(FrameDomains_ParallelIO, FrameDomains_ParallelIO%active)
     end if
   
   end subroutine
@@ -88,7 +91,13 @@ contains
     
   subroutine AddFrameDomain_ParallelIO(D)
     type(TFrameDomain_ParallelIO),intent(in) :: D
-
+    
+    if (allocated(FrameDomains_ParallelIO)) then
+      if (any(FrameDomains_ParallelIO%base_name==D%base_name)) &
+        call error_stop("Error, duplicate frame basename '"//trim(D%base_name)//"'. &
+                        &Check for duplicate parallel frame labels.")
+    end if
+    
     call add_element_fd(FrameDomains_ParallelIO, D)
 
   end subroutine
@@ -138,15 +147,16 @@ contains
   
   
   function TFrameDomain_ParallelIO_Init(label,dimension,direction,position, &
-                                        time_params,frame_flags) result(D)
+                                        time_params,frame_flags,bbox) result(D)
     type(TFrameDomain_ParallelIO) :: D
     character(*) :: label
     integer,intent(in) :: dimension,direction
     real(knd),intent(in) :: position
     type(TFrameTimes),intent(in) :: time_params
     type(TFrameFlags),intent(in) :: frame_flags
+    type(bounding_box), intent(in), optional :: bbox
 
-    D%TFrameDomain = TFrameDomain(label,dimension,direction,position,time_params,frame_flags)
+    D%TFrameDomain = TFrameDomain(label,dimension,direction,position,time_params,frame_flags,bbox)
     
     D%suffix = ".eaf"
     D%base_name = trim(shared_output_dir)//"frame-"//label
@@ -156,17 +166,29 @@ contains
   
 
   subroutine TFrameDomain_ParallelIO_SetRest(D, num_of_scalars)
+    use mpi
     use Boundaries, only: GridCoords
     use custom_par, only: iim, jim, kim, domain_comm, &
                           comm_plane_xy, comm_plane_yz, comm_plane_xz
     class(TFrameDomain_ParallelIO),intent(inout) :: D
     integer, intent(in) :: num_of_scalars
-
-    call D%TFrameDomain%SetRest(num_of_scalars)
+    integer :: ie, rank
+    
+    D%active = D%InDomain()
     
     if (D%dimension == 3) then
-      D%comm = domain_comm
-      D%master = master
+      if (allocated(D%bbox)) then
+        if (D%active) then
+          call MPI_Comm_split(domain_comm, 1, 0, D%comm, ie)
+          call MPI_Comm_rank(D%comm, rank, ie)
+          D%master = rank==0
+        else
+          call MPI_Comm_split(domain_comm, MPI_UNDEFINED, 0, D%comm, ie)
+        end if
+      else
+        D%comm = domain_comm
+        D%master = master
+      end if
     else
       if (D%direction == 1) then
         D%comm = comm_plane_yz
@@ -180,9 +202,13 @@ contains
       end if
     end if
     
+    if (.not.D%active) return
+
+    call D%TFrameDomain%SetRest(num_of_scalars)
+    
     call D%ParallelDatatypes
     
-    call D%SaveHeader
+    if (D%master) call D%SaveHeader
   end subroutine TFrameDomain_ParallelIO_SetRest
     
     
@@ -194,9 +220,13 @@ contains
     class(TFrameDomain_ParallelIO), intent(inout), target :: D
     integer :: plane_type = PAR_DATATYPE_NULL, vec_plane_type = PAR_DATATYPE_NULL
     integer :: plane_size, vec_plane_size, scalar_size, vector_size
-    integer, dimension(3) :: ng, nxyz, off
+    integer, dimension(3) :: nxyz, off
     integer :: mini, maxi, minj, maxj, mink, maxk
     integer :: ie
+    integer :: nps
+    integer, dimension(:), allocatable :: is, js, ks, nxs, nys, nzs
+    integer :: ngx, ngy, ngz
+    integer :: lo_i, lo_j, lo_k
     
     mini = D%minPri
     maxi = D%maxPri
@@ -223,35 +253,95 @@ contains
     call MPI_Type_contiguous(vector_size, vec_plane_type, D%par_datatype_vector, ie)
     call MPI_Type_commit(D%par_datatype_vector, ie)
     
-    ng = gPrns
-    nxyz = [Prnx, Prny, Prnz]
-    off = offsets_to_global
-    if (D%dimension==2) then
-      if (D%direction==1) then
-        ng(1) = 1
-        nxyz(1) = 1
-        off(1) = 0
-      else if (D%direction==2) then
-        ng(2) = 1
-        nxyz(2) = 1
-        off(2) = 0
-      else if (D%direction==3) then
-        ng(3) = 1
-        nxyz(3) = 1
-        off(3) = 0
+    if (allocated(D%bbox)) then
+      nxyz = [maxi-mini+1, maxj-minj+1, maxk-mink+1]
+    
+    
+      call MPI_Comm_size(D%comm, nps, ie)
+      allocate(is(nps))
+      call MPI_AllGather(iim, 1, MPI_INTEGER, is, 1 ,MPI_INTEGER, D%comm, ie)
+      lo_i = minval(is)
+!       hi_i = maxval(is)
+      deallocate(is)
+      
+      allocate(js(nps))
+      call MPI_AllGather(jim, 1, MPI_INTEGER, js, 1 ,MPI_INTEGER, D%comm, ie)
+      lo_j = minval(js)
+!       hi_j = maxval(js)
+      deallocate(js)
+      
+      allocate(ks(nps))
+      call MPI_AllGather(kim, 1, MPI_INTEGER, ks, 1 ,MPI_INTEGER, D%comm, ie)
+      lo_k = minval(ks)
+!       hi_k = maxval(ks)
+      deallocate(ks)
+      
+      D%lo_ijk = [lo_i, lo_j, lo_k]
+      
+      allocate(nxs(nps))
+      if (jim==lo_j.and.kim==lo_k) then
+        call MPI_AllGather(nxyz(1), 1, MPI_INTEGER, nxs, 1 ,MPI_INTEGER, D%comm, ie)
+      else
+        call MPI_AllGather(0, 1, MPI_INTEGER, nxs, 1 ,MPI_INTEGER, D%comm, ie)
+      end if
+      nxs = pack(nxs, nxs>0)
+      D%ngxyz(1) = sum(nxs)
+      off(1) = sum(nxs(1:iim-lo_i))
+      deallocate(nxs)
+      
+      allocate(nys(nps))
+      if (iim==lo_i.and.kim==lo_k) then
+        call MPI_AllGather(nxyz(2), 1, MPI_INTEGER, nys, 1 ,MPI_INTEGER, D%comm, ie)
+      else
+        call MPI_AllGather(0, 1, MPI_INTEGER, nys, 1 ,MPI_INTEGER, D%comm, ie)
+      end if
+      nys = pack(nys, nys>0)
+      D%ngxyz(2) = sum(nys)
+      off(2) = sum(nys(1:jim-lo_j))
+      deallocate(nys)
+      
+      allocate(nzs(nps))
+      if (jim==lo_j.and.iim==lo_i) then
+        call MPI_AllGather(nxyz(3), 1, MPI_INTEGER, nzs, 1 ,MPI_INTEGER, D%comm, ie)
+      else
+        call MPI_AllGather(0, 1, MPI_INTEGER, nzs, 1 ,MPI_INTEGER, D%comm, ie)
+      end if
+      nzs = pack(nzs, nzs>0)
+      D%ngxyz(3) = sum(nzs)
+      off(3) = sum(nzs(1:kim-lo_k))
+      deallocate(nzs)
+
+      
+    else
+      D%ngxyz = gPrns
+      nxyz = [Prnx, Prny, Prnz]
+      off = offsets_to_global
+      if (D%dimension==2) then
+        if (D%direction==1) then
+          D%ngxyz(1) = 1
+          nxyz(1) = 1
+          off(1) = 0
+        else if (D%direction==2) then
+          D%ngxyz(2) = 1
+          nxyz(2) = 1
+          off(2) = 0
+        else if (D%direction==3) then
+          D%ngxyz(3) = 1
+          nxyz(3) = 1
+          off(3) = 0
+        end if
       end if
     end if
     
-    
-    call MPI_Type_create_subarray(3, ng, nxyz, off, &
+    call MPI_Type_create_subarray(3, D%ngxyz, nxyz, off, &
         MPI_ORDER_FORTRAN, PAR_REAL32, D%par_filetype_scalar, ie)
     call MPI_Type_commit(D%par_filetype_scalar, ie)
 
-    call MPI_Type_create_subarray(3, ng, nxyz, off, &
+    call MPI_Type_create_subarray(3, D%ngxyz, nxyz, off, &
         MPI_ORDER_FORTRAN, PAR_TRIPLET32, D%par_filetype_vector, ie)
     call MPI_Type_commit(D%par_filetype_vector, ie)
 
-    D%glob_scalar_storage_size = product(ng) * &
+    D%glob_scalar_storage_size = product(D%ngxyz) * &
                                  storage_size(1_real32) / CHARACTER_STORAGE_SIZE
     D%glob_vector_storage_size = 3 * D%glob_scalar_storage_size
     
@@ -289,29 +379,23 @@ contains
                         CHARACTER_STORAGE_SIZE, &
                       int32)                                      ! size of real used
 
-    xs = [(gxmin + dxmin/2 + (i-1)*dxmin, i = 1, gPrnx)]
-    ys = [(gymin + dymin/2 + (j-1)*dymin, j = 1, gPrny)]
-    zs = [(gzmin + dzmin/2 + (k-1)*dzmin, k = 1, gPrnz)]
-    
-    nxs = gPrns
+    xs = [(gxmin + dxmin/2 + (i-1)*dxmin, i = D%lo_ijk(1), D%ngxyz(1)-D%lo_ijk(1)+1)]
+    ys = [(gymin + dymin/2 + (j-1)*dymin, j = D%lo_ijk(2), D%ngxyz(2)-D%lo_ijk(2)+1)]
+    zs = [(gzmin + dzmin/2 + (k-1)*dzmin, k = D%lo_ijk(3), D%ngxyz(3)-D%lo_ijk(3)+1)]
     
     if (D%dimension==2) then
       if (D%direction==1) then
-        nxs(1) = 1
         xs = [xPr(D%minPri)]        
       else if (D%direction==2) then
-        nxs(2) = 1
         ys = [yPr(D%minPrj)]
       else
-        nxs(3) = 1
         zs = [zPr(D%minPrk)]
       end if
     end if
     
     D%number_of_arrays = 0
     
-    write(D%unit) nxs
-    
+    write(D%unit) D%ngxyz
     write(D%unit) real(xs,real32)
     write(D%unit) real(ys,real32)
     write(D%unit) real(zs,real32)
