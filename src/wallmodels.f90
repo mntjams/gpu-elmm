@@ -2166,6 +2166,8 @@ contains
                               dist, vel, wallvel, tan_vect = tan_vect)
           end if
 
+          mag = norm2(tan_vect)
+
           if (mag>eps) then
           
             ! This is a bit ugly, but saves CPU cycles.
@@ -2201,7 +2203,7 @@ contains
             
               p%fluxp = (tan_vect(component) / mag) * p%ustar**2 * drec(direction)
               p%fluxm = p%fluxp
-              
+             
             end if
 
             if (mod(direction,2)==1) then
