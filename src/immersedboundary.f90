@@ -201,9 +201,9 @@ contains
                 if (.not. right_direction(distvec, dirvec)) then
                   t = SB%ClosestOnLineOut( x(i+m), y(j+n), z(k+o), &
                                                    x(i),   y(j),   z(k) )
-                  nearx = xU(i+m) + t * ( x(i) - x(i+m) )
-                  neary = yPr(j+n) + t * ( y(j) - y(j+n) )
-                  nearz = zPr(k+o) + t * ( z(k) - z(k+o) )
+                  nearx = x(i+m) + t * ( x(i) - x(i+m) )
+                  neary = y(j+n) + t * ( y(j) - y(j+n) )
+                  nearz = z(k+o) + t * ( z(k) - z(k+o) )
                   distvec = [nearx - x(i), neary - y(j), nearz - z(k)]
                   if (norm2(distvec)<dist) then
                     !Potentially problematic
