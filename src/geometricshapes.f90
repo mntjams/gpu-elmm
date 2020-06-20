@@ -748,7 +748,8 @@ contains
     inearest = 0
     minv = huge(minv)
     do i = 1,self%nplanes
-     if (dists(i)>=0.and.dists(i)<minv) then
+     !>=0 caused problems near the corners when on the extended wall, it accepted negative zero
+     if (dists(i)>=tiny(dxmin).and.dists(i)<minv) then
        inearest = i
        minv = dists(i)
      endif
