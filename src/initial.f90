@@ -2167,6 +2167,7 @@ contains
         interval = 0
         distributed = .false.
         flags_ptr%ptr => null()
+        bbox_ptr%ptr => null()
         
         call get_object_field_values(tree(iobj), stat, &
                                      fields = names_vtk, fields_str = names_str)
