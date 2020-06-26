@@ -31,6 +31,7 @@ module Frames_ParallelIO
     integer :: par_filetype_scalar = PAR_DATATYPE_NULL, par_filetype_vector = PAR_DATATYPE_NULL
     
     integer :: ngxyz(3)
+    integer :: lo_im_ijk(3) = [1,1,1]
     integer :: lo_ijk(3) = [1,1,1]
   contains
     procedure :: ParallelDatatypes => TFrameDomain_ParallelIO_ParallelDatatypes
@@ -276,7 +277,7 @@ contains
 !       hi_k = maxval(ks)
       deallocate(ks)
       
-      D%lo_ijk = [lo_i, lo_j, lo_k]
+      D%lo_im_ijk = [lo_i, lo_j, lo_k]
       
       allocate(nxs(nps))
       if (jim==lo_j.and.kim==lo_k) then
@@ -287,6 +288,8 @@ contains
       nxs = pack(nxs, nxs>0)
       D%ngxyz(1) = sum(nxs)
       off(1) = sum(nxs(1:iim-lo_i))
+      D%lo_ijk(1) = mini + offsets_to_global(1)
+      call MPI_AllReduce(MPI_IN_PLACE, D%lo_ijk(1), 1, MPI_INTEGER, MPI_MIN, D%comm, ie)
       deallocate(nxs)
       
       allocate(nys(nps))
@@ -298,6 +301,8 @@ contains
       nys = pack(nys, nys>0)
       D%ngxyz(2) = sum(nys)
       off(2) = sum(nys(1:jim-lo_j))
+      D%lo_ijk(2) = minj + offsets_to_global(2)
+      call MPI_AllReduce(MPI_IN_PLACE, D%lo_ijk(2), 1, MPI_INTEGER, MPI_MIN, D%comm, ie)
       deallocate(nys)
       
       allocate(nzs(nps))
@@ -309,26 +314,32 @@ contains
       nzs = pack(nzs, nzs>0)
       D%ngxyz(3) = sum(nzs)
       off(3) = sum(nzs(1:kim-lo_k))
+      D%lo_ijk(3) = mink + offsets_to_global(3)
+      call MPI_AllReduce(MPI_IN_PLACE, D%lo_ijk(3), 1, MPI_INTEGER, MPI_MIN, D%comm, ie)
       deallocate(nzs)
 
       
     else
       D%ngxyz = gPrns
-      nxyz = [Prnx, Prny, Prnz]
+      nxyz = [Prnx, Prny, Prnz]      
       off = offsets_to_global
+      D%lo_ijk = [1,1,1]
       if (D%dimension==2) then
         if (D%direction==1) then
           D%ngxyz(1) = 1
           nxyz(1) = 1
           off(1) = 0
+          D%lo_ijk(1) = mini + offsets_to_global(1)
         else if (D%direction==2) then
           D%ngxyz(2) = 1
           nxyz(2) = 1
           off(2) = 0
+          D%lo_ijk(2) = minj + offsets_to_global(2)
         else if (D%direction==3) then
           D%ngxyz(3) = 1
           nxyz(3) = 1
           off(3) = 0
+          D%lo_ijk(3) = mink + offsets_to_global(3)
         end if
       end if
     end if
@@ -379,9 +390,9 @@ contains
                         CHARACTER_STORAGE_SIZE, &
                       int32)                                      ! size of real used
 
-    xs = [(gxmin + dxmin/2 + (i-1)*dxmin, i = D%lo_ijk(1), D%ngxyz(1)-D%lo_ijk(1)+1)]
-    ys = [(gymin + dymin/2 + (j-1)*dymin, j = D%lo_ijk(2), D%ngxyz(2)-D%lo_ijk(2)+1)]
-    zs = [(gzmin + dzmin/2 + (k-1)*dzmin, k = D%lo_ijk(3), D%ngxyz(3)-D%lo_ijk(3)+1)]
+    xs = [(gxmin + dxmin/2 + (i-1)*dxmin, i = D%lo_ijk(1), D%ngxyz(1)+D%lo_ijk(1)-1)]
+    ys = [(gymin + dymin/2 + (j-1)*dymin, j = D%lo_ijk(2), D%ngxyz(2)+D%lo_ijk(2)-1)]
+    zs = [(gzmin + dzmin/2 + (k-1)*dzmin, k = D%lo_ijk(3), D%ngxyz(3)+D%lo_ijk(3)-1)]
     
     if (D%dimension==2) then
       if (D%direction==1) then
@@ -399,7 +410,7 @@ contains
     write(D%unit) real(xs,real32)
     write(D%unit) real(ys,real32)
     write(D%unit) real(zs,real32)
-    
+
     if (D%flags%Pr==1) then
       write(D%unit) scalar_flag
       write(D%unit) "p", lf
