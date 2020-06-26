@@ -1,8 +1,5 @@
 #!/usr/bin/python3
 import numpy as np
-import sys
-import os
-from collections import OrderedDict
 
 scalar_flag = 1001
 
