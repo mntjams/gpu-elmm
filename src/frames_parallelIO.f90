@@ -406,7 +406,7 @@ contains
     
     D%number_of_arrays = 0
     
-    write(D%unit) D%ngxyz
+    write(D%unit) int(D%ngxyz, int32)
     write(D%unit) real(xs,real32)
     write(D%unit) real(ys,real32)
     write(D%unit) real(zs,real32)
