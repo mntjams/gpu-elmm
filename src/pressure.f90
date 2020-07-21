@@ -222,7 +222,7 @@ contains
       if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC) then
         do j = 1, Wny
           do i = 1, Wnx
-            if (Wtype(i,j,Prnz)<=0) flux(Bo) = flux(Bo) - W(i,j,Prnz)
+            if (Wtype(i,j,Prnz)<=0) flux(To) = flux(To) - W(i,j,Prnz)
           end do
         end do
       end if
