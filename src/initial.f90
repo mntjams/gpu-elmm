@@ -2279,7 +2279,7 @@ contains
     integer :: iobj, stat
 
     type(field_names) :: names(8)
-    type(field_names_a) :: names_a(2)
+    type(field_names_a) :: names_a(5)
     type(field_names_a_int_alloc) :: names_a_int_alloc(1)
     
     logical, target :: enable_multiple_domains_l = .false.
@@ -2291,8 +2291,11 @@ contains
     integer, target :: spatial_ratio_l = -99
     integer, target :: time_step_ratio_l = -99
 
-    logical :: is_domain_boundary_nested_l(6) = .true.
-    logical :: has_domain_boundary_turbulence_generator_l(6) = .false.
+    logical, target :: is_domain_boundary_nested_l(6) = .true.
+    logical, target :: has_domain_boundary_turbulence_generator_l(6) = .false.
+    logical, target :: has_domain_boundary_relaxation_l(6) = .true.
+    integer, target :: domain_boundary_relaxation_width_l(6) = 2 !in parent domain units
+    real(knd), target :: domain_boundary_relaxation_factor_l(6) = 1
 
     names = [field_names_init("enable_multiple_domains", enable_multiple_domains_l), &
              field_names_init("is_two_way_nested",   is_two_way_nested_l), &
@@ -2304,7 +2307,10 @@ contains
              field_names_init("time_step_ratio",   time_step_ratio_l)]
 
     names_a = [field_names_a_init("is_boundary_nested", is_domain_boundary_nested_l), &
-               field_names_a_init("has_boundary_turbulence_generator", has_domain_boundary_turbulence_generator_l)]
+               field_names_a_init("has_boundary_turbulence_generator", has_domain_boundary_turbulence_generator_l), &
+               field_names_a_init("has_boundary_relaxation", has_domain_boundary_relaxation), &
+               field_names_a_init("boundary_relaxation_factor", domain_boundary_relaxation_factor), &
+               field_names_a_init("boundary_relaxation_width", domain_boundary_relaxation_width)]
 
     names_a_int_alloc = [field_names_a_int_alloc_init("child_domains")]
 
@@ -2383,6 +2389,14 @@ contains
 
         has_domain_boundary_turbulence_generator = has_domain_boundary_turbulence_generator_l
         where (.not.is_domain_boundary_nested) has_domain_boundary_turbulence_generator = .false.
+        
+        has_domain_boundary_relaxation = has_domain_boundary_relaxation_l
+        where (.not.is_domain_boundary_nested) has_domain_boundary_relaxation = .false.
+        
+        domain_boundary_relaxation_factor = domain_boundary_relaxation_factor_l
+
+        domain_boundary_relaxation_width = domain_boundary_relaxation_width_l
+        where (.not.has_domain_boundary_relaxation) domain_boundary_relaxation_width = 0
 
         if (spatial_ratio_l>0) domain_spatial_ratio = spatial_ratio_l
         if (time_step_ratio_l>0) domain_time_step_ratio = time_step_ratio_l

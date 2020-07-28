@@ -608,7 +608,9 @@ contains
         b%direction = dir
         b%enabled = .true.
 
-        b%relaxation = .true.
+        b%relaxation = has_domain_boundary_relaxation(dir)
+        b%relaxation_width = domain_boundary_relaxation_width(dir)
+        b%relax_factor = domain_boundary_relaxation_factor(dir)
 
 !spectral interpolation is disabled by default. Big problems with mean profile distortion.
 !         if (b%direction==We) b%interp_order = 0
@@ -616,7 +618,7 @@ contains
         b%spatial_ratio = domain_spatial_ratio
         b%time_step_ratio = domain_time_step_ratio
 
-        width = b%spatial_ratio * 2
+        width = b%spatial_ratio * b%relaxation_width
 
         select case  (dir)
           case (We)
@@ -1210,9 +1212,6 @@ contains
           call b%turb_generator%init()
         end if
 
-        if (dir==Ea) then
-          b%relax_factor = 10
-        end if
       end associate
 
     end subroutine create_boundary_child_buffer

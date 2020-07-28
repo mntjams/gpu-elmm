@@ -89,6 +89,7 @@ module domains_bc_types
  
     logical :: relaxation = .true.
     real(knd) :: relax_factor = 1
+    integer :: relaxation_width = 2
 
     integer :: remote_domain
     !This is the index of the cell boundary corresponding to the domain boundary 

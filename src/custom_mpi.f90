@@ -65,6 +65,11 @@ module custom_par
   !whether given domain boundary is generating additional synthetic turbulence
   logical :: has_domain_boundary_turbulence_generator(6) = .false.
 
+  !whether given domain boundary has a relaxation zone
+  logical :: has_domain_boundary_relaxation(6) = .true.
+  integer, target :: domain_boundary_relaxation_width(6) = 2 !in parent domain units
+  real(knd), target :: domain_boundary_relaxation_factor(6) = 1  
+
   !whether receive initial conditions from the parent
   logical :: receive_initial_conditions_from_parent = .true.
 
