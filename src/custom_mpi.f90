@@ -47,7 +47,7 @@ module custom_par
 
   integer :: parent_domain = 0
 
-  integer :: parent_image(3) = [1, 1, 1]
+  integer :: parent_image(3) = [0, 0, 0]
   
   integer, allocatable :: child_domains(:)
 

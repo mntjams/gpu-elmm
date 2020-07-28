@@ -112,8 +112,14 @@ outer:  do dkk = 1, domain_nzims(parent_domain)
             end do
           end do
         end do outer
-      end if
+        
+        if (any(parent_image<1)) then
+          write(*,'(a,i0,a)') "Error, no parent image for domain ",domain_index,". Is the domain properly nested?"
+          call error_stop
+        end if
 
+      end if
+      
       ! 4 Set up the domain parrent buffers for each child image immersed in this image.
 
       !send buffers should be counted from 1, there may be more of them from several nested domains
@@ -1276,7 +1282,7 @@ contains
       
       
       !Check that child image does not exceed this (parent) image.
-      !It may exceed it if no neighbouring boundary is nested and two-way nesing is disabled.
+      !It may exceed it if no neighbouring boundary is nested and two-way nesting is disabled.
       if ((cxmin < im_xmin - dxmin/100) .and. &
           (b%is_two_way_nested  .or. &
            any(domain_is_boundary_nested([We,So,No,Bo,To],child_domain)))) then
