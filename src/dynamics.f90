@@ -56,6 +56,7 @@ contains
 
 
   subroutine PressureGrad(Pr, U, V, W, coef)
+    use Pressure, only: pressure_solution, PROJECTION_METHOD_PRESSURE
     real(knd), intent(inout), contiguous :: Pr(-1:,-1:,-1:)
     real(knd), intent(inout), contiguous, dimension(-2:,-2:,-2:) :: U,V,W
     real(knd), intent(in)    :: coef
@@ -112,6 +113,8 @@ contains
       end do
       !$omp end do
     end if
+    
+    if (pressure_solution%projection_method==PROJECTION_METHOD_PRESSURE) return
     
     if (discretization_order==4) then
       !grad p_i = 9/8 (p_i+1 - p_i) / dx  - 1/8 (p_i+2 - p_i-1) / 3*dx

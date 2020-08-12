@@ -2004,7 +2004,7 @@ contains
     logical :: ex
     integer :: iobj, stat
 
-    type(field_names) :: names(11)
+    type(field_names) :: names(12)
     type(field_names_a) :: names_a(1)
 
     names = [field_names_init("check_mass_flux", p_s%check_mass_flux), &
@@ -2016,6 +2016,7 @@ contains
              field_names_init("correct_mass_flux_bottom", p_s%correct_mass_flux(Bo)), &
              field_names_init("correct_mass_flux_top",    p_s%correct_mass_flux(To)), &
              field_names_init("poisson_solver",      p_s%poisson_solver), &
+             field_names_init("projection_method",   p_s%projection_method), &
              field_names_init("check_divergence",    p_s%check_divergence), &
              field_names_init("bottom_pressure",     p_s%bottom_pressure)]
 

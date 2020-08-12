@@ -19,12 +19,18 @@ module Pressure
                                 POISSON_SOLVER_SOR = 1, &
                                 POISSON_SOLVER_POISFFT = 2, &
                                 POISSON_SOLVER_MULTIGRID = 3
+                                
+  ! incremental - the Poisson equation solves for the inceremental pressure update, momentum equations use last stage pressure gradient
+  ! pressure - the Poisson equation solves for the pressure field itself, no pressure gradient in momentum equations
+  integer, parameter, public :: PROJECTION_METHOD_INCREMENTAL = 0, &
+                                PROJECTION_METHOD_PRESSURE = 1
 
   type pressure_solution_control
     logical :: check_mass_flux = .false.
     logical :: report_mass_flux = .false.
     logical :: correct_mass_flux(6) = .false.
     integer :: poisson_solver = POISSON_SOLVER_POISFFT
+    integer :: projection_method = PROJECTION_METHOD_INCREMENTAL
     logical :: check_divergence = .false.
     real(knd) :: top_pressure = 0    !mean pressure at the top boundary - calculated
     real(knd) :: bottom_pressure = 0
@@ -506,32 +512,44 @@ contains
       end if
     end if
 
-    if (explicit_diffusion) then
-      !$omp do
-      do k = 1, Prnz
-        do j = 1, Prny
-          do i = 1, Prnx
-            Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k)
+    if (pressure_solution%projection_method==PROJECTION_METHOD_PRESSURE) then
+        !$omp do
+        do k = 1, Prnz
+          do j = 1, Prny
+            do i = 1, Prnx
+              Pr(i,j,k) = Phi(i,j,k)
+            end do
           end do
         end do
-      end do
-      !$omp end do
+        !$omp end do
     else
-      !$omp do
-      do k = 1, Prnz
-        do j = 1, Prny
-          do i = 1, Prnx
-            Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k) - &
-                        dt3 * Viscosity(i,j,k) * (((Phi(i+1,j,k)-Phi(i,j,k)) - &
-                                                   (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
-                                                  ((Phi(i,j+1,k)-Phi(i,j,k)) - &
-                                                   (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
-                                                  ((Phi(i,j,k+1)-Phi(i,j,k)) - &
-                                                   (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
+      if (explicit_diffusion) then
+        !$omp do
+        do k = 1, Prnz
+          do j = 1, Prny
+            do i = 1, Prnx
+              Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k)
+            end do
           end do
         end do
-      end do
-      !$omp end do
+        !$omp end do
+      else
+        !$omp do
+        do k = 1, Prnz
+          do j = 1, Prny
+            do i = 1, Prnx
+              Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k) - &
+                          dt3 * Viscosity(i,j,k) * (((Phi(i+1,j,k)-Phi(i,j,k)) - &
+                                                    (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
+                                                    ((Phi(i,j+1,k)-Phi(i,j,k)) - &
+                                                    (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
+                                                    ((Phi(i,j,k+1)-Phi(i,j,k)) - &
+                                                    (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
+            end do
+          end do
+        end do
+        !$omp end do
+      end if
     end if
 
     Phi_ref = 0
