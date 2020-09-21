@@ -57,7 +57,7 @@ contains
    use StaggeredFrames, only: rrange, TFrameTimes, TSaveFlags, &
                               TStaggeredFrameDomain,  AddDomain
    use PoisFFT, only: PoisFFT_NeumannStag, PoisFFT_Periodic
-   use Sponge, only: enable_out_sponge_x, enable_out_sponge_y, &
+   use Sponge, only: enable_in_sponge_x, enable_out_sponge_x, enable_out_sponge_y, &
                      enable_top_sponge, enable_top_sponge_scalar
    integer ::  lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
    real(knd) :: mgepsinnerGS
@@ -1038,7 +1038,8 @@ contains
 #endif
                        obstacles_file, probes_file, scalar_probes_file, input_dir, output_dir, &
                        enable_fixed_flow_rate, &
-                       enable_out_sponge_x, enable_out_sponge_y, enable_top_sponge, enable_top_sponge_scalar, &
+                       enable_in_sponge_x, enable_out_sponge_x, enable_out_sponge_y, &
+                       enable_top_sponge, enable_top_sponge_scalar, &
                        enable_liquid, &
                        discretization_order
 
