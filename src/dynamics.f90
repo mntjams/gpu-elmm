@@ -114,84 +114,86 @@ contains
       !$omp end do
     end if
     
-    if (pressure_solution%projection_method==PROJECTION_METHOD_PRESSURE) return
+    if (pressure_solution%projection_method/=PROJECTION_METHOD_PRESSURE) then
     
-    if (discretization_order==4) then
-      !grad p_i = 9/8 (p_i+1 - p_i) / dx  - 1/8 (p_i+2 - p_i-1) / 3*dx
-    
-      !$omp do
-      do k = 1, Unz
-        do j = 1, Uny
-          do i = 1, Unx
-            U(i,j,k) = U(i,j,k) + &
-                   Ax * ( (Pr(i+1,j,k) - Pr(i  ,j,k)) * C1 - &
-                          (Pr(i+2,j,k) - Pr(i-1,j,k)) * C3 )
+      if (discretization_order==4) then
+        !grad p_i = 9/8 (p_i+1 - p_i) / dx  - 1/8 (p_i+2 - p_i-1) / 3*dx
+      
+        !$omp do
+        do k = 1, Unz
+          do j = 1, Uny
+            do i = 1, Unx
+              U(i,j,k) = U(i,j,k) + &
+                    Ax * ( (Pr(i+1,j,k) - Pr(i  ,j,k)) * C1 - &
+                            (Pr(i+2,j,k) - Pr(i-1,j,k)) * C3 )
+            end do
           end do
         end do
-      end do
-      !$omp end do nowait
-      !$omp do
-      do k = 1, Vnz
-        do j = 1, Vny
-          do i = 1, Vnx
-            V(i,j,k) = V(i,j,k) + &
-                   Ay * ( (Pr(i,j+1,k) - Pr(i,j  ,k)) * C1 - &
-                          (Pr(i,j+2,k) - Pr(i,j-1,k)) * C3 )
+        !$omp end do nowait
+        !$omp do
+        do k = 1, Vnz
+          do j = 1, Vny
+            do i = 1, Vnx
+              V(i,j,k) = V(i,j,k) + &
+                    Ay * ( (Pr(i,j+1,k) - Pr(i,j  ,k)) * C1 - &
+                            (Pr(i,j+2,k) - Pr(i,j-1,k)) * C3 )
+            end do
           end do
         end do
-      end do
-      !$omp end do nowait
-      !$omp do
-      do k = 1, Wnz
-        do j = 1, Wny
-          do i = 1, Wnx
-            W(i,j,k) = W(i,j,k) + &
-                   Az * ( (Pr(i,j,k+1) - Pr(i,j,k  )) * C1 - &
-                          (Pr(i,j,k+2) - Pr(i,j,k-1)) * C3 )
-          end do
-        end do
-      end do
-      !$omp end do nowait
-    else
-      !$omp do
-      do k = 1, Unz
-        do j = 1, Uny
-          do i = 1, Unx
-            U(i,j,k) = U(i,j,k) + Ax * (Pr(i+1,j,k)-Pr(i,j,k))
-          end do
-        end do
-      end do
-      !$omp end do nowait
-      !$omp do
-      do k = 1, Vnz
-        do j = 1, Vny
-          do i = 1, Vnx
-            V(i,j,k) = V(i,j,k) + Ay * (Pr(i,j+1,k)-Pr(i,j,k))
-          end do
-        end do
-      end do
-      !$omp end do nowait
-      if (gridtype==GRID_VARIABLE_Z) then
+        !$omp end do nowait
         !$omp do
         do k = 1, Wnz
           do j = 1, Wny
             do i = 1, Wnx
-              W(i,j,k) = W(i,j,k) - coef * (Pr(i,j,k+1)-Pr(i,j,k)) / dzW(k)
+              W(i,j,k) = W(i,j,k) + &
+                    Az * ( (Pr(i,j,k+1) - Pr(i,j,k  )) * C1 - &
+                            (Pr(i,j,k+2) - Pr(i,j,k-1)) * C3 )
             end do
           end do
         end do
         !$omp end do nowait
       else
         !$omp do
-        do k = 1, Wnz
-          do j = 1, Wny
-            do i = 1, Wnx
-              W(i,j,k) = W(i,j,k) + Az * (Pr(i,j,k+1)-Pr(i,j,k))
+        do k = 1, Unz
+          do j = 1, Uny
+            do i = 1, Unx
+              U(i,j,k) = U(i,j,k) + Ax * (Pr(i+1,j,k)-Pr(i,j,k))
             end do
           end do
         end do
         !$omp end do nowait
+        !$omp do
+        do k = 1, Vnz
+          do j = 1, Vny
+            do i = 1, Vnx
+              V(i,j,k) = V(i,j,k) + Ay * (Pr(i,j+1,k)-Pr(i,j,k))
+            end do
+          end do
+        end do
+        !$omp end do nowait
+        if (gridtype==GRID_VARIABLE_Z) then
+          !$omp do
+          do k = 1, Wnz
+            do j = 1, Wny
+              do i = 1, Wnx
+                W(i,j,k) = W(i,j,k) - coef * (Pr(i,j,k+1)-Pr(i,j,k)) / dzW(k)
+              end do
+            end do
+          end do
+          !$omp end do nowait
+        else
+          !$omp do
+          do k = 1, Wnz
+            do j = 1, Wny
+              do i = 1, Wnx
+                W(i,j,k) = W(i,j,k) + Az * (Pr(i,j,k+1)-Pr(i,j,k))
+              end do
+            end do
+          end do
+          !$omp end do nowait
+        end if
       end if
+      
     end if
     !$omp end parallel
   end subroutine PressureGrad
