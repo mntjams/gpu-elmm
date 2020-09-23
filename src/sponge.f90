@@ -10,14 +10,14 @@ module Sponge
   private
   
   public :: enable_top_sponge, enable_top_sponge_scalar, &
-            enable_out_sponge_x, enable_out_sponge_y, &
+            enable_in_sponge_x, enable_out_sponge_x, enable_out_sponge_y, &
             SpongeTop, SpongeOut, SpongeTopScalar, &
             top_sponge_bottom, sponge_to_profiles, &
             U_sponge_avg, V_sponge_avg, W_sponge_avg
 
   logical :: enable_top_sponge = .false.
   logical :: enable_top_sponge_scalar = .false.
-  logical :: enable_out_sponge = .false.
+  logical :: enable_in_sponge_x = .false.
   logical :: enable_out_sponge_x = .false.
   logical :: enable_out_sponge_y = .false.
 
@@ -295,9 +295,105 @@ contains
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: temperature
     
     !NOTE: currently having both of them enabled will likely lead to strange results
+    if (enable_in_sponge_x) call SpongeIn_X(U, V, W, temperature)
     if (enable_out_sponge_x) call SpongeOut_X(U, V, W, temperature)
     if (enable_out_sponge_y) call SpongeOut_Y(U, V, W, temperature)
   end subroutine
+
+  subroutine SpongeIn_X(U, V, W, temperature)
+    real(knd), contiguous, intent(inout), dimension(-2:,-2:,-2:) :: U, V, W
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: temperature
+    integer   :: i, j, k, bufn
+    integer   :: hi, lo, loU, hiU
+    real(knd) :: p, xe, xs, xb, DF
+
+    !size end extent of the buffer region
+    bufn = min(max(5,Prnx/50), Prnx/4)
+    xs = xU(0)
+    xe = xU(bufn + 2)
+
+    !extent of the probe region where the local average is taken from
+    loU = bufn+1
+    hiU = max(Unx/3, 50)
+
+    lo = bufn+1
+    hi = max(Prnx/3, 50)
+
+    !$omp parallel private(i, j, k, p, xb, DF)
+
+    !$omp do collapse(2)
+    do k = 1, Unz
+      do j = 1, Uny
+        p = 0
+        do i = loU, hiU
+          p = p + U(i,j,k)
+        end do
+        p = p / (hiU - loU + 1)
+        do i = Unx - bufn, Unx + 1
+          xb = (xe-xU(i)) / (xe-xs)
+          DF = DampF(xb)
+          U(i,j,k) = p + DF * (U(i,j,k) - p)
+        end do
+      end do
+    end do
+    !$omp end do
+
+    !$omp do collapse(2)
+    do k = 1, Vnz
+      do j = 1, Vny
+        p = 0
+        do i = lo, hi
+          p = p + V(i,j,k)
+        end do
+        p = p / (hi - lo + 1)
+        do i = Vnx-bufn, Vnx + 1
+          xb = (xe-xPr(i)) / (xe-xs)
+          DF = DampF(xb)
+          V(i,j,k) = p + DF * (V(i,j,k) - p)
+        end do
+      end do
+    end do
+    !$omp end do
+
+    !$omp do collapse(2)
+    do k = 1, Wnz
+      do j = 1, Wny
+        p = 0
+        do i = lo, hi
+          p = p + W(i,j,k)
+        end do
+        p = p / (hi - lo + 1)
+        do i = Wnx - bufn, Wnx + 1
+          xb = (xe-xPr(i)) / (xe-xs)
+          DF = DampF(xb)
+          W(i,j,k) = p + DF * (W(i,j,k) - p)
+        end do
+      end do
+    end do
+    !$omp end do
+
+    if (enable_buoyancy) then
+      !$omp do collapse(2)
+      do k = 1, Prnz
+        do j = 1, Prny
+          p = 0
+          do i = lo, hi
+            p = p + temperature(i,j,k)
+          end do
+          p = p / (hi - lo + 1)
+          do i = Prnx - bufn, Prnx + 1
+            xb = (xe-xPr(i)) / (xe-xs)
+            DF = DampF(xb)
+            temperature(i,j,k) = p + DF * (temperature(i,j,k) - p)
+          end do
+        end do
+      end do
+      !$omp end do
+    end if
+    !$omp end parallel
+
+  end subroutine SpongeIn_X
+
 
   subroutine SpongeOut_X(U, V, W, temperature)
     real(knd), contiguous, intent(inout), dimension(-2:,-2:,-2:) :: U, V, W
@@ -307,7 +403,7 @@ contains
     real(knd) :: p, xe, xs, xb, DF
 
     !size end extent of the buffer region
-    bufn = min(5, Prnx/4)
+    bufn = min(max(5,Prnx/50), Prnx/4)
     xs = xU(Prnx - bufn-2)
     xe = xU(Prnx)
 
@@ -405,7 +501,7 @@ contains
     !TODO: Properly parallelize for a sponge zone across several images
     if (jim==nyims) then
       !size end extent of the buffer region
-      bufn = min(5, gPrny/4, Prny/4)
+      bufn = min(max(5,Prnx/50), gPrny/4, Prny/4)
       ys = yV(Prny - bufn-2)
       ye = yV(Prny)
 
