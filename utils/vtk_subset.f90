@@ -400,7 +400,8 @@ contains
     character(:),allocatable,intent(out) :: title
     character(7) :: vtype
     character :: ch
-    integer :: io, n, lf_pos
+    integer :: io
+    integer(int64) :: n, lf_pos
     character(256) :: msg
   
     do
@@ -465,8 +466,8 @@ contains
     end subroutine
     
     subroutine stream_back(n)
-      integer, intent(in) :: n
-      integer :: pos
+      integer(int64), intent(in) :: n
+      integer(int64) :: pos
       character :: dummy
       inquire(unit=g%unit,pos=pos)
       read(g%unit,pos=pos-n) dummy
@@ -512,7 +513,8 @@ program vtk_subset
   real(rp), allocatable :: sc(:,:,:),vec(:,:,:,:)
  
   character(:), allocatable :: title
-  integer :: status, var_type, arg_len, title_pos
+  integer :: status, var_type, arg_len
+  integer(int64) :: title_pos
   
   character(:), allocatable :: in_name, out_name, arg
   
