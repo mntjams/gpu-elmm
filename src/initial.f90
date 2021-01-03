@@ -3515,6 +3515,11 @@ contains
     deallocate(xU2)
     deallocate(yV2)
     deallocate(zW2)
+    
+    if (zgridfromfile) then
+      dzmin = minval(dzPr)
+    end if
+    
 
     call par_sync_out("  ...creating grid cell type arrays.")
 
