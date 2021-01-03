@@ -10,7 +10,6 @@ module Pressure
   public InitPressureCorrection, PressureCorrection, InitHydrostaticPressure, &
           pressure_solution, pressure_solution_control
   
-  integer :: bound_n_free(6)
   real(knd) :: bound_area(6)
   real(knd) :: bound_cell_area(6)
   real(knd) :: correction_area
@@ -43,6 +42,9 @@ contains
 
   subroutine InitPressureCorrection
     use custom_par
+    
+    integer :: bound_n_free(6)
+    integer :: i, j, k
 
     bound_cell_area(We) = dymin * dzmin
     bound_cell_area(Ea) = dymin * dzmin
@@ -51,31 +53,93 @@ contains
     bound_cell_area(Bo) = dymin * dxmin
     bound_cell_area(To) = dymin * dxmin
     
-    bound_n_free = 0
+    
+    if (gridtype == GRID_UNIFORM) then
+      !no reason to save a few CPU cycles, but we save some numerical accuracy when summing up integers
+        
+      bound_n_free = 0
 
-    if (iim==1     .and. Btype(We)/=BC_NOSLIP .and. Btype(We)/=BC_PERIODIC) &
-      bound_n_free(We) = count(Utype(0,1:Uny,1:Unz)<=0)
+      if (iim==1     .and. Btype(We)/=BC_NOSLIP .and. Btype(We)/=BC_PERIODIC) &
+        bound_n_free(We) = count(Utype(0,1:Uny,1:Unz)<=0)
 
-    if (iim==nxims .and. Btype(Ea)/=BC_NOSLIP .and. Btype(Ea)/=BC_PERIODIC) &
-      bound_n_free(Ea) = count(Utype(Prnx,1:Uny,1:Unz)<=0)
+      if (iim==nxims .and. Btype(Ea)/=BC_NOSLIP .and. Btype(Ea)/=BC_PERIODIC) &
+        bound_n_free(Ea) = count(Utype(Prnx,1:Uny,1:Unz)<=0)
 
-    if (jim==1     .and. Btype(So)/=BC_NOSLIP .and. Btype(So)/=BC_PERIODIC) &
-      bound_n_free(So) = count(Vtype(1:Vnx,0,1:Vnz)<=0)
+      if (jim==1     .and. Btype(So)/=BC_NOSLIP .and. Btype(So)/=BC_PERIODIC) &
+        bound_n_free(So) = count(Vtype(1:Vnx,0,1:Vnz)<=0)
 
-    if (jim==nyims .and. Btype(No)/=BC_NOSLIP .and. Btype(No)/=BC_PERIODIC) &
-      bound_n_free(No) = count(Vtype(1:Vnx,Prny,1:Vnz)<=0)
+      if (jim==nyims .and. Btype(No)/=BC_NOSLIP .and. Btype(No)/=BC_PERIODIC) &
+        bound_n_free(No) = count(Vtype(1:Vnx,Prny,1:Vnz)<=0)
 
-    if (kim==1     .and. Btype(Bo)/=BC_NOSLIP .and. Btype(Bo)/=BC_PERIODIC) &
-      bound_n_free(Bo) = count(Wtype(1:Wnx,1:Wny,0)<=0)
+      if (kim==1     .and. Btype(Bo)/=BC_NOSLIP .and. Btype(Bo)/=BC_PERIODIC) &
+        bound_n_free(Bo) = count(Wtype(1:Wnx,1:Wny,0)<=0)
 
-    if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC) &
-      bound_n_free(To) = count(Wtype(1:Wnx,1:Wny,Prnz)<=0)
+      if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC) &
+        bound_n_free(To) = count(Wtype(1:Wnx,1:Wny,Prnz)<=0)
 
 #ifdef PAR
-    bound_n_free = par_co_sum(bound_n_free)
+      bound_n_free = par_co_sum(bound_n_free)
 #endif
 
-    bound_area = bound_cell_area * bound_n_free
+      bound_area = bound_cell_area * bound_n_free
+
+    else
+    
+      bound_area = 0
+      
+      if (iim==1     .and. Btype(We)/=BC_NOSLIP .and. Btype(We)/=BC_PERIODIC) then
+        do k = 1, Prnz
+          do j = 1, Prny
+            if (Utype(0,j,k)<=0) bound_area(We) = bound_area(We) + dyPr(j) * dzPr(k)
+          end do
+        end do
+      end if
+    
+      if (iim==nxims .and. Btype(Ea)/=BC_NOSLIP .and. Btype(Ea)/=BC_PERIODIC) then
+        do k = 1, Prnz
+          do j = 1, Prny
+            if (Utype(Prnx,j,k)<=0) bound_area(Ea) = bound_area(Ea) + dyPr(j) * dzPr(k)
+          end do
+        end do
+      end if
+    
+      if (jim==1     .and. Btype(So)/=BC_NOSLIP .and. Btype(So)/=BC_PERIODIC) then
+        do k = 1, Prnz
+          do i = 1, Prnx
+            if (Vtype(i,0,k)<=0) bound_area(So) = bound_area(So) + dxPr(i) * dzPr(k)
+          end do
+        end do
+      end if
+    
+      if (jim==nyims .and. Btype(No)/=BC_NOSLIP .and. Btype(No)/=BC_PERIODIC) then
+        do k = 1, Prnz
+          do i = 1, Prnx
+            if (Vtype(i,Prny,k)<=0) bound_area(No) = bound_area(No) + dxPr(i) * dzPr(k)
+          end do
+        end do
+      end if
+    
+      if (kim==1     .and. Btype(Bo)/=BC_NOSLIP .and. Btype(Bo)/=BC_PERIODIC) then
+        do j = 1, Prny
+          do i = 1, Prnx
+            if (Wtype(i,j,0)<=0) bound_area(Bo) = bound_area(Bo) + dxPr(i) * dyPr(j)
+          end do
+        end do
+      end if
+    
+      if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC) then
+        do j = 1, Prny
+          do i = 1, Prnx
+            if (Wtype(i,j,Prnz)<=0) bound_area(To) = bound_area(To) + dxPr(i) * dyPr(j)
+          end do
+        end do
+      end if
+    
+#ifdef PAR
+      bound_area = par_co_sum(bound_area)
+#endif
+
+    end if
     
     correction_area = sum(bound_area, mask=pressure_solution%correct_mass_flux)
 
@@ -190,51 +254,100 @@ contains
 
     flux = 0
     if (pressure_solution%check_mass_flux) then
-      if (iim==1 .and. Btype(We)/=BC_NOSLIP .and. Btype(We)/=BC_PERIODIC) then
-        do k = 1, Unz
-          do j = 1, Uny
-            if (Utype(0,j,k)<=0) flux(We) = flux(We) + U(0,j,k)
-          end do
-        end do
-      end if
-      if (iim==nxims .and. Btype(Ea)/=BC_NOSLIP .and. Btype(Ea)/=BC_PERIODIC) then
-        do k = 1, Unz
-          do j = 1, Uny
-            if (Utype(Prnx,j,k)<=0) flux(Ea) = flux(Ea) - U(Prnx,j,k)
-          end do
-        end do
-      end if
-      if (jim==1 .and. Btype(So)/=BC_NOSLIP .and. Btype(So)/=BC_PERIODIC) then
-        do k = 1, Vnz
-          do i = 1, Vnx
-            if (Vtype(i,0,k)<=0) flux(So) = flux(So) + V(i,0,k)
-          end do
-        end do
-      end if
-      if (jim==nyims .and. Btype(No)/=BC_NOSLIP .and. Btype(No)/=BC_PERIODIC) then
-        do k = 1, Vnz
-          do i = 1, Vnx
-            if (Vtype(i,Prny,k)<=0) flux(No) = flux(No) - V(i,Prny,k)
-          end do
-        end do
-      end if
-      if (kim==1 .and. Btype(Bo)/=BC_NOSLIP .and. Btype(Bo)/=BC_PERIODIC) then
-        do j = 1, Wny
-          do i = 1, Wnx
-            if (Wtype(i,j,0)<=0) flux(Bo) = flux(Bo) + W(i,j,0)
-          end do
-        end do
-      end if
-      if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC) then
-        do j = 1, Wny
-          do i = 1, Wnx
-            if (Wtype(i,j,Prnz)<=0) flux(To) = flux(To) - W(i,j,Prnz)
-          end do
-        end do
-      end if
     
-      flux = flux * bound_cell_area
-    
+      if (gridtype==GRID_VARIABLE_Z) then
+        if (iim==1 .and. Btype(We)/=BC_NOSLIP .and. Btype(We)/=BC_PERIODIC) then
+          do k = 1, Unz
+            do j = 1, Uny
+              if (Utype(0,j,k)<=0) flux(We) = flux(We) + U(0,j,k) * dymin * dzPr(k)
+            end do
+          end do
+        end if
+        if (iim==nxims .and. Btype(Ea)/=BC_NOSLIP .and. Btype(Ea)/=BC_PERIODIC) then
+          do k = 1, Unz
+            do j = 1, Uny
+              if (Utype(Prnx,j,k)<=0) flux(Ea) = flux(Ea) - U(Prnx,j,k) * dymin * dzPr(k)
+            end do
+          end do
+        end if
+        if (jim==1 .and. Btype(So)/=BC_NOSLIP .and. Btype(So)/=BC_PERIODIC) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              if (Vtype(i,0,k)<=0) flux(So) = flux(So) + V(i,0,k) * dxmin * dzPr(k)
+            end do
+          end do
+        end if
+        if (jim==nyims .and. Btype(No)/=BC_NOSLIP .and. Btype(No)/=BC_PERIODIC) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              if (Vtype(i,Prny,k)<=0) flux(No) = flux(No) - V(i,Prny,k) * dxmin * dzPr(k)
+            end do
+          end do
+        end if
+        if (kim==1 .and. Btype(Bo)/=BC_NOSLIP .and. Btype(Bo)/=BC_PERIODIC) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              if (Wtype(i,j,0)<=0) flux(Bo) = flux(Bo) + W(i,j,0) * dxmin * dymin
+            end do
+          end do
+        end if
+        if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              if (Wtype(i,j,Prnz)<=0) flux(To) = flux(To) - W(i,j,Prnz) * dxmin * dymin
+            end do
+          end do
+        end if
+        
+      else
+      
+        if (iim==1 .and. Btype(We)/=BC_NOSLIP .and. Btype(We)/=BC_PERIODIC) then
+          do k = 1, Unz
+            do j = 1, Uny
+              if (Utype(0,j,k)<=0) flux(We) = flux(We) + U(0,j,k)
+            end do
+          end do
+        end if
+        if (iim==nxims .and. Btype(Ea)/=BC_NOSLIP .and. Btype(Ea)/=BC_PERIODIC) then
+          do k = 1, Unz
+            do j = 1, Uny
+              if (Utype(Prnx,j,k)<=0) flux(Ea) = flux(Ea) - U(Prnx,j,k)
+            end do
+          end do
+        end if
+        if (jim==1 .and. Btype(So)/=BC_NOSLIP .and. Btype(So)/=BC_PERIODIC) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              if (Vtype(i,0,k)<=0) flux(So) = flux(So) + V(i,0,k)
+            end do
+          end do
+        end if
+        if (jim==nyims .and. Btype(No)/=BC_NOSLIP .and. Btype(No)/=BC_PERIODIC) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              if (Vtype(i,Prny,k)<=0) flux(No) = flux(No) - V(i,Prny,k)
+            end do
+          end do
+        end if
+        if (kim==1 .and. Btype(Bo)/=BC_NOSLIP .and. Btype(Bo)/=BC_PERIODIC) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              if (Wtype(i,j,0)<=0) flux(Bo) = flux(Bo) + W(i,j,0)
+            end do
+          end do
+        end if
+        if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              if (Wtype(i,j,Prnz)<=0) flux(To) = flux(To) - W(i,j,Prnz)
+            end do
+          end do
+        end if
+        
+        flux = flux * bound_cell_area
+        
+      end if
+
 
 #ifdef PAR
       !TODO: only the relevant planes
@@ -247,10 +360,11 @@ contains
       
       do side = We, To
         if (pressure_solution%correct_mass_flux(side)) then
+          !part of the flux that goes to that side
           df_side(side) = df * bound_area(side) / correction_area
-          df_side(side) = df_side(side) / bound_cell_area(side)
           
-          df_side(side) = df_side(side) / bound_n_free(side)
+          !the velocity to be added is flux / the area
+          df_side(side) = df_side(side) / bound_area(side)          
         end if
       end do
     
