@@ -698,7 +698,7 @@ program interpolate_new_grid_variable_z
     new%y(:) = [ (lo + new%dy * (it - 0.5_rp), it = -2, new%ny+3) ]
     new%y1 = new%y(1)
   end if
-print *,"x",old%x;print *,"y",old%y;print *,"z",old%z      
+     
   call save_header
 
 
@@ -991,7 +991,7 @@ contains
     real(real64) :: val
 
     idx = 0; idy = 0; idz = 0
-! print *,"x",old%x;print *,"y",old%y;print *,"z",old%z    
+  
     call spl%initialize(real(old%x(-1:old%nx+2), real64), &
                         real(old%y(-1:old%ny+2), real64), &
                         real(old%z(-1:old%nz+2), real64), &
