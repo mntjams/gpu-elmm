@@ -20,6 +20,10 @@ contains
 
     integer, parameter :: narr = 7
 
+    if (gridtype==GRID_VARIABLE_Z) then
+      call error_stop("MTS subgrid only implemented for uniform grid.")
+    end if
+    
     tnx = tilenx(narr)
     tny = tileny(narr)
     tnz = tilenz(narr)
