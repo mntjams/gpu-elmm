@@ -307,9 +307,17 @@ module Subgrid
 
 
 
-
-
     subroutine SGS_Sigma(U, V, W, filter_ratio)
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(in) :: filter_ratio
+      if (gridtype==GRID_VARIABLE_Z) then
+        call SGS_Sigma_variable_z(U, V, W, filter_ratio)
+      else
+        call SGS_Sigma_uniform(U, V, W, filter_ratio)
+      end if
+    end subroutine SGS_Sigma
+
+    subroutine SGS_Sigma_uniform(U, V, W, filter_ratio)
       !from Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
       use Tiling, only: tilenx, tileny, tilenz
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
@@ -441,7 +449,145 @@ module Subgrid
               - A(1,3) * A(2,2) * A(3,1)
       end function det3x3
 
-    end subroutine SGS_Sigma
+    end subroutine SGS_Sigma_uniform
+    
+    
+    
+    
+    subroutine SGS_Sigma_variable_z(U, V, W, filter_ratio)
+      !from Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
+      use Tiling, only: tilenx, tileny, tilenz
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(in) :: filter_ratio
+      real(knd), parameter :: Csig = 1.04_knd
+      integer   :: i, j, k, bi, bj, bk
+      real(knd) :: width, dz23, C, D, g(3,3), s1, s2, s3
+      integer, parameter :: sigma_knd = knd
+      integer :: tnx, tny, tnz
+
+      integer,parameter :: narr = 4
+    
+      tnx = tilenx(narr)
+      tny = tileny(narr)
+      tnz = tilenz(narr)
+
+      width = filter_ratio * (dxmin*dymin)**(1._knd/3._knd)
+      C = (Csig*width)**2
+
+      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk) schedule(runtime) collapse(3)
+      do bk = 1, Prnz, tnz
+       do bj = 1, Prny, tny
+        do bi = 1, Prnx, tnx
+         do k = bk, min(bk+tnz-1, Prnz)
+          dz23 = dzPr(k)**(2._knd/3._knd)
+          do j = bj, min(bj+tny-1, Prny)
+           do i = bi, min(bi+tnx-1, Prnx)
+
+            call GradientTensorUG(g, i, j, k)
+
+            call Sigmas(s1,s2,s3,g)
+
+            D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
+
+            D = max(0._knd, D)
+
+            Viscosity(i,j,k) = (C*dz23) * D + molecular_viscosity
+
+           end do
+          end do
+         end do
+        end do
+       end do
+      end do
+      !$omp end parallel do
+
+    contains
+
+      pure subroutine GradientTensorUG(g ,i, j, k)
+        real(knd), intent(out) :: g(3,3)
+        integer, intent(in) :: i, j, k
+
+        g(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
+        g(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) / (4._knd*dymin)
+        g(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) / (2*(zPr(k+1)-zPr(k-1)))
+
+        g(2,2) = (V(i,j,k)-V(i,j-1,k)) / dymin
+        g(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) / (4._knd*dxmin)
+        g(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) / (2*(zPr(k+1)-zPr(k-1)))
+
+        g(3,3) = (W(i,j,k)-W(i,j,k-1)) / dzPr(k)
+        g(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) / (4._knd*dxmin)
+        g(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) / (4._knd*dymin)
+      end subroutine GradientTensorUG
+
+
+      pure subroutine Sigmas(s1,s2,s3,grads)
+        !from Hasan, Basser, Parker, Alexander, http://dx.doi.org/10.1006/jmre.2001.2400
+        !via Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
+        use ieee_arithmetic
+
+        real(knd), intent(out) :: s1, s2, s3
+        real(knd), intent(in)  :: grads(3,3)
+
+        real(sigma_knd) :: trG2, i1, i2, i3, a1, a2, a3, c, G(3,3)
+
+        !G = matmul(transpose(grads),grads)
+        G(1,1) = grads(1,1)**2           + grads(2,1)**2           + grads(3,1)**2
+        G(1,2) = grads(1,1) * grads(1,2) + grads(2,1) * grads(2,2) + grads(3,1) * grads(3,2)
+        G(1,3) = grads(1,1) * grads(1,3) + grads(2,1) * grads(2,3) + grads(3,1) * grads(3,3)
+        G(2,1) = grads(1,1) * grads(1,2) + grads(2,1) * grads(2,2) + grads(3,1) * grads(3,2)
+        G(2,2) = grads(1,2)**2           + grads(2,2)**2           + grads(3,2)**2
+        G(2,3) = grads(1,2) * grads(1,3) + grads(2,2) * grads(2,3) + grads(3,2) * grads(3,3)
+        G(3,1) = grads(1,1) * grads(1,3) + grads(2,1) * grads(2,3) + grads(3,1) * grads(3,3)
+        G(3,2) = grads(1,2) * grads(1,3) + grads(2,2) * grads(2,3) + grads(3,2) * grads(3,3)
+        G(3,3) = grads(1,3)**2           + grads(2,3)**2           + grads(3,3)**2
+
+        trG2 = dot_product(G(:,1),G(:,1)) +&
+               dot_product(G(:,2),G(:,2)) +&
+               dot_product(G(:,3),G(:,3))
+
+        i1 = G(1,1) + G(2,2) + G(3,3)
+
+        i2 = (i1**2 - trG2)
+        i2 = i2 / 2
+
+        i3 = det3x3(G)
+
+        a1 = max((i1**2)/9 - i2/3,0._sigma_knd)
+
+        a2 = (i1**3)/27 - i1*i2/6 +i3/2
+
+        !This requires no FPE trapping is in progress!
+        c =  a2 / sqrt(a1**3)
+
+        !If c is NaN let it be 1.
+        c = max(-1._sigma_knd, min(1._sigma_knd,c))
+        a3 = acos(c) / 3
+
+        c = 2*sqrt(a1)
+
+        s1 = real( sqrt( i1/3 + c*cos(a3) ) , knd )
+
+        s2 = real( sqrt( max( i1/3 - c*cos(pi/3 + a3) , 0._sigma_knd ) ) , knd)
+
+        s3 = real( sqrt( max( i1/3 - c*cos(pi/3 - a3) , 0._sigma_knd ) ) , knd)
+
+      end subroutine Sigmas
+
+
+      pure function det3x3(A) result (res)
+        real(sigma_knd), intent(in) :: A(3,3)
+        real(sigma_knd) :: res
+
+        res =   A(1,1) * A(2,2) * A(3,3)  &
+              - A(1,1) * A(2,3) * A(3,2)  &
+              - A(1,2) * A(2,1) * A(3,3)  &
+              + A(1,2) * A(2,3) * A(3,1)  &
+              + A(1,3) * A(2,1) * A(3,2)  &
+              - A(1,3) * A(2,2) * A(3,1)
+      end function det3x3
+
+    end subroutine SGS_Sigma_variable_z
     
     
     
