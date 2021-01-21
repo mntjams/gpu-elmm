@@ -963,12 +963,19 @@ contains
     offsets_to_global = int(off)
 
     im_xmin = gxmin + offset_to_global_x * dxmin
-    im_ymin = gymin + offset_to_global_y * dymin
-    im_zmin = gzmin + offset_to_global_z * dzmin
-
     im_xmax = im_xmin + Prnx * dxmin
+
+    im_ymin = gymin + offset_to_global_y * dymin
     im_ymax = im_ymin + Prny * dymin
-    im_zmax = im_zmin + Prnz * dzmin
+
+    if (gridtype==GRID_VARIABLE_Z) then
+      im_zmin = gzW(offset_to_global_z)
+      im_zmax = gzW(offset_to_global_z + Prnz)
+    else
+      im_zmin = gzmin + offset_to_global_z * dzmin
+      im_zmax = im_zmin + Prnz * dzmin
+    end if
+
 
     call par_init_domain_grids
    
