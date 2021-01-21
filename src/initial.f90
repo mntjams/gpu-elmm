@@ -61,8 +61,9 @@ contains
                      enable_top_sponge, enable_top_sponge_scalar
    integer ::  lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
    real(knd) :: mgepsinnerGS
-   integer ::  i,io,io2,itmp
+   integer ::  i, j, io, io2, itmp
    integer :: numframeslices
+   real(knd) :: rtmp
 
    character(len = 1024) :: command_line, msg
    integer :: exenamelength
@@ -232,6 +233,76 @@ contains
      call error_stop
    end if
    close(unit)
+   
+   gxmin = x0
+   gxmax = x0 + lx
+   gymin = y0
+   gymax = y0 + ly
+   gzmin = z0
+   gzmax = z0 + lz
+   
+    
+   if (zgridfromfile) then           
+      open(unit=unit,file="zgrid.txt", status="old", action="read")
+      j = -1
+      do
+        read (unit,*,iostat = io) rtmp
+        if (io==0) then
+          j = j+1
+        else
+          exit
+        end if
+      end do
+      rewind(unit)
+      Prnz = j
+      allocate(gzW(0:Prnz))
+      do j = 0, Prnz
+        read (unit,*) gzW(j)
+      end do
+      close(unit)
+      
+      gzPr = [((gzW(j)+gzW(j-1))/2, j = 1, Prnz)]
+      
+      z0 = gzW(0)
+      lz = gzW(Prnz) - gzW(0)
+      
+      gzmin = gzW(0)
+      gzmax = gzW(Prnz)
+   end if
+
+   dxmin = lx/(Prnx)
+   dymin = ly/(Prny)
+   dzmin = lz/(Prnz)
+
+   if (Prnx==1) then
+     dxmin = sqrt(dymin*dzmin)
+     lx = dxmin
+   elseif (Prny==1) then
+     dymin = sqrt(dxmin*dzmin)
+     ly = dymin
+   elseif (Prnz==1) then
+     dzmin = sqrt(dxmin*dymin)
+     lz = dzmin
+   end if
+
+   !can be overwritten after MPI decomposition
+   gPrnx = Prnx
+   gPrny = Prny
+   gPrnz = Prnz   
+
+
+
+   if (master) then
+      write(*,*) "dxmin ",dxmin
+      write(*,*) "dymin ",dymin
+      write(*,*) "dzmin ",dzmin
+
+      write(*,*) "lx:",lx
+      write(*,*) "ly:",ly
+      write(*,*) "lz:",lz
+   end if
+
+   
 
    open(unit,file="boundconds.conf",status="old",action="read")
    call get(Btype(We))
@@ -721,37 +792,6 @@ contains
    molecular_diffusivity = molecular_viscosity / Prandtl
 
 
-   dxmin = lx/(Prnx)
-   dymin = ly/(Prny)
-   dzmin = lz/(Prnz)
-
-   if (Prnx==1) then
-     dxmin = sqrt(dymin*dzmin)
-     lx = dxmin
-   elseif (Prny==1) then
-     dymin = sqrt(dxmin*dzmin)
-     ly = dymin
-   elseif (Prnz==1) then
-     dzmin = sqrt(dxmin*dymin)
-     lz = dzmin
-   end if
-
-   !can be overwritten after MPI decomposition
-   gPrnx = Prnx
-   gPrny = Prny
-   gPrnz = Prnz   
-
-
-   if (master) then
-      write(*,*) "dxmin ",dxmin
-      write(*,*) "dymin ",dymin
-      write(*,*) "dzmin ",dzmin
-
-      write(*,*) "lx:",lx
-      write(*,*) "ly:",ly
-      write(*,*) "lz:",lz
-   end if
-
 
    if (Btype(We)==BC_TURBULENT_INLET) inlettype = TurbulentInletType
    if (Btype(We)==BC_INLET_FROM_FILE) inlettype = FromFileInletType
@@ -785,13 +825,6 @@ contains
      end if
    end do
    
-   gxmin = x0
-   gxmax = x0 + lx
-   gymin = y0
-   gymax = y0 + ly
-   gzmin = z0
-   gzmax = z0 + lz
-
 
    im_xmin = gxmin
    im_ymin = gymin
@@ -837,7 +870,7 @@ contains
 
    Vnx = Prnx
    if (Btype(No)==BC_PERIODIC .or. &
-       (Btype(No)>=BC_MPI_BOUNDS_MIN.and.Btype(Ea)<=BC_MPI_BOUNDS_MAX)) then
+       (Btype(No)>=BC_MPI_BOUNDS_MIN.and.Btype(No)<=BC_MPI_BOUNDS_MAX)) then
                           Vny = Prny
    else
                           Vny = Prny-1
@@ -847,7 +880,7 @@ contains
    Wnx = Prnx
    Wny = Prny
    if (Btype(To)==BC_PERIODIC .or. &
-       (Btype(To)>=BC_MPI_BOUNDS_MIN.and.Btype(Ea)<=BC_MPI_BOUNDS_MAX)) then
+       (Btype(To)>=BC_MPI_BOUNDS_MIN.and.Btype(To)<=BC_MPI_BOUNDS_MAX)) then
                           Wnz = Prnz
    else
                           Wnz = Prnz-1
@@ -3211,9 +3244,7 @@ contains
     
     real(knd), allocatable:: xU2(:), yV2(:), zW2(:)
     integer   :: i, j, k
-    integer   :: nx, ny, nz
-    integer   :: nxup, nxdown, nyup, nydown, nzup, nzdown
-    real(knd) :: P, dt
+    real(knd) :: dt
     integer   :: unit, io
     
     type(spline_coefs) :: geostrophic_wind
@@ -3236,219 +3267,47 @@ contains
     call par_sync_out("  ...computing grid coordinates.")
 
 
-    nx = Prnx-1
-    ny = Prny-1
-    nz = Prnz-1
+    allocate(xU2(-3:Prnx+3))
+    allocate(yV2(-3:Prny+3))
+    allocate(zW2(-3:Prnz+3))
 
-    if (xgridfromfile) then
-
-      call newunit(unit)
-
-      open(unit,file="xgrid.txt")
-      j = -1
-      do
-        read (unit,*,iostat = io) P
-        if (io==0) then
-          j = j+1
-        else
-          exit
-        end if
-      end do
-
-      nx = j
-      Prnx = nx
-      Vnx = Prnx
-      Wnx = Prnx
-
-      if (Btype(Ea)==BC_PERIODIC) then
-                            Unx = Prnx
-      else
-                            Unx = Prnx-1
-      end if
-
-      close(unit)
-
-    end if
-
-    if (ygridfromfile) then
-
-      call newunit(unit)
-
-      open(unit,file="ygrid.txt")
-      j = -1
-      do
-        read (unit,*,iostat = io) P
-        if (io==0) then
-          j = j+1
-        else
-          exit
-        end if
-      end do
-
-      ny = j
-      Prny = ny
-      Uny = Prny
-      Wny = Prny
-
-      if (Btype(No)==BC_PERIODIC) then
-                            Vny = Prny
-      else
-                            Vny = Prny-1
-      end if
-
-      close(unit)
-
-    end if
+    forall (i=-3:Prnx+3)
+      xU2(i) = i * dxmin + im_xmin
+    end forall
+    
+    forall (j=-3:Prny+3)
+      yV2(j) = j * dymin + im_ymin
+    end forall
 
     if (zgridfromfile) then
 
-      call newunit(unit)
-
-      open(unit,file="zgrid.txt")
-      j = -1
-      do
-        read (unit,*,iostat = io) P
-        if (io==0) then
-          j = j+1
-          if (master) write(*,*) j
-        else
-          exit
-        end if
-      end do
-
-      nz = j
-      Prnz = nz
-      Unz = Prnz
-      Vnz = Prnz
-
-      if (Btype(To)==BC_PERIODIC) then
-                            Wnz = Prnz
-      else
-                            Wnz = Prnz-1
-      end if
-
-      close(unit)
-
-    end if
-
-
-
-
-
-    allocate(xU2(-3:nx+4))
-    allocate(yV2(-3:ny+4))
-    allocate(zW2(-3:nz+4))
-
-
-
-    if (xgridfromfile) then
-
-      call newunit(unit)
-
-      open(unit,file="xgrid.txt")
-      do j = 0, nx
-        if (master) write(*,*) j
-        read(unit,*) xU2(j)
-      end do
-      close(unit)
-
-      if (Btype(We)==BC_PERIODIC) then
-        do j = -1, -3, -1
-          xU2(j) = xU2(0) - (xU2(nx)-xU2(nx+j))
-        end do
-      else
-        do j = -1, -3, -1
-          xU2(j) = xU2(0) - (xU2(0-j)-xU2(0))
-        end do
-      end if
-
-      if (Btype(Ea)==BC_PERIODIC) then
-        do j = nx+1, nx+4
-          xU2(j) = xU2(nx) + (xU2(j-nx)-xU2(0))
-        end do
-      else
-        do j = nx+1, nx+4
-          xU2(j) = xU2(nx) + (xU2(nx)-xU2(nx-(j-nx)))
-        end do
-      end if
-
-    else
-
-      forall (i=-3:nx+4)
-         xU2(i) = i * dxmin + im_xmin
-      end forall
-
-    end if
-
-
-    if (ygridfromfile) then
-
-      call newunit(unit)
-
-      open(unit,file="ygrid.txt")
-      do j = 0, ny
-        read(unit,*) yV2(j)
-      end do
-      close(unit)
-
-      if (Btype(So)==BC_PERIODIC) then
-        do j = -1, -3, -1
-          yV2(j) = yV2(0) - (yV2(ny)-yV2(ny+j))
-        end do
-      else
-        do j = -1, -3, -1
-          yV2(j) = yV2(0) - (yV2(0-j)-yV2(0))
-        end do
-      end if
-
-      if (Btype(No)==BC_PERIODIC) then
-        do j = ny+1, ny+4
-          yV2(j) = yV2(ny) + (yV2(j-ny)-yV2(0))
-        end do
-      else
-        do j = ny+1, ny+4
-          yV2(j) = yV2(ny) + (yV2(ny)-yV2(ny-(j-ny)))
-        end do
-      end if
-
-      y0 = yV2(0)
-
-    else
-
-      forall (j=-3:ny+4)
-        yV2(j) = j * dymin + im_ymin
-      end forall
-
-    end if
-
-
-    if (zgridfromfile) then
-
-      call newunit(unit)
-
-      open(unit,file="zgrid.txt")
-      do j = 0, nz
-        read(unit,*) zW2(j)
-      end do
-      close(unit)
+      zW2(0:Prnz) = gzW(offset_to_global_z:offset_to_global_z + Prnz)
 
       if (Btype(Bo)==BC_PERIODIC) then
         do j = -1, -3, -1
-          zW2(j) = zW2(0) - (zW2(nz)-zW2(nz+j))
+          zW2(j) = zW2(0) - (zW2(Prnz-1)-zW2(Prnz-1 + j))
+        end do
+      else if (Btype(Bo)>=BC_MPI_BOUNDS_MIN.and.Btype(Bo)<=BC_MPI_BOUNDS_MAX) then
+        do j = -1, -3, -1
+          zW2(j) = gzW(offset_to_global_z + j)
         end do
       else
         do j = -1, -3, -1
-          zW2(j) = zW2(0) - (zW2(0-j)-zW2(0))
+          zW2(j) = zW2(0) - (zW2(-j)-zW2(0))
         end do
       end if
 
       if (Btype(To)==BC_PERIODIC) then
-        do j = nz+1, nz+4
-          zW2(j) = zW2(nz) + (zW2(j-nz)-zW2(0))
+        do j = Prnz+1, Prnz+3
+          zW2(j) = zW2(Prnz-1) + (zW2(j-Prnz+1)-zW2(0))
+        end do
+      else if (Btype(To)>=BC_MPI_BOUNDS_MIN.and.Btype(Ea)<=BC_MPI_BOUNDS_MAX) then
+        do j = Prnz+1, Prnz+3
+          zW2(j) = gzW(offset_to_global_z + j)
         end do
       else
-        do j = nz+1, nz+4
-          zW2(j) = zW2(nz) + (zW2(nz)-zW2(nz-(j-nz)))
+        do j = Prnz+1, Prnz+3
+          zW2(j) = zW2(Prnz-1) + (zW2(Prnz-1)-zW2(Prnz-1 - (j-Prnz+1)))
         end do
       end if
 
@@ -3456,70 +3315,63 @@ contains
 
     else
 
-       forall (k=-3:nz+4)
+       forall (k=-3:Prnz+3)
          zW2(k) = k * dzmin + im_zmin
        end forall
 
     end if
 
 
-    nxup = nx+1
-    nxdown = 0
-    nyup = ny+1
-    nydown = 0
-    nzup = nz+1
-    nzdown = 0
+    allocate(xU(-3:Prnx+3))
+    allocate(yV(-3:Prny+3))
+    allocate(zW(-3:Prnz+3))
+    allocate(dxU(-2:Prnx+2))
+    allocate(dyV(-2:Prny+2))
+    allocate(dzW(-2:Prnz+2))
+    allocate(xPr(-2:Prnx+3),dxPr(-2:Prnx+3))
+    allocate(yPr(-2:Prny+3),dyPr(-2:Prny+3))
+    allocate(zPr(-2:Prnz+3),dzPr(-2:Prnz+3))
 
+    xU = xU2(-3:Prnx+3)
+    yV = yV2(-3:Prny+3)
+    zW = zW2(-3:Prnz+3)
 
-    allocate(xU(-3:nx+4))
-    allocate(yV(-3:ny+4))
-    allocate(zW(-3:nz+4))
-    allocate(dxU(-2:nx+3))
-    allocate(dyV(-2:ny+3))
-    allocate(dzW(-2:nz+3))
-    allocate(xPr(-2:nx+4),dxPr(-2:nx+4))
-    allocate(yPr(-2:ny+4),dyPr(-2:ny+4))
-    allocate(zPr(-2:nz+4),dzPr(-2:nz+4))
-
-    xU = xU2(nxdown-3:nxup+3)
-    yV = yV2(nydown-3:nyup+3)
-    zW = zW2(nzdown-3:nzup+3)
-
-    forall (i=-2:nx+4)
+    forall (i=-2:Prnx+3)
       xPr(i) = (xU(i-1)+xU(i))/2._knd
       dxPr(i) = xU(i)-xU(i-1)
     end forall
 
-    forall (j=-2:ny+4)
+    forall (j=-2:Prny+3)
       yPr(j) = (yV(j-1)+yV(j))/2._knd
       dyPr(j) = yV(j)-yV(j-1)
     end forall
 
-    forall (k=-2:nz+4)
+    forall (k=-2:Prnz+3)
       zPr(k) = (zW(k-1)+zW(k))/2._knd
       dzPr(k) = zW(k)-zW(k-1)
     end forall
 
-    forall (i=-2:nx+3)
+    forall (i=-2:Prnx+2)
       dxU(i) = xPr(i+1)-xPr(i)
     end forall
 
-    forall (j=-2:ny+3)
+    forall (j=-2:Prny+2)
       dyV(j) = yPr(j+1)-yPr(j)
     end forall
 
-    forall (k=-2:nz+3)
+    forall (k=-2:Prnz+2)
       dzW(k) = zPr(k+1)-zPr(k)
     end forall
+    
+    if (zgridfromfile) then
+            dzmin = minval(dzPr)
+    end if
+
 
     deallocate(xU2)
     deallocate(yV2)
     deallocate(zW2)
-    
-    if (zgridfromfile) then
-      dzmin = minval(dzPr)
-    end if
-    
+  
 
     call par_sync_out("  ...creating grid cell type arrays.")
 
