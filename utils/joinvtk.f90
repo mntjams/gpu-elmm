@@ -105,7 +105,7 @@ contains
 
     call skip_to("X_COORDINATES", io)
     if (io/=0) then
-      print *,"Error, cannot find X_COORDINATES in '",g%fname,"'"
+      write(*,*) "Error, cannot find X_COORDINATES in '",g%fname,"'"
       stop
     end if
     call get_number(g%nx)
@@ -117,7 +117,7 @@ contains
 
     call skip_to("Y_COORDINATES", io)
     if (io/=0) then
-      print *,"Error, cannot find Y_COORDINATES in '",g%fname,"'"
+      write(*,*) "Error, cannot find Y_COORDINATES in '",g%fname,"'"
       stop
     end if
     call get_number(g%ny)
@@ -129,7 +129,7 @@ contains
 
     call skip_to("Z_COORDINATES", io)
     if (io/=0) then
-      print *,"Error, cannot find Z_COORDINATES in '",g%fname,"'"
+      write(*,*) "Error, cannot find Z_COORDINATES in '",g%fname,"'"
       stop
     end if
     call get_number(g%nz)
