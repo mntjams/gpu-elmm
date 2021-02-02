@@ -1,6 +1,9 @@
 import os
 
-ncpus = str(os.cpu_count())
+try:
+  ncpus = str(os.cpu_count())
+except AttributeError:
+  ncpus = 8
 
 comp = ARGUMENTS.get('comp','')
 prec = ARGUMENTS.get('prec','')
