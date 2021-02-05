@@ -2,6 +2,7 @@ module Pressure
 
   use Parameters
   use Boundaries
+  use PoissonResidues
   use PoissonSolvers
 
   implicit none
@@ -31,6 +32,7 @@ module Pressure
     integer :: poisson_solver = POISSON_SOLVER_POISFFT
     integer :: projection_method = PROJECTION_METHOD_INCREMENTAL
     logical :: check_divergence = .false.
+    logical :: check_poisson_residue = .false.
     real(knd) :: top_pressure = 0    !mean pressure at the top boundary - calculated
     real(knd) :: bottom_pressure = 0
   end type
@@ -157,6 +159,7 @@ contains
     real(TIM) :: dt2,dt3                                      !RHS right hand side of eq. with divergence of U
                                                            !Phi computed pseudopressure, saved as first guess for next time
     real(knd) :: mass_flux
+    real(knd) :: res
     integer, save :: called = 0
     integer(int64), save :: trate
     integer(int64), save :: time1, time2, time3, time4
@@ -210,6 +213,13 @@ contains
 
 
     call Bound_Phi(Phi)
+    
+    
+    if (pressure_solution%check_poisson_residue) then
+      call Poiss_Residue(Phi, RHS, res)
+      
+      if (master) write(*,*) "Poisson equation residue:", res
+    end if
 
 
     if (debugparam>1 .and. called>1) then
