@@ -159,9 +159,9 @@ else:
     fast_flag = '  -O5 -ffast-math -fno-protect-parens'
     check_flag = '  -fbacktrace -g'
   else:
-    fast_flag = ' -O5 -ffast-math -fno-protect-parens'
+    fast_flag = '-O2'#' -O5 -ffast-math -fno-protect-parens'
     c_check_flag = '  -fbacktrace -g -Wall -Wno-unused -Wno-maybe-uninitialized -Wno-uninitialized'
-    check_flag = c_check_flag + ' -fbacktrace -Waliasing -Wsurprising -Wno-unused-dummy-argument -Wno-aliasing  -fcheck=all  -Werror'
+    check_flag = c_check_flag + ' -fbacktrace -Waliasing -Wsurprising -Wno-unused-dummy-argument -Wno-aliasing  -fcheck=all'#  -Werror'
     if mpi!='yes':
       check_flag += ' -Wimplicit-interface'
       
@@ -414,7 +414,8 @@ objs += env.Object(target = target_dir + 'frames_common',      source = 'frames_
 objs += env.Object(target = target_dir + 'frames',             source = 'frames.f90')
 objs += env.Object(target = target_dir + 'output_helpers',     source = 'output_helpers.f90')
 objs += env.Object(target = target_dir + 'vtkframes',          source = 'vtkframes.f90')
-objs += env.Object(target = target_dir + 'frames_parallelIO',  source = 'frames_parallelIO.f90')
+if str(mpi)=='yes':
+  objs += env.Object(target = target_dir + 'frames_parallelIO',  source = 'frames_parallelIO.f90')
 objs += env.Object(target = target_dir + 'surfacemapframes',   source = 'surfacemapframes.f90')
 objs += env.Object(target = target_dir + 'vertical_profiles',  source = 'vertical_profiles.f90')
 objs += env.Object(target = target_dir + 'outputs',            source = 'outputs.f90')
