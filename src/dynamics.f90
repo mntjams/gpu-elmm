@@ -539,21 +539,40 @@ contains
 
     subroutine get_U_dx_max
       U_dx_max = 0
-      !$omp parallel do private(i,j,k,p) reduction(max:U_dx_max) reduction(.or.:nan)
-      do k = 1, Prnz
-        do j = 1, Prny
-          do i = 1, Prnx
-            !For scalar advection the sum proved to be necessary when the flow is not aligned to grid.
-            p =     max( abs(U(i,j,k)), abs(U(i-1,j,k)) ) / dxmin
-            p = p + max( abs(V(i,j,k)), abs(V(i,j-1,k)) ) / dymin
-            p = p + max( abs(W(i,j,k)), abs(W(i,j,k-1)) ) / dzmin
-            
-            U_dx_max = max(U_dx_max, p)
-            if (ieee_is_nan(p)) nan = .true.
+      
+      if (gridtype==GRID_VARIABLE_Z) then
+        !$omp parallel do private(i,j,k,p) reduction(max:U_dx_max) reduction(.or.:nan)
+        do k = 1, Prnz
+          do j = 1, Prny
+            do i = 1, Prnx
+              !For scalar advection the sum proved to be necessary when the flow is not aligned to grid.
+              p =     max( abs(U(i,j,k)), abs(U(i-1,j,k)) ) / dxPr(i)
+              p = p + max( abs(V(i,j,k)), abs(V(i,j-1,k)) ) / dyPr(j)
+              p = p + max( abs(W(i,j,k)), abs(W(i,j,k-1)) ) / dzPr(k)
+              
+              U_dx_max = max(U_dx_max, p)
+              if (ieee_is_nan(p)) nan = .true.
+            end do
           end do
         end do
-      end do
-      !$omp end parallel do
+        !$omp end parallel do
+      else
+        !$omp parallel do private(i,j,k,p) reduction(max:U_dx_max) reduction(.or.:nan)
+        do k = 1, Prnz
+          do j = 1, Prny
+            do i = 1, Prnx
+              !For scalar advection the sum proved to be necessary when the flow is not aligned to grid.
+              p =     max( abs(U(i,j,k)), abs(U(i-1,j,k)) ) / dxmin
+              p = p + max( abs(V(i,j,k)), abs(V(i,j-1,k)) ) / dymin
+              p = p + max( abs(W(i,j,k)), abs(W(i,j,k-1)) ) / dzmin
+              
+              U_dx_max = max(U_dx_max, p)
+              if (ieee_is_nan(p)) nan = .true.
+            end do
+          end do
+        end do
+        !$omp end parallel do
+      end if
     end subroutine
 
   end subroutine TimeStepLength
