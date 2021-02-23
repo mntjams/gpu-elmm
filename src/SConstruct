@@ -9,6 +9,7 @@ comp = ARGUMENTS.get('comp','')
 prec = ARGUMENTS.get('prec','')
 openmp = ARGUMENTS.get('openmp','')
 fast = ARGUMENTS.get('fast','')
+aggressive = ARGUMENTS.get('aggressive','')
 lto = ARGUMENTS.get('lto','')
 prof = ARGUMENTS.get('prof','')
 diag = ARGUMENTS.get('diag','')
@@ -156,10 +157,16 @@ else:
     openmp_flag = ' -frecursive'
 
   if str(fast)=='yes':
-    fast_flag = '  -O5 -ffast-math -fno-protect-parens'
+    if str(aggressive)=='no':
+      fast_flag = ' -O2'
+    else:
+      fast_flag = ' -O5 -ffast-math -fno-protect-parens'
     check_flag = '  -fbacktrace -g'
   else:
-    fast_flag = '-O2'#' -O5 -ffast-math -fno-protect-parens'
+    if str(aggressive)=='no':
+      fast_flag = ' -O2'
+    else:
+      fast_flag = ' -O5 -ffast-math -fno-protect-parens'
     c_check_flag = '  -fbacktrace -g -Wall -Wno-unused -Wno-maybe-uninitialized -Wno-uninitialized'
     check_flag = c_check_flag + ' -fbacktrace -Waliasing -Wsurprising -Wno-unused-dummy-argument -Wno-aliasing  -fcheck=all'#  -Werror'
     if mpi!='yes':
