@@ -61,7 +61,7 @@ contains
                      enable_top_sponge, enable_top_sponge_scalar
    integer ::  lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
    real(knd) :: mgepsinnerGS
-   integer ::  i, j, io, io2, itmp
+   integer ::  i, j, k, io, io2, itmp
    integer :: numframeslices
    real(knd) :: rtmp
 
@@ -261,14 +261,25 @@ contains
       end do
       close(unit)
       
-      gzPr = [((gzW(j)+gzW(j-1))/2, j = 1, Prnz)]
-      
       z0 = gzW(0)
       lz = gzW(Prnz) - gzW(0)
       
       gzmin = gzW(0)
       gzmax = gzW(Prnz)
+   else
+      allocate(gzW(0:Prnz))
+      gzW(:) = [(k*dzmin + gzmin, k = 0, Prnz)]
    end if
+   
+   allocate(gxU(0:Prnx))
+   allocate(gyV(0:Prny))
+   gxU(:) = [(i*dxmin + gxmin, i = 0, Prnx)]
+   gyV(:) = [(j*dymin + gymin, j = 0, Prny)]
+
+   gxPr = [((gxU(i)+gxU(i-1))/2, i = 1, Prnx)]
+   gyPr = [((gyV(j)+gyV(j-1))/2, j = 1, Prny)]
+   gzPr = [((gzW(k)+gzW(k-1))/2, k = 1, Prnz)]
+  
 
    dxmin = lx/(Prnx)
    dymin = ly/(Prny)

@@ -392,7 +392,7 @@ contains
 
     xs = [(gxmin + dxmin/2 + (i-1)*dxmin, i = D%lo_ijk(1), D%ngxyz(1)+D%lo_ijk(1)-1)]
     ys = [(gymin + dymin/2 + (j-1)*dymin, j = D%lo_ijk(2), D%ngxyz(2)+D%lo_ijk(2)-1)]
-    zs = [(gzmin + dzmin/2 + (k-1)*dzmin, k = D%lo_ijk(3), D%ngxyz(3)+D%lo_ijk(3)-1)]
+    zs = [(gzPr(k), k = D%lo_ijk(3), D%ngxyz(3)+D%lo_ijk(3)-1)]
     
     if (D%dimension==2) then
       if (D%direction==1) then
