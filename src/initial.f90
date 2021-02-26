@@ -276,9 +276,9 @@ contains
    gxU(:) = [(i*dxmin + gxmin, i = 0, Prnx)]
    gyV(:) = [(j*dymin + gymin, j = 0, Prny)]
 
-   gxPr = [((gxU(i)+gxU(i-1))/2, i = 1, Prnx)]
-   gyPr = [((gyV(j)+gyV(j-1))/2, j = 1, Prny)]
-   gzPr = [((gzW(k)+gzW(k-1))/2, k = 1, Prnz)]
+   gxPr = [( (gxU(i)+gxU(i-1)) / 2, i = 1, Prnx)]
+   gyPr = [( (gyV(j)+gyV(j-1)) / 2, j = 1, Prny)]
+   gzPr = [( (gzW(k)+gzW(k-1)) / 2, k = 1, Prnz)]
   
 
    dxmin = lx/(Prnx)
