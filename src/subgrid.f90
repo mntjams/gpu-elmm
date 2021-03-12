@@ -205,12 +205,12 @@ module Subgrid
     
     
     
-    pure function TKEDissipation(i, j, k, U, V, W) result(res)
+    function TKEDissipation(i, j, k, U, V, W) result(res)
       !includes resolved and subgrid
       ! epsilon =  2*nu*Sij*Sij where Sij = (di_uj + dj_ui)/2
       real(knd) :: res
       integer, intent(in) :: i,j,k
-      real(knd), dimension(-2:,-2:,-2:), intent(in) :: U,V,W
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
       real(knd) :: S(1:3,1:3)
       integer :: ii, jj
       
