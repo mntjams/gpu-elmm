@@ -1818,15 +1818,15 @@ contains
                        Pr, Temperature, Moisture, &
                        UU, VV, WW, UV, UW, VW, &
                        TKE_sgs, UU_sgs, VV_sgs, WW_sgs, UV_sgs, UW_sgs, VW_sgs)
-    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U, V, W
-    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: UU, VV, WW
-    real(knd), dimension( 1:, 1:, 1:), contiguous, intent(inout) :: UV, UW, VW
-    real(knd), dimension( 1:, 1:, 1:), contiguous, intent(inout) :: TKE_sgs
-    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: UU_sgs, VV_sgs, WW_sgs
-    real(knd), dimension( 1:, 1:, 1:), contiguous, intent(inout) :: UV_sgs, UW_sgs, VW_sgs
-    real(knd), dimension( 1:, 1:, 1:), contiguous, intent(inout) :: Pr
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Temperature
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Moisture
+    real(knd), dimension(:,:,:), allocatable, intent(inout) :: U, V, W
+    real(knd), dimension(:,:,:), allocatable, intent(inout) :: UU, VV, WW
+    real(knd), dimension(:,:,:), allocatable, intent(inout) :: UV, UW, VW
+    real(knd), dimension(:,:,:), allocatable, intent(inout) :: TKE_sgs
+    real(knd), dimension(:,:,:), allocatable, intent(inout) :: UU_sgs, VV_sgs, WW_sgs
+    real(knd), dimension(:,:,:), allocatable, intent(inout) :: UV_sgs, UW_sgs, VW_sgs
+    real(knd), dimension(:,:,:), allocatable, intent(inout) :: Pr
+    real(knd), dimension(:,:,:), allocatable, intent(inout) :: Temperature
+    real(knd), dimension(:,:,:), allocatable, intent(inout) :: Moisture
     character(70) :: str
     integer :: i,j,k,unit
     real(real32), allocatable :: tmp(:,:,:,:), sc_tmp(:,:,:)
