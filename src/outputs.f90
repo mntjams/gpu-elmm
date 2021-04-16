@@ -35,47 +35,48 @@ module Outputs
   type(InstantaneousProfiles), allocatable :: instant_profiles
   type(TimeAveragedProfiles), allocatable :: running_average_profiles(:)
 
-  real(knd),allocatable :: U_avg(:,:,:),V_avg(:,:,:),W_avg(:,:,:) !<u>
-  real(knd),allocatable :: UU_prime(:,:,:),VV_prime(:,:,:),WW_prime(:,:,:) !<uu>, <u'u'> must be computed before saving
-  real(knd),allocatable :: UV_prime(:,:,:),UW_prime(:,:,:),VW_prime(:,:,:) !<uv>, <u'v'> must be computed before saving
-  real(knd),allocatable :: UU_prime_sgs(:,:,:),VV_prime_sgs(:,:,:),WW_prime_sgs(:,:,:) !<uu>, <u'u'> must be computed before saving
-  real(knd),allocatable :: UV_prime_sgs(:,:,:),UW_prime_sgs(:,:,:),VW_prime_sgs(:,:,:) !<uv>, <u'v'> must be computed before saving
-  real(knd),allocatable :: TKE_prime_sgs(:,:,:) !subgrid TKE approximation
-  real(knd),allocatable :: Pr_avg(:,:,:) !<p>
-  real(knd),allocatable :: Temperature_avg(:,:,:) !<theta>
-  real(knd),allocatable :: Moisture_avg(:,:,:) !<q>
-  real(knd),allocatable :: Scalar_avg(:,:,:,:) !<c>
+  real(knd), allocatable :: U_avg(:,:,:),V_avg(:,:,:),W_avg(:,:,:) !<u>
+  real(knd), allocatable :: UU_prime(:,:,:),VV_prime(:,:,:),WW_prime(:,:,:) !<uu>, <u'u'> must be computed before saving
+  real(knd), allocatable :: UV_prime(:,:,:),UW_prime(:,:,:),VW_prime(:,:,:) !<uv>, <u'v'> must be computed before saving
+  real(knd), allocatable :: UU_prime_sgs(:,:,:),VV_prime_sgs(:,:,:),WW_prime_sgs(:,:,:) !<uu>, <u'u'> must be computed before saving
+  real(knd), allocatable :: UV_prime_sgs(:,:,:),UW_prime_sgs(:,:,:),VW_prime_sgs(:,:,:) !<uv>, <u'v'> must be computed before saving
+  real(knd), allocatable :: TKE_prime_sgs(:,:,:) !subgrid TKE approximation
+  
+  real(knd), allocatable :: Pr_avg(:,:,:) !<p>
+  real(knd), allocatable :: Temperature_avg(:,:,:) !<theta>
+  real(knd), allocatable :: Moisture_avg(:,:,:) !<q>
+  real(knd), allocatable :: Scalar_avg(:,:,:,:) !<c>
 
-  real(knd),allocatable :: Scalar_variance(:,:,:,:)
+  real(knd), allocatable :: Scalar_variance(:,:,:,:)
 
-  real(knd),allocatable :: Scalar_max(:,:,:,:)
+  real(knd), allocatable :: Scalar_max(:,:,:,:)
 
-  real(knd),allocatable :: Scalar_intermitency(:,:,:,:)
+  real(knd), allocatable :: Scalar_intermitency(:,:,:,:)
 
-  real(knd),allocatable :: Scalar_fl_U_avg(:,:,:,:) !<cu>, <c'u'> must be computed before saving
-  real(knd),allocatable :: Scalar_fl_V_avg(:,:,:,:)
-  real(knd),allocatable :: Scalar_fl_W_avg(:,:,:,:)
+  real(knd), allocatable :: Scalar_fl_U_avg(:,:,:,:) !<cu>, <c'u'> must be computed before saving
+  real(knd), allocatable :: Scalar_fl_V_avg(:,:,:,:)
+  real(knd), allocatable :: Scalar_fl_W_avg(:,:,:,:)
 
-  real(knd),allocatable :: Scalar_fl_U_sgs(:,:,:,:)
-  real(knd),allocatable :: Scalar_fl_V_sgs(:,:,:,:)
-  real(knd),allocatable :: Scalar_fl_W_sgs(:,:,:,:)
+  real(knd), allocatable :: Scalar_fl_U_sgs(:,:,:,:)
+  real(knd), allocatable :: Scalar_fl_V_sgs(:,:,:,:)
+  real(knd), allocatable :: Scalar_fl_W_sgs(:,:,:,:)
 
-  real(TIM),allocatable,dimension(:) :: times                                !times of the timesteps
+  real(TIM), allocatable, dimension(:) :: times                                !times of the timesteps
 
-  real(knd),allocatable,dimension(:) :: delta_time, tke, dissip
+  real(knd), allocatable, dimension(:) :: delta_time, tke, dissip
 
-  real(knd),allocatable,dimension(:) :: pr_gradient_x_time, pr_gradient_y_time, pr_gradient_z_time
+  real(knd), allocatable, dimension(:) :: pr_gradient_x_time, pr_gradient_y_time, pr_gradient_z_time
 
-  real(knd),allocatable,dimension(:,:) :: ustar, tstar, mstar                !first index differentiates flux from friction number
+  real(knd), allocatable, dimension(:,:) :: ustar, tstar, mstar                !first index differentiates flux from friction number
                                                                              !second index is time
-  real(knd),allocatable,dimension(:,:) :: U_time,V_time,W_time,temp_time,moist_time  !position, time
+  real(knd), allocatable, dimension(:,:) :: U_time,V_time,W_time,temp_time,moist_time  !position, time
 
-  real(knd),allocatable,dimension(:,:,:) :: scalp_time                        !which scalar, position, time
-  real(knd),allocatable,dimension(:,:) :: scalsum_time                        !which scalar, time
+  real(knd), allocatable, dimension(:,:,:) :: scalp_time                        !which scalar, position, time
+  real(knd), allocatable, dimension(:,:) :: scalsum_time                        !which scalar, time
 
-  real(knd),allocatable,dimension(:,:,:) :: momentum_fluxes_time, momentum_fluxes_sgs_time   !component, position, time
+  real(knd), allocatable, dimension(:,:,:) :: momentum_fluxes_time, momentum_fluxes_sgs_time   !component, position, time
                                                        !components: 1,1; 1,2; 1,3; 2,2; 2,3; 3,3 for 1..6
-  real(knd),allocatable,dimension(:,:,:,:) :: scalar_fluxes_time !component, scalar, position, time
+  real(knd), allocatable, dimension(:,:,:,:) :: scalar_fluxes_time !component, scalar, position, time
                                                                  !components x,y,z
 
   type TProbe
@@ -87,13 +88,13 @@ module Outputs
   end type TProbe
 
   !for flow variables including scalar ones (temperature, moisture)
-  type(TProbe),allocatable,dimension(:),save :: probes
+  type(TProbe), allocatable, dimension(:), save :: probes
 
   !for fluxes
-  type(TProbe),allocatable,dimension(:),save :: flux_probes
+  type(TProbe), allocatable, dimension(:), save :: flux_probes
 
   !for passive scalars
-  type(TProbe),allocatable,dimension(:),save :: scalar_probes
+  type(TProbe), allocatable, dimension(:), save :: scalar_probes
   
   integer :: time_series_max_length = 10000 !how often save the time series
   integer :: time_series_step = 0
@@ -153,7 +154,7 @@ module Outputs
     integer :: probes_fluxes = 0
   end type TOutputSwitches
 
-  type(TOutputSwitches),save :: store
+  type(TOutputSwitches), save :: store
 
   type TDisplaySwitches
     integer :: delta = 0
@@ -162,18 +163,18 @@ module Outputs
     integer :: mstar = 0
   end type
 
-  type(TDisplaySwitches),save :: display
+  type(TDisplaySwitches), save :: display
 
   !line feed
-  character,parameter :: lf = achar(10)
+  character, parameter :: lf = achar(10)
 
 contains
 
 
   subroutine ReadProbes(ps,nps,pfile)
-    type(TProbe),allocatable,intent(out) :: ps(:)
-    integer,intent(out)     :: nps
-    character(*),intent(in) ::pfile
+    type(TProbe), allocatable, intent(out) :: ps(:)
+    integer, intent(out)     :: nps
+    character(*), intent(in) ::pfile
     integer :: i,io,unit
     real(knd) :: tmp3(3)
 
@@ -767,13 +768,13 @@ contains
 
   subroutine OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
     use Wallmodels, only: ComputeViscsWM
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)   :: U,V,W
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)      :: Pr
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)   :: Temperature
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in)   :: Moisture
-    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: Scalar
-    real(knd),intent(in) :: dt
-    real(knd),intent(in) :: delta
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)   :: U,V,W
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)      :: Pr
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)   :: Temperature
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)   :: Moisture
+    real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(in) :: Scalar
+    real(knd), intent(in) :: dt
+    real(knd), intent(in) :: delta
 
     integer :: step !just a shorter name
     
@@ -1218,11 +1219,11 @@ contains
   subroutine AddSubgridStresses(TKE, UU, VV, WW, UV, UW, VW, &
                                 U, V, W, weight)
     use Filters, only: filtertype, filter_ratios
-    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: TKE
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU, VV, WW
-    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV, UW, VW
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in)    :: U, V, W
-    real(knd),intent(in) :: weight
+    real(knd), dimension( 1:, 1:, 1:), contiguous, intent(inout) :: TKE
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: UU, VV, WW
+    real(knd), dimension( 1:, 1:, 1:), contiguous, intent(inout) :: UV, UW, VW
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: U, V, W
+    real(knd), intent(in) :: weight
     real(knd) :: Ax, Ay, Az, Ax2, Ay2, Az2
     integer :: i, j, k
     real(knd) :: width
@@ -1509,12 +1510,12 @@ contains
 
 
   subroutine OutputOut(U,V,W,Pr,Temperature,Moisture)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Pr
-    real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
-    real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Pr
+    real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in) :: Moisture(-1:,-1:,-1:)
     character(70) :: str
-    real(real32),allocatable :: tmp(:,:,:,:)
+    real(real32), allocatable :: tmp(:,:,:,:)
     integer :: i,j,k,unit
     real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
 
@@ -1703,9 +1704,9 @@ contains
 
 
   subroutine OutputScalars(Scalar)
-    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: Scalar
+    real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(in) :: Scalar
     character(70) :: str
-    real(knd),dimension(:,:,:),allocatable :: depos
+    real(knd), dimension(:,:,:), allocatable :: depos
     character(8) ::  scalname
     integer :: l,unit
 
@@ -1817,18 +1818,18 @@ contains
                        Pr, Temperature, Moisture, &
                        UU, VV, WW, UV, UW, VW, &
                        TKE_sgs, UU_sgs, VV_sgs, WW_sgs, UV_sgs, UW_sgs, VW_sgs)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U, V, W
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU, VV, WW
-    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV, UW, VW
-    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: TKE_sgs
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: UU_sgs, VV_sgs, WW_sgs
-    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: UV_sgs, UW_sgs, VW_sgs
-    real(knd),dimension( 1:, 1:, 1:),contiguous,intent(inout) :: Pr
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(inout) :: Temperature
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(inout) :: Moisture
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U, V, W
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: UU, VV, WW
+    real(knd), dimension( 1:, 1:, 1:), contiguous, intent(inout) :: UV, UW, VW
+    real(knd), dimension( 1:, 1:, 1:), contiguous, intent(inout) :: TKE_sgs
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: UU_sgs, VV_sgs, WW_sgs
+    real(knd), dimension( 1:, 1:, 1:), contiguous, intent(inout) :: UV_sgs, UW_sgs, VW_sgs
+    real(knd), dimension( 1:, 1:, 1:), contiguous, intent(inout) :: Pr
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Temperature
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout) :: Moisture
     character(70) :: str
     integer :: i,j,k,unit
-    real(real32),allocatable :: tmp(:,:,:,:), sc_tmp(:,:,:)
+    real(real32), allocatable :: tmp(:,:,:,:), sc_tmp(:,:,:)
     real(knd) :: time_factor
 
     if (averaging==1 .and. time_stepping%time > timeavg1) then
@@ -2115,8 +2116,8 @@ contains
   end subroutine OutputAvg
 
   subroutine OutputScalarStats(S_avg, S_var, S_max, S_int)
-    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(inout) :: S_avg, S_var
-    real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: S_max, S_int
+    real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(inout) :: S_avg, S_var
+    real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(in) :: S_max, S_int
     character(70) :: str
     integer :: unit
     real(knd) :: time_factor
@@ -2188,8 +2189,8 @@ contains
   contains
   
     subroutine aux(S,suff)
-      real(knd),dimension(-1:,-1:,-1:,:),contiguous,intent(in) :: S
-      character(*),intent(in) :: suff
+      real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(in) :: S
+      character(*), intent(in) :: suff
       integer :: l
       character(8) ::  scalname="scalar00"
 
@@ -2209,9 +2210,9 @@ contains
 
 
   subroutine OutputUVW(U,V,W,fnameU,fnameV,fnameW,avg_mode_arg)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    character(*),intent(in) :: fnameU,fnameV,fnameW
-    logical,optional,intent(in) :: avg_mode_arg
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
+    character(*), intent(in) :: fnameU,fnameV,fnameW
+    logical,optional, intent(in) :: avg_mode_arg
     character(70) :: str
     integer :: i,unit
     logical :: avg_mode
@@ -2440,12 +2441,12 @@ contains
 
 
   subroutine OutputAvgFluxes
-    real(knd),allocatable :: Scalar_fl_U_adv(:,:,:,:)
-    real(knd),allocatable :: Scalar_fl_V_adv(:,:,:,:)
-    real(knd),allocatable :: Scalar_fl_W_adv(:,:,:,:)
-    real(knd),allocatable :: Scalar_fl_U_turb(:,:,:,:)
-    real(knd),allocatable :: Scalar_fl_V_turb(:,:,:,:)
-    real(knd),allocatable :: Scalar_fl_W_turb(:,:,:,:)
+    real(knd), allocatable :: Scalar_fl_U_adv(:,:,:,:)
+    real(knd), allocatable :: Scalar_fl_V_adv(:,:,:,:)
+    real(knd), allocatable :: Scalar_fl_W_adv(:,:,:,:)
+    real(knd), allocatable :: Scalar_fl_U_turb(:,:,:,:)
+    real(knd), allocatable :: Scalar_fl_V_turb(:,:,:,:)
+    real(knd), allocatable :: Scalar_fl_W_turb(:,:,:,:)
     integer :: i
     real(knd) :: time_factor
    
@@ -2614,11 +2615,11 @@ contains
 
 
   subroutine Output(U,V,W,Pr,Temperature,Moisture,Scalar)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(inout) :: U,V,W
-    real(knd),contiguous,intent(inout) :: Pr(-1:,-1:,-1:)
-    real(knd),contiguous,intent(in) :: Temperature(-1:,-1:,-1:)
-    real(knd),contiguous,intent(in) :: Moisture(-1:,-1:,-1:)
-    real(knd),contiguous,intent(in) :: Scalar(-1:,-1:,-1:,:)
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U,V,W
+    real(knd), contiguous, intent(inout) :: Pr(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in) :: Moisture(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in) :: Scalar(-1:,-1:,-1:,:)
     
 #ifdef CUSTOM_OUTPUT
     interface
@@ -2681,7 +2682,7 @@ contains
   subroutine StressProfiles(U,V,W)
     use Filters, only: filtertype, filter_ratios
     use Subgrid, only: TKEDissipation
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
     integer   :: i,j,k
     real(knd) :: S, width
     real(knd), parameter :: Ck = 0.1 !model constant for the sgs_tke eddy viscosity sgs model
@@ -2833,10 +2834,10 @@ contains
   
   
   subroutine FluxSGSProfiles(W,Temperature,Moisture,Scalar)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Moisture
-    real(knd),dimension(-1:,-1:,-1:,1:),contiguous,intent(in) :: Scalar
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: W
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Moisture
+    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(in) :: Scalar
 
     
     if (enable_buoyancy) call TemperatureFluxSGSProfile(W,Temperature)
@@ -2850,8 +2851,8 @@ contains
 
     use custom_par, only: kim
 
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: W
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature
     real(knd) :: S
     integer   :: i,j,k
     !current_profiles%tempfl is computed directly during advection step
@@ -2888,8 +2889,8 @@ contains
   end subroutine
 
   subroutine MoistureFluxSGSProfile(W,Moisture)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Moisture
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: W
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Moisture
     real(knd) :: S
     integer   :: i,j,k
     !current_profiles%moistfl is computed directly during advection step
@@ -2911,8 +2912,8 @@ contains
   end subroutine
       
   subroutine ScalarFluxSGSProfile(W,Scalar)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: W
-    real(knd),dimension(-1:,-1:,-1:,1:),contiguous,intent(in) :: Scalar
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: W
+    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(in) :: Scalar
     real(knd) :: S
     integer   :: i,j,k,l
 
@@ -2953,10 +2954,10 @@ contains
 
 
   subroutine BLProfiles(U,V,W,Temperature,Moisture,Scalar)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Moisture
-    real(knd),dimension(-1:,-1:,-1:,1:),contiguous,intent(in) :: Scalar
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Moisture
+    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(in) :: Scalar
     real(knd) :: S
     integer   :: i,j,k,l
 
@@ -3140,7 +3141,7 @@ contains
 
 
   subroutine OutputU2(U,V,W)
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
     integer :: unit
     character(70) :: str
 
@@ -3252,10 +3253,10 @@ contains
   subroutine OUTINLET(U,V,W,Temperature)
     use Parameters, t_s => time_stepping
     !for output of 2d data for use as an inilet condition later
-    real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
-    real(knd),dimension(-1:,-1:,-1:),contiguous,intent(in) :: Temperature
-    integer,save ::fnum
-    integer,save :: called = 0
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature
+    integer, save ::fnum
+    integer, save :: called = 0
 
     if ((t_s%time>=timefram1).and.(t_s%time<=timefram2+(timefram2-timefram1)/(frames-1))&
         .and.(t_s%time>=timefram1+fnum*(timefram2-timefram1)/(frames-1))) then
@@ -3280,8 +3281,8 @@ contains
 
 
   subroutine OUTINLETFrame(U,V,W,Temperature,n)
-    real(knd),intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(knd),dimension(-1:,-1:,-1:),intent(in)   :: Temperature
+    real(knd), intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
+    real(knd), dimension(-1:,-1:,-1:), intent(in)   :: Temperature
     integer :: n
     character(12) :: fname
     integer :: mini,maxi,minj,maxj,mink,maxk,unit
@@ -3358,7 +3359,7 @@ contains
 
 
   pure real(knd) function TriLinInt(a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111)
-  real(knd),intent(in) :: a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111
+    real(knd), intent(in) :: a,b,c,vel000,vel100,vel010,vel001,vel110,vel101,vel011,vel111
 
     TriLinInt=   (1-a)*(1-b)*(1-c)*vel000+&
                  a*(1-b)*(1-c)*vel100+&
