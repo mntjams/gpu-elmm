@@ -263,9 +263,12 @@ module ParseTrees
 
   implicit none
 
-  private
+  !HACK: private must be disabled due to a bug in Intel Fortran 2021.1
+  !   private
 
   public field_names, field_names_a, field_names_a_int_alloc, field_names_str
+  !HACK: must be called directly, the overloaded constructor causes https://gcc.gnu.org/bugzilla/show_bug.cgi?id=49213
+  
   public field_names_init, field_names_a_init, field_names_a_int_alloc_init
 
   public tree_object, tree_object_field, tree_object_fields, tree_object_ptr, &
