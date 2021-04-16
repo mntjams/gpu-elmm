@@ -158,13 +158,13 @@ else:
 
   if str(fast)=='yes':
     if str(aggressive)=='no':
-      fast_flag = ' -O2'
+      fast_flag = ' -O3'
     else:
-      fast_flag = ' -O5 -ffast-math -fno-protect-parens'
+      fast_flag = ' -O5 -ffast-math -fno-protect-parens -funroll-loops -march=native -mtune=native'
     check_flag = '  -fbacktrace -g'
   else:
     if str(aggressive)=='no':
-      fast_flag = ' -O2'
+      fast_flag = ' -O3'
     else:
       fast_flag = ' -O5 -ffast-math -fno-protect-parens'
     c_check_flag = '  -fbacktrace -g -Wall -Wno-unused -Wno-maybe-uninitialized -Wno-uninitialized'
