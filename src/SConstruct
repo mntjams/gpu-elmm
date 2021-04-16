@@ -79,7 +79,7 @@ if str(comp)=='intel':
   compiler_executables()
   
   if str(openmp)!='no':
-    openmp_flag = ' -openmp -recursive'
+    openmp_flag = ' -qopenmp -recursive'
   else:
     openmp_flag = ' -recursive -reentrancy'
 
