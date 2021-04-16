@@ -2738,7 +2738,7 @@ contains
       do j = 1,Vny
        do i = 1,Vnx
          if ((Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0).and.(Wtype(i,j+1,k)<=0.or.Wtype(i,j,k)<=0)) then
-           S = S + ((V(i,j,k+1) + V(i,j,k))/2 - molecular_viscosity) * (W(i,j+1,k) + W(i,j,k)) / 2
+           S = S + (V(i,j,k+1) + V(i,j,k)) * (W(i,j+1,k) + W(i,j,k)) / 4
          end if
        end do
       end do
@@ -2790,7 +2790,7 @@ contains
       do j = 1,Uny
        do i = 1,Unx
          if ((Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0)) then
-           S = S - (U(i,j,k+1) - U(i,j,k)) * molecular_viscosity
+           S = S - molecular_viscosity * (U(i,j,k+1) - U(i,j,k)) / dzmin
          end if
        end do
       end do
@@ -2804,7 +2804,7 @@ contains
       do j = 1,Vny
        do i = 1,Vnx
          if ((Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0)) then
-           S = S - (V(i,j,k+1) - V(i,j,k)) * molecular_viscosity
+           S = S - molecular_viscosity * (V(i,j,k+1) - V(i,j,k)) / dzmin
          end if
        end do
       end do
