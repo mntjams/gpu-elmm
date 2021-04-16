@@ -574,6 +574,7 @@ contains
       allocate(n_free_VW(0:Prnz))
       allocate(n_free_UW_sgs(0:Prnz))
       allocate(n_free_VW_sgs(0:Prnz))
+
       do k = 0, Unz+1
         n_free_U(k) = count(Utype(1:Unx,1:Uny,k) <= 0)
       end do
@@ -601,8 +602,7 @@ contains
                           (Wtype(1:Vnx,2:Vny+1,k)<=0.or.Wtype(1:Vnx,1:Vny,k)<=0))
       end do
       do k = 0, Prnz
-        n_free_UW_sgs(k) = count((Utype(1:Unx,1:Uny,k+1)<=0.or.Utype(1:Unx,1:Uny,k)<=0) .and. &
-                          (Wtype(2:Unx+1,1:Uny,k)<=0.or.Wtype(1:Unx,1:Uny,k)<=0))
+        n_free_UW_sgs(k) = count((Utype(1:Unx,1:Uny,k+1)<=0.or.Utype(1:Unx,1:Uny,k)<=0)) 
       end do
       do k = 0, Prnz
         n_free_VW_sgs(k) = count((Vtype(1:Vnx,1:Vny,k+1)<=0.or.Vtype(1:Vnx,1:Vny,k)<=0))
@@ -2781,6 +2781,34 @@ contains
        end do
       end do
       current_profiles%vwsgs(k) = S
+    end do
+    !$omp end do nowait
+
+    !$omp do
+    do k = 0,Prnz
+      S = 0
+      do j = 1,Uny
+       do i = 1,Unx
+         if ((Utype(i,j,k+1)<=0.or.Utype(i,j,k)<=0)) then
+           S = S - (U(i,j,k+1) - U(i,j,k)) * molecular_viscosity
+         end if
+       end do
+      end do
+      current_profiles%uz_visc(k) = S
+    end do
+    !$omp end do nowait
+
+    !$omp do
+    do k = 0,Prnz
+      S = 0
+      do j = 1,Vny
+       do i = 1,Vnx
+         if ((Vtype(i,j,k+1)<=0.or.Vtype(i,j,k)<=0)) then
+           S = S - (V(i,j,k+1) - V(i,j,k)) * molecular_viscosity
+         end if
+       end do
+      end do
+      current_profiles%vz_visc(k) = S
     end do
     !$omp end do nowait
 

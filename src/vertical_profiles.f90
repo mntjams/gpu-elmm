@@ -15,7 +15,8 @@ module VerticalProfiles
                                             moist, moistfl, &
                                             moistflsgs, mm, &
                                             uw, uwsgs, &
-                                            vw, vwsgs
+                                            vw, vwsgs, &
+                                            uz_visc, vz_visc
 
     real(knd), dimension(:,:), allocatable :: scal, scalfl, &  !which scalar, height
                                               scalflsgs, ss
@@ -202,6 +203,7 @@ contains
     allocate(self%uusgs(1:Unz), self%vvsgs(1:Vnz), self%wwsgs(0:Prnz))
     allocate(self%uw(0:Prnz), self%uwsgs(0:Prnz))
     allocate(self%vw(0:Prnz), self%vwsgs(0:Prnz))
+    allocate(self%uz_visc(0:Prnz), self%vz_visc(0:Prnz))
     
     allocate(self%tkesgs(1:Prnz), self%dissip(1:Prnz))
 
@@ -230,6 +232,8 @@ contains
     self%vw = 0
     self%uwsgs = 0
     self%vwsgs = 0
+    self%uz_visc = 0
+    self%vz_visc = 0
 
     self%temp = 0
     self%tempfl = 0
@@ -288,6 +292,8 @@ contains
     call ReduceProfile(p%vw,     n_free_VW)
     call ReduceProfile(p%uwsgs,  n_free_UW_sgs)
     call ReduceProfile(p%vwsgs,  n_free_VW_sgs)
+    call ReduceProfile(p%uz_visc,  n_free_UW_sgs)
+    call ReduceProfile(p%vz_visc,  n_free_VW_sgs)
     
     if (enable_buoyancy) then
       call ReduceProfile(p%temp,      n_free_Pr(1:Prnz))
@@ -367,13 +373,13 @@ contains
 
       open(unit, file = dir // "profuw" // nth_char // ".txt")
       do k = flux_start,Prnz
-       write(unit,*) zW(k), p%uw(k), p%uwsgs(k)
+       write(unit,*) zW(k), p%uw(k), p%uwsgs(k), p%uz_visc(k)
       end do
       close(unit)
 
       open(unit, file = dir // "profvw" // nth_char // ".txt")
       do k = flux_start,Prnz
-       write(unit,*) zW(k), p%vw(k), p%vwsgs(k)
+       write(unit,*) zW(k), p%vw(k), p%vwsgs(k), p%uz_visc(k)
       end do
       close(unit)
 
@@ -526,6 +532,9 @@ contains
     self%uwsgs = self%uwsgs + current%uwsgs * weight
     self%vw = self%vw + current%vw * weight
     self%vwsgs = self%vwsgs + current%vwsgs * weight
+    self%uz_visc = self%uz_visc + current%uz_visc * weight
+    self%vz_visc = self%vz_visc + current%vz_visc * weight
+    
     self%uu = self%uu + current%uu * weight
     self%vv = self%vv + current%vv * weight
     self%ww = self%ww + current%ww * weight
