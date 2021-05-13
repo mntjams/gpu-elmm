@@ -40,9 +40,11 @@ class eaf_reader:
         self.zs = np.fromfile(efh, dtype = self.dtype, count = self.nxyz[2])
         
         self.arrays = []
-        #Now for simplicitly just assume that we know that the file contains velocity vectors only.
+        #Now for simplicity just assume that we know that the file contains velocity vectors only.
         #Therefore we skip reading the data description.
         self.arrays = self.arrays + [{"name":"u", "vector":True}]
+        
+        self.transformed_xy = False
         
     def read_frame(self, n_frame):
         eaf = open(self.base_name + "-" + str(n_frame) + ".eaf", "rb")
@@ -51,9 +53,14 @@ class eaf_reader:
         
         for array in self.arrays:
             if array["vector"]:
-              array_data = np.fromfile(eaf, dtype=self.dtype).reshape([3]+self.nxyz, order='F')
+              array_data = np.fromfile(eaf, dtype=self.dtype).reshape([3]+self.orig_nxyz, order='F')
+              if self.transformed_xy:
+                array_data = array_data.swapaxes(1,2)
+                array_data[[0,1],:,:,:] = array_data[[1,0],:,:,:]            
             else:
-              array_data = np.fromfile(eaf, dtype=self.dtype).reshape(self.nxyz, order='F')
+              array_data = np.fromfile(eaf, dtype=self.dtype).reshape(self.orig_nxyz, order='F')
+              if self.transformed_xy:
+                array_data = array_data.swapaxes(0,1)
               
             data = data + [{"name" : array["name"], "data" : array_data}]
             
@@ -70,6 +77,45 @@ class eaf_reader:
     #returns the z-xoordinate of the ith index
     def z(self,i):
       return self.zs[i]
+    
+    #converts the vector components u,v,w in data to one long 1D sequence
+    #for certain specialized purposes, ignore if not needed
+    def step_data_matrix(self, data, name):
+        n = np.product(self.nxyz)
+        for i in range(3*n):
+          if data[0]["name"] == name:
+            u = data[0]["data"]
+            res = np.ndarray([3*n])
+            res[0:n] = u[0,:,:,:].reshape([n])
+            res[n:2*n] = u[1,:,:,:].reshape([n])
+            res[2*n:3*n] = u[2,:,:,:].reshape([n])
+            return res
+        return None    
+     
+    #returns a big array with a row of step_data_matrix times each time step
+    def steps_data_matrix(self, name, first, last, step):
+        n = np.product(self.nxyz)
+        nsteps = (last - first + 1) // step
+        res = np.ndarray([3*n, nsteps])
+        k = 0
+        print(first, last+1, step)
+        print([k for k in range(first, last+1, step)])
+        for tstep in range(first, last+1, step):
+          print(tstep)
+          data = self.read_frame(tstep)
+          res[:,k] = self.step_data_matrix(data, name)
+          k += 1
+        return res
+          
+          
+    #switch x and y (and u and v)
+    #useful when simulationg a channel in the y direction
+    def transform_xy(self):
+        self.x, self.y = self.y, self.x
+        self.orig_nxyz = self.nxyz
+        self.nxyz = np.asarray([self.nxyz[1],self.nxyz[0],self.nxyz[2]])
+        self.transformed_xy = True
+        
       
                            
 if __name__ == '__main__':
