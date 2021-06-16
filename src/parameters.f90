@@ -280,14 +280,18 @@ module PhysicalProperties
   use Parameters
 
   implicit none
+  
+  real(knd), parameter :: R_universal = 8.31446261815324_knd !J.kg^-1.mol^-1
 
-  real(knd), parameter :: rho_air_ref = 1.196 !kg.m^-3
+  real(knd), parameter :: m_mol_air = 28.9644e-3_knd !kg.mol^-1  NIST 400 ppm CO2
+  
+  real(knd), parameter :: Rd_air_ref = R_universal / m_mol_air !J.kg^-1.K^-1
+
+  real(knd), parameter :: rho_air_ref = 1.196_knd !kg.m^-3
 
   real(knd), parameter :: Cp_air_ref = 1005 !J.kg^-1.K^-1
 
   real(knd), parameter :: Cv_air_ref = 718 !J.kg^-1.K^-1
-
-  real(knd), parameter :: Rd_air_ref = Cp_air_ref - Cv_air_ref !J.kg^-1.K^-1
 
   real(knd), parameter :: Lv_water_ref = 2442000 !J.kg^-1
 
