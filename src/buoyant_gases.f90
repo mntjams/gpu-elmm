@@ -1,5 +1,5 @@
 module BuoyantGases
-
+  use Parameters
   use PhysicalPropertis
   
   ! At the moment buoyant gases should not be combined with air moisture.
@@ -16,10 +16,24 @@ module BuoyantGases
   
   type buoyant_scalar
     real(knd) :: m_mol = m_mol_air_ref
-    real(knd) :: R = Rd_air_ref
-    real(knd) :: eps = 1
+    real(knd) :: R = Rd_air_ref  ! R_gas_universal / m_mol
+    real(knd) :: eps = 0         ! m_mol_air_ref/m_mol - 1
   end type
   
+  ! Index of the array correspends to the number of the scalar.
   type(buoyant_scalar), allocatable :: buoyant_scalars(:)
+  
+contains
+
+   
+  function buoyant_scalar_init(m_mol) result(res)
+    type(buoyant_scalar) :: res
+    real(knd), intent(in) :: m_mol
+    
+    res%m_mol = m_mol
+    res%R = R_gas_universal / m_mol
+    res%eps = m_mol_air_ref / m_mol - 1
+  end function
+   
 end module
 
