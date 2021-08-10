@@ -123,7 +123,7 @@ contains
       call Convection(U, V, W, &
                       U2, V2, W2, &
                       Ustar, Vstar, Wstar, &
-                      Temperature, Moisture, &
+                      Temperature, Moisture, Scalar, &
                       Pr, &
                       RK_beta, RK_rho, RK_stage, time_stepping%dt)
 
