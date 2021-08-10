@@ -50,6 +50,7 @@ contains
     
     real(knd) :: p_r, p_g, rho_d
     
+    !TODO: avoid re-computing this constant value
     p_r = rho_air_ref * Rd_air_ref * temperature_ref
     
     p_g = rho_g * sc%R * temperature_ref
