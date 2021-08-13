@@ -698,8 +698,7 @@ fields_do:  do j = 1, size(obj_fields)
   ! uncomment to get details when debugging
                   write(*,*) "Error, expecting", &
                              size(fields_a(i)%var), &
-                             "vector components", &
-                             "but", &
+                             "vector components, but", &
                              size(obj_fields(j)%array_value), &
                              "components present."
                   stat = 3
