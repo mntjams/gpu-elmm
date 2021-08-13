@@ -574,6 +574,9 @@ contains
      num_of_scalars = 0
      if (master) write (*,*) "scalars.conf not found, no passive scalars for computation."
    end if
+   
+   
+   call get_buoyant_scalars("buoyant_scalars.conf")
 
 
    if (num_of_scalars>0) then
@@ -1553,6 +1556,78 @@ contains
     end subroutine
 
   end subroutine get_area_sources
+
+  
+  subroutine get_buoyant_scalars(fname)
+    use BuoyantGases
+    use Strings
+    use ParseTrees
+    character(*), intent(in) :: fname
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: iobj, stat
+    real(knd), allocatable, target :: molecular_masses(:)
+
+    logical, target :: enable = .true.
+
+
+    type(field_names) :: names(1)
+    type(field_names_a) :: names_a(1)
+
+    names = [field_names_init("enable",   enable)]
+
+    names_a = [field_names_a_init("molecular_masses", molecular_masses)]
+
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+
+      if (allocated(tree)) then
+        call find_object_get_field_values(tree, "buoyant_scalars", stat, &
+                                     fields = names, fields_a = names_a)
+
+        if (stat<=0) then
+          call init
+        else if (stat==1) then
+          write(*,*) "Error, no buoyant_scalars object in " // fname
+          call error_stop
+        else
+          write(*,*) "Error, parsing buoyant_scalars() in " // fname
+          write(*,*) "Status:", stat
+          call error_stop
+        endif
+
+        do iobj = 1, size(tree)
+          call tree(iobj)%finalize
+        end do
+
+      end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+
+  contains
+
+    subroutine init
+      if (allocated(molecular_masses)) then
+        
+        if (enable .and. size(molecular_masses)>0) then
+          enable_buoyant_scalars = .true.
+
+          buoyant_scalars = buoyant_scalar(molecular_masses)
+        end if
+      end if
+    end subroutine
+
+  end subroutine get_buoyant_scalars
 
 
   subroutine get_geostrophic_wind(fname, g)

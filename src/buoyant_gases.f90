@@ -29,10 +29,13 @@ module BuoyantGases
   ! Index of the array correspends to the number of the scalar.
   type(buoyant_scalar), allocatable :: buoyant_scalars(:)
   
+  interface buoyant_scalar
+    module procedure buoyant_scalar_init
+  end interface
 contains
 
    
-  function buoyant_scalar_init(m_mol) result(res)
+  elemental function buoyant_scalar_init(m_mol) result(res)
     type(buoyant_scalar) :: res
     real(knd), intent(in) :: m_mol
     
