@@ -1566,17 +1566,11 @@ contains
     type(tree_object), allocatable :: tree(:)
     logical :: ex
     integer :: iobj, stat
-    real(knd), allocatable, target :: molecular_masses(:)
-
-    logical, target :: enable = .true.
-
+    real(knd), target :: molecular_mass
 
     type(field_names) :: names(1)
-    type(field_names_a) :: names_a(1)
 
-    names = [field_names_init("enable",   enable)]
-
-    names_a = [field_names_a_init("molecular_masses", molecular_masses)]
+    names = [field_names_init("molecular_mass", molecular_mass)]
 
     inquire(file=fname, exist=ex)
 
@@ -1587,11 +1581,13 @@ contains
     if (stat==0) then
 
       if (allocated(tree)) then
-        call find_object_get_field_values(tree, "buoyant_scalars", stat, &
-                                     fields = names, fields_a = names_a)
+      
+        molecular_mass = m_mol_air
+        
+        call find_object_get_field_values(tree, "buoyant_scalar", stat, fields = names)
 
         if (stat<=0) then
-          call init
+          call add
         else if (stat==1) then
           write(*,*) "Error, no buoyant_scalars object in " // fname
           call error_stop
@@ -1616,15 +1612,12 @@ contains
 
   contains
 
-    subroutine init
-      if (allocated(molecular_masses)) then
+    subroutine add
+      if (.not.allocated(buoyant_scalars)) allocate(buoyant_scalars(0))
+      
+      enable_buoyant_scalars = .true.
         
-        if (enable .and. size(molecular_masses)>0) then
-          enable_buoyant_scalars = .true.
-
-          buoyant_scalars = buoyant_scalar(molecular_masses)
-        end if
-      end if
+      buoyant_scalars = [buoyant_scalars, buoyant_scalar(molecular_mass)]
     end subroutine
 
   end subroutine get_buoyant_scalars

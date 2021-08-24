@@ -405,7 +405,7 @@ contains
 
     if (abs(Coriolis_parameter)>tiny(1._knd)) call CoriolisForce(Ustar, Vstar, U, V)
 
-    if (enable_buoyancy) call BuoyancyForce(Wstar, Temperature, Moisture, Scalar, Pr)
+    call BuoyancyForce(Wstar, Temperature, Moisture, Scalar, Pr)
 
     call ResistanceForce(Ustar, Vstar, Wstar, U, V, W)
     
@@ -627,10 +627,15 @@ contains
         if (discretization_order==4) then
           call error_stop("not yet implemented")
         else
-          call apply_buoyant_scalars(1)
-          call apply_buoyant_scalars(2)
+          if (enable_buoyancy) then                    
+            call apply_buoyant_scalars_temperature(1)
+            call apply_buoyant_scalars_temperature(2)
+          else
+            call apply_buoyant_scalars(1)
+            call apply_buoyant_scalars(2)
+          end if
         end if
-    else
+    else if (enable_buoyancy) then
       A = grav_acc / temperature_ref
       A2 = A / 2._KND
       if (discretization_order==4) then
@@ -719,6 +724,24 @@ contains
         !$omp end parallel do
       end subroutine
 
+      subroutine apply_buoyant_scalars_temperature(start)
+        integer, intent(in) :: start
+        integer :: i, j, k
+        real(knd) :: temperature_virt
+
+        !$omp parallel do private(i,j,k,temperature_virt)
+        do k = start, Wnz+1,2
+          do j = 1, Wny
+            do i = 1, Wnx
+              temperature_virt = theta_v_scalars_temperature(i,j,k)
+              W(i,j,k)   = W(i,j,k)   + A2 * temperature_virt - A * temperature_ref
+              W(i,j,k-1) = W(i,j,k-1) + A2 * temperature_virt
+            end do
+          end do
+        end do
+        !$omp end parallel do
+      end subroutine
+
       pure real(knd) function theta_v(i, j, k)
         integer, intent(in) :: i, j, k
 
@@ -762,7 +785,23 @@ contains
           fact_sum = fact_sum + &
               buoyant_scalars(iscal)%eps * mass_fraction(buoyant_scalars(iscal), Scalar(i,j,k,iscal))
         end do
-        theta_v_scalars = Temperature(i,j,k) * (1 + fact_sum)
+        
+        theta_v_scalars = temperature_ref * (1 + fact_sum)
+      end function
+      
+      real(knd) function theta_v_scalars_temperature(i,j,k)
+        use BuoyantGases
+        integer, intent(in) :: i, j, k
+        real(knd) :: fact_sum
+        integer :: iscal
+        
+        fact_sum = 0
+        do iscal = 1, min(num_of_scalars, size(buoyant_scalars))
+          fact_sum = fact_sum + &
+              buoyant_scalars(iscal)%eps * mass_fraction(buoyant_scalars(iscal), Scalar(i,j,k,iscal))
+        end do
+        
+        theta_v_scalars_temperature = Temperature(i,j,k) * (1 + fact_sum)
       end function
   end subroutine BuoyancyForce
 
