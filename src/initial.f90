@@ -1566,11 +1566,11 @@ contains
     type(tree_object), allocatable :: tree(:)
     logical :: ex
     integer :: iobj, stat
-    real(knd), target :: molecular_mass
+    real(knd), target :: molar_mass
 
     type(field_names) :: names(1)
 
-    names = [field_names_init("molecular_mass", molecular_mass)]
+    names = [field_names_init("m_g_mol", molar_mass)]
 
     inquire(file=fname, exist=ex)
 
@@ -1578,37 +1578,36 @@ contains
 
     call parse_file(tree, fname, stat)
 
-    if (stat==0) then
-
-      if (allocated(tree)) then
-      
-        molecular_mass = m_mol_air
-        
-        call find_object_get_field_values(tree, "buoyant_scalar", stat, fields = names)
-
-        if (stat<=0) then
-          call add
-        else if (stat==1) then
-          write(*,*) "Error, no buoyant_scalars object in " // fname
-          call error_stop
-        else
-          write(*,*) "Error, parsing buoyant_scalars() in " // fname
-          write(*,*) "Status:", stat
-          call error_stop
-        endif
-
-        do iobj = 1, size(tree)
-          call tree(iobj)%finalize
-        end do
-
-      end if
-
-    else
-
+    if (stat/=0) then
       write(*,*) "Error parsing file " // fname
       call error_stop
-
     end if
+  
+    if (.not.allocated(tree)) return
+
+    do iobj = 1, size(tree)
+         
+      if (downcase(tree(iobj)%name)=="buoyant_scalar") then
+         !m_mol_air is in kg/mol
+         molar_mass = m_mol_air * 1000
+         
+         call get_object_field_values(tree(iobj), stat, &
+                                     fields = names)
+                                     
+        if (stat/=0) then
+          call error_stop("Error interpretting buoyant_scalar fields in " // trim(fname))
+        end if
+        
+        call add
+               
+      else 
+        call error_stop("Error, unknown object type '"//trim(tree(iobj)%name)//"' in file '"//trim(fname)//"'.")
+      end if
+
+      call tree(iobj)%finalize
+      
+    end do
+
 
   contains
 
@@ -1617,7 +1616,8 @@ contains
       
       enable_buoyant_scalars = .true.
         
-      buoyant_scalars = [buoyant_scalars, buoyant_scalar(molecular_mass)]
+      !g/mol -> kg/mol
+      buoyant_scalars = [buoyant_scalars, buoyant_scalar(molar_mass / 1000)]
     end subroutine
 
   end subroutine get_buoyant_scalars
