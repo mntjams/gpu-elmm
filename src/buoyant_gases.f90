@@ -44,7 +44,7 @@ contains
     res%eps = m_mol_air / m_mol - 1
   end function
   
-  function mass_fraction(sc, rho_g)
+  elemental function mass_fraction(sc, rho_g)
     real(knd) mass_fraction
     type(buoyant_scalar), intent(in) :: sc
     real(knd), intent(in) :: rho_g
