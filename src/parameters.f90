@@ -140,7 +140,7 @@ module Parameters
   logical :: enable_pr_gradient_y_profile = .false.
 
 
-  real(knd) :: grav_acc = 0, Coriolis_parameter = 0
+  real(knd) :: grav_acc = 9.81, Coriolis_parameter = 0
 
   real(knd) :: ShearInletTypeParameter, Uinlet, Uinlet_vec(3)
 
