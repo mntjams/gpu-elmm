@@ -45,13 +45,15 @@ contains
 #endif
     type(ScalarFlVolumesContainer) :: res
     class(ScalarAreaSource), intent(in) :: self
-    integer :: i, j, k, n_total
+    integer :: i, j, k
+    real(knd) :: total_volume
     
     res%scalar_number = self%scalar_number
     
     allocate(res%volumes(0))
 
-
+    total_volume = 0
+    
     do j = 1, Prny
       do i = 1, Prnx
         if (self%GeometricShape%Inside(xPr(i), yPr(j))) then
@@ -61,6 +63,9 @@ contains
 
           do k = 1, Prnz
             if (Prtype(i,j,k)<=0) then
+              total_volume = total_volume + dxmin * dymin * dzPr(k)
+              !the flux inScalarFlVolume is the local concentration derivative dc/dt
+              !but self%flux is the total amount m released per unit time. m = c * total_volume
               res%volumes = [res%volumes , &
                              ScalarFlVolume([i, j, k], self%flux)]
               exit
@@ -71,11 +76,11 @@ contains
       end do
     end do
 
-    n_total = size(res%volumes)
 #ifdef PAR
-    n_total = par_co_sum(n_total)
+    total_volume = par_co_sum(total_volume)
 #endif
-    if (n_total>0) res%volumes%flux = res%volumes%flux / n_total
+    if (total_volume>0) res%volumes%flux = res%volumes%flux / total_volume
+    print *, "fluxes init:",res%volumes%flux
   end function
   
   subroutine InitAreaSources
