@@ -58,6 +58,46 @@ contains
     
     !$omp parallel private(i, j, k, tmp) shared(U, mini, maxi, minj, maxj, mink, maxk)
     
+    !filter by the separable kernel in all three directions
+    
+    !$omp do collapse(2) schedule(dynamic,4)
+    do k = mink - 1, maxk + 1
+      do j = minj - 1, maxj + 1
+        tmp(:ubound(U,1)) = U(:,j,k)
+        do i = mini, maxi
+          if (all(Utype(i-1:i+1,j,k)<=0)) then
+            Uf(i,j,k) = 0.25 * (tmp(i+1) + 2 * tmp(i) + tmp(i-1))
+          else
+            Uf(i,j,k) = tmp(i)
+          end if
+        end do
+      end do
+    end do
+
+    !$omp do schedule(dynamic)
+    do k = mink - 1, maxk + 1
+      do i = mini, maxi
+        tmp(:ubound(U,2)) = Uf(i,:,k)
+        do j = minj, maxj
+          if (all(Utype(i,j-1:j+1,k)<=0)) &
+            Uf(i,j,k) = 0.25 * (tmp(j+1) + 2 * tmp(j) + tmp(j-1))
+        end do
+      end do
+    end do
+
+    !$omp do collapse(2) schedule(guided)
+    do j = minj, maxj
+      do i = mini, maxi
+        tmp(:ubound(U,3)) = Uf(i,j,:)
+        do k = mink, maxk
+          if (all(Utype(i,j,k-1:k+1)<=0)) then
+            Uf(i,j,k) = 0.25 * (tmp(k+1) + 2 * tmp(k) + tmp(k-1))
+          end if
+        end do
+      end do
+    end do
+    !$omp end parallel
+    
     !copy the portions which are not filtered
     
     !$omp do collapse(3)
@@ -119,46 +159,7 @@ contains
       end do
     end do
     !$omp end do nowait
-    
-    !filter by the separable kernel in all three directions
-    
-    !$omp do collapse(2) schedule(dynamic,4)
-    do k = mink, maxk
-      do j = minj, maxj
-        tmp(:ubound(U,1)) = U(:,j,k)
-        do i = mini, maxi
-          if (all(Utype(i-1:i+1,j,k)<=0)) then
-            Uf(i,j,k) = 0.25 * (tmp(i+1) + 2 * tmp(i) + tmp(i-1))
-          else
-            Uf(i,j,k) = tmp(i)
-          end if
-        end do
-      end do
-    end do
-
-    !$omp do schedule(dynamic)
-    do k = mink, maxk
-      do i = mini, maxi
-        tmp(:ubound(U,2)) = Uf(i,:,k)
-        do j = minj, maxj
-          if (all(Utype(i,j-1:j+1,k)<=0)) &
-            Uf(i,j,k) = 0.25 * (tmp(j+1) + 2 * tmp(j) + tmp(j-1))
-        end do
-      end do
-    end do
-
-    !$omp do collapse(2) schedule(guided)
-    do j = minj, maxj
-      do i = mini, maxi
-        tmp(:ubound(U,3)) = Uf(i,j,:)
-        do k = mink, maxk
-          if (all(Utype(i,j,k-1:k+1)<=0)) then
-            Uf(i,j,k) = 0.25 * (tmp(k+1) + 2 * tmp(k) + tmp(k-1))
-          end if
-        end do
-      end do
-    end do
-    !$omp end parallel
+        
   end subroutine 
 
 
