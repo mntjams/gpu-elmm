@@ -229,7 +229,7 @@ contains
 
   subroutine Convection(U, V, W, U2, V2, W2, &
                         Ustar, Vstar, Wstar, &
-                        Temperature, Moisture, Pr, &
+                        Temperature, Moisture, Scalar, Pr, &
                         beta, rho, RK_stage, dt)
     use MomentumAdvection
     use MomentumAdvection_variable_z
@@ -241,6 +241,7 @@ contains
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: Ustar, Vstar ,Wstar
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)    :: Temperature
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)    :: Moisture
+    real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(in)  :: Scalar
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)    :: Pr
     real(knd), dimension(1:3), intent(in) :: beta,rho
     integer,   intent(in) :: RK_stage
@@ -404,7 +405,7 @@ contains
 
     if (abs(Coriolis_parameter)>tiny(1._knd)) call CoriolisForce(Ustar, Vstar, U, V)
 
-    if (enable_buoyancy) call BuoyancyForce(Wstar, Temperature, Moisture, Pr)
+    call BuoyancyForce(Wstar, Temperature, Moisture, Scalar, Pr)
 
     call ResistanceForce(Ustar, Vstar, Wstar, U, V, W)
     
@@ -583,10 +584,12 @@ contains
 
 
 
-  subroutine BuoyancyForce(W, Temperature, Moisture, Pr)
+  subroutine BuoyancyForce(W, Temperature, Moisture, Scalar, Pr)
     use WaterThermodynamics, only: LiquidWater, compute_liquid_water_content
+    use BuoyantGases, only: enable_buoyant_scalars
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: W
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature, Moisture
+    real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(in) :: Scalar
     real(knd), contiguous, intent(in) :: Pr(-1:,-1:,-1:)
     real(knd) :: A, A2
     integer :: i, j, k
@@ -617,7 +620,22 @@ contains
           call apply_moist(2)
         end if
       end if
-    else
+    else if (enable_buoyant_scalars) then
+        A = grav_acc / temperature_ref
+        A2 = A / 2._KND
+        
+        if (discretization_order==4) then
+          call error_stop("not yet implemented")
+        else
+          if (enable_buoyancy) then                    
+            call apply_buoyant_scalars_temperature(1)
+            call apply_buoyant_scalars_temperature(2)
+          else
+            call apply_buoyant_scalars(1)
+            call apply_buoyant_scalars(2)
+          end if
+        end if
+    else if (enable_buoyancy) then
       A = grav_acc / temperature_ref
       A2 = A / 2._KND
       if (discretization_order==4) then
@@ -627,7 +645,7 @@ contains
             do i = 1, Wnx
               !deconvolution of Temperature: e.g., in Hokpunna, Manhart, (2010), JCP 229
               W(i,j,k) = W(i,j,k) + &
-                A2 * ( C1 * Temperature(i,j,k+2) + &
+                A * ( C1 * Temperature(i,j,k+2) + &
                        C0 * Temperature(i,j,k+1) + &
                        C0 * Temperature(i,j,k)   + &
                        C1 * Temperature(i,j,k-1) ) - &
@@ -688,6 +706,42 @@ contains
         !$omp end parallel do
       end subroutine
 
+      subroutine apply_buoyant_scalars(start)
+        integer, intent(in) :: start
+        integer :: i, j, k
+        real(knd) :: temperature_virt
+
+        !$omp parallel do private(i,j,k,temperature_virt)
+        do k = start, Wnz+1,2
+          do j = 1, Wny
+            do i = 1, Wnx
+              temperature_virt = theta_v_scalars(i,j,k)
+              W(i,j,k)   = W(i,j,k)   + A2 * temperature_virt - A * temperature_ref
+              W(i,j,k-1) = W(i,j,k-1) + A2 * temperature_virt
+            end do
+          end do
+        end do
+        !$omp end parallel do
+      end subroutine
+
+      subroutine apply_buoyant_scalars_temperature(start)
+        integer, intent(in) :: start
+        integer :: i, j, k
+        real(knd) :: temperature_virt
+
+        !$omp parallel do private(i,j,k,temperature_virt)
+        do k = start, Wnz+1,2
+          do j = 1, Wny
+            do i = 1, Wnx
+              temperature_virt = theta_v_scalars_temperature(i,j,k)
+              W(i,j,k)   = W(i,j,k)   + A2 * temperature_virt - A * temperature_ref
+              W(i,j,k-1) = W(i,j,k-1) + A2 * temperature_virt
+            end do
+          end do
+        end do
+        !$omp end parallel do
+      end subroutine
+
       pure real(knd) function theta_v(i, j, k)
         integer, intent(in) :: i, j, k
 
@@ -718,6 +772,36 @@ contains
           theta_v_liquid = theta_v(i, j, k)
         end if
                   
+      end function
+      
+      real(knd) function theta_v_scalars(i,j,k)
+        use BuoyantGases
+        integer, intent(in) :: i, j, k
+        real(knd) :: fact_sum
+        integer :: iscal
+        
+        fact_sum = 0
+        do iscal = 1, min(num_of_scalars, size(buoyant_scalars))
+          fact_sum = fact_sum + &
+              buoyant_scalars(iscal)%eps * mass_fraction(buoyant_scalars(iscal), Scalar(i,j,k,iscal))
+        end do
+        
+        theta_v_scalars = temperature_ref * (1 + fact_sum)
+      end function
+      
+      real(knd) function theta_v_scalars_temperature(i,j,k)
+        use BuoyantGases
+        integer, intent(in) :: i, j, k
+        real(knd) :: fact_sum
+        integer :: iscal
+        
+        fact_sum = 0
+        do iscal = 1, min(num_of_scalars, size(buoyant_scalars))
+          fact_sum = fact_sum + &
+              buoyant_scalars(iscal)%eps * mass_fraction(buoyant_scalars(iscal), Scalar(i,j,k,iscal))
+        end do
+        
+        theta_v_scalars_temperature = Temperature(i,j,k) * (1 + fact_sum)
       end function
   end subroutine BuoyancyForce
 

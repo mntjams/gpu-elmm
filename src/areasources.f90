@@ -80,7 +80,7 @@ contains
     total_volume = par_co_sum(total_volume)
 #endif
     if (total_volume>0) res%volumes%flux = res%volumes%flux / total_volume
-    print *, "fluxes init:",res%volumes%flux
+
   end function
   
   subroutine InitAreaSources

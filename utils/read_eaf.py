@@ -164,7 +164,7 @@ class eaf_reader:
         return None    
      
     #returns a big array with a row of step_data_matrix times each time step
-    def steps_data_matrix(self, name, first, last, step=1, swap=False):
+    def steps_data_matrix(self, name, first, last, step=1, swap=None):
         n = np.product(self.nxyz)
         nsteps = (last - first + 1) // step
         res = np.ndarray([3*n, nsteps])

@@ -140,7 +140,7 @@ module Parameters
   logical :: enable_pr_gradient_y_profile = .false.
 
 
-  real(knd) :: grav_acc = 0, Coriolis_parameter = 0
+  real(knd) :: grav_acc = 9.81, Coriolis_parameter = 0
 
   real(knd) :: ShearInletTypeParameter, Uinlet, Uinlet_vec(3)
 
@@ -281,11 +281,11 @@ module PhysicalProperties
 
   implicit none
   
-  real(knd), parameter :: R_universal = 8.31446261815324_knd !J.kg^-1.mol^-1
+  real(knd), parameter :: R_gas_universal = 8.31446261815324_knd !J.kg^-1.mol^-1
 
   real(knd), parameter :: m_mol_air = 28.9644e-3_knd !kg.mol^-1  NIST 400 ppm CO2
   
-  real(knd), parameter :: Rd_air_ref = R_universal / m_mol_air !J.kg^-1.K^-1
+  real(knd), parameter :: Rd_air_ref = R_gas_universal / m_mol_air !J.kg^-1.K^-1
 
   real(knd), parameter :: rho_air_ref = 1.196_knd !kg.m^-3
 

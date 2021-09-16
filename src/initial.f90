@@ -577,6 +577,9 @@ contains
      num_of_scalars = 0
      if (master) write (*,*) "scalars.conf not found, no passive scalars for computation."
    end if
+   
+   
+   call get_buoyant_scalars("buoyant_scalars.conf")
 
 
    if (num_of_scalars>0) then
@@ -1556,6 +1559,71 @@ contains
     end subroutine
 
   end subroutine get_area_sources
+
+  
+  subroutine get_buoyant_scalars(fname)
+    use BuoyantGases
+    use Strings
+    use ParseTrees
+    character(*), intent(in) :: fname
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: iobj, stat
+    real(knd), target :: molar_mass
+
+    type(field_names) :: names(1)
+
+    names = [field_names_init("m_g_mol", molar_mass)]
+
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat/=0) then
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+    end if
+  
+    if (.not.allocated(tree)) return
+
+    do iobj = 1, size(tree)
+         
+      if (downcase(tree(iobj)%name)=="buoyant_scalar") then
+         !m_mol_air is in kg/mol
+         molar_mass = m_mol_air * 1000
+         
+         call get_object_field_values(tree(iobj), stat, &
+                                     fields = names)
+                                     
+        if (stat/=0) then
+          call error_stop("Error interpretting buoyant_scalar fields in " // trim(fname))
+        end if
+        
+        call add
+               
+      else 
+        call error_stop("Error, unknown object type '"//trim(tree(iobj)%name)//"' in file '"//trim(fname)//"'.")
+      end if
+
+      call tree(iobj)%finalize
+      
+    end do
+
+
+  contains
+
+    subroutine add
+      if (.not.allocated(buoyant_scalars)) allocate(buoyant_scalars(0))
+      
+      enable_buoyant_scalars = .true.
+        
+      !g/mol -> kg/mol
+      buoyant_scalars = [buoyant_scalars, buoyant_scalar(molar_mass / 1000)]
+    end subroutine
+
+  end subroutine get_buoyant_scalars
 
 
   subroutine get_geostrophic_wind(fname, g)
