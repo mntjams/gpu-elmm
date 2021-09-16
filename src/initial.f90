@@ -241,6 +241,22 @@ contains
    gzmin = z0
    gzmax = z0 + lz
    
+   dxmin = lx/(Prnx)
+   dymin = ly/(Prny)
+   dzmin = lz/(Prnz)
+
+   if (Prnx==1) then
+     dxmin = sqrt(dymin*dzmin)
+     lx = dxmin
+   elseif (Prny==1) then
+     dymin = sqrt(dxmin*dzmin)
+     ly = dymin
+   elseif (Prnz==1) then
+     dzmin = sqrt(dxmin*dymin)
+     lz = dzmin
+   end if
+   
+   
     
    if (zgridfromfile) then           
       open(unit=unit,file="zgrid.txt", status="old", action="read")
@@ -266,6 +282,8 @@ contains
       
       gzmin = gzW(0)
       gzmax = gzW(Prnz)
+      
+      dzmin = minval(gzW(1:Prnz)-gzW(0:Prnz-1))
    else
       allocate(gzW(0:Prnz))
       gzW(:) = [(k*dzmin + gzmin, k = 0, Prnz)]
@@ -280,21 +298,6 @@ contains
    gyPr = [( (gyV(j)+gyV(j-1)) / 2, j = 1, Prny)]
    gzPr = [( (gzW(k)+gzW(k-1)) / 2, k = 1, Prnz)]
   
-
-   dxmin = lx/(Prnx)
-   dymin = ly/(Prny)
-   dzmin = lz/(Prnz)
-
-   if (Prnx==1) then
-     dxmin = sqrt(dymin*dzmin)
-     lx = dxmin
-   elseif (Prny==1) then
-     dymin = sqrt(dxmin*dzmin)
-     ly = dymin
-   elseif (Prnz==1) then
-     dzmin = sqrt(dxmin*dymin)
-     lz = dzmin
-   end if
 
    !can be overwritten after MPI decomposition
    gPrnx = Prnx
