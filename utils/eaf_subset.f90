@@ -286,7 +286,7 @@ contains
 
     g%fname = fname
     
-    open(newunit=g%hu,file=g%fname,access="stream",form="unformatted",status="replace",action="read",iostat=io, iomsg=msg)
+    open(newunit=g%hu,file=g%fname,access="stream",form="unformatted",status="old",action="read",iostat=io, iomsg=msg)
     if (io/=0) then
       stop msg
     end if
@@ -463,7 +463,7 @@ contains
     character(*) :: fname
     integer :: io
     character(256) :: msg
-    open(newunit=g%fu,file=fname,access="stream",form="unformatted",status="new", &
+    open(newunit=g%fu,file=fname,access="stream",form="unformatted",status="replace", &
          action="write",iostat=io, position="rewind", iomsg=msg)
     if (io/=0) then
       stop msg
