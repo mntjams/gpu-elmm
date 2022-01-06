@@ -259,9 +259,8 @@ contains
   
   subroutine Profiles_Save(p, dir, nth)
     use FreeUnit
-#ifdef PAR
-    use custom_par, only: iim, jim, kim
-#endif
+    use custom_par, only: iim, jim, kim, nzims
+
     class(Profiles), intent(inout) :: p
     character(*), intent(in) :: dir
     integer, intent(in), optional :: nth
@@ -316,16 +315,12 @@ contains
       call ReduceProfile(p%ss(i,:),        n_free_Pr(1:Prnz))
     end do
       
-#ifdef PAR
     if (iim==1.and.jim==1) then
-      if (kim == 1) then
-        flux_start = 0
-      else
+      if (kim > 1) then
         flux_start = 1
+      else
+        flux_start = 0
       end if
-#else
-      flux_start = 0 
-#endif
 
       p%uu = p%uu - p%u(1:Unz)**2
       p%vv = p%vv - p%v(1:Vnz)**2
@@ -411,11 +406,11 @@ contains
          if (enable_buoyancy) then
            open(unit, file = dir // "profRig" // nth_char // ".txt")
            do k = 1,Prnz
-             if (k==1) then
+             if (kim==1 .and. k==1) then
                num = (grav_acc/temperature_ref) * (p%temp(2)-p%temp(1)) / (dzmin)
                denom = (p%u(2) / (2*dzmin))**2 + &
                        (p%v(2) / (2*dzmin))**2
-             else if (k==Prnz) then
+             else if (kim==nzims .and. k==Prnz) then
                num = (grav_acc/temperature_ref) * (p%temp(k)-p%temp(k-1)) / (dzmin)
                denom = ((p%u(k)-p%u(k-1)) / (dzmin))**2 + &
                        ((p%v(k)-p%v(k-1)) / (dzmin))**2
@@ -514,9 +509,7 @@ contains
 
       end if !num_of_scalars>0
      
-#ifdef PAR
     end if
-#endif
 
   end subroutine Profiles_Save
   
