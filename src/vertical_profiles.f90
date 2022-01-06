@@ -207,7 +207,7 @@ contains
     
     allocate(self%tkesgs(1:Prnz), self%dissip(1:Prnz))
 
-    allocate(self%temp(1:Prnz), self%tempfl(0:Prnz))
+    allocate(self%temp(0:Prnz+1), self%tempfl(0:Prnz))
     allocate(self%tempflsgs(0:Prnz), self%tt(1:Prnz))
 
     allocate(self%moist(1:Prnz), self%moistfl(0:Prnz))
@@ -279,6 +279,14 @@ contains
 
     call ReduceProfile(p%u,      n_free_U)
     call ReduceProfile(p%v,      n_free_V)
+    
+#ifdef PAR
+      if (iim==1.and.jim==1) then
+        call profile_exchange_bc(p%u)
+        call profile_exchange_bc(p%v)
+      end if
+#endif      
+    
     call ReduceProfile(p%uu,     n_free_U(1:Unz))
     call ReduceProfile(p%vv,     n_free_V(1:Vnz))
     call ReduceProfile(p%ww,     n_free_W(0:Prnz))
@@ -295,7 +303,12 @@ contains
     call ReduceProfile(p%vz_visc,  n_free_VW_sgs)
     
     if (enable_buoyancy) then
-      call ReduceProfile(p%temp,      n_free_Pr(1:Prnz))
+      call ReduceProfile(p%temp(1:Prnz),      n_free_Pr(1:Prnz))
+#ifdef PAR
+      if (iim==1.and.jim==1) then
+        call profile_exchange_bc(p%temp)
+      end if
+#endif      
       call ReduceProfile(p%tempfl,    n_all_Pr(0:Prnz))
       call ReduceProfile(p%tempflsgs, [n_free_PrW_surf, n_free_PrW(1:Prnz)])
       call ReduceProfile(p%tt,        n_free_Pr(1:Prnz))
@@ -392,7 +405,7 @@ contains
          end do
          close(unit)
 
-         p%tt = p%tt - p%temp**2
+         p%tt = p%tt - p%temp(1:Prnz)**2
          !Niewstadt, Mason, Moeng, Schumann, 1993 - LES of CBL: A Comparison of Four Computer Codes 
          ttsgs = ((p%tempflsgs(0:Prnz-1)+p%tempflsgs(1:Prnz))/2)**2 / &
                                   (0.67_knd**4 * (p%tkesgs(1:Prnz)))
@@ -511,6 +524,32 @@ contains
      
     end if
 
+#ifdef PAR    
+  contains
+  
+    subroutine profile_exchange_bc(prof)
+      use custom_par
+      real(knd), intent(inout) :: prof(0:)      
+      !set halo cells in profiles for gradient computation
+      !TODO: consider fourth order gradients?
+      integer :: reqs(4)
+      integer :: ie
+      
+      reqs = MPI_REQUEST_NULL
+      
+      if (kim<nzims) then
+        call MPI_ISend(prof(Prnz), 1, PAR_KND, kim, 1301, comm_row_z, reqs(1), ie)
+        call MPI_IRecv(prof(Prnz+1), 1, PAR_KND, kim, 1301, comm_row_z, reqs(2), ie)
+      end if
+        
+      if (kim>1) then
+        call MPI_ISend(prof(1), 1, PAR_KND, kim-2, 1301, comm_row_z, reqs(3), ie)
+        call MPI_IRecv(prof(0), 1, PAR_KND, kim-2, 1301, comm_row_z, reqs(4), ie)
+      end if
+        
+      call MPI_Waitall(4, reqs, MPI_STATUSES_IGNORE, ie)
+    end subroutine
+#endif
   end subroutine Profiles_Save
   
   
