@@ -264,7 +264,6 @@ contains
     class(Profiles), intent(inout) :: p
     character(*), intent(in) :: dir
     integer, intent(in), optional :: nth
-    real(knd) :: S, S2, num, denom
     integer :: i, j, k, unit, flux_start
     real(knd), allocatable :: ttsgs(:), mmsgs(:), sssgs(:,:)
     character(:), allocatable :: nth_char
@@ -344,122 +343,191 @@ contains
 
       open(unit, file = dir // "profu" // nth_char // ".txt")
       do k = 1,Unz !Unz == Vnz
-       write(unit,*) zPr(k), p%u(k), p%v(k)
+        write(unit,*) zPr(k), p%u(k), p%v(k)
       end do
       close(unit)
 
       open(unit, file = dir // "profuu" // nth_char // ".txt")
       do k = 1,Unz
-       write(unit,*) zPr(k), p%uu(k), p%uusgs(k)
+        write(unit,*) zPr(k), p%uu(k), p%uusgs(k)
       end do
       close(unit)
 
       open(unit, file = dir // "profvv" // nth_char // ".txt")
       do k = 1,Vnz
-       write(unit,*) zPr(k), p%vv(k), p%vvsgs(k)
+        write(unit,*) zPr(k), p%vv(k), p%vvsgs(k)
       end do
       close(unit)
 
       open(unit, file = dir // "profww" // nth_char // ".txt")
       do k = 1,Wnz
-       write(unit,*) zW(k), p%ww(k), p%wwsgs(k)
+        write(unit,*) zW(k), p%ww(k), p%wwsgs(k)
       end do
       close(unit)
 
       open(unit, file = dir // "proftke" // nth_char // ".txt")
       do k = 1,Prnz
-       write(unit,*) zPr(k), (p%uu(k)+p%vv(k)+(p%ww(k-1)+p%ww(k))/2) / 2, &
+        write(unit,*) zPr(k), (p%uu(k)+p%vv(k)+(p%ww(k-1)+p%ww(k))/2) / 2, &
                              p%tkesgs(k)
       end do
       close(unit)
 
-       open(unit, file = dir // "profdissip" // nth_char // ".txt")
+      open(unit, file = dir // "profdissip" // nth_char // ".txt")
       do k = 1,Prnz
-       write(unit,*) zPr(k), p%dissip(k)
+        write(unit,*) zPr(k), p%dissip(k)
       end do
       close(unit)
 
       open(unit, file = dir // "profuw" // nth_char // ".txt")
       do k = flux_start,Prnz
-       write(unit,*) zW(k), p%uw(k), p%uwsgs(k), p%uz_visc(k)
+        write(unit,*) zW(k), p%uw(k), p%uwsgs(k), p%uz_visc(k)
       end do
       close(unit)
 
       open(unit, file = dir // "profvw" // nth_char // ".txt")
       do k = flux_start,Prnz
-       write(unit,*) zW(k), p%vw(k), p%vwsgs(k), p%uz_visc(k)
+        write(unit,*) zW(k), p%vw(k), p%vwsgs(k), p%uz_visc(k)
       end do
       close(unit)
 
       if (enable_buoyancy) then
 
-         open(unit, file = dir // "proftemp" // nth_char // ".txt")
-         do k = 1,Prnz
-          write(unit,*) zPr(k), p%temp(k)
-         end do
-         close(unit)
+        open(unit, file = dir // "proftemp" // nth_char // ".txt")
+        do k = 1,Prnz
+        write(unit,*) zPr(k), p%temp(k)
+        end do
+        close(unit)
 
-         open(unit, file = dir // "proftempfl" // nth_char // ".txt")
-         do k = flux_start,Prnz
-          write(unit,*) zW(k), p%tempfl(k), p%tempflsgs(k)
-         end do
-         close(unit)
+        open(unit, file = dir // "proftempfl" // nth_char // ".txt")
+        do k = flux_start,Prnz
+        write(unit,*) zW(k), p%tempfl(k), p%tempflsgs(k)
+        end do
+        close(unit)
 
-         p%tt = p%tt - p%temp(1:Prnz)**2
-         !Niewstadt, Mason, Moeng, Schumann, 1993 - LES of CBL: A Comparison of Four Computer Codes 
-         ttsgs = ((p%tempflsgs(0:Prnz-1)+p%tempflsgs(1:Prnz))/2)**2 / &
-                                  (0.67_knd**4 * (p%tkesgs(1:Prnz)))
-   
-         open(unit, file = dir // "proftt" // nth_char // ".txt")
-         do k = 1,Prnz
-          write(unit,*) zPr(k), p%tt(k), ttsgs(k)
-         end do
-         close(unit)
+        p%tt = p%tt - p%temp(1:Prnz)**2
+        !Niewstadt, Mason, Moeng, Schumann, 1993 - LES of CBL: A Comparison of Four Computer Codes 
+        ttsgs = ((p%tempflsgs(0:Prnz-1)+p%tempflsgs(1:Prnz))/2)**2 / &
+                                (0.67_knd**4 * (p%tkesgs(1:Prnz)))
+  
+        open(unit, file = dir // "proftt" // nth_char // ".txt")
+        do k = 1,Prnz
+        write(unit,*) zPr(k), p%tt(k), ttsgs(k)
+        end do
+        close(unit)
+      end if
 
-         if (enable_buoyancy) then
-           open(unit, file = dir // "profRig" // nth_char // ".txt")
-           do k = 1,Prnz
-             if (kim==1 .and. k==1) then
-               num = (grav_acc/temperature_ref) * (p%temp(2)-p%temp(1)) / (dzmin)
-               denom = (p%u(2) / (2*dzmin))**2 + &
-                       (p%v(2) / (2*dzmin))**2
-             else if (kim==nzims .and. k==Prnz) then
-               num = (grav_acc/temperature_ref) * (p%temp(k)-p%temp(k-1)) / (dzmin)
-               denom = ((p%u(k)-p%u(k-1)) / (dzmin))**2 + &
-                       ((p%v(k)-p%v(k-1)) / (dzmin))**2
-             else
-               num = (grav_acc/temperature_ref) * (p%temp(k+1)-p%temp(k-1)) / (2*dzmin)
-               denom = ((p%u(k+1)-p%u(k-1)) / (2*dzmin))**2 + &
-                       ((p%v(k+1)-p%v(k-1)) / (2*dzmin))**2
-             end if
-             
-             if (abs(denom)>1E-5_knd*abs(num) .and. abs(denom)>epsilon(1._knd)) then
-               S = num / denom
-             else
-               S = 100000._knd*sign(1.0_knd,num)*sign(1.0_knd,denom)
-             end if
-             write(unit,*) zPr(k), S
-           end do
-           close(unit)
+      if (enable_buoyancy) then
+        !TODO: This is only valid without moisture. Otherwise we need the virtual temperature (flux).
+        block
+          real(knd) :: num, denom
+          real(knd) :: du_dz, dv_dz, dth_dz
+          real(knd) :: Ri, Rf, Prt, Km, Kh
+          real(knd) :: shear, N_BV, u_star, theta_star
+          real(knd) :: L_MO, L_Oz, L_Ko, l_mix
 
-           open(unit, file = dir // "profRf" // nth_char // ".txt")
-           do k = 1,Prnz
-            S = ( p%u(k+1)-p%u(k-1) ) / (2*dzmin)
-            S2 = ( p%v(k+1)-p%v(k-1) ) / (2*dzmin)
-            num = (grav_acc/temperature_ref) * (p%tempfl(k)+p%tempflsgs(k))
-            denom = (p%uw(k)+p%uwsgs(k)) * S + (p%vw(k)+p%vwsgs(k)) * S2
-
-            if (abs(denom)>1E-5_knd*abs(num) .and. abs(num)>epsilon(1._knd)) then
-              S = num / denom
+          open(unit, file = dir // "profother" // nth_char // ".txt")
+          write(unit,'(*(a,2x))') "#", "Ri", "Rf", "shear", "N_BV", "u_star", "theta_star", &
+                                  "L_MO", "L_Oz", "L_Ko", "Prt", "Km", "Kh", "l_mix"
+          do k = 1,Prnz
+            if (kim==1 .and. k==1) then
+              du_dz = ( p%u(2) - 0 ) / (dzmin)
+              dv_dz = ( p%v(2) - 0 ) / (dzmin)
+              dth_dz = (p%temp(2)-p%temp(1)) / (dzmin)
+            else if (kim==nzims .and. k==Prnz) then
+              du_dz = ( p%u(k) - p%u(k-1) ) / (dzmin)
+              dv_dz = ( p%v(k) - p%v(k-1) ) / (dzmin)
+              dth_dz = ( p%temp(k) - p%temp(k-1)) / (dzmin)
             else
-              S = 100000._knd * sign(1.0_knd,num) * sign(1.0_knd,denom)
+              du_dz = ( p%u(k+1) - p%u(k-1) ) / (2*dzmin)
+              dv_dz = ( p%v(k+1) - p%v(k-1) ) / (2*dzmin)
+              dth_dz = ( p%temp(k+1) - p%temp(k-1) ) / (2*dzmin)
+            end if
+            
+            shear = hypot(du_dz, dv_dz)
+            
+            num = (grav_acc/temperature_ref) * dth_dz
+            denom = shear**2
+            
+            if (abs(denom)>1E-5_knd*abs(num) .and. abs(denom)>epsilon(1._knd)) then
+              Ri = num / denom
+            else
+              Ri = 100000._knd * sign(1.0_knd, num) * sign(1.0_knd, denom)
             end if
 
-            write(unit,*) zPr(k),S
-           end do
-           close(unit)
-         end if !allocated avgs
+            
+            num = (grav_acc/temperature_ref) * (p%tempfl(k)+p%tempflsgs(k))
+            denom = (p%uw(k)+p%uwsgs(k)) * du_dz + (p%vw(k)+p%vwsgs(k)) * dv_dz
 
+            if (abs(denom)>1E-5_knd*abs(num) .and. abs(num)>epsilon(1._knd)) then
+              Rf = num / denom
+            else
+              Rf = 100000._knd * sign(1.0_knd, num) * sign(1.0_knd, denom)
+            end if
+            
+
+            Km = (hypot(p%uw(k)+p%uwsgs(k), p%vw(k)+p%vwsgs(k))) / shear
+            Kh = - (p%tempfl(k)+p%tempflsgs(k)) / dth_dz
+            
+            Prt = Km / Kh
+            
+            !allowing NaN for dth_dz<0
+            N_BV = sqrt((grav_acc/temperature_ref) * dth_dz)
+            
+            u_star = sqrt(hypot(p%uw(k)+p%uwsgs(k), p%vw(k)+p%vwsgs(k)))
+            
+            theta_star = - (p%tempfl(k)+p%tempflsgs(k)) / u_star
+            
+            !local MO
+            L_MO = u_star**2 * temperature_ref / (Karman * grav_acc * theta_star)
+            
+            L_Oz = sqrt(p%dissip(k) / N_BV**3)
+            
+            !or eta, the Kolmogorov microscale
+            L_Ko = (molecular_viscosity**3 / p%dissip(k))**(1/4._knd)
+            
+            l_mix = sqrt(Km / shear)
+                        
+            write(unit,'(*(g0,2x))') zPr(k), Ri, Rf, shear, N_BV, u_star, theta_star, &
+                                     L_MO, L_Oz, L_Ko, Prt, Km, Kh, l_mix
+          end do
+          close(unit)
+        end block
+      else
+        block
+          real(knd) :: du_dz, dv_dz
+          real(knd) :: Km
+          real(knd) :: shear, u_star
+          real(knd) :: L_Ko, l_mix
+          
+          open(unit, file = dir // "profother" // nth_char // ".txt")
+          write(unit,'(*(a,2x))') "#", "shear", "u_star", "L_Ko", "Km", "l_mix"
+          do k = 1,Prnz
+            if (kim==1 .and. k==1) then
+              du_dz = ( p%u(2) - 0 ) / (dzmin)
+              dv_dz = ( p%v(2) - 0 ) / (dzmin)
+            else if (kim==nzims .and. k==Prnz) then
+              du_dz = ( p%u(k) - p%u(k-1) ) / (dzmin)
+              dv_dz = ( p%v(k) - p%v(k-1) ) / (dzmin)
+            else
+              du_dz = ( p%u(k+1) - p%u(k-1) ) / (2*dzmin)
+              dv_dz = ( p%v(k+1) - p%v(k-1) ) / (2*dzmin)
+            end if
+            
+            shear = hypot(du_dz, dv_dz)
+            
+            Km = (hypot(p%uw(k)+p%uwsgs(k), p%vw(k)+p%vwsgs(k))) / shear
+            
+            u_star = sqrt(hypot(p%uw(k)+p%uwsgs(k), p%vw(k)+p%vwsgs(k)))
+                        
+            !or eta, the Kolmogorov microscale
+            L_Ko = (molecular_viscosity**3 / p%dissip(k))**(1/4._knd)
+            
+            l_mix = sqrt(Km / shear)
+                        
+            write(unit,'(*(g0,2x))') zPr(k), shear, u_star, L_Ko, Km, l_mix
+          end do
+          close(unit)
+        end block
       end if !enable_buoyancy == 1
 
 
