@@ -426,7 +426,7 @@ contains
           real(knd) :: L_MO, L_Oz, L_Ko, l_mix
 
           open(unit, file = dir // "profother" // nth_char // ".txt")
-          write(unit,'(*(a,2x))') "#", "Ri", "Rf", "shear", "N_BV", "u_star", "theta_star", &
+          write(unit,'(*(a,2x))') "#", "z", "Ri", "Rf", "shear", "N_BV", "u_star", "theta_star", &
                                   "L_MO", "L_Oz", "L_Ko", "Prt", "Km", "Kh", "l_mix"
           do k = 1,Prnz
             if (kim==1 .and. k==1) then
