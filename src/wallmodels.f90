@@ -1970,6 +1970,10 @@ contains
 
       if (WMPoints(i)%z0>0) then
 
+#ifdef CUSTOM_SURFACE_TEMPERATURE_FLUX
+         WMPoints(i)%temperature_flux = SurfaceTemperatureFlux(xPr(xi), yPr(yj), zPr(zk), time_stepping%time)
+#endif
+
          if (WMPoints(i)%prescribed_ustar) then
          
            continue
@@ -2459,6 +2463,23 @@ contains
      end function
    end interface
    SurfaceTemperature = CustomSurfaceTemperature(x,y,z,t)
+  end function
+#endif
+
+
+#if CUSTOM_SURFACE_TEMPERATURE_FLUX
+  real(knd) function SurfaceTemperatureFlux(x,y,z,t)
+   real(knd),intent(in):: x,y,z
+   real(TIM),intent(in):: t
+   interface
+     function CustomSurfaceTemperatureFlux(x,y,z,t) result(res)
+       use Kinds
+       real(knd) :: res
+       real(knd), intent(in) :: x, y, z
+       real(tim), intent(in) :: t
+     end function
+   end interface
+   SurfaceTemperatureFlux = CustomSurfaceTemperatureFlux(x,y,z,t)
   end function
 #endif
 
