@@ -205,7 +205,7 @@ module Subgrid
     
     
     
-    function TKEDissipation(i, j, k, U, V, W) result(res)
+    pure function TKEDissipation(i, j, k, U, V, W) result(res)
       !includes resolved and subgrid
       ! epsilon =  2*nu*Sij*Sij where Sij = (di_uj + dj_ui)/2
       real(knd) :: res
