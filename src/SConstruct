@@ -217,10 +217,6 @@ if comp=='cray':
     env.Append(F90PATH = env['ENV']['CPATH'])
   except KeyError:
     pass
-  try:
-    env.Append(LIBPATH = env['ENV']['LIBRARY_PATH'])
-  except KeyError:
-    pass
 
 
 env.Replace(LINK = env.Dump('F90'))
@@ -236,6 +232,10 @@ env.Append(CFLAGS= ' -O3 '+ openmp_flag + prof_flag + lto_flag + extra_flag + pr
 env.Append(CXXFLAGS= ' -O3 ' + openmp_flag + prof_flag + extra_flag + prec_flag + c_check_flag)
   
 env.Append(LINKFLAGS= fast_flag + openmp_flag + prof_flag + lto_flag + extra_flag) # + '-Bdynamic -lpoisfft -lfftw3 -lfftw3f -lfftw3_omp -lfftw3f_omp -Bstatic -lgfortran -lquadmath -lstdc++ -llapack -L/usr/lib/x86_64-linux-uclibc/usr/lib/ -lc -lm -lpthread'  -Wl,--verbose
+try:
+  env.Append(LIBPATH = env['ENV']['LIBRARY_PATH'])
+except KeyError:
+  pass
     
 missing_pfft = str(missing_pfft_r2r)=='yes'
 if missing_pfft:
