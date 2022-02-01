@@ -170,42 +170,36 @@ module Subgrid
 
 
 
-    pure subroutine StrainIJ(i, j, k, U, V, W, S)     !Computes components of the strain rate tensor.
-      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
+     subroutine StrainIJ(i, j, k, U, V, W, S)     !Computes components of the strain rate tensor.
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(out) :: S(1:3,1:3)
-      integer, intent(in) :: i,j,k
+      integer, intent(in) :: i, j, k
       real(knd) :: D(1:3,1:3)
-      integer ::ii,jj
+      integer :: ii, jj
 
       D = 0
 
-      if (i>-2.and.i<Prnx+3) D(1,1) = (U(i,j,k)-U(i-1,j,k))/dxPr(i)
-      if (j>-2.and.j<Prny+3) D(2,2) = (V(i,j,k)-V(i,j-1,k))/dyPr(j)
-      if (k>-2.and.j<Prnz+3) D(3,3) = (W(i,j,k)-W(i,j,k-1))/dzPr(k)
-      if (j>-1.and.i>-1.and.j<Uny+3.and.i<Unx+4)&
-         D(1,2) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k))/(2._knd*(yPr(j+1)-yPr(j-1)))
-      if (k>-1.and.i>-1.and.k<Uny+3.and.i<Unx+4)&
-         D(1,3) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
-      if (j>-1.and.i>-1.and.i<Vnx+3.and.j<Vny+4)&
-         D(2,1) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k))/(2._knd*(xPr(i+1)-xPr(i-1)))
-      if (j>-1.and.k>-1.and.k<Vnz+3.and.j<Vny+4)&
-         D(2,3) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1))/(2._knd*(zPr(k+1)-zPr(k-1)))
-      if (k>-1.and.i>-1.and.i<Wnx+3.and.k<Wnz+4)&
-         D(3,1) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1))/(2._knd*(xPr(i+1)-xPr(i-1)))
-      if (j>-1.and.k>-1.and.j<Wny+3.and.k<Wnz+4)&
-         D(3,2) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1))/(2._knd*(yPr(j+1)-yPr(j-1)))
+      D(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
+      D(2,2) = (V(i,j,k)-V(i,j-1,k)) / dymin
+      D(3,3) = (W(i,j,k)-W(i,j,k-1)) / dzPr(k)
+      D(1,2) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) / (4 * dymin)
+      D(1,3) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) / (2 * (zPr(k+1)-zPr(k-1)))
+      D(2,1) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) / (4 * dxmin)
+      D(2,3) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) / (2 * (zPr(k+1)-zPr(k-1)))
+      D(3,1) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) / (4 * dxmin)
+      D(3,2) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) / (4 * dymin)
 
       do jj = 1, 3
        do ii = 1, 3
-        S(ii,jj) = (D(ii,jj)+D(jj,ii))
+        S(ii,jj) = (D(ii,jj) + D(jj,ii)) / 2
        end do
       end do
-      S = S/2._knd
     endsubroutine StrainIJ
     
     
     
-    pure function TKEDissipation(i, j, k, U, V, W) result(res)
+    
+     function TKEDissipation(i, j, k, U, V, W) result(res)
       !includes resolved and subgrid
       ! epsilon =  2*nu*Sij*Sij where Sij = (di_uj + dj_ui)/2
       real(knd) :: res
@@ -213,7 +207,7 @@ module Subgrid
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
       real(knd) :: S(1:3,1:3)
       integer :: ii, jj
-      
+
       call StrainIJ(i, j, k, U, V, W, S)
       res = 0
       do jj = 1, 3
