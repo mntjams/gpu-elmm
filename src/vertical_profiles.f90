@@ -10,10 +10,10 @@ module VerticalProfiles
     real(knd), dimension(:), allocatable :: u, v, uu, vv, ww, &
                                             uusgs, vvsgs, wwsgs, &
                                             tkesgs, dissip, &
-                                            temp, tempfl, &
-                                            tempflsgs, tt, &
-                                            moist, moistfl, &
-                                            moistflsgs, mm, &
+                                            temp, tt, &
+                                            tempfl, tempflsgs, tempflvisc, &
+                                            moist, mm, &
+                                            moistfl, moistflsgs, moistflvisc, &
                                             uw, uwsgs, &
                                             vw, vwsgs, &
                                             uz_visc, vz_visc
@@ -207,11 +207,11 @@ contains
     
     allocate(self%tkesgs(1:Prnz), self%dissip(1:Prnz))
 
-    allocate(self%temp(0:Prnz+1), self%tempfl(0:Prnz))
-    allocate(self%tempflsgs(0:Prnz), self%tt(1:Prnz))
+    allocate(self%temp(0:Prnz+1), self%tt(1:Prnz))
+    allocate(self%tempfl(0:Prnz), self%tempflsgs(0:Prnz), self%tempflvisc(0:Prnz))
 
-    allocate(self%moist(1:Prnz), self%moistfl(0:Prnz))
-    allocate(self%moistflsgs(0:Prnz), self%mm(1:Prnz))
+    allocate(self%moist(1:Prnz), self%mm(1:Prnz))
+    allocate(self%moistfl(0:Prnz), self%moistflsgs(0:Prnz), self%moistflvisc(0:Prnz))
 
     allocate(self%scal(num_of_scalars,1:Prnz), self%scalfl(num_of_scalars,0:Prnz))
     allocate(self%scalflsgs(num_of_scalars,0:Prnz), self%ss(num_of_scalars,1:Prnz))
@@ -238,11 +238,13 @@ contains
     self%temp = 0
     self%tempfl = 0
     self%tempflsgs = 0
+    self%tempflvisc = 0
     self%tt = 0
 
     self%moist = 0
     self%moistfl = 0
     self%moistflsgs = 0
+    self%moistflvisc = 0
     self%mm = 0
 
     if (num_of_scalars>0) then
@@ -310,6 +312,7 @@ contains
 #endif      
       call ReduceProfile(p%tempfl,    n_all_Pr(0:Prnz))
       call ReduceProfile(p%tempflsgs, [n_free_PrW_surf, n_free_PrW(1:Prnz)])
+      call ReduceProfile(p%tempflvisc,n_free_PrW(0:Prnz))
       call ReduceProfile(p%tt,        n_free_Pr(1:Prnz))
     end if
     
@@ -317,6 +320,7 @@ contains
       call ReduceProfile(p%moist,      n_free_Pr(1:Prnz))
       call ReduceProfile(p%moistfl,    n_all_Pr(0:Prnz))
       call ReduceProfile(p%moistflsgs, n_free_PrW(0:Prnz))
+      call ReduceProfile(p%moistflvisc,n_free_PrW(0:Prnz))
       call ReduceProfile(p%mm,         n_free_Pr(1:Prnz))
     end if
       
@@ -400,7 +404,7 @@ contains
 
         open(unit, file = dir // "proftempfl" // nth_char // ".txt")
         do k = flux_start,Prnz
-        write(unit,*) zW(k), p%tempfl(k), p%tempflsgs(k)
+        write(unit,*) zW(k), p%tempfl(k), p%tempflsgs(k), p%tempflvisc(k)
         end do
         close(unit)
 
@@ -541,7 +545,7 @@ contains
 
          open(unit, file = dir // "profmoistfl" // nth_char // ".txt")
          do k = flux_start,Prnz
-          write(unit,*) zW(k), p%moistfl(k), p%moistflsgs(k)
+          write(unit,*) zW(k), p%moistfl(k), p%moistflsgs(k), p%moistflvisc(k)
          end do
          close(unit)
 

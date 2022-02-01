@@ -2885,7 +2885,8 @@ contains
     integer   :: i,j,k
     !current_profiles%tempfl is computed directly during advection step
 
-    !$omp parallel do private(i,j,k,S)
+    !$omp parallel 
+    !$omp do private(i,j,k,S)
     do k = 1,Prnz
       S = 0
       do j = 1,Prny
@@ -2897,33 +2898,59 @@ contains
        end do
       end do
       current_profiles%tempflsgs(k) = S
+    end do  
+
+    !$omp do private(i,j,k,S)
+    do k = 0,Prnz
+      S = 0
+      do j = 1,Prny
+       do i = 1,Prnx
+         if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
+           S = S - ( molecular_diffusivity &
+                    * (Temperature(i,j,k+1)-Temperature(i,j,k))) / dzmin
+         end if
+       end do
+      end do
+      current_profiles%tempflvisc(k) = S
     end do
-    !$omp end parallel do
-    
 
     if (kim==1) then
+      !$omp single
       S = 0
-      !$omp parallel do private(i) reduction(+:S)
+      !$omp end single
+      !$omp do private(i) reduction(+:S)
       do i = 1, size(WMPoints)
         if (WMPoints(i)%zk==1.and.Prtype(WMPoints(i)%xi,WMPoints(i)%yj,1)<=0) then
           S = S + WMPoints(i)%temperature_flux
         end if
       end do
-      !$omp end parallel do
+      
+      !$omp single
+      if (abs(S)<abs(current_profiles%tempflvisc(0))) then
+        current_profiles%tempflvisc(0) = 0
+      else
+        S = S - current_profiles%tempflvisc(0)
+      end if
       current_profiles%tempflsgs(0) = S
+      !$omp end single
     endif
+    !$omp end parallel
    
-
   end subroutine
 
   subroutine MoistureFluxSGSProfile(W,Moisture)
+    use Wallmodels
+
+    use custom_par, only: kim
+
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: W
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Moisture
     real(knd) :: S
     integer   :: i,j,k
     !current_profiles%moistfl is computed directly during advection step
 
-    !$omp parallel do private(i,j,k,S)
+    !$omp parallel 
+    !$omp do private(i,j,k,S)
     do k = 0,Prnz
       S = 0
       do j = 1,Prny
@@ -2936,7 +2963,43 @@ contains
       end do
       current_profiles%moistflsgs(k) = S
     end do
-    !$omp end parallel do
+
+    !$omp do private(i,j,k,S)
+    do k = 0,Prnz
+      S = 0
+      do j = 1,Prny
+       do i = 1,Prnx
+         if (Prtype(i,j,k+1)<=0.or.Prtype(i,j,k)<=0) then
+           S = S - ( molecular_diffusivity &
+                    * (Moisture(i,j,k+1)-Moisture(i,j,k))) / dzmin
+         end if
+       end do
+      end do
+      current_profiles%moistflvisc(k) = S
+    end do
+
+    if (kim==1) then
+      !$omp single
+      S = 0
+      !$omp end single
+      !$omp do private(i) reduction(+:S)
+      do i = 1, size(WMPoints)
+        if (WMPoints(i)%zk==1.and.Prtype(WMPoints(i)%xi,WMPoints(i)%yj,1)<=0) then
+          S = S + WMPoints(i)%moisture_flux
+        end if
+      end do
+
+      !$omp single      
+      if (abs(S)<abs(current_profiles%moistflvisc(0))) then
+        current_profiles%moistflvisc(0) = 0
+      else
+        S = S - current_profiles%moistflvisc(0)
+      end if
+      current_profiles%moistflsgs(0) = S
+      !$omp end single
+    endif
+    !$omp end parallel
+   
   end subroutine
       
   subroutine ScalarFluxSGSProfile(W,Scalar)
