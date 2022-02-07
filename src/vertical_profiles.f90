@@ -390,7 +390,7 @@ contains
 
       open(unit, file = dir // "profvw" // nth_char // ".txt")
       do k = flux_start,Prnz
-        write(unit,*) zW(k), p%vw(k), p%vwsgs(k), p%uz_visc(k)
+        write(unit,*) zW(k), p%vw(k), p%vwsgs(k), p%vz_visc(k)
       end do
       close(unit)
 
