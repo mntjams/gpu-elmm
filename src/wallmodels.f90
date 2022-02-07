@@ -1219,13 +1219,16 @@ contains
     real(knd),intent(in) :: vel,dist,z0
     real(knd),parameter  :: eps = 1e-4_knd
     real(knd),parameter  :: yplcrit = 11.225_knd
-    real(knd) :: dist_plus
 
-    dist_plus = sqrt(dist * vel / molecular_viscosity)
+    !if in the laminar region for flat boundary layer, treat as flat and laminar
+    if (molecular_viscosity>0) then
+      ustar = sqrt(molecular_viscosity * vel / dist)
+      if (dist * ustar / molecular_viscosity < yplcrit*1.1_knd) return
+    end if
+        
 
     !under z0 the whole concept of rougness parameter breaks down
-    !if in the laminar region for flat boundary layer also treat as flat and possibly laminar
-    if (dist<=z0*2_knd .or. dist_plus<yplcrit*1.1_knd) then
+    if (dist<=z0*2_knd) then
       if (molecular_viscosity > 0) then
         call WMFlatUstar(ustar,vel,dist)
       else
@@ -1575,12 +1578,20 @@ contains
     real(knd),parameter :: yplcrit = 11.225_knd
     real(knd),parameter :: k_U = 0.4_knd
     real(knd),parameter :: k_T = 0.47_knd
-    real(knd) :: zL, zL0, psi_m, psi_h
+    real(knd) :: zL, zL0, psi_m, psi_h, ustar_lam, dist_plus
     integer :: i
 
     call WMRoughUstar(ustar,vel,dist,z0)
 
-    if (dist<=z0) then
+    !if in the laminar region for flat boundary layer, treat as flat and laminar
+    if (molecular_viscosity>0) then
+      ustar_lam = sqrt(molecular_viscosity * vel / dist)
+      dist_plus = dist * ustar_lam / molecular_viscosity
+    else
+      dist_plus = huge(dist_plus)
+    end if
+    
+    if (dist<=z0 .or. dist_plus < 1.1 *  yplcrit) then
 
       temperature_flux = - molecular_diffusivity * tempdif / dist
 
