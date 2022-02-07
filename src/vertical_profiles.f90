@@ -652,6 +652,7 @@ contains
       self%temp = self%temp + current%temp * weight
       self%tempfl = self%tempfl + current%tempfl * weight
       self%tempflsgs = self%tempflsgs + current%tempflsgs * weight
+      self%tempflvisc = self%tempflvisc + current%tempflvisc * weight
       self%tt = self%tt + current%tt * weight
     end if
 
@@ -659,6 +660,7 @@ contains
       self%moist = self%moist + current%moist * weight
       self%moistfl = self%moistfl + current%moistfl * weight
       self%moistflsgs = self%moistflsgs + current%moistflsgs * weight
+      self%moistflvisc = self%moistflvisc + current%moistflvisc * weight
       self%mm = self%mm + current%mm * weight
     end if
 
