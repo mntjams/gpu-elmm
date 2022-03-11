@@ -177,7 +177,7 @@ else:
     fast_flag += ' -fsanitize=address -fsanitize=undefined -fsanitize=address -fsanitize=unreachable -fsanitize=null -fsanitize=signed-integer-overflow'
     
   if str(lto)=='yes':
-    lto_flag = ' -flto='+ncpus
+    lto_flag = ' -flto='+str(ncpus)
   else:
     lto_flag = ''
   
