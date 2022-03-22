@@ -397,14 +397,12 @@ contains
     p = p - g%compat                  !To ensure the g%compatibility condition.
     
     if (g%direction==2) then
-      p = p / (Vnx * Vnz)
+      p = p / (gVnx * gVnz)      
+      call add(Vin, p)
     else
-      p = p / (Uny * Unz)
+      p = p / (gUny * gUnz)
+      call add(Uin, p)
     end if
-
-    call add(Uin, p)
-    call add(Vin, p)
-    call add(Win, p)
 
 
     call g%bound_Uin(1, Uin)
