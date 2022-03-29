@@ -169,14 +169,36 @@ contains
 
 
 
-  elemental subroutine ComputeAreaFactor(p)
+  impure elemental subroutine ComputeAreaFactor(p)
     type(WMpoint),intent(inout):: p
-    real(knd) :: out_norm(3)
+    real(knd) :: out_norm(3), d, l, o, S, V
+    
     !FIXME: Not accurate!!!
+    p%area_factor = 0
     if (all([-p%distx, -p%disty, -p%distz]==0)) return !HACK!!!
+    
+    V = dxmin*dymin*dzmin
+    
     out_norm = [-p%distx, -p%disty, -p%distz] / &
-                     hypot(hypot(p%distx,p%disty),p%distz)
-    p%area_factor = 1._knd/dot_product([dxmin,dymin,dzmin],abs(out_norm))
+                     norm2([p%distx,p%disty,p%distz])
+    out_norm = abs(out_norm)
+
+    !FIXME
+    if (abs(out_norm(1))>abs(out_norm(2)).and.abs(out_norm(1))>abs(out_norm(3))) then
+      o = out_norm(1)
+      d = sqrt(dymin*dzmin)
+    else if (abs(out_norm(2))>abs(out_norm(1)).and.abs(out_norm(2))>abs(out_norm(3))) then
+      o = out_norm(2)
+      d = sqrt(dxmin*dzmin)
+    else
+      o = out_norm(3)
+      d = sqrt(dxmin*dymin)
+    end if
+    
+    l = d / o
+    S = d*l
+    
+    p%area_factor = S / V
   end subroutine  
 
 
