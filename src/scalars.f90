@@ -136,9 +136,76 @@ contains
                  ScalarTypeTemperature, TempBtype, &
                  BoundTemperature, TemperatureExtra, &
                  temperature_flux_profile)
-      
-      where (Prtype(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)>0) Temperature = temperature_ref
-      
+      block
+        !TODO:move into a procedure reduce the number of involved points. 
+        !FIXME Ultimately, fix the spurious fluxes so that this is not needed.
+        integer :: i, j, k, ii, jj, kk, n
+        real(knd) :: t
+        do k = -1, Prnz+2
+          do j = -1, Prny+2
+            do i = -1, Prnx+2
+              if (Prtype(i,j,k)>0) then
+                t = 0
+                n = 0
+                if (Prtype(i-1,j,k)<=0) then
+                  t = t + Temperature(i-1,j,k) 
+                  n = n+1
+                end if
+                if (Prtype(i+1,j,k)<=0) then
+                  t = t + Temperature(i+1,j,k) 
+                  n = n+1
+                end if
+                if (Prtype(i,j-1,k)<=0) then
+                  t = t + Temperature(i,j-1,k) 
+                  n = n+1
+                end if
+                if (Prtype(i,j+1,k)<=0) then
+                  t = t + Temperature(i,j+1,k) 
+                  n = n+1
+                end if
+                if (Prtype(i,j,k-1)<=0) then
+                  t = t + Temperature(i,j,k-1) 
+                  n = n+1
+                end if
+                if (Prtype(i,j,k+1)<=0) then
+                  t = t + Temperature(i,j,k+1) 
+                  n = n+1
+                end if
+                if (n>0) then
+                  Temperature(i,j,k) = t / n
+                else
+                  t = 0
+                  n = 0
+                  if (i>-1) then
+                    t = t + Temperature(i-1,j,k) 
+                    n = n+1
+                  end if
+                  if (i<Prnx+2) then
+                    t = t + Temperature(i+1,j,k) 
+                    n = n+1
+                  end if
+                  if (j>-1) then
+                    t = t + Temperature(i,j-1,k) 
+                    n = n+1
+                  end if
+                  if (j<Prny+2) then
+                    t = t + Temperature(i,j+1,k) 
+                    n = n+1
+                  end if
+                  if (k>-1) then
+                    t = t + Temperature(i,j,k-1) 
+                    n = n+1
+                  end if
+                  if (k<Prnz+2) then
+                    t = t + Temperature(i,j,k+1) 
+                    n = n+1
+                  end if
+                end if
+              end if
+            end do
+          end do
+        end do
+      end block
     end if
 
     if (enable_moisture) then
