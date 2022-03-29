@@ -147,29 +147,29 @@ contains
               if (Prtype(i,j,k)>0) then
                 t = 0
                 n = 0
-                if (Prtype(i-1,j,k)<=0) then
+                if (i>-1 .and. Prtype(i-1,j,k)<=0) then
                   t = t + Temperature(i-1,j,k) 
-                  n = n+1
+                  n = n + 1
                 end if
-                if (Prtype(i+1,j,k)<=0) then
+                if (i<Prnx+2 .and. Prtype(i+1,j,k)<=0) then
                   t = t + Temperature(i+1,j,k) 
-                  n = n+1
+                  n = n + 1
                 end if
-                if (Prtype(i,j-1,k)<=0) then
+                if (j>-1 .and. Prtype(i,j-1,k)<=0) then
                   t = t + Temperature(i,j-1,k) 
-                  n = n+1
+                  n = n + 1
                 end if
-                if (Prtype(i,j+1,k)<=0) then
+                if (j<Prny+2 .and. Prtype(i,j+1,k)<=0) then
                   t = t + Temperature(i,j+1,k) 
-                  n = n+1
+                  n = n + 1
                 end if
-                if (Prtype(i,j,k-1)<=0) then
+                if (k>-1 .and. Prtype(i,j,k-1)<=0) then
                   t = t + Temperature(i,j,k-1) 
-                  n = n+1
+                  n = n + 1
                 end if
-                if (Prtype(i,j,k+1)<=0) then
+                if (k<Prnz+2 .and. Prtype(i,j,k+1)<=0) then
                   t = t + Temperature(i,j,k+1) 
-                  n = n+1
+                  n = n + 1
                 end if
                 if (n>0) then
                   Temperature(i,j,k) = t / n
@@ -178,27 +178,27 @@ contains
                   n = 0
                   if (i>-1) then
                     t = t + Temperature(i-1,j,k) 
-                    n = n+1
+                    n = n + 1
                   end if
                   if (i<Prnx+2) then
                     t = t + Temperature(i+1,j,k) 
-                    n = n+1
+                    n = n + 1
                   end if
                   if (j>-1) then
                     t = t + Temperature(i,j-1,k) 
-                    n = n+1
+                    n = n + 1
                   end if
                   if (j<Prny+2) then
                     t = t + Temperature(i,j+1,k) 
-                    n = n+1
+                    n = n + 1
                   end if
                   if (k>-1) then
                     t = t + Temperature(i,j,k-1) 
-                    n = n+1
+                    n = n + 1
                   end if
                   if (k<Prnz+2) then
                     t = t + Temperature(i,j,k+1) 
-                    n = n+1
+                    n = n + 1
                   end if
                 end if
               end if
