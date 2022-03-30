@@ -929,13 +929,28 @@ contains
       !$omp do collapse(3) schedule(dynamic, 100)
       do k = 1, Prnz
         do j = 1, Prny
-          do i = 1, Prnx
+          do i = 0, Prnx
             if (Prtype(i,j,k)>0.or.Prtype(i+1,j,k)>0) Scflx_mask(i,j,k) = .false.
+          end do
+        end do
+      end do
+      !$omp do collapse(3) schedule(dynamic, 100)
+      do k = 1, Prnz
+        do j = 0, Prny
+          do i = 1, Prnx
             if (Prtype(i,j,k)>0.or.Prtype(i,j+1,k)>0) Scfly_mask(i,j,k) = .false.
+          end do
+        end do
+      end do
+      !$omp do collapse(3) schedule(dynamic, 100)
+      do k = 0, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
             if (Prtype(i,j,k)>0.or.Prtype(i,j,k+1)>0) Scflz_mask(i,j,k) = .false.
           end do
         end do
       end do
+
 
       !$omp single
       nx = 0
@@ -946,9 +961,23 @@ contains
       !$omp do reduction(+:nx,ny,nz) collapse(3) schedule(dynamic, 100)
       do k = 1, Prnz
         do j = 1, Prny
-          do i = 1, Prnx
+          do i = 0, Prnx
             if (Prtype(i,j,k)>0.neqv.Prtype(i+1,j,k)>0) nx = nx + 1
+         end do
+        end do
+      end do
+      !$omp do reduction(+:nx,ny,nz) collapse(3) schedule(dynamic, 100)
+      do k = 1, Prnz
+        do j = 0, Prny
+          do i = 1, Prnx
             if (Prtype(i,j,k)>0.neqv.Prtype(i,j+1,k)>0) ny = ny + 1
+          end do
+        end do
+      end do
+      !$omp do reduction(+:nx,ny,nz) collapse(3) schedule(dynamic, 100)
+      do k = 0, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
             if (Prtype(i,j,k)>0.neqv.Prtype(i,j,k+1)>0) nz = nz + 1
           end do
         end do
@@ -965,15 +994,27 @@ contains
       
       do k = 1, Prnz
         do j = 1, Prny
-          do i = 1, Prnx
+          do i = 0, Prnx
             if (Prtype(i,j,k)>0.neqv.Prtype(i+1,j,k)>0) then
               nx = nx + 1
               Scflx_points(nx) = point(i,j,k)
             end if
+          end do
+        end do
+      end do
+      do k = 1, Prnz
+        do j = 0, Prny
+          do i = 1, Prnx
             if (Prtype(i,j,k)>0.neqv.Prtype(i,j+1,k)>0) then
               ny = ny + 1
               Scfly_points(ny) = point(i,j,k)
             end if
+          end do
+        end do
+      end do
+      do k = 0, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
             if (Prtype(i,j,k)>0.neqv.Prtype(i,j,k+1)>0) then
               nz = nz + 1
               Scflz_points(nz) = point(i,j,k)
@@ -1088,9 +1129,8 @@ contains
       if (Prtype(xi-1,yj,zk)<=0) div = div - U(xi-1,yj,zk) / dxmin
       if (Prtype(xi,yj+1,zk)<=0) div = div + V(xi,yj,zk) / dymin
       if (Prtype(xi,yj-1,zk)<=0) div = div - V(xi,yj-1,zk) / dymin
-      if (Prtype(xi,yj,zk+1)<=0) div = div + W(xi,yj,zk) / dzmin
-      if (Prtype(xi,yj,zk-1)<=0) div = div - W(xi,yj,zk-1) / dzmin
-
+      if (Prtype(xi,yj,zk+1)<=0) div = div + W(xi,yj,zk) / dzPr(zk)
+      if (Prtype(xi,yj,zk-1)<=0) div = div - W(xi,yj,zk-1) / dzPr(zk)
       WMPoints(i)%div = div
     end do
     !$omp end parallel do
