@@ -27,7 +27,7 @@ fi
 for i in "${arr[@]}"
 do
   if find im-1-1-*/ -wholename "im-1-1-*/$1/$i" | grep "/" > /dev/null; then
-    find im-1-1-*/ -wholename "im-1-1-*/$1/$i" | xargs cat | sort -n > "./$1/$i"
+    find im-1-1-*/ -wholename "im-1-1-*/$1/$i" | xargs cat | sort -g > "./$1/$i"
   fi
 done
  
