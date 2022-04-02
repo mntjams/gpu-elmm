@@ -256,7 +256,7 @@ module Parameters
                         ParabolicInletType = 3, TurbulentInletType = 4, FromFileInletType = 5, &
                         GeostrophicInletType = 6
   !inlet profile types
-  integer, parameter :: PROFILE_CONSTANT = 1, PROFILE_LOGARITHMIC = 2, PROFILE_POWER_LAW = 3 
+  integer, parameter :: PROFILE_CONSTANT = 1, PROFILE_LOGARITHMIC = 2, PROFILE_POWER_LAW = 3, PROFILE_FROM_FILE = 4
   integer, parameter :: GRID_UNIFORM = 0, GRID_VARIABLE_Z = 1, GRID_GENERAL = 2
 
   !scalar source types

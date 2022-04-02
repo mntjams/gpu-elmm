@@ -51,6 +51,8 @@ module TurbInlet
     procedure, private :: init_turbulence_profiles => turbulence_generator_init_turbulence_profiles
     procedure, private :: init_mean_profiles => turbulence_generator_init_mean_profiles
     procedure, private :: bound_Uin => bound_Uin
+    procedure, private :: get_mean_profile_from_file => turbulence_generator_get_mean_profile_from_file
+    procedure, private :: get_turbulence_profile_from_file => turbulence_generator_get_turbulence_profile_from_file
   end type
 
   
@@ -83,6 +85,8 @@ contains
     integer :: jlo, jup, klo, kup, ny
     real(knd) :: bysum, bzsum
     integer :: tid
+    
+    ! The synthetic turbulence generation method by Xie and Castro, 2008, https://dx.doi.org/10.1007/s10494-008-9151-5
 
 #ifdef PAR
     if (g%direction==2) then
@@ -350,12 +354,12 @@ contains
 
         Uin(j,k) = g%Uinavg(j,k) + g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
 
-        Vin(j,k) = g%Vinavg(j,k) + g%transform_tensor(2,j,k) * Ui&
-                              +g%transform_tensor(3,j,k) * Vi
+        Vin(j,k) = g%Vinavg(j,k) + g%transform_tensor(2,j,k) * Ui &
+                                 + g%transform_tensor(3,j,k) * Vi
 
-        Win(j,k) = g%Winavg(j,k) + g%transform_tensor(4,j,k) * Ui&
-                              +g%transform_tensor(5,j,k) * Vi&
-                              +g%transform_tensor(6,j,k) * Wi
+        Win(j,k) = g%Winavg(j,k) + g%transform_tensor(4,j,k) * Ui &
+                                 + g%transform_tensor(5,j,k) * Vi &
+                                 + g%transform_tensor(6,j,k) * Wi
        end do
       end do
       !$omp end parallel do
@@ -517,7 +521,11 @@ contains
       allocate(g%transform_tensor(1:6,1:Prny,1:Prnz))
     end if
     
-    !constant stress assumption
+    if (profiletype==PROFILE_FROM_FILE) then
+      call g%get_turbulence_profile_from_file("inlet_stress_profile.txt")
+      return
+    end if
+    
     if ((profiletype==PROFILE_LOGARITHMIC .and. g%Ustar_surf_inlet<=0) .or. &
         (profiletype==PROFILE_POWER_LAW .and. g%Ustar_surf_inlet<=0)) then
       g%Ustar_surf_inlet = abs(Karman * g%U_ref_inlet / log(g%z0_inlet / g%z_ref_inlet))
@@ -544,10 +552,15 @@ contains
   end subroutine
 
   subroutine turbulence_generator_init_mean_profiles(g)
+    use ieee_exceptions
     class(turbulence_generator), intent(inout) :: g
     real(knd) :: Ustar_prof, utmp
     integer :: k, maxj, maxk
     logical :: fix_direction
+    
+    CALL IEEE_SET_HALTING_MODE(IEEE_DIVIDE_BY_ZERO, .TRUE.)
+    CALL IEEE_SET_HALTING_MODE(IEEE_OVERFLOW, .TRUE.)
+    CALL IEEE_SET_HALTING_MODE(IEEE_INVALID, .TRUE.)
     
     if (g%direction==2) then
       allocate(g%Uinavg(-2:Unx+3,-2:Unz+3), g%Vinavg(-2:Vnx+3,-2:Vnz+3), g%Winavg(-2:Wnx+3,-2:Wnz+3))
@@ -608,6 +621,12 @@ contains
       end do
 
       fix_direction = .false.
+      
+    else if (profiletype==PROFILE_FROM_FILE) then
+    
+      call g%get_mean_profile_from_file("inlet_mean_profile.txt")
+      
+      fix_direction = .false.
 
     else
 
@@ -640,7 +659,283 @@ contains
     end if
 
   end subroutine turbulence_generator_init_mean_profiles
+  
+  
+  subroutine turbulence_generator_get_mean_profile_from_file(g, fname)
+    use ieee_exceptions
+    use Interpolation
+    class(turbulence_generator), intent(inout) :: g
+    character(*), intent(in) :: fname
+    character(1024) :: line
+    integer :: nh, n, i, j, k
+    integer :: io, io1, io2, unit
+    integer :: components
+    real(knd) :: r4(4)
+    real(knd), allocatable :: z(:), up(:), vp(:), wp(:), cu(:,:), cv(:,:), cw(:,:)
+    
+    
+    CALL IEEE_SET_HALTING_MODE(IEEE_DIVIDE_BY_ZERO, .TRUE.)
+    CALL IEEE_SET_HALTING_MODE(IEEE_OVERFLOW, .TRUE.)
+    CALL IEEE_SET_HALTING_MODE(IEEE_INVALID, .TRUE.)
+    
+    open(newunit=unit,file=fname,status="old",action="read",iostat = io)
+    if (io/=0) then
+      call error_stop("Cannot open profile of the mean inlet profile in: "//fname)
+    end if
 
+    n = 0
+    nh = 0
+    components = 0
+    do
+      read(unit,'(a)',iostat=io) line
+      if (io/=0) exit
+      
+      if (scan(line(1:1),"#!")>0.and.n==0) then
+        nh = nh + 1
+        cycle
+      end if
+      if (components==1) then
+        read(line,*,iostat=io) r4(1:2)
+        if (io/=0) exit
+      else if (components==2) then
+        read(line,*,iostat=io) r4(1:3)
+        if (io/=0) exit
+      else if (components==3) then
+        read(line,*,iostat=io) r4
+        if (io/=0) exit
+      else if (components == 0) then
+        read(line,*,iostat=io) r4
+        read(line,*,iostat=io2) r4(1:3)
+        read(line,*,iostat=io1) r4(1:2)
+        if (io==3) then
+          components = 3
+        else if (io2==0) then
+          components = 2
+        else if (io1==0) then
+          components = 1
+        else
+          exit
+        end if
+      end if
+
+      n = n + 1
+    end do
+    
+    rewind(unit)
+    
+    if (n>0) then
+      allocate(z(n), up(n), vp(n), wp(n))
+      allocate(cu(0:4,n), cv(0:4,n), cw(0:4,n))
+      do i = 1, nh
+        read(unit,'(a)')
+      end do
+      do i = 1, n
+        read(unit,'(a)') line
+        if (components==3) then
+          read(line, *) z(i), up(i), vp(i), wp(i)
+        else if (components==2) then
+          read(line, *) z(i), up(i), vp(i)
+          wp(i) = 0        
+        else if (components==1) then
+          read(line, *) z(i), up(i)
+          vp(i) =0; wp(i) = 0        
+        end if
+      end do
+    else
+      write(*,*) "Error, mean inlet profile file '",trim(fname),"'empty."
+      call error_stop
+    end if
+
+    if (n > 1) then
+      call linear_interpolation(z, up, cu)
+      call linear_interpolation(z, vp, cv)
+      call linear_interpolation(z, wp, cw)
+
+      j = 1
+      do k = 1, Prnz
+        g%Uinavg(:,k) = linear_interpolation_eval(zPr(k), z, cu, j)
+        g%Vinavg(:,k) = linear_interpolation_eval(zPr(k), z, cv, j)
+        g%Winavg(:,k) = linear_interpolation_eval(zW(k),  z, cw, j)        
+      end do
+
+    else
+      g%Uinavg = up(1)
+      g%Vinavg = vp(1)
+      g%Winavg = wp(1)
+    end if
+
+  end subroutine turbulence_generator_get_mean_profile_from_file
+  
+
+  subroutine turbulence_generator_get_turbulence_profile_from_file(g, fname)
+    use Interpolation
+    use Strings
+    class(turbulence_generator), intent(inout) :: g
+    character(*), intent(in) :: fname
+    character(1024) :: line
+    integer :: nh, n, i, j, k, comp
+    integer :: io, io4, unit
+    integer :: components
+    real(knd) :: r7(7)
+    real(knd), allocatable :: z(:), stress(:,:), c_stress(:,:,:)
+    real(knd) :: uu, vv, ww, uv, uw, vw, tmp
+    
+    open(newunit=unit,file=fname,status="old",action="read",iostat = io)
+    if (io/=0) then
+      call error_stop("Cannot open profile of the mean inlet profile in: "//fname)
+    end if
+
+    n = 0
+    nh = 0
+    components = 0
+    do
+      read(unit,'(a)',iostat=io) line
+      if (io/=0) exit
+      
+      if (scan(line(1:1),"#!")>0.and.n==0) then
+        nh = nh + 1
+        cycle
+      end if
+      if (components==4) then
+        read(line,*,iostat=io) r7(1:5)
+        if (io/=0) exit
+      else if (components==6) then
+        read(line,*,iostat=io) r7
+        if (io/=0) exit
+      else if (components == 0) then
+        read(line,*,iostat=io) r7
+        read(line,*,iostat=io4) r7(1:5)
+        if (io==0) then
+          components = 6
+        else if (io4==0) then
+          components = 4
+        else
+          exit
+        end if
+      end if
+
+      n = n + 1
+    end do
+    
+    rewind(unit)
+    
+    if (n>0) then
+      allocate(z(n), stress(n,6))  !order uu, vv, ww, uv, uw, vw
+      allocate(c_stress(0:4,n,6))
+      do i = 1, nh
+        read(unit,'(a)')
+      end do
+      do i = 1, n
+        read(unit,'(a)') line
+        if (components==4) then
+          read(line, *) z(i), stress(i,[1,2,3,5])
+          stress(i,4) = 0
+          stress(i,6) = 0
+        else
+          read(line, *) z(i), stress(i,:)
+        end if
+      end do
+    else
+      write(*,*) "Error, mean inlet profile file '",trim(fname),"'empty."
+      call error_stop
+    end if
+
+    if (n > 1) then
+      do comp = 1, 6
+        call linear_interpolation(z, stress(:,comp), c_stress(:,:,comp))
+      end do
+
+      j = 1
+      do k = 1, Prnz
+        !a small inconsistency in z due to the staggered grid
+        uu = linear_interpolation_eval(zPr(k), z, c_stress(:,:,1), j)
+        vv = linear_interpolation_eval(zPr(k), z, c_stress(:,:,2), j)
+        ww = linear_interpolation_eval(zW(k),  z, c_stress(:,:,3), j)
+        uv = linear_interpolation_eval(zPr(k), z, c_stress(:,:,4), j)
+        uw = linear_interpolation_eval(zPr(k), z, c_stress(:,:,5), j)
+        vw = linear_interpolation_eval(zPr(k), z, c_stress(:,:,6), j)
+
+        ! different numbering! See Xie and Castro, 2008
+        ! tt1 = a11,tt2 = a21,tt3 = a22, tt4 = a31, tt5 = a32, tt6 = a33
+        if (uu <= 0) then
+          write(*,*) "interpolated stresses at z =",zPr(k)
+          write(*,*) "uu,vv,ww,uv,uw,vw:",uu, vv, ww, uv, uw, vw
+          call error_stop("Error in the interpolated inlet stress profile.&
+                         & Stress component uu not positive at&
+                         & k = " // itoa(k))
+        end if
+        if (vv <= 0) then
+          write(*,*) "interpolated stresses at z =",zPr(k)
+          write(*,*) "uu,vv,ww,uv,uw,vw:",uu, vv, ww, uv, uw, vw
+          call error_stop("Error in the interpolated inlet stress profile.&
+                         & Stress component vv not positive at&
+                         & k = " // itoa(k))
+        end if
+        if (ww <= 0) then
+          write(*,*) "interpolated stresses at z =",zPr(k)
+          write(*,*) "uu,vv,ww,uv,uw,vw:",uu, vv, ww, uv, uw, vw
+          call error_stop("Error in the interpolated inlet stress profile.&
+                         & Stress component ww not positive at&
+                         & k = " // itoa(k))
+        end if
+        g%transform_tensor(1,1,k) = sqrt(uu)
+        g%transform_tensor(2,1,k) = uv / g%transform_tensor(1,1,k)
+        
+        tmp = vv - g%transform_tensor(2,1,k)**2
+        if (tmp <= 0) then
+          write(*,*) "interpolated stresses at z =",zPr(k)
+          write(*,*) "uu,vv,ww,uv,uw,vw:",uu, vv, ww, uv, uw, vw
+          call error_stop("Error in the interpolated inlet stress profile.&
+                         & Argument of sqrt() for tensor component 3 (vv) not positive at&
+                         & k = " // itoa(k))
+        end if
+        g%transform_tensor(3,1,k) = sqrt(tmp)
+
+        g%transform_tensor(4,1,k) = uw / g%transform_tensor(1,1,k)
+        
+        g%transform_tensor(5,1,k) = (vw - &
+                                     g%transform_tensor(2,1,k) * g%transform_tensor(4,1,k)) / &
+                                    g%transform_tensor(3,1,k)
+
+        tmp = ww - g%transform_tensor(4,1,k)**2 - g%transform_tensor(5,1,k)**2
+        if  (tmp < 0) then
+          write(*,*) "interpolated stresses at z =",zPr(k)
+          write(*,*) "uu,vv,ww,uv,uw,vw:",uu, vv, ww, uv, uw, vw
+          call error_stop("Error in the interpolated inlet stress profile.&
+                         & Argument of sqrt() for tensor component 6 (ww) negative at&
+                         & k = " // itoa(k))
+        end if
+        g%transform_tensor(6,1,k) = sqrt(tmp)
+        
+        do comp = 1, 6
+          g%transform_tensor(comp,:,k) = g%transform_tensor(comp,1,k)
+        end do
+      end do
+
+
+    else
+      uu = stress(1,1)
+      vv = stress(1,2)
+      ww = stress(1,3)
+      uv = stress(1,4)
+      uw = stress(1,5)
+      vw = stress(1,6)
+      
+      g%transform_tensor(1,:,:) = sqrt(uu)
+      g%transform_tensor(2,:,:) = uv / g%transform_tensor(1,:,:)
+      g%transform_tensor(3,:,:) = sqrt(vv - g%transform_tensor(2,:,:)**2)
+      g%transform_tensor(4,:,:) = uw / g%transform_tensor(1,:,:)
+      g%transform_tensor(5,:,:) = (vw - &
+                                      g%transform_tensor(2,:,:) * &
+                                      g%transform_tensor(4,:,:)) &
+                                  / g%transform_tensor(3,:,:)
+      g%transform_tensor(6,:,:) = sqrt(ww - &
+                                        g%transform_tensor(4,:,:)**2 - &
+                                        g%transform_tensor(5,:,:)**2)
+    end if
+
+  end subroutine turbulence_generator_get_turbulence_profile_from_file
+  
 
   subroutine nesting_init_turbulence_profiles(g)
     class(turbulence_generator_nesting), intent(inout) :: g
