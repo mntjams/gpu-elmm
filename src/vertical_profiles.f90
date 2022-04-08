@@ -504,7 +504,7 @@ contains
           real(knd) :: L_Ko, l_mix
           
           open(unit, file = dir // "profother" // nth_char // ".txt")
-          write(unit,'(*(a,2x))') "#", "shear", "u_star", "L_Ko", "Km", "l_mix"
+          write(unit,'(*(a,2x))') "#", "z", "shear", "u_star", "L_Ko", "Km", "l_mix"
           do k = 1,Prnz
             if (kim==1 .and. k==1) then
               du_dz = ( p%u(2) - 0 ) / (dzmin)
