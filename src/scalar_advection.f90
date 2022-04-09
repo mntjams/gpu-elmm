@@ -6,6 +6,10 @@ module ScalarAdvection
   
   implicit none
   
+  private
+  
+  public AdvScalar, AddScalarAdvVector, ScalarAdvection_Deallocate
+  
   real(knd), allocatable :: Slope(:,:,:)
 
   
@@ -14,12 +18,12 @@ contains
 
 
   subroutine AdvScalar(Scal2, Scal, U, V, W, dt, temperature_flux_profile)
-  real(knd), contiguous, intent(out) :: Scal2(-1:,-1:,-1:)
-  real(knd), contiguous, intent(in)  :: Scal(-1:,-1:,-1:)
-  real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
-  real(knd),             intent(in)  :: dt
-  real(knd), contiguous, intent(out), optional :: temperature_flux_profile(0:)
-  real(knd), allocatable, save :: temperature_flux_profileLoc(:)
+    real(knd), contiguous, intent(out) :: Scal2(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in)  :: Scal(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    real(knd),             intent(in)  :: dt
+    real(knd), contiguous, intent(out), optional :: temperature_flux_profile(0:)
+    real(knd), allocatable, save :: temperature_flux_profileLoc(:)
 
     if (.not.allocated(temperature_flux_profileLoc)) then
       allocate(temperature_flux_profileLoc(0:Prnz))
@@ -618,7 +622,9 @@ contains
 
 
 
-
+  subroutine ScalarAdvection_Deallocate
+    if (allocated(Slope)) deallocate(Slope)
+  end subroutine ScalarAdvection_Deallocate
 
 
 

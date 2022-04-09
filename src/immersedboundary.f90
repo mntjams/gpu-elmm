@@ -525,7 +525,8 @@ module ImmersedBoundary
 
   public TIBPoint, TIBPoint_Interpolate, TIBPoint_Viscosity, &
          UIBPoints, VIBPoints, WIBPoints, ScalFlIBPoints, &
-         GetSolidBodiesBC, InitIBPFluxes!, SetIBPFluxes
+         GetSolidBodiesBC, InitIBPFluxes, &
+         Scalar_ImmersedBoundaries
          !InitSolidBodies imported from SolidBodies
 
 
@@ -580,6 +581,17 @@ module ImmersedBoundary
    
 contains
 
+  subroutine  Scalar_ImmersedBoundaries(Scal)
+    real(knd), contiguous :: Scal(-1:,-1:,-1:)
+    integer :: i
+
+    !$omp parallel do
+    do i = 1, size(ScalFlIBPoints)
+      Scal(ScalFlIBPoints(i)%xi, ScalFlIBPoints(i)%yj, ScalFlIBPoints(i)%zk) = &
+        TIBPoint_Interpolate(ScalFlIBPoints(i), Scal, -1)
+    end do
+    !$omp end parallel do
+  end subroutine
 
   subroutine VelIBPtoIBP(IBP,VelIBP)
     type(TIBPoint),intent(out)    :: IBP
