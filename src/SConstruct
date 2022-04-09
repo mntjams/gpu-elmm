@@ -415,6 +415,7 @@ objs += env.Object(target = target_dir + 'immersedboundary',   source = 'immerse
 objs += env.Object(target = target_dir + 'turbinlet',          source = 'turbinlet.f90')
 objs += env.Object(target = target_dir + 'boundaries',         source = 'boundaries.f90')
 objs += env.Object(target = target_dir + 'scalarboundaries',   source = 'scalarboundaries.f90')
+objs += env.Object(target = target_dir + 'scalar_advection',   source = 'scalar_advection.f90')
 objs += env.Object(target = target_dir + 'scalars',            source = 'scalars.f90')
 objs += env.Object(target = target_dir + 'filters',            source = 'filters.f90')
 objs += env.Object(target = target_dir + 'subgrid_mixedtimescale', source = 'subgrid_mixedtimescale.f90')
