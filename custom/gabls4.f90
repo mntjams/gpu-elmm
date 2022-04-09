@@ -672,7 +672,7 @@ subroutine CustomConfiguration_last
 
   close(u)
   
-  call move_alloc(theta, TemperatureProfile%points)
+  call move_alloc(theta, TemperatureProfileObj%points)
   
 !   call AddDomain(TFrameDomain('3d', &
 !                3, 1, 0.0_knd, &
