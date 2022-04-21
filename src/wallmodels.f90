@@ -1117,24 +1117,53 @@ contains
     real(knd), contiguous, intent(in)    :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     integer :: i, xi, yj, zk
     real(knd) :: div
+    real(knd), parameter :: D0 = 13._knd/12, D1 = -1._knd/24
 
-    !$omp parallel do private(i, xi, yj, zk, div)
-    do i=1,size(WMPoints)
-      xi = WMPoints(i)%xi
-      yj = WMPoints(i)%yj
-      zk = WMPoints(i)%zk
+    
+    if (discretization_order==4) then
+      ! in 4th order advective velocities by deconvolution    
+      ! c.f. Hokpunna, Manhart, 2010, eq. 11, https://dx.doi.org/10.1016/j.jcp.2010.05.042
+      
+      !$omp parallel do private(i, xi, yj, zk, div)
+      do i=1,size(WMPoints)
+        xi = WMPoints(i)%xi
+        yj = WMPoints(i)%yj
+        zk = WMPoints(i)%zk
 
-      div = 0
-      if (Prtype(xi+1,yj,zk)<=0) div = div + U(xi,yj,zk) / dxmin
-      if (Prtype(xi-1,yj,zk)<=0) div = div - U(xi-1,yj,zk) / dxmin
-      if (Prtype(xi,yj+1,zk)<=0) div = div + V(xi,yj,zk) / dymin
-      if (Prtype(xi,yj-1,zk)<=0) div = div - V(xi,yj-1,zk) / dymin
-      if (Prtype(xi,yj,zk+1)<=0) div = div + W(xi,yj,zk) / dzPr(zk)
-      if (Prtype(xi,yj,zk-1)<=0) div = div - W(xi,yj,zk-1) / dzPr(zk)
-      WMPoints(i)%div = div
-    end do
-    !$omp end parallel do
+        div = 0
+        if (Prtype(xi+1,yj,zk)<=0) &
+          div = div + (D1*U(xi+1,yj,zk) + D0*U(xi,yj,zk)   + D1*U(xi-1,yj,zk)) / dxmin
+        if (Prtype(xi-1,yj,zk)<=0) &
+          div = div - (D1*U(xi,yj,zk)   + D0*U(xi-1,yj,zk) + D1*U(xi-2,yj,zk)) / dxmin
+        if (Prtype(xi,yj+1,zk)<=0) &
+          div = div + (D1*V(xi,yj+1,zk) + D0*V(xi,yj,zk)   + D1*V(xi,yj-1,zk)) / dymin
+        if (Prtype(xi,yj-1,zk)<=0) &
+          div = div - (D1*V(xi,yj,zk)   + D0*V(xi,yj-1,zk) + D1*V(xi,yj-2,zk)) / dymin
+        if (Prtype(xi,yj,zk+1)<=0) &
+          div = div + (D1*W(xi,yj,zk+1) + D0*W(xi,yj,zk)   + D1*W(xi,yj,zk-1)) / dzmin
+        if (Prtype(xi,yj,zk-1)<=0) &
+          div = div - (D1*W(xi,yj,zk)   + D0*W(xi,yj,zk-1) + D1*W(xi,yj,zk-2)) / dzmin
+        WMPoints(i)%div = div
+      end do
+      !$omp end parallel do
+    else
+      !$omp parallel do private(i, xi, yj, zk, div)
+      do i=1,size(WMPoints)
+        xi = WMPoints(i)%xi
+        yj = WMPoints(i)%yj
+        zk = WMPoints(i)%zk
 
+        div = 0
+        if (Prtype(xi+1,yj,zk)<=0) div = div + U(xi,yj,zk) / dxmin
+        if (Prtype(xi-1,yj,zk)<=0) div = div - U(xi-1,yj,zk) / dxmin
+        if (Prtype(xi,yj+1,zk)<=0) div = div + V(xi,yj,zk) / dymin
+        if (Prtype(xi,yj-1,zk)<=0) div = div - V(xi,yj-1,zk) / dymin
+        if (Prtype(xi,yj,zk+1)<=0) div = div + W(xi,yj,zk) / dzPr(zk)
+        if (Prtype(xi,yj,zk-1)<=0) div = div - W(xi,yj,zk-1) / dzPr(zk)
+        WMPoints(i)%div = div
+      end do
+      !$omp end parallel do
+    end if
   end subroutine
 
 
