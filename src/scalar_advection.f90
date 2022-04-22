@@ -31,6 +31,10 @@ contains
 
     
     if (discretization_order==4) then
+      call KappaScalar_4ord(Scal2, Scal, &
+                            U, V, W, &
+                            temperature_flux_profileLoc)
+    else
 #ifdef MODIFIED_KAPPA
       call KappaScalar_mod_delta(Scal2, Scal, &
                                   U, V, W, &
@@ -41,10 +45,6 @@ contains
                         U, V, W, &
                         temperature_flux_profileLoc)
 #endif
-    else
-      call KappaScalar_4ord(Scal2, Scal, &
-                            U, V, W, &
-                            temperature_flux_profileLoc)
     end if
 
     if (present(temperature_flux_profile)) then
@@ -294,7 +294,7 @@ contains
     call set(Scal2, 0._knd)
     call set(Slope, 0._knd)
 
-    !$omp parallel private(i,j,k,l,vel,sl,sr,flux,Uadv) shared(Slope,Scal,Scal2,temperature_flux_profile)
+    !$omp parallel private(i,j,k,l,Uadv,sl,sr,flux) shared(Slope,Scal,Scal2,temperature_flux_profile)
     !$omp do schedule(runtime)
     do k = 1, Prnz
      do j = 1, Prny
@@ -403,7 +403,7 @@ contains
 
     call set(temperature_flux_profile, 0._knd)
 
-    !$omp parallel private(i,j,k,l,vel,sl,sr,flux) shared(Slope,Scal,Scal2,temperature_flux_profile)
+    !$omp parallel private(i,j,k,l,Wadv,sl,sr,flux) shared(Slope,Scal,Scal2,temperature_flux_profile)
     do l = 0, 1  !odd-even separation to avoid a race condition
       !$omp do reduction(+:temperature_flux_profile) schedule(runtime)
       do k = 0+l, Prnz, 2
