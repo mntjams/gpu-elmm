@@ -445,6 +445,7 @@ contains
 
 
 
+
   subroutine KappaScalar_mod_delta(Scal2, Scal, &
                                    U, V, W, &
                                    dt, &
@@ -621,6 +622,116 @@ contains
     end function
 
   endsubroutine KappaScalar_mod_delta
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  subroutine CDS4Scalar(Scal2, Scal, &
+                         U, V, W, &
+                         temperature_flux_profile)
+    !advection velocities following the 4th-order discrete divergence-free condition
+    ! c.f. Hokpunna, Manhart, 2010, eq. 11, https://dx.doi.org/10.1016/j.jcp.2010.05.042
+    ! [U]i = -1/24 U(i+1) + 13/12 U(i) - 1/24 U(i-1)
+    ! ([U]i - [U]i-1) / dx = 9/8*(U(i)-U(i-1)) / dx - 1/8*(U(i+1)-U(i-2))/(3*dx)
+                         
+    ! Central scheme, e.g. in Wicker, Skamarock (2002), eq. 4b or Wesseling (2001) p. 150
+    ! F = Uadv * (7/12 (C(j) + C(j+1)) - 1/12 (C(j-1) + C(j+2)))
+    
+    real(knd), contiguous, intent(out) :: Scal2(-1:,-1:,-1:) 
+    real(knd), contiguous, intent(in)  :: Scal(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    real(knd), contiguous, intent(out) :: temperature_flux_profile(0:)
+    integer   :: i, j, k, l
+    real(knd) :: Ax, Ay, Az              !Auxiliary variables to store muliplication constants for efficiency
+    real(knd) :: sl, sr, flux
+    real(knd) :: Uadv, Vadv, Wadv
+    real(knd), parameter :: D0 = 13._knd / 12, D1 = -1._knd / 24
+    real(knd), parameter :: C0 = 7._knd / 12, C1 = 1._knd / 12
+    real(knd), parameter :: eps = 1e-8
+
+    Ax = 1 / dxmin
+    Ay = 1 / dymin
+    Az = 1 / dzmin
+
+
+    call set(Scal2, 0._knd)
+
+    !$omp parallel private(i,j,k,l,Uadv,sl,sr,flux) shared(Slope,Scal,Scal2,temperature_flux_profile)
+    !$omp do schedule(runtime)
+    do k = 1, Prnz
+     do j = 1, Prny
+      do i = 0, Prnx
+        if (Scflx_mask(i,j,k)) then
+          Uadv = D1 * U(i-1,j,k) + D0 * U(i,j,k) + D1 * U(i+1,j,k)
+
+          flux = Uadv * (C0 * (Scal(i,j,k) + Scal(i+1,j,k)) - C1 * (Scal(i-1,j,k) + Scal(i+2,j,k)))
+
+          Scal2(i,j,k) = Scal2(i,j,k) - Ax * flux
+          Scal2(i+1,j,k) = Scal2(i+1,j,k) + Ax * flux
+        end if
+      end do
+     end do
+    end do
+    !$omp end do
+    !$omp end parallel
+
+
+    !$omp do schedule(runtime)
+    do k = 1, Prnz
+     do j = 0, Prny
+      do i = 1, Prnx
+        if (Scfly_mask(i,j,k)) then
+          Vadv = D1 * V(i,j-1,k) + D0 * V(i,j,k) + D1 * V(i,j+1,k)
+
+          flux = Vadv * (C0 * (Scal(i,j,k) + Scal(i,j+1,k)) - C1 * (Scal(i,j-1,k) + Scal(i,j+2,k)))
+
+          Scal2(i,j,k) = Scal2(i,j,k) - Ay * flux
+          Scal2(i,j+1,k) = Scal2(i,j+1,k) + Ay * flux
+        end if
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp end parallel
+
+
+    call set(temperature_flux_profile, 0._knd)
+
+    !$omp parallel private(i,j,k,l,Wadv,sl,sr,flux) shared(Slope,Scal,Scal2,temperature_flux_profile)
+    do l = 0, 1  !odd-even separation to avoid a race condition
+      !$omp do reduction(+:temperature_flux_profile) schedule(runtime)
+      do k = 0+l, Prnz, 2
+       do j = 1, Prny
+        do i = 1, Prnx
+          if (Scflz_mask(i,j,k)) then
+            Wadv = D1 * W(i,j,k-1) + D0 * W(i,j,k) + D1 * W(i,j,k+1)
+
+            flux = Wadv * (C0 * (Scal(i,j,k) + Scal(i,j,k+1)) - C1 * (Scal(i,j,k-1) + Scal(i,j,k+2)))
+
+            temperature_flux_profile(k) = temperature_flux_profile(k) + flux
+
+            Scal2(i,j,k) = Scal2(i,j,k) - Az * flux
+            Scal2(i,j,k+1) = Scal2(i,j,k+1) + Az * flux
+          end if
+        end do
+       end do
+      end do
+      !$omp end do
+    end do
+    !$omp end parallel
+
+  endsubroutine CDS4Scalar
+
+  
+  
 
 
 
