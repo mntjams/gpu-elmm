@@ -510,6 +510,125 @@ contains
 
 
 
+!   subroutine ScalarDiffusion_nobranch_4ord(Scal2, Scal)
+!     real(knd), contiguous, intent(inout) :: Scal2(-1:,-1:,-1:)
+!     real(knd), contiguous, intent(in)    :: Scal(-1:,-1:,-1:)
+!     integer :: i, j, k, bi, bj, bk
+!     integer :: xi, yj, zk
+!     real(knd) :: Ax, Ay, Az
+!     integer :: tnx, tny, tnz
+!     
+!     integer, parameter :: narr = 3
+!     
+!     
+!     
+!     ! To avoid issues near the boundaries (wall-modelled and internal points), the turbulent viscosity is not interpolated in fourth order 
+!     ! on a 4-point stencil, but only in second order on a 2-point stencil. The difference is expected to be insignificant due to
+!     ! uncertainties in the value of TDiff itself.
+!     
+!     tnx = tilenx(narr)
+!     tny = tileny(narr)
+!     tnz = tilenz(narr)
+! 
+!     Ax = 1 / (dxmin**2)
+!     Ay = 1 / (dymin**2)
+!     Az = 1 / (dzmin**2)
+! 
+!     !$omp parallel private(i, j, k, bi, bj, bk, xi, yj, zk)
+!     !$omp do schedule(runtime) collapse(3)
+!     do bk = 1, Prnz, tnz
+!      do bj = 1, Prny, tny
+!       do bi = 0, Prnx+2, tnx
+!        do k = bk, min(bk+tnz-1, Prnz)
+!         do j = bj, min(bj+tny-1, Prny)
+!          do i = bi, min(bi+tnx-1, Prnx)
+!            Fl(i,j,k) = (TDiff(i+1,j,k)+TDiff(i,j,k)) * (C1*(Scal(i,j,k)-Scal(i-1,j,k) - C3*(Scal(i+1,j,k)-Scal(i-2,j,k))) * Ax
+!          end do
+!         end do
+!        end do
+!       end do
+!      end do
+!     end do
+!     !$omp end do
+!     !$omp do schedule(runtime) collapse(3)
+!     do bk = 1, Prnz, tnz
+!      do bj = 1, Prny, tny
+!       do bi = 1, Prnx, tnx
+!        do k = bk, min(bk+tnz-1, Prnz)
+!         do j = bj, min(bj+tny-1, Prny)
+!          do i = bi, min(bi+tnx-1, Prnx)
+!              Scal2(i,j,k) = Scal2(i,j,k) + (C1*(Fl(i+1,j,k)-Fl(i,j,k)) - C3*(Fl(i+2,j,k)-Fl(i-1,j,k)))
+!          end do
+!         end do
+!        end do
+!       end do
+!      end do
+!     end do
+!     !$omp end do
+! 
+!     !$omp do
+!     do i = 1, size(Scflx_points)
+!       xi = Scflx_points(i)%xi
+!       yj = Scflx_points(i)%yj
+!       zk = Scflx_points(i)%zk
+!       Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - &
+!                         (TDiff(xi+1,yj,zk)+TDiff(xi,yj,zk)) * (Scal(xi+1,yj,zk)-Scal(xi,yj,zk)) * Ax
+!     end do
+!     !$omp end do
+!     !$omp do
+!     do i = 1, size(Scflx_points)
+!       xi = Scflx_points(i)%xi
+!       yj = Scflx_points(i)%yj
+!       zk = Scflx_points(i)%zk
+!       Scal2(xi+1,yj,zk) = Scal2(xi+1,yj,zk) + &
+!                           (TDiff(xi+1,yj,zk)+TDiff(xi,yj,zk)) * (Scal(xi+1,yj,zk)-Scal(xi,yj,zk)) * Ax
+!     end do
+!     !$omp end do nowait
+!     !$omp do
+!     do i = 1, size(Scfly_points)
+!       xi = Scfly_points(i)%xi
+!       yj = Scfly_points(i)%yj
+!       zk = Scfly_points(i)%zk
+!       Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - &
+!                         (TDiff(xi,yj+1,zk)+TDiff(xi,yj,zk)) * (Scal(xi,yj+1,zk)-Scal(xi,yj,zk)) * Ay
+!     end do
+!     !$omp end do
+!     !$omp do
+!     do i = 1, size(Scfly_points)
+!       xi = Scfly_points(i)%xi
+!       yj = Scfly_points(i)%yj
+!       zk = Scfly_points(i)%zk
+!       Scal2(xi,yj+1,zk) = Scal2(xi,yj+1,zk) + &
+!                           (TDiff(xi,yj+1,zk)+TDiff(xi,yj,zk)) * (Scal(xi,yj+1,zk)-Scal(xi,yj,zk)) * Ay
+!     end do
+!     !$omp end do nowait
+!     !$omp do
+!     do i = 1, size(Scflz_points)
+!       xi = Scflz_points(i)%xi
+!       yj = Scflz_points(i)%yj
+!       zk = Scflz_points(i)%zk
+!       Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - &
+!                         (TDiff(xi,yj,zk+1)+TDiff(xi,yj,zk)) * (Scal(xi,yj,zk+1)-Scal(xi,yj,zk)) * Az
+!     end do
+!     !$omp end do
+!     !$omp do
+!     do i = 1, size(Scflz_points)
+!       xi = Scflz_points(i)%xi
+!       yj = Scflz_points(i)%yj
+!       zk = Scflz_points(i)%zk
+!       Scal2(xi,yj,zk+1) = Scal2(xi,yj,zk+1) + &
+!                           (TDiff(xi,yj,zk+1)+TDiff(xi,yj,zk)) * (Scal(xi,yj,zk+1)-Scal(xi,yj,zk)) * Az
+!     end do
+!     !$omp end do
+!     !$omp end parallel
+!   end subroutine ScalarDiffusion_nobranch_4ord
+
+
+
+
+
+
+
 
   subroutine AddScalarDiffVector(ScU, ScV, ScW, Scal, weight, probes_flux, px, py, pz)
     real(knd), contiguous, intent(inout) :: ScU(:,:,:)
