@@ -643,9 +643,9 @@ contains
         do k = 1, Wnz
           do j = 1, Wny
             do i = 1, Wnx
-              !deconvolution of Temperature: e.g., in Hokpunna, Manhart, (2010), JCP 229
+              !interpolation/deconvolution of Temperature: e.g. Morinishi et al. eq. 35 or in Hokpunna, Manhart, (2010), JCP 229
               W(i,j,k) = W(i,j,k) + &
-                A * ( C1 * Temperature(i,j,k+2) + &
+                 A * ( C1 * Temperature(i,j,k+2) + &
                        C0 * Temperature(i,j,k+1) + &
                        C0 * Temperature(i,j,k)   + &
                        C1 * Temperature(i,j,k-1) ) - &
