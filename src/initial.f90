@@ -2532,9 +2532,9 @@ contains
     use Endianness
     real(knd), intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd), intent(inout) :: Pr(-1:,-1:,-1:)
-    real(knd), intent(inout) :: Temperature(-1:,-1:,-1:)
-    real(knd), intent(inout) :: Moisture(-1:,-1:,-1:)
-    real(knd), intent(inout) :: Scalar(-1:,-1:,-1:,:)
+    real(knd), intent(inout) :: Temperature(-2:,-2:,-2:)
+    real(knd), intent(inout) :: Moisture(-2:,-2:,-2:)
+    real(knd), intent(inout) :: Scalar(-2:,-2:,-2:,:)
     logical, intent(in) :: scalars_optional
     real(real32), allocatable :: buffer(:,:,:), UVWbuffer(:,:,:,:)
     integer :: i, unit, stat, file_stat
@@ -2775,9 +2775,9 @@ contains
 #endif
     use ArrayUtilities
     real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(-1:,-1:,-1:)
-    real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
-    real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
-    real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
+    real(knd),contiguous,intent(inout) :: Temperature(-2:,-2:,-2:)
+    real(knd),contiguous,intent(inout) :: Moisture(-2:,-2:,-2:)
+    real(knd),contiguous,intent(inout) :: Scalar(-2:,-2:,-2:,:)
     real(knd), intent(out) :: dt
     integer :: i,j,k
     real(knd) :: p,x,y,z,x1,x2,y1,y2,z1,z2
@@ -2790,9 +2790,9 @@ contains
       subroutine CustomInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar)
         use Parameters
         real(knd),contiguous,intent(inout) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:),Pr(-1:,-1:,-1:)
-        real(knd),contiguous,intent(inout) :: Temperature(-1:,-1:,-1:)
-        real(knd),contiguous,intent(inout) :: Moisture(-1:,-1:,-1:)
-        real(knd),contiguous,intent(inout) :: Scalar(-1:,-1:,-1:,:)
+        real(knd),contiguous,intent(inout) :: Temperature(-2:,-2:,-2:)
+        real(knd),contiguous,intent(inout) :: Moisture(-2:,-2:,-2:)
+        real(knd),contiguous,intent(inout) :: Scalar(-2:,-2:,-2:,:)
       end subroutine
     end interface
 #endif

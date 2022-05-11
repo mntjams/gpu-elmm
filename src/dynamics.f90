@@ -239,9 +239,9 @@ contains
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: U, V, W
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(out)   :: U2, V2, W2
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: Ustar, Vstar ,Wstar
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)    :: Temperature
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)    :: Moisture
-    real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(in)  :: Scalar
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: Temperature
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: Moisture
+    real(knd), dimension(-2:,-2:,-2:,:), contiguous, intent(in)  :: Scalar
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)    :: Pr
     real(knd), dimension(1:3), intent(in) :: beta,rho
     integer,   intent(in) :: RK_stage
@@ -588,8 +588,8 @@ contains
     use WaterThermodynamics, only: LiquidWater, compute_liquid_water_content
     use BuoyantGases, only: enable_buoyant_scalars
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: W
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature, Moisture
-    real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(in) :: Scalar
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Temperature, Moisture
+    real(knd), dimension(-2:,-2:,-2:,:), contiguous, intent(in) :: Scalar
     real(knd), contiguous, intent(in) :: Pr(-1:,-1:,-1:)
     real(knd) :: A, A2
     integer :: i, j, k
@@ -853,8 +853,8 @@ contains
 
     real(knd), contiguous, intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
     real(knd), contiguous, intent(in) :: Pr(-1:,-1:,-1:)
-    real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:)
-    real(knd), contiguous, intent(in) :: Moisture(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in) :: Temperature(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in) :: Moisture(-2:,-2:,-2:)
     integer :: i
 
 

@@ -26,7 +26,7 @@ module ScalarDiffusion
   abstract interface
     subroutine boundary_interface(array)
       use Parameters
-      real(knd), intent(inout) :: array(-1:,-1:,-1:)
+      real(knd), intent(inout) :: array(-2:,-2:,-2:)
     end subroutine
   end interface
 
@@ -39,8 +39,8 @@ contains
 #ifdef PAR
     use custom_par, only: par_co_max
 #endif
-    real(knd), contiguous, intent(in)    :: Scal(-1:,-1:,-1:)
-    real(knd), contiguous, intent(inout) :: Scal2(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in)    :: Scal(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: Scal2(-2:,-2:,-2:)
     real(knd), intent(in) :: coef
     integer, intent(in) :: sctype
     procedure(boundary_interface) :: boundary_procedure
@@ -63,8 +63,8 @@ contains
     
 
     if (.not.allocated(Scal3)) then
-      allocate(Scal3(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
-      allocate(Ap(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+      allocate(Scal3, mold=Scal)
+      allocate(Ap, mold=Scal)
     end if
 
     nx = Prnx
@@ -344,8 +344,8 @@ contains
 
 
   subroutine ScalarDiffusion_explicit(Scal2, Scal)
-    real(knd), contiguous, intent(inout) :: Scal2(-1:,-1:,-1:)
-    real(knd), contiguous, intent(in)    :: Scal(-1:,-1:,-1:)
+    real(knd), contiguous, intent(inout) :: Scal2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)    :: Scal(-2:,-2:,-2:)
     integer :: i, j, k, bi, bj, bk
     real(knd) :: Ax, Ay, Az
     integer :: tnx, tny, tnz
@@ -400,8 +400,8 @@ contains
 
 
   subroutine ScalarDiffusion_nobranch(Scal2, Scal)
-    real(knd), contiguous, intent(inout) :: Scal2(-1:,-1:,-1:)
-    real(knd), contiguous, intent(in)    :: Scal(-1:,-1:,-1:)
+    real(knd), contiguous, intent(inout) :: Scal2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)    :: Scal(-2:,-2:,-2:)
     integer :: i, j, k, bi, bj, bk
     integer :: xi, yj, zk
     real(knd) :: Ax, Ay, Az
@@ -511,8 +511,8 @@ contains
 
 
 !   subroutine ScalarDiffusion_nobranch_4ord(Scal2, Scal)
-!     real(knd), contiguous, intent(inout) :: Scal2(-1:,-1:,-1:)
-!     real(knd), contiguous, intent(in)    :: Scal(-1:,-1:,-1:)
+!     real(knd), contiguous, intent(inout) :: Scal2(-2:,-2:,-2:)
+!     real(knd), contiguous, intent(in)    :: Scal(-2:,-2:,-2:)
 !     integer :: i, j, k, bi, bj, bk
 !     integer :: xi, yj, zk
 !     real(knd) :: Ax, Ay, Az
@@ -634,7 +634,7 @@ contains
     real(knd), contiguous, intent(inout) :: ScU(:,:,:)
     real(knd), contiguous, intent(inout) :: ScV(:,:,:)
     real(knd), contiguous, intent(inout) :: ScW(:,:,:)
-    real(knd), contiguous, intent(in)    :: Scal(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in)    :: Scal(-2:,-2:,-2:)
     real(knd), intent(in) :: weight
     real(knd), intent(out) :: probes_flux(:,:) !component, position
     integer, intent(in) :: px(:), py(:), pz(:)

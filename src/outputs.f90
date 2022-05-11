@@ -770,9 +770,9 @@ contains
     use Wallmodels, only: ComputeViscsWM
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)   :: U,V,W
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)      :: Pr
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)   :: Temperature
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)   :: Moisture
-    real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(in) :: Scalar
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)   :: Temperature
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)   :: Moisture
+    real(knd), dimension(-2:,-2:,-2:,:), contiguous, intent(in) :: Scalar
     real(knd), intent(in) :: dt
     real(knd), intent(in) :: delta
 
@@ -1512,8 +1512,8 @@ contains
   subroutine OutputOut(U,V,W,Pr,Temperature,Moisture)
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
     real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Pr
-    real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:)
-    real(knd), contiguous, intent(in) :: Moisture(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in) :: Temperature(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in) :: Moisture(-2:,-2:,-2:)
     character(70) :: str
     real(real32), allocatable :: tmp(:,:,:,:)
     integer :: i,j,k,unit
@@ -1704,7 +1704,7 @@ contains
 
 
   subroutine OutputScalars(Scalar)
-    real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(in) :: Scalar
+    real(knd), dimension(-2:,-2:,-2:,:), contiguous, intent(in) :: Scalar
     character(70) :: str
     real(knd), dimension(:,:,:), allocatable :: depos
     character(8) ::  scalname
@@ -2116,8 +2116,8 @@ contains
   end subroutine OutputAvg
 
   subroutine OutputScalarStats(S_avg, S_var, S_max, S_int)
-    real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(inout) :: S_avg, S_var
-    real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(in) :: S_max, S_int
+    real(knd), dimension(-2:,-2:,-2:,:), contiguous, intent(inout) :: S_avg, S_var
+    real(knd), dimension(-2:,-2:,-2:,:), contiguous, intent(in) :: S_max, S_int
     character(70) :: str
     integer :: unit
     real(knd) :: time_factor
@@ -2189,7 +2189,7 @@ contains
   contains
   
     subroutine aux(S,suff)
-      real(knd), dimension(-1:,-1:,-1:,:), contiguous, intent(in) :: S
+      real(knd), dimension(-2:,-2:,-2:,:), contiguous, intent(in) :: S
       character(*), intent(in) :: suff
       integer :: l
       character(8) ::  scalname="scalar00"
@@ -2617,9 +2617,9 @@ contains
   subroutine Output(U,V,W,Pr,Temperature,Moisture,Scalar)
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U,V,W
     real(knd), contiguous, intent(inout) :: Pr(-1:,-1:,-1:)
-    real(knd), contiguous, intent(in) :: Temperature(-1:,-1:,-1:)
-    real(knd), contiguous, intent(in) :: Moisture(-1:,-1:,-1:)
-    real(knd), contiguous, intent(in) :: Scalar(-1:,-1:,-1:,:)
+    real(knd), contiguous, intent(in) :: Temperature(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in) :: Moisture(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in) :: Scalar(-2:,-2:,-2:,:)
     
 #ifdef CUSTOM_OUTPUT
     interface
@@ -2863,8 +2863,8 @@ contains
   
   subroutine FluxSGSProfiles(W,Temperature,Moisture,Scalar)
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: W
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Moisture
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Temperature
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Moisture
     real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(in) :: Scalar
 
     
@@ -2880,7 +2880,7 @@ contains
     use custom_par, only: kim
 
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: W
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Temperature
     real(knd) :: S
     integer   :: i,j,k
     !current_profiles%tempfl is computed directly during advection step
@@ -2944,7 +2944,7 @@ contains
     use custom_par, only: kim
 
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: W
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Moisture
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Moisture
     real(knd) :: S
     integer   :: i,j,k
     !current_profiles%moistfl is computed directly during advection step
@@ -3046,8 +3046,8 @@ contains
 
   subroutine BLProfiles(U,V,W,Temperature,Moisture,Scalar)
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Moisture
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Temperature
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Moisture
     real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(in) :: Scalar
     real(knd) :: S
     integer   :: i,j,k,l
@@ -3345,7 +3345,7 @@ contains
     use Parameters, t_s => time_stepping
     !for output of 2d data for use as an inilet condition later
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Temperature
     integer, save ::fnum
     integer, save :: called = 0
 
@@ -3373,7 +3373,7 @@ contains
 
   subroutine OUTINLETFrame(U,V,W,Temperature,n)
     real(knd), intent(in) :: U(-2:,-2:,-2:),V(-2:,-2:,-2:),W(-2:,-2:,-2:)
-    real(knd), dimension(-1:,-1:,-1:), intent(in)   :: Temperature
+    real(knd), dimension(-2:,-2:,-2:), intent(in)   :: Temperature
     integer :: n
     character(12) :: fname
     integer :: mini,maxi,minj,maxj,mink,maxk,unit

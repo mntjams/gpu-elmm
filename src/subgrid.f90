@@ -60,7 +60,7 @@ module Subgrid
 
     subroutine SGS_StabSmag(U,V,W,Temperature,filter_ratio)  !Smagorinsky with a stability correction Brown et al. (1994)
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
-      real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: Temperature
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Temperature
       real(knd), intent(in) :: filter_ratio
       real(knd) :: Ri, l, l0
       real(knd) :: width, Sbar
@@ -132,7 +132,7 @@ module Subgrid
     pure real(knd) function Rig(i, j, k, U, V, temperature)
       integer, intent(in) :: i, j, k
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V
-      real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in) :: temperature
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: temperature
       real(knd) :: num, denom
 
       num = (grav_acc/temperature_ref) * &

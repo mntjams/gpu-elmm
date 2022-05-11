@@ -18,8 +18,8 @@ contains
 
 
   subroutine AdvScalar(Scal2, Scal, U, V, W, dt, temperature_flux_profile)
-    real(knd), contiguous, intent(out) :: Scal2(-1:,-1:,-1:)
-    real(knd), contiguous, intent(in)  :: Scal(-1:,-1:,-1:)
+    real(knd), contiguous, intent(out) :: Scal2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)  :: Scal(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd),             intent(in)  :: dt
     real(knd), contiguous, intent(out), optional :: temperature_flux_profile(0:)
@@ -55,8 +55,8 @@ contains
   endsubroutine AdvScalar
 
   subroutine CDSScalar(Scal2, Scal, U, V, W)
-    real(knd), contiguous, intent(out) :: Scal2(-1:,-1:,-1:)
-    real(knd), contiguous, intent(in)  :: Scal(-1:,-1:,-1:)
+    real(knd), contiguous, intent(out) :: Scal2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)  :: Scal(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     integer :: nx, ny, nz, i, j, k
     real(knd) :: Ax, Ay, Az
@@ -93,8 +93,8 @@ contains
                          temperature_flux_profile)
     !Kappa scheme with flux limiter
     !Hunsdorfer et al. 1995, JCP
-    real(knd), contiguous, intent(out) :: Scal2(-1:,-1:,-1:) 
-    real(knd), contiguous, intent(in)  :: Scal(-1:,-1:,-1:)
+    real(knd), contiguous, intent(out) :: Scal2(-2:,-2:,-2:) 
+    real(knd), contiguous, intent(in)  :: Scal(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd), contiguous, intent(out) :: temperature_flux_profile(0:)
     integer   :: i, j, k, l
@@ -270,8 +270,8 @@ contains
                          
     !Kappa scheme with flux limiter
     !Hunsdorfer et al. 1995, JCP
-    real(knd), contiguous, intent(out) :: Scal2(-1:,-1:,-1:) 
-    real(knd), contiguous, intent(in)  :: Scal(-1:,-1:,-1:)
+    real(knd), contiguous, intent(out) :: Scal2(-2:,-2:,-2:) 
+    real(knd), contiguous, intent(in)  :: Scal(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd), contiguous, intent(out) :: temperature_flux_profile(0:)
     integer   :: i, j, k, l
@@ -453,8 +453,8 @@ contains
     !Kappa scheme with flux limiter
     !Hunsdorfer et al. 1995, JCP
     !delta modified for smaller Courant numbers according to Hunsdorfer et al.
-    real(knd), contiguous, intent(out) :: Scal2(-1:,-1:,-1:)
-    real(knd), contiguous, intent(in)  :: Scal(-1:,-1:,-1:)
+    real(knd), contiguous, intent(out) :: Scal2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)  :: Scal(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd),             intent(in)  :: dt
     real(knd), contiguous, intent(out) :: temperature_flux_profile(0:)
@@ -645,8 +645,8 @@ contains
     ! Central scheme, e.g. in Wicker, Skamarock (2002), eq. 4b or Wesseling (2001) p. 150
     ! F = Uadv * (7/12 (C(j) + C(j+1)) - 1/12 (C(j-1) + C(j+2)))
     
-    real(knd), contiguous, intent(out) :: Scal2(-1:,-1:,-1:) 
-    real(knd), contiguous, intent(in)  :: Scal(-1:,-1:,-1:)
+    real(knd), contiguous, intent(out) :: Scal2(-2:,-2:,-2:) 
+    real(knd), contiguous, intent(in)  :: Scal(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd), contiguous, intent(out) :: temperature_flux_profile(0:)
     integer   :: i, j, k, l
@@ -742,7 +742,7 @@ contains
     real(knd), contiguous, intent(inout) :: ScU(:,:,:) !Hunsdorfer et al. 1995, JCP
     real(knd), contiguous, intent(inout) :: ScV(:,:,:)
     real(knd), contiguous, intent(inout) :: ScW(:,:,:)
-    real(knd), contiguous, intent(in)    :: Scal(-1:,-1:,-1:)
+    real(knd), contiguous, intent(in)    :: Scal(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)    :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd), intent(in) :: weight
     real(knd), intent(out) :: probes_flux(:,:) !component, position
