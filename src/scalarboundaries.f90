@@ -16,7 +16,7 @@ contains
 
 
   subroutine CommonBase(arr,btype,side,in,BsideArr,BsideFlArr)
-    real(knd),intent(inout) :: arr(-1:,-1:,-1:)
+    real(knd),intent(inout) :: arr(-2:,-2:,-2:)
     integer  ,intent(in)    :: btype(6)
     real(knd),intent(in)    :: side(6)
     real(knd),intent(in),optional :: in(-1:,-1:)
@@ -283,7 +283,7 @@ contains
 
 
   subroutine BoundScalar(SCAL)
-    real(knd),intent(inout) :: SCAL(-1:,-1:,-1:)
+    real(knd),intent(inout) :: Scal(-2:,-2:,-2:)
 
     call CommonBase(SCAL,ScalBtype,sideScal)
 
@@ -298,7 +298,7 @@ contains
 #ifdef PAR
     use domains_bc_par
 #endif
-    real(knd),intent(inout) :: Temperature(-1:,-1:,-1:)
+    real(knd),intent(inout) :: Temperature(-2:,-2:,-2:)
     
 #ifdef PAR
     call par_update_domain_bounds_temperature(Temperature, time_stepping%effective_time)
@@ -313,7 +313,7 @@ contains
 #ifdef PAR
     use domains_bc_par
 #endif
-    real(knd),intent(inout) :: Moisture(-1:,-1:,-1:)
+    real(knd),intent(inout) :: Moisture(-2:,-2:,-2:)
 
 #ifdef PAR
     call par_update_domain_bounds_moisture(Moisture, time_stepping%effective_time)
@@ -333,7 +333,7 @@ contains
     nz = Prnz
     
 #ifdef PAR
-    call par_exchange_Sc_x(Nu, Btype)
+    call par_exchange_visc_x(Nu, Btype)
 #endif
 
     if (Btype(Ea)==BC_PERIODIC) then
@@ -353,7 +353,7 @@ contains
     end if
 
 #ifdef PAR
-    call par_exchange_Sc_y(Nu, Btype)
+    call par_exchange_visc_y(Nu, Btype)
 #endif
 
     if (Btype(No)==BC_PERIODIC) then
@@ -373,7 +373,7 @@ contains
     end if
     
 #ifdef PAR
-    call par_exchange_Sc_z(Nu, Btype)
+    call par_exchange_visc_z(Nu, Btype)
 #endif
 
     if (Btype(To)==BC_PERIODIC) then

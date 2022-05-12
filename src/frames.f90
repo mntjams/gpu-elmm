@@ -142,8 +142,8 @@ contains
     real(knd),intent(in) :: time
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     real(knd),contiguous,intent(in) :: Pr(-1:,-1:,-1:), &
-                                       Temperature(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
-                                       Moisture(-1:,-1:,-1:), Scalar(-1:,-1:,-1:,1:)
+                                       Temperature(-2:,-2:,-2:), Viscosity(-1:,-1:,-1:), &
+                                       Moisture(-2:,-2:,-2:), Scalar(-1:,-1:,-1:,1:)
     integer :: i
     
     if (allocated(StaggeredFrameDomains)) then
@@ -290,7 +290,7 @@ contains
     class(TStaggeredFrameDomain),intent(inout) :: D
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     real(knd),contiguous,intent(in) :: Pr(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
-                                       Temperature(-1:,-1:,-1:), Moisture(-1:,-1:,-1:), &
+                                       Temperature(-2:,-2:,-2:), Moisture(-2:,-2:,-2:), &
                                        Scalar(-1:,-1:,-1:,1:)
     integer :: offset
     integer :: i

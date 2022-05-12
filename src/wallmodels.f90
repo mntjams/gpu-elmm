@@ -2047,8 +2047,8 @@ contains
   subroutine ComputeViscsWM(U,V,W,Pr,Temperature,Moisture)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
     real(knd),dimension(-1:,-1:,-1:),   intent(in) :: Pr
-    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
-    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Moisture
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: Temperature
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: Moisture
     integer :: i, xi, yj, zk
     real(knd) :: tdif
     real(knd) :: dist(3), vel(3), wallvel(3), prgrad(3)
@@ -2156,8 +2156,8 @@ contains
   subroutine ComputeUVWFluxesWM(U, V, W, Pr, Temperature, Moisture)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
     real(knd),dimension(-1:,-1:,-1:),   intent(in) :: Pr
-    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Temperature
-    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Moisture
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: Temperature
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: Moisture
 
 
     call fluxes(UxmWMpoints, 1, MINUSX, xU, yPr, zPr)
@@ -2336,7 +2336,7 @@ contains
 
   pure function local_value(C,component,xi,yj,zk) result(val)
     real(knd) :: val
-    real(knd),dimension(-1:,-1:,-1:),intent(in) :: C
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: C
     integer, intent(in) :: component, xi, yj, zk
 
     select case (component)
