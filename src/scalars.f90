@@ -251,7 +251,13 @@ contains
         end do
         !$omp end parallel do
 
-        if (explicit_scalar_diffusion) call ScalarDiffusion_nobranch(Array_adv, Array)
+        if (explicit_scalar_diffusion) then
+          if (discretization_order==4) then
+            call ScalarDiffusion_nobranch_4ord(Array_adv, Array)
+          else
+            call ScalarDiffusion_nobranch(Array_adv, Array)
+          end if
+        end if
 
         if (enable_subsidence_profile) call apply_subsidence_profile(Array_adv, Array)
 
