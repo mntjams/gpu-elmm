@@ -216,7 +216,7 @@
         k = p%zk
         
         wrk(i,j,k-1) = &
-          wrk(i,j,k-1) - (D1*Fl(i,j-1,k) + D0*Fl(i,j,k) + D1*Fl(i,j,k+1))
+          wrk(i,j,k-1) - (D1*Fl(i,j,k-1) + D0*Fl(i,j,k) + D1*Fl(i,j,k+1))
 
         wrk(i,j,k-1) = &
           wrk(i,j,k-1) - p%fluxp
