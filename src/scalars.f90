@@ -80,7 +80,7 @@ contains
     real(knd), contiguous, intent(in)    :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)    :: Pr(-1:,-1:,-1:)
     real(knd), contiguous, intent(inout) :: Temperature(-2:,-2:,-2:), Moisture(-2:,-2:,-2:)
-    real(knd), contiguous, intent(inout) :: Scalar(-1:,-1:,-1:,1:)
+    real(knd), contiguous, intent(inout) :: Scalar(-2:,-2:,-2:,1:)
     real(knd), intent(in)                :: dt
     real(knd), contiguous, intent(out)   :: temperature_flux_profile(:)
     real(knd), contiguous, intent(out)   :: moisture_flux_profile(:)
@@ -190,7 +190,7 @@ contains
                  BoundMoisture, MoistureExtra, &
                  moisture_flux_profile)
       
-      where (Prtype(-1:Prnx+2,-1:Prny+2,-1:Prnz+2)>0) Moisture = moisture_ref
+      where (Prtype(-2:Prnx+3,-2:Prny+3,-2:Prnz+3)>0) Moisture = moisture_ref
       
     end if
     
@@ -543,7 +543,7 @@ contains
   endfunction DepositionFlux
 
   subroutine Deposition(Scal, coef)
-    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(inout) :: Scal
+    real(knd), dimension(-2:,-2:,-2:,1:), contiguous, intent(inout) :: Scal
     real(knd), intent(in) :: coef
     integer   :: i, j
     real(knd) :: deptmp
@@ -574,7 +574,7 @@ contains
 
 
   subroutine Gravsettling(Scal, coef)
-    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(inout) :: Scal
+    real(knd), dimension(-2:,-2:,-2:,1:), contiguous, intent(inout) :: Scal
     integer :: i, j, k, l
     real(knd), dimension(Prnx,Prny,Prnz) :: flux
     real(knd) :: coef, press, temp, us
@@ -665,10 +665,10 @@ contains
 
   subroutine InitScalarProfile(ScalarIn, ScalarProfile, default_value)
     use Interpolation
-    real(knd), contiguous, intent(inout) :: ScalarIn(-1:,-1:)
+    real(knd), contiguous, intent(inout) :: ScalarIn(-2:,-2:)
     type(TScalarProfile), intent(inout) :: ScalarProfile
     real(knd), intent(in) :: default_value
-    integer   :: SectionToUse(-1:ubound(ScalarIn,2))
+    integer   :: SectionToUse(lbound(ScalarIn,2):ubound(ScalarIn,2))
     integer   :: section, nSections, s
     integer   :: i, j, k
     real(knd) :: temp
@@ -761,7 +761,7 @@ contains
   subroutine InitScalar(ScalarIn, ScalarProfile, Sc)
     use rng_par_zig
     !$ use omp_lib
-    real(knd), contiguous, intent(in)  :: ScalarIn(-1:,-1:)
+    real(knd), contiguous, intent(in)  :: ScalarIn(-2:,-2:)
     type(TScalarProfile), intent(in)  :: ScalarProfile
     real(knd), contiguous, intent(out) :: Sc(-2:,-2:,-2:)
     real(knd) :: p

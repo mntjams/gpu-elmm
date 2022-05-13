@@ -61,7 +61,7 @@ module Frames_common
       real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
       real(knd),contiguous,intent(in) :: Pr(-1:,-1:,-1:), Viscosity(-1:,-1:,-1:), &
                               Temperature(-2:,-2:,-2:), Moisture(-2:,-2:,-2:), &
-                              Scalar(-1:,-1:,-1:,1:)
+                              Scalar(-2:,-2:,-2:,1:)
     end subroutine
     subroutine dosave_interface(D)
       import
@@ -123,7 +123,7 @@ contains
     real(knd),dimension(-2:,-2:,-2:),contiguous,intent(in) :: U,V,W
     real(knd),contiguous,intent(in) :: Pr(-1:,-1:,-1:), &
                                        Temperature(-2:,-2:,-2:), Viscosity(-1:,-1:,-1:), &
-                                       Moisture(-2:,-2:,-2:), Scalar(-1:,-1:,-1:,1:)
+                                       Moisture(-2:,-2:,-2:), Scalar(-2:,-2:,-2:,1:)
 
     associate(start   => D%frame_times%start,&
               end     => D%frame_times%end,&
