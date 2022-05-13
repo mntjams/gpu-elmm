@@ -12,7 +12,7 @@ module ScalarDiffusion
   
   private
   
-  public ScalarDiffusion_explicit, ScalarDiffusion_nobranch, ScalarDiffusion_implicit, &
+  public ScalarDiffusion_explicit, ScalarDiffusion_nobranch, ScalarDiffusion_nobranch_4ord, ScalarDiffusion_implicit, &
          AddScalarDiffVector, ComputeTDiff, &
          ScalarDiffusion_Deallocate, &
          boundary_interface, &
@@ -530,6 +530,10 @@ contains
     ! on a 4-point stencil, but only in second order on a 2-point stencil. The difference is expected to be insignificant due to
     ! uncertainties in the value of TDiff itself.
     
+    !deconvolution of flux
+    ! [Fl]i = -1/24*Fl(i+1) + 13*Fl(i)/12 -1/24*Fl(i-1)
+    ! ([Fl]i+1 - [Fl]i) / dx = 9/8*(Fl(i+1)-Fl(i)) / dx - 1/8*(Fl(i+2)-Fl(i-1))/(3*dx)
+    
     tnx = tilenx(narr)
     tny = tileny(narr)
     tnz = tilenz(narr)
@@ -581,7 +585,7 @@ contains
       yj = Scflx_points(i)%yj
       zk = Scflx_points(i)%zk
       Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - &
-                        (TDiff(xi+1,yj,zk)+TDiff(xi,yj,zk)) * (Scal(xi+1,yj,zk)-Scal(xi,yj,zk)) * Ax
+                        (D1*Fl(i-1,j,k) + D0*Fl(i,j,k) + D1*Fl(i+1,j,k))
     end do
     !$omp end do
     !$omp do
@@ -590,7 +594,7 @@ contains
       yj = Scflx_points(i)%yj
       zk = Scflx_points(i)%zk
       Scal2(xi+1,yj,zk) = Scal2(xi+1,yj,zk) + &
-                          (TDiff(xi+1,yj,zk)+TDiff(xi,yj,zk)) * (Scal(xi+1,yj,zk)-Scal(xi,yj,zk)) * Ax
+                          (D1*Fl(i-1,j,k) + D0*Fl(i,j,k) + D1*Fl(i+1,j,k))
     end do
     !$omp end do nowait
 
@@ -631,7 +635,8 @@ contains
       yj = Scfly_points(i)%yj
       zk = Scfly_points(i)%zk
       Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - &
-                        (TDiff(xi,yj+1,zk)+TDiff(xi,yj,zk)) * (Scal(xi,yj+1,zk)-Scal(xi,yj,zk)) * Ay
+                        (D1*Fl(i,j-1,k) + D0*Fl(i,j,k) + D1*Fl(i,j+1,k))
+                        
     end do
     !$omp end do
     !$omp do
@@ -640,7 +645,7 @@ contains
       yj = Scfly_points(i)%yj
       zk = Scfly_points(i)%zk
       Scal2(xi,yj+1,zk) = Scal2(xi,yj+1,zk) + &
-                          (TDiff(xi,yj+1,zk)+TDiff(xi,yj,zk)) * (Scal(xi,yj+1,zk)-Scal(xi,yj,zk)) * Ay
+                          (D1*Fl(i,j-1,k) + D0*Fl(i,j,k) + D1*Fl(i,j+1,k))
     end do
     !$omp end do nowait
 
@@ -681,7 +686,7 @@ contains
       yj = Scflz_points(i)%yj
       zk = Scflz_points(i)%zk
       Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - &
-                        (TDiff(xi,yj,zk+1)+TDiff(xi,yj,zk)) * (Scal(xi,yj,zk+1)-Scal(xi,yj,zk)) * Az
+                        (D1*Fl(i,j,k-1) + D0*Fl(i,j,k) + D1*Fl(i,j,k+1))
     end do
     !$omp end do
     !$omp do
@@ -690,7 +695,7 @@ contains
       yj = Scflz_points(i)%yj
       zk = Scflz_points(i)%zk
       Scal2(xi,yj,zk+1) = Scal2(xi,yj,zk+1) + &
-                          (TDiff(xi,yj,zk+1)+TDiff(xi,yj,zk)) * (Scal(xi,yj,zk+1)-Scal(xi,yj,zk)) * Az
+                          (D1*Fl(i,j,k-1) + D0*Fl(i,j,k) + D1*Fl(i,j,k+1))
     end do
     !$omp end do
     !$omp end parallel
