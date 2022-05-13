@@ -543,19 +543,19 @@ contains
     Az = 1 / (dzmin**2)
 
     if (.not.allocated(Fl)) &
-      allocate(Fl(-1:max(Unx,Vnx,Wnx)+2, &
-                  -1:max(Uny,Vny,Wny)+2, &
-                  -1:max(Unz,Vnz,Wnz)+2))
+      allocate(Fl(-1:Prnx+1, &
+                  -1:Prny+1, &
+                  -1:Prnz+1))
                   
     !$omp parallel private(i, j, k, bi, bj, bk, xi, yj, zk)
     !$omp do schedule(runtime) collapse(3)
     do bk = 1, Prnz, tnz
      do bj = 1, Prny, tny
-      do bi = 0, Prnx+2, tnx
+      do bi = -1, Prnx+1, tnx
        do k = bk, min(bk+tnz-1, Prnz)
         do j = bj, min(bj+tny-1, Prny)
-         do i = bi, min(bi+tnx-1, Prnx+2)
-           Fl(i,j,k) = (TDiff(i+1,j,k)+TDiff(i,j,k)) * (C1*(Scal(i,j,k)-Scal(i-1,j,k)) - C3*(Scal(i+1,j,k)-Scal(i-2,j,k))) * Ax
+         do i = bi, min(bi+tnx-1, Prnx+1)
+           Fl(i,j,k) = (TDiff(i+1,j,k)+TDiff(i,j,k)) * (C1*(Scal(i+1,j,k)-Scal(i,j,k)) - C3*(Scal(i+2,j,k)-Scal(i-1,j,k))) * Ax
          end do
         end do
        end do
@@ -570,7 +570,7 @@ contains
        do k = bk, min(bk+tnz-1, Prnz)
         do j = bj, min(bj+tny-1, Prny)
          do i = bi, min(bi+tnx-1, Prnx)
-             Scal2(i,j,k) = Scal2(i,j,k) + C1*(Fl(i+1,j,k)-Fl(i,j,k)) - C3*(Fl(i+2,j,k)-Fl(i-1,j,k))
+             Scal2(i,j,k) = Scal2(i,j,k) + C1*(Fl(i,j,k)-Fl(i-1,j,k)) - C3*(Fl(i+1,j,k)-Fl(i-2,j,k))
          end do
         end do
        end do
@@ -600,12 +600,12 @@ contains
 
     !$omp do schedule(runtime) collapse(3)
     do bk = 1, Prnz, tnz
-     do bj = 0, Prny+2, tny
-      do bi = 0, Prnx, tnx
+     do bj = -1, Prny+1, tny
+      do bi = 1, Prnx, tnx
        do k = bk, min(bk+tnz-1, Prnz)
-        do j = bj, min(bj+tny-1, Prny+2)
+        do j = bj, min(bj+tny-1, Prny+1)
          do i = bi, min(bi+tnx-1, Prnx)
-           Fl(i,j,k) = (TDiff(i+1,j,k)+TDiff(i,j,k)) * (C1*(Scal(i,j,k)-Scal(i-1,j,k)) - C3*(Scal(i+1,j,k)-Scal(i-2,j,k))) * Ax
+           Fl(i,j,k) = (TDiff(i,j+1,k)+TDiff(i,j,k)) * (C1*(Scal(i,j+1,k)-Scal(i,j,k)) - C3*(Scal(i,j+2,k)-Scal(i,j-1,k))) * Ay
          end do
         end do
        end do
@@ -620,7 +620,7 @@ contains
        do k = bk, min(bk+tnz-1, Prnz)
         do j = bj, min(bj+tny-1, Prny)
          do i = bi, min(bi+tnx-1, Prnx)
-             Scal2(i,j,k) = Scal2(i,j,k) + C1*(Fl(i+1,j,k)-Fl(i,j,k)) - C3*(Fl(i+2,j,k)-Fl(i-1,j,k))
+             Scal2(i,j,k) = Scal2(i,j,k) + C1*(Fl(i,j,k)-Fl(i,j-1,k)) - C3*(Fl(i,j+1,k)-Fl(i,j-2,k))
          end do
         end do
        end do
@@ -650,13 +650,13 @@ contains
     !$omp end do nowait
 
     !$omp do schedule(runtime) collapse(3)
-    do bk = 0, Prnz+2, tnz
+    do bk = -1, Prnz+1, tnz
      do bj = 1, Prny, tny
       do bi = 1, Prnx, tnx
-       do k = bk, min(bk+tnz-1, Prnz+2)
+       do k = bk, min(bk+tnz-1, Prnz+1)
         do j = bj, min(bj+tny-1, Prny)
          do i = bi, min(bi+tnx-1, Prnx)
-           Fl(i,j,k) = (TDiff(i+1,j,k)+TDiff(i,j,k)) * (C1*(Scal(i,j,k)-Scal(i-1,j,k)) - C3*(Scal(i+1,j,k)-Scal(i-2,j,k))) * Ax
+           Fl(i,j,k) = (TDiff(i,j,k+1)+TDiff(i,j,k)) * (C1*(Scal(i,j,k+1)-Scal(i,j,k)) - C3*(Scal(i,j,k+1)-Scal(i,j,k-1))) * Az
          end do
         end do
        end do
@@ -671,7 +671,7 @@ contains
        do k = bk, min(bk+tnz-1, Prnz)
         do j = bj, min(bj+tny-1, Prny)
          do i = bi, min(bi+tnx-1, Prnx)
-             Scal2(i,j,k) = Scal2(i,j,k) + C1*(Fl(i+1,j,k)-Fl(i,j,k)) - C3*(Fl(i+2,j,k)-Fl(i-1,j,k))
+             Scal2(i,j,k) = Scal2(i,j,k) + C1*(Fl(i,j,k)-Fl(i,j,k-2)) - C3*(Fl(i,j,k+1)-Fl(i,j,k-2))
          end do
         end do
        end do
