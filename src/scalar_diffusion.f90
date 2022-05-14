@@ -538,9 +538,9 @@ contains
     tny = tileny(narr)
     tnz = tilenz(narr)
 
-    Ax = 1 / (dxmin**2)
-    Ay = 1 / (dymin**2)
-    Az = 1 / (dzmin**2)
+    Ax = 1 / (2*dxmin**2)
+    Ay = 1 / (2*dymin**2)
+    Az = 1 / (2*dzmin**2)
 
     if (.not.allocated(Fl)) &
       allocate(Fl(-1:Prnx+1, &
