@@ -656,7 +656,7 @@ contains
        do k = bk, min(bk+tnz-1, Prnz+1)
         do j = bj, min(bj+tny-1, Prny)
          do i = bi, min(bi+tnx-1, Prnx)
-           Fl(i,j,k) = (TDiff(i,j,k+1)+TDiff(i,j,k)) * (C1*(Scal(i,j,k+1)-Scal(i,j,k)) - C3*(Scal(i,j,k+1)-Scal(i,j,k-1))) * Az
+           Fl(i,j,k) = (TDiff(i,j,k+1)+TDiff(i,j,k)) * (C1*(Scal(i,j,k+1)-Scal(i,j,k)) - C3*(Scal(i,j,k+2)-Scal(i,j,k-1))) * Az
          end do
         end do
        end do
@@ -671,7 +671,7 @@ contains
        do k = bk, min(bk+tnz-1, Prnz)
         do j = bj, min(bj+tny-1, Prny)
          do i = bi, min(bi+tnx-1, Prnx)
-             Scal2(i,j,k) = Scal2(i,j,k) + C1*(Fl(i,j,k)-Fl(i,j,k-2)) - C3*(Fl(i,j,k+1)-Fl(i,j,k-2))
+             Scal2(i,j,k) = Scal2(i,j,k) + C1*(Fl(i,j,k)-Fl(i,j,k-1)) - C3*(Fl(i,j,k+1)-Fl(i,j,k-2))
          end do
         end do
        end do
