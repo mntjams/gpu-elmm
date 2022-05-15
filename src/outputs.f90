@@ -952,7 +952,7 @@ contains
     end if
 
     if (store%delta_time==1.and.dt>0) then
-      delta_time(step)=delta/dt
+      delta_time(step)=delta
     end if
 
     if (flow_rate_x_fixed) then
