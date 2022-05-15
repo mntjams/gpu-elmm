@@ -253,7 +253,7 @@ contains
 
         if (explicit_scalar_diffusion) then
           if (discretization_order==4) then
-            call ScalarDiffusion_nobranch_4ord(Array_adv, Array)
+            call ScalarDiffusion_4ord_5point(Array_adv, Array)
           else
             call ScalarDiffusion_nobranch(Array_adv, Array)
           end if
