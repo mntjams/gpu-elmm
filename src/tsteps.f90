@@ -197,7 +197,8 @@ contains
         if (RK_stage==RK_stages) then
 #ifdef PAR
           delta = par_co_sum(delta)
-#endif
+#endif          
+          delta = delta / time_stepping%dt
           if (master) write(*,*) "delta",delta
         end if
       end if

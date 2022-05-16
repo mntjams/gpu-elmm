@@ -681,8 +681,6 @@ contains
      end do
     end do
     !$omp end do
-    !$omp end parallel
-
 
     !$omp do schedule(runtime)
     do k = 1, Prnz

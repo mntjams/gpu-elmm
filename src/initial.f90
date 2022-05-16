@@ -3499,9 +3499,9 @@ contains
     Vin = 0
     Win = 0
 
-    if (enable_buoyancy) allocate(TempIn(-1:Prny+2,-1:Prnz+2))
+    if (enable_buoyancy) allocate(TempIn(-2:Prny+3,-2:Prnz+3))
 
-    if (enable_moisture) allocate(MoistIn(-1:Prny+2,-1:Prnz+2))
+    if (enable_moisture) allocate(MoistIn(-2:Prny+3,-2:Prnz+3))
 
     select case (inlettype)
       case (ZeroInletType)
@@ -3530,7 +3530,7 @@ contains
 
        if (TempBtype(Bo)==BC_CONSTFLUX.or.TempBtype(Bo)==BC_DIRICHLET) then
 
-         allocate(BsideTFlArr(-1:Prnx+2,-1:Prny+2))
+         allocate(BsideTFlArr(-2:Prnx+3,-2:Prny+3))
 
          if (enable_radiation) then
            BsideTFlArr = 0
@@ -3541,7 +3541,7 @@ contains
          end if
 
          if (TempBtype(Bo)==BC_DIRICHLET) then
-           allocate(BsideTArr(-1:Prnx+2,-1:Prny+2))
+           allocate(BsideTArr(-2:Prnx+3,-2:Prny+3))
            BsideTArr = sideTemp(Bo)
          end if
 
@@ -3558,7 +3558,7 @@ contains
 
        if (MoistBtype(Bo)==BC_CONSTFLUX.or.MoistBtype(Bo)==BC_DIRICHLET) then
 
-         allocate(BsideMFlArr(-1:Prnx+2,-1:Prny+2))
+         allocate(BsideMFlArr(-2:Prnx+3,-2:Prny+3))
 
          if (enable_radiation) then
            BsideMFlArr = 0
@@ -3569,7 +3569,7 @@ contains
          end if
 
          if (MoistBtype(Bo)==BC_DIRICHLET) then
-           allocate(BsideMArr(-1:Prnx+2,-1:Prny+2))
+           allocate(BsideMArr(-2:Prnx+3,-2:Prny+3))
            BsideMArr = sideMoist(Bo)
          end if
 

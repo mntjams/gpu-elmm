@@ -28,7 +28,7 @@ module Puffs
 contains
 
   subroutine PreparePuffs(Scalar, RK_stage, RK_stages, time, dt)
-    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(inout) :: Scalar
+    real(knd), dimension(-2:,-2:,-2:,1:), contiguous, intent(inout) :: Scalar
     integer, intent(in) :: RK_stage, RK_stages
     real(knd), intent(in) :: time, dt
     integer :: i

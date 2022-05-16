@@ -952,7 +952,7 @@ contains
     end if
 
     if (store%delta_time==1.and.dt>0) then
-      delta_time(step)=delta/dt
+      delta_time(step)=delta
     end if
 
     if (flow_rate_x_fixed) then
@@ -2865,7 +2865,7 @@ contains
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: W
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Temperature
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Moisture
-    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(in) :: Scalar
+    real(knd), dimension(-2:,-2:,-2:,1:), contiguous, intent(in) :: Scalar
 
     
     if (enable_buoyancy) call TemperatureFluxSGSProfile(W,Temperature)
@@ -3004,7 +3004,7 @@ contains
       
   subroutine ScalarFluxSGSProfile(W,Scalar)
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: W
-    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(in) :: Scalar
+    real(knd), dimension(-2:,-2:,-2:,1:), contiguous, intent(in) :: Scalar
     real(knd) :: S
     integer   :: i,j,k,l
 
@@ -3048,7 +3048,7 @@ contains
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Temperature
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: Moisture
-    real(knd), dimension(-1:,-1:,-1:,1:), contiguous, intent(in) :: Scalar
+    real(knd), dimension(-2:,-2:,-2:,1:), contiguous, intent(in) :: Scalar
     real(knd) :: S
     integer   :: i,j,k,l
 
