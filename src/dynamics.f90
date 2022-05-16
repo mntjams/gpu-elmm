@@ -415,7 +415,7 @@ contains
 
     if (explicit_diffusion) then
       if (discretization_order>=3) then
-        call MomentumDiffusion_nobranch_4ord(Ustar, Vstar, Wstar, U, V, W)
+        call MomentumDiffusion_4ord_5point(Ustar, Vstar, Wstar, U, V, W)
       else
         if (gridtype==GRID_VARIABLE_Z) then
           call MomentumDiffusion_variable_z_nobranch_2ord(Ustar, Vstar, Wstar, U, V, W)
