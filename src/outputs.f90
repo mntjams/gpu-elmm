@@ -289,39 +289,39 @@ contains
       end if
 
       if (enable_buoyancy.and.store%avg_temperature==1) then
-        allocate(Temperature_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+        allocate(Temperature_avg(-2:Prnx+3,-2:Prny+3,-2:Prnz+3))
         Temperature_avg = 0
       end if
 
       if (enable_moisture.and.store%avg_moisture==1) then
-        allocate(Moisture_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
+        allocate(Moisture_avg(-2:Prnx+3,-2:Prny+3,-2:Prnz+3))
         Moisture_avg = 0
       end if
     end if
 
     if (num_of_scalars>0.and.store%scalars_avg==1) then
-      allocate(Scalar_avg(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+      allocate(Scalar_avg(-2:Prnx+3,-2:Prny+3,-2:Prnz+3,num_of_scalars))
       Scalar_avg = 0
     else
       allocate(Scalar_avg(0,0,0,0))
     end if
     
     if (num_of_scalars>0.and.store%scalars_variance==1) then
-      allocate(Scalar_variance(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+      allocate(Scalar_variance(-2:Prnx+3,-2:Prny+3,-2:Prnz+3,num_of_scalars))
       Scalar_variance = 0
     else
       allocate(Scalar_variance(0,0,0,0))
     end if
 
     if (num_of_scalars>0.and.store%scalars_max==1) then
-      allocate(Scalar_max(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+      allocate(Scalar_max(-2:Prnx+3,-2:Prny+3,-2:Prnz+3,num_of_scalars))
       Scalar_max = 0
     else
       allocate(Scalar_max(0,0,0,0))
     end if
 
     if (num_of_scalars>0.and.store%scalars_intermitency==1) then
-      allocate(Scalar_intermitency(-1:Prnx+2,-1:Prny+2,-1:Prnz+2,num_of_scalars))
+      allocate(Scalar_intermitency(-2:Prnx+3,-2:Prny+3,-2:Prnz+3,num_of_scalars))
       Scalar_intermitency = 0
     else
       allocate(Scalar_intermitency(0,0,0,0))
