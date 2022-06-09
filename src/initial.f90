@@ -3935,7 +3935,9 @@ contains
     
     nt = 1
     !$omp parallel
+    !$omp single
     !$ nt = omp_get_num_threads()
+    !$omp end single
     !$omp end parallel
 
     seed = base
