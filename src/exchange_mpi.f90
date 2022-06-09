@@ -378,24 +378,30 @@ contains
     if (Btype(We)==BC_MPI_PERIODIC.or.Btype(Ea)==BC_MPI_PERIODIC) then
       if (iim==1) then
         call send(Phi, We)
+        call recv(Phi, We)
       else if (iim==nxims) then
         call recv(Phi, Ea)
+        call send(Phi, Ea)
       end if     
     end if
 
     if (Btype(So)==BC_MPI_PERIODIC.or.Btype(No)==BC_MPI_PERIODIC) then
       if (jim==1) then
         call send(Phi, So)
+        call recv(Phi, So)
       else if (jim==nyims) then
         call recv(Phi, No)
+        call send(Phi, No)
       end if
     end if
           
     if (Btype(Bo)==BC_MPI_PERIODIC.or.Btype(To)==BC_MPI_PERIODIC) then
       if (kim==1) then
         call send(Phi, Bo)
+        call recv(Phi, Bo)
       else if (kim==nzims) then
         call recv(Phi, To)
+        call send(Phi, To)
       end if
     end if
 
