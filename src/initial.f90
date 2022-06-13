@@ -3176,6 +3176,9 @@ contains
           call InitScalarProfile(TempIn,TemperatureProfileObj,temperature_ref)
 
           call InitScalar(TempIn,TemperatureProfileObj,Temperature)
+          
+          !only affects Dirichlet BC's without a wall model
+          call UpdateSurfaceTemperatures(U, V, W, Pr, Temperature, Moisture)
 
         end if !buoyancy and task_type
 

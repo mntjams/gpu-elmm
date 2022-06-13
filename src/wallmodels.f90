@@ -128,6 +128,7 @@ module Wallmodels
          AddWMPoint, AddWMPointUVW, &
          MoveWMPointsToArray, GetOutsideBoundariesWM, InitWMMasks, &
          ComputeViscsWM, ComputeUVWFluxesWM, DivergenceWM, &
+         UpdateSurfaceTemperatures, &
          GroundDeposition, &
          GroundUstar, GroundUstarUVW, &
          GroundTFlux, GroundTFluxUVW, &
@@ -2046,7 +2047,7 @@ contains
 
   subroutine ComputeViscsWM(U,V,W,Pr,Temperature,Moisture)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-    real(knd),dimension(-1:,-1:,-1:),   intent(in) :: Pr
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Pr
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: Temperature
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: Moisture
     integer :: i, xi, yj, zk
@@ -2155,7 +2156,7 @@ contains
 
   subroutine ComputeUVWFluxesWM(U, V, W, Pr, Temperature, Moisture)
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
-    real(knd),dimension(-1:,-1:,-1:),   intent(in) :: Pr
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Pr
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: Temperature
     real(knd),dimension(-2:,-2:,-2:),intent(in) :: Moisture
 
@@ -2394,6 +2395,43 @@ contains
         vel(3) =   W(xi, yj, zk)
     end select
   end function
+  
+  
+  
+  
+  
+  
+  subroutine UpdateSurfaceTemperatures(U, V, W, Pr, Temperature, Moisture)
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: U,V,W
+    real(knd),dimension(-1:,-1:,-1:),intent(in) :: Pr
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: Temperature
+    real(knd),dimension(-2:,-2:,-2:),intent(in) :: Moisture
+    integer :: i, j
+    
+#ifdef CUSTOM_SURFACE_TEMPERATURE  
+    if (TempBtype(Bo)==BC_DIRICHLET) then
+      do j = 1, Prny
+        do i = 1, Prnx
+          SideTemp(Bo) = SurfaceTemperature(xPr(i), yPr(j), zW(0), time_stepping%time)
+        end do
+      end do
+    end if
+#elif CUSTOM_SURFACE_TEMPERATURE_FLUX
+    if (TempBtype(Bo)==BC_CONSTFLUX) then
+      do j = 1, Prny
+        do i = 1, Prnx
+          SideTemp(Bo) = SurfaceTemperatureFlux(xPr(i), yPr(j), zW(0), time_stepping%time)
+        end do
+      end do
+    end if
+#endif  
+  
+  end subroutine
+  
+  
+  
+  
+  
 
 
   real(knd) function GroundUstar()

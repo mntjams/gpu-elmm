@@ -861,6 +861,8 @@ contains
     if (wallmodeltype>0) then
                       !resulting Viscosity intentionally overwritten
                       call ComputeViscsWM(U,V,W,Pr,Temperature,Moisture)
+    else if (enable_buoyancy) then
+                      call UpdateSurfaceTemperatures(U, V, W, Pr, Temperature, Moisture)
     end if
     
 
@@ -868,7 +870,7 @@ contains
 
 
     if (wallmodeltype>0) then
-                    call ComputeUVWFluxesWM(U,V,W,Pr,Temperature,Moisture)
+                    call ComputeUVWFluxesWM(U, V, W, Pr, Temperature, Moisture)
     end if
 
     call BoundViscosity(Viscosity)
