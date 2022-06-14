@@ -442,7 +442,7 @@ contains
 
 #ifdef CUSTOM_FORCING
     call CustomForcingProcedure(Ustar, Vstar, Wstar, U, V, W, &
-                                  Temperature, Moisture, Scalar, Pr)
+                                Temperature, Moisture, Scalar, Pr)
 #endif
 
     !$omp parallel private(i,j,k)
