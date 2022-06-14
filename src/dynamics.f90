@@ -247,6 +247,21 @@ contains
     integer,   intent(in) :: RK_stage
     real(knd), intent(in) :: dt
     integer :: i,j,k
+    
+#ifdef CUSTOM_FORCING
+    interface
+      subroutine CustomForcingProcedure(U2, V2, W2, U, V, W, &
+                                     Temperature, Moisture, Scalar, Pr)
+        use Parameters
+        real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: U, V, W
+        real(knd), dimension(-2:,-2:,-2:), contiguous, intent(out)   :: U2, V2, W2
+        real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: Temperature
+        real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: Moisture
+        real(knd), dimension(-2:,-2:,-2:,:), contiguous, intent(in)  :: Scalar
+        real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)    :: Pr
+      end subroutine
+    end interface
+#endif
 
     if (RK_stage>1) then
       !$omp parallel private(i,j,k)
@@ -425,6 +440,10 @@ contains
       end if
     end if  
 
+#ifdef CUSTOM_FORCING
+    call CustomForcingProcedure(Ustar, Vstar, Wstar, U, V, W, &
+                                  Temperature, Moisture, Scalar, Pr)
+#endif
 
     !$omp parallel private(i,j,k)
     !$omp do
