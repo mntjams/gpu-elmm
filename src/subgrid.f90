@@ -232,6 +232,9 @@ module Subgrid
       real(knd) :: c2
       integer :: i, j, k, bi, bj, bk, ii, jj
       integer :: tnx, tny, tnz
+      
+      real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+      real(knd), parameter :: D1 = 2._knd / 3, D3 = 1._knd / 12
 
       integer,parameter :: narr = 4
     
@@ -245,6 +248,8 @@ module Subgrid
       dy2 = dymin**2
       dz2 = dzmin**2
 
+      !NOTE: Consider consolidating the common part, but it would be branching in a tight loop.
+      ! But there might be enough computing to offset that.
       if (gridtype==GRID_VARIABLE_Z) then
         !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) collapse(3)
         do bk = 1, Prnz, tnz
@@ -267,58 +272,6 @@ module Subgrid
                 a(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) / dz_2k
 
                 a(3,3) = (W(i,j,k)-W(i,j,k-1)) / dzPr(k)
-                a(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) / (4._knd*dxmin)
-                a(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) / (4._knd*dymin)
-
-                do jj = 1, 3
-                  do ii = 1, 3
-                    b(ii,jj) = dx2 * a(1,ii) * a(1,jj) + &
-                              dy2 * a(2,ii) * a(2,jj) + &
-                              dz2 * a(3,ii) * a(3,jj)
-                  end do
-                end do
-
-                bb =      b(1,1)*b(2,2) - b(1,2)**2
-                bb = bb + b(1,1)*b(3,3) - b(1,3)**2
-                bb = bb + b(2,2)*b(3,3) - b(2,3)**2
-
-                aa = 0
-
-                do jj = 1, 3
-                  do ii = 1, 3
-                    aa = aa + (a(ii,jj)**2)
-                  end do
-                end do
-
-
-
-                Viscosity(i,j,k) = c2 * sqrt(bb/aa)
-
-                Viscosity(i,j,k) = max(0._knd, Viscosity(i,j,k)) + molecular_viscosity
-             end do
-            end do
-           end do
-          end do
-         end do
-        end do
-        !$omp end parallel do
-      else
-        !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) collapse(3)
-        do bk = 1, Prnz, tnz
-         do bj = 1, Prny, tny
-          do bi = 1, Prnx, tnx
-           do k = bk, min(bk+tnz-1, Prnz)
-            do j = bj, min(bj+tny-1, Prny)
-             do i = bi, min(bi+tnx-1, Prnx)
-                a(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
-                a(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) / (4._knd*dymin)
-                a(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) / (4._knd*dzmin)
-
-                a(2,2) = (V(i,j,k)-V(i,j-1,k)) / dymin
-                a(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) / (4._knd*dxmin)
-                a(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) / (4._knd*dzmin)
-
-                a(3,3) = (W(i,j,k)-W(i,j,k-1)) / dzmin
                 a(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) / (4._knd*dxmin)
                 a(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) / (4._knd*dymin)
 
@@ -354,6 +307,130 @@ module Subgrid
          end do
         end do
         !$omp end parallel do
+      else
+        if (discretization_order==4) then
+          !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) collapse(3)
+          do bk = 1, Prnz, tnz
+           do bj = 1, Prny, tny
+            do bi = 1, Prnx, tnx
+             do k = bk, min(bk+tnz-1, Prnz)
+              do j = bj, min(bj+tny-1, Prny)
+               do i = bi, min(bi+tnx-1, Prnx)
+                  a(1,1) = (C1*(U(i,j,k)-U(i-1,j,k)) - C3*(U(i+1,j,k)-U(i-2,j,k))) / dxmin
+                  a(2,1) = ( &
+                             D1*(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) - &
+                             D3*(U(i,j+2,k)+U(i-1,j+2,k)-U(i,j-2,k)-U(i-1,j-2,k)) &
+                           ) / (2*dymin)
+                  a(3,1) = ( &
+                             D1*(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) - &
+                             D1*(U(i,j,k+2)+U(i-1,j,k+2)-U(i,j,k-2)-U(i-1,j,k-2)) &
+                           ) / (2*dzmin)
+
+                  a(2,2) = (C1*(V(i,j,k)-V(i,j-1,k)) - C3*(V(i,j+1,k)-V(i,j-2,k))) / dymin
+                  a(1,2) = ( &
+                             D1*(V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) - &
+                             D3*(V(i+2,j,k)+V(i+2,j-1,k)-V(i-2,j,k)-V(i-2,j-1,k)) &
+                           ) / (2*dxmin)
+                  a(3,2) = ( &
+                             D1*(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) - &
+                             D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
+                           ) / (2*dzmin)
+
+                  a(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+                  a(1,3) = ( &
+                             D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
+                             D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
+                           ) / (2*dxmin)
+                  a(2,3) = ( &
+                             D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
+                             D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                           ) / (2*dymin)
+
+                  do jj = 1, 3
+                    do ii = 1, 3
+                      b(ii,jj) = dx2 * a(1,ii) * a(1,jj) + &
+                                 dy2 * a(2,ii) * a(2,jj) + &
+                                 dz2 * a(3,ii) * a(3,jj)
+                    end do
+                  end do
+
+                  bb =      b(1,1)*b(2,2) - b(1,2)**2
+                  bb = bb + b(1,1)*b(3,3) - b(1,3)**2
+                  bb = bb + b(2,2)*b(3,3) - b(2,3)**2
+
+                  aa = 0
+
+                  do jj = 1, 3
+                    do ii = 1, 3
+                      aa = aa + (a(ii,jj)**2)
+                    end do
+                  end do
+
+
+
+                  Viscosity(i,j,k) = c2 * sqrt(bb/aa)
+
+                  Viscosity(i,j,k) = max(0._knd, Viscosity(i,j,k)) + molecular_viscosity
+               end do
+              end do
+             end do
+            end do
+           end do
+          end do
+          !$omp end parallel do
+        else
+          !$omp parallel do private(aa,bb,a,b,i,j,k,bi,bj,bk,ii,jj) schedule(runtime) collapse(3)
+          do bk = 1, Prnz, tnz
+           do bj = 1, Prny, tny
+            do bi = 1, Prnx, tnx
+             do k = bk, min(bk+tnz-1, Prnz)
+              do j = bj, min(bj+tny-1, Prny)
+               do i = bi, min(bi+tnx-1, Prnx)
+                  a(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
+                  a(2,1) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) / (4._knd*dymin)
+                  a(3,1) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) / (4._knd*dzmin)
+
+                  a(2,2) = (V(i,j,k)-V(i,j-1,k)) / dymin
+                  a(1,2) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) / (4._knd*dxmin)
+                  a(3,2) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) / (4._knd*dzmin)
+
+                  a(3,3) = (W(i,j,k)-W(i,j,k-1)) / dzmin
+                  a(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) / (4._knd*dxmin)
+                  a(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) / (4._knd*dymin)
+
+                  do jj = 1, 3
+                    do ii = 1, 3
+                      b(ii,jj) = dx2 * a(1,ii) * a(1,jj) + &
+                                 dy2 * a(2,ii) * a(2,jj) + &
+                                 dz2 * a(3,ii) * a(3,jj)
+                    end do
+                  end do
+
+                  bb =      b(1,1)*b(2,2) - b(1,2)**2
+                  bb = bb + b(1,1)*b(3,3) - b(1,3)**2
+                  bb = bb + b(2,2)*b(3,3) - b(2,3)**2
+
+                  aa = 0
+
+                  do jj = 1, 3
+                    do ii = 1, 3
+                      aa = aa + (a(ii,jj)**2)
+                    end do
+                  end do
+
+
+
+                  Viscosity(i,j,k) = c2 * sqrt(bb/aa)
+
+                  Viscosity(i,j,k) = max(0._knd, Viscosity(i,j,k)) + molecular_viscosity
+               end do
+              end do
+             end do
+            end do
+           end do
+          end do
+          !$omp end parallel do
+        end if
       end if
     endsubroutine SGS_Vreman
 
