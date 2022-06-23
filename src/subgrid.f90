@@ -466,32 +466,61 @@ module Subgrid
       width = filter_ratio * (dxmin*dymin*dzmin)**(1._knd/3._knd)
       C = (Csig*width)**2
 
-      !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk) schedule(runtime) collapse(3)
-      do bk = 1, Prnz, tnz
-       do bj = 1, Prny, tny
-        do bi = 1, Prnx, tnx
-         do k = bk, min(bk+tnz-1, Prnz)
-          do j = bj, min(bj+tny-1, Prny)
-           do i = bi, min(bi+tnx-1, Prnx)
+      !TODO: profile and perhaps consolidate into a single loop.
+      if (discretization_order==4) then
+        !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk) schedule(runtime) collapse(3)
+        do bk = 1, Prnz, tnz
+         do bj = 1, Prny, tny
+          do bi = 1, Prnx, tnx
+           do k = bk, min(bk+tnz-1, Prnz)
+            do j = bj, min(bj+tny-1, Prny)
+             do i = bi, min(bi+tnx-1, Prnx)
 
-            call GradientTensorUG(g, i, j, k)
+              call GradientTensorUG4(g, i, j, k)
 
-            call Sigmas(s1,s2,s3,g)
+              call Sigmas(s1,s2,s3,g)
 
-            D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
+              D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
 
-            D = max(0._knd, D)
+              D = max(0._knd, D)
 
-            Viscosity(i,j,k) = C * D + molecular_viscosity
+              Viscosity(i,j,k) = C * D + molecular_viscosity
 
+             end do
+            end do
            end do
           end do
          end do
         end do
-       end do
-      end do
-      !$omp end parallel do
+        !$omp end parallel do
+      else
+        !$omp parallel do private(g,s1,s2,s3,D,i,j,k,bi,bj,bk) schedule(runtime) collapse(3)
+        do bk = 1, Prnz, tnz
+         do bj = 1, Prny, tny
+          do bi = 1, Prnx, tnx
+           do k = bk, min(bk+tnz-1, Prnz)
+            do j = bj, min(bj+tny-1, Prny)
+             do i = bi, min(bi+tnx-1, Prnx)
 
+              call GradientTensorUG(g, i, j, k)
+
+              call Sigmas(s1,s2,s3,g)
+
+              D = (s3 * (s1 - s2) * (s2 - s3)) / s1**2
+
+              D = max(0._knd, D)
+
+              Viscosity(i,j,k) = C * D + molecular_viscosity
+
+             end do
+            end do
+           end do
+          end do
+         end do
+        end do
+        !$omp end parallel do
+      end if
+      
     contains
 
       pure subroutine GradientTensorUG(g ,i, j, k)
@@ -510,6 +539,44 @@ module Subgrid
         g(1,3) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) / (4._knd*dxmin)
         g(2,3) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) / (4._knd*dymin)
       end subroutine GradientTensorUG
+
+
+      pure subroutine GradientTensorUG4(g ,i, j, k)
+        real(knd), intent(out) :: g(3,3)
+        integer, intent(in) :: i, j, k
+        real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+        real(knd), parameter :: D1 = 2._knd / 3, D3 = 1._knd / 12
+
+        g(1,1) = (C1*(U(i,j,k)-U(i-1,j,k)) - C3*(U(i+1,j,k)-U(i-2,j,k))) / dxmin
+        g(2,1) = ( &
+                    D1*(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) - &
+                    D3*(U(i,j+2,k)+U(i-1,j+2,k)-U(i,j-2,k)-U(i-1,j-2,k)) &
+                 ) / (2*dymin)
+        g(3,1) = ( &
+                    D1*(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) - &
+                    D1*(U(i,j,k+2)+U(i-1,j,k+2)-U(i,j,k-2)-U(i-1,j,k-2)) &
+                 ) / (2*dzmin)
+
+        g(2,2) = (C1*(V(i,j,k)-V(i,j-1,k)) - C3*(V(i,j+1,k)-V(i,j-2,k))) / dymin
+        g(1,2) = ( &
+                    D1*(V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) - &
+                    D3*(V(i+2,j,k)+V(i+2,j-1,k)-V(i-2,j,k)-V(i-2,j-1,k)) &
+                 ) / (2*dxmin)
+        g(3,2) = ( &
+                    D1*(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) - &
+                    D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
+                 ) / (2*dzmin)
+
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+        g(1,3) = ( &
+                    D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
+                    D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
+                 ) / (2*dxmin)
+        g(2,3) = ( &
+                    D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
+                    D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                 ) / (2*dymin)
+      end subroutine GradientTensorUG4
 
 
       pure subroutine Sigmas(s1,s2,s3,grads)
