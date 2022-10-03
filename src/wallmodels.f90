@@ -1569,30 +1569,28 @@ contains
   end function PsiH_MO
 
 
-  pure real(knd) function PsiM_MO_mod(zeta) result(res)
-    real(knd),intent(in):: zeta
+  pure real(knd) function PsiM_MO_mod(zeta, k_U) result(res)
+    real(knd),intent(in):: zeta, k_U
     real(knd) :: x
-    !For L defined without k!
+    !Original formulation of Zilitinkevich, Esau - 2006 was for L defined without k!
     if (zeta<0) then
-      x = (1-6._knd*zeta)**(1/4._knd)
+      x = (1-6._knd*zeta*k_U)**(1/4._knd)
       res = log(((1+x**2)/2._knd)*((1+x)/2._knd)**2)-2._knd*atan(x)+pi/2
     else
-      !Zilitinkevich, Esau - 2006
-      res = - 3 * zeta**(5._knd/6._knd) 
+      res = - 3 * (zeta*k_U)**(5._knd/6._knd) 
     end if
   end function PsiM_MO_mod
 
 
-  pure real(knd) function PsiH_MO_mod(zeta) result(res)
-    real(knd),intent(in):: zeta
+  pure real(knd) function PsiH_MO_mod(zeta, k_U) result(res)
+    real(knd),intent(in):: zeta, k_U
     real(knd) :: x
-    !For L defined without k!
+    !Original formulation of Zilitinkevich, Esau - 2006 was for L defined without k!
     if (zeta<0) then
-      x = (1-6._knd*zeta)**(1/4._knd)
+      x = (1-6._knd*zeta*k_U)**(1/4._knd)
       res = 2._knd*log((1+x**2)/2._knd)
     else
-      !Zilitinkevich, Esau - 2006
-      res = - 2.5_knd * zeta**(4._knd/5._knd)
+      res = - 2.5_knd * (zeta*k_U)**(4._knd/5._knd)
     end if
   end function PsiH_MO_mod
 
@@ -1669,7 +1667,7 @@ contains
     real(knd),parameter :: eps = 1e-3_knd
     real(knd),parameter :: yplcrit = 11.225_knd
     real(knd),parameter :: k_U = 0.4_knd
-    real(knd),parameter :: k_T = 0.47_knd
+    real(knd),parameter :: k_T = 0.47_knd !0.47 for Zilitinkevich, Esau - 2006
     real(knd) :: zL, zL0, psi_m, psi_h, ustar_lam, dist_plus
     integer :: i
 
@@ -1696,11 +1694,10 @@ contains
        do
          i = i+1
          
-         !L does not contain the Karman constant!
-         zL =  - dist * grav_acc * temperature_flux / (temperature_ref * ustar**3)
+         zL =  - dist * grav_acc * temperature_flux / (k_U * temperature_ref * ustar**3)
          
-         psi_m = PsiM_MO_mod(zL)
-         psi_h = PsiH_MO_mod(zL)
+         psi_m = PsiM_MO_mod(zL, k_U)
+         psi_h = PsiH_MO_mod(zL, k_U)
          
          ustar = vel * k_U / (log(dist/z0) - psi_m)
          temperature_flux = - tempdif * ustar * k_T / (log(dist/z0H) - psi_h)
@@ -1732,7 +1729,8 @@ contains
     real(knd),parameter :: eps = 1e-3_knd
     real(knd),parameter :: yplcrit = 11.225_knd
     real(knd),parameter :: k_U = 0.4_knd
-    real(knd),parameter :: k_T = 0.47_knd, k_Q = k_T
+    real(knd),parameter :: k_T = 0.47_knd !0.47 for Zilitinkevich, Esau - 2006
+    real(knd),parameter :: k_Q = k_T
     real(knd),parameter :: e_coef = 0.61_knd
     real(knd) :: zL, zL0, psi_m, psi_h, psi_e
     real(knd) :: tempdif, moistdif, virt_flux
@@ -1762,11 +1760,10 @@ contains
          virt_flux = temperature_flux * (1 + e_coef * moist) + &
                      e_coef * temp * moisture_flux
          
-         !L does not contain the Karman constant!
-         zL =  - dist * grav_acc * virt_flux / (temperature_ref * ustar**3)
+         zL =  - dist * grav_acc * virt_flux / (k_U * temperature_ref * ustar**3)
          
-         psi_m = PsiM_MO_mod(zL)
-         psi_h = PsiH_MO_mod(zL)
+         psi_m = PsiM_MO_mod(zL, k_U)
+         psi_h = PsiH_MO_mod(zL, k_U)
          psi_e = psi_h
          
          ustar = vel * k_U / (log(dist/z0) - psi_m)
