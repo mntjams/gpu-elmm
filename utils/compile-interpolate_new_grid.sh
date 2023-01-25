@@ -1,4 +1,5 @@
 gfortran -O3 -g -fbacktrace -cpp -Wall -Wno-maybe-uninitialized -Wno-unused-dummy-argument -fcheck=all \
+../../bspline-fortran/src/bspline_kinds_module.F90 \
 ../../bspline-fortran/src/bspline_sub_module.f90 \
 ../../bspline-fortran/src/bspline_oo_module.f90 \
 ../src/lists.f90  \
