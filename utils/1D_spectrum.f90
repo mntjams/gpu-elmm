@@ -768,7 +768,7 @@ contains
     
     if (.not. c_associated(forw)) &
       forw = fftw_plan_gen(size(u), &
-                  u, u_hat, FFTW_UNALIGNED)
+                  u, u_hat, FFTW_UNALIGNED+FFTW_ESTIMATE)
                 
     do k = mink, maxk
       do j = minj, maxj
