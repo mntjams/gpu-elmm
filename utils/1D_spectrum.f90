@@ -1,7 +1,10 @@
 module Kinds
   use iso_fortran_env
-  
+#ifdef DPREC  
+  integer,parameter :: rp = real64
+#else
   integer,parameter :: rp = real32
+#endif
 end module
 
 module Endianness
@@ -249,6 +252,7 @@ module Types
     procedure :: read_title
     procedure :: read_scalar
     procedure :: read_vector
+    procedure :: skip_var
   end type
   
   integer, parameter :: SCALAR = 7, VECTOR = 8
@@ -261,6 +265,7 @@ contains
     use Endianness
     class(grid),intent(inout) :: g
     integer :: io
+    real(real32), allocatable :: tmp(:)
 
     open(newunit=g%unit,file=g%fname,access="stream",form="unformatted",status="old",action="read",iostat=io)
 
@@ -279,9 +284,10 @@ contains
     call get_number(g%nx)
     call skip_line
     
-    allocate(g%x(g%nx))
-    read(g%unit,iostat=io) g%x
-    g%x=BigEnd(g%x)
+    allocate(tmp(g%nx))
+    read(g%unit,iostat=io) tmp
+    g%x=BigEnd(tmp)
+    deallocate(tmp)
 
     call skip_to("Y_COORDINATES", io)
     if (io/=0) then
@@ -291,9 +297,10 @@ contains
     call get_number(g%ny)
     call skip_line
     
-    allocate(g%y(g%ny))
-    read(g%unit,iostat=io) g%y
-    g%y=BigEnd(g%y)
+    allocate(tmp(g%ny))
+    read(g%unit,iostat=io) tmp
+    g%y=BigEnd(tmp)
+    deallocate(tmp)
 
     call skip_to("Z_COORDINATES", io)
     if (io/=0) then
@@ -303,9 +310,10 @@ contains
     call get_number(g%nz)
     call skip_line
     
-    allocate(g%z(g%nz))
-    read(g%unit,iostat=io) g%z
-    g%z=BigEnd(g%z)
+    allocate(tmp(g%nz))
+    read(g%unit,iostat=io) tmp
+    g%z=BigEnd(tmp)
+    deallocate(tmp)
     
     call skip_line
     call skip_line
@@ -475,22 +483,55 @@ contains
   end subroutine
   
   subroutine read_scalar(g,buf)
+    use Endianness
     class(grid),intent(in) :: g
     real(rp),intent(out) :: buf(:,:,:)
+    real(real32), allocatable :: tmp(:,:,:) 
     character :: ch
     
-    read(g%unit) buf(1:g%nx,1:g%ny,1:g%nz)
+    if (rp==real32) then
+      read(g%unit) buf(1:g%nx,1:g%ny,1:g%nz)
+      buf(1:g%nx,1:g%ny,1:g%nz) = BigEnd(buf(1:g%nx,1:g%ny,1:g%nz))
+    else
+      allocate(tmp(1:g%nx,1:g%ny,1:g%nz))
+      read(g%unit) tmp
+      buf(1:g%nx,1:g%ny,1:g%nz) = BigEnd(tmp)
+    end if
     read(g%unit) ch
   end subroutine
   
   subroutine read_vector(g,buf)
-  use Endianness
+    use Endianness
     class(grid),intent(in) :: g
     real(rp),intent(out) :: buf(:,:,:,:)
+    real(real32), allocatable :: tmp(:,:,:,:) 
     character :: ch
 
-    read(g%unit) buf(:,1:g%nx,1:g%ny,1:g%nz)
+   if (rp==real32) then
+      read(g%unit) buf(:,1:g%nx,1:g%ny,1:g%nz)
+      buf(:,1:g%nx,1:g%ny,1:g%nz) = BigEnd(buf(:,1:g%nx,1:g%ny,1:g%nz))
+    else
+      allocate(tmp(3,1:g%nx,1:g%ny,1:g%nz))
+      read(g%unit) tmp
+      buf(:,1:g%nx,1:g%ny,1:g%nz) = BigEnd(tmp)
+    end if
     read(g%unit) ch
+  end subroutine
+  
+  subroutine skip_var(g,stat)
+    use iso_c_binding
+    class(grid),intent(in) :: g
+    integer, intent(in) :: stat
+    integer(c_size_t) :: nbytes, fpos
+    nbytes = c_sizeof(1_real32) * &
+            int(g%nx, c_size_t) * &
+            int(g%ny, c_size_t) * &
+            int(g%nz, c_size_t)
+    if (stat==VECTOR) nbytes = nbytes *3
+    nbytes = nbytes + 1 !EOL
+    
+    inquire(g%unit, pos = fpos)
+    read(g%unit, pos=fpos + nbytes)
   end subroutine
   
 end module Types
@@ -510,39 +551,70 @@ program spectrum_1D
   
   integer :: nx, ny, nz
   real(rp), allocatable :: sc(:,:,:),vec(:,:,:,:)
+
+  real(rp), allocatable, dimension(:) :: kappas, spectrum_1comp
+  real(rp), allocatable, dimension(:,:) :: spectrum
+  real(rp) :: variance, variances(3)
  
   character(:), allocatable :: title
-  integer :: status, var_type, arg_len, title_pos
+  integer :: status, var_type, title_pos
   
-  character(:), allocatable :: in_name, out_name, arg
+  character(:), allocatable :: in_name, out_name, field, arg, field_title
+  integer :: iarg, arg_len
+  
+  integer :: n, iu, j
+  
+  character(2048) :: command_line
   
   type(grid) :: in_g
   
-  integer :: dir
+  integer :: dir = 1
+  
+  integer :: xrange(2)=[-1,huge(1)], &
+             yrange(2)=[-1,huge(1)], &
+             zrange(2)=[-1,huge(1)]
   
   call GetEndianness
 
-  if (command_argument_count()<1) then
-    write(*,*) "Usage: 1D_spectrum U.vtk spectrum.txt [direction]"
+  if (command_argument_count()<2) then
+    write(*,*) 'Example usage: 1D_spectrum U.vtk spectrum.txt [dir=1 field=U xrange=1,10 yrange=1,10 zrange=1,10]'
     stop 1
   end if
- 
+  
+  
   call get_command_argument(1, length=arg_len)
   allocate(character(arg_len) :: in_name)
   call get_command_argument(1, value=in_name)
-
+ 
   call get_command_argument(2, length=arg_len)
   allocate(character(arg_len) :: out_name)
   call get_command_argument(2, value=out_name)
-  
-  if (command_argument_count()>2) then
-    call get_command_argument(3, length=arg_len)
+ 
+  do iarg = 3, command_argument_count()
+    call get_command_argument(iarg, length=arg_len)
     allocate(character(arg_len) :: arg)
-    call get_command_argument(3, value=arg)
-    read(arg,*) dir
-  else
-    dir = 1
-  end if
+    call get_command_argument(iarg, value=arg)
+    
+    !NOTE:quick and dirty, bit working
+    if (arg(1:4)=="dir=") then
+      read(arg(5:),*) dir
+    else if (arg(1:7)=="xrange=") then
+      read(arg(8:),*) xrange
+    else if (arg(1:7)=="yrange=") then
+      read(arg(8:),*) yrange
+    else if (arg(1:7)=="zrange=") then
+      read(arg(8:),*) zrange
+    else if (arg(1:6)=="field=") then
+      field = arg(7:)
+    else
+      write(*,*) "Error, unrecognized command line argument:","'",arg,"'"
+      stop 1
+    end if
+    deallocate(arg)
+  end do
+  
+  if (.not.allocated(field)) allocate(character(0) :: field)
+    
   
   in_g%fname = in_name
   call in_g%read_header
@@ -558,34 +630,84 @@ program spectrum_1D
   
   do
     call in_g%read_title(status,title)
+    
+    if (status/=SCALAR .and. status/=VECTOR) exit
 
-    if (status==SCALAR) then
-      call get_buffer(status,sc,vec)
+    field_title = get_field_name(title)
+
+    if (len(field)<=0.or.field_title==field) then
     
-      sc = BigEnd(sc)
-    
-      call do_transform(sc, dir)
-    else if (status==VECTOR) then
-      call get_buffer(status,sc,vec)
-    
-      sc = BigEnd(vec(1,:,:,:))
-    
-      call do_transform(sc, dir)
+      if (status==SCALAR) then
+        call get_buffer(status,sc,vec)
+
+        call do_transform(sc, dir, kappas, spectrum_1comp, variance)
+        
+        allocate(spectrum(size(spectrum_1comp),1))
+        spectrum(:,1) = spectrum_1comp
+        
+        n = size(kappas)
+        
+        open(newunit=iu,file=out_name)
+        do j = 1, n
+          write(iu,*) kappas(j), spectrum(j,1)
+        end do 
+        close(iu)
+        
+        write(*,*) "average 1D variance:", variance
+        write(*,*) "spectrum integral:", sum(spectrum)/n *kappas(n)
+        write(*,*) "full 3D array variance:", array_variance(sc)
+
+      else if (status==VECTOR) then
+        call get_buffer(status,sc,vec)
+        
+        sc = vec(1,:,:,:)
+        call do_transform(sc, dir, kappas, spectrum_1comp, variances(1))        
+        
+        allocate(spectrum(size(spectrum_1comp),3))
+        
+        spectrum(:,1) = spectrum_1comp
+        sc = vec(2,:,:,:)
+        call do_transform(sc, dir, kappas, spectrum_1comp, variances(2))        
+        spectrum(:,2) = spectrum_1comp
+        sc = vec(3,:,:,:)
+        call do_transform(sc, dir, kappas, spectrum_1comp, variances(3))        
+        spectrum(:,3) = spectrum_1comp
+        
+        
+        n = size(kappas)
+        
+        open(newunit=iu,file=out_name)
+        do j = 1, n
+          write(iu,*) kappas(j), spectrum(j,:), sum(spectrum(j,:))/2
+        end do 
+        close(iu)
+        
+        write(*,*) "average 1D variances:", variances
+        write(*,*) "spectrum integrals:", sum(spectrum,dim=1)/n *kappas(n)
+        write(*,*) "<E11 + E22 + E33>/2:", sum(variances)/2
+        forall(j=1:3) variances(j) = array_variance(vec(j,:,:,:))
+        write(*,*) "full 3D variances and TKE:", variances, sum(variances)/2
+      end if
+      exit
+    else
+      call in_g%skip_var(status)
     end if
-    exit
   end do
   
 contains
 
-  subroutine do_transform(u3d, dir)
+  subroutine do_transform(u3d, dir, kappas, spectrum, u_var)
     real(rp), intent(in) :: u3d(:,:,:)
     integer, intent(in) :: dir    
+    real(rp), allocatable, intent(out) :: kappas(:), spectrum(:)
+    real(rp), intent(out) :: u_var
     real(rp), allocatable :: u(:), sp(:), sp_avg(:)
     complex(rp), allocatable :: u_hat(:)
     integer :: n, nj, nk
-    type(c_ptr) :: forw
-    integer :: i, j, k, iu
-    real(rp) :: dx, lx, u_var, u_m
+    integer :: mini, minj, mink, maxi, maxj, maxk
+    type(c_ptr), save :: forw = c_null_ptr
+    integer :: i, j, k
+    real(rp) :: dx, lx, u_m
     real(rp), parameter :: pi = acos(-1.0_rp)
     
     n = size(u3d,dir)
@@ -594,13 +716,47 @@ contains
       case (1)
         nj = size(u3d, 2)
         nk = size(u3d, 3)
+
+        mini = max(1,xrange(1))
+        maxi = min(n,xrange(2))
+
+        minj = max(1,yrange(1))
+        maxj = min(nj,yrange(2))
+
+        mink = max(1,zrange(1))
+        maxk = min(nk,zrange(2))
+
       case (2)
         nj = size(u3d, 1)
         nk = size(u3d, 3)
+
+        mini = max(1,yrange(1))
+        maxi = min(n,yrange(2))
+
+        minj = max(1,xrange(1))
+        maxj = min(nj,xrange(2))
+
+        mink = max(1,zrange(1))
+        maxk = min(nk,zrange(2))
+
       case (3)
         nj = size(u3d, 1)
-        nk = size(u3d, 3)
+        nk = size(u3d, 2)
+
+        mini = max(1,zrange(1))
+        maxi = min(n,zrange(2))
+
+        minj = max(1,xrange(1))
+        maxj = min(nj,xrange(2))
+
+        mink = max(1,yrange(1))
+        maxk = min(nk,yrange(2))
+
     end select
+    
+    n = maxi - mini + 1
+    nj = maxj - minj + 1
+    nk = maxk - mink + 1
     
     allocate(u(n))
     allocate(u_hat(0:n/2))
@@ -610,18 +766,19 @@ contains
     sp_avg = 0
     u_var = 0
     
-    forw = fftw_plan_gen(size(u), &
-                u, u_hat, FFTW_UNALIGNED)
+    if (.not. c_associated(forw)) &
+      forw = fftw_plan_gen(size(u), &
+                  u, u_hat, FFTW_UNALIGNED)
                 
-    do k = 1, nk
-      do j = 1, nj
+    do k = mink, maxk
+      do j = minj, maxj
         select case (dir)
           case (1)
-            u = u3d(:,j,k)
+            u = u3d(mini:maxi,j,k)
           case (2)
-            u = u3d(j,:,k)
+            u = u3d(j,mini:maxi,k)
           case (3)
-            u = u3d(j,k,:)
+            u = u3d(j,k,mini:maxi)
         end select
         
 #ifdef DPREC
@@ -643,9 +800,7 @@ contains
     
     sp_avg = sp_avg / (nj*nk)
     
-    u_var = u_var / size(u3d)
-    
-    write(*,*) "variance:", u_var
+    u_var = u_var / (n*nj*nk)
 
     select case (dir)
       case(1)
@@ -659,13 +814,10 @@ contains
         dx = (in_g%z(n)-in_g%z(1))/n
     end select
     
-    open(newunit=iu,file=out_name)
-    do j = 1, size(sp_avg)
-      write(iu,*) 2*pi*j/lx, dx*sp_avg(j)/pi
-    end do 
-    close(iu)
+    spectrum = dx * sp_avg / pi
     
-    write(*,*) "integral:", 2*pi*n/lx   *  dx*sum(sp_avg)/n/pi
+    kappas = [(2*pi*j/lx, j = 1, size(sp_avg))]
+        
   end subroutine
   
   subroutine get_buffer(status,sc,vec)
@@ -678,5 +830,31 @@ contains
       call in_g%read_vector(vec)
     end if
   end subroutine
-      
+
+  function itoa(i) result(res)
+    character(:),allocatable :: res
+    integer,intent(in) :: i
+    character(range(i)+2) :: tmp
+    write(tmp,'(i0)') i
+    res = trim(tmp)
+  end function
+  
+  function get_field_name(line) result(res)
+    character(:), allocatable :: res
+    character(*), intent(in) :: line
+    integer :: s1, s2
+    s1 = scan(line,' ')
+    s2 = scan(line(s1+1:),' ') + s1
+
+    res = line(s1+1:s2-1)
+  end function
+  
+  pure function array_variance(a) result(var)
+    real(rp), intent(in) :: a(:,:,:)
+    real(rp) :: am, var
+    integer :: n
+    n = size(a)
+    am = sum(a) / n
+    var = sum((a-am)**2)/n
+  end function
 end program
