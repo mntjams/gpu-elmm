@@ -557,14 +557,12 @@ program spectrum_1D
   real(rp) :: variance, variances(3)
  
   character(:), allocatable :: title
-  integer :: status, var_type, title_pos
+  integer :: status
   
   character(:), allocatable :: in_name, out_name, field, arg, field_title
   integer :: iarg, arg_len
   
   integer :: n, iu, j
-  
-  character(2048) :: command_line
   
   type(grid) :: in_g
   
@@ -595,7 +593,7 @@ program spectrum_1D
     allocate(character(arg_len) :: arg)
     call get_command_argument(iarg, value=arg)
     
-    !NOTE:quick and dirty, bit working
+    !NOTE:quick and dirty, but working
     if (arg(1:4)=="dir=") then
       read(arg(5:),*) dir
     else if (arg(1:7)=="xrange=") then
@@ -804,14 +802,14 @@ contains
 
     select case (dir)
       case(1)
-        lx = (in_g%x(n)-in_g%x(1))
-        dx = (in_g%x(n)-in_g%x(1))/n
+        dx = (in_g%x(n)-in_g%x(1))/(n-1)
+        lx = dx * n
       case(2)
-        lx = (in_g%y(n)-in_g%y(1))
-        dx = (in_g%y(n)-in_g%y(1))/n
+        dx = (in_g%y(n)-in_g%y(1))/(n-1)
+        lx = dx * n
       case(3)
-        lx = (in_g%z(n)-in_g%z(1))
-        dx = (in_g%z(n)-in_g%z(1))/n
+        dx = (in_g%z(n)-in_g%z(1))/(n-1)
+        lx = dx * n
     end select
     
     spectrum = dx * sp_avg / pi
@@ -830,14 +828,6 @@ contains
       call in_g%read_vector(vec)
     end if
   end subroutine
-
-  function itoa(i) result(res)
-    character(:),allocatable :: res
-    integer,intent(in) :: i
-    character(range(i)+2) :: tmp
-    write(tmp,'(i0)') i
-    res = trim(tmp)
-  end function
   
   function get_field_name(line) result(res)
     character(:), allocatable :: res
