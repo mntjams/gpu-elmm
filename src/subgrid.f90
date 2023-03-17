@@ -449,6 +449,7 @@ module Subgrid
     subroutine SGS_Sigma_uniform(U, V, W, filter_ratio)
       !from Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
       use Tiling, only: tilenx, tileny, tilenz
+      use ieee_exceptions
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
       real(knd), parameter :: Csig = 1.04_knd
@@ -458,6 +459,11 @@ module Subgrid
       integer :: tnx, tny, tnz
 
       integer,parameter :: narr = 4
+      
+      logical :: saved_fpe_mode(size(ieee_all))
+      
+      call ieee_get_halting_mode(ieee_all, saved_fpe_mode)
+      call ieee_set_halting_mode(ieee_all, .false.)
     
       tnx = tilenx(narr)
       tny = tileny(narr)
@@ -521,6 +527,7 @@ module Subgrid
         !$omp end parallel do
       end if
       
+      call ieee_set_halting_mode(ieee_all, saved_fpe_mode)
     contains
 
       pure subroutine GradientTensorUG(g ,i, j, k)
