@@ -149,8 +149,8 @@ contains
 
 
   subroutine PressureCorrection(U,V,W,Pr,Q,coef)                    !Pressure correction
-    real(knd), dimension(-2:,-2:,-2:), intent(inout)     :: U, V, W !Phi is computed in Poisson eq. with div of U in RHS
-    real(knd), dimension(-1:,-1:,-1:), intent(inout)        :: Pr      !Depend ing on active projection method Phi becomes new pressure
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout)     :: U, V, W !Phi is computed in Poisson eq. with div of U in RHS
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout)        :: Pr      !Depend ing on active projection method Phi becomes new pressure
     real(knd), dimension(:,:,:), allocatable, intent(in) :: Q       !or is added to last pressure
     real(knd), intent(in) :: coef
                                                            !U,V,W velocity field for correction
@@ -244,10 +244,10 @@ contains
 
   subroutine PrePoisson(U,V,W,Q,RHS,dt2,mass_flux)
     use custom_par
-    real(knd), intent(inout) :: U(-2:,-2:,-2:)
-    real(knd), intent(inout) :: V(-2:,-2:,-2:)
-    real(knd), intent(inout) :: W(-2:,-2:,-2:)
-    real(knd), intent(out)   :: RHS(0:,0:,0:)
+    real(knd), contiguous, intent(inout) :: U(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: V(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: W(-2:,-2:,-2:)
+    real(knd), contiguous, intent(out)   :: RHS(0:,0:,0:)
     real(knd), allocatable, intent(in) :: Q(:,:,:)
     real(knd), intent(out)   :: mass_flux
     real(knd), intent(in)    :: dt2
@@ -540,10 +540,10 @@ contains
                           par_co_max, par_broadcast_from_last_z, par_co_sum_plane_xy
     use exchange_par, only: par_exchange_UVW
 #endif
-    real(knd), intent(inout) :: U(-2:,-2:,-2:)
-    real(knd), intent(inout) :: V(-2:,-2:,-2:)
-    real(knd), intent(inout) :: W(-2:,-2:,-2:)
-    real(knd), intent(inout) :: Pr(-1:,-1:,-1:)
+    real(knd), contiguous, intent(inout) :: U(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: V(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: W(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: Pr(-1:,-1:,-1:)
     real(knd), allocatable, intent(in) :: Q(:,:,:)
     real(knd), intent(inout) :: Phi(-1:,-1:,-1:)
     real(knd), intent(in)    :: dt2,dt3

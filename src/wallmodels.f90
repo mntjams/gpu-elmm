@@ -959,7 +959,7 @@ contains
       nz = 0
       !$omp end single
 
-      !$omp do reduction(+:nx,ny,nz) collapse(3) schedule(dynamic, 100)
+      !$omp do reduction(+:nx) collapse(3) schedule(dynamic, 100)
       do k = 1, Prnz
         do j = 1, Prny
           do i = 0, Prnx
@@ -967,7 +967,7 @@ contains
          end do
         end do
       end do
-      !$omp do reduction(+:nx,ny,nz) collapse(3) schedule(dynamic, 100)
+      !$omp do reduction(+:ny) collapse(3) schedule(dynamic, 100)
       do k = 1, Prnz
         do j = 0, Prny
           do i = 1, Prnx
@@ -975,7 +975,7 @@ contains
           end do
         end do
       end do
-      !$omp do reduction(+:nx,ny,nz) collapse(3) schedule(dynamic, 100)
+      !$omp do reduction(+:nz) collapse(3) schedule(dynamic, 100)
       do k = 0, Prnz
         do j = 1, Prny
           do i = 1, Prnx
