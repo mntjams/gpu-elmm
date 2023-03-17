@@ -923,7 +923,7 @@ implicit none
 #ifdef PAR
     use domains_bc_par
 #endif
-    real(knd), intent(inout)     :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout)     :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     integer, optional, intent(in) :: regime
 #ifdef PAR
     integer :: reg
