@@ -572,6 +572,7 @@ contains
               call g%read_data_file(iframe, stat)
               if (stat/=0) exit outer
               call gs%move_data(g)
+              gs%time = g%time
             end associate
             
           end do
