@@ -1,20 +1,26 @@
 module Subgrid
 
   use Parameters
-  use Subgrid_MixedTimeScale, only: SGS_MixedTimeScale
+  use Subgrid_MixedTimeScale, only: SGS_MixedTimeScale, C_MixedTimeScale
 
   implicit none
 
   private
-  public :: sgstype, SubgridModel, TKEDissipation
+  public :: sgstype, SubgridModel, TKEDissipation, C_MixedTimeScale
 
-  real(knd),parameter :: CSmag = 0.122_knd
+!   real(knd),parameter :: CSmag = 0.122_knd
 
   integer :: sgstype
 
   integer, parameter, public :: SmagorinskyModel = 1, SigmaModel = 2, VremanModel = 3, &
                                 StabSubgridModel = 4, MixedTimeScaleModel = 5
 
+  real(knd), public :: C_Smagorinsky = 0.122_knd, &
+                       C_Sigma = 1.04_knd, &
+                       C_Vreman = 0.041_knd, &
+                       C_StabSubgrid = 1.04_knd
+                     
+  
   contains
 
     subroutine SGS_Smag(U,V,W,filter_ratio)  !Standard Smagorinsky model with implicit filtering
@@ -47,6 +53,8 @@ module Subgrid
       real(knd), intent(in) :: filter_ratio
       real(knd) :: S(1:3,1:3)
       real(knd) :: width,Sbar
+      real(knd) :: CSmag
+      CSmag = C_Smagorinsky
 
       width = filter_ratio * (dxPr(i)*dyPr(j)*dzPr(k))**(1._knd/3._knd)
       call StrainIJ(i, j, k, U, V, W, S)
@@ -228,7 +236,7 @@ module Subgrid
       real(knd) :: aa, bb
       real(knd), dimension(1:3,1:3) :: a, b
       real(knd) :: dx2, dy2, dz2, dz_2k
-      real(knd),parameter ::c = 0.041
+!       real(knd),parameter ::c = 0.041
       real(knd) :: c2
       integer :: i, j, k, bi, bj, bk, ii, jj
       integer :: tnx, tny, tnz
@@ -237,6 +245,8 @@ module Subgrid
       real(knd), parameter :: D1 = 2._knd / 3, D3 = 1._knd / 12
 
       integer,parameter :: narr = 4
+      real(knd) :: c
+      c = C_Vreman
     
       tnx = tilenx(narr)
       tny = tileny(narr)
@@ -452,7 +462,7 @@ module Subgrid
       use ieee_exceptions
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
-      real(knd), parameter :: Csig = 1.04_knd
+!       real(knd), parameter :: Csig = 1.04_knd
       integer   :: i, j, k, bi, bj, bk
       real(knd) :: width, C, D, g(3,3), s1, s2, s3
       integer, parameter :: sigma_knd = knd
@@ -461,6 +471,9 @@ module Subgrid
       integer,parameter :: narr = 4
       
       logical :: saved_fpe_mode(size(ieee_all))
+      
+      real(knd) :: Csig
+      Csig = C_Sigma
       
       call ieee_get_halting_mode(ieee_all, saved_fpe_mode)
       call ieee_set_halting_mode(ieee_all, .false.)
@@ -662,13 +675,15 @@ module Subgrid
       use Tiling, only: tilenx, tileny, tilenz
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
-      real(knd), parameter :: Csig = 1.04_knd
+!       real(knd), parameter :: Csig = 1.04_knd
       integer   :: i, j, k, bi, bj, bk
       real(knd) :: width, dz23, C, D, g(3,3), s1, s2, s3
       integer, parameter :: sigma_knd = knd
       integer :: tnx, tny, tnz
 
       integer,parameter :: narr = 4
+      real(knd) :: Csig
+      Csig = C_Sigma
     
       tnx = tilenx(narr)
       tny = tileny(narr)
@@ -804,7 +819,7 @@ module Subgrid
       use VerticalProfiles, only: enable_profiles, current_profiles
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
-      real(knd), parameter :: Csig = 1.04_knd
+!       real(knd), parameter :: Csig = 1.04_knd
       integer   :: i, j, k, bi, bj, bk
       real(knd) :: width, C, Pr_sgs, D, g(3,3), s1, s2, s3
       integer, parameter :: sigma_knd = knd
@@ -815,6 +830,8 @@ module Subgrid
       integer :: tnx, tny, tnz
 
       integer,parameter :: narr = 4
+      real(knd) :: Csig
+      Csig = C_StabSubgrid
     
       tnx = tilenx(narr)
       tny = tileny(narr)

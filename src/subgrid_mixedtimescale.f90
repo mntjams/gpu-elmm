@@ -7,18 +7,22 @@ module Subgrid_MixedTimeScale
 
   private
   public SGS_MixedTimeScale
+  
+  real(knd), public :: C_MixedTimeScale = 0.05_knd
 
 contains
 
   subroutine SGS_MixedTimeScale(U, V, W)
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W    
-    real(knd), parameter :: C_mts = 0.05
+!     real(knd), parameter :: C_mts = 0.05
     real(knd), dimension(:,:,:), allocatable, save :: Uf, Vf, Wf
     integer :: i, j, k, bi, bj, bk
     real(knd) :: rec_width, T_s, k_es
     integer :: tnx, tny, tnz
 
     integer, parameter :: narr = 7
+    real(knd) :: C_mts
+    C_mts = C_MixedTimeScale
 
     if (gridtype==GRID_VARIABLE_Z) then
       call error_stop("MTS subgrid only implemented for uniform grid.")
