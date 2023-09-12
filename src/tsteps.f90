@@ -423,7 +423,7 @@ contains
     use vtkarray
 
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
-    real(knd), intent(out) :: Q(0:,0:,0:)
+    real(knd), contiguous, intent(out) :: Q(0:,0:,0:)
     integer :: i, xi, yj, zk
     !deconvolution of the flux velocity
     real(knd), parameter :: C0 = 26._knd / 24, C1 = -1._knd / 24
