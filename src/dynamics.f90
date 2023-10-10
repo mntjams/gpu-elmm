@@ -910,13 +910,13 @@ contains
 
 
 
-  subroutine CorrectFlowRate(U, V, W)
+  subroutine CorrectFlowRate(U, V, W, dt)
     use custom_par
 
     real(knd), intent(inout), contiguous, dimension(-2:,-2:,-2:) :: U, V, W
+    real(knd), intent(in) :: dt
 
     real(knd) :: rate_actual
-    real(knd) :: pr_gradient_diff
     integer :: i, j, k
 
     if (flow_rate_x_fixed) then
@@ -930,19 +930,19 @@ contains
 #ifdef PAR        
       call par_broadcast_from_last_x(rate_actual)
 #endif
-      pr_gradient_diff = (rate_actual - flow_rate_x) / ( dymin * dzmin * gPrny * gPrnz)
+      pr_gradient_x_dynamic = (rate_actual - flow_rate_x) / ( dymin * dzmin * gPrny * gPrnz)
 
       !$omp parallel do private(i,j,k)
       do k = 1, Unz
         do j = 1, Uny
           do i = 1, Unx
-            U(i,j,k) = U(i,j,k) -  pr_gradient_diff
+            U(i,j,k) = U(i,j,k) -  pr_gradient_x_dynamic
           end do
         end do
       end do
       !$omp end parallel do
 
-      pr_gradient_x = pr_gradient_x + pr_gradient_diff
+      pr_gradient_x_dynamic = pr_gradient_x_dynamic / dt
     end if
 
       
@@ -957,19 +957,19 @@ contains
 #ifdef PAR        
       call par_broadcast_from_last_y(rate_actual)
 #endif
-      pr_gradient_diff = (rate_actual - flow_rate_y) / (dxmin * dzmin * gPrnx * gPrnz)
+      pr_gradient_y_dynamic = (rate_actual - flow_rate_y) / (dxmin * dzmin * gPrnx * gPrnz)
 
       !$omp parallel do private(i,j,k)
       do k = 1, Vnz
         do j = 1, Vny
           do i = 1, Vnx
-            V(i,j,k) = V(i,j,k) - pr_gradient_diff
+            V(i,j,k) = V(i,j,k) - pr_gradient_y_dynamic
           end do
         end do
       end do
       !$omp end parallel do
 
-      pr_gradient_y = pr_gradient_y + pr_gradient_diff
+      pr_gradient_y_dynamic = pr_gradient_y_dynamic / dt
     end if
 
       
@@ -984,19 +984,19 @@ contains
 #ifdef PAR        
       call par_broadcast_from_last_z(rate_actual)
 #endif
-      pr_gradient_diff = (rate_actual - flow_rate_z) / (dxmin * dymin * gPrnx * gPrny)
+      pr_gradient_z_dynamic = (rate_actual - flow_rate_z) / (dxmin * dymin * gPrnx * gPrny)
 
       !$omp parallel do private(i,j,k)
       do k = 1, Wnz
         do j = 1, Wny
           do i = 1, Wnx
-            W(i,j,k) = W(i,j,k) - pr_gradient_diff
+            W(i,j,k) = W(i,j,k) - pr_gradient_z_dynamic
           end do
         end do
       end do
       !$omp end parallel do
 
-      pr_gradient_z = pr_gradient_z + pr_gradient_diff
+      pr_gradient_z_dynamic = pr_gradient_z_dynamic / dt
     end if
       
   end subroutine CorrectFlowRate
