@@ -1087,7 +1087,7 @@ contains
                        npxyz, domain_index, number_of_domains, &
 #endif
                        obstacles_file, probes_file, scalar_probes_file, input_dir, output_dir, &
-                       enable_fixed_flow_rate, &
+                       enable_fixed_flow_rate, set_U_bulk, U_bulk_vec, &
                        enable_in_sponge_x, enable_out_sponge_x, enable_out_sponge_y, &
                        enable_top_sponge, enable_top_sponge_scalar, &
                        enable_liquid, &
@@ -3748,14 +3748,19 @@ contains
     if (enable_fixed_flow_rate) then
 
       if (flow_rate_x_fixed) then
-        if (initcondsfromfile==0.and.inlettype==TurbulentInletType.and. &
-            default_turbulence_generator%direction==1) then
-          flow_rate_x = sum(default_turbulence_generator%Uinavg(1:Uny, 1:Unz)) &
-                        * dymin * dzmin
+        if (set_U_bulk) then
+          flow_rate_x = U_bulk_vec(1) * count(Utype(0,1:Uny,1:Unz)<=0) * dymin * dzmin
         else
-          flow_rate_x = sum(U(Unx,1:Uny, 1:Unz)) &
-                        * dymin * dzmin
+          if (initcondsfromfile==0.and.inlettype==TurbulentInletType.and. &
+              default_turbulence_generator%direction==1) then
+            flow_rate_x = sum(default_turbulence_generator%Uinavg(1:Uny, 1:Unz)) &
+                          * dymin * dzmin
+          else
+            flow_rate_x = sum(U(Unx,1:Uny, 1:Unz)) &
+                          * dymin * dzmin
+          end if
         end if
+        
 #ifdef PAR
         flow_rate_x = par_co_sum_plane_yz(flow_rate_x)
         call par_broadcast_from_last_x(flow_rate_x)
@@ -3764,14 +3769,18 @@ contains
 
 
       if (flow_rate_y_fixed) then
-        if (initcondsfromfile==0.and.inlettype==TurbulentInletType.and. &
-            default_turbulence_generator%direction==2) then
-          !average V
-          flow_rate_y = sum(default_turbulence_generator%Vinavg(1:Vny, 1:Vnz)) &
-                        / (Vny*Vnz)
-          flow_rate_y = flow_rate_y * Vnx * Vnz * dxmin * dzmin        
+        if (set_U_bulk) then
+          flow_rate_y = U_bulk_vec(2) * count(Vtype(1:Vnx,0,1:Vnz)<=0) * dxmin * dzmin
         else
-          flow_rate_y = sum(V(1:Vnx, Vny, 1:Vnz)) * dxmin * dzmin
+          if (initcondsfromfile==0.and.inlettype==TurbulentInletType.and. &
+              default_turbulence_generator%direction==2) then
+            !average V
+            flow_rate_y = sum(default_turbulence_generator%Vinavg(1:Vny, 1:Vnz)) &
+                          / (Vny*Vnz)
+            flow_rate_y = flow_rate_y * Vnx * Vnz * dxmin * dzmin        
+          else
+            flow_rate_y = sum(V(1:Vnx, Vny, 1:Vnz)) * dxmin * dzmin
+          end if
         end if
 
 #ifdef PAR
@@ -3782,7 +3791,11 @@ contains
       
 
       if (flow_rate_z_fixed) then
-        flow_rate_z = sum(W(1:Wnx, 1:Wny, Wnz)) * dxmin * dymin
+        if (set_U_bulk) then
+          flow_rate_z = U_bulk_vec(3) * count(Wtype(1:Wnx,1:Wny,0)<=0) * dxmin * dymin
+        else
+          flow_rate_z = sum(W(1:Wnx, 1:Wny, Wnz)) * dxmin * dymin
+        end if
 
 #ifdef PAR
         flow_rate_z = par_co_sum_plane_xy(flow_rate_z)

@@ -147,7 +147,7 @@ contains
           call SpongeOut(U2, V2, W2, temperature)
       end if
 
-      if (enable_fixed_flow_rate) call CorrectFlowRate(U2, V2, W2)
+      if (enable_fixed_flow_rate) call CorrectFlowRate(U2, V2, W2, 2*RK_alpha(RK_stage)*time_stepping%dt)
 
       call BoundUVW(U2, V2, W2)
 

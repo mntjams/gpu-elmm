@@ -956,15 +956,15 @@ contains
     end if
 
     if (flow_rate_x_fixed) then
-      pr_gradient_x_time(step) = pr_gradient_x
+      pr_gradient_x_time(step) = pr_gradient_x + pr_gradient_x_dynamic
     end if
 
     if (flow_rate_y_fixed) then
-      pr_gradient_y_time(step) = pr_gradient_y
+      pr_gradient_y_time(step) = pr_gradient_y + pr_gradient_y_dynamic
     end if
 
     if (flow_rate_z_fixed) then
-      pr_gradient_z_time(step) = pr_gradient_z
+      pr_gradient_z_time(step) = pr_gradient_z + pr_gradient_z_dynamic
     end if
 
 
