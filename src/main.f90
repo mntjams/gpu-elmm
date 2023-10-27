@@ -317,12 +317,21 @@ contains
   
   
   subroutine InitTimer
+    use ieee_exceptions
+    logical :: saved_fpe_mode(size(ieee_all))
+
     call system_clock(count_rate = timer_rate)
     call system_clock(count_max = timer_max_count)   
+
+    call ieee_get_halting_mode(ieee_all, saved_fpe_mode)
+    call ieee_set_halting_mode(ieee_all, .false.)
+
     timer_count_time_limit = int( min(time_stepping%clock_time_limit &
                                         * real(timer_rate, knd),  &
-                                      real(timer_max_count, knd) * 0.999_dbl) &
-                                , dbl)  
+                                      real(timer_max_count-timer_max_count/1024, knd)) &
+                                , dbl)
+
+    call ieee_set_halting_mode(ieee_all, saved_fpe_mode)
   end subroutine
 
 
