@@ -231,6 +231,7 @@ module Subgrid
 
     subroutine SGS_Vreman(U,V,W,filter_ratio)   !Vreman subgrid model (Physics of Fluids, 2004)
       use Tiling, only: tilenx, tileny, tilenz
+      use ieee_exceptions
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
       real(knd) :: aa, bb
@@ -246,6 +247,14 @@ module Subgrid
 
       integer,parameter :: narr = 4
       real(knd) :: c
+      
+      logical :: saved_fpe_mode(size(ieee_all))
+
+      !$omp parallel
+      call ieee_get_halting_mode(ieee_all, saved_fpe_mode)
+      call ieee_set_halting_mode(ieee_all, .false.)
+      !$omp end parallel
+      
       c = C_Vreman
     
       tnx = tilenx(narr)
@@ -442,6 +451,11 @@ module Subgrid
           !$omp end parallel do
         end if
       end if
+      
+      !$omp parallel
+      call ieee_set_halting_mode(ieee_all, saved_fpe_mode)
+      !$omp end parallel
+      
     endsubroutine SGS_Vreman
 
 
