@@ -599,12 +599,14 @@ contains
     do iobj = 1, size(tree)
     
       if (downcase(tree(iobj)%name)==object_name) then
+   
         stat = stat - 1
         call get_object_field_values(tree(iobj), stat, &
                                      fields, &
                                      fields_a, &
                                      fields_a_int_alloc, &
                                      fields_str)
+                                  
         if (stat>1) return
       end if
       
@@ -625,10 +627,13 @@ contains
     type(tree_object), intent(in) :: obj
     integer, intent(out) :: stat
     !stat 0    .. success
-    !stat < 0  .. multiple definitions of object named object_name
     !stat 2    .. inconsistent number of components in an array in fields_a
     !stat 11   .. unexpected type of variable in fields
     !stat 12   .. unexpected type of variable in fields_a
+    !
+    !Not currently implemented but reserved:
+    !    ?stat < 0  .. multiple definitions of object named object_name
+    !  Currently the last value present counts.
     type(field_names), intent(inout), optional :: fields(:)
     type(field_names_a), intent(inout), optional :: fields_a(:)
     type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
@@ -636,7 +641,8 @@ contains
 
     integer :: i, j
 
-
+    stat = 0
+    
     if (allocated(obj%fields%array)) then
 
       associate(obj_fields => obj%fields%array)
