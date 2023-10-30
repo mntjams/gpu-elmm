@@ -287,7 +287,7 @@ contains
     use exchange_par
 #endif
     class(turbulence_generator), intent(inout) :: g
-    real(knd), intent(out) :: Uin(-2:,-2:), Vin(-2:,-2:), Win(-2:,-2:)
+    real(knd), intent(out), contiguous :: Uin(-2:,-2:), Vin(-2:,-2:), Win(-2:,-2:)
     real(knd), intent(in) :: dt
     integer :: i, j, k
     integer :: jlo, jup, klo, kup, ny
