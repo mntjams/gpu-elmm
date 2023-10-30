@@ -461,19 +461,30 @@ module Subgrid
 
 
     subroutine SGS_Sigma(U, V, W, filter_ratio)
+      use ieee_exceptions
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
-      if (gridtype==GRID_VARIABLE_Z) then
+      logical :: saved_fpe_mode(size(ieee_all))
+      
+      !$omp parallel
+      call ieee_get_halting_mode(ieee_all, saved_fpe_mode)
+      call ieee_set_halting_mode(ieee_all, .false.)
+      !$omp end parallel
+    
+     if (gridtype==GRID_VARIABLE_Z) then
         call SGS_Sigma_variable_z(U, V, W, filter_ratio)
       else
         call SGS_Sigma_uniform(U, V, W, filter_ratio)
       end if
+      
+      !$omp parallel
+      call ieee_set_halting_mode(ieee_all, saved_fpe_mode)
+      !$omp end parallel
     end subroutine SGS_Sigma
 
     subroutine SGS_Sigma_uniform(U, V, W, filter_ratio)
       !from Nicoud, Toda, Cabrit, Bose, Lee, http://dx.doi.org/10.1063/1.3623274
       use Tiling, only: tilenx, tileny, tilenz
-      use ieee_exceptions
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(in) :: filter_ratio
 !       real(knd), parameter :: Csig = 1.04_knd
@@ -484,14 +495,9 @@ module Subgrid
 
       integer,parameter :: narr = 4
       
-      logical :: saved_fpe_mode(size(ieee_all))
-      
       real(knd) :: Csig
       Csig = C_Sigma
       
-      call ieee_get_halting_mode(ieee_all, saved_fpe_mode)
-      call ieee_set_halting_mode(ieee_all, .false.)
-    
       tnx = tilenx(narr)
       tny = tileny(narr)
       tnz = tilenz(narr)
@@ -554,7 +560,6 @@ module Subgrid
         !$omp end parallel do
       end if
       
-      call ieee_set_halting_mode(ieee_all, saved_fpe_mode)
     contains
 
       pure subroutine GradientTensorUG(g ,i, j, k)
