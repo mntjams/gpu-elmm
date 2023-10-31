@@ -399,7 +399,7 @@ objs += env.Object(target = target_dir + 'puffs',              source = 'puffs.f
 
 if cgal=='yes':
   #Support for CGAL for geometry files reading.
-  objs += env.Object(target = target_dir + 'cgal_polyhedra_cc',source = 'cgal_polyhedra.cc', CXXFLAGS = env['CXXFLAGS'] + '-O3 -std=c++11 -frounding-math')
+  objs += env.Object(target = target_dir + 'cgal_polyhedra_cc',source = 'cgal_polyhedra.cc', CXXFLAGS = env['CXXFLAGS'] + '-O3 -frounding-math')
   objs += env.Object(target = target_dir + 'cgal_polyhedra',   source = 'cgal_polyhedra.f90')
   Depends(objs[-1], 'cgal_polyhedra.cc')
   env.Append(LIBS = ['CGAL','boost_thread','boost_system'])
