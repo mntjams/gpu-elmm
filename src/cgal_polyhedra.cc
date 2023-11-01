@@ -36,11 +36,11 @@ typedef CGAL::Bbox_3 Bbox_3;
 
 typedef struct {double x,y,z;} d3;
 
-typedef struct {
+struct Polytree {
     Polyhedron *poly=nullptr; 
     Tree *tree=nullptr;
     bool infinity_outside; //whether consider infinity as outside or inside
-} Polytree;
+};
 
 using std::cout;
 using std::endl;
@@ -116,11 +116,15 @@ extern "C" {
     int i = 0;
     for (auto iter = intersections.begin(); iter != intersections.end(); ++iter){
       i += 1;
+
       // gets intersection object
       auto op = *iter;
+
       // op is a std::optional< Tree::Intersection_and_primitive_id<Segment>::Type >
+      // which is a std::optional< std::pair<CGAL::Object, Primitive_id> >
       if (op.has_value() == false) continue;
       CGAL::Object object = op->first;
+
       Point point;
       if(CGAL::assign(point, object)) {
         points.push_back(point);
