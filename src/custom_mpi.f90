@@ -237,6 +237,21 @@ module custom_par
     module procedure par_co_broadcast_logical
   end interface
 
+  interface par_broadcast_from_first_x
+    module procedure par_broadcast_from_first_x_real32
+    module procedure par_broadcast_from_first_x_real64
+  end interface
+
+  interface par_broadcast_from_first_y
+    module procedure par_broadcast_from_first_y_real32
+    module procedure par_broadcast_from_first_y_real64
+  end interface
+
+  interface par_broadcast_from_first_z
+    module procedure par_broadcast_from_first_z_real32
+    module procedure par_broadcast_from_first_z_real64
+  end interface
+  
   interface par_broadcast_from_last_x
     module procedure par_broadcast_from_last_x_real32
     module procedure par_broadcast_from_last_x_real64
@@ -1641,6 +1656,96 @@ contains
   end subroutine
 
 
+
+  subroutine par_broadcast_from_first_x_real32(x)
+    real(real32), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real32) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real32, 1-1, comm_row_x, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_first_x_real64(x)
+    real(real64), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real64) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real64, 1-1, comm_row_x, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_first_y_real32(x)
+    real(real32), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real32) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real32, 1-1, comm_row_y, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_first_y_real64(x)
+    real(real64), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real64) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real64, 1-1, comm_row_y, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_first_z_real32(x)
+    real(real32), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real32) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real32, 1-1, comm_row_z, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
+
+  subroutine par_broadcast_from_first_z_real64(x)
+    real(real64), intent(inout) :: x
+    integer :: ie
+    interface
+      subroutine MPI_BCAST(BUFFER, COUNT, DATATYPE, ROOT, COMM, IERROR)
+        import
+        real(real64) ::  BUFFER
+        INTEGER   COUNT, DATATYPE, ROOT, COMM, IERROR
+      end subroutine
+    end interface
+
+    call MPI_Bcast(x, 1, MPI_real64, 1-1, comm_row_z, ie)
+    if (ie/=0) call error_stop("Error calling MPI_Bcast, in "//__FILE__//" line",__LINE__)
+  end subroutine
 
   subroutine par_broadcast_from_last_x_real32(x)
     real(real32), intent(inout) :: x
