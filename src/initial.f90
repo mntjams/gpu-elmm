@@ -867,8 +867,6 @@ contains
    call init_random_seed
 
 
-   call get_pressure_solution("pressure_solution.conf", pressure_solution)
-
 
    !both procedures below use the name of the output directory (affected by MPI)
    call get_frames("frames.conf")
@@ -2114,14 +2112,20 @@ contains
   subroutine get_pressure_solution(fname, p_s)
     use Strings
     use ParseTrees
+    use Boundaries, only: InGlobalDomain, InDomain
     character(*), intent(in) :: fname
     type(pressure_solution_control), intent(inout), target :: p_s
     type(tree_object), allocatable :: tree(:)
+    type(tree_object_ptr) :: reference_obj_ptr
+    character(char_len), target :: boundary_index_str = "", reference_type_str = ""
     logical :: ex
     integer :: iobj, stat
 
-    type(field_names) :: names(13)
+    type(field_names) :: names(14)
     type(field_names_a) :: names_a(1)
+
+    type(field_names) :: reference_names(2)
+    type(field_names_a) :: reference_names_a(1)
 
     names = [field_names_init("check_mass_flux", p_s%check_mass_flux), &
              field_names_init("report_mass_flux", p_s%report_mass_flux), &
@@ -2135,9 +2139,15 @@ contains
              field_names_init("projection_method",   p_s%projection_method), &
              field_names_init("check_divergence",    p_s%check_divergence), &
              field_names_init("check_poisson_residue", p_s%check_poisson_residue), &
-             field_names_init("bottom_pressure",     p_s%bottom_pressure)]
+             field_names_init("bottom_pressure",     p_s%bottom_pressure), &
+             field_names_init("reference", reference_obj_ptr)]
 
     names_a = [field_names_a_init("correct_mass_flux", p_s%correct_mass_flux)]
+    
+    reference_names = [field_names_init("type", reference_type_str), &
+                       field_names_init("boundary_index", boundary_index_str)]
+                            
+    reference_names_a = [field_names_a_init("reference_point", p_s%reference%reference_point_xyz)]
 
     inquire(file=fname, exist=ex)
 
@@ -2152,7 +2162,20 @@ contains
         call find_object_get_field_values(tree, "pressure_solution", stat, &
                                      fields = names, fields_a = names_a)
 
-        if (stat<=0) call init
+        if (stat<=0) then
+          if (associated(reference_obj_ptr%ptr)) then
+                      
+            call get_object_field_values(reference_obj_ptr%ptr, stat, &
+                                         fields = reference_names, &
+                                         fields_a = reference_names_a)
+            if (stat/=0) then
+              write(*,*) "Error parsing the reference object inside pressure_solution() in pressure_solution.conf"
+              call error_stop
+            end if
+          end if
+          
+          call init
+        end if
 
         do iobj = 1, size(tree)
           call tree(iobj)%finalize
@@ -2180,7 +2203,94 @@ contains
       where(Btype==BC_NOSLIP) p_s%correct_mass_flux = .false.
 
       where(Btype==BC_PERIODIC) p_s%correct_mass_flux = .false.
-    
+      
+      associate(p_s_ref => p_s%reference)
+        if (len_trim(reference_type_str)>0) then
+          select case (downcase(reference_type_str))
+            case ("boundary")
+              p_s_ref%type = PRESSURE_REFERENCE_BOUNDARY
+            case ("volume_average")
+              p_s_ref%type = PRESSURE_REFERENCE_VOLUME_AVERAGE
+            case ("point")
+              p_s_ref%type = PRESSURE_REFERENCE_POINT
+            case default
+              write(*,*) "Error, unknown reference type '", &
+                        reference_type_str, &
+                        "' in reference() in pressure_solution() in pressure_solution.conf"
+              call error_stop
+          end select
+        end if
+        
+        if (p_s_ref%type ==PRESSURE_REFERENCE_BOUNDARY) then
+          if (len_trim(boundary_index_str)>0) then
+            select case (downcase(boundary_index_str(1:1)))
+              case("w","1")
+                p_s_ref%boundary_index = We
+              case("e","2")
+                p_s_ref%boundary_index = Ea
+              case("s","3")
+                p_s_ref%boundary_index = So
+              case("n","4")
+                p_s_ref%boundary_index = No
+              case("b","5")
+                p_s_ref%boundary_index = Bo
+              case("t","6")
+                p_s_ref%boundary_index = To
+              case default
+                write(*,*) "Error, invalid value '", &
+                            trim(boundary_index_str), &
+                            "' of boundary_index in reference() in pressure_solution() in pressure_solution.conf"
+                call error_stop
+            end select
+          end if
+        else if (p_s_ref%type == PRESSURE_REFERENCE_POINT) then 
+          if (.not. InGlobalDomain(p_s_ref%reference_point_xyz)) then
+            write(*,*) "Error, pressure reference point ", &
+                      p_s_ref%reference_point_xyz, &
+                      "outside of the grid domain."
+            call error_stop          
+          end if
+#ifdef PAR        
+          block
+            integer :: num
+            if (InDomain(p_s_ref%reference_point_xyz)) then
+              num = 1
+              num = par_co_sum(num)
+              
+              if (num>1) then
+                write(*,*) "Error, reference point on an image boundary, not yet implemented"
+                call error_stop
+              else
+                call GridCoords_interp(p_s_ref%reference_point(1), &
+                                      p_s_ref%reference_point(2), &
+                                      p_s_ref%reference_point(3), &
+                                      p_s_ref%reference_point_xyz(1), &
+                                      p_s_ref%reference_point_xyz(2), &
+                                      p_s_ref%reference_point_xyz(3))
+                p_s_ref%reference_point_im = myim
+              end if
+            else
+              num = 0
+              num = par_co_sum(num)
+              p_s_ref%reference_point_im = 0
+            end if
+          end block
+          
+          ! instead of a broadcast, we do not know on each image
+          ! which image will be broadcasting
+          p_s_ref%reference_point_im = par_co_sum(p_s_ref%reference_point_im)
+          
+#else
+          call GridCoords_interp(p_s_ref%reference_point(1), &
+                                p_s_ref%reference_point(2), &
+                                p_s_ref%reference_point(3), &
+                                p_s_ref%reference_point_xyz(1), &
+                                p_s_ref%reference_point_xyz(2), &
+                                p_s_ref%reference_point_xyz(3))
+          p_s_ref%reference_point_im = myim
+#endif        
+        end if
+      end associate
     end subroutine
 
   end subroutine get_pressure_solution
@@ -3477,6 +3587,9 @@ contains
 
     !Requires grid coordinates
     call get_pressure_gradient("pressure_gradient_profile.conf")
+    
+    call get_pressure_solution("pressure_solution.conf", pressure_solution)
+
 
 
     call par_sync_out("  ...reading geostrophic wind.")

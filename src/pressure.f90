@@ -25,6 +25,17 @@ module Pressure
   integer, parameter, public :: PROJECTION_METHOD_INCREMENTAL = 0, &
                                 PROJECTION_METHOD_PRESSURE = 1
 
+  integer, parameter, public :: PRESSURE_REFERENCE_BOUNDARY = 0, &
+                                PRESSURE_REFERENCE_VOLUME_AVERAGE = 1, &
+                                PRESSURE_REFERENCE_POINT = 2
+  type pressure_reference
+    integer :: type = PRESSURE_REFERENCE_BOUNDARY
+    integer :: boundary_index = To
+    integer :: reference_point(3) = [1, 1, 1]
+    real(knd) :: reference_point_xyz(3) = 0
+    integer :: reference_point_im = 1
+  end type
+                                
   type pressure_solution_control
     logical :: check_mass_flux = .false.
     logical :: report_mass_flux = .false.
@@ -33,8 +44,13 @@ module Pressure
     integer :: projection_method = PROJECTION_METHOD_INCREMENTAL
     logical :: check_divergence = .false.
     logical :: check_poisson_residue = .false.
+    
+    type(pressure_reference) :: reference
+
+    ! for classical atmospheric flows above Earth surface:
     real(knd) :: top_pressure = 0    !mean pressure at the top boundary - calculated
     real(knd) :: bottom_pressure = 0
+
   end type
   
   type(pressure_solution_control) :: pressure_solution
@@ -536,8 +552,7 @@ contains
 
   subroutine PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3)
 #ifdef PAR
-    use custom_par, only: kim, nzims, &
-                          par_co_max, par_broadcast_from_last_z, par_co_sum_plane_xy
+    use custom_par, only: par_co_max
     use exchange_par, only: par_exchange_UVW
 #endif
     real(knd), contiguous, intent(inout) :: U(-2:,-2:,-2:)
@@ -675,61 +690,11 @@ contains
         !$omp end do
       end if
     end if
-
-    !$omp single
-    Phi_ref = 0
-    !$omp end single
-    
-#ifdef PAR
-    !images in top plane compute the reference pressure
-    if (kim==nzims) then
-      !$omp do reduction(+:Phi_ref)
-      do j = 1, Prny
-        do i = 1, Prnx
-          Phi_ref = Phi_ref + Pr(i,j,Prnz)
-        end do
-      end do
-      !$omp end do
-
-      !$omp single
-      Phi_ref = par_co_sum_plane_xy(Phi_ref)
-      Phi_ref = Phi_ref / (gPrnx * gPrny)
-      !$omp end single
-    end if
-
-    !all kim==nzims broadcast to images with smaller kim
-    !$omp single
-    call par_broadcast_from_last_z(Phi_ref)
-    !$omp end single
-
-#else
-
-    !$omp do reduction(+:Phi_ref)
-    do j = 1, Prny
-      do i = 1, Prnx
-        Phi_ref = Phi_ref + Pr(i,j,Prnz)
-      end do
-    end do
-    !$omp end do
-
-    !$omp single
-    Phi_ref = Phi_ref / (Prnx*Prny)
-    !$omp end single
-
-#endif
-
-    !$omp do reduction(+:Phi_ref)
-    do k = 1, Prnz
-      do j = 1, Prny
-        do i = 1, Prnx
-          Pr(i,j,k) = Pr(i,j,k) - (Phi_ref)
-        end do
-      end do
-    end do
-    !$omp end do   
-
     !$omp end parallel
 
+    call FixPressureToReference(Pr)
+    
+    
 #ifdef PAR    
     call par_exchange_UVW(U, V, W)
 #endif
@@ -844,6 +809,240 @@ contains
     end if
 
   end subroutine PostPoisson
+  
+  
+  subroutine FixPressureToReference(Pr)
+    use custom_par
+    real(knd), intent(inout), contiguous :: Pr(-1:,-1:,-1:)
+    integer :: i, j, k
+    integer :: i_ref, j_ref, k_ref
+    integer :: im_ref
+    real(knd) :: Phi_ref
+    
+    ! fixes the pressure to some reference, because
+    ! it is only determined up to an additive constant
+    
+    ! the value of Phi at the reference location
+    ! to be subtracted
+    Phi_ref = 0
+    associate(ref => pressure_solution%reference)
+    !$omp parallel private(i,j,k)
+
+    if (ref%type == PRESSURE_REFERENCE_VOLUME_AVERAGE) then
+      !$omp do reduction(+:Phi_ref)
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            Phi_ref = Phi_ref + Pr(i,j,k)
+          end do
+        end do
+      end do
+      !$omp end do
+      
+      !$omp single
+#ifdef PAR
+      Phi_ref = par_co_sum(Phi_ref)
+      Phi_ref = Phi_ref / (gPrnx*gPrny*gPrnz)
+#else
+      Phi_ref = Phi_ref / (Prnx*Prny*Prnz)
+#endif
+      !$omp end single      
+    else if (ref%type == PRESSURE_REFERENCE_POINT) then
+      !$omp single    
+      if (myim==ref%reference_point_im) then
+        block
+          use Interpolation
+          real(knd) :: a, b, c
+          real(knd) :: p000, p100, p010, p001, p110, p101, p011, p111
+          i = ref%reference_point(1)
+          j = ref%reference_point(2)
+          k = ref%reference_point(3)
+          
+          p000 = Pr(i,j,k)
+          p100 = Pr(i+1,j,k)
+          p010 = Pr(i,j+1,k)
+          p001 = Pr(i,j,k+1)
+          p110 = Pr(i+1,j+1,k)
+          p101 = Pr(i+1,j,k+1)
+          p011 = Pr(i,j+1,k+1)
+          p111 = Pr(i+1,j+1,k+1)
+          a = (ref%reference_point_xyz(1) - xPr(i)) / (xPr(i+1) - xPr(i))
+          b = (ref%reference_point_xyz(2) - yPr(j)) / (yPr(j+1) - yPr(j))
+          c = (ref%reference_point_xyz(3) - zPr(k)) / (zPr(k+1) - zPr(k))
+          
+          Phi_ref = trilinear_interpolation(a, b, c, p000, p100, p010, p001, p110, p101, p011, p111)
+        end block 
+      end if
+#ifdef PAR
+      call par_co_broadcast(Phi_ref, ref%reference_point_im)
+#endif
+      !$omp end single
+    else if (ref%type == PRESSURE_REFERENCE_BOUNDARY) then
+      
+      if (ref%boundary_index==We .or. &
+          ref%boundary_index==Ea) then
+        !$omp single  
+        if (ref%boundary_index==We) then
+          i_ref = 1
+          im_ref = 1
+        else
+          i_ref = Prnx
+          im_ref = nxims
+        end if
+        !$omp end single
+#ifdef PAR
+        !images in top plane compute the reference pressure
+        if (iim==im_ref) then
+          !$omp do reduction(+:Phi_ref)
+          do k = 1, Prnz
+            do j = 1, Prny
+              Phi_ref = Phi_ref + Pr(i_ref,j,k)
+            end do
+          end do
+          !$omp end do
+
+          !$omp single
+          Phi_ref = par_co_sum_plane_yz(Phi_ref)
+          Phi_ref = Phi_ref / (gPrny * gPrnz)
+          !$omp end single
+        end if
+
+        !$omp single
+        if (im_ref==1) then
+          call par_broadcast_from_first_x(Phi_ref)
+        else
+          call par_broadcast_from_last_x(Phi_ref)
+        end if        
+        !$omp end single
+#else
+        !$omp do reduction(+:Phi_ref)
+        do k = 1, Prnz
+          do j = 1, Prny
+            Phi_ref = Phi_ref + Pr(i_ref,j,k)
+          end do
+        end do
+        !$omp end do
+
+        !$omp single
+        Phi_ref = Phi_ref / (Prny*Prnz)
+        !$omp end single
+#endif
+      else if (ref%boundary_index==So .or. &
+               ref%boundary_index==No) then
+        !$omp single       
+        if (ref%boundary_index==Bo) then
+          j_ref = 1
+          im_ref = 1
+        else
+          j_ref = Prny
+          im_ref = nyims
+        end if
+        !$omp end single
+#ifdef PAR
+        !images in top plane compute the reference pressure
+        if (jim==im_ref) then
+          !$omp do reduction(+:Phi_ref)
+          do k = 1, Prnz
+            do i = 1, Prnx
+              Phi_ref = Phi_ref + Pr(i,j_ref,k)
+            end do
+          end do
+          !$omp end do
+
+          !$omp single
+          Phi_ref = par_co_sum_plane_xz(Phi_ref)
+          Phi_ref = Phi_ref / (gPrnx * gPrnz)
+          !$omp end single
+        end if
+
+        !$omp single
+        if (im_ref==1) then
+          call par_broadcast_from_first_y(Phi_ref)
+        else
+          call par_broadcast_from_last_y(Phi_ref)
+        end if        
+        !$omp end single
+#else
+        !$omp do reduction(+:Phi_ref)
+        do k = 1, Prnz
+          do i = 1, Prnx
+            Phi_ref = Phi_ref + Pr(i,j_ref,k)
+          end do
+        end do
+        !$omp end do
+
+        !$omp single
+        Phi_ref = Phi_ref / (Prnx*Prnz)
+        !$omp end single
+#endif
+      else if (ref%boundary_index==Bo .or. &
+               ref%boundary_index==To) then
+        !$omp single       
+        if (ref%boundary_index==Bo) then
+          k_ref = 1
+          im_ref = 1
+        else
+          k_ref = Prnz
+          im_ref = nzims
+        end if
+        !$omp end single
+#ifdef PAR
+        !images in top plane compute the reference pressure
+        if (kim==im_ref) then
+          !$omp do reduction(+:Phi_ref)
+          do j = 1, Prny
+            do i = 1, Prnx
+              Phi_ref = Phi_ref + Pr(i,j,k_ref)
+            end do
+          end do
+          !$omp end do
+
+          !$omp single
+          Phi_ref = par_co_sum_plane_xy(Phi_ref)
+          Phi_ref = Phi_ref / (gPrnx * gPrny)
+          !$omp end single
+        end if
+
+        !$omp single
+        if (im_ref==1) then
+          call par_broadcast_from_first_z(Phi_ref)
+        else
+          call par_broadcast_from_last_z(Phi_ref)
+        end if        
+        !$omp end single
+#else
+        !$omp do reduction(+:Phi_ref)
+        do j = 1, Prny
+          do i = 1, Prnx
+            Phi_ref = Phi_ref + Pr(i,j,k_ref)
+          end do
+        end do
+        !$omp end do
+
+        !$omp single
+        Phi_ref = Phi_ref / (Prnx*Prny)
+        !$omp end single
+#endif
+      end if
+      
+    end if
+     
+    !$omp do
+    do k = 1, Prnz
+      do j = 1, Prny
+        do i = 1, Prnx
+          Pr(i,j,k) = Pr(i,j,k) - Phi_ref
+        end do
+      end do
+    end do
+    !$omp end do   
+
+    !$omp end parallel
+    
+    end associate
+    
+    ! if no default, do not fix
+  end subroutine
 
 
   subroutine InitHydrostaticPressure(Pr, Temperature, Moisture)
