@@ -25,9 +25,10 @@ module Pressure
   integer, parameter, public :: PROJECTION_METHOD_INCREMENTAL = 0, &
                                 PROJECTION_METHOD_PRESSURE = 1
 
-  integer, parameter, public :: PRESSURE_REFERENCE_BOUNDARY = 0, &
-                                PRESSURE_REFERENCE_VOLUME_AVERAGE = 1, &
-                                PRESSURE_REFERENCE_POINT = 2
+  integer, parameter, public :: PRESSURE_REFERENCE_NONE = 0, &
+                                PRESSURE_REFERENCE_BOUNDARY = 1, &
+                                PRESSURE_REFERENCE_VOLUME_AVERAGE = 2, &
+                                PRESSURE_REFERENCE_POINT = 3
   type pressure_reference
     integer :: type = PRESSURE_REFERENCE_BOUNDARY
     integer :: boundary_index = To
@@ -562,7 +563,7 @@ contains
     real(knd), allocatable, intent(in) :: Q(:,:,:)
     real(knd), intent(inout) :: Phi(-1:,-1:,-1:)
     real(knd), intent(in)    :: dt2,dt3
-    real(knd) :: Phi_ref,Au,Av,Aw,dxmin2,dymin2,dzmin2,S,p
+    real(knd) :: Au,Av,Aw,dxmin2,dymin2,dzmin2,S,p
     integer   :: i,j,k
     real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
 
@@ -828,7 +829,9 @@ contains
     associate(ref => pressure_solution%reference)
     !$omp parallel private(i,j,k)
 
-    if (ref%type == PRESSURE_REFERENCE_VOLUME_AVERAGE) then
+    if (ref%type == PRESSURE_REFERENCE_NONE) then
+      continue
+    else if (ref%type == PRESSURE_REFERENCE_VOLUME_AVERAGE) then
       !$omp do reduction(+:Phi_ref)
       do k = 1, Prnz
         do j = 1, Prny
@@ -1027,15 +1030,17 @@ contains
       
     end if
      
-    !$omp do
-    do k = 1, Prnz
-      do j = 1, Prny
-        do i = 1, Prnx
-          Pr(i,j,k) = Pr(i,j,k) - Phi_ref
+    if (Phi_ref /=0 ) then
+      !$omp do
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            Pr(i,j,k) = Pr(i,j,k) - Phi_ref
+          end do
         end do
       end do
-    end do
-    !$omp end do   
+      !$omp end do   
+    end if
 
     !$omp end parallel
     

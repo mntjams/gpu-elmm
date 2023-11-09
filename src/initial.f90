@@ -2213,6 +2213,8 @@ contains
               p_s_ref%type = PRESSURE_REFERENCE_VOLUME_AVERAGE
             case ("point")
               p_s_ref%type = PRESSURE_REFERENCE_POINT
+            case ("none")
+              p_s_ref%type = PRESSURE_REFERENCE_NONE
             case default
               write(*,*) "Error, unknown reference type '", &
                         reference_type_str, &
