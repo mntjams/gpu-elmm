@@ -676,7 +676,10 @@ contains
       end if
     end if
 
+    !$omp single
     Phi_ref = 0
+    !$omp end single
+    
 #ifdef PAR
     !images in top plane compute the reference pressure
     if (kim==nzims) then
