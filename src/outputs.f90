@@ -436,12 +436,13 @@ contains
         momentum_fluxes_time = huge(1.0_knd)
         allocate(momentum_fluxes_sgs_time(6,size(probes),1:time_series_max_length))
         momentum_fluxes_sgs_time = huge(1.0_knd)
-        allocate(scalar_fluxes_time(3,1:num_of_scalars,size(probes),1:time_series_max_length))
-        scalar_fluxes_time = huge(1.0_knd)
+        allocate(scalar_fluxes_time(3,size(probes),1:num_of_scalars,1:time_series_max_length))
+        !presently only added during the averaging phase
+        scalar_fluxes_time = 0
       else
         allocate(momentum_fluxes_time(0,0,0))
         allocate(momentum_fluxes_sgs_time(0,0,0))
-        allocate(scalar_fluxes_time(0,0,0,0))
+        allocate(scalar_fluxes_time(0,0,1:num_of_scalars,1:time_series_max_length))
       end if
 
       if (enable_buoyancy) then
@@ -769,7 +770,7 @@ contains
   subroutine OutTStep(U,V,W,Pr,Temperature,Moisture,Scalar,dt,delta)
     use Wallmodels, only: ComputeViscsWM
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)   :: U,V,W
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)      :: Pr
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)   :: Pr
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)   :: Temperature
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)   :: Moisture
     real(knd), dimension(-2:,-2:,-2:,:), contiguous, intent(in) :: Scalar
@@ -1042,30 +1043,7 @@ contains
          (time_stepping%time - time_stepping%dt < timeavg2))) then
 
       if (num_of_scalars > 0 .and. store%avg_flux_scalar == 1) then
-        do i=1,num_of_scalars
-          call AddScalarAdvVector(Scalar_fl_U_avg(:,:,:,i), &
-                               Scalar_fl_V_avg(:,:,:,i), &
-                               Scalar_fl_W_avg(:,:,:,i), &
-                               Scalar(:,:,:,i), &
-                               U,V,W,time_weight, &
-                               scalar_fluxes_time(:,i,:,step), &
-                               scalar_probes%i, scalar_probes%j, scalar_probes%k)
-          if (store%avg_flux_scalar_sgs==1) then
-            call AddScalarDiffVector(Scalar_fl_U_sgs(:,:,:,i), &
-                                  Scalar_fl_V_sgs(:,:,:,i), &
-                                  Scalar_fl_W_sgs(:,:,:,i), &
-                                  Scalar(:,:,:,i),time_weight, &
-                                  scalar_fluxes_time(:,i,:,step), &
-                                  scalar_probes%i, scalar_probes%j, scalar_probes%k)
-          else
-            call AddScalarDiffVector(Scalar_fl_U_avg(:,:,:,i), &
-                                  Scalar_fl_V_avg(:,:,:,i), &
-                                  Scalar_fl_W_avg(:,:,:,i), &
-                                  Scalar(:,:,:,i),time_weight, &
-                                  scalar_fluxes_time(:,i,:,step), &
-                                  scalar_probes%i, scalar_probes%j, scalar_probes%k)
-          end if
-        end do
+       call AddScalarFluxes()
       end if
       
     end if
@@ -1212,6 +1190,57 @@ contains
 #ifdef CUSTOM_OUTPUT
     call CustomTimeStepOutput
 #endif
+
+contains
+
+  subroutine AddScalarFluxes
+
+    if (size(scalar_fluxes_time)>0 .and. size(scalar_probes)>0) then
+      do i=1,num_of_scalars
+        call AddScalarAdvVector(Scalar_fl_U_avg(:,:,:,i), &
+                            Scalar_fl_V_avg(:,:,:,i), &
+                            Scalar_fl_W_avg(:,:,:,i), &
+                            Scalar(:,:,:,i), &
+                            U,V,W,time_weight, &
+                            scalar_fluxes_time(:,:,i,step), &
+                            scalar_probes%i, scalar_probes%j, scalar_probes%k)
+        if (store%avg_flux_scalar_sgs==1) then
+          call AddScalarDiffVector(Scalar_fl_U_sgs(:,:,:,i), &
+                                Scalar_fl_V_sgs(:,:,:,i), &
+                                Scalar_fl_W_sgs(:,:,:,i), &
+                                Scalar(:,:,:,i),time_weight, &
+                                scalar_fluxes_time(:,:,i,step), &
+                                scalar_probes%i, scalar_probes%j, scalar_probes%k)
+        else
+          call AddScalarDiffVector(Scalar_fl_U_avg(:,:,:,i), &
+                                Scalar_fl_V_avg(:,:,:,i), &
+                                Scalar_fl_W_avg(:,:,:,i), &
+                                Scalar(:,:,:,i),time_weight, &
+                                scalar_fluxes_time(:,:,i,step), &
+                                scalar_probes%i, scalar_probes%j, scalar_probes%k)
+        end if
+      end do
+    else
+      do i=1,num_of_scalars
+        call AddScalarAdvVector(Scalar_fl_U_avg(:,:,:,i), &
+                            Scalar_fl_V_avg(:,:,:,i), &
+                            Scalar_fl_W_avg(:,:,:,i), &
+                            Scalar(:,:,:,i), &
+                            U,V,W,time_weight)
+        if (store%avg_flux_scalar_sgs==1) then
+          call AddScalarDiffVector(Scalar_fl_U_sgs(:,:,:,i), &
+                                Scalar_fl_V_sgs(:,:,:,i), &
+                                Scalar_fl_W_sgs(:,:,:,i), &
+                                Scalar(:,:,:,i),time_weight)
+        else
+          call AddScalarDiffVector(Scalar_fl_U_avg(:,:,:,i), &
+                                Scalar_fl_V_avg(:,:,:,i), &
+                                Scalar_fl_W_avg(:,:,:,i), &
+                                Scalar(:,:,:,i),time_weight)
+        end if
+      end do
+    end if
+   end subroutine AddScalarFluxes
 
   end subroutine OutTstep
 
@@ -1369,7 +1398,7 @@ contains
 
         open(unit,file=output_dir//"scalfltimep"//trim(prob)//".unf", &
              access="stream",status="old",position="append")
-        write(unit) scalar_fluxes_time(:,:,k,1:time_series_step)
+        write(unit) scalar_fluxes_time(:,k,:,1:time_series_step)
         close(unit)
       end if
 
@@ -2475,16 +2504,27 @@ contains
       Scalar_fl_V_adv = 0
       Scalar_fl_W_adv = 0
 
-      do i=1,num_of_scalars
-        call AddScalarAdvVector(Scalar_fl_U_adv(:,:,:,i), &
-                             Scalar_fl_V_adv(:,:,:,i), &
-                             Scalar_fl_W_adv(:,:,:,i), &
-                             Scalar_avg(:,:,:,i), &
-                             U_avg,V_avg,W_avg, &
-                             1._knd, &
-                             scalar_fluxes_time(:,i,:,1), &
-                             scalar_probes%i, scalar_probes%j, scalar_probes%k)
-      end do
+      if (size(scalar_fluxes_time)>0 .and. size(scalar_probes)>0) then
+        do i=1,num_of_scalars
+          call AddScalarAdvVector(Scalar_fl_U_adv(:,:,:,i), &
+                              Scalar_fl_V_adv(:,:,:,i), &
+                              Scalar_fl_W_adv(:,:,:,i), &
+                              Scalar_avg(:,:,:,i), &
+                              U_avg,V_avg,W_avg, &
+                              1._knd, &
+                              scalar_fluxes_time(:,:,i,1), &
+                              scalar_probes%i, scalar_probes%j, scalar_probes%k)
+        end do
+      else
+        do i=1,num_of_scalars
+          call AddScalarAdvVector(Scalar_fl_U_adv(:,:,:,i), &
+                              Scalar_fl_V_adv(:,:,:,i), &
+                              Scalar_fl_W_adv(:,:,:,i), &
+                              Scalar_avg(:,:,:,i), &
+                              U_avg,V_avg,W_avg, &
+                              1._knd)
+        end do
+      end if
 
       if (store%avg_flux_scalar_sgs==1) then
         Scalar_fl_U_avg = Scalar_fl_U_avg + Scalar_fl_U_sgs

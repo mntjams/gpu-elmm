@@ -773,7 +773,7 @@ contains
       xi = Scflx_points(i)%xi
       yj = Scflx_points(i)%yj
       zk = Scflx_points(i)%zk
-      Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - Fl(i,j,k)
+      Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - Fl(xi,yj,zk)
     end do
     !$omp end do
     !$omp do
@@ -781,7 +781,7 @@ contains
       xi = Scflx_points(i)%xi
       yj = Scflx_points(i)%yj
       zk = Scflx_points(i)%zk
-      Scal2(xi+1,yj,zk) = Scal2(xi+1,yj,zk) + Fl(i,j,k)
+      Scal2(xi+1,yj,zk) = Scal2(xi+1,yj,zk) + Fl(xi,yj,zk)
     end do
     !$omp end do nowait
 
@@ -821,7 +821,7 @@ contains
       xi = Scfly_points(i)%xi
       yj = Scfly_points(i)%yj
       zk = Scfly_points(i)%zk
-      Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - Fl(i,j,k)
+      Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - Fl(xi,yj,zk)
                         
     end do
     !$omp end do
@@ -830,7 +830,7 @@ contains
       xi = Scfly_points(i)%xi
       yj = Scfly_points(i)%yj
       zk = Scfly_points(i)%zk
-      Scal2(xi,yj+1,zk) = Scal2(xi,yj+1,zk) + Fl(i,j,k)
+      Scal2(xi,yj+1,zk) = Scal2(xi,yj+1,zk) + Fl(xi,yj,zk)
     end do
     !$omp end do nowait
 
@@ -870,7 +870,7 @@ contains
       xi = Scflz_points(i)%xi
       yj = Scflz_points(i)%yj
       zk = Scflz_points(i)%zk
-      Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - Fl(i,j,k)
+      Scal2(xi,yj,zk) = Scal2(xi,yj,zk) - Fl(xi,yj,zk)
     end do
     !$omp end do
     !$omp do
@@ -878,7 +878,7 @@ contains
       xi = Scflz_points(i)%xi
       yj = Scflz_points(i)%yj
       zk = Scflz_points(i)%zk
-      Scal2(xi,yj,zk+1) = Scal2(xi,yj,zk+1) + Fl(i,j,k)
+      Scal2(xi,yj,zk+1) = Scal2(xi,yj,zk+1) + Fl(xi,yj,zk)
     end do
     !$omp end do
     !$omp end parallel
@@ -898,9 +898,17 @@ contains
     real(knd), contiguous, intent(inout) :: ScW(:,:,:)
     real(knd), contiguous, intent(in)    :: Scal(-2:,-2:,-2:)
     real(knd), intent(in) :: weight
-    real(knd), intent(out) :: probes_flux(:,:) !component, position
-    integer, intent(in) :: px(:), py(:), pz(:)
+    real(knd), intent(out), optional :: probes_flux(:,:) !component, position
+    integer, intent(in), optional :: px(:), py(:), pz(:)
+    logical :: do_probes
     integer :: i, j, k, probe
+    real(knd) :: Ax, Ay, Az
+
+    Ax = 1 / (2 * dxmin)
+    Ay = 1 / (2 * dymin)
+    Az = 1 / (2 * dzmin)
+
+    do_probes = present(probes_flux)
 
     !$omp parallel private (i,j,k)
     !$omp do
@@ -908,55 +916,66 @@ contains
      do j = 1, Uny
       do i = 1, Unx
         ScU(i,j,k) = ScU(i,j,k) + &
-                   weight * (TDiff(i+1,j,k)+TDiff(i,j,k)) * (Scal(i+1,j,k)-Scal(i,j,k)) / dxmin
+                   weight * (TDiff(i+1,j,k)+TDiff(i,j,k)) * (Scal(i+1,j,k)-Scal(i,j,k)) * Ax
       end do
      end do
     end do
     !$omp end do nowait
-    !$omp do
-    do probe = 1, size(px)
-        i = px(probe)
-        j = py(probe)
-        k = pz(probe)
-        probes_flux(1, probe) = probes_flux(1, probe) + (TDiff(i+1,j,k)+TDiff(i,j,k)) * (Scal(i+1,j,k)-Scal(i,j,k)) / dxmin
-    end do
-    !$omp end do nowait
+
+    if (do_probes) then
+      !$omp do
+      do probe = 1, size(px)
+          i = px(probe)
+          j = py(probe)
+          k = pz(probe)
+          probes_flux(1, probe) = probes_flux(1, probe) + (TDiff(i+1,j,k)+TDiff(i,j,k)) * (Scal(i+1,j,k)-Scal(i,j,k)) * Ax
+      end do
+      !$omp end do nowait
+    end if
+
     !$omp do
     do k = 1, Vnz
      do j = 1, Vny
       do i = 1, Vnx
         ScV(i,j,k) = ScV(i,j,k) + &
-                   weight * (TDiff(i,j+1,k)+TDiff(i,j,k)) * (Scal(i,j+1,k)-Scal(i,j,k)) / dymin
+                   weight * (TDiff(i,j+1,k)+TDiff(i,j,k)) * (Scal(i,j+1,k)-Scal(i,j,k)) * Ay
       end do
      end do
     end do
     !$omp end do nowait
-    !$omp do
-    do probe = 1, size(px)
-        i = px(probe)
-        j = py(probe)
-        k = pz(probe)
-        probes_flux(2, probe) = probes_flux(2, probe) + (TDiff(i,j+1,k)+TDiff(i,j,k)) * (Scal(i,j+1,k)-Scal(i,j,k)) / dymin
-    end do
-    !$omp end do nowait
+
+    if (do_probes) then
+      !$omp do
+      do probe = 1, size(px)
+          i = px(probe)
+          j = py(probe)
+          k = pz(probe)
+          probes_flux(2, probe) = probes_flux(2, probe) + (TDiff(i,j+1,k)+TDiff(i,j,k)) * (Scal(i,j+1,k)-Scal(i,j,k)) * Ay
+      end do
+      !$omp end do nowait
+    end if
+
     !$omp do
     do k = 1, Wnz
      do j = 1, Wny
       do i = 1, Wnx
         ScW(i,j,k) = ScW(i,j,k) + &
-                   weight * (TDiff(i,j,k+1)+TDiff(i,j,k)) * (Scal(i,j,k+1)-Scal(i,j,k)) / dzmin
+                   weight * (TDiff(i,j,k+1)+TDiff(i,j,k)) * (Scal(i,j,k+1)-Scal(i,j,k)) * Az
       end do
      end do
     end do
     !$omp end do nowait
-    !$omp do
-    do probe = 1, size(px)
-        i = px(probe)
-        j = py(probe)
-        k = pz(probe)
-        probes_flux(3, probe) = probes_flux(3, probe) + (TDiff(i,j,k+1)+TDiff(i,j,k)) * (Scal(i,j,k+1)-Scal(i,j,k)) / dzmin
-    end do
-    !$omp end do nowait
+
+    if (do_probes) then
+      !$omp do
+      do probe = 1, size(px)
+          i = px(probe)
+          j = py(probe)
+          k = pz(probe)
+          probes_flux(3, probe) = probes_flux(3, probe) + (TDiff(i,j,k+1)+TDiff(i,j,k)) * (Scal(i,j,k+1)-Scal(i,j,k)) * Az
+      end do
+      !$omp end do nowait
+    end if
     !$omp end parallel
   endsubroutine AddScalarDiffVector
   
