@@ -1,9 +1,15 @@
 module Kinds
   use iso_fortran_env
 #ifdef DPREC  
-  integer,parameter :: rp = real64
+  integer, parameter :: rp = real64
 #else
-  integer,parameter :: rp = real32
+  integer, parameter :: rp = real32
+#endif
+
+#ifdef VTK_DOUBLE
+  integer, parameter :: vtk_kind = real64
+#else
+  integer, parameter :: vtk_kind = real32
 #endif
 end module
 
@@ -484,12 +490,17 @@ contains
   
   subroutine read_scalar(g,buf)
     use Endianness
+    use ieee_exceptions
     class(grid),intent(in) :: g
     real(rp),intent(out) :: buf(:,:,:)
-    real(real32), allocatable :: tmp(:,:,:) 
+    real(vtk_kind), allocatable :: tmp(:,:,:) 
     character :: ch
+    logical :: saved_fpe_mode(size(ieee_all))
     
-    if (rp==real32) then
+    call ieee_get_halting_mode(ieee_all, saved_fpe_mode)
+    call ieee_set_halting_mode(ieee_all, .false.)
+    
+    if (rp==vtk_kind) then
       read(g%unit) buf(1:g%nx,1:g%ny,1:g%nz)
       buf(1:g%nx,1:g%ny,1:g%nz) = BigEnd(buf(1:g%nx,1:g%ny,1:g%nz))
     else
@@ -498,16 +509,24 @@ contains
       buf(1:g%nx,1:g%ny,1:g%nz) = BigEnd(tmp)
     end if
     read(g%unit) ch
+    
+    call ieee_set_halting_mode(ieee_all, saved_fpe_mode)
   end subroutine
   
   subroutine read_vector(g,buf)
     use Endianness
+    use ieee_exceptions
+    use ieee_arithmetic
     class(grid),intent(in) :: g
     real(rp),intent(out) :: buf(:,:,:,:)
-    real(real32), allocatable :: tmp(:,:,:,:) 
+    real(vtk_kind), allocatable :: tmp(:,:,:,:) 
     character :: ch
+    logical :: saved_fpe_mode(size(ieee_all))
 
-   if (rp==real32) then
+    call ieee_get_halting_mode(ieee_all, saved_fpe_mode)
+    call ieee_set_halting_mode(ieee_all, .false.)
+    
+    if (rp==vtk_kind) then
       read(g%unit) buf(:,1:g%nx,1:g%ny,1:g%nz)
       buf(:,1:g%nx,1:g%ny,1:g%nz) = BigEnd(buf(:,1:g%nx,1:g%ny,1:g%nz))
     else
@@ -516,6 +535,8 @@ contains
       buf(:,1:g%nx,1:g%ny,1:g%nz) = BigEnd(tmp)
     end if
     read(g%unit) ch
+    
+    call ieee_set_halting_mode(ieee_all, saved_fpe_mode)
   end subroutine
   
   subroutine skip_var(g,stat)
