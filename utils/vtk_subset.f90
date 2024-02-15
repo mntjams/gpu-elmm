@@ -1,7 +1,13 @@
 module Kinds
   use iso_fortran_env
   
-  integer,parameter :: rp = real32
+#ifdef VTK_DOUBLE
+  integer, parameter :: vtk_kind = real64, rp = vtk_kind
+  character(*), parameter :: float_string = "double"
+#else
+  integer, parameter :: vtk_kind = real32, rp = vtk_kind
+  character(*), parameter :: float_string = "float"
+#endif
 end module
 
 module Endianness
@@ -634,7 +640,7 @@ program vtk_subset
   
   if (size(fields_arr)>0) then
     do ifield = 1, size(fields_arr)
-      call find(trim(fields_arr(ifield))//" float", status, var_type)   
+      call find(trim(fields_arr(ifield))//" "//float_string, status, var_type)   
       call in_g%read_title(status,title)
           
       call get_buffer(var_type,sc,vec)
@@ -712,17 +718,17 @@ contains
     write(str(12:),*) nx,ny,nz
     write(out_unit) str,lf
     str="X_COORDINATES"
-    write(str(15:),'(i5,2x,a)') nx,"float"
+    write(str(15:),'(i5,2x,a)') nx, float_string
     write(out_unit) str,lf
-    write(out_unit) BigEnd(real(x, real32)),lf
+    write(out_unit) BigEnd(real(x, vtk_kind)),lf
     str="Y_COORDINATES"
-    write(str(15:),'(i5,2x,a)') ny,"float"
+    write(str(15:),'(i5,2x,a)') ny, float_string
     write(out_unit) str,lf
-    write(out_unit) BigEnd(real(y, real32)),lf
+    write(out_unit) BigEnd(real(y, vtk_kind)),lf
     str="Z_COORDINATES"
-    write(str(15:),'(i5,2x,a)') nz,"float"
+    write(str(15:),'(i5,2x,a)') nz, float_string
     write(out_unit) str,lf
-    write(out_unit) BigEnd(real(z, real32)),lf
+    write(out_unit) BigEnd(real(z, vtk_kind)),lf
     str="POINT_DATA"
     write(str(12:),*) nx*ny*nz
     write(out_unit) str,lf 
