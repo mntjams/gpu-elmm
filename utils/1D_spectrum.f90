@@ -271,7 +271,7 @@ contains
     use Endianness
     class(grid),intent(inout) :: g
     integer :: io
-    real(real32), allocatable :: tmp(:)
+    real(vtk_kind), allocatable :: tmp(:)
 
     open(newunit=g%unit,file=g%fname,access="stream",form="unformatted",status="old",action="read",iostat=io)
 
@@ -544,7 +544,7 @@ contains
     class(grid),intent(in) :: g
     integer, intent(in) :: stat
     integer(c_size_t) :: nbytes, fpos
-    nbytes = c_sizeof(1_real32) * &
+    nbytes = c_sizeof(1_vtk_kind) * &
             int(g%nx, c_size_t) * &
             int(g%ny, c_size_t) * &
             int(g%nz, c_size_t)
@@ -834,7 +834,7 @@ contains
     end select
     
     spectrum = dx * sp_avg / pi
-    
+
     kappas = [(2*pi*j/lx, j = 1, size(sp_avg))]
         
   end subroutine
