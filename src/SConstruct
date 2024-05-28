@@ -149,7 +149,7 @@ elif str(comp)=='cray':
   env.Append(FORTRANMODDIRPREFIX = '-J')
    
 else:
-  env = Environment()
+  env = Environment(FORTRAN='gfortran',LINK='gfortran')
   
   compiler_executables()
  
