@@ -743,8 +743,9 @@ contains
     real(knd), contiguous, intent(in)    :: Scal(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)    :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd), intent(in) :: weight
-    real(knd), intent(out) :: probes_flux(:,:) !component, position
-    integer, intent(in) :: px(:), py(:), pz(:)
+    real(knd), intent(out), optional :: probes_flux(:,:) !component, position
+    integer, intent(in), optional :: px(:), py(:), pz(:)
+    logical :: do_probes
     integer :: i, j, k, probe
     real(knd) :: sl, sr
     real(knd), parameter ::eps = 1e-8
@@ -753,6 +754,7 @@ contains
       allocate(Slope(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
     end if
 
+    do_probes = present(probes_flux)
 
     call set(Slope,0._knd)
 
@@ -790,18 +792,20 @@ contains
     end do
     !$omp end do nowait
 
-    !$omp do
-    do probe = 1, size(px)
-        i = px(probe)
-        j = py(probe)
-        k = pz(probe)
-        if (U(i,j,k)>0) then
-          probes_flux(1, probe) = U(i,j,k) * (Scal(i,j,k) + (Scal(i,j,k)-Scal(i-1,j,k)) * Slope(i,j,k)/2._knd)
-        else
-          probes_flux(1, probe) = U(i,j,k) * (Scal(i+1,j,k) + (Scal(i+1,j,k)-Scal(i+2,j,k)) * Slope(i,j,k)/2._knd)
-       end if
-    end do
-    !$omp end do nowait
+    if (do_probes) then
+      !$omp do
+      do probe = 1, size(px)
+          i = px(probe)
+          j = py(probe)
+          k = pz(probe)
+          if (U(i,j,k)>0) then
+            probes_flux(1, probe) = U(i,j,k) * (Scal(i,j,k) + (Scal(i,j,k)-Scal(i-1,j,k)) * Slope(i,j,k)/2._knd)
+          else
+            probes_flux(1, probe) = U(i,j,k) * (Scal(i+1,j,k) + (Scal(i+1,j,k)-Scal(i+2,j,k)) * Slope(i,j,k)/2._knd)
+        end if
+      end do
+      !$omp end do nowait
+    end if
     !$omp end parallel
 
     call set(Slope,0._knd)
@@ -841,18 +845,20 @@ contains
     end do
     !$omp end do nowait
 
-    !$omp do
-    do probe = 1, size(px)
-        i = px(probe)
-        j = py(probe)
-        k = pz(probe)
-        if (V(i,j,k)>0) then
-          probes_flux(2, probe) = V(i,j,k) * (Scal(i,j,k) + (Scal(i,j,k)-Scal(i,j-1,k)) * Slope(i,j,k)/2._knd)
-        else
-          probes_flux(2, probe) = V(i,j,k) * (Scal(i,j+1,k) + (Scal(i,j+1,k)-Scal(i,j+2,k)) * Slope(i,j,k)/2._knd)
-       end if
-    end do
-    !$omp end do nowait
+    if (do_probes) then
+      !$omp do
+      do probe = 1, size(px)
+          i = px(probe)
+          j = py(probe)
+          k = pz(probe)
+          if (V(i,j,k)>0) then
+            probes_flux(2, probe) = V(i,j,k) * (Scal(i,j,k) + (Scal(i,j,k)-Scal(i,j-1,k)) * Slope(i,j,k)/2._knd)
+          else
+            probes_flux(2, probe) = V(i,j,k) * (Scal(i,j+1,k) + (Scal(i,j+1,k)-Scal(i,j+2,k)) * Slope(i,j,k)/2._knd)
+        end if
+      end do
+      !$omp end do nowait
+    end if
     !$omp end parallel
 
 
@@ -892,18 +898,20 @@ contains
     end do
     !$omp end do
 
-    !$omp do
-    do probe = 1, size(px)
-        i = px(probe)
-        j = py(probe)
-        k = pz(probe)
-        if (W(i,j,k)>0) then
-          probes_flux(3, probe) = W(i,j,k) * (Scal(i,j,k) + (Scal(i,j,k)-Scal(i,j,k-1)) * Slope(i,j,k)/2._knd)
-        else
-          probes_flux(3, probe) = W(i,j,k) * (Scal(i,j,k+1) + (Scal(i,j,k+1)-Scal(i,j,k+2)) * Slope(i,j,k)/2._knd)
-       end if
-    end do
-    !$omp end do nowait
+    if (do_probes) then
+      !$omp do
+      do probe = 1, size(px)
+          i = px(probe)
+          j = py(probe)
+          k = pz(probe)
+          if (W(i,j,k)>0) then
+            probes_flux(3, probe) = W(i,j,k) * (Scal(i,j,k) + (Scal(i,j,k)-Scal(i,j,k-1)) * Slope(i,j,k)/2._knd)
+          else
+            probes_flux(3, probe) = W(i,j,k) * (Scal(i,j,k+1) + (Scal(i,j,k+1)-Scal(i,j,k+2)) * Slope(i,j,k)/2._knd)
+        end if
+      end do
+      !$omp end do nowait
+    end if
     !$omp end parallel
 
   contains
