@@ -1029,6 +1029,7 @@ contains
     use Parameters
     
     call helper(Btype)
+    call helper(PrBtype)
     call helper(TempBtype)
     call helper(MoistBtype)
     call helper(ScalBtype)

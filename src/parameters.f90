@@ -219,13 +219,18 @@ module Parameters
 
   real(knd) :: temperature_ref = 295
   real(knd) :: moisture_ref = 0.001 !TODO: compute from relative humidity
+  
+  logical, dimension(6) :: PrBtype_explicitly_set = .false.
 
   integer, dimension(6) :: Btype      !boundary condition types for velocity, see below for values
+  integer, dimension(6) :: PrBtype    !boundary consitions for the pressure solver
+                                      ! Dirichlet, Neumann or Periodic
   integer, dimension(6) :: TempBtype  !boundary condition types for temperature
   integer, dimension(6) :: MoistBtype !boundary condition types for temperature
   integer, dimension(6) :: ScalBtype  !boundary condition types for scalars
   
-  integer, dimension(6) :: PoissonBtype !boundary conditions for the pressure solver
+  integer, dimension(6) :: PoissonBtype !boundary conditions for the Poisson solver
+                                        !follows PrBtype
 
 
   real(knd), dimension(3,6)   :: sideU     !velocities on boundaries in case of Dirichlet BC

@@ -56,7 +56,7 @@ contains
  subroutine ReadConfiguration
    use StaggeredFrames, only: rrange, TFrameTimes, TSaveFlags, &
                               TStaggeredFrameDomain,  AddDomain
-   use PoisFFT, only: PoisFFT_NeumannStag, PoisFFT_Periodic
+   use PoisFFT, only: PoisFFT_NeumannStag, PoisFFT_DirichletStag, PoisFFT_Periodic
    use Sponge, only: enable_in_sponge_x, enable_out_sponge_x, enable_out_sponge_y, &
                      enable_top_sponge, enable_top_sponge_scalar
    integer ::  lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
@@ -833,13 +833,25 @@ contains
      if (master) write(*,*) "General grid not supported."; call error_stop
    end if
 
-   !Btype might get overwritten by MPI procedures
+   !Btype and PrBtype might get overwritten by MPI procedures
    do i = We, To
-     if (Btype(i)==BC_PERIODIC) then
+      if (.not.PrBtype_explicitly_set(i)) then
+        if (Btype(i)==BC_PERIODIC) then
+          PrBtype(i) = BC_PERIODIC
+        else
+          PrBtype(i) = BC_NEUMANN
+        end if
+      end if
+   end do
+   
+   do i = We, To
+      if (PrBtype(i)==BC_PERIODIC) then
         PoissonBtype(i) = PoisFFT_PERIODIC
-     else
+      else if (PrBtype(i)==BC_DIRICHLET) then
+        PoissonBtype(i) = PoisFFT_DirichletStag
+      else
         PoissonBtype(i) = PoisFFT_NeumannStag
-     end if
+      end if
    end do
    
 
