@@ -206,6 +206,157 @@ module Subgrid
     endsubroutine StrainIJ
     
     
+     subroutine S_Omega_IJ(i, j, k, U, V, W, S, Om)     !Computes components of the strain rate tensor.
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(out) :: S(1:3,1:3), Om(1:3,1:3)
+      integer, intent(in) :: i, j, k
+      real(knd) :: D(1:3,1:3)
+      integer :: ii, jj
+
+      D = 0
+
+      D(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
+      D(2,2) = (V(i,j,k)-V(i,j-1,k)) / dymin
+      D(3,3) = (W(i,j,k)-W(i,j,k-1)) / dzPr(k)
+      D(1,2) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) / (4 * dymin)
+      D(1,3) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) / (2 * (zPr(k+1)-zPr(k-1)))
+      D(2,1) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) / (4 * dxmin)
+      D(2,3) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) / (2 * (zPr(k+1)-zPr(k-1)))
+      D(3,1) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) / (4 * dxmin)
+      D(3,2) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) / (4 * dymin)
+
+      do jj = 1, 3
+        do ii = 1, 3
+          S(ii,jj) = (D(ii,jj) + D(jj,ii)) / 2
+          Om(ii,jj) = (D(ii,jj) - D(jj,ii)) / 2
+        end do
+      end do
+    endsubroutine S_Omega_IJ
+    
+    
+    subroutine StrainIJ_4ord(i, j, k, U, V, W, S)     !Computes components of the strain rate tensor.
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(out) :: S(1:3,1:3)
+      integer, intent(in) :: i, j, k
+      real(knd) :: D(1:3,1:3)
+      integer :: ii, jj
+      
+      real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+      real(knd), parameter :: D2 = 8._knd / 12, D4 = -1._knd / 12
+
+      D = 0
+      
+      call GradientTensorUG4(D, i, j, k)
+
+      do jj = 1, 3
+        do ii = 1, 3
+          S(ii,jj) = (D(ii,jj) + D(jj,ii)) / 2
+        end do
+      end do
+      
+    contains
+    
+      pure subroutine GradientTensorUG4(g ,i, j, k)
+        real(knd), intent(out) :: g(3,3)
+        integer, intent(in) :: i, j, k
+        real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+        real(knd), parameter :: D1 = 2._knd / 3, D3 = 1._knd / 12
+
+        g(1,1) = (C1*(U(i,j,k)-U(i-1,j,k)) - C3*(U(i+1,j,k)-U(i-2,j,k))) / dxmin
+        g(2,1) = ( &
+                    D1*(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) - &
+                    D3*(U(i,j+2,k)+U(i-1,j+2,k)-U(i,j-2,k)-U(i-1,j-2,k)) &
+                 ) / (2*dymin)
+        g(3,1) = ( &
+                    D1*(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) - &
+                    D1*(U(i,j,k+2)+U(i-1,j,k+2)-U(i,j,k-2)-U(i-1,j,k-2)) &
+                 ) / (2*dzmin)
+
+        g(2,2) = (C1*(V(i,j,k)-V(i,j-1,k)) - C3*(V(i,j+1,k)-V(i,j-2,k))) / dymin
+        g(1,2) = ( &
+                    D1*(V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) - &
+                    D3*(V(i+2,j,k)+V(i+2,j-1,k)-V(i-2,j,k)-V(i-2,j-1,k)) &
+                 ) / (2*dxmin)
+        g(3,2) = ( &
+                    D1*(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) - &
+                    D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
+                 ) / (2*dzmin)
+
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+        g(1,3) = ( &
+                    D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
+                    D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
+                 ) / (2*dxmin)
+        g(2,3) = ( &
+                    D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
+                    D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                 ) / (2*dymin)
+      end subroutine GradientTensorUG4
+    end subroutine StrainIJ_4ord
+    
+    
+    subroutine S_Omega_IJ_4ord(i, j, k, U, V, W, S, Om)     !Computes components of the strain rate tensor.
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(out) :: S(1:3,1:3), Om(1:3,1:3)
+      integer, intent(in) :: i, j, k
+      real(knd) :: D(1:3,1:3)
+      integer :: ii, jj
+      
+      real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+      real(knd), parameter :: D2 = 8._knd / 12, D4 = -1._knd / 12
+
+      D = 0
+      
+      call GradientTensorUG4(D, i, j, k)
+
+      do jj = 1, 3
+        do ii = 1, 3
+          S(ii,jj) = (D(ii,jj) + D(jj,ii)) / 2
+          Om(ii,jj) = (D(ii,jj) - D(jj,ii)) / 2
+        end do
+      end do
+      
+    contains
+    
+      pure subroutine GradientTensorUG4(g ,i, j, k)
+        real(knd), intent(out) :: g(3,3)
+        integer, intent(in) :: i, j, k
+        real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+        real(knd), parameter :: D1 = 2._knd / 3, D3 = 1._knd / 12
+
+        g(1,1) = (C1*(U(i,j,k)-U(i-1,j,k)) - C3*(U(i+1,j,k)-U(i-2,j,k))) / dxmin
+        g(2,1) = ( &
+                    D1*(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) - &
+                    D3*(U(i,j+2,k)+U(i-1,j+2,k)-U(i,j-2,k)-U(i-1,j-2,k)) &
+                 ) / (2*dymin)
+        g(3,1) = ( &
+                    D1*(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) - &
+                    D1*(U(i,j,k+2)+U(i-1,j,k+2)-U(i,j,k-2)-U(i-1,j,k-2)) &
+                 ) / (2*dzmin)
+
+        g(2,2) = (C1*(V(i,j,k)-V(i,j-1,k)) - C3*(V(i,j+1,k)-V(i,j-2,k))) / dymin
+        g(1,2) = ( &
+                    D1*(V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) - &
+                    D3*(V(i+2,j,k)+V(i+2,j-1,k)-V(i-2,j,k)-V(i-2,j-1,k)) &
+                 ) / (2*dxmin)
+        g(3,2) = ( &
+                    D1*(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) - &
+                    D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
+                 ) / (2*dzmin)
+
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+        g(1,3) = ( &
+                    D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
+                    D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
+                 ) / (2*dxmin)
+        g(2,3) = ( &
+                    D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
+                    D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                 ) / (2*dymin)
+      end subroutine GradientTensorUG4
+    end subroutine S_Omega_IJ_4ord
+    
+    
     
     
     function TKEDissipation(i, j, k, U, V, W) result(res)
@@ -1034,8 +1185,12 @@ module Subgrid
       
         do j = 1, Prny
           do i = 1, Prnx
-            call StrainIJ(i, j, k, U, V, W, S)
-            call OmegaIJ(Omega, i, j, k)
+            if (discretization_order==4) then
+              call S_Omega_IJ_4ord(i, j, k, U, V, W, S, Omega)
+            else
+              call S_Omega_IJ(i, j, k, U, V, W, S, Omega)
+            end if
+            
             S_sqr = 0
             Omega_sqr = 0
             IVs = 0
@@ -1072,33 +1227,6 @@ module Subgrid
         end do
       end do
       !$omp end parallel do
-
-      contains
-        pure subroutine OmegaIJ(Omega, i, j, k)
-          real(knd), intent(out) :: Omega(1:3,1:3)
-          integer, intent(in) :: i, j, k
-          real(knd) :: D(1:3,1:3)
-          integer :: ii, jj
-
-          D = 0
-
-          D(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
-          D(2,2) = (V(i,j,k)-V(i,j-1,k)) / dymin
-          D(3,3) = (W(i,j,k)-W(i,j,k-1)) / dzPr(k)
-          D(1,2) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) / (4 * dymin)
-          D(1,3) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) / (2 * (zPr(k+1)-zPr(k-1)))
-          D(2,1) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) / (4 * dxmin)
-          D(2,3) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) / (2 * (zPr(k+1)-zPr(k-1)))
-          D(3,1) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) / (4 * dxmin)
-          D(3,2) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) / (4 * dymin)
-
-          do jj = 1, 3
-            do ii = 1, 3
-              Omega(ii,jj) = (D(ii,jj) - D(jj,ii)) / 2
-            end do
-          end do
-
-        end subroutine OmegaIJ
 
     endsubroutine SGS_WALE
     
