@@ -165,11 +165,12 @@ contains
   end subroutine
 
 
-  subroutine PressureCorrection(U,V,W,Pr,Q,coef)                    !Pressure correction
-    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout)     :: U, V, W !Phi is computed in Poisson eq. with div of U in RHS
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout)        :: Pr      !Depend ing on active projection method Phi becomes new pressure
-    real(knd), dimension(:,:,:), allocatable, intent(in) :: Q       !or is added to last pressure
+  subroutine PressureCorrection(U,V,W,Pr,Q,coef,do_not_update_pressure)          !Pressure correction
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout)     :: U, V, W  !Phi is computed in Poisson eq. with div of U in RHS
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout)        :: Pr    !Depend ing on active projection method Phi becomes new pressure
+    real(knd), dimension(:,:,:), allocatable, intent(in) :: Q                    !or is added to last pressure
     real(knd), intent(in) :: coef
+    logical, optional, intent(in) :: do_not_update_pressure
                                                            !U,V,W velocity field for correction
     real(knd), save, allocatable :: Phi(:,:,:), RHS(:,:,:) !Pr pressure
                                                            !coef cofficient from Runge Kutta, Q mass sources from immersed boundary
@@ -180,6 +181,8 @@ contains
     integer, save :: called = 0
     integer(int64), save :: trate
     integer(int64), save :: time1, time2, time3, time4
+    
+    logical :: update_pressure
 
     if (called==0) then
       allocate(Phi(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
@@ -192,6 +195,12 @@ contains
 
 
     if (debugparam>1 .and. called>1) call system_clock(count=time1)
+    
+    if (present(do_not_update_pressure)) then
+      update_pressure = .not. do_not_update_pressure
+    else
+      update_pressure = .true.
+    end if
 
     dt2 = coef
     dt3 = coef / 2
@@ -245,7 +254,7 @@ contains
     endif
 
 
-    call PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3)
+    call PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3,update_pressure)
 
 
     if (debugparam>1 .and. called>1) then
@@ -551,7 +560,7 @@ contains
 
 
 
-  subroutine PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3)
+  subroutine PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3,update_pressure)
 #ifdef PAR
     use custom_par, only: par_co_max
     use exchange_par, only: par_exchange_UVW
@@ -563,6 +572,7 @@ contains
     real(knd), allocatable, intent(in) :: Q(:,:,:)
     real(knd), intent(inout) :: Phi(-1:,-1:,-1:)
     real(knd), intent(in)    :: dt2,dt3
+    logical, intent(in)      :: update_pressure
     real(knd) :: Au,Av,Aw,dxmin2,dymin2,dzmin2,S,p
     integer   :: i,j,k
     real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
@@ -651,56 +661,60 @@ contains
         !$omp end do nowait
       end if
     end if
-
-    if (pressure_solution%projection_method==PROJECTION_METHOD_PRESSURE) then
-        !$omp do
-        do k = 1, Prnz
-          do j = 1, Prny
-            do i = 1, Prnx
-              Pr(i,j,k) = Phi(i,j,k)
-            end do
-          end do
-        end do
-        !$omp end do
-    else
-      if (explicit_diffusion) then
-        !$omp do
-        do k = 1, Prnz
-          do j = 1, Prny
-            do i = 1, Prnx
-              Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k)
-            end do
-          end do
-        end do
-        !$omp end do
-      else
-        !$omp do
-        do k = 1, Prnz
-          do j = 1, Prny
-            do i = 1, Prnx
-              Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k) - &
-                          dt3 * Viscosity(i,j,k) * (((Phi(i+1,j,k)-Phi(i,j,k)) - &
-                                                    (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
-                                                    ((Phi(i,j+1,k)-Phi(i,j,k)) - &
-                                                    (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
-                                                    ((Phi(i,j,k+1)-Phi(i,j,k)) - &
-                                                    (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
-            end do
-          end do
-        end do
-        !$omp end do
-      end if
-    end if
-    !$omp end parallel
-
-    call FixPressureToReference(Pr)
     
+    if (update_pressure) then
+
+      if (pressure_solution%projection_method==PROJECTION_METHOD_PRESSURE) then
+          !$omp do
+          do k = 1, Prnz
+            do j = 1, Prny
+              do i = 1, Prnx
+                Pr(i,j,k) = Phi(i,j,k)
+              end do
+            end do
+          end do
+          !$omp end do
+      else
+        if (explicit_diffusion) then
+          !$omp do
+          do k = 1, Prnz
+            do j = 1, Prny
+              do i = 1, Prnx
+                Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k)
+              end do
+            end do
+          end do
+          !$omp end do
+        else
+          !$omp do
+          do k = 1, Prnz
+            do j = 1, Prny
+              do i = 1, Prnx
+                Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k) - &
+                            dt3 * Viscosity(i,j,k) * (((Phi(i+1,j,k)-Phi(i,j,k)) - &
+                                                      (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
+                                                      ((Phi(i,j+1,k)-Phi(i,j,k)) - &
+                                                      (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
+                                                      ((Phi(i,j,k+1)-Phi(i,j,k)) - &
+                                                      (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
+              end do
+            end do
+          end do
+          !$omp end do
+        end if
+      end if
+      !$omp end parallel
+
+      call FixPressureToReference(Pr)
+    
+      call Bound_Pr(Pr)
+      
+    end if !update_pressure
+
     
 #ifdef PAR    
     call par_exchange_UVW(U, V, W)
 #endif
-
-    call Bound_Pr(Pr)
 
     if (pressure_solution%check_divergence) then
       call BoundUVW(U,V,W)
