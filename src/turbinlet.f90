@@ -13,6 +13,7 @@ module TurbInlet
   private
   public :: turbulence_generator, turbulence_generator_nesting, &
             default_turbulence_generator, &
+            turbulent_inlet_method, &
             GetInletFromFile
 
   type turbulence_generator
@@ -71,7 +72,12 @@ module TurbInlet
   end type
 
   type(turbulence_generator) :: default_turbulence_generator
+  
+  integer, public, parameter :: turbulent_inlet_XC = 1, & ! Xie, Castro (2008) http://dx.doi.org/10.1007/s10494-008-9151-5
+                                turbulent_inlet_XCDF = 2  ! Kim, Castro, Xie (2013) http://dx.doi.org/10.1016/j.compfluid.2013.06.001
 
+  integer :: turbulent_inlet_method = turbulent_inlet_XC
+                        
 contains
 
   subroutine turbulence_generator_init(g)
