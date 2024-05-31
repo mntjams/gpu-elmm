@@ -53,7 +53,10 @@ module TurbInlet
 #endif    
   contains
     procedure :: init => turbulence_generator_init
-    procedure :: time_step => turbulence_generator_time_step
+    procedure :: step_xc => turbulence_generator_step_xc
+    procedure :: step_xcdf => turbulence_generator_step_xcdf
+    procedure :: Uin_reset => turbulence_generator_Uin_reset
+    procedure, private :: time_step => turbulence_generator_time_step
     procedure, private :: init_turbulence_profiles => turbulence_generator_init_turbulence_profiles
     procedure, private :: init_mean_profiles => turbulence_generator_init_mean_profiles
     procedure, private :: bound_Uin => bound_Uin
@@ -298,13 +301,12 @@ contains
   end subroutine
 
 
-  subroutine turbulence_generator_time_step(g, Uin, Vin, Win, dt)
+  subroutine turbulence_generator_time_step(g, dt)
 #ifdef PAR
     use custom_par, only: iim, jim, kim, nxims, nyims, nzims, par_co_sum, par_co_min
     use exchange_par
 #endif
     class(turbulence_generator), intent(inout) :: g
-    real(knd), intent(out), contiguous :: Uin(-2:,-2:), Vin(-2:,-2:), Win(-2:,-2:)
     real(knd), intent(in) :: dt
     integer :: i, j, k
     integer :: jlo, jup, klo, kup, ny
@@ -433,11 +435,6 @@ contains
     call g%bound_Uin(3, g%Win)
     
     
-    Uin = g%Uin
-    Vin = g%Vin
-    Win = g%Win
-    
-
     !$omp parallel private(j,k,tid)
     tid = 0
     !$ tid = omp_get_thread_num()
@@ -525,7 +522,52 @@ contains
 
 
 
+  subroutine turbulence_generator_Uin_reset(g, Uin, Vin, Win)
+    class(turbulence_generator), intent(inout) :: g
+    real(knd), dimension(-2:,-2:), contiguous, intent(out) :: Uin, Vin, Win
+    ! sets the Uin fields to the mean values
+    
+    Uin = g%Uinavg
+    Vin = g%Vinavg
+    Win = g%Winavg
+   
+  end subroutine turbulence_generator_Uin_reset
 
+  subroutine turbulence_generator_step_xc(g, Uin, Vin, Win, dt)
+    class(turbulence_generator), intent(inout) :: g
+    real(knd), dimension(-2:,-2:), contiguous, intent(out) :: Uin, Vin, Win
+    real(knd), intent(in) :: dt
+    ! applies the resulting g%Uin fields as in the XC method
+    
+    call g%time_step(dt)
+    
+    Uin = g%Uin
+    Vin = g%Vin
+    Win = g%Win
+   
+  end subroutine turbulence_generator_step_xc
+
+
+  subroutine turbulence_generator_step_xcdf(g, U, V, W, dt)
+    class(turbulence_generator), intent(inout) :: g
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U, V, W
+    real(knd), intent(in) :: dt
+    ! applies the resulting g%Uin fields as in the XCDF method
+    ! XCDF originally implemented and tested by Jakub Herec
+    
+    call g%time_step(dt)
+
+    if (g%direction==2) then
+      U(:,g%inlet_plane_i,:) = g%Uin
+      V(:,g%inlet_plane_i,:) = g%Vin
+      W(:,g%inlet_plane_i,:) = g%Win
+    else
+      U(g%inlet_plane_i,:,:) = g%Uin
+      V(g%inlet_plane_i,:,:) = g%Vin
+      W(g%inlet_plane_i,:,:) = g%Win
+    end if
+   
+  end subroutine turbulence_generator_step_xcdf
 
 
 

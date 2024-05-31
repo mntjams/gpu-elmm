@@ -270,7 +270,7 @@ contains
 
                 if (b%turb_generator_enabled) then
                   if (b%interpolate) call b%compute_sgs_tke
-                  call b%turb_generator%time_step(b%U_turb, b%V_turb, b%V_turb, dt)
+                  call b%turb_generator%step_xc(b%U_turb, b%V_turb, b%V_turb, dt)
 
                 end if
 

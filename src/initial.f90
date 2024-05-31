@@ -3086,7 +3086,7 @@ contains
             
                 do j = 1, Prny
                   
-                  call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+                  call default_turbulence_generator%step_xc(Uin, Vin, Win, time_stepping%dt)
 
                   !$omp parallel private(i,k)
                   !$omp do collapse(2)
@@ -3130,7 +3130,7 @@ contains
                   integer :: ierr, im
                   do im = 2, nyims
                     do j = 1, domain_grids(domain_index)%nys(im)
-                      call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+                      call default_turbulence_generator%step_xc(Uin, Vin, Win, time_stepping%dt)
                       
                       call MPI_Send(Uin(1:Unx,1:Unz), Unx*Unz, PAR_KND, &
                                     ranks_grid(iim,im,kim), 111, domain_comm, ierr)
@@ -3163,7 +3163,7 @@ contains
 
               do i = 1, Prnx
                 
-                call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+                call default_turbulence_generator%step_xc(Uin, Vin, Win, time_stepping%dt)
                 
                 !$omp parallel private(j,k)
                 !$omp do collapse(2)
@@ -3202,6 +3202,9 @@ contains
                 !$omp end parallel
               end do
             end if
+            
+            !sets the Uin to mean values
+            call default_turbulence_generator%Uin_reset(Uin, Vin, Win)
 
         else
 
@@ -3644,7 +3647,7 @@ contains
         call ParabolicInlet
       case (TurbulentInletType)
         call default_turbulence_generator%init()
-        call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+        call default_turbulence_generator%step_xc(Uin, Vin, Win, time_stepping%dt)
       case (FromFileInletType)
         call GetInletFromFile(time_stepping%start_time)
       case (GeostrophicInletType)
