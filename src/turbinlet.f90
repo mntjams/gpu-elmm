@@ -18,6 +18,10 @@ module TurbInlet
 
   type turbulence_generator
     integer :: direction
+    
+    real(knd) :: inlet_plane_x !coordinate of the inlet plane in the `direction` direction
+    integer  :: inlet_plane_i !grid index of the inlet plane in the `direction` direction
+                              !0 means the inlet arrays Uin, Vin, Win
 
     real(knd) :: T_lag
     real(knd) :: L_y
@@ -41,6 +45,7 @@ module TurbInlet
 
     real(knd),allocatable,dimension(:)     :: Ustar_inlet !friction velocity profile at inlet
     real(knd),allocatable,dimension(:,:)   :: Uinavg, Vinavg, Winavg !mean values of U,V,W at inflow
+    real(knd),allocatable,dimension(:,:)   :: Uin, Vin, Win !internal inflow-plane values
     real(knd),allocatable,dimension(:,:,:) :: transform_tensor
     real(knd),dimension(1:3,1:3) :: relative_stress
 #ifdef PAR    
@@ -106,6 +111,12 @@ contains
       g%comm = comm_plane_yz
     end if
 #endif
+
+    if (g%direction==2) then
+      allocate(g%Uin(-2:Unx+3,-2:Unz+3), g%Vin(-2:Vnx+3,-2:Vnz+3), g%Win(-2:Wnx+3,-2:Wnz+3))
+    else
+      allocate(g%Uin(-2:Uny+3,-2:Unz+3), g%Vin(-2:Vny+3,-2:Vnz+3), g%Win(-2:Wny+3,-2:Wnz+3))
+    end if
 
     call g%init_turbulence_profiles
 
@@ -346,9 +357,9 @@ contains
     call multiply(g%Psiw(:,:,1),exp(-pi * dt / (2._knd * g%T_lag)))
     call add_multiplied(g%Psiw(:,:,1), g%Psiw(:,:,2), sqrt(1 - exp(-pi * dt / (g%T_lag))))
     
-    call set(Uin, 0._knd)
-    call set(Vin, 0._knd)
-    call set(Win, 0._knd)
+    call set(g%Uin, 0._knd)
+    call set(g%Vin, 0._knd)
+    call set(g%Win, 0._knd)
 
     if (allocated(g%Uinavg) .and. allocated(g%Vinavg) .and. allocated(g%Winavg)) then
       !$omp parallel do private(j,k,Ui,Vi,Wi)
@@ -358,12 +369,12 @@ contains
         Vi = g%Psiv(j,k,1)
         Wi = g%Psiw(j,k,1)
 
-        Uin(j,k) = g%Uinavg(j,k) + g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
+        g%Uin(j,k) = g%Uinavg(j,k) + g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
 
-        Vin(j,k) = g%Vinavg(j,k) + g%transform_tensor(2,j,k) * Ui &
+        g%Vin(j,k) = g%Vinavg(j,k) + g%transform_tensor(2,j,k) * Ui &
                                  + g%transform_tensor(3,j,k) * Vi
 
-        Win(j,k) = g%Winavg(j,k) + g%transform_tensor(4,j,k) * Ui &
+        g%Win(j,k) = g%Winavg(j,k) + g%transform_tensor(4,j,k) * Ui &
                                  + g%transform_tensor(5,j,k) * Vi &
                                  + g%transform_tensor(6,j,k) * Wi
        end do
@@ -377,12 +388,12 @@ contains
         Vi = g%Psiv(j,k,1)
         Wi = g%Psiw(j,k,1)
 
-        Uin(j,k) = g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
+        g%Uin(j,k) = g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
 
-        Vin(j,k) =  g%transform_tensor(2,j,k) * Ui &
+        g%Vin(j,k) =  g%transform_tensor(2,j,k) * Ui &
                   + g%transform_tensor(3,j,k) * Vi
 
-        Win(j,k) =  g%transform_tensor(4,j,k) * Ui &
+        g%Win(j,k) =  g%transform_tensor(4,j,k) * Ui &
                   + g%transform_tensor(5,j,k) * Vi &
                   + g%transform_tensor(6,j,k) * Wi
        end do
@@ -392,11 +403,11 @@ contains
 
     if (g%direction==2) then
       !$omp parallel workshare
-      p = sum(Vin(1:Vnx,1:Vnz))
+      p = sum(g%Vin(1:Vnx,1:Vnz))
       !$omp end parallel workshare      
     else
       !$omp parallel workshare
-      p = sum(Uin(1:Uny,1:Unz))
+      p = sum(g%Uin(1:Uny,1:Unz))
       !$omp end parallel workshare
     end if
 
@@ -408,18 +419,24 @@ contains
     
     if (g%direction==2) then
       p = p / (gVnx * gVnz)      
-      call add(Vin, p)
+      call add(g%Vin, p)
     else
       p = p / (gUny * gUnz)
-      call add(Uin, p)
+      call add(g%Uin, p)
     end if
 
 
-    call g%bound_Uin(1, Uin)
+    call g%bound_Uin(1, g%Uin)
 
-    call g%bound_Uin(2, Vin)
+    call g%bound_Uin(2, g%Vin)
 
-    call g%bound_Uin(3, Win)
+    call g%bound_Uin(3, g%Win)
+    
+    
+    Uin = g%Uin
+    Vin = g%Vin
+    Win = g%Win
+    
 
     !$omp parallel private(j,k,tid)
     tid = 0
