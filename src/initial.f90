@@ -153,17 +153,7 @@ contains
    close(unit)
 
 
-   open(unit,file="les.conf",status="old",action="read")
-   call get(sgstype)
-   call get(filtertype)
-
-   if (filtertype > size(filter_ratios)) then
-     if (master) write(*,*) "Chosen filter type does not exist. Maximum index is:",size(filter_ratios)
-     call error_stop
-   end if
-
-   call get(wallmodeltype)
-   close(unit)
+   call get_les("les.conf")
 
 
    open(unit,file="grid.conf",status="old",action="read")
@@ -2108,7 +2098,199 @@ contains
   end subroutine get_time_stepping
   
   
+  subroutine get_les(fname)
+    use Strings
+    use ParseTrees
+    character(*), intent(in) :: fname
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: iobj, stat
+    
+    sgstype = -1
+    filtertype = -1
+    wallmodeltype = -1
+
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+
+      if (allocated(tree)) then
+        do iobj = 1, size(tree)
+          if (downcase(tree(iobj)%name)=="subgrid_model") then
+            call get_subgrid_model(tree(iobj))
+          else if (downcase(tree(iobj)%name)=="filter") then
+            call get_filter(tree(iobj))
+          else if (downcase(tree(iobj)%name)=="wall_model") then
+            call get_filter(tree(iobj))
+          end if
+          call tree(iobj)%finalize
+        end do
+      end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+    
+    ! The default is laminar simulation.
+    ! If a subgrid model is enabled, the default is the wall model on.
+    
+    if (sgstype == -1) sgstype = 0
+    
+    if (filtertype == -1) filtertype = 0
+    
+    if (wallmodeltype == -1) then
+      if (sgstype>0) then
+        wallmodeltype = 1
+      else
+        wallmodeltype = 0
+      end if
+    end if
+    
+  contains
   
+    subroutine get_subgrid_model(obj)
+      use Subgrid
+      type(tree_object), intent(in) :: obj
+      integer :: i, j
+      real(knd) :: C_m
+      
+      sgstype = -1
+      C_m = -1
+      
+      if (allocated(obj%fields%array)) then
+
+        associate(fields => obj%fields%array)
+
+          do j = 1, size(fields)
+
+            if (downcase(fields(j)%name)=='type') then            
+              do i = 0, ubound(subgrid_model_names,1)
+                if (downcase(fields(j)%value)==downcase(subgrid_model_names(i))) then
+                  sgstype = i
+                  exit
+                end if                
+              end do
+              if (sgstype==-1) then
+                write(*,*) "Unknown subgrid model '"//trim(fields(j)%value)//"' in " // fname
+                write(*,'(1x,g0,*(/,tr4,g0))') "Valid values:", (trim(subgrid_model_names(i)),i=0,ubound(subgrid_model_names,1))
+                call error_stop
+              end if
+            else if (downcase(fields(j)%name)=='model_constant') then
+              read(fields(j)%value, *) C_m
+            else
+              write(*,*) "Unknown field '"//trim(fields(j)%name)//"' in the subgrid_model object in " // fname
+              call error_stop
+            end if
+
+          end do
+
+        end associate
+        
+        if (C_m > 0 .and. sgstype > 0) then
+          select case (sgstype)
+            case (1)
+              C_Smagorinsky = C_m
+            case (2)
+              C_sigma = C_m
+            case (3)
+              C_Vreman = C_m
+            case (4)
+              C_sigma = C_m
+            case (5)
+              C_MixedTimeScale = C_m
+            case (6)
+              C_WALE = C_m
+          end select
+        end if
+
+      else
+
+        write(*,*) "No fields in the subgrid_model object in " // fname
+        call error_stop
+
+      end if
+      
+    end subroutine
+    
+    subroutine get_filter(obj)
+      use Filters
+      type(tree_object), intent(in) :: obj
+      integer :: j
+      if (allocated(obj%fields%array)) then
+
+        associate(fields => obj%fields%array)
+
+          do j = 1, size(fields)
+            if (downcase(fields(j)%name)=='type') then 
+              select case (downcase(fields(j)%value))
+                case ('none')
+                  filtertype = 0
+                case ('default')
+                  filtertype = 1
+                case default
+                  write(*,*) "Unknown wall model type '"//trim(fields(j)%value)//"' in " // fname
+                  write(*,'(1x,g0,*(/,tr4,g0))') "Valid values: ", "none", "default"
+                  call error_stop
+              end select
+            else
+              write(*,*) "Unknown field '"//trim(fields(j)%name)//"' in the wall_model object in " // fname
+              call error_stop
+            end if
+          end do
+
+        end associate
+
+      else
+
+        write(*,*) "No fields in the wall_model object in " // fname
+        call error_stop
+
+      end if
+    end subroutine
+    
+    subroutine get_wall_model(obj)
+      use Filters
+      type(tree_object), intent(in) :: obj
+      integer :: j
+      if (allocated(obj%fields%array)) then
+
+        associate(fields => obj%fields%array)
+
+          do j = 1, size(fields)
+            if (downcase(fields(j)%name)=='type') then 
+              select case (downcase(fields(j)%value))
+                case ('none')
+                  filtertype = 0
+                case ('default')
+                  filtertype = 1
+                case default
+                  write(*,*) "Unknown filter type '"//trim(fields(j)%value)//"' in " // fname
+                  write(*,'(1x,g0,*(/,tr4,g0))') "Valid values: ", "none", "default"
+                  call error_stop
+              end select
+            else
+              write(*,*) "Unknown field '"//trim(fields(j)%name)//"' in the filter object in " // fname
+              call error_stop
+            end if
+          end do
+
+        end associate
+
+      else
+
+        write(*,*) "No fields in the filter object in " // fname
+        call error_stop
+
+      end if
+    end subroutine
+  end subroutine
   
 
   subroutine get_pressure_solution(fname, p_s)

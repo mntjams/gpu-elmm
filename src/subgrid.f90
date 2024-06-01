@@ -20,6 +20,9 @@ module Subgrid
                        C_Vreman = 0.041_knd, &
                        C_StabSubgrid = 1.04_knd, &
                        C_WALE = 0.58_knd
+                       
+  character(*), dimension(0:6), public, parameter :: subgrid_model_names(0:6) = &
+    [character(16) :: "none", "Smagorinsky", "sigma", "Vreman", "sigma_stability", "MTS", "WALE"]
                      
   
   contains
