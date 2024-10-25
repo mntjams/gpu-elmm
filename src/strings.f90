@@ -190,28 +190,35 @@ module ParseTrees_Fields
 
   type field_names
     character(char_len) :: name
-    !not nullified bucause of a bug in GCC 5.3
-    class(*), pointer :: var
+    class(*), pointer :: var => null()
+    logical :: found = .false.
   end type
 
   type field_names_a
     character(char_len) :: name
-    !not nullified bucause of a bug in GCC 5.3
-    class(*), pointer :: var(:)
+    class(*), pointer :: var(:) => null() 
+    logical :: found = .false.
   end type
 
   type field_names_a_int_alloc
     character(char_len) :: name
-    !not nullified bucause of a bug in GCC 5.3
     integer, allocatable :: var(:)
+    logical :: found = .false.
   end type
 
   type field_names_str
     character(char_len) :: name
     !workaround of BUG https://gcc.gnu.org/bugzilla/show_bug.cgi?id=60359 fixed in GCC 4.9
     character(char_len), pointer :: var => null()
+    logical :: found = .false.
   end type
 
+  type field_names_a_str_alloc
+    character(char_len) :: name
+    character(char_len), allocatable :: var(:)
+    logical :: found = .false.
+  end type
+    
   interface field_names
     procedure field_names_init
   end interface
@@ -233,6 +240,7 @@ contains
 
     res%name = name
     res%var => var
+    res%found = .false.
   end function
 
   function field_names_a_init(name, var) result(res)
@@ -242,6 +250,7 @@ contains
 
     res%name = name
     res%var => var
+    res%found = .false.
   end function
 
   function field_names_a_int_alloc_init(name) result(res)
@@ -249,6 +258,7 @@ contains
     character(*) :: name
 
     res%name = name
+    res%found = .false.
   end function
 
 
@@ -577,7 +587,8 @@ contains
                                      fields, &
                                      fields_a, &
                                      fields_a_int_alloc, &
-                                     fields_str)
+                                     fields_str, &
+                                     fields_a_str_alloc)
     type(tree_object), intent(in) :: tree(:)
     character(*), intent(in) :: object_name
     integer, intent(out) :: stat
@@ -591,6 +602,7 @@ contains
     type(field_names_a), intent(inout), optional :: fields_a(:)
     type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
     type(field_names_str), intent(inout), optional :: fields_str(:)
+    type(field_names_a_str_alloc), intent(inout), optional :: fields_a_str_alloc(:)
 
     integer :: iobj
 
@@ -605,7 +617,8 @@ contains
                                      fields, &
                                      fields_a, &
                                      fields_a_int_alloc, &
-                                     fields_str)
+                                     fields_str, &
+                                     fields_a_str_alloc)
                                   
         if (stat>1) return
       end if
@@ -621,7 +634,8 @@ contains
                         fields, &
                         fields_a, &
                         fields_a_int_alloc, &
-                        fields_str)
+                        fields_str, &
+                        fields_a_str_alloc)
     !To extract values of variables from the parse tree
     use iso_fortran_env, only: real32, real64, int32, int64
     type(tree_object), intent(in) :: obj
@@ -638,10 +652,17 @@ contains
     type(field_names_a), intent(inout), optional :: fields_a(:)
     type(field_names_a_int_alloc), intent(inout), optional :: fields_a_int_alloc(:)
     type(field_names_str), intent(inout), optional :: fields_str(:)
+    type(field_names_a_str_alloc), intent(inout), optional :: fields_a_str_alloc(:)
 
     integer :: i, j
 
     stat = 0
+    
+    if (present(fields)) fields%found = .false.
+    if (present(fields_a)) fields_a%found = .false.
+    if (present(fields_a_int_alloc)) fields_a_int_alloc%found = .false.
+    if (present(fields_str)) fields_str%found = .false.
+    if (present(fields_a_str_alloc)) fields_a_str_alloc%found = .false.
     
     if (allocated(obj%fields%array)) then
 
@@ -652,7 +673,8 @@ fields_do:  do j = 1, size(obj_fields)
           !workaround of 60359, see also below
           if (present(fields_str)) then
             do i = 1, size(fields_str)
-              if (obj_fields(j)%name == fields_str(i)%name) then                
+              if (obj_fields(j)%name == fields_str(i)%name) then
+                fields_str(i)%found = .true.
                 read(obj_fields(j)%value, *) fields_str(i)%var
                 cycle fields_do
               end if
@@ -663,6 +685,7 @@ fields_do:  do j = 1, size(obj_fields)
           if (present(fields)) then
             do i = 1, size(fields)
               if (obj_fields(j)%name == fields(i)%name) then
+                fields(i)%found = .true.
                 select type (var => fields(i)%var)
                   type is (tree_object_ptr)
                     if (.not.obj_fields(j)%is_object .or. &
@@ -693,6 +716,7 @@ fields_do:  do j = 1, size(obj_fields)
          if (present(fields_a)) then
            do i = 1, size(fields_a)
               if (obj_fields(j)%name == fields_a(i)%name) then
+                fields_a(i)%found = .true.
                 if (.not.obj_fields(j)%is_array .or. &
                     .not.allocated(obj_fields(j)%array_value)) then
   ! uncomment to get details when debugging
@@ -742,9 +766,21 @@ fields_do:  do j = 1, size(obj_fields)
           if (present(fields_a_int_alloc)) then
             do i = 1, size(fields_a_int_alloc)
               if (obj_fields(j)%name == fields_a_int_alloc(i)%name) then
+                fields_a_int_alloc(i)%found = .true.
                 allocate(fields_a_int_alloc(i)%var(size(obj_fields(j)%array_value)))
                 if (size(fields_a_int_alloc(i)%var)>0) &
                   read(obj_fields(j)%array_value, *) fields_a_int_alloc(i)%var
+              end if
+            end do
+          end if
+
+          if (present(fields_a_str_alloc)) then
+            do i = 1, size(fields_a_str_alloc)
+              if (obj_fields(j)%name == fields_a_str_alloc(i)%name) then
+                fields_a_str_alloc(i)%found = .true.
+                allocate(fields_a_str_alloc(i)%var(size(obj_fields(j)%array_value)))
+                if (size(fields_a_str_alloc(i)%var)>0) &
+                  read(obj_fields(j)%array_value, *) fields_a_str_alloc(i)%var
               end if
             end do
           end if
