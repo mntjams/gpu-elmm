@@ -318,32 +318,8 @@ contains
 
    
 
-   open(unit,file="boundconds.conf",status="old",action="read")
-   call get(Btype(We))
-   call get(Btype(Ea))
-   call get(Btype(So))
-   call get(Btype(No))
-   call get(Btype(Bo))
-   call get(Btype(To))
-   call get(sideU(1,So))
-   call get(sideU(2,So))
-   call get(sideU(3,So))
-   call get(sideU(1,No))
-   call get(sideU(2,No))
-   call get(sideU(3,No))
-   call get(sideU(1,Bo))
-   call get(sideU(2,Bo))
-   call get(sideU(3,Bo))
-   call get(sideU(1,To))
-   call get(sideU(2,To))
-   call get(sideU(3,To))
-   call get(z0W)
-   call get(z0E)
-   call get(z0S)
-   call get(z0N)
-   call get(z0B)
-   call get(z0T)
-   close(unit)
+   call get_boundary_conditions_velocity("boundconds-new.conf")
+print *,"types:", Btype
 
    open(unit,file="large_scale.conf",status="old",action="read",iostat = io)
    if (io==0) then
@@ -717,6 +693,8 @@ contains
          write(*,*) "dirichlet"
        case (BC_NEUMANN)
          write(*,*) "neumann"
+       case default
+         write(*,*) "other", Btype(We)
      endselect
 
      write(*,'(a2)',advance='no') " E "
@@ -731,6 +709,8 @@ contains
          write(*,*) "dirichlet"
        case (BC_NEUMANN)
          write(*,*) "neumann"
+       case default
+         write(*,*) "other", Btype(Ea)
      endselect
 
      write(*,'(a2)',advance='no') " S "
@@ -745,6 +725,8 @@ contains
          write(*,*) "dirichlet"
        case (BC_NEUMANN)
          write(*,*) "neumann"
+       case default
+         write(*,*) "other", Btype(So)
      endselect
 
      write(*,'(a2)',advance='no') " N "
@@ -759,6 +741,8 @@ contains
          write(*,*) "dirichlet"
        case (BC_NEUMANN)
          write(*,*) "neumann"
+       case default
+         write(*,*) "other", Btype(No)
      endselect
 
      write(*,'(a2)',advance='no') " B "
@@ -773,6 +757,8 @@ contains
          write(*,*) "dirichlet"
        case (BC_NEUMANN)
          write(*,*) "neumann"
+       case default
+         write(*,*) "other", Btype(Bo)
      endselect
 
      write(*,'(a2)',advance='no') " T "
@@ -787,6 +773,8 @@ contains
          write(*,*) "dirichlet"
        case (BC_NEUMANN)
          write(*,*) "neumann"
+       case default
+         write(*,*) "other", Btype(To)
      endselect
      
      if ((Btype(We)==BC_PERIODIC.or.Btype(Ea)==BC_PERIODIC).and.Btype(We)/=Btype(Ea)) &
@@ -1205,7 +1193,215 @@ contains
      end subroutine read_staggered_frames
 
   end subroutine ReadConfiguration
+  
+  
+  
 
+  subroutine get_boundary_conditions_velocity(fname)
+    use Strings
+    use ParseTrees
+    character(*), intent(in) :: fname
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: iobj, stat
+    
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+
+      if (allocated(tree)) then
+        do iobj = 1, size(tree)
+          if (downcase(tree(iobj)%name)=="bc") then
+            call get_bc(tree(iobj))
+          end if
+          call tree(iobj)%finalize
+        end do
+      end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+  
+  contains
+  
+    subroutine get_bc(obj)
+      type(tree_object), intent(in) :: obj
+      
+      character(char_len), target :: selected_side_str, type_str
+      character(char_len), allocatable :: selected_sides_str(:)
+      type(tree_object_ptr) :: stg_properties_obj
+      real(knd) :: u_vec(3)
+      real(knd) :: z0
+      
+      character(*), dimension(6), parameter :: sides_str = &
+        [character(len("bottom")) :: "west", "east", "south", "north", "bottom", "top"]
+      logical :: side_selected, sides_selected
+      integer, allocatable :: selected_sides(:)
+      integer :: bc_type
+      
+      
+      integer :: stat
+      integer :: iside
+      type(field_names) :: names(4)
+      type(field_names_a) :: names_a(1)
+      type(field_names_a_str_alloc) :: names_a_str_alloc(1)
+    
+      
+      names = [field_names_init("side", selected_side_str), &
+               field_names_init("type", type_str), &
+               field_names_init("z0", z0), &
+               field_names_init("stg_properties", stg_properties_obj)]
+                
+      names_a = [field_names_a_init("u", u_vec)]
+      
+      names_a_str_alloc = [field_names_a_str_alloc("sides")]
+      
+      
+      u_vec = 0
+      z0 = 0
+      selected_side_str = ""
+      type_str = ""
+      side_selected = .false.
+      sides_selected = .false.
+      bc_type = 0
+      
+      call get_object_field_values(obj, stat, names, fields_a_str_alloc=names_a_str_alloc)
+      
+      side_selected = len_trim(selected_side_str) > 0
+      
+      sides_selected = allocated(names_a_str_alloc(1)%var)
+      
+      if (side_selected.and.sides_selected) then
+        write(*,*) "Error. Only one of `side=` and `sides=` can be specified in a bc object in " // fname
+        call error_stop()
+      else if (.not.(side_selected.or.sides_selected)) then
+        write(*,*) "Error. One of `side=` or `sides=` must be specified in a bc object in " // fname
+        call error_stop()
+      else if (side_selected) then
+        allocate(selected_sides(1))
+        select case(downcase(selected_side_str(1:1)))
+          case ("w")
+            selected_sides(1) = 1
+          case ("e")
+            selected_sides(1) = 2
+          case ("s")
+            selected_sides(1) = 3
+          case ("n")
+            selected_sides(1) = 4
+          case ("b")
+            selected_sides(1) = 5
+          case ("t")
+            selected_sides(1) = 6
+          case default
+            write(*,*) "Error. Unknown boundary side in " // fname
+            call error_stop()
+        end select
+      else if (sides_selected) then
+        call move_alloc(names_a_str_alloc(1)%var, selected_sides_str)
+        allocate(selected_sides(size(selected_sides_str)))
+        if (size(selected_sides)<=0 .or. size(selected_sides)>6) then
+          write(*,*) "Error. Selected_sizes array must contain from 1 to 6 elements in " // fname
+          call error_stop()
+        end if
+        do iside = 1, size(selected_sides)
+          select case(downcase(selected_sides_str(iside)(1:1)))
+            case ("w")
+              selected_sides(iside) = 1
+            case ("e")
+              selected_sides(iside) = 2
+            case ("s")
+              selected_sides(iside) = 3
+            case ("n")
+              selected_sides(iside) = 4
+            case ("b")
+              selected_sides(iside) = 5
+            case ("t")
+              selected_sides(iside) = 6
+            case default
+              write(*,*) "Error. Unknown boundary side in " // fname
+              call error_stop()
+          end select
+        end do
+      else
+        write(*,*) "Internal error when selecting side in " // fname
+        call error_stop()
+      end if
+      
+      if (len_trim(type_str)==0) then
+        write(*,*) "Error. The boundary type must be provided in " // fname
+        call error_stop()
+      end if
+    
+      select case(downcase(type_str))
+        case ("periodic")
+          bc_type = BC_PERIODIC
+        case ("noslip")
+          bc_type = BC_NOSLIP
+        case ("freeslip")
+          bc_type = BC_FREESLIP
+        case ("dirichlet")
+          bc_type = BC_DIRICHLET
+        case ("neumann")
+          bc_type = BC_NEUMANN
+        case ("turbulent_inlet")
+          bc_type = BC_TURBULENT_INLET
+        case ("from_file")
+          bc_type = BC_INLET_FROM_FILE
+        case default
+          write(*,*) "Error. Unknown boundary side in " // fname
+          call error_stop()
+      end select
+      
+      Btype(selected_sides) = bc_type
+      
+      if (bc_type == BC_DIRICHLET) then
+        do iside = 1, size(selected_sides)
+          sideU(:,selected_sides(iside)) = u_vec
+        end do
+      end if
+      
+      if (z0>0) then
+        !TODO: refactor the z0 information to an array accross sides
+        do iside = 1, size(selected_sides)
+          select case (selected_sides(iside))
+            case(1)
+              z0W = z0
+            case(2)
+              z0E = z0
+            case(3)
+              z0S = z0
+            case(4)
+              z0N = z0
+            case(5)
+              z0B = z0
+            case(6)
+              z0T = z0
+          end select
+        end do
+      end if
+      
+    end subroutine
+    
+    subroutine get_vec_profile(obj)
+      type(tree_object), intent(in) :: obj
+
+    end subroutine
+    
+    subroutine get_stg_properties(obj)
+      type(tree_object), intent(in) :: obj
+      
+    end subroutine
+    
+  end subroutine get_boundary_conditions_velocity
+  
+  
 
 
   subroutine get_obstacles(fname)
