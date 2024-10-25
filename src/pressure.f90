@@ -661,11 +661,12 @@ contains
         !$omp end do nowait
       end if
     end if
+    !$omp end parallel
     
     if (update_pressure) then
 
       if (pressure_solution%projection_method==PROJECTION_METHOD_PRESSURE) then
-          !$omp do
+          !$omp parallel do
           do k = 1, Prnz
             do j = 1, Prny
               do i = 1, Prnx
@@ -673,10 +674,10 @@ contains
               end do
             end do
           end do
-          !$omp end do
+          !$omp end parallel do
       else
         if (explicit_diffusion) then
-          !$omp do
+          !$omp parallel do
           do k = 1, Prnz
             do j = 1, Prny
               do i = 1, Prnx
@@ -684,9 +685,9 @@ contains
               end do
             end do
           end do
-          !$omp end do
+          !$omp end parallel do
         else
-          !$omp do
+          !$omp parallel do
           do k = 1, Prnz
             do j = 1, Prny
               do i = 1, Prnx
@@ -700,10 +701,9 @@ contains
               end do
             end do
           end do
-          !$omp end do
+          !$omp end parallel do
         end if
       end if
-      !$omp end parallel
 
       call FixPressureToReference(Pr)
     
