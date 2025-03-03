@@ -75,15 +75,18 @@ def compiler_executables():
 
 
 
+long_lines_flag = ''
+
+
 if str(comp)=='intel':
-  env = Environment(tools=['default','ifort','intelc'],ENV=os.environ)
+  env = Environment(tools=['default','ifort','intelc'], CC='icx', CXX='icpx', F90='ifx', FORTRAN='ifx', LINK='ifx',ENV=os.environ)
   
   compiler_executables()
   
   if str(openmp)!='no':
-    openmp_flag = ' -qopenmp -recursive'
+    openmp_flag = ' -qopenmp'
   else:
-    openmp_flag = ' -recursive -reentrancy'
+    openmp_flag = ''
 
   if str(fast)=='yes':
    fast_flag = ' -O3 -shared-intel'
@@ -97,7 +100,7 @@ if str(comp)=='intel':
   else:
     lto_flag = ''
 
-  env.Append(F90FLAGS='-cpp -standard-semantics -heap-arrays 200')
+  env.Append(F90FLAGS='-cpp -standard-semantics -heap-arrays 200 -assume recursion')
 
   env.Append(F90PATH = [target_dir,target_dir + '/P/'])
 
@@ -107,6 +110,8 @@ if str(comp)=='intel':
   
   #workaround of https://software.intel.com/en-us/forums/topic/509671
   env.Append(F90FLAGS='-Dcollapse=!')
+#   
+#   env.Replace(FORTRANMODDIRPREFIX = '-module')
 
    
 elif str(comp)=='cray':
@@ -156,7 +161,8 @@ else:
   if str(openmp)!='no':
     openmp_flag = ' -fopenmp'
   else:
-    openmp_flag = ' -frecursive'
+    openmp_flag = ''
+    env.Append(F90FLAGS='-frecursive')
 
   if str(fast)=='yes':
     if str(aggressive)=='no':
@@ -169,7 +175,7 @@ else:
       fast_flag = ' -O3'
     else:
       fast_flag = ' -O5 -ffast-math -fno-protect-parens'
-    c_check_flag = '  -fbacktrace -g -Wall -Wno-unused -Wno-maybe-uninitialized -Wno-uninitialized'
+    c_check_flag = '  -g -Wall -Wno-unused -Wno-maybe-uninitialized -Wno-uninitialized'
     check_flag = c_check_flag + ' -fbacktrace -Waliasing -Wsurprising -Wno-unused-dummy-argument -Wno-aliasing  -fcheck=all'#  -Werror'
     if mpi!='yes':
       check_flag += ' -Wimplicit-interface'
@@ -181,6 +187,8 @@ else:
     lto_flag = ' -flto='+str(ncpus)
   else:
     lto_flag = ''
+    
+  long_lines_flag = '-ffree-line-length-0'
   
   env.Append(F90FLAGS='-cpp')
 
@@ -446,7 +454,7 @@ objs += env.Object(target = target_dir + 'water_thermodynamics',           sourc
 objs += env.Object(target = target_dir + 'buoyant_gases',      source = 'buoyant_gases.f90')
 objs += env.Object(target = target_dir + 'dynamics',           source = 'dynamics.f90')
 objs += env.Object(target = target_dir + 'advection_variable_zz',     source = 'advection_variable_z.f90')
-objs += env.Object(target = target_dir + 'momentum_diffusion', source = 'momentum_diffusion.f90',F90FLAGS=env['F90FLAGS'] + ['-ffree-line-length-0'])
+objs += env.Object(target = target_dir + 'momentum_diffusion', source = 'momentum_diffusion.f90',F90FLAGS=env['F90FLAGS'] + [long_lines_flag])
 Depends(objs[-1], 'wmfluxes-inc.f90')
 Depends(objs[-1], 'wmfluxes-nobranch-U-inc.f90')
 Depends(objs[-1], 'wmfluxes-nobranch-V-inc.f90')
