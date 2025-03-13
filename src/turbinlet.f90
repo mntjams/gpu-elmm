@@ -19,8 +19,8 @@ module TurbInlet
   type turbulence_generator
     integer :: direction
     
-    real(knd) :: inlet_plane_x !coordinate of the inlet plane in the `direction` direction
-    integer  :: inlet_plane_i !grid index of the inlet plane in the `direction` direction
+    real(knd), allocatable :: inlet_plane_x !coordinate of the inlet plane in the `direction` direction
+    integer, allocatable  :: inlet_plane_i !grid index of the inlet plane in the `direction` direction
                               !0 means the inlet arrays Uin, Vin, Win
 
     real(knd) :: T_lag
@@ -101,6 +101,11 @@ contains
     integer :: tid
     
     ! The synthetic turbulence generation method by Xie and Castro, 2008, https://dx.doi.org/10.1007/s10494-008-9151-5
+    
+    if (g%direction<1 .or. g%direction>2) then
+      write(*,*) "Error, invalid direction value in the turbulence generator. Value:", g%direction
+      call error_stop()
+    end if
 
 #ifdef PAR
     if (g%direction==2) then
@@ -119,6 +124,55 @@ contains
       allocate(g%Uin(-2:Unx+3,-2:Unz+3), g%Vin(-2:Vnx+3,-2:Vnz+3), g%Win(-2:Wnx+3,-2:Wnz+3))
     else
       allocate(g%Uin(-2:Uny+3,-2:Unz+3), g%Vin(-2:Vny+3,-2:Vnz+3), g%Win(-2:Wny+3,-2:Wnz+3))
+    end if
+    
+    if (turbulent_inlet_method==turbulent_inlet_XCDF) then
+      if (allocated(g%inlet_plane_i)) then
+        if (g%inlet_plane_i<1) then
+          write(*,*) "Error, inlet_plane_i for the XCDF turbulence generator must be positive. Value:", g%inlet_plane_i
+          call error_stop()
+        else if ((g%inlet_plane_i>Unx.and.g%direction==1).or.((g%inlet_plane_i>Vny.and.g%direction==2))) then
+          write(*,*) "Error, inlet_plane_i for the XCDF turbulence generator overflows the grid. Value", g%inlet_plane_i
+          call error_stop()
+        end if
+      !if inlet_plane_i is set, inlet_plane_x is ignored
+      else if (allocated(g%inlet_plane_x)) then
+        if (g%direction == 2) then
+          if (g%inlet_plane_x < gymin .or. g%inlet_plane_x > gymax) then
+            write(*,*) "Error, inlet_plane_x for the XCDF turbulence generator outside of the y extent of the domain."
+            write(*,*) "Value:", g%inlet_plane_x
+            call error_stop()
+          else if (g%inlet_plane_x<yV(0) .or. g%inlet_plane_x>yV(Prny)) then
+            write(*,*) "Error, inlet_plane_x outside of the image containing the boudary. Value:", g%inlet_plane_x
+            call error_stop()
+            write(*,*) "Boundary image y bounds:", yV(0), yV(Prny)
+            call error_stop()
+          end if
+        else
+          if (g%inlet_plane_x < gxmin .or. g%inlet_plane_x > gxmax) then
+            write(*,*) "Error, inlet_plane_x for the XCDF turbulence generator outside of the x extent of the domain."
+            write(*,*) "Value:", g%inlet_plane_x
+            call error_stop()
+          else if (g%inlet_plane_x<xU(0) .or. g%inlet_plane_x>xU(Prnx)) then
+            write(*,*) "Error, inlet_plane_x outside of the image containing the boudary. Value:", g%inlet_plane_x
+            call error_stop()
+            write(*,*) "Boundary image x bounds:", xU(0), xU(Prnx)
+            call error_stop()
+          end if
+        end if
+        
+        block
+          use Boundaries, only: GridCoords
+          integer :: xi, yj, zk
+          real(knd) :: x, y, z
+          
+          if (g%direction==2) then
+            call GridCoords(xi, g%inlet_plane_i, zk, x, g%inlet_plane_x, z)
+          else
+            call GridCoords(g%inlet_plane_i, yj, zk, g%inlet_plane_x, y, z)
+          end if
+        end block
+      end if
     end if
 
     call g%init_turbulence_profiles
@@ -884,7 +938,7 @@ contains
       do i = 1, n
         read(unit,'(a)') line
         if (components==4) then
-          read(line, *) z(i), stress(i,[1,2,3,5])
+          read(line, *) z(i), stress(i,1), stress(i,2), stress(i,3), stress(i,5)
           stress(i,4) = 0
           stress(i,6) = 0
         else
