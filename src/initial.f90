@@ -1205,6 +1205,12 @@ print *,"types:", Btype
     logical :: ex
     integer :: iobj, stat
     
+    real(knd), target :: Uinlet_conf(3)
+
+
+    Uinlet_conf = 0
+    Uinlet = 0
+    
     inquire(file=fname, exist=ex)
 
     if (.not.ex) return
@@ -1217,6 +1223,8 @@ print *,"types:", Btype
         do iobj = 1, size(tree)
           if (downcase(tree(iobj)%name)=="bc") then
             call get_bc(tree(iobj))
+          else if (downcase(tree(iobj)%name)=="ic") then
+            call get_ic(tree(iobj))
           end if
           call tree(iobj)%finalize
         end do
@@ -1236,7 +1244,7 @@ print *,"types:", Btype
       
       character(char_len), target :: selected_side_str, type_str
       character(char_len), allocatable :: selected_sides_str(:)
-      type(tree_object_ptr) :: stg_properties_obj
+      type(tree_object_ptr), target :: stg_properties_obj
       real(knd) :: u_vec(3)
       real(knd) :: z0
       
@@ -1257,7 +1265,7 @@ print *,"types:", Btype
       names = [field_names_init("side", selected_side_str), &
                field_names_init("type", type_str), &
                field_names_init("z0", z0), &
-               field_names_init("stg_properties", stg_properties_obj)]
+               field_names_init("stg", stg_properties_obj)]
                 
       names_a = [field_names_a_init("u", u_vec)]
       
@@ -1273,6 +1281,12 @@ print *,"types:", Btype
       bc_type = 0
       
       call get_object_field_values(obj, stat, names, fields_a_str_alloc=names_a_str_alloc)
+      
+      if (stat/=0) then
+        write(*,*) "Error parsing a bc() object in " // fname
+        write(*,*) "Error status", stat
+        call error_stop()
+      end if
       
       side_selected = len_trim(selected_side_str) > 0
       
@@ -1365,6 +1379,11 @@ print *,"types:", Btype
         do iside = 1, size(selected_sides)
           sideU(:,selected_sides(iside)) = u_vec
         end do
+        
+        if (norm2(u_vec)>0) then
+          Uinlet_vec = u_vec
+          Uinlet = norm2(Uinlet_vec)
+        end if
       end if
       
       if (z0>0) then
@@ -1385,17 +1404,302 @@ print *,"types:", Btype
               z0T = z0
           end select
         end do
+        
+        
+        if (bc_type == BC_TURBULENT_INLET) then
+          if (size(selected_sides)>1) then
+            write(*,*) "Error, multiple sides selected for the turbulent inlet boundary condition in " // fname
+            call error_stop()
+          end if
+          if (associated(stg_properties_obj%ptr)) then
+            call get_stg_properties(stg_properties_obj%ptr, selected_sides(1))
+          end if
+        end if
       end if
       
-    end subroutine
+    end subroutine get_bc
     
+    
+    subroutine get_ic(obj)
+      type(tree_object), intent(in) :: obj
+
+      type(tree_object_ptr), target :: stg_properties_obj
+      character(char_len), target :: inlet_type_str
+      real(knd), target :: inlet_parameter, u_vec(3)
+      
+      type(field_names) :: names(2)
+      type(field_names_a) :: names_a(1)
+
+      integer :: is, side
+      real(knd) :: theta
+      
+      names = [field_names_init("inlet_type_str", inlet_type_str), &
+               field_names_init("stg", stg_properties_obj)]
+
+      names_a = [field_names_a_init("Uinlet", u_vec)]
+      
+      
+      inlet_type_str = ""
+      inlet_parameter = 0
+      
+      call get_object_field_values(obj, stat, names, names_a)
+        
+      if (stat/=0) then
+        write(*,*) "Error parsing an ic() object in " // fname
+        write(*,*) "Error status", stat
+        call error_stop()
+      end if
+      
+      if (associated(stg_properties_obj%ptr)) then
+        side = 0
+        !is there any side with the BC_TURBULENT_INLET condition?
+        do is = We, No
+          if (Btype(is)==BC_TURBULENT_INLET) then
+            side = is
+            exit
+          end if
+        end do
+
+        !if not, get the direction of Uinlet
+        if (side<=0) then
+          if (norm2(u_vec)>0) then
+            theta = atan2(u_vec(2), u_vec(1))
+            if (theta <= -3*pi/4 .or. theta >=3*pi/4) then
+              side = Ea
+            else if (theta < -pi/4) then
+              side = No
+            else if (theta > pi/4) then
+              side = So
+            else
+              side = We
+            end if
+
+            if (Uinlet<0) then
+              Uinlet_vec = u_vec
+              Uinlet = norm2(Uinlet_vec)
+            end if
+          end if
+        end if
+
+        ! now side could still be 0
+      
+        call get_stg_properties(stg_properties_obj%ptr, side)
+        inlettype = TurbulentInletType
+        
+      else if (len_trim(inlet_type_str)>0) then
+      
+        !TODO: Currently just setting the legacy configuration parameters. To be completely rewritten.
+        select case (downcase(inlet_type_str))
+          case ("zero")
+            inlettype = ZeroInletType
+          case ("shear")
+            inlettype = ShearInletType
+          case ("parabolic")
+            inlettype = ParabolicInletType
+          case ("turbulent")
+            inlettype = TurbulentInletType
+          case ("from_file")
+            inlettype = FromFileInletType
+          case ("geostrophic")
+            inlettype = GeostrophicInletType
+          case ("constant")
+            inlettype = ConstantInletType
+          case default
+            write(*,*) "Error, unknown inlet_type '"// trim(inlet_type_str)//"' at "  // fname
+            call error_stop()
+        end select
+        
+      else
+      
+        inlettype = ConstantInletType
+      end if
+    end subroutine get_ic
+    
+    
+      
     subroutine get_vec_profile(obj)
       type(tree_object), intent(in) :: obj
 
     end subroutine
     
-    subroutine get_stg_properties(obj)
+    subroutine get_stg_properties(obj, side)
+      use Turbinlet
+      use, intrinsic :: ieee_arithmetic
       type(tree_object), intent(in) :: obj
+      integer, intent(in) :: side
+      
+      
+      integer, target :: stg_method
+      character(char_len), target :: stg_method_str
+      
+      character(char_len), target :: profile_type_str
+      
+      real(knd), target :: u_ref, z_ref, u_star, z0, power_exponent, stress_grad
+      
+      real(knd), target :: T_Lag, L_y, L_z
+      
+      real(knd), target :: uu, vv, ww, uv, uw, vw
+      real(knd), target :: stress(6)
+      character(char_len), target :: stress_type_str
+      
+      integer, parameter :: STRESS_RELATIVE = 1, STRESS_ABSOLUTE = 2
+      
+      integer, target :: inlet_plane_i
+      real(knd), target :: inlet_plane_x
+      
+      character(:), allocatable, target :: u_profile_file, stress_profile, file
+      
+      integer :: profile_type
+      integer :: stress_type
+      
+      type(field_names) :: names(19)
+      type(field_names_a) :: names_a(1)
+      
+      integer :: stat
+      
+      names = [ field_names_init("method", stg_method_str), &
+                field_names_init("profile", profile_type_str), &
+                field_names_init("u_ref", u_ref), &
+                field_names_init("z_ref", z_ref), &
+                field_names_init("u_star", u_star), &
+                field_names_init("z0", z0), &
+                field_names_init("exponent", power_exponent), &
+                field_names_init("T_Lag", T_Lag), &
+                field_names_init("L_y", L_y), &
+                field_names_init("L_z", L_z), &
+                field_names_init("uu", uu), &
+                field_names_init("vv", vv), &
+                field_names_init("ww", ww), &
+                field_names_init("uv", uv), &
+                field_names_init("uw", uw), &
+                field_names_init("vw", vw), &
+                field_names_init("stress_type", stress_type), &
+                field_names_init("inlet_plane_i", inlet_plane_i), &
+                field_names_init("inlet_plane_x", inlet_plane_x) ]
+              
+      names_a = [ field_names_a_init("stress", stress) ]
+      
+      
+      stg_method = turbulent_inlet_XC
+      
+      profile_type = 0
+      profile_type_str = ""
+      
+      T_Lag = -1
+      L_y = -1
+      L_z = -1
+      
+      u_ref = -1
+      z_ref = -1
+      u_star = -1
+      z0 = -1
+      power_exponent = -1
+      
+      uu = -1
+      vv = -1
+      uu = -1
+      uv = 0
+      uw = 0
+      vw = 0
+      stress = -1
+      
+      stress_type_str = ""
+      stress_type = 0
+      
+      inlet_plane_i = huge(1)
+      inlet_plane_x = ieee_value(inlet_plane_x, ieee_quiet_nan)
+        
+      call get_object_field_values(obj, stat, names, names_a)
+      
+      if (stat/=0) then
+        write(*,*) "Error parsing an stg() object in " // fname
+        write(*,*) "Error status", stat
+        call error_stop()
+      end if
+      
+      if (len_trim(stg_method_str)>0) then
+        select case (downcase(stg_method_str))
+          case ("xc","xiecastro","default")
+            stg_method = turbulent_inlet_XC
+          case ("xcdf","xc_div_free","kcx")
+            stg_method = turbulent_inlet_XCDF
+          case default
+            write(*,*) "Error, unknown stg method '" // trim(stg_method_str) // "' in " // fname
+            call error_stop()
+        end select
+        
+        turbulent_inlet_method = stg_method
+      end if
+      
+      select case (profile_type_str)
+        case ("log","logarithmic")
+          profiletype = PROFILE_LOGARITHMIC
+        case ("pow", "power", "power law", "power_law")
+          profiletype = PROFILE_POWER_LAW
+        case ("file", "from file", "from_file")
+          profiletype = PROFILE_FROM_FILE
+        case default
+          profiletype = PROFILE_CONSTANT
+      end select
+        
+      
+      associate(g=>default_turbulence_generator)
+        if (stg_method==turbulent_inlet_XCDF) then
+          if (.not.ieee_is_nan(inlet_plane_x)) &
+            g%inlet_plane_x = inlet_plane_x
+          if (inlet_plane_i < huge(1)) &
+            g%inlet_plane_i = inlet_plane_i
+        end if
+        
+        g%Ustar_surf_inlet = u_star
+        !FIXME
+        g%stress_gradient_inlet = stress_grad
+        
+        g%U_ref_inlet = u_ref
+        g%z_ref_inlet = z_ref
+        g%z0_inlet = z0
+        g%power_exponent_inlet = power_exponent
+        
+        g%T_Lag = T_Lag
+        g%L_y = L_y
+        g%L_z = L_z
+        
+        if (uu>0.and.vv>0.and.ww>0) then
+          g%relative_stress(1,1) = uu
+          g%relative_stress(2,2) = vv
+          g%relative_stress(3,3) = ww
+          g%relative_stress(1,2) = uv
+          g%relative_stress(2,1) = uv
+          g%relative_stress(1,3) = uw
+          g%relative_stress(3,1) = uw
+          g%relative_stress(2,3) = vw
+          g%relative_stress(3,2) = vw
+        else if (all(stress(1:3)>0)) then
+          g%relative_stress(1,1) = stress(1)
+          g%relative_stress(2,2) = stress(2)
+          g%relative_stress(3,3) = stress(3)
+          g%relative_stress(1,2) = stress(4)
+          g%relative_stress(2,1) = stress(4)
+          g%relative_stress(1,3) = stress(5)
+          g%relative_stress(3,1) = stress(5)
+          g%relative_stress(2,3) = stress(6)
+          g%relative_stress(3,2) = stress(6)
+        else
+          write(*,*) "Relative stress with positive diagonal terms must be provided for the turbulence generator in " // fname
+          call error_stop()          
+        end if
+        
+        
+        select case (side)
+          case (We, Ea)
+            g%direction = 1
+          case (So, No)
+            g%direction = 2
+          case default
+            write(*,*) "Error, synthetic turbulence generation supported only on boundaries in the horizontal directions (W,E,S,N)."
+            call error_stop()
+        end select
+      end associate
       
     end subroutine
     
