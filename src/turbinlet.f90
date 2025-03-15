@@ -48,6 +48,8 @@ module TurbInlet
     real(knd),allocatable,dimension(:,:)   :: Uin, Vin, Win !internal inflow-plane values
     real(knd),allocatable,dimension(:,:,:) :: transform_tensor
     real(knd),dimension(1:3,1:3) :: relative_stress
+    character(:), allocatable :: mean_profile_file
+    character(:), allocatable :: turbulence_profile_file
 #ifdef PAR    
     integer :: comm = PAR_COMM_NULL
 #endif    
@@ -172,6 +174,10 @@ contains
             call GridCoords(g%inlet_plane_i, yj, zk, g%inlet_plane_x, y, z)
           end if
         end block
+      else
+        write(*,*) "Error, neither %inlet_plane_x nor %inlet_plane_i allocated &
+                   &in the turbulence generator and the XCDF method is selected."
+        call error_stop
       end if
     end if
 
@@ -641,7 +647,7 @@ contains
     end if
     
     if (profiletype==PROFILE_FROM_FILE) then
-      call g%get_turbulence_profile_from_file("inlet_stress_profile.txt")
+      call g%get_turbulence_profile_from_file(g%turbulence_profile_file)
       return
     end if
     
@@ -739,7 +745,7 @@ contains
       
     else if (profiletype==PROFILE_FROM_FILE) then
     
-      call g%get_mean_profile_from_file("inlet_mean_profile.txt")
+      call g%get_mean_profile_from_file(g%mean_profile_file)
       
       fix_direction = .false.
 
@@ -752,7 +758,7 @@ contains
     if (fix_direction) then
       maxj = min(ubound(g%Uinavg,1),ubound(g%Vinavg,1),ubound(g%Winavg,1))
       maxk = min(ubound(g%Uinavg,2),ubound(g%Vinavg,2),ubound(g%Winavg,2))
-      if (norm2(Uinlet_vec(2:3))>0) then
+      if (Uinlet>0 .and. norm2(Uinlet_vec(2:3))>0) then
         g%Vinavg(-2:maxj,-2:maxk) = (Uinlet_vec(2)/Uinlet) * g%Uinavg(-2:maxj,-2:maxk)
         g%Winavg(-2:maxj,-2:maxk) = (Uinlet_vec(3)/Uinlet) * g%Uinavg(-2:maxj,-2:maxk)
         g%Uinavg(-2:maxj,-2:maxk) = (Uinlet_vec(1)/Uinlet) * g%Uinavg(-2:maxj,-2:maxk)
@@ -790,7 +796,7 @@ contains
     
     open(newunit=unit,file=fname,status="old",action="read",iostat = io)
     if (io/=0) then
-      call error_stop("Cannot open profile of the mean inlet profile in: "//fname)
+      call error_stop("Cannot open the inlet mean profile in: "//fname)
     end if
 
     n = 0
@@ -892,7 +898,7 @@ contains
     
     open(newunit=unit,file=fname,status="old",action="read",iostat = io)
     if (io/=0) then
-      call error_stop("Cannot open profile of the mean inlet profile in: "//fname)
+      call error_stop("Cannot open the inlet turbulence profile in: "//fname)
     end if
 
     n = 0

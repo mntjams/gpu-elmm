@@ -319,7 +319,6 @@ contains
    
 
    call get_boundary_conditions_velocity("boundconds-new.conf")
-print *,"types:", Btype
 
    open(unit,file="large_scale.conf",status="old",action="read",iostat = io)
    if (io==0) then
@@ -467,42 +466,42 @@ print *,"types:", Btype
    if (.not.(enable_buoyancy.and.enable_moisture)) enable_liquid = .false.
 
    
-   open(unit,file="inlet.conf",status="old",action="read")
-   call get(inlettype)
-   call get(profiletype)
-   call get(ShearInletTypeParameter)
-   if (master) write(*,*) "G=",ShearInletTypeParameter
-   call get(Uinlet_vec)
-   Uinlet = norm2(Uinlet_vec)
-   if (master) write(*,*) "Uinlet=",Uinlet_vec
-   call get(default_turbulence_generator%Ustar_surf_inlet)  !-<u'w'>
-   call get(default_turbulence_generator%stress_gradient_inlet) !in relative part per 1m
-   call get(default_turbulence_generator%z0_inlet)
-   call get(default_turbulence_generator%power_exponent_inlet)
-   call get(default_turbulence_generator%z_ref_inlet)
-   call get(default_turbulence_generator%U_ref_inlet)
-   call get(default_turbulence_generator%relative_stress(1,1))
-   call get(default_turbulence_generator%relative_stress(2,2))
-   call get(default_turbulence_generator%relative_stress(3,3))
-   call get(default_turbulence_generator%relative_stress(1,2))
-   call get(default_turbulence_generator%relative_stress(1,3))
-   call get(default_turbulence_generator%relative_stress(2,3))
-   call get(default_turbulence_generator%T_Lag)
-   call get(default_turbulence_generator%L_y)
-   call get(default_turbulence_generator%L_z)
-   close(unit)
-   
-   default_turbulence_generator%relative_stress(2,1) = default_turbulence_generator%relative_stress(1,2)
-   default_turbulence_generator%relative_stress(3,1) = default_turbulence_generator%relative_stress(1,3)
-   default_turbulence_generator%relative_stress(3,2) = default_turbulence_generator%relative_stress(2,3)
-   
-   if (Btype(We)==BC_TURBULENT_INLET .or. Btype(Ea)==BC_TURBULENT_INLET) then
-     default_turbulence_generator%direction = 1
-   else if (Btype(So)==BC_TURBULENT_INLET .or. Btype(No)==BC_TURBULENT_INLET) then
-     default_turbulence_generator%direction = 2
-   else
-     default_turbulence_generator%direction = 0
-   end if
+!    open(unit,file="inlet.conf",status="old",action="read")
+!    call get(inlettype)
+!    call get(profiletype)
+!    call get(ShearInletTypeParameter)
+!    if (master) write(*,*) "G=",ShearInletTypeParameter
+!    call get(Uinlet_vec)
+!    Uinlet = norm2(Uinlet_vec)
+!    if (master) write(*,*) "Uinlet=",Uinlet_vec
+!    call get(default_turbulence_generator%Ustar_surf_inlet)  !-<u'w'>
+!    call get(default_turbulence_generator%stress_gradient_inlet) !in relative part per 1m
+!    call get(default_turbulence_generator%z0_inlet)
+!    call get(default_turbulence_generator%power_exponent_inlet)
+!    call get(default_turbulence_generator%z_ref_inlet)
+!    call get(default_turbulence_generator%U_ref_inlet)
+!    call get(default_turbulence_generator%relative_stress(1,1))
+!    call get(default_turbulence_generator%relative_stress(2,2))
+!    call get(default_turbulence_generator%relative_stress(3,3))
+!    call get(default_turbulence_generator%relative_stress(1,2))
+!    call get(default_turbulence_generator%relative_stress(1,3))
+!    call get(default_turbulence_generator%relative_stress(2,3))
+!    call get(default_turbulence_generator%T_Lag)
+!    call get(default_turbulence_generator%L_y)
+!    call get(default_turbulence_generator%L_z)
+!    close(unit)
+!
+!    default_turbulence_generator%relative_stress(2,1) = default_turbulence_generator%relative_stress(1,2)
+!    default_turbulence_generator%relative_stress(3,1) = default_turbulence_generator%relative_stress(1,3)
+!    default_turbulence_generator%relative_stress(3,2) = default_turbulence_generator%relative_stress(2,3)
+!
+!    if (Btype(We)==BC_TURBULENT_INLET .or. Btype(Ea)==BC_TURBULENT_INLET) then
+!      default_turbulence_generator%direction = 1
+!    else if (Btype(So)==BC_TURBULENT_INLET .or. Btype(No)==BC_TURBULENT_INLET) then
+!      default_turbulence_generator%direction = 2
+!    else
+!      default_turbulence_generator%direction = 0
+!    end if
 
    open(unit,file="scalars.conf",status="old",action="read",iostat = io)
    if (io==0) then
@@ -1207,7 +1206,6 @@ print *,"types:", Btype
     
     real(knd), target :: Uinlet_conf(3)
 
-
     Uinlet_conf = 0
     Uinlet = 0
     
@@ -1404,16 +1402,15 @@ print *,"types:", Btype
               z0T = z0
           end select
         end do
+      end if
         
-        
-        if (bc_type == BC_TURBULENT_INLET) then
-          if (size(selected_sides)>1) then
-            write(*,*) "Error, multiple sides selected for the turbulent inlet boundary condition in " // fname
-            call error_stop()
-          end if
-          if (associated(stg_properties_obj%ptr)) then
-            call get_stg_properties(stg_properties_obj%ptr, selected_sides(1))
-          end if
+      if (bc_type == BC_TURBULENT_INLET) then
+        if (size(selected_sides)>1) then
+          write(*,*) "Error, multiple sides selected for the turbulent inlet boundary condition in " // fname
+          call error_stop()
+        end if
+        if (associated(stg_properties_obj%ptr)) then
+          call get_stg_properties(stg_properties_obj%ptr, selected_sides(1))
         end if
       end if
       
@@ -1431,7 +1428,6 @@ print *,"types:", Btype
       type(field_names_a) :: names_a(1)
 
       integer :: is, side
-      real(knd) :: theta
       
       names = [field_names_init("inlet_type_str", inlet_type_str), &
                field_names_init("stg", stg_properties_obj)]
@@ -1449,7 +1445,7 @@ print *,"types:", Btype
         write(*,*) "Error status", stat
         call error_stop()
       end if
-      
+
       if (associated(stg_properties_obj%ptr)) then
         side = 0
         !is there any side with the BC_TURBULENT_INLET condition?
@@ -1460,19 +1456,10 @@ print *,"types:", Btype
           end if
         end do
 
-        !if not, get the direction of Uinlet
+        !if not, get the direction of Uinlet if known
         if (side<=0) then
           if (norm2(u_vec)>0) then
-            theta = atan2(u_vec(2), u_vec(1))
-            if (theta <= -3*pi/4 .or. theta >=3*pi/4) then
-              side = Ea
-            else if (theta < -pi/4) then
-              side = No
-            else if (theta > pi/4) then
-              side = So
-            else
-              side = We
-            end if
+            call u_vec_to_side(u_vec, side)
 
             if (Uinlet<0) then
               Uinlet_vec = u_vec
@@ -1514,6 +1501,23 @@ print *,"types:", Btype
         inlettype = ConstantInletType
       end if
     end subroutine get_ic
+
+
+    subroutine u_vec_to_side(u_vec, side)
+      real(knd), intent(in) :: u_vec(3)
+      integer, intent(out) :: side
+      real(knd) :: theta
+      theta = atan2(u_vec(2), u_vec(1))
+      if (theta <= -3*pi/4 .or. theta >=3*pi/4) then
+        side = Ea
+      else if (theta < -pi/4) then
+        side = No
+      else if (theta > pi/4) then
+        side = So
+      else
+        side = We
+      end if
+    end subroutine
     
     
       
@@ -1526,7 +1530,7 @@ print *,"types:", Btype
       use Turbinlet
       use, intrinsic :: ieee_arithmetic
       type(tree_object), intent(in) :: obj
-      integer, intent(in) :: side
+      integer, intent(inout) :: side
       
       
       integer, target :: stg_method
@@ -1535,6 +1539,7 @@ print *,"types:", Btype
       character(char_len), target :: profile_type_str
       
       real(knd), target :: u_ref, z_ref, u_star, z0, power_exponent, stress_grad
+      real(knd), target :: u_vec(3)
       
       real(knd), target :: T_Lag, L_y, L_z
       
@@ -1547,14 +1552,15 @@ print *,"types:", Btype
       integer, target :: inlet_plane_i
       real(knd), target :: inlet_plane_x
       
-      character(:), allocatable, target :: u_profile_file, stress_profile, file
+      character(char_len), target :: mean_profile, turbulence_profile
       
       integer :: profile_type
       integer :: stress_type
       
-      type(field_names) :: names(19)
-      type(field_names_a) :: names_a(1)
-      
+      type(field_names), allocatable :: names(:)
+      type(field_names_a), allocatable :: names_a(:)
+      type(field_names_str), allocatable :: names_str(:)
+
       integer :: stat
       
       names = [ field_names_init("method", stg_method_str), &
@@ -1574,10 +1580,16 @@ print *,"types:", Btype
                 field_names_init("uw", uw), &
                 field_names_init("vw", vw), &
                 field_names_init("stress_type", stress_type), &
+                field_names_init("stress_gradeint", stress_grad), &
                 field_names_init("inlet_plane_i", inlet_plane_i), &
                 field_names_init("inlet_plane_x", inlet_plane_x) ]
               
-      names_a = [ field_names_a_init("stress", stress) ]
+      names_a = [ field_names_a_init("stress", stress), &
+                  field_names_a_init("Uinlet", u_vec)]
+
+      names_str = [ field_names_str("mean_profile", mean_profile), &
+                    field_names_str("turbulence_profile", turbulence_profile)]
+
       
       
       stg_method = turbulent_inlet_XC
@@ -1594,6 +1606,8 @@ print *,"types:", Btype
       u_star = -1
       z0 = -1
       power_exponent = -1
+
+      u_vec = -1
       
       uu = -1
       vv = -1
@@ -1605,18 +1619,22 @@ print *,"types:", Btype
       
       stress_type_str = ""
       stress_type = 0
+      stress_grad = 0
       
       inlet_plane_i = huge(1)
-      inlet_plane_x = ieee_value(inlet_plane_x, ieee_quiet_nan)
+      inlet_plane_x = huge(1._knd)
+
+      mean_profile = ""
+      turbulence_profile = ""
         
-      call get_object_field_values(obj, stat, names, names_a)
+      call get_object_field_values(obj, stat, names, names_a, fields_str = names_str)
       
       if (stat/=0) then
         write(*,*) "Error parsing an stg() object in " // fname
         write(*,*) "Error status", stat
         call error_stop()
       end if
-      
+
       if (len_trim(stg_method_str)>0) then
         select case (downcase(stg_method_str))
           case ("xc","xiecastro","default")
@@ -1641,18 +1659,48 @@ print *,"types:", Btype
         case default
           profiletype = PROFILE_CONSTANT
       end select
+
+
+      if (norm2(u_vec)>0) then
+        if (Uinlet>0) then
+          write(*,*) "Error, multiple definitions of Uinlet in " // fname
+          call error_stop
+        end if
+
+        Uinlet_vec = u_vec
+        Uinlet = norm2(u_vec)
+
+        if (Uinlet==0) then
+          write(*,*) "Error, Uinlet vector must be nonzero in " // fname
+          call error_stop
+        end if
+
+        if (side<=0) then
+          call u_vec_to_side(u_vec, side)
+        end if
+      else if (Uinlet < 0 .and. profiletype == PROFILE_CONSTANT) then
+        write(*,*) "Error, Uinlet must be defined for the synthetic turbulence generator in" // fname
+        write(*,*) "when the profile type is constant."
+        call error_stop
+      end if
+
         
-      
       associate(g=>default_turbulence_generator)
         if (stg_method==turbulent_inlet_XCDF) then
-          if (.not.ieee_is_nan(inlet_plane_x)) &
+          if (inlet_plane_x < huge(1._knd)) &
             g%inlet_plane_x = inlet_plane_x
           if (inlet_plane_i < huge(1)) &
             g%inlet_plane_i = inlet_plane_i
+
+          if (.not. allocated(g%inlet_plane_x) .and. .not. allocated(g%inlet_plane_i)) then
+            write(*,*) "Error, when method=XCDF in stg, then either inlet_plane_x or &
+                       &inlet_plane_i must be provided in " // fname
+            call error_stop
+          end if
         end if
         
         g%Ustar_surf_inlet = u_star
-        !FIXME
+        !TODO more options
         g%stress_gradient_inlet = stress_grad
         
         g%U_ref_inlet = u_ref
@@ -1660,10 +1708,22 @@ print *,"types:", Btype
         g%z0_inlet = z0
         g%power_exponent_inlet = power_exponent
         
-        g%T_Lag = T_Lag
-        g%L_y = L_y
-        g%L_z = L_z
-        
+        if (T_Lag>0) then
+          g%T_Lag = T_Lag
+        else
+          write(*,*) "The Lagrangian time scale must be provided for the turbulence generator&
+          & in the T_Lag variable in " // fname
+          call error_stop()
+        end if
+        if (L_y>0 .and. L_z>0) then
+          g%L_y = L_y
+          g%L_z = L_z
+        else
+          write(*,*) "The integral length scales in the spanwise and vertical direction&
+          & must be provided for the turbulence generator in the L_y and L_z variables in " // fname
+          call error_stop()
+        end if
+
         if (uu>0.and.vv>0.and.ww>0) then
           g%relative_stress(1,1) = uu
           g%relative_stress(2,2) = vv
@@ -1684,8 +1744,9 @@ print *,"types:", Btype
           g%relative_stress(3,1) = stress(5)
           g%relative_stress(2,3) = stress(6)
           g%relative_stress(3,2) = stress(6)
-        else
+        else if (.not. profiletype==PROFILE_FROM_FILE) then
           write(*,*) "Relative stress with positive diagonal terms must be provided for the turbulence generator in " // fname
+          write(*,*) "Set either the uu, vv and ww variables or the stress array, ordered [uu, vvv, ww, uv, uw, vw]."
           call error_stop()          
         end if
         
@@ -1695,10 +1756,28 @@ print *,"types:", Btype
             g%direction = 1
           case (So, No)
             g%direction = 2
+          case (0)
+            !no information on the direction has been given
+            !assuming +x
+            g%direction = 1
           case default
             write(*,*) "Error, synthetic turbulence generation supported only on boundaries in the horizontal directions (W,E,S,N)."
             call error_stop()
         end select
+
+        if (profiletype==PROFILE_FROM_FILE) then
+          if (len_trim(mean_profile)>0) then
+            g%mean_profile_file = trim(mean_profile)
+          else
+            g%mean_profile_file = "inlet_mean_profile.txt"
+          end if
+          if (len_trim(turbulence_profile)>0) then
+            g%turbulence_profile_file = trim(turbulence_profile)
+          else
+            g%turbulence_profile_file = "inlet_turbulence_profile.txt"
+          end if
+        end if
+
       end associate
       
     end subroutine
