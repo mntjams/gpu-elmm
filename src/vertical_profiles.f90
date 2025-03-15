@@ -262,6 +262,7 @@ contains
   subroutine Profiles_Save(p, dir, nth)
     use FreeUnit
     use custom_par, only: iim, jim, kim, nzims
+    use ieee_exceptions
 
     class(Profiles), intent(inout) :: p
     character(*), intent(in) :: dir
@@ -269,7 +270,8 @@ contains
     integer :: i, j, k, unit, flux_start
     real(knd), allocatable :: ttsgs(:), mmsgs(:), sssgs(:,:)
     character(:), allocatable :: nth_char
-    
+    logical :: saved_fpe_mode(size(ieee_all))
+
     if (present(nth)) then
       nth_char = "-" // itoa(nth)
     else
@@ -330,7 +332,12 @@ contains
       call ReduceProfile(p%scalflsgs(i,:), n_free_PrW(0:Prnz))
       call ReduceProfile(p%ss(i,:),        n_free_Pr(1:Prnz))
     end do
-      
+
+    !$omp parallel
+    call ieee_get_halting_mode(ieee_all, saved_fpe_mode)
+    call ieee_set_halting_mode(ieee_all, .false.)
+    !$omp end parallel
+
     if (iim==1.and.jim==1) then
       if (kim > 1) then
         flux_start = 1
@@ -595,6 +602,11 @@ contains
       end if !num_of_scalars>0
      
     end if
+
+    !$omp parallel
+    call ieee_set_halting_mode(ieee_all, saved_fpe_mode)
+    !$omp end parallel
+
 
 #ifdef PAR    
   contains
