@@ -11,7 +11,7 @@ implicit none
   public volumePr, &
          GridCoords, GridCoords_interp, GridCoords_interp_U, GridCoords_interp_V, GridCoords_interp_W, &
          InDomain, InGlobalDomain, &
-         BoundUVW, BoundU, Bound_Phi, Bound_Pr, Bound_Q,&
+         BoundUVW, Bound_Phi, Bound_Pr, Bound_Q,&
          ShearInlet, ParabolicInlet, ConstantInlet
 
   interface GridCoords
@@ -178,21 +178,10 @@ implicit none
   end function
 
 
-  recursive subroutine BoundU(component, U, Uin, regime)
-    integer, intent(in)                   :: component
-    real(knd), contiguous, intent(inout)  :: U(-2:,-2:,-2:)
-    real(knd), contiguous, intent(in)     :: Uin(-2:,-2:)
-    integer, optional, intent(in)         :: regime
-    integer :: reg, i, j, k, nx, ny, nz
-    !intermediate regime is when doing BC for one of the terms for dU/dt
-    !currently used when explicit filtering is on only
-    integer, parameter :: intermediate = 2
-
-    if (present(regime)) then
-      reg = regime
-    else
-      reg = 0
-    end if
+  subroutine periodic_corners_edges(U, component)
+    real(knd), intent(inout) :: U(-2:,-2:,-2:)
+    integer, intent(in) :: component
+    integer :: i, j, k, nx, ny, nz
 
     if (component==1) then
       nx = Unx
@@ -212,711 +201,1333 @@ implicit none
 
     !!! corners and edges for periodic conditions
     if (Btype(Ea)==BC_PERIODIC.and.Btype(No)==BC_PERIODIC.and.Btype(To)==BC_PERIODIC) then
-    !$omp sections
-    !$omp section
-     do k = nz+1, nz+3
-      do j = ny+1, ny+3
-       do i = nx+1, nx+3
-        U(i,j,k) = U(i-nx,j-ny,k-nz)
-       end do
+      !$omp sections
+      !$omp section
+      do k = nz+1, nz+3
+        do j = ny+1, ny+3
+          do i = nx+1, nx+3
+            U(i,j,k) = U(i-nx,j-ny,k-nz)
+          end do
+        end do
       end do
-     end do
-    !$omp section
-     do k = -2, 0
-      do j = ny+1, ny+3
-       do i = nx+1, nx+3
-        U(i,j,k) = U(i-nx,j-ny,k+nz)
-       end do
+      !$omp section
+      do k = -2, 0
+        do j = ny+1, ny+3
+          do i = nx+1, nx+3
+            U(i,j,k) = U(i-nx,j-ny,k+nz)
+          end do
+        end do
       end do
-     end do
-    !$omp section
-     do k = nz+1, nz+3
-      do j = -2, 0
-       do i = nx+1, nx+3
-        U(i,j,k) = U(i-nx,j+ny,k-nz)
-       end do
+      !$omp section
+      do k = nz+1, nz+3
+        do j = -2, 0
+          do i = nx+1, nx+3
+            U(i,j,k) = U(i-nx,j+ny,k-nz)
+          end do
+        end do
       end do
-     end do
-    !$omp section
-     do k = nz+1, nz+3
-      do j = ny+1, ny+3
-       do i = -2, 0
-        U(i,j,k) = U(i+nx,j-ny,k-nz)
-       end do
+      !$omp section
+      do k = nz+1, nz+3
+        do j = ny+1, ny+3
+          do i = -2, 0
+            U(i,j,k) = U(i+nx,j-ny,k-nz)
+          end do
+        end do
       end do
-     end do
-    !$omp section
-     do k = -2, 0
-      do j = -2, 0
-       do i = nx+1, nx+3
-        U(i,j,k) = U(i-nx,j+ny,k+nz)
-       end do
+      !$omp section
+      do k = -2, 0
+        do j = -2, 0
+          do i = nx+1, nx+3
+            U(i,j,k) = U(i-nx,j+ny,k+nz)
+          end do
+        end do
       end do
-     end do
-    !$omp section
-     do k = nz+1, nz+3
-      do j = -2, 0
-       do i = -2, 0
-        U(i,j,k) = U(i+nx,j+ny,k-nz)
-       end do
+      !$omp section
+      do k = nz+1, nz+3
+        do j = -2, 0
+          do i = -2, 0
+            U(i,j,k) = U(i+nx,j+ny,k-nz)
+          end do
+        end do
       end do
-     end do
-    !$omp section
-     do k = -2, 0
-      do j = ny+1, ny+3
-       do i = -2, 0
-        U(i,j,k) = U(i+nx,j-ny,k+nz)
-       end do
+      !$omp section
+      do k = -2, 0
+        do j = ny+1, ny+3
+          do i = -2, 0
+            U(i,j,k) = U(i+nx,j-ny,k+nz)
+          end do
+        end do
       end do
-     end do
-    !$omp section
-     do k = -2, 0
-      do j = -2, 0
-       do i = -2, 0
-        U(i,j,k) = U(i+nx,j+ny,k+nz)
-       end do
+      !$omp section
+      do k = -2, 0
+        do j = -2, 0
+          do i = -2, 0
+            U(i,j,k) = U(i+nx,j+ny,k+nz)
+          end do
+        end do
       end do
-     end do
-     !$omp end sections
+      !$omp end sections nowait
     end if
-
+  
     if (Btype(Ea)==BC_PERIODIC.and.Btype(No)==BC_PERIODIC) then
-     !$omp sections
-     !$omp section
-     do k = 1, nz
-      do j = ny+1, ny+3
-       do i = nx+1, nx+3
-        U(i,j,k) = U(i-nx,j-ny,k)
-       end do
+      !$omp sections
+      !$omp section
+      do k = 1, nz
+          do j = ny+1, ny+3
+            do i = nx+1, nx+3
+              U(i,j,k) = U(i-nx,j-ny,k)
+            end do
+          end do
       end do
-     end do
-     !$omp section
-     do k = 1, nz
-      do j = -2, 0
-       do i = nx+1, nx+3
-        U(i,j,k) = U(i-nx,j+ny,k)
-       end do
+      !$omp section
+      do k = 1, nz
+        do j = -2, 0
+          do i = nx+1, nx+3
+            U(i,j,k) = U(i-nx,j+ny,k)
+          end do
+        end do
       end do
-     end do
-     !$omp section
-     do k = 1, nz
-      do j = ny+1, ny+3
-       do i = -2, 0
-        U(i,j,k) = U(i+nx,j-ny,k)
-       end do
+      !$omp section
+      do k = 1, nz
+        do j = ny+1, ny+3
+          do i = -2, 0
+            U(i,j,k) = U(i+nx,j-ny,k)
+          end do
+        end do
       end do
-     end do
-     !$omp section
-     do k = 1, nz
-      do j = -2, 0
-       do i = -2, 0
-        U(i,j,k) = U(i+nx,j+ny,k)
-       end do
+      !$omp section
+      do k = 1, nz
+        do j = -2, 0
+          do i = -2, 0
+            U(i,j,k) = U(i+nx,j+ny,k)
+          end do
+        end do
       end do
-     end do
-     !$omp end sections
+      !$omp end sections nowait
     end if
-
-
+  
+  
     if (Btype(Ea)==BC_PERIODIC.and.Btype(To)==BC_PERIODIC) then
-     !$omp sections
-     !$omp section
-     do k = nz+1, nz+3
-      do j = 1, ny
-       do i = nx+1, nx+3
-        U(i,j,k) = U(i-nx,j,k-nz)
-       end do
+      !$omp sections
+      !$omp section
+      do k = nz+1, nz+3
+        do j = 1, ny
+          do i = nx+1, nx+3
+            U(i,j,k) = U(i-nx,j,k-nz)
+          end do
+        end do
       end do
-     end do
-     !$omp section
-     do k = -2, 0
-      do j = 1, ny
-       do i = nx+1, nx+3
-        U(i,j,k) = U(i-nx,j,k+nz)
-       end do
+      !$omp section
+      do k = -2, 0
+        do j = 1, ny
+          do i = nx+1, nx+3
+            U(i,j,k) = U(i-nx,j,k+nz)
+          end do
+        end do
       end do
-     end do
-     !$omp section
-     do k = nz+1, nz+3
-      do j = 1, ny
-       do i = -2, 0
-        U(i,j,k) = U(i+nx,j,k-nz)
-       end do
+      !$omp section
+      do k = nz+1, nz+3
+        do j = 1, ny
+          do i = -2, 0
+            U(i,j,k) = U(i+nx,j,k-nz)
+          end do
+        end do
       end do
-     end do
-     !$omp section
-     do k = -2, 0
-      do j = 1, ny
-       do i = -2, 0
-        U(i,j,k) = U(i+nx,j,k+nz)
-       end do
+      !$omp section
+      do k = -2, 0
+        do j = 1, ny
+          do i = -2, 0
+            U(i,j,k) = U(i+nx,j,k+nz)
+          end do
+        end do
       end do
-     end do
-     !$omp end sections
+      !$omp end sections nowait
     end if
 
 
     if (Btype(No)==BC_PERIODIC.and.Btype(To)==BC_PERIODIC) then
-     !$omp sections
-     !$omp section
-     do k = nz+1, nz+3
-      do j = ny+1, ny+3
-       do i = 1, nx
-        U(i,j,k) = U(i,j-ny,k-nz)
-       end do
+      !$omp sections
+      !$omp section
+      do k = nz+1, nz+3
+        do j = ny+1, ny+3
+          do i = 1, nx
+            U(i,j,k) = U(i,j-ny,k-nz)
+          end do
+        end do
       end do
-     end do
-     !$omp section
-     do k = -2, 0
-      do j = ny+1, ny+3
-       do i = 1, nx
-        U(i,j,k) = U(i,j-ny,k+nz)
-       end do
+      !$omp section
+      do k = -2, 0
+        do j = ny+1, ny+3
+          do i = 1, nx
+            U(i,j,k) = U(i,j-ny,k+nz)
+          end do
+        end do
       end do
-     end do
-     do k = nz+1, nz+3
-      do j = -2, 0
-       do i = 1, nx
-        U(i,j,k) = U(i,j+ny,k-nz)
-       end do
+      !$omp section
+      do k = nz+1, nz+3
+        do j = -2, 0
+          do i = 1, nx
+            U(i,j,k) = U(i,j+ny,k-nz)
+          end do
+        end do
       end do
-     end do
-     !$omp section
-     do k = -2, 0
-      do j = -2, 0
-       do i = 1, nx
-        U(i,j,k) = U(i,j+ny,k+nz)
-       end do
+      !$omp section
+      do k = -2, 0
+        do j = -2, 0
+          do i = 1, nx
+            U(i,j,k) = U(i,j+ny,k+nz)
+          end do
+        end do
       end do
-     end do
-     !$omp end sections
+      !$omp end sections
     end if 
 
     !$omp end parallel
+  end subroutine periodic_corners_edges
+
+
+
+  subroutine BoundUVW_do_BC(U, V, W, regime)
+    real(knd), intent(inout) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    integer, intent(in), optional :: regime
+    integer :: i, j, k
+    integer :: reg
+    !intermediate regime is when doing BC for one of the terms for dU/dt
+    !currently used when explicit filtering is on only
+    integer, parameter :: intermediate = 2
+
+
+    if (present(regime)) then
+      reg = regime
+    else
+      reg = 0
+    end if
+
+    ! Unified boundary conditions for U, V, W from th eformer split subroutine BoundU
     
-    
+    !!!corners and edges for periodic conditions
+    call periodic_corners_edges(U, 1)
+    call periodic_corners_edges(V, 2)
+    call periodic_corners_edges(W, 3)
+
 #ifdef PAR
-    call par_exchange_U_x(U, component)
+    call par_exchange_U_x(U, 1)
+    call par_exchange_U_x(V, 2)
+    call par_exchange_U_x(W, 3)
 #endif
 
-    !$omp parallel sections
-    !$omp section
+    !$omp parallel private(i,j,k)
     if (Btype(We)==BC_DIRICHLET.and.reg/=intermediate) then
-      if (component==1) then
-         do k = 1, nz
-          do j = 1, ny                       !Dirichlet inlet
-           U(0,j,k) = Uin(j,k)
-           U(-1,j,k) = Uin(j,k) + (Uin(j,k)-U(1,j,k))
-           U(-2,j,k) = Uin(j,k) + (Uin(j,k)-U(2,j,k))
-          end do
-         end do
-      else
-         do k = 1, nz
-          do j = 1, ny                       !Dirichlet inlet
-           U(0,j,k) = -U(1,j,k)
-           U(-1,j,k) = -U(2,j,k)
-           U(-2,j,k) = -U(3,j,k)
-          end do
-         end do
-      end if
-    else if (Btype(We)==BC_NOSLIP .or. (component==1.and.Btype(We)==BC_FREESLIP) .or. &
-             (Btype(We)==BC_DIRICHLET.and.reg==intermediate)) then
-      if (component==1) then
-         do k = 1, nz
-          do j = 1, ny                       !Solid wall
-           U(0,j,k) = 0
-           U(-1,j,k) = -U(1,j,k)
-           U(-2,j,k) = -U(2,j,k)
-          end do
-         end do
-      else
-         do k = 1, nz
-          do j = 1, ny                       !Solid wall
-           U(0,j,k) = -U(1,j,k)
-           U(-1,j,k) = -U(2,j,k)
-           U(-2,j,k) = -U(3,j,k)
-          end do
-         end do
-      end if
-    else if (Btype(We)==BC_NEUMANN.or.(component/=1.and.Btype(We)==BC_FREESLIP)) then
-      if (component==1) then
-         do k = 1, nz
-          do j = 1, ny                       !Neumann inlet
-           U(0,j,k) = U(1,j,k)
-           U(-1,j,k) = U(1,j,k)
-           U(-2,j,k) = U(1,j,k)
-          end do
-         end do
-      else
-         do k = 1, nz
-          do j = 1, ny                       !Neumann inlet
-           U(0,j,k) = U(1,j,k)
-           U(-1,j,k) = U(1,j,k)
-           U(-2,j,k) = U(1,j,k)
-          end do
-         end do
-      end if
-    else if (Btype(We)==BC_PERIODIC) then  !Periodic BC
-      do k = 1, nz
-       do j = 1, ny
-        U(0,j,k) = U(nx,j,k)
-        U(-1,j,k) = U(nx-1,j,k)
-        U(-2,j,k) = U(nx-2,j,k)
-       end do
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do j = 1, Uny                       
+          U(0,j,k) = Uin(j,k)
+          U(-1,j,k) = Uin(j,k) + (Uin(j,k)-U(1,j,k))
+          U(-2,j,k) = Uin(j,k) + (Uin(j,k)-U(2,j,k))
+        end do
       end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny                       
+          V(0,j,k) = -V(1,j,k)
+          V(-1,j,k) = -V(2,j,k)
+          V(-2,j,k) = -V(3,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny                       
+          W(0,j,k) = -W(1,j,k)
+          W(-1,j,k) = -W(2,j,k)
+          W(-2,j,k) = -W(3,j,k)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(We)==BC_NOSLIP .or. (Btype(We)==BC_DIRICHLET.and.reg==intermediate)) then
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do j = 1, Uny                       
+          U(0,j,k) = 0
+          U(-1,j,k) = -U(1,j,k)
+          U(-2,j,k) = -U(2,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny                       
+          V(0,j,k) = -V(1,j,k)
+          V(-1,j,k) = -V(2,j,k)
+          V(-2,j,k) = -V(3,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny                       
+          W(0,j,k) = -W(1,j,k)
+          W(-1,j,k) = -W(2,j,k)
+          W(-2,j,k) = -W(3,j,k)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(We)==BC_NEUMANN) then
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do j = 1, Uny                       
+          U(0,j,k) = U(1,j,k)
+          U(-1,j,k) = U(1,j,k)
+          U(-2,j,k) = U(1,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny                       
+          V(0,j,k) = V(1,j,k)
+          V(-1,j,k) = V(1,j,k)
+          V(-2,j,k) = V(1,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny                       
+          W(0,j,k) = W(1,j,k)
+          W(-1,j,k) = W(1,j,k)
+          W(-2,j,k) = W(1,j,k)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(We)==BC_FREESLIP) then
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do j = 1, Uny                       
+          U(0,j,k) = 0
+          U(-1,j,k) = -U(1,j,k)
+          U(-2,j,k) = -U(2,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny                       
+          V(0,j,k) = V(1,j,k)
+          V(-1,j,k) = V(1,j,k)
+          V(-2,j,k) = V(1,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny                       
+          W(0,j,k) = W(1,j,k)
+          W(-1,j,k) = W(1,j,k)
+          W(-2,j,k) = W(1,j,k)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(We)==BC_PERIODIC) then  
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do j = 1, Uny
+          U(0,j,k) = U(Unx,j,k)
+          U(-1,j,k) = U(Unx-1,j,k)
+          U(-2,j,k) = U(Unx-2,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny
+          V(0,j,k) = V(Vnx,j,k)
+          V(-1,j,k) = V(Vnx-1,j,k)
+          V(-2,j,k) = V(Vnx-2,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny
+          W(0,j,k) = W(Wnx,j,k)
+          W(-1,j,k) = W(Wnx-1,j,k)
+          W(-2,j,k) = W(Wnx-2,j,k)
+        end do
+      end do
+      !$omp end do nowait
     else if (Btype(We)==BC_TURBULENT_INLET.or.Btype(We)==BC_INLET_FROM_FILE) then
       if (reg/=intermediate) then
-        if (component==1) then
-          do k = -1, nz+2
-           do j = -1, ny+2
+        !$omp do collapse(2)
+        do k = -1, Unz+2
+          do j = -1, Uny+2
             U(0,j,k) = Uin(j,k)
             U(-1,j,k) = Uin(j,k) + (Uin(j,k)-U(1,j,k))
             U(-2,j,k) = Uin(j,k) + (Uin(j,k)-U(2,j,k))
-           end do
           end do
-        else
-          do k = -1, nz+2
-           do j = -1, ny+2
-            U(0,j,k) = Uin(j,k) + (Uin(j,k)-U(1,j,k))
-            U(-1,j,k) = Uin(j,k) + (Uin(j,k)-U(2,j,k))
-            U(-2,j,k) = Uin(j,k) + (Uin(j,k)-U(3,j,k))
-           end do
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = -1, Vnz+2
+          do j = -1, Vny+2
+            V(0,j,k) = Vin(j,k) + (Vin(j,k)-V(1,j,k))
+            V(-1,j,k) = Vin(j,k) + (Vin(j,k)-V(2,j,k))
+            V(-2,j,k) = Vin(j,k) + (Vin(j,k)-V(3,j,k))
           end do
-        end if
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = -1, Wnz+2
+          do j = -1, Wny+2
+            W(0,j,k) = Win(j,k) + (Win(j,k)-W(1,j,k))
+            W(-1,j,k) = Win(j,k) + (Win(j,k)-W(2,j,k))
+            W(-2,j,k) = Win(j,k) + (Win(j,k)-W(3,j,k))
+          end do
+        end do
+        !$omp end do nowait
       else
-        if (component==1) then
-           do k = -1, nz+2
-            do j = -1, ny+2
-             U(0,j,k) = 0
-             U(-1,j,k) = -U(1,j,k)
-             U(-2,j,k) = -U(2,j,k)
-            end do
-           end do
-        else
-           do k = -1, nz+2
-            do j = -1, ny+2
-             U(0,j,k) = -U(1,j,k)
-             U(-1,j,k) = -U(2,j,k)
-             U(-2,j,k) = -U(3,j,k)
-            end do
-           end do
-        end if
+        !$omp do collapse(2)
+        do k = -1, Unz+2
+          do j = -1, Uny+2
+            U(0,j,k) = 0
+            U(-1,j,k) = -U(1,j,k)
+            U(-2,j,k) = -U(2,j,k)
+          end do
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = -1, Vnz+2
+          do j = -1, Vny+2
+            V(0,j,k) = -V(1,j,k)
+            V(-1,j,k) = -V(2,j,k)
+            V(-2,j,k) = -V(3,j,k)
+          end do
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = -1, Wnz+2
+          do j = -1, Wny+2
+            W(0,j,k) = -W(1,j,k)
+            W(-1,j,k) = -W(2,j,k)
+            W(-2,j,k) = -W(3,j,k)
+          end do
+        end do
+        !$omp end do nowait
       end if
     end if
 
 
-    !$omp section
     if (Btype(Ea)==BC_DIRICHLET.and.reg/=intermediate) then
-      if (component==1) then
-        do k = 1, nz
-         do j = 1, ny                       !Dirichlet inlet
-          U(nx+1,j,k) = Uin(j,k)
-          U(nx+2,j,k) = Uin(j,k) + (Uin(j,k)-U(nx,j,k))
-          U(nx+3,j,k) = Uin(j,k) + (Uin(j,k)-U(nx-1,j,k))
-         end do
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do j = 1, Uny                       
+          U(Unx+1,j,k) = Uin(j,k)
+          U(Unx+2,j,k) = Uin(j,k) + (Uin(j,k)-U(Unx,j,k))
+          U(Unx+3,j,k) = Uin(j,k) + (Uin(j,k)-U(Unx-1,j,k))
         end do
-      else
-        do k = 1, nz
-         do j = 1, ny                       !Dirichlet inlet
-          U(nx+1,j,k) = -U(nx,j,k)
-          U(nx+2,j,k) = -U(nx-1,j,k)
-          U(nx+3,j,k) = -U(nx-2,j,k)
-         end do
-        end do
-      end if
-    else if (Btype(Ea)==BC_NOSLIP .or. (component==1.and.Btype(Ea)==BC_FREESLIP) .or. &
-              (Btype(Ea)==BC_DIRICHLET.and.reg==intermediate)) then
-      if (component==1) then
-        do k = 1, nz
-         do j = 1, ny                       !Solid wall
-          U(nx+1,j,k) = 0
-          U(nx+2,j,k) = -U(nx,j,k)
-          U(nx+3,j,k) = -U(nx-1,j,k)
-         end do
-        end do
-      else
-        do k = 1, nz
-         do j = 1, ny                       !Solid wall
-          U(nx+1,j,k) = -U(nx,j,k)
-          U(nx+2,j,k) = -U(nx-1,j,k)
-          U(nx+3,j,k) = -U(nx-2,j,k)
-         end do
-        end do
-      end if
-    else if (Btype(Ea)==BC_NEUMANN.or.(component/=1.and.Btype(Ea)==BC_FREESLIP)) then   !Neumann outlet
-      do k = 1, nz
-       do j = 1, ny
-        U(nx+1,j,k) = U(nx,j,k)
-        U(nx+2,j,k) = U(nx,j,k)
-        U(nx+3,j,k) = U(nx,j,k)
-       end do
       end do
-    else if (Btype(Ea)==BC_PERIODIC) then  !Periodic BC
-      do k = 1, nz
-       do j = 1, ny
-        U(nx+1,j,k) = U(1,j,k)
-        U(nx+2,j,k) = U(2,j,k)
-        U(nx+3,j,k) = U(3,j,k)
-       end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny                       
+          V(Vnx+1,j,k) = -V(Vnx,j,k)
+          V(Vnx+2,j,k) = -V(Vnx-1,j,k)
+          V(Vnx+3,j,k) = -V(Vnx-2,j,k)
+        end do
       end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny                       
+          W(Wnx+1,j,k) = -W(Wnx,j,k)
+          W(Wnx+2,j,k) = -W(Wnx-1,j,k)
+          W(Wnx+3,j,k) = -W(Wnx-2,j,k)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(Ea)==BC_NOSLIP .or. (Btype(Ea)==BC_DIRICHLET.and.reg==intermediate)) then
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do j = 1, Uny                       
+          U(Unx+1,j,k) = 0
+          U(Unx+2,j,k) = -U(Unx,j,k)
+          U(Unx+3,j,k) = -U(Unx-1,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny                       
+          V(Vnx+1,j,k) = -V(Vnx,j,k)
+          V(Vnx+2,j,k) = -V(Vnx-1,j,k)
+          V(Vnx+3,j,k) = -V(Vnx-2,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny                       
+          W(Wnx+1,j,k) = -W(Wnx,j,k)
+          W(Wnx+2,j,k) = -W(Wnx-1,j,k)
+          W(Wnx+3,j,k) = -W(Wnx-2,j,k)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(Ea)==BC_NEUMANN) then   !Neumann outlet
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do j = 1, Uny
+          U(Unx+1,j,k) = U(Unx,j,k)
+          U(Unx+2,j,k) = U(Unx,j,k)
+          U(Unx+3,j,k) = U(Unx,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny
+          V(Vnx+1,j,k) = V(Vnx,j,k)
+          V(Vnx+2,j,k) = V(Vnx,j,k)
+          V(Vnx+3,j,k) = V(Vnx,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny
+          W(Wnx+1,j,k) = W(Wnx,j,k)
+          W(Wnx+2,j,k) = W(Wnx,j,k)
+          W(Wnx+3,j,k) = W(Wnx,j,k)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(Ea)==BC_FREESLIP) then
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do j = 1, Uny
+          U(Unx+1,j,k) = 0
+          U(Unx+2,j,k) = -U(Unx,j,k)
+          U(Unx+3,j,k) = -U(Unx-1,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny
+          V(Vnx+1,j,k) = V(Vnx,j,k)
+          V(Vnx+2,j,k) = V(Vnx,j,k)
+          V(Vnx+3,j,k) = V(Vnx,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny
+          W(Wnx+1,j,k) = W(Wnx,j,k)
+          W(Wnx+2,j,k) = W(Wnx,j,k)
+          W(Wnx+3,j,k) = W(Wnx,j,k)
+        end do
+      end do 
+      !$omp end do nowait
+    else if (Btype(Ea)==BC_PERIODIC) then  
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do j = 1, Uny
+          U(Unx+1,j,k) = U(1,j,k)
+          U(Unx+2,j,k) = U(2,j,k)
+          U(Unx+3,j,k) = U(3,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny
+          V(Vnx+1,j,k) = V(1,j,k)
+          V(Vnx+2,j,k) = V(2,j,k)
+          V(Vnx+3,j,k) = V(3,j,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny
+          W(Wnx+1,j,k) = W(1,j,k)
+          W(Wnx+2,j,k) = W(2,j,k)
+          W(Wnx+3,j,k) = W(3,j,k)
+        end do
+      end do
+      !$omp end do nowait
     else if (Btype(Ea)==BC_TURBULENT_INLET) then
       if (reg/=intermediate) then
-        if (component==1) then
-          do k = 1, nz
-           do j = 1, ny
-            U(nx+1,j,k) = Uin(j,k)
-            U(nx+2,j,k) = Uin(j,k) + (Uin(j,k)-U(nx,j,k))
-            U(nx+3,j,k) = Uin(j,k) + (Uin(j,k)-U(nx-1,j,k))
-           end do
+        !$omp do collapse(2)
+        do k = 1, Unz
+          do j = 1, Uny
+            U(Unx+1,j,k) = Uin(j,k)
+            U(Unx+2,j,k) = Uin(j,k) + (Uin(j,k)-U(Unx,j,k))
+            U(Unx+3,j,k) = Uin(j,k) + (Uin(j,k)-U(Unx-1,j,k))
           end do
-        else
-          do k = 1, nz
-           do j = 1, ny
-            U(nx+1,j,k) = Uin(j,k) + (Uin(j,k)-U(nx,j,k))
-            U(nx+2,j,k) = Uin(j,k) + (Uin(j,k)-U(nx-1,j,k))
-            U(nx+3,j,k) = Uin(j,k) + (Uin(j,k)-U(nx-2,j,k))
-           end do
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = 1, Vnz
+          do j = 1, Vny
+            V(Vnx+1,j,k) = Vin(j,k) + (Vin(j,k)-V(Vnx,j,k))
+            V(Vnx+2,j,k) = Vin(j,k) + (Vin(j,k)-V(Vnx-1,j,k))
+            V(Vnx+3,j,k) = Vin(j,k) + (Vin(j,k)-V(Vnx-2,j,k))
           end do
-        end if
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = 1, Wnz
+          do j = 1, Wny
+            W(Wnx+1,j,k) = Win(j,k) + (Win(j,k)-W(Wnx,j,k))
+            W(Wnx+2,j,k) = Win(j,k) + (Win(j,k)-W(Wnx-1,j,k))
+            W(Wnx+3,j,k) = Win(j,k) + (Win(j,k)-W(Wnx-2,j,k))
+          end do
+        end do
+        !$omp end do nowait
       else
-        if (component==1) then
-           do k = 1, nz
-            do j = 1, ny
-             U(nx+1,j,k) = 0
-             U(nx+2,j,k) = -U(nx,j,k)
-             U(nx+3,j,k) = -U(nx-1,j,k)
-            end do
-           end do
-        else
-           do k = 1, nz
-            do j = 1, ny
-             U(nx+1,j,k) = -U(nx,j,k)
-             U(nx+2,j,k) = -U(nx-1,j,k)
-             U(nx+3,j,k) = -U(nx-2,j,k)
-            end do
-           end do
-        end if
+        !$omp do collapse(2)
+        do k = 1, Unz
+          do j = 1, Uny
+            U(Unx+1,j,k) = 0
+            U(Unx+2,j,k) = -U(Unx,j,k)
+            U(Unx+3,j,k) = -U(Unx-1,j,k)
+          end do
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = 1, Vnz
+          do j = 1, Vny
+            V(Vnx+1,j,k) = -V(Vnx,j,k)
+            V(Vnx+2,j,k) = -V(Vnx-1,j,k)
+            V(Vnx+3,j,k) = -V(Vnx-2,j,k)
+          end do
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = 1, Wnz
+          do j = 1, Wny
+            W(Wnx+1,j,k) = -W(Wnx,j,k)
+            W(Wnx+2,j,k) = -W(Wnx-1,j,k)
+            W(Wnx+3,j,k) = -W(Wnx-2,j,k)
+          end do
+        end do
+        !$omp end do nowait
       end if
     end if
-    !$omp end parallel sections
-    
-#ifdef PAR    
-    call par_exchange_U_y(U, component)
+    !$omp end parallel
+
+
+#ifdef PAR
+    call par_exchange_U_y(U, 1)
+    call par_exchange_U_y(V, 2)
+    call par_exchange_U_y(W, 3)
 #endif
 
-    !$omp parallel sections
-    !$omp section
+
+    !$omp parallel private(i,j,k)
     if (Btype(So)==BC_DIRICHLET.and.reg/=intermediate) then
-      if (component==2) then
-        do k = 1, nz
-         do i = -2, nx+3                       !Dirichlet inlet
-          U(i,0,k) = sideU(component,So)
-          U(i,-1,k) = sideU(component,So) + (sideU(component,So)-U(i,1,k))
-          U(i,-2,k) = sideU(component,So) + (sideU(component,So)-U(i,2,k))
-         end do
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do i = -2, Vnx+3                       
+          V(i,0,k) = sideU(2,So)
+          V(i,-1,k) = sideU(2,So) + (sideU(2,So)-V(i,1,k))
+          V(i,-2,k) = sideU(2,So) + (sideU(2,So)-V(i,2,k))
         end do
-      else
-        do k = 1, nz
-         do i = -2, nx+3                       !Dirichlet inlet
-          U(i,0,k) = sideU(component,So) + (sideU(component,So)-U(i,1,k))
-          U(i,-1,k) = sideU(component,So) + (sideU(component,So)-U(i,2,k))
-          U(i,-2,k) = sideU(component,So) + (sideU(component,So)-U(i,3,k))
-         end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do i = -2, Unx+3                       
+          U(i,0,k) = sideU(1,So) + (sideU(1,So)-U(i,1,k))
+          U(i,-1,k) = sideU(1,So) + (sideU(1,So)-U(i,2,k))
+          U(i,-2,k) = sideU(1,So) + (sideU(1,So)-U(i,3,k))
         end do
-      end if
-    else if (Btype(So)==BC_NOSLIP .or. (component==2.and.Btype(So)==BC_FREESLIP) .or. &
-               (Btype(So)==BC_DIRICHLET.and.reg==intermediate)) then
-      if (component==2) then
-        do k = 1, nz
-         do i = -2, nx+3                       !Solid wall
-          U(i,0,k) = 0
-          U(i,-1,k) = -U(i,1,k)
-          U(i,-2,k) = -U(i,2,k)
-         end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do i = -2, Wnx+3                       
+          W(i,0,k) = sideU(3,So) + (sideU(3,So)-W(i,1,k))
+          W(i,-1,k) = sideU(3,So) + (sideU(3,So)-W(i,2,k))
+          W(i,-2,k) = sideU(3,So) + (sideU(3,So)-W(i,3,k))
         end do
-      else
-        do k = 1, nz
-         do i = -2, nx+3                       !Solid wall
+      end do
+      !$omp end do nowait
+    else if (Btype(So)==BC_NOSLIP .or. (Btype(So)==BC_DIRICHLET.and.reg==intermediate)) then
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do i = -2, Vnx+3                       
+          V(i,0,k) = 0
+          V(i,-1,k) = -V(i,1,k)
+          V(i,-2,k) = -V(i,2,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do i = -2, Unx+3                       
           U(i,0,k) = -U(i,1,k)
           U(i,-1,k) = -U(i,2,k)
           U(i,-2,k) = -U(i,3,k)
-         end do
         end do
-      end if
-    else if (Btype(So)==BC_NEUMANN.or.(component/=2.and.Btype(So)==BC_FREESLIP)) then
-      do k = 1, nz
-       do i = -2, nx+3                       !Neumann inlet
-        U(i,0,k) = U(i,1,k)
-        U(i,-1,k) = U(i,1,k)
-        U(i,-2,k) = U(i,1,k)
-       end do
       end do
-    else if (Btype(So)==BC_PERIODIC) then  !Periodic BC
-      do k = 1, nz
-       do i = -2, nx+3
-        U(i,0,k) = U(i,ny,k)
-        U(i,-1,k) = U(i,ny-1,k)
-        U(i,-2,k) = U(i,ny-2,k)
-       end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do i = -2, Wnx+3                       
+          W(i,0,k) = -W(i,1,k)
+          W(i,-1,k) = -W(i,2,k)
+          W(i,-2,k) = -W(i,3,k)
+        end do
       end do
+      !$omp end do nowait
+    else if (Btype(So)==BC_NEUMANN) then
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do i = -2, Vnx+3                       
+          V(i,0,k) = V(i,1,k)
+          V(i,-1,k) = V(i,1,k)
+          V(i,-2,k) = V(i,1,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do i = -2, Unx+3                       
+          U(i,0,k) = U(i,1,k)
+          U(i,-1,k) = U(i,1,k)
+          U(i,-2,k) = U(i,1,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do i = -2, Wnx+3                       
+          W(i,0,k) = W(i,1,k)
+          W(i,-1,k) = W(i,1,k)
+          W(i,-2,k) = W(i,1,k)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(So)==BC_FREESLIP) then
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do i = -2, Vnx+3                       
+          V(i,0,k) = 0
+          V(i,-1,k) = -V(i,1,k)
+          V(i,-2,k) = -V(i,2,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do i = -2, Unx+3                       
+          U(i,0,k) = U(i,1,k)
+          U(i,-1,k) = U(i,1,k)
+          U(i,-2,k) = U(i,1,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do i = -2, Wnx+3                       
+          W(i,0,k) = W(i,1,k)
+          W(i,-1,k) = W(i,1,k)
+          W(i,-2,k) = W(i,1,k)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(So)==BC_PERIODIC) then  
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do i = -2, Vnx+3
+          V(i,0,k) = V(i,Vny,k)
+          V(i,-1,k) = V(i,Vny-1,k)
+          V(i,-2,k) = V(i,Vny-2,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do i = -2, Unx+3
+          U(i,0,k) = U(i,Uny,k)
+          U(i,-1,k) = U(i,Uny-1,k)
+          U(i,-2,k) = U(i,Uny-2,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do i = -2, Wnx+3
+          W(i,0,k) = W(i,Wny,k)
+          W(i,-1,k) = W(i,Wny-1,k)
+          W(i,-2,k) = W(i,Wny-2,k)
+        end do
+      end do
+      !$omp end do nowait
     else if (Btype(So)==BC_TURBULENT_INLET.or.Btype(So)==BC_INLET_FROM_FILE) then
       if (reg/=intermediate) then
-        if (component==2) then        
-          do k = -1, nz+2
-           do i = -1, nx+2
-            U(i,0,k) = Uin(i,k)
-            U(i,-1,k) = Uin(i,k) + (Uin(i,k)-U(i,1,k))
-            U(i,-2,k) = Uin(i,k) + (Uin(i,k)-U(i,2,k))
-           end do
+        !$omp do collapse(2)
+        do k = -1, Vnz+2
+          do i = -1, Vnx+2
+            V(i,0,k) = Vin(i,k)
+            V(i,-1,k) = Vin(i,k) + (Vin(i,k)-V(i,1,k))
+            V(i,-2,k) = Vin(i,k) + (Vin(i,k)-V(i,2,k))
           end do
-        else
-          do k = -1, nz+2
-           do i = -1, nx+2
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = -1, Unz+2
+          do i = -1, Unx+2
             U(i,0,k) = Uin(i,k) + (Uin(i,k)-U(i,1,k))
             U(i,-1,k) = Uin(i,k) + (Uin(i,k)-U(i,2,k))
             U(i,-2,k) = Uin(i,k) + (Uin(i,k)-U(i,3,k))
-           end do
           end do
-        end if
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = -1, Wnz+2
+          do i = -1, Wnx+2
+            W(i,0,k) = Win(i,k) + (Win(i,k)-W(i,1,k))
+            W(i,-1,k) = Win(i,k) + (Win(i,k)-W(i,2,k))
+            W(i,-2,k) = Win(i,k) + (Win(i,k)-W(i,3,k))
+          end do
+        end do
+        !$omp end do nowait
       else
-        if (component==2) then
-           do k = -1, nz+2
-            do i = -1, nx+2
-             U(i,0,k) = 0
-             U(i,-1,k) = -U(i,1,k)
-             U(i,-2,k) = -U(i,2,k)
-            end do
-           end do
-        else
-           do k = -1, nz+2
-            do i = -1, nx+2
-             U(i,0,k) = -U(i,1,k)
-             U(i,-1,k) = -U(i,2,k)
-             U(i,-2,k) = -U(i,3,k)
-            end do
-           end do
-        end if
+        !$omp do collapse(2)
+        do k = -1, Vnz+2
+          do i = -1, Vnx+2
+            V(i,0,k) = 0
+            V(i,-1,k) = -V(i,1,k)
+            V(i,-2,k) = -V(i,2,k)
+          end do
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = -1, Unz+2
+          do i = -1, Unx+2
+            U(i,0,k) = -U(i,1,k)
+            U(i,-1,k) = -U(i,2,k)
+            U(i,-2,k) = -U(i,3,k)
+          end do
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = -1, Wnz+2
+          do i = -1, Wnx+2
+            W(i,0,k) = -W(i,1,k)
+            W(i,-1,k) = -W(i,2,k)
+            W(i,-2,k) = -W(i,3,k)
+          end do
+        end do
+        !$omp end do nowait
       end if
     end if
 
 
-    !$omp section
     if (Btype(No)==BC_DIRICHLET.and.reg/=intermediate) then
-      if (component==2) then
-        do k = 1, nz
-         do i = -2, nx+3                       !Dirichlet inlet
-          U(i,ny+1,k) = sideU(component,No)
-          U(i,ny+2,k) = sideU(component,No) + (sideU(component,No)-U(i,ny,k))
-          U(i,ny+3,k) = sideU(component,No) + (sideU(component,No)-U(i,ny-1,k))
-         end do
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do i = -2, Vnx+3                       
+          V(i,Vny+1,k) = sideU(2,No)
+          V(i,Vny+2,k) = sideU(2,No) + (sideU(2,No)-V(i,Vny,k))
+          V(i,Vny+3,k) = sideU(2,No) + (sideU(2,No)-V(i,Vny-1,k))
         end do
-      else
-        do k = 1, nz
-         do i = -2, nx+3                       !Dirichlet inlet
-          U(i,ny+1,k) = sideU(component,No) + (sideU(component,No)-U(i,ny,k))
-          U(i,ny+2,k) = sideU(component,No) + (sideU(component,No)-U(i,ny-1,k))
-          U(i,ny+3,k) = sideU(component,No) + (sideU(component,No)-U(i,ny-2,k))
-         end do
-        end do
-      end if
-    else if (Btype(No)==BC_NOSLIP .or. (component==2.and.Btype(No)==BC_FREESLIP) .or. &
-             (Btype(No)==BC_DIRICHLET.and.reg==intermediate)) then
-      if (component==2) then
-        do k = 1, nz
-         do i = -2, nx+3                       !Solid wall
-          U(i,ny+1,k) = 0
-          U(i,ny+2,k) = -U(i,ny,k)
-          U(i,ny+3,k) = -U(i,ny-1,k)
-         end do
-        end do
-      else
-        do k = 1, nz
-         do i = -2, nx+3                       !Solid wall
-          U(i,ny+1,k) = -U(i,ny,k)
-          U(i,ny+2,k) = -U(i,ny-1,k)
-          U(i,ny+3,k) = -U(i,ny-2,k)
-         end do
-        end do
-      end if
-    else if (Btype(No)==BC_NEUMANN .or. (component/=2.and.Btype(No)==BC_FREESLIP)) then
-      do k = 1, nz
-       do i = -2, nx+3                       !Neumann inlet
-        U(i,ny+1,k) = U(i,ny,k)
-        U(i,ny+2,k) = U(i,ny,k)
-        U(i,ny+3,k) = U(i,ny,k)
-       end do
       end do
-    else if (Btype(No)==BC_PERIODIC) then  !Periodic BC
-      do k = 1, nz
-       do i = -2, nx+3
-        U(i,ny+1,k) = U(i,1,k)
-        U(i,ny+2,k) = U(i,2,k)
-        U(i,ny+3,k) = U(i,3,k)
-       end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do i = -2, Unx+3                       
+          U(i,Uny+1,k) = sideU(1,No) + (sideU(1,No)-U(i,Uny,k))
+          U(i,Uny+2,k) = sideU(1,No) + (sideU(1,No)-U(i,Uny-1,k))
+          U(i,Uny+3,k) = sideU(1,No) + (sideU(1,No)-U(i,Uny-2,k))
+        end do
       end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do i = -2, Wnx+3                       
+          W(i,Wny+1,k) = sideU(3,No) + (sideU(3,No)-W(i,Wny,k))
+          W(i,Wny+2,k) = sideU(3,No) + (sideU(3,No)-W(i,Wny-1,k))
+          W(i,Wny+3,k) = sideU(3,No) + (sideU(3,No)-W(i,Wny-2,k))
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(No)==BC_NOSLIP .or. (Btype(No)==BC_DIRICHLET.and.reg==intermediate)) then
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do i = -2, Vnx+3                       
+          V(i,Vny+1,k) = 0
+          V(i,Vny+2,k) = -V(i,Vny,k)
+          V(i,Vny+3,k) = -V(i,Vny-1,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do i = -2, Unx+3                       
+          U(i,Uny+1,k) = -U(i,Uny,k)
+          U(i,Uny+2,k) = -U(i,Uny-1,k)
+          U(i,Uny+3,k) = -U(i,Uny-2,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do i = -2, Wnx+3                       
+          W(i,Wny+1,k) = -W(i,Wny,k)
+          W(i,Wny+2,k) = -W(i,Wny-1,k)
+          W(i,Wny+3,k) = -W(i,Wny-2,k)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(No)==BC_NEUMANN) then
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do i = -2, Vnx+3                       
+          V(i,Vny+1,k) = V(i,Vny,k)
+          V(i,Vny+2,k) = V(i,Vny,k)
+          V(i,Vny+3,k) = V(i,Vny,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do i = -2, Unx+3                       
+          U(i,Uny+1,k) = U(i,Uny,k)
+          U(i,Uny+2,k) = U(i,Uny,k)
+          U(i,Uny+3,k) = U(i,Uny,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do i = -2, Wnx+3                       
+          W(i,Wny+1,k) = W(i,Wny,k)
+          W(i,Wny+2,k) = W(i,Wny,k)
+          W(i,Wny+3,k) = W(i,Wny,k)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(No)==BC_FREESLIP) then
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do i = -2, Vnx+3                       
+          V(i,Vny+1,k) = 0
+          V(i,Vny+2,k) = -V(i,Vny,k)
+          V(i,Vny+3,k) = -V(i,Vny-1,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do i = -2, Unx+3                       
+          U(i,Uny+1,k) = U(i,Uny,k)
+          U(i,Uny+2,k) = U(i,Uny,k)
+          U(i,Uny+3,k) = U(i,Uny,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do i = -2, Wnx+3                       
+          W(i,Wny+1,k) = W(i,Wny,k)
+          W(i,Wny+2,k) = W(i,Wny,k)
+          W(i,Wny+3,k) = W(i,Wny,k)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(No)==BC_PERIODIC) then  
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do i = -2, Vnx+3
+          V(i,Vny+1,k) = V(i,1,k)
+          V(i,Vny+2,k) = V(i,2,k)
+          V(i,Vny+3,k) = V(i,3,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do i = -2, Unx+3
+          U(i,Uny+1,k) = U(i,1,k)
+          U(i,Uny+2,k) = U(i,2,k)
+          U(i,Uny+3,k) = U(i,3,k)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do i = -2, Wnx+3
+          W(i,Wny+1,k) = W(i,1,k)
+          W(i,Wny+2,k) = W(i,2,k)
+          W(i,Wny+3,k) = W(i,3,k)
+        end do
+      end do
+      !$omp end do nowait
     else if (Btype(No)==BC_TURBULENT_INLET.or.Btype(No)==BC_INLET_FROM_FILE) then
       if (reg/=intermediate) then
-        if (component==2) then
-          do k = -1, nz+2
-           do i = -1, nx+2
-            U(i,ny+1,k) = Uin(i,k)
-            U(i,ny+2,k) = Uin(i,k) + (Uin(i,k)-U(i,ny,k))
-            U(i,ny+3,k) = Uin(i,k) + (Uin(i,k)-U(i,ny-1,k))
-           end do
+        !$omp do collapse(2)
+        do k = -1, Vnz+2
+          do i = -1, Vnx+2
+            V(i,Vny+1,k) = Vin(i,k)
+            V(i,Vny+2,k) = Vin(i,k) + (Vin(i,k)-V(i,Vny,k))
+            V(i,Vny+3,k) = Vin(i,k) + (Vin(i,k)-V(i,Vny-1,k))
           end do
-        else
-          do k = -1, nz+2
-           do i = -1, nx+2
-            U(i,ny+1,k) = Uin(i,k) + (Uin(i,k)-U(i,ny,k))
-            U(i,ny+2,k) = Uin(i,k) + (Uin(i,k)-U(i,ny-1,k))
-            U(i,ny+3,k) = Uin(i,k) + (Uin(i,k)-U(i,ny-2,k))
-           end do
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = -1, Unz+2
+          do i = -1, Unx+2
+            U(i,Uny+1,k) = Uin(i,k) + (Uin(i,k)-U(i,Uny,k))
+            U(i,Uny+2,k) = Uin(i,k) + (Uin(i,k)-U(i,Uny-1,k))
+            U(i,Uny+3,k) = Uin(i,k) + (Uin(i,k)-U(i,Uny-2,k))
           end do
-        end if
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = -1, Wnz+2
+          do i = -1, Wnx+2
+            W(i,Wny+1,k) = Win(i,k) + (Win(i,k)-W(i,Wny,k))
+            W(i,Wny+2,k) = Win(i,k) + (Win(i,k)-W(i,Wny-1,k))
+            W(i,Wny+3,k) = Win(i,k) + (Win(i,k)-W(i,Wny-2,k))
+          end do
+        end do
+        !$omp end do nowait
       else
-        if (component==2) then
-           do k = -1, nz+2
-            do i = -1, nx+2
-             U(i,ny+1,k) = 0
-             U(i,ny+2,k) = -U(i,ny,k)
-             U(i,ny+3,k) = -U(i,ny-1,k)
-            end do
-           end do
-        else
-           do k = -1, nz+2
-            do i = -1, nx+2
-             U(i,ny+1,k) = -U(i,ny,k)
-             U(i,ny+2,k) = -U(i,ny-1,k)
-             U(i,ny+3,k) = -U(i,ny-2,k)
-            end do
-           end do
-        end if
+        !$omp do collapse(2)
+        do k = -1, Vnz+2
+          do i = -1, Vnx+2
+            V(i,Vny+1,k) = 0
+            V(i,Vny+2,k) = -V(i,Vny,k)
+            V(i,Vny+3,k) = -V(i,Vny-1,k)
+          end do
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = -1, Unz+2
+          do i = -1, Unx+2
+            U(i,Uny+1,k) = -U(i,Uny,k)
+            U(i,Uny+2,k) = -U(i,Uny-1,k)
+            U(i,Uny+3,k) = -U(i,Uny-2,k)
+          end do
+        end do
+        !$omp end do nowait
+        !$omp do collapse(2)
+        do k = -1, Wnz+2
+          do i = -1, Wnx+2
+            W(i,Wny+1,k) = -W(i,Wny,k)
+            W(i,Wny+2,k) = -W(i,Wny-1,k)
+            W(i,Wny+3,k) = -W(i,Wny-2,k)
+          end do
+        end do
+        !$omp end do nowait
       end if
     end if
-    !$omp end parallel sections
+    !$omp end parallel
+
 
 #ifdef PAR
-    call par_exchange_U_z(U, component)
+    call par_exchange_U_z(U, 1)
+    call par_exchange_U_z(V, 2)
+    call par_exchange_U_z(W, 3)
 #endif
 
-    !$omp parallel sections
-    !$omp section
+
+    !$omp parallel private(i,j,k)
     if (Btype(Bo)==BC_DIRICHLET .and. reg/=intermediate) then
-      if (component==3) then
-        do j = -2, ny+3
-         do i = -2, nx+3                       !Dirichlet inlet
-          U(i,j,0) = sideU(component,Bo)
-          U(i,j,-1) = sideU(component,Bo) + (sideU(component,Bo)-U(i,j,1))
-          U(i,j,-2) = sideU(component,Bo) + (sideU(component,Bo)-U(i,j,2))
-         end do
+      !$omp do collapse(2)
+      do j = -2, Wny+3
+        do i = -2, Wnx+3                       
+          W(i,j,0) = sideU(3,Bo)
+          W(i,j,-1) = sideU(3,Bo) + (sideU(3,Bo)-W(i,j,1))
+          W(i,j,-2) = sideU(3,Bo) + (sideU(3,Bo)-W(i,j,2))
         end do
-      else
-        do j = -2, ny+3
-         do i = -2, nx+3                       !Dirichlet inlet
-          U(i,j,0) = sideU(component,Bo) + (sideU(component,Bo)-U(i,j,1))
-          U(i,j,-1) = sideU(component,Bo) + (sideU(component,Bo)-U(i,j,2))
-          U(i,j,-2) = sideU(component,Bo) + (sideU(component,Bo)-U(i,j,3))
-         end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Uny+3
+        do i = -2, Unx+3                       
+          U(i,j,0) = sideU(1,Bo) + (sideU(1,Bo)-U(i,j,1))
+          U(i,j,-1) = sideU(1,Bo) + (sideU(1,Bo)-U(i,j,2))
+          U(i,j,-2) = sideU(1,Bo) + (sideU(1,Bo)-U(i,j,3))
         end do
-      end if
-    else if (Btype(Bo)==BC_NOSLIP .or. (component==3.and.Btype(Bo)==BC_FREESLIP) .or. &
-               (Btype(Bo)==BC_DIRICHLET.and.reg==intermediate)) then
-      if (component==3) then
-        do j = -2, ny+3
-         do i = -2, nx+3                       !Solid wall
-          U(i,j,0) = 0
-          U(i,j,-1) = -U(i,j,1)
-          U(i,j,-2) = -U(i,j,2)
-         end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Vny+3
+        do i = -2, Vnx+3                       
+          V(i,j,0) = sideU(2,Bo) + (sideU(2,Bo)-V(i,j,1))
+          V(i,j,-1) = sideU(2,Bo) + (sideU(2,Bo)-V(i,j,2))
+          V(i,j,-2) = sideU(2,Bo) + (sideU(2,Bo)-V(i,j,3))
         end do
-      else
-        do j = -2, ny+3
-         do i = -2, nx+3                       !Solid wall
+      end do
+      !$omp end do nowait
+    else if (Btype(Bo)==BC_NOSLIP .or. (Btype(Bo)==BC_DIRICHLET.and.reg==intermediate)) then
+      !$omp do collapse(2)
+      do j = -2, Wny+3
+        do i = -2, Wnx+3                       
+          W(i,j,0) = 0
+          W(i,j,-1) = -W(i,j,1)
+          W(i,j,-2) = -W(i,j,2)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Uny+3
+        do i = -2, Unx+3                       
           U(i,j,0) = -U(i,j,1)
           U(i,j,-1) = -U(i,j,2)
           U(i,j,-2) = -U(i,j,3)
-         end do
         end do
-      end if
-    else if (Btype(Bo)==BC_NEUMANN.or.(component/=3.and.Btype(Bo)==BC_FREESLIP)) then
-      do j = -2, ny+3
-       do i = -2, nx+3                       !Neumann inlet
-        U(i,j,0) = U(i,j,1)
-        U(i,j,-1) = U(i,j,1)
-        U(i,j,-2) = U(i,j,1)
-       end do
       end do
-    else if (Btype(Bo)==BC_PERIODIC) then  !Periodic BC
-     do j = -2, ny+3
-      do i = -2, nx+3
-       U(i,j,0) = U(i,j,nz)
-       U(i,j,-1) = U(i,j,nz-1)
-       U(i,j,-2) = U(i,j,nz-2)
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Vny+3
+        do i = -2, Vnx+3                       
+          V(i,j,0) = -V(i,j,1)
+          V(i,j,-1) = -V(i,j,2)
+          V(i,j,-2) = -V(i,j,3)
+        end do
       end do
-     end do
+      !$omp end do nowait
+    else if (Btype(Bo)==BC_NEUMANN) then
+      !$omp do collapse(2)
+      do j = -2, Wny+3
+        do i = -2, Wnx+3                       
+          W(i,j,0) = W(i,j,1)
+          W(i,j,-1) = W(i,j,1)
+          W(i,j,-2) = W(i,j,1)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Uny+3
+        do i = -2, Unx+3
+          U(i,j,0) = U(i,j,1)
+          U(i,j,-1) = U(i,j,1)
+          U(i,j,-2) = U(i,j,1)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Vny+3
+        do i = -2, Vnx+3
+          V(i,j,0) = V(i,j,1)
+          V(i,j,-1) = V(i,j,1)
+          V(i,j,-2) = V(i,j,1)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(Bo)==BC_FREESLIP) then
+      !$omp do collapse(2)
+      do j = -2, Wny+3
+        do i = -2, Wnx+3                       
+          W(i,j,0) = 0
+          W(i,j,-1) = -W(i,j,1)
+          W(i,j,-2) = -W(i,j,2)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Uny+3
+        do i = -2, Unx+3
+          U(i,j,0) = U(i,j,1)
+          U(i,j,-1) = U(i,j,1)
+          U(i,j,-2) = U(i,j,1)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Vny+3
+        do i = -2, Vnx+3
+          V(i,j,0) = V(i,j,1)
+          V(i,j,-1) = V(i,j,1)
+          V(i,j,-2) = V(i,j,1)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(Bo)==BC_PERIODIC) then  
+      !$omp do collapse(2)
+      do j = -2, Wny+3
+        do i = -2, Wnx+3
+          W(i,j,0) = W(i,j,Wnz)
+          W(i,j,-1) = W(i,j,Wnz-1)
+          W(i,j,-2) = W(i,j,Wnz-2)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Uny+3
+        do i = -2, Unx+3
+          U(i,j,0) = U(i,j,Unz)
+          U(i,j,-1) = U(i,j,Unz-1)
+          U(i,j,-2) = U(i,j,Unz-2)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Vny+3
+        do i = -2, Vnx+3
+          V(i,j,0) = V(i,j,Vnz)
+          V(i,j,-1) = V(i,j,Vnz-1)
+          V(i,j,-2) = V(i,j,Vnz-2)
+        end do
+      end do
+      !$omp end do nowait
     end if
 
-    !$omp section
+
     if (Btype(To)==BC_DIRICHLET.and.reg/=intermediate) then
-      if (component==3) then
-        do j = -2, ny+3
-         do i = -2, nx+3                       !Dirichlet inlet
-          U(i,j,nz+1) = sideU(component,To)
-          U(i,j,nz+2) = sideU(component,To) + (sideU(component,To)-U(i,j,nz))
-          U(i,j,nz+3) = sideU(component,To) + (sideU(component,To)-U(i,j,nz-1))
-         end do
+      !$omp do collapse(2)
+      do j = -2, Wny+3
+        do i = -2, Wnx+3                       
+          W(i,j,Wnz+1) = sideU(3,To)
+          W(i,j,Wnz+2) = sideU(3,To) + (sideU(3,To)-W(i,j,Wnz))
+          W(i,j,Wnz+3) = sideU(3,To) + (sideU(3,To)-W(i,j,Wnz-1))
         end do
-      else
-        do j = -2, ny+3
-         do i = -2, nx+3                       !Dirichlet inlet
-          U(i,j,nz+1) = sideU(component,To) + (sideU(component,To)-U(i,j,nz))
-          U(i,j,nz+2) = sideU(component,To) + (sideU(component,To)-U(i,j,nz-1))
-          U(i,j,nz+3) = sideU(component,To) + (sideU(component,To)-U(i,j,nz-2))
-         end do
-        end do
-      end if
-    else if (Btype(To)==BC_NOSLIP .or. &
-             (component==3.and.(Btype(To)==BC_FREESLIP .or. &
-                                Btype(To)==BC_AUTOMATIC_FLUX)) .or. &
-             (Btype(To)==BC_DIRICHLET.and.reg==intermediate) ) then
-      if (component==3) then
-        do j = -2, ny+3
-         do i = -2, nx+3                       !Solid wall
-          U(i,j,nz+1) = 0
-          U(i,j,nz+2) = -U(i,j,nz)
-          U(i,j,nz+3) = -U(i,j,nz-1)
-         end do
-        end do
-      else
-        do j = -2, ny+3
-         do i = -2, nx+3                       !Solid wall
-          U(i,j,nz+1) = -U(i,j,nz)
-          U(i,j,nz+2) = -U(i,j,nz-1)
-          U(i,j,nz+3) = -U(i,j,nz-2)
-         end do
-        end do
-      end if
-    else if (Btype(To)==BC_NEUMANN .or. &
-             (component/=3.and.(Btype(To)==BC_FREESLIP .or. &
-                                Btype(To)==BC_AUTOMATIC_FLUX))) then
-      do j = -2, ny+3
-       do i = -2, nx+3                       !Neumann inlet
-        U(i,j,nz+1) = U(i,j,nz)
-        U(i,j,nz+2) = U(i,j,nz)
-        U(i,j,nz+3) = U(i,j,nz)
-       end do
       end do
-    else if (Btype(To)==BC_PERIODIC) then  !Periodic BC
-     do j = -2, ny+3
-      do i = -2, nx+3
-       U(i,j,nz+1) = U(i,j,1)
-       U(i,j,nz+2) = U(i,j,2)
-       U(i,j,nz+3) = U(i,j,3)
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Uny+3
+        do i = -2, Unx+3                       
+          U(i,j,Unz+1) = sideU(1,To) + (sideU(1,To)-U(i,j,Unz))
+          U(i,j,Unz+2) = sideU(1,To) + (sideU(1,To)-U(i,j,Unz-1))
+          U(i,j,Unz+3) = sideU(1,To) + (sideU(1,To)-U(i,j,Unz-2))
+        end do
       end do
-     end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Vny+3
+        do i = -2, Vnx+3                       
+          V(i,j,Vnz+1) = sideU(2,To) + (sideU(2,To)-V(i,j,Vnz))
+          V(i,j,Vnz+2) = sideU(2,To) + (sideU(2,To)-V(i,j,Vnz-1))
+          V(i,j,Vnz+3) = sideU(2,To) + (sideU(2,To)-V(i,j,Vnz-2))
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(To)==BC_NOSLIP .or. (Btype(To)==BC_DIRICHLET.and.reg==intermediate) ) then
+      !$omp do collapse(2)
+      do j = -2, Wny+3
+        do i = -2, Wnx+3                       
+          W(i,j,Wnz+1) = 0
+          W(i,j,Wnz+2) = -W(i,j,Wnz)
+          W(i,j,Wnz+3) = -W(i,j,Wnz-1)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Uny+3
+        do i = -2, Unx+3                       
+          U(i,j,Unz+1) = -U(i,j,Unz)
+          U(i,j,Unz+2) = -U(i,j,Unz-1)
+          U(i,j,Unz+3) = -U(i,j,Unz-2)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Vny+3
+        do i = -2, Vnx+3                       
+          V(i,j,Vnz+1) = -V(i,j,Vnz)
+          V(i,j,Vnz+2) = -V(i,j,Vnz-1)
+          V(i,j,Vnz+3) = -V(i,j,Vnz-2)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(To)==BC_NEUMANN) then
+      !$omp do collapse(2)
+      do j = -2, Wny+3
+        do i = -2, Wnx+3                       
+          W(i,j,Wnz+1) = W(i,j,Wnz)
+          W(i,j,Wnz+2) = W(i,j,Wnz)
+          W(i,j,Wnz+3) = W(i,j,Wnz)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Uny+3
+        do i = -2, Unx+3                       
+          U(i,j,Unz+1) = U(i,j,Unz)
+          U(i,j,Unz+2) = U(i,j,Unz)
+          U(i,j,Unz+3) = U(i,j,Unz)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Vny+3
+        do i = -2, Vnx+3                       
+          V(i,j,Vnz+1) = V(i,j,Vnz)
+          V(i,j,Vnz+2) = V(i,j,Vnz)
+          V(i,j,Vnz+3) = V(i,j,Vnz)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(To)==BC_FREESLIP .or. Btype(To)==BC_AUTOMATIC_FLUX) then
+      !$omp do collapse(2)
+      do j = -2, Wny+3
+        do i = -2, Wnx+3                       
+          W(i,j,Wnz+1) = 0
+          W(i,j,Wnz+2) = -W(i,j,Wnz)
+          W(i,j,Wnz+3) = -W(i,j,Wnz-1)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Uny+3
+        do i = -2, Unx+3                       
+          U(i,j,Unz+1) = U(i,j,Unz)
+          U(i,j,Unz+2) = U(i,j,Unz)
+          U(i,j,Unz+3) = U(i,j,Unz)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Vny+3
+        do i = -2, Vnx+3                       
+          V(i,j,Vnz+1) = V(i,j,Vnz)
+          V(i,j,Vnz+2) = V(i,j,Vnz)
+          V(i,j,Vnz+3) = V(i,j,Vnz)
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(To)==BC_PERIODIC) then  
+      !$omp do collapse(2)
+      do j = -2, Wny+3
+        do i = -2, Wnx+3
+          W(i,j,Wnz+1) = W(i,j,1)
+          W(i,j,Wnz+2) = W(i,j,2)
+          W(i,j,Wnz+3) = W(i,j,3)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Uny+3
+        do i = -2, Unx+3
+          U(i,j,Unz+1) = U(i,j,1)
+          U(i,j,Unz+2) = U(i,j,2)
+          U(i,j,Unz+3) = U(i,j,3)
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do j = -2, Vny+3
+        do i = -2, Vnx+3
+          V(i,j,Vnz+1) = V(i,j,1)
+          V(i,j,Vnz+2) = V(i,j,2)
+          V(i,j,Vnz+3) = V(i,j,3)
+        end do
+      end do
+      !$omp end do nowait
     end if
-    !$omp end parallel sections
-  end subroutine BoundU
+    !$omp end parallel
+
+  end subroutine BoundUVW_do_BC
+
+
 
 
   subroutine BoundUVW(U, V, W, regime)
@@ -935,9 +1546,7 @@ implicit none
 
 #endif
 
-    call BoundU(1, U, Uin, regime)
-    call BoundU(2, V, Vin, regime)
-    call BoundU(3, W, Win, regime)
+    call BoundUVW_do_BC(U, V, W, regime)
   end subroutine
 
 
