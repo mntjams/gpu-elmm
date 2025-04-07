@@ -615,6 +615,10 @@ implicit none
         end do
         !$omp end do nowait
       end if
+    else
+      !$omp single
+      call error_stop("Error, unknown boundary condition on the W (x-) boundary.")
+      !$omp end single
     end if
 
 
@@ -816,6 +820,10 @@ implicit none
         end do
         !$omp end do nowait
       end if
+    else
+      !$omp single
+      call error_stop("Error, unknown boundary condition on the E (x+) boundary.")
+      !$omp end single
     end if
     !$omp end parallel
 
@@ -1026,6 +1034,10 @@ implicit none
         end do
         !$omp end do nowait
       end if
+    else
+      !$omp single
+      call error_stop("Error, unknown boundary condition on the S (y-) boundary.")
+      !$omp end single
     end if
 
 
@@ -1227,6 +1239,10 @@ implicit none
         end do
         !$omp end do nowait
       end if
+    else
+      !$omp single
+      call error_stop("Error, unknown boundary condition on the N (y+) boundary.")
+      !$omp end single
     end if
     !$omp end parallel
 
@@ -1379,6 +1395,10 @@ implicit none
         end do
       end do
       !$omp end do nowait
+    else
+      !$omp single
+      call error_stop("Error, unknown boundary condition on the B (z-) boundary.")
+      !$omp end single
     end if
 
 
@@ -1522,6 +1542,10 @@ implicit none
         end do
       end do
       !$omp end do nowait
+    else
+      !$omp single
+      call error_stop("Error, unknown boundary condition on the T (z+) boundary.")
+      !$omp end single
     end if
     !$omp end parallel
 
