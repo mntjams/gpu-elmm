@@ -82,7 +82,7 @@ contains
 
   
   subroutine par_exchange_boundaries(Phi, Btype, component, dir)
-    real(knd), intent(inout), contiguous :: Phi(:,:,:)
+    real(knd), contiguous, intent(inout) :: Phi(:,:,:)
     integer, intent(in) :: Btype(6)
     integer, intent(in) :: component
     integer, intent(in), optional :: dir
@@ -185,7 +185,6 @@ contains
     end if
     
     call MPI_Waitall(size(requests), requests, MPI_STATUSES_IGNORE, ierr)
-    
   contains
   
   
@@ -274,7 +273,7 @@ contains
   
   subroutine par_exchange_UVW(U, V, W)
     use Parameters, only: Btype
-    real(knd), intent(inout), contiguous :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     call par_exchange_boundaries(U, Btype, 1)
     call par_exchange_boundaries(V, Btype, 2)
     call par_exchange_boundaries(W, Btype, 3)
@@ -282,7 +281,7 @@ contains
 
   subroutine par_exchange_U_x(U, component)
     use Parameters, only: Btype
-    real(knd), intent(inout) :: U(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: U(-2:,-2:,-2:)
     integer, intent(in) :: component
     call par_exchange_boundaries(U, Btype, component, dir=1)
   end subroutine
@@ -290,34 +289,34 @@ contains
   subroutine par_exchange_U_y(U, component)
     use Parameters, only: Btype
     integer, intent(in) :: component
-    real(knd), intent(inout) :: U(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: U(-2:,-2:,-2:)
     call par_exchange_boundaries(U, Btype, component, dir=2)
   end subroutine
   
   subroutine par_exchange_U_z(U, component)
     use Parameters, only: Btype
     integer, intent(in) :: component
-    real(knd), intent(inout) :: U(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: U(-2:,-2:,-2:)
     call par_exchange_boundaries(U, Btype, component, dir=3)
   end subroutine
   
   subroutine par_exchange_Sc_x(U, SBtype)
     use Parameters, only: Prnx, Prny, Prnz
-    real(knd), intent(inout) :: U(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: U(-2:,-2:,-2:)
     integer, intent(in) :: SBtype(6)
     call par_exchange_boundaries(U, SBtype, 4, dir=1)
   end subroutine
   
   subroutine par_exchange_Sc_y(U, SBType)
     use Parameters, only: Prnx, Prny, Prnz
-    real(knd), intent(inout) :: U(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: U(-2:,-2:,-2:)
     integer, intent(in) :: SBtype(6)
     call par_exchange_boundaries(U, SBtype, 4, dir=2)
   end subroutine
   
   subroutine par_exchange_Sc_z(U, SBType)
     use Parameters, only: Prnx, Prny, Prnz
-    real(knd), intent(inout) :: U(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: U(-2:,-2:,-2:)
     integer, intent(in) :: SBtype(6)
     call par_exchange_boundaries(U, SBtype, 4, dir=3)
   end subroutine
@@ -325,21 +324,21 @@ contains
 
   subroutine par_exchange_visc_x(U, SBtype)
     use Parameters, only: Prnx, Prny, Prnz
-    real(knd), intent(inout) :: U(-1:,-1:,-1:)
+    real(knd), contiguous, intent(inout) :: U(-1:,-1:,-1:)
     integer, intent(in) :: SBtype(6)
     call par_exchange_boundaries(U, SBtype, 5, dir=1)
   end subroutine
   
   subroutine par_exchange_visc_y(U, SBType)
     use Parameters, only: Prnx, Prny, Prnz
-    real(knd), intent(inout) :: U(-1:,-1:,-1:)
+    real(knd), contiguous, intent(inout) :: U(-1:,-1:,-1:)
     integer, intent(in) :: SBtype(6)
     call par_exchange_boundaries(U, SBtype, 5, dir=2)
   end subroutine
   
   subroutine par_exchange_visc_z(U, SBType)
     use Parameters, only: Prnx, Prny, Prnz
-    real(knd), intent(inout) :: U(-1:,-1:,-1:)
+    real(knd), contiguous, intent(inout) :: U(-1:,-1:,-1:)
     integer, intent(in) :: SBtype(6)
     call par_exchange_boundaries(U, SBtype, 5, dir=3)
   end subroutine
@@ -351,7 +350,7 @@ contains
   
   subroutine par_exchange_Pr(Phi)
     use Parameters, only: We, Ea, So, No, Bo, To, BC_MPI_PERIODIC, Prnx, Prny, Prnz, Btype
-    real(knd), intent(inout), contiguous :: Phi(0:,0:,0:)
+    real(knd), contiguous, intent(inout) :: Phi(0:,0:,0:)
     integer :: ierr
     integer :: nx, ny, nz
     integer :: requests(12)
@@ -420,7 +419,7 @@ contains
     end subroutine
     
     subroutine recv(a, side)
-      real(knd), intent(out) :: a(:,:,:)
+      real(knd), contiguous, intent(out) :: a(:,:,:)
       integer, intent(in) :: side
 
       call MPI_IRecv(a, 1, recv_mpi_types(side, 6), neigh_ranks(side), &
@@ -511,7 +510,7 @@ contains
   subroutine par_exchange_Q(Phi)
     use Parameters, only: We, Ea, So, No, Bo, To, BC_MPI_PERIODIC, &
                           nx=>Prnx, ny=>Prny, nz=>Prnz, Btype
-    real(knd), intent(inout), contiguous :: Phi(0:,0:,0:)
+    real(knd), contiguous, intent(inout) :: Phi(0:,0:,0:)
     integer :: ierr
     integer :: requests(12)
     real(knd) :: tmp_w(ny,nz), tmp_e(ny,nz), &
@@ -689,7 +688,7 @@ contains
   
   subroutine par_exchange_boundaries_xz(Phi, nx, nz, Btype, lbx, lbz, widthx, widthz)
     use Parameters, only: We, Ea, Bo, To, BC_MPI_PERIODIC
-    real(knd), intent(inout), contiguous :: Phi(lbx:, lbz:)
+    real(knd), contiguous, intent(inout) :: Phi(lbx:, lbz:)
     integer, intent(in) :: nx, nz
     integer, intent(in) :: Btype(6)
     integer, intent(in) :: lbx, lbz, widthx, widthz
@@ -855,7 +854,7 @@ contains
   
   subroutine par_exchange_boundaries_yz(Phi, ny, nz, Btype, lby, lbz, widthy, widthz)
     use Parameters, only: So, No, Bo, To, BC_MPI_PERIODIC
-    real(knd), intent(inout), contiguous :: Phi(lby:, lbz:)
+    real(knd), contiguous, intent(inout) :: Phi(lby:, lbz:)
     integer, intent(in) :: ny, nz
     integer, intent(in) :: Btype(6)
     integer, intent(in) :: lby, lbz, widthy, widthz
@@ -957,7 +956,7 @@ contains
     
   contains
   
-  
+    !TODO: Change to non-blocking with derived types.
     subroutine send(a,to)
       real(knd), intent(in) :: a(:,:)
       integer, intent(in) :: to
