@@ -973,7 +973,6 @@ contains
    if (master) write(*,*) "set"
    
    
-   
 
  contains
  
@@ -1207,7 +1206,9 @@ contains
     real(knd), target :: Uinlet_conf(3)
 
     Uinlet_conf = 0
-    Uinlet = 0
+    Uinlet = -1
+
+    Btype = 0
     
     inquire(file=fname, exist=ex)
 
@@ -1233,6 +1234,12 @@ contains
       write(*,*) "Error parsing file " // fname
       call error_stop
 
+    end if
+
+    if (any(Btype<=0)) then
+      write(*,*) "Error, non-positive boundary type value."
+      write(*,*) "Btype:", Btype
+      call error_stop
     end if
   
   contains
@@ -1298,6 +1305,7 @@ contains
         call error_stop()
       else if (side_selected) then
         allocate(selected_sides(1))
+
         select case(downcase(selected_side_str(1:1)))
           case ("w")
             selected_sides(1) = 1
@@ -1366,14 +1374,18 @@ contains
           bc_type = BC_TURBULENT_INLET
         case ("from_file")
           bc_type = BC_INLET_FROM_FILE
+        case ("inlet_no_backflow")
+          bc_type = BC_INLET_NO_BACKFLOW
+        case ("outlet_no_backflow")
+          bc_type = BC_OUTLET_NO_BACKFLOW
         case default
           write(*,*) "Error. Unknown boundary side in " // fname
           call error_stop()
       end select
-      
+
       Btype(selected_sides) = bc_type
       
-      if (bc_type == BC_DIRICHLET) then
+      if (bc_type == BC_DIRICHLET .or. bc_type == BC_INLET_NO_BACKFLOW) then
         do iside = 1, size(selected_sides)
           sideU(:,selected_sides(iside)) = u_vec
         end do
@@ -1422,17 +1434,17 @@ contains
 
       type(tree_object_ptr), target :: stg_properties_obj
       character(char_len), target :: inlet_type_str
-      real(knd), target :: inlet_parameter, u_vec(3)
+      real(knd), target :: inlet_parameter
       
       type(field_names) :: names(2)
       type(field_names_a) :: names_a(1)
 
       integer :: is, side
       
-      names = [field_names_init("inlet_type_str", inlet_type_str), &
+      names = [field_names_init("inlet_type", inlet_type_str), &
                field_names_init("stg", stg_properties_obj)]
 
-      names_a = [field_names_a_init("Uinlet", u_vec)]
+      names_a = [field_names_a_init("Uinlet", Uinlet_conf)]
       
       
       inlet_type_str = ""
@@ -1458,11 +1470,11 @@ contains
 
         !if not, get the direction of Uinlet if known
         if (side<=0) then
-          if (norm2(u_vec)>0) then
-            call u_vec_to_side(u_vec, side)
+          if (norm2(Uinlet_conf)>0) then
+            call u_vec_to_side(Uinlet_conf, side)
 
             if (Uinlet<0) then
-              Uinlet_vec = u_vec
+              Uinlet_vec = Uinlet_conf
               Uinlet = norm2(Uinlet_vec)
             end if
           end if
@@ -1495,10 +1507,20 @@ contains
             write(*,*) "Error, unknown inlet_type '"// trim(inlet_type_str)//"' at "  // fname
             call error_stop()
         end select
-        
+
+        if (Uinlet<0) then
+          Uinlet_vec = Uinlet_conf
+          Uinlet = norm2(Uinlet_vec)
+        end if
+
       else
       
+        if (Uinlet<0) then
+          Uinlet_vec = Uinlet_conf
+          Uinlet = norm2(Uinlet_vec)
+        end if
         inlettype = ConstantInletType
+
       end if
     end subroutine get_ic
 
@@ -1593,6 +1615,7 @@ contains
       
       
       stg_method = turbulent_inlet_XC
+      stg_method_str = ""
       
       profile_type = 0
       profile_type_str = ""
@@ -1607,7 +1630,7 @@ contains
       z0 = -1
       power_exponent = -1
 
-      u_vec = -1
+      u_vec = 0
       
       uu = -1
       vv = -1
@@ -2712,7 +2735,7 @@ contains
     logical :: ex
     integer :: iobj, stat
 
-    type(field_names) :: names(14)
+    type(field_names) :: names(15)
     type(field_names_a) :: names_a(1)
 
     type(field_names) :: reference_names(2)
@@ -2720,6 +2743,7 @@ contains
 
     names = [field_names_init("check_mass_flux", p_s%check_mass_flux), &
              field_names_init("report_mass_flux", p_s%report_mass_flux), &
+             field_names_init("report_total_mass_flux", p_s%report_total_mass_flux), &
              field_names_init("correct_mass_flux_west",   p_s%correct_mass_flux(We)), &
              field_names_init("correct_mass_flux_east",   p_s%correct_mass_flux(Ea)), &
              field_names_init("correct_mass_flux_south",  p_s%correct_mass_flux(So)), &
@@ -3532,15 +3556,14 @@ contains
       else
         call ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,scalars_optional=.false.)
       end if
-
       Viscosity = molecular_viscosity
 
       if (enable_buoyancy.or. &
           enable_moisture.or. &
           num_of_scalars>0)        TDiff = molecular_diffusivity
 
-        call BoundUVW(U, V, W)
-        call Bound_Pr(Pr)
+      call BoundUVW(U, V, W)
+      call Bound_Pr(Pr)
 
     else   !init conditions not from file
 
@@ -3833,7 +3856,6 @@ contains
         end if  !task_type
 
 
-
         if (num_of_scalars>0) then
           call par_sync_out("  ...setting initial scalar values.")
           !$omp parallel
@@ -3945,12 +3967,10 @@ contains
      call par_sync_out("  ...setting ghost cell values.")
 
      call BoundUVW(U, V, W)
-
      call Bound_Pr(Pr)
 
      call par_sync_out("  ...computing pressure correction.")
      call PressureCorrection(U,V,W,Pr,Q,1._knd)
-
      call par_sync_out("  ...computing initial eddy viscosity.")
      call SubgridModel(U, V, W)
 
@@ -4017,7 +4037,6 @@ contains
 #endif
 
     call par_sync_out("initial conditions set.")
-
 
   end subroutine InitialConditions
 
