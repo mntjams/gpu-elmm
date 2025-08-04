@@ -40,6 +40,7 @@ module Pressure
   type pressure_solution_control
     logical :: check_mass_flux = .false.
     logical :: report_mass_flux = .false.
+    logical :: report_total_mass_flux = .false.
     logical :: correct_mass_flux(6) = .false.
     integer :: poisson_solver = POISSON_SOLVER_POISFFT
     integer :: projection_method = PROJECTION_METHOD_INCREMENTAL
@@ -212,7 +213,7 @@ contains
     if (debugparam>1 .and. called>1) call system_clock(count=time2)
 
     if (pressure_solution%report_mass_flux .and. pressure_solution%check_mass_flux) then
-      if (master) write(*,*) "total mass flux:", mass_flux
+      if (master) write(*,*) "mass flux:", mass_flux
     end if
 
     if (pressure_solution%poisson_solver==POISSON_SOLVER_SOR) then
@@ -287,6 +288,59 @@ contains
     dt2_rec = 1._knd / dt2
 
     call BoundUVW(U, V, W)
+
+    !HACK
+    !Set all domain border velocities to zero inside solid bodies
+    ! to ensure zero total flux.
+    !For higher accuracy we may want to allow internal velocities that balance
+    ! the flux of the immersed boundary velocities.
+    !We may also want to consider all bodies separately to avoid net flow into one
+    ! and net outflow from another.
+    !Currently, that can be prevented by creating a solid bodyfor the floor
+    ! and extending the domain below it.
+    if (iim==1 .and. Btype(We)/=BC_NOSLIP .and. Btype(We)/=BC_PERIODIC .and. Btype(We)<BC_MPI_BOUNDS_MIN) then
+      do k = 1, Unz
+        do j = 1, Uny
+          if (Utype(0,j,k)>0) U(0,j,k) = 0
+        end do
+      end do
+    end if
+    if (iim==nxims .and. Btype(Ea)/=BC_NOSLIP .and. Btype(Ea)/=BC_PERIODIC .and. Btype(Ea)<BC_MPI_BOUNDS_MIN) then
+      do k = 1, Unz
+        do j = 1, Uny
+          if (Utype(Prnx,j,k)>0) U(Prnx,j,k) = 0
+        end do
+      end do
+    end if
+    if (jim==1 .and. Btype(So)/=BC_NOSLIP .and. Btype(So)/=BC_PERIODIC .and. Btype(So)<BC_MPI_BOUNDS_MIN) then
+      do k = 1, Vnz
+        do i = 1, Vnx
+          if (Vtype(i,0,k)>0) V(i,0,k) = 0
+        end do
+      end do
+    end if
+    if (jim==nyims .and. Btype(No)/=BC_NOSLIP .and. Btype(No)/=BC_PERIODIC .and. Btype(No)<BC_MPI_BOUNDS_MIN) then
+      do k = 1, Vnz
+        do i = 1, Vnx
+          if (Vtype(i,Prny,k)>0) V(i,Prny,k) = 0
+        end do
+      end do
+    end if
+    if (kim==1 .and. Btype(Bo)/=BC_NOSLIP .and. Btype(Bo)/=BC_PERIODIC .and. Btype(Bo)<BC_MPI_BOUNDS_MIN) then
+      do j = 1, Wny
+        do i = 1, Wnx
+          if (Wtype(i,j,0)>0) W(i,j,0) = 0
+        end do
+      end do
+    end if
+    if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC .and. Btype(To)<BC_MPI_BOUNDS_MIN) then
+      do j = 1, Wny
+        do i = 1, Wnx
+          if (Wtype(i,j,Prnz)>0) W(i,j,Prnz) = 0
+        end do
+      end do
+    end if
+
 
     flux = 0
     if (pressure_solution%check_mass_flux) then
@@ -448,6 +502,117 @@ contains
       end if
 
     end if !check mass flux    
+
+
+    !check total mass flux on whole domain boundaries including solid bodies
+    flux = 0
+    if (pressure_solution%report_total_mass_flux) then
+
+      if (gridtype==GRID_VARIABLE_Z) then
+        if (iim==1 .and. Btype(We)/=BC_NOSLIP .and. Btype(We)/=BC_PERIODIC) then
+          do k = 1, Unz
+            do j = 1, Uny
+              flux(We) = flux(We) + U(0,j,k) * dymin * dzPr(k)
+            end do
+          end do
+        end if
+        if (iim==nxims .and. Btype(Ea)/=BC_NOSLIP .and. Btype(Ea)/=BC_PERIODIC) then
+          do k = 1, Unz
+            do j = 1, Uny
+              flux(Ea) = flux(Ea) - U(Prnx,j,k) * dymin * dzPr(k)
+            end do
+          end do
+        end if
+        if (jim==1 .and. Btype(So)/=BC_NOSLIP .and. Btype(So)/=BC_PERIODIC) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              flux(So) = flux(So) + V(i,0,k) * dxmin * dzPr(k)
+            end do
+          end do
+        end if
+        if (jim==nyims .and. Btype(No)/=BC_NOSLIP .and. Btype(No)/=BC_PERIODIC) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              flux(No) = flux(No) - V(i,Prny,k) * dxmin * dzPr(k)
+            end do
+          end do
+        end if
+        if (kim==1 .and. Btype(Bo)/=BC_NOSLIP .and. Btype(Bo)/=BC_PERIODIC) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              flux(Bo) = flux(Bo) + W(i,j,0) * dxmin * dymin
+            end do
+          end do
+        end if
+        if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              flux(To) = flux(To) - W(i,j,Prnz) * dxmin * dymin
+            end do
+          end do
+        end if
+
+      else
+
+        if (iim==1 .and. Btype(We)/=BC_NOSLIP .and. Btype(We)/=BC_PERIODIC) then
+          do k = 1, Unz
+            do j = 1, Uny
+              flux(We) = flux(We) + U(0,j,k)
+            end do
+          end do
+        end if
+        if (iim==nxims .and. Btype(Ea)/=BC_NOSLIP .and. Btype(Ea)/=BC_PERIODIC) then
+          do k = 1, Unz
+            do j = 1, Uny
+             flux(Ea) = flux(Ea) - U(Prnx,j,k)
+            end do
+          end do
+        end if
+        if (jim==1 .and. Btype(So)/=BC_NOSLIP .and. Btype(So)/=BC_PERIODIC) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              flux(So) = flux(So) + V(i,0,k)
+            end do
+          end do
+        end if
+        if (jim==nyims .and. Btype(No)/=BC_NOSLIP .and. Btype(No)/=BC_PERIODIC) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              flux(No) = flux(No) - V(i,Prny,k)
+            end do
+          end do
+        end if
+        if (kim==1 .and. Btype(Bo)/=BC_NOSLIP .and. Btype(Bo)/=BC_PERIODIC) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              flux(Bo) = flux(Bo) + W(i,j,0)
+            end do
+          end do
+        end if
+        if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              flux(To) = flux(To) - W(i,j,Prnz)
+            end do
+          end do
+        end if
+
+        flux = flux * bound_cell_area
+
+      end if
+#ifdef PAR
+      !TODO sum only the relevant images
+      flux = par_co_sum(flux)
+#endif
+      if (master) then
+        write(*,*) "total mass flux through domain boundaries including solid bodies:", flux
+        write(*,*) "total mass sum:", sum(flux)
+      end if
+
+    end if
+
+
+
 
     if (discretization_order == 4) then
     
