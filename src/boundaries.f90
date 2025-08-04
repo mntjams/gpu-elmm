@@ -388,13 +388,15 @@ implicit none
 
 
   subroutine BoundUVW_do_BC(U, V, W, regime)
-    real(knd), intent(inout) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    real(knd), intent(inout), contiguous :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     integer, intent(in), optional :: regime
     integer :: i, j, k
     integer :: reg
     !intermediate regime is when doing BC for one of the terms for dU/dt
     !currently used when explicit filtering is on only
     integer, parameter :: intermediate = 2
+
+    real(knd) :: Uloc
 
 
     if (present(regime)) then
@@ -415,6 +417,9 @@ implicit none
     call par_exchange_U_x(V, 2)
     call par_exchange_U_x(W, 3)
 #endif
+
+    !NOTE No checking for unknown Btype values as special types for parallel
+    ! computations exist.
 
     !$omp parallel private(i,j,k)
     if (Btype(We)==BC_DIRICHLET.and.reg/=intermediate) then
@@ -615,17 +620,134 @@ implicit none
         end do
         !$omp end do nowait
       end if
-    else
-      !$omp single
-      call error_stop("Error, unknown boundary condition on the W (x-) boundary.")
-      !$omp end single
+    else if (Btype(We)==BC_INLET_NO_BACKFLOW) then
+      if (reg==intermediate) then
+        !$omp do collapse(2)
+        do k = 1, Unz
+          do j = 1, Uny
+            Uloc = U(1,j,k)
+            if (Uloc >= 0 .or. Prtype(0,j,k) > 0) then
+              U(0,j,k) = 0
+              U(-1,j,k) = -U(1,j,k)
+              U(-2,j,k) = -U(2,j,k)
+            else
+              U(0,j,k) = U(1,j,k)
+              U(-1,j,k) = U(1,j,k)
+              U(-2,j,k) = U(1,j,k)
+            end if
+          end do
+        end do
+        !$omp end do nowait
+      else
+        !$omp do collapse(2)
+        do k = 1, Unz
+          do j = 1, Uny
+            Uloc = U(1,j,k)
+            if (Utype(0,j,k) > 0) then
+              U(0,j,k) = 0
+              U(-1,j,k) = -U(1,j,k)
+              U(-2,j,k) = -U(2,j,k)
+            else if (Uloc >= 0) then
+              U(0,j,k) = Uin(j,k)
+              U(-1,j,k) = Uin(j,k) + (Uin(j,k)-U(1,j,k))
+              U(-2,j,k) = Uin(j,k) + (Uin(j,k)-U(2,j,k))
+            else
+              U(0,j,k) = U(1,j,k)
+              U(-1,j,k) = U(1,j,k)
+              U(-2,j,k) = U(1,j,k)
+            end if
+          end do
+        end do
+        !$omp end do nowait
+      end if
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny
+          Uloc = (U(1,j,k) + U(1,j+1,k)) / 2
+          if (Uloc >= 0 .or. Prtype(0,j,k) > 0) then
+            V(0,j,k) = -V(1,j,k)
+            V(-1,j,k) = -V(2,j,k)
+            V(-2,j,k) = -V(3,j,k)
+          else
+            V(0,j,k) = V(1,j,k)
+            V(-1,j,k) = V(1,j,k)
+            V(-2,j,k) = V(1,j,k)
+          end if
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny
+          Uloc = (U(1,j,k) + U(1,j,k+1)) / 2
+          if (Uloc >= 0 .or. Prtype(0,j,k) > 0) then
+            W(0,j,k) = -W(1,j,k)
+            W(-1,j,k) = -W(2,j,k)
+            W(-2,j,k) = -W(3,j,k)
+          else
+            W(0,j,k) = W(1,j,k)
+            W(-1,j,k) = W(1,j,k)
+            W(-2,j,k) = W(1,j,k)
+          end if
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(We)==BC_OUTLET_NO_BACKFLOW) then
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do j = 1, Uny
+          Uloc = U(Unx,j,k)
+          if (Uloc <= 0 .and. Utype(0,j,k) <= 0) then
+            U(0,j,k) = U(1,j,k)
+            U(-1,j,k) = U(1,j,k)
+            U(-2,j,k) = U(1,j,k)
+          else
+            U(0,j,k) = 0
+            U(-1,j,k) = -U(1,j,k)
+            U(-2,j,k) = -U(2,j,k)
+          end if
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny
+          Uloc = (U(Unx,j,k) + U(Unx,j+1,k)) / 2
+          if (Uloc <= 0 .and. Prtype(0,j,k) <= 0) then
+            V(0,j,k) = V(1,j,k)
+            V(-1,j,k) = V(1,j,k)
+            V(-2,j,k) = V(1,j,k)
+          else
+            V(0,j,k) = -V(1,j,k)
+            V(-1,j,k) = -V(2,j,k)
+            V(-2,j,k) = -V(3,j,k)
+          end if
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny
+          Uloc = (U(Unx,j,k) + U(Unx,j,k+1)) / 2
+          if (Uloc <= 0 .and. Prtype(0,j,k) <= 0) then
+            W(0,j,k) = W(1,j,k)
+            W(-1,j,k) = W(1,j,k)
+            W(-2,j,k) = W(1,j,k)
+          else
+            W(0,j,k) = -W(1,j,k)
+            W(-1,j,k) = -W(2,j,k)
+            W(-2,j,k) = -W(3,j,k)
+          end if
+        end do
+      end do
+      !$omp end do nowait
     end if
 
 
     if (Btype(Ea)==BC_DIRICHLET.and.reg/=intermediate) then
       !$omp do collapse(2)
       do k = 1, Unz
-        do j = 1, Uny                       
+        do j = 1, Uny
           U(Unx+1,j,k) = Uin(j,k)
           U(Unx+2,j,k) = Uin(j,k) + (Uin(j,k)-U(Unx,j,k))
           U(Unx+3,j,k) = Uin(j,k) + (Uin(j,k)-U(Unx-1,j,k))
@@ -653,7 +775,7 @@ implicit none
     else if (Btype(Ea)==BC_NOSLIP .or. (Btype(Ea)==BC_DIRICHLET.and.reg==intermediate)) then
       !$omp do collapse(2)
       do k = 1, Unz
-        do j = 1, Uny                       
+        do j = 1, Uny
           U(Unx+1,j,k) = 0
           U(Unx+2,j,k) = -U(Unx,j,k)
           U(Unx+3,j,k) = -U(Unx-1,j,k)
@@ -820,10 +942,135 @@ implicit none
         end do
         !$omp end do nowait
       end if
-    else
-      !$omp single
-      call error_stop("Error, unknown boundary condition on the E (x+) boundary.")
-      !$omp end single
+    else if (Btype(Ea)==BC_INLET_NO_BACKFLOW) then
+      if (reg==intermediate) then
+        !$omp do collapse(2)
+        do k = 1, Unz
+          do j = 1, Uny
+            Uloc = U(Unx,j,k)
+            if (Uloc <= 0 .or. Utype(Prnx,j,k)>0) then
+              U(Unx+1,j,k) = 0
+              U(Unx+2,j,k) = -U(Unx,j,k)
+              U(Unx+3,j,k) = -U(Unx-1,j,k)
+            else
+              U(Unx+1,j,k) = U(Unx,j,k)
+              U(Unx+2,j,k) = U(Unx,j,k)
+              U(Unx+3,j,k) = U(Unx,j,k)
+            end if
+          end do
+        end do
+        !$omp end do nowait
+      else
+        !$omp do collapse(2)
+        do k = 1, Unz
+          do j = 1, Uny
+            Uloc = U(Unx,j,k)
+            if (Prtype(Prnx+1,j,k)>0) then
+              U(Unx+1,j,k) = 0
+              U(Unx+2,j,k) = -U(Unx,j,k)
+              U(Unx+3,j,k) = -U(Unx-1,j,k)
+            else if (Uloc <= 0) then
+              U(Unx+1,j,k) = Uin(j,k)
+              U(Unx+2,j,k) = Uin(j,k) + (Uin(j,k)-U(Unx,j,k))
+              U(Unx+3,j,k) = Uin(j,k) + (Uin(j,k)-U(Unx-1,j,k))
+            else
+              U(Unx+1,j,k) = U(Unx,j,k)
+              U(Unx+2,j,k) = U(Unx,j,k)
+              U(Unx+3,j,k) = U(Unx,j,k)
+            end if
+          end do
+        end do
+        !$omp end do nowait
+      end if
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny
+          Uloc = (U(Unx,j,k) + U(Unx,j+1,k)) / 2
+          if (Prtype(Prnx+1,j,k)>0) then
+            V(Vnx+1,j,k) = 0
+            V(Vnx+2,j,k) = -V(Vnx,j,k)
+            V(Vnx+3,j,k) = -V(Vnx-1,j,k)
+          else if (Uloc <= 0) then
+            V(Vnx+1,j,k) = -V(Vnx,j,k)
+            V(Vnx+2,j,k) = -V(Vnx-1,j,k)
+            V(Vnx+3,j,k) = -V(Vnx-2,j,k)
+          else
+            V(Vnx+1,j,k) = V(Vnx,j,k)
+            V(Vnx+2,j,k) = V(Vnx,j,k)
+            V(Vnx+3,j,k) = V(Vnx,j,k)
+          end if
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny
+          Uloc = (U(Unx,j,k) + U(Unx,j,k+1)) / 2
+          if (Prtype(Prnx+1,j,k)>0) then
+            W(Wnx+1,j,k) = 0
+            W(Wnx+2,j,k) = -W(Wnx,j,k)
+            W(Wnx+3,j,k) = -W(Wnx-1,j,k)
+          else if (Uloc <= 0) then
+            W(Wnx+1,j,k) = -W(Wnx,j,k)
+            W(Wnx+2,j,k) = -W(Wnx-1,j,k)
+            W(Wnx+3,j,k) = -W(Wnx-2,j,k)
+          else
+            W(Wnx+1,j,k) = W(Wnx,j,k)
+            W(Wnx+2,j,k) = W(Wnx,j,k)
+            W(Wnx+3,j,k) = W(Wnx,j,k)
+          end if
+        end do
+      end do
+      !$omp end do nowait
+    else if (Btype(Ea)==BC_OUTLET_NO_BACKFLOW) then
+      !$omp do collapse(2)
+      do k = 1, Unz
+        do j = 1, Uny
+          Uloc = U(Unx,j,k)
+          if (Uloc >= 0 .and. Utype(Prnx,j,k) <= 0) then
+            U(Unx+1,j,k) = U(Unx,j,k)
+            U(Unx+2,j,k) = U(Unx,j,k)
+            U(Unx+3,j,k) = U(Unx,j,k)
+          else
+            U(Unx+1,j,k) = 0
+            U(Unx+2,j,k) = -U(Unx,j,k)
+            U(Unx+3,j,k) = -U(Unx-1,j,k)
+          end if
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Vnz
+        do j = 1, Vny
+          Uloc = (U(Unx,j,k) + U(Unx,j+1,k)) / 2
+          if (Uloc >= 0 .and. Prtype(Prnx+1,j,k) <= 0) then
+            V(Vnx+1,j,k) = V(Vnx,j,k)
+            V(Vnx+2,j,k) = V(Vnx,j,k)
+            V(Vnx+3,j,k) = V(Vnx,j,k)
+          else
+            V(Vnx+1,j,k) = -V(Vnx,j,k)
+            V(Vnx+2,j,k) = -V(Vnx-1,j,k)
+            V(Vnx+3,j,k) = -V(Vnx-2,j,k)
+          end if
+        end do
+      end do
+      !$omp end do nowait
+      !$omp do collapse(2)
+      do k = 1, Wnz
+        do j = 1, Wny
+          Uloc = (U(Unx,j,k) + U(Unx,j,k+1)) / 2
+          if (Uloc >= 0 .and. Prtype(Prnx+1,j,k) <= 0) then
+            W(Wnx+1,j,k) = W(Wnx,j,k)
+            W(Wnx+2,j,k) = W(Wnx,j,k)
+            W(Wnx+3,j,k) = W(Wnx,j,k)
+          else
+            W(Wnx+1,j,k) = -W(Wnx,j,k)
+            W(Wnx+2,j,k) = -W(Wnx-1,j,k)
+            W(Wnx+3,j,k) = -W(Wnx-2,j,k)
+          end if
+        end do
+      end do
+      !$omp end do nowait
     end if
     !$omp end parallel
 
@@ -1034,10 +1281,6 @@ implicit none
         end do
         !$omp end do nowait
       end if
-    else
-      !$omp single
-      call error_stop("Error, unknown boundary condition on the S (y-) boundary.")
-      !$omp end single
     end if
 
 
@@ -1239,10 +1482,6 @@ implicit none
         end do
         !$omp end do nowait
       end if
-    else
-      !$omp single
-      call error_stop("Error, unknown boundary condition on the N (y+) boundary.")
-      !$omp end single
     end if
     !$omp end parallel
 
@@ -1395,10 +1634,6 @@ implicit none
         end do
       end do
       !$omp end do nowait
-    else
-      !$omp single
-      call error_stop("Error, unknown boundary condition on the B (z-) boundary.")
-      !$omp end single
     end if
 
 
@@ -1542,10 +1777,6 @@ implicit none
         end do
       end do
       !$omp end do nowait
-    else
-      !$omp single
-      call error_stop("Error, unknown boundary condition on the T (z+) boundary.")
-      !$omp end single
     end if
     !$omp end parallel
 
@@ -1576,7 +1807,7 @@ implicit none
 
 
   subroutine Bound_Phi(Phi)
-    real(knd), intent(inout) :: Phi(-1:,-1:,-1:)
+    real(knd), contiguous, intent(inout) :: Phi(-1:,-1:,-1:)
     integer :: i, j, k, nx, ny, nz
 
     nx = Prnx
@@ -1710,7 +1941,7 @@ implicit none
 
   
   subroutine Bound_Pr(Pr)
-    real(knd), intent(inout) :: Pr(-1:,-1:,-1:)
+    real(knd), contiguous, intent(inout) :: Pr(-1:,-1:,-1:)
     integer :: i, j, k, nx, ny, nz
 
     nx = Prnx
@@ -1853,7 +2084,7 @@ implicit none
 
 
   subroutine Bound_Q(Phi)
-    real(knd), intent(inout) :: Phi(0:,0:,0:)
+    real(knd), contiguous, intent(inout) :: Phi(0:,0:,0:)
     integer :: i, j, k, nx, ny, nz
 
     nx = Prnx
@@ -1971,7 +2202,6 @@ implicit none
     Uin = Uinlet * cos(windangle/180._knd*pi)
     Vin = Uinlet * sin(windangle/180._knd*pi)
     Win = 0
-
   end subroutine
 
   subroutine ShearInlet(G)
