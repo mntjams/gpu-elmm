@@ -164,14 +164,13 @@ contains
         end if
         
         block
-          use Boundaries, only: GridCoords
           integer :: xi, yj, zk
           real(knd) :: x, y, z
           
           if (g%direction==2) then
-            call GridCoords(xi, g%inlet_plane_i, zk, x, g%inlet_plane_x, z)
+            call GridCoords_scalar(xi, g%inlet_plane_i, zk, x, g%inlet_plane_x, z)
           else
-            call GridCoords(g%inlet_plane_i, yj, zk, g%inlet_plane_x, y, z)
+            call GridCoords_scalar(g%inlet_plane_i, yj, zk, g%inlet_plane_x, y, z)
           end if
         end block
       else
@@ -358,6 +357,49 @@ contains
     g%compat = par_co_sum(g%compat, g%comm)
 #endif
 
+  contains
+
+    !local version here to avoid needing to use Bondaries to avoid a dependency cycle
+    elemental subroutine GridCoords_scalar(xi, yj, zk, x, y, z)
+      integer, intent(out):: xi, yj, zk
+      real(knd), intent(in):: x, y, z
+      integer :: i
+
+
+      if (gridtype==GRID_UNIFORM) then
+
+          xi = min( max(nint( (x - xU(0))/dxmin + 0.5_knd ),1) , Prnx)
+          yj = min( max(nint( (y - yV(0))/dymin + 0.5_knd ),1) , Prny)
+          zk = min( max(nint( (z - zW(0))/dzmin + 0.5_knd ),1) , Prnz)
+
+      else
+
+        xi = Prnx
+        do i = 1, Prnx
+        if (xU(i)>=x) then
+                      xi = i
+                      exit
+                      end if
+        end do
+
+        yj = Prny
+        do i = 1, Prny
+        if (yV(i)>=y) then
+                      yj = i
+                      exit
+                      end if
+        end do
+        zk = Prnz
+        do i = 1, Prnz
+        if (zW(i)>=z) then
+                      zk = i
+                      exit
+                      end if
+        end do
+
+      end if
+    end subroutine GridCoords_scalar
+
   end subroutine
 
 
@@ -372,7 +414,7 @@ contains
     integer :: jlo, jup, klo, kup, ny
     real(knd) :: Ui, Vi, Wi, p
     integer :: tid
-    
+
 #ifdef PAR
     if (g%direction==2) then
       if (.not. (jim==1 .or. jim==nyims)) return
