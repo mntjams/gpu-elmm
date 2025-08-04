@@ -686,6 +686,13 @@ fields_do:  do j = 1, size(obj_fields)
             do i = 1, size(fields)
               if (obj_fields(j)%name == fields(i)%name) then
                 fields(i)%found = .true.
+
+                if (obj_fields(j)%is_array) then
+                  write(*,*) "Error, not expecting an array in '",trim(fields(i)%name),"'."
+                  stat = 14
+                  return
+                end if
+
                 select type (var => fields(i)%var)
                   type is (tree_object_ptr)
                     if (.not.obj_fields(j)%is_object .or. &
