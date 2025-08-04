@@ -9,10 +9,8 @@ module SolidBodies
   private
 
   public SolidBody, InitSolidBodies, SetCurrentSB, FindInsideCells, &
-         obstacles_file, roughness_file, displacement_file
-#ifdef CUSTOMSB
-  public  AddSolidBody, SolidBodiesList
-#endif
+         obstacles_file, roughness_file, displacement_file, &
+         AddSolidBody, SolidBodiesList
 
   type, extends(Body) :: SolidBody
     logical   :: rough = .false.                             !T rough surface, F flat surface
