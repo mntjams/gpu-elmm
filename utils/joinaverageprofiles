@@ -1,0 +1,58 @@
+#!/bin/bash
+declare -a arr=("profu"
+                "profuw"
+                "profvw"
+                "proftke"
+                "profdissip"
+                "profuu"
+                "profvv"
+                "profww"
+                "proftemp"
+                "proftempfl"
+                "proftt"
+                "profmoist"
+                "profmoistfl"
+                "profmm"
+                "profscal"
+                "profscalfl"
+                "profss"
+                "profother")
+
+imdirs=im-1-1-*
+
+profdirs=$(find im-1-1-1 -maxdepth 1 -wholename "im-1-1-1/average_profiles*" -type d -exec sh -c 'echo $(basename {})' \;)
+
+
+nzims=1
+while :; do
+ nzims_=$(($nzims + 1)) 
+ if test -d im-1-1-$nzims_; then
+   nzims=$nzims_
+ else
+   break
+ fi
+done
+
+mkdir -p $profdirs
+
+for profdir in $profdirs; do
+  for name in "${arr[@]}"; do
+    files=""
+    
+    if ! test -f im-1-1-1/$profdir/$name.txt; then
+      break
+    fi
+    
+    for im in $(seq 1 $nzims); do
+      files="$files im-1-1-$im/$profdir/$name.txt"
+    done
+    
+    #echo $result | xargs cat | sort -g > "./instant_profiles/$name-$n.txt"
+    
+    cat $files > $profdir/$name.txt
+  done
+
+
+done
+ 
+
