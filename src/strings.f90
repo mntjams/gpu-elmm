@@ -190,13 +190,15 @@ module ParseTrees_Fields
 
   type field_names
     character(char_len) :: name
-    class(*), pointer :: var => null()
+    ! not nullified because of a bug in GCC 8
+    class(*), pointer :: var
     logical :: found = .false.
   end type
 
   type field_names_a
     character(char_len) :: name
-    class(*), pointer :: var(:) => null() 
+    ! not nullified because of a bug in GCC 8
+    class(*), pointer :: var(:)
     logical :: found = .false.
   end type
 
