@@ -97,9 +97,9 @@ module Parameters
 
     real(tim) :: dt
 
-    real(tim) :: dt_max           !minimal time step for diagnosing diverging simulation
+    real(tim) :: dt_max = 0       !minimal time step for diagnosing diverging simulation
     
-    real(tim) :: dt_min           !maximum time step, larger value will not be used
+    real(tim) :: dt_min = 0       !maximum time step, larger value will not be used
     
     real(knd) :: U_scaling(3) = 0 !velocity vector used to compute constant_U
 
