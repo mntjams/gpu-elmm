@@ -6,7 +6,7 @@ module Scalars
  use ScalarBoundaries
  use ScalarAdvection
  use ScalarDiffusion
- use Sponge, only: enable_top_sponge_scalar, SpongeTopScalar
+ use Sponge, only: enable_top_sponge_scalar, SpongeTopScalar, rayleigh_damping_temperature, rayleigh_damping_moisture
 
 implicit none
   private
@@ -312,6 +312,8 @@ contains
 
           end associate
         end do
+        
+        call rayleigh_damping_temperature(Temperature_adv, Temperature)
       end subroutine
 
       subroutine MoistureExtra
@@ -338,6 +340,8 @@ contains
 
           end associate
         end do
+        
+        call rayleigh_damping_moisture(Moisture_adv, Moisture)
       end subroutine
 
       subroutine ScalarExtra
