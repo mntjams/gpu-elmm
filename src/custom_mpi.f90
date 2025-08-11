@@ -230,6 +230,11 @@ module custom_par
     module procedure par_sum_to_master_horizontal_64_1d
   end interface
 
+  interface par_sum_to_master_y
+    module procedure par_sum_to_master_y_32_2d
+    module procedure par_sum_to_master_y_64_2d
+  end interface
+
   interface par_co_broadcast
     module procedure par_co_broadcast_real32
     module procedure par_co_broadcast_real64
@@ -1209,7 +1214,7 @@ contains
     end interface
     
     call MPI_Allreduce(x, res, &
-                       count=1, datatype=MPI_KND, op=op, &
+                       count=1, datatype=MPI_real32, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_32.")
   end function
@@ -1229,7 +1234,7 @@ contains
     end interface
     
     call MPI_Allreduce(x, res, &
-                       count=1, datatype=MPI_KND, op=op, &
+                       count=1, datatype=MPI_real64, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_64.")
   end function
@@ -1239,7 +1244,7 @@ contains
     real(real32) :: res(size(x))
     integer, intent(in) :: op, comm
     integer :: ie
-    
+
     interface
       subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
@@ -1247,9 +1252,9 @@ contains
         real(real32) :: SENDBUF(count), RECVBUF(count)
       end subroutine
     end interface
-    
+
     call MPI_Allreduce(x, res, &
-                       count=size(x), datatype=MPI_KND, op=op, &
+                       count=size(x), datatype=MPI_real32, op=op, &
                        comm=comm, ierror=ie)
     if (ie/=0) call error_stop("Error in par_co_reduce_32.")
   end function
@@ -1259,7 +1264,7 @@ contains
     real(real64) :: res(size(x))
     integer, intent(in) :: op, comm
     integer :: ie
-    
+
     interface
       subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
         import
@@ -1267,7 +1272,47 @@ contains
         real(real64) :: SENDBUF(count), RECVBUF(count)
       end subroutine
     end interface
-    
+
+    call MPI_Allreduce(x, res, &
+                       count=size(x), datatype=MPI_real64, op=op, &
+                       comm=comm, ierror=ie)
+    if (ie/=0) call error_stop("Error in par_co_reduce_64.")
+  end function
+
+  function par_co_reduce_32_2d(x,op,comm) result(res)
+    real(real32),intent(in),contiguous :: x(:,:)
+    real(real32) :: res(size(x,1),size(x,2))
+    integer, intent(in) :: op, comm
+    integer :: ie
+
+    interface
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+        import
+        integer :: COUNT, DATATYPE, OP, COMM, IERROR
+        real(real32) :: SENDBUF(count), RECVBUF(count)
+      end subroutine
+    end interface
+
+    call MPI_Allreduce(x, res, &
+                       count=size(x), datatype=MPI_KND, op=op, &
+                       comm=comm, ierror=ie)
+    if (ie/=0) call error_stop("Error in par_co_reduce_32.")
+  end function
+
+  function par_co_reduce_64_2d(x,op,comm) result(res)
+    real(real64),intent(in),contiguous :: x(:,:)
+    real(real64) :: res(size(x,1),size(x,2))
+    integer, intent(in) :: op, comm
+    integer :: ie
+
+    interface
+      subroutine MPI_Allreduce(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, COMM, IERROR)
+        import
+        integer :: COUNT, DATATYPE, OP, COMM, IERROR
+        real(real64) :: SENDBUF(count), RECVBUF(count)
+      end subroutine
+    end interface
+
     call MPI_Allreduce(x, res, &
                        count=size(x), datatype=MPI_KND, op=op, &
                        comm=comm, ierror=ie)
@@ -1587,6 +1632,43 @@ contains
       call MPI_Reduce(MPI_IN_PLACE_real64, x, size(x), MPI_real64, MPI_SUM, 0, comm_plane_xy, ie)
     else
       call MPI_Reduce(x, x, size(x), MPI_real64, MPI_SUM, 0, comm_plane_xy, ie)
+    end if
+  end subroutine
+
+
+  subroutine par_sum_to_master_y_32_2d(x)
+    real(real32), intent(inout), contiguous :: x(:,:)
+    integer :: ie
+    interface
+      subroutine MPI_REDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, ROOT, COMM, IERROR)
+        import
+        INTEGER    COUNT, DATATYPE, OP, ROOT, COMM, IERROR
+        real(real32)  SENDBUF(*), RECVBUF(count)
+      end subroutine
+    end interface
+    !sums the values across y row of images to the master image (jim==1)
+    if (jim==1) then
+      call MPI_Reduce(MPI_IN_PLACE_real32, x, size(x), MPI_real32, MPI_SUM, 0, comm_plane_xy, ie)
+    else
+      call MPI_Reduce(x, x, size(x), MPI_real32, MPI_SUM, 0, comm_row_y, ie)
+    end if
+  end subroutine
+
+  subroutine par_sum_to_master_y_64_2d(x)
+    real(real64), intent(inout), contiguous :: x(:,:)
+    integer :: ie
+    interface
+      subroutine MPI_REDUCE(SENDBUF, RECVBUF, COUNT, DATATYPE, OP, ROOT, COMM, IERROR)
+        import
+        INTEGER    COUNT, DATATYPE, OP, ROOT, COMM, IERROR
+        real(real64)  SENDBUF(*), RECVBUF(count)
+      end subroutine
+    end interface
+    !sums the values across y row of images to the master image (jim==1)
+    if (jim==1) then
+      call MPI_Reduce(MPI_IN_PLACE_real64, x, size(x), MPI_real64, MPI_SUM, 0, comm_plane_xy, ie)
+    else
+      call MPI_Reduce(x, x, size(x), MPI_real64, MPI_SUM, 0, comm_row_y, ie)
     end if
   end subroutine
 
