@@ -353,7 +353,7 @@ contains
     call MPI_Type_commit(D%par_filetype_vector, ie)
 
     D%glob_scalar_storage_size = product(D%ngxyz) * &
-                                 storage_size(1_real32) / CHARACTER_STORAGE_SIZE
+                                 storage_size(1._real32) / CHARACTER_STORAGE_SIZE
     D%glob_vector_storage_size = 3 * D%glob_scalar_storage_size
     
   end subroutine TFrameDomain_ParallelIO_ParallelDatatypes
