@@ -1257,7 +1257,7 @@ contains
 
       p = p - rho_air_ref * grav_acc*dzPr(k) * &
               (1 - &
-                      ( temperature_ref - t_virt ) &
+                      ( t_virt - temperature_ref) &
                       / temperature_ref &
               )
     end do
@@ -1283,7 +1283,7 @@ contains
     do j = 1, Vny+1
       do i = 1, Unx+1
         t_virt_prev = theta_v(i,j,Prnz)
-        Pr(i,j,Prnz) = - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
+        Pr(i,j,Prnz) = - grav_acc*(zW(Prnz)-zPr(Prnz)) * &
                 ( t_virt_prev - temperature_ref ) &
                 / temperature_ref
         do k = Prnz-1, 1, -1
@@ -1352,10 +1352,9 @@ contains
       t_virt = par_co_sum_plane_xy(sum(TempIn(1:Prny,k)))/gPrny
 
       if (enable_moisture) t_virt = theta_v(t_virt, par_co_sum_plane_xy(sum(MoistIn(1:Prny,k)))/gPrny)
-
       p = p - rho_air_ref * grav_acc*dzPr(k) * &
               (1 - &
-                      ( temperature_ref - t_virt ) &
+                      ( t_virt - temperature_ref ) &
                       / temperature_ref &
               )
     end do
@@ -1401,7 +1400,7 @@ contains
       
         if (kim == nzims) then
           t_virt_prev = theta_v(i,j,Prnz)
-          Pr(i,j,Prnz) = - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
+          Pr(i,j,Prnz) = - grav_acc*(zW(Prnz)-zPr(Prnz)) * &
                   ( t_virt_prev - temperature_ref ) &
                   / temperature_ref
           nz = Prnz -1
