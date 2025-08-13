@@ -1648,7 +1648,7 @@ contains
     end interface
     !sums the values across y row of images to the master image (jim==1)
     if (jim==1) then
-      call MPI_Reduce(MPI_IN_PLACE_real32, x, size(x), MPI_real32, MPI_SUM, 0, comm_plane_xy, ie)
+      call MPI_Reduce(MPI_IN_PLACE_real32, x, size(x), MPI_real32, MPI_SUM, 0, comm_row_y, ie)
     else
       call MPI_Reduce(x, x, size(x), MPI_real32, MPI_SUM, 0, comm_row_y, ie)
     end if
@@ -1666,7 +1666,7 @@ contains
     end interface
     !sums the values across y row of images to the master image (jim==1)
     if (jim==1) then
-      call MPI_Reduce(MPI_IN_PLACE_real64, x, size(x), MPI_real64, MPI_SUM, 0, comm_plane_xy, ie)
+      call MPI_Reduce(MPI_IN_PLACE_real64, x, size(x), MPI_real64, MPI_SUM, 0, comm_row_y, ie)
     else
       call MPI_Reduce(x, x, size(x), MPI_real64, MPI_SUM, 0, comm_row_y, ie)
     end if
