@@ -24,7 +24,7 @@ module Outputs
   implicit none
  
 
-  private
+  !private
   public store, display, probes, scalar_probes,  &
          OutTStep, Output, CreateOutputDirectories, AllocateOutputs, ReadProbes,  &
          ProfileSwitches, current_profiles, profiles_config, enable_profiles
