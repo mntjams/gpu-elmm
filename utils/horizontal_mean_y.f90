@@ -317,7 +317,7 @@ contains
     z = glob%z
 
 
-    open(newunit=out_unit,file="horiz_mean_"//file_name, &
+    open(newunit=out_unit,file="horiz_mean_y_"//file_name, &
       access='stream',status='replace',form="unformatted",action="write")
 
     write(out_unit) "# vtk DataFile Version 2.0",lf
