@@ -312,7 +312,7 @@ contains
     character(70) :: str
     real(rp), allocatable :: x(:),y(:),z(:)
 
-    x = [glob%x(1)]
+    x = glob%x
     y = [glob%y(1)]
     z = glob%z
 
@@ -325,10 +325,10 @@ contains
     write(out_unit) "BINARY",lf
     write(out_unit) "DATASET RECTILINEAR_GRID",lf
     str="DIMENSIONS"
-    write(str(12:),*) 1,1,nz
+    write(str(12:),*) nx,1,nz
     write(out_unit) str,lf
     str="X_COORDINATES"
-    write(str(15:),'(i5,2x,a)') 1,"float"
+    write(str(15:),'(i5,2x,a)') nx,"float"
     write(out_unit) str,lf
     write(out_unit) BigEnd(real(x, real32)),lf
     str="Y_COORDINATES"
@@ -340,7 +340,7 @@ contains
     write(out_unit) str,lf
     write(out_unit) BigEnd(real(z, real32)),lf
     str="POINT_DATA"
-    write(str(12:),*) 1*1*nz
+    write(str(12:),*) nx*1*nz
     write(out_unit) str,lf
   end subroutine
 
