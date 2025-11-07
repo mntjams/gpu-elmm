@@ -238,14 +238,14 @@ module Subgrid
                     D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
                  ) / (2*dzmin)
 
-        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k+1)-W(i,j,k-2))) / dzmin
         g(1,3) = ( &
                     D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
                     D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
                  ) / (2*dxmin)
         g(2,3) = ( &
                     D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
-                    D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                    D3*(W(i,j+2,k)+W(i,j+2,k-1)-W(i,j-2,k)-W(i,j-2,k-1)) &
                  ) / (2*dymin)
       else
         g(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
@@ -354,19 +354,19 @@ module Subgrid
                     D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
                  ) / (2*dzmin)
 
-        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k+1)-W(i,j,k-2))) / dzmin
         g(1,3) = ( &
                     D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
                     D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
                  ) / (2*dxmin)
         g(2,3) = ( &
                     D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
-                    D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                    D3*(W(i,j+2,k)+W(i,j+2,k-1)-W(i,j-2,k)-W(i,j-2,k-1)) &
                  ) / (2*dymin)
       end subroutine GradientTensorUG4
     end subroutine StrainIJ_4ord
-    
-    
+
+
     subroutine S_Omega_IJ_4ord(i, j, k, U, V, W, S, Om)     !Computes components of the strain rate tensor.
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(out) :: S(1:3,1:3), Om(1:3,1:3)
@@ -416,14 +416,14 @@ module Subgrid
                     D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
                  ) / (2*dzmin)
 
-        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k+1)-W(i,j,k-2))) / dzmin
         g(1,3) = ( &
                     D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
                     D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
                  ) / (2*dxmin)
         g(2,3) = ( &
                     D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
-                    D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                    D3*(W(i,j+2,k)+W(i,j+2,k-1)-W(i,j-2,k)-W(i,j-2,k-1)) &
                  ) / (2*dymin)
       end subroutine GradientTensorUG4
     end subroutine S_Omega_IJ_4ord
@@ -850,14 +850,14 @@ module Subgrid
                     D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
                  ) / (2*dzmin)
 
-        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k+1)-W(i,j,k-2))) / dzmin
         g(1,3) = ( &
                     D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
                     D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
                  ) / (2*dxmin)
         g(2,3) = ( &
                     D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
-                    D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                    D3*(W(i,j+2,k)+W(i,j+2,k-1)-W(i,j-2,k)-W(i,j-2,k-1)) &
                  ) / (2*dymin)
       end subroutine GradientTensorUG4
 
