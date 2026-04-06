@@ -17,7 +17,7 @@ module Pressure
   
   integer, parameter, public :: POISSON_SOLVER_NONE = 0, &
                                 POISSON_SOLVER_SOR = 1, &
-                                POISSON_SOLVER_POISFFT = 2, &
+                                POISSON_SOLVER_POISSOLVER = 2, &
                                 POISSON_SOLVER_MULTIGRID = 3
                                 
   ! incremental - the Poisson equation solves for the inceremental pressure update, momentum equations use last stage pressure gradient
@@ -29,7 +29,7 @@ module Pressure
     logical :: check_mass_flux = .false.
     logical :: report_mass_flux = .false.
     logical :: correct_mass_flux(6) = .false.
-    integer :: poisson_solver = POISSON_SOLVER_POISFFT
+    integer :: poisson_solver = POISSON_SOLVER_POISSOLVER
     integer :: projection_method = PROJECTION_METHOD_INCREMENTAL
     logical :: check_divergence = .false.
     logical :: check_poisson_residue = .false.
@@ -193,12 +193,13 @@ contains
 
         call PoissSOR(Phi,RHS)
 
-    else if (pressure_solution%poisson_solver==POISSON_SOLVER_POISFFT) then
+    else if (pressure_solution%poisson_solver==POISSON_SOLVER_POISSOLVER) then
 
         if (gridtype==GRID_VARIABLE_Z) then
-          call Poiss_PoisFFT_variable_z(Phi,RHS)
+          ! TODO: Uncomment when this type becomes available in poisson-solver
+          ! call Poiss_PoisFFT_variable_z(Phi,RHS)
         else
-          call Poiss_PoisFFT(Phi,RHS)
+          call Poiss_PoisSolver(Phi,RHS)
         end if
 
     else if (pressure_solution%poisson_solver==POISSON_SOLVER_MULTIGRID) then

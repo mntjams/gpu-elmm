@@ -102,7 +102,7 @@ if str(comp)=='intel':
 
   env.Append(F90FLAGS='-cpp -standard-semantics -heap-arrays 200 -assume recursion')
 
-  env.Append(F90PATH = [target_dir,target_dir + '/P/'])
+  env.Append(F90PATH = [target_dir])
 
   if str(diag)=='yes':
     env.Append(F90FLAGS=' -diag-enable sc1 -diag-enable sc-precise')
@@ -149,7 +149,7 @@ elif str(comp)=='cray':
 
   env.Append(F90FLAGS='-e Z')
 
-  env.Append(F90PATH = [target_dir,target_dir + '/P/'])
+  env.Append(F90PATH = [target_dir])
 
   env.Append(FORTRANMODDIRPREFIX = '-J')
    
@@ -192,7 +192,7 @@ else:
   
   env.Append(F90FLAGS='-cpp')
 
-  env.Append(F90PATH = [target_dir,target_dir + '/P/'])
+  env.Append(F90PATH = [target_dir])
   
   if '-J' not in env['FORTRANMODDIRPREFIX']:
     env.Replace(FORTRANMODDIRPREFIX = '-J')
@@ -264,13 +264,6 @@ if str(mpi)=='yes':
   env.Append(CFLAGS=' -DMPI -DPAR')
   env.Append(CXXFLAGS=' -DMPI -DPAR')
   
-  if (openmp=='no'):
-    env.Append(LIBS = ['pfft','pfftf'])
-  else:
-    env.Append(LIBS = ['pfft_omp','pfftf_omp'])
-    
-  env.Append(LIBS = ['fftw3_mpi','fftw3f_mpi'])
-  
 if cray!='yes':
   #if necessary pass openblas, mkl_xx or equivalent (and include their dependencies) 
   # in the `lapack_blas` argument
@@ -279,10 +272,7 @@ if cray!='yes':
   else:
     env.Append(LIBS = ['blas','lapack'])
 
-if str(openmp)!='no':
-  env.Append(LIBS = ['fftw3_omp','fftw3f_omp'])
-
-env.Append(LIBS = ['fftw3','fftw3f','pthread','stdc++'])
+env.Append(LIBS = ['pthread','stdc++'])
 
 if customSB=='yes':
   env.Append(F90FLAGS='-DCUSTOMSB')
@@ -339,29 +329,14 @@ if ompp=='yes':
 
 env.Replace(FORTRANFLAGS=env['F90FLAGS'])
 
-#May be used to compile PoisFFT directly, adjust the correct path.
-Mkdir(target_dir + '/P/')
-objs = env.Object(target = target_dir + 'P/customfftw3',       source = '../../PoisFFT/src/customfftw3.f90')
-if str(mpi)=='yes':
-  objs += env.Object(target = target_dir + 'P/custompfft',     source = '../../PoisFFT/src/custompfft.f90')
-objs += env.Object(target = target_dir + 'P/precisions',       source = '../../PoisFFT/src/precisions.f90')
-objs += env.Object(target = target_dir + 'P/parameters',       source = '../../PoisFFT/src/parameters.f90')
-objs += env.Object(target = target_dir + 'P/fft',              source = '../../PoisFFT/src/fft.f90', 
-                   F90FLAGS = list(filter(lambda flag: flag !='-ipo' , env['F90FLAGS'])))
-Depends(objs[-1], '../../PoisFFT/src/fft-inc.f90')
-Depends(objs[-1], '../../PoisFFT/src/plan_new-inc.f90')
-Depends(objs[-1], '../../PoisFFT/src/allocate_fftw-inc.f90')
-Depends(objs[-1], objs[0])
-Depends(objs[-1], objs[2])
-Depends(objs[-1], objs[3])
-if missing_pfft:
-  objs += env.Object(target = target_dir + 'P/missing_pfft',   source = '../../PoisFFT/src/missing_pfft.c')
-objs += env.Object(target = target_dir + 'P/poisfft',          source = '../../PoisFFT/src/poisfft.f90')
-Depends(objs[-1], '../../PoisFFT/src/poisfft-inc.f90')
-Depends(objs[-1], '../../PoisFFT/src/poisfft-solvers-inc.f90')
-Depends(objs[-1], '../../PoisFFT/src/loop_nest_3d.f90')
-Depends(objs[-1], objs[3])
-objs += env.Object(target = target_dir + 'P/main',             source = '../../PoisFFT/src/main.f90')
+env.Append(F90PATH = ['../../poisson-solver/build-release/modules'])
+env.Append(LIBPATH = ['../../poisson-solver/lib', '/usr/local/cuda/lib64'])
+env.Append(LIBS = ['poisson-solver', 'cufft', 'cudart'])
+# '-Wl' passes arguments to the run-time linker
+# -rpath adds a directory to the run-time library search path
+env.Append(LINKFLAGS = ['-Wl,-rpath,/opt/build/poisson-solver/lib'])
+
+objs = []
 
 if str(mpi)=='yes':
   objs += env.Object(target = target_dir + 'custom_mpi',       source = 'custom_mpi.f90')

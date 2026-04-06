@@ -73,44 +73,52 @@ module PoissonSolvers
 
 contains
 
-  subroutine Poiss_PoisFFT(Phi,RHS)
+  subroutine Poiss_PoisSolver(Phi,RHS)
 #ifdef DPREC
-    use PoisFFT, PoisFFT_Solver => PoisFFT_Solver3D_DP
+    use PoisSolver
 #else
+    ! TODO Use single precision poisson-solver when it becomes available
     use PoisFFT, PoisFFT_Solver => PoisFFT_Solver3D_SP
 #endif
 #ifdef PAR
     use custom_par
 #endif
 
-    type(PoisFFT_Solver),save :: Solver
+    type(PoissonSolver),save :: Solver
     real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Phi
     real(knd),dimension(0:,0:,0:),intent(in) :: RHS
     logical, save :: called = .false.
 
     integer(int64), save :: trate
     integer(int64)       :: t1, t2
+
+    ! Used to strip the ghost cells later
+    integer :: ngPhi(3), ngRHS(3)
+    integer :: dims(3)
 
     integer :: discretization
     
     if (discretization_order == 4) then
-      discretization = PoisFFT_FiniteDifference4
+      discretization = PoisSolver_FiniteDifference4
     else
-      discretization = PoisFFT_FiniteDifference2
+      discretization = PoisSolver_FiniteDifference2
     end if
 
     if (.not.called) then
 #ifdef PAR
+      ! TODO: This is the distributed solver? Call it when it becomes available in poisson-solver
       Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
                                [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
                                PoissonBtype, &
                                discretization, &
                                gPrns,offsets_to_global,poisfft_comm)
 #else
-      Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
-                               [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
-                               PoissonBtype, &
-                               discretization)
+      call poisson_solver_new(Solver, &
+                              3, &
+                              [Prnx,Prny,Prnz], &
+                              [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
+                              PoissonBtype, &
+                              discretization)
 #endif
       called = .true.
 
@@ -121,73 +129,18 @@ contains
 
     call system_clock(count=t1)
 
-
-    call Execute(Solver,Phi,RHS)
-
-
-    call system_clock(count=t2)
-    if (master) then
-      poisson_solver_time = poisson_solver_time + real(t2-t1,dbl)/real(trate,dbl)
-      if (master.and.debugparam > 1) write(*,*) "solver cpu time", real(t2-t1)/real(trate)
-    end if
-
-  end subroutine Poiss_PoisFFT
-
-
-
-
-
-  subroutine Poiss_PoisFFT_variable_z(Phi,RHS)
-#ifdef DPREC
-    use PoisFFT, PoisFFT_Solver => PoisFFT_Solver3D_nonuniform_z_DP
-#else
-    use PoisFFT, PoisFFT_Solver => PoisFFT_Solver3D_nonuniform_z_SP
-#endif
-#ifdef PAR
-    use custom_par
-#endif
-
-    type(PoisFFT_Solver),save :: Solver
-    real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Phi
-    real(knd),dimension(0:,0:,0:),intent(in) :: RHS
-    logical, save :: called = .false.
-
-    integer(int64), save :: trate
-    integer(int64)       :: t1, t2
-
-    integer :: discretization
-
-    if (discretization_order == 4) then
-      discretization = PoisFFT_FiniteDifference4
-    else
-      discretization = PoisFFT_FiniteDifference2
-    end if
-
-    if (.not.called) then
-#ifdef PAR
-      Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
-                               [gxmax-gxmin,gymax-gymin], gzPr(1:gPrnz), gzW(0:gPrnz),  &
-                               PoissonBtype, &
-                               discretization, &
-                               gPrns,offsets_to_global,poisfft_comm)
-#else
-      Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
-                               [gxmax-gxmin,gymax-gymin], zPr(1:Prnz), zW(0:Prnz), &
-                               PoissonBtype, &
-                               discretization)
-#endif
-      called = .true.
-
-      call system_clock(count_rate=trate)
-
-    end if
-
-
-    call system_clock(count=t1)
-
-
-    call Execute(Solver,Phi,RHS)
-
+    ! Need to strip the arrays of ghost cells
+    dims = [Prnx, Prny, Prnz]
+    ngPhi = (ubound(Phi) - dims) / 2
+    ngRHS = (ubound(RHS) - dims) / 2
+    ! TODO - Not sure yet, but this probably forces a copy creation because the params are phi(*) and rhs(*)
+    call poisson_solver_execute(Solver, &
+                                Phi(ngPhi(1) + 1 : ngPhi(1) + dims(1), &
+                                    ngPhi(2) + 1 : ngPhi(2) + dims(2), &
+                                    ngPhi(3) + 1 : ngPhi(3) + dims(3)), &
+                                RHS(ngRHS(1) + 1 : ngRHS(1) + dims(1), &
+                                    ngRHS(2) + 1 : ngRHS(2) + dims(2), &
+                                    ngRHS(3) + 1 : ngRHS(3) + dims(3)))
 
     call system_clock(count=t2)
     if (master) then
@@ -195,7 +148,72 @@ contains
       if (master.and.debugparam > 1) write(*,*) "solver cpu time", real(t2-t1)/real(trate)
     end if
 
-  end subroutine Poiss_PoisFFT_variable_z
+  end subroutine Poiss_PoisSolver
+
+
+
+
+
+! TODO: Update all this when it becomes available in poisson-solver
+!  subroutine Poiss_PoisFFT_variable_z(Phi,RHS)
+!#ifdef DPREC
+!    use PoisFFT, PoisFFT_Solver => PoisFFT_Solver3D_nonuniform_z_DP
+!#else
+!    use PoisFFT, PoisFFT_Solver => PoisFFT_Solver3D_nonuniform_z_SP
+!#endif
+!#ifdef PAR
+!    use custom_par
+!#endif
+!
+!    type(PoisFFT_Solver),save :: Solver
+!    real(knd),dimension(-1:,-1:,-1:),intent(inout) :: Phi
+!    real(knd),dimension(0:,0:,0:),intent(in) :: RHS
+!    logical, save :: called = .false.
+!
+!    integer(int64), save :: trate
+!    integer(int64)       :: t1, t2
+!
+!    integer :: discretization
+!
+!    if (discretization_order == 4) then
+!      discretization = PoisFFT_FiniteDifference4
+!    else
+!      discretization = PoisFFT_FiniteDifference2
+!    end if
+!
+!    if (.not.called) then
+!#ifdef PAR
+!      Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
+!                               [gxmax-gxmin,gymax-gymin], gzPr(1:gPrnz), gzW(0:gPrnz),  &
+!                               PoissonBtype, &
+!                               discretization, &
+!                               gPrns,offsets_to_global,poisfft_comm)
+!#else
+!      Solver =  PoisFFT_Solver([Prnx,Prny,Prnz], &
+!                               [gxmax-gxmin,gymax-gymin], zPr(1:Prnz), zW(0:Prnz), &
+!                               PoissonBtype, &
+!                               discretization)
+!#endif
+!      called = .true.
+!
+!      call system_clock(count_rate=trate)
+!
+!    end if
+!
+!
+!    call system_clock(count=t1)
+!
+!
+!    call Execute(Solver,Phi,RHS)
+!
+!
+!    call system_clock(count=t2)
+!    if (master) then
+!      poisson_solver_time = poisson_solver_time + real(t2-t1,dbl)/real(trate,dbl)
+!      if (master.and.debugparam > 1) write(*,*) "solver cpu time", real(t2-t1)/real(trate)
+!    end if
+!
+!  end subroutine Poiss_PoisFFT_variable_z
 
 
 

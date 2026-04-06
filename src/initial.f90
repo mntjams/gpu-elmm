@@ -56,7 +56,7 @@ contains
  subroutine ReadConfiguration
    use StaggeredFrames, only: rrange, TFrameTimes, TSaveFlags, &
                               TStaggeredFrameDomain,  AddDomain
-   use PoisFFT, only: PoisFFT_NeumannStag, PoisFFT_Periodic
+   use PoisSolver, only: PoisSolver_NeumannStag, PoisSolver_Periodic
    use Sponge, only: enable_in_sponge_x, enable_out_sponge_x, enable_out_sponge_y, &
                      enable_top_sponge, enable_top_sponge_scalar
    integer ::  lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
@@ -836,9 +836,9 @@ contains
    !Btype might get overwritten by MPI procedures
    do i = We, To
      if (Btype(i)==BC_PERIODIC) then
-        PoissonBtype(i) = PoisFFT_PERIODIC
+        PoissonBtype(i) = PoisSolver_PERIODIC
      else
-        PoissonBtype(i) = PoisFFT_NeumannStag
+        PoissonBtype(i) = PoisSolver_NeumannStag
      end if
    end do
    
