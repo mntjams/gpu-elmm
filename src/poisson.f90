@@ -131,16 +131,16 @@ contains
 
     ! Need to strip the arrays of ghost cells
     dims = [Prnx, Prny, Prnz]
-    ngPhi = (ubound(Phi) - dims) / 2
-    ngRHS = (ubound(RHS) - dims) / 2
-    ! TODO - Not sure yet, but this probably forces a copy creation because the params are phi(*) and rhs(*)
+    ngPhi = (shape(Phi) - dims) / 2
+    ngRHS = (shape(RHS) - dims) / 2
+    ! TODO - This forces a copy creation because the params are phi(*) and rhs(*)
     call poisson_solver_execute(Solver, &
-                                Phi(ngPhi(1) + 1 : ngPhi(1) + dims(1), &
-                                    ngPhi(2) + 1 : ngPhi(2) + dims(2), &
-                                    ngPhi(3) + 1 : ngPhi(3) + dims(3)), &
-                                RHS(ngRHS(1) + 1 : ngRHS(1) + dims(1), &
-                                    ngRHS(2) + 1 : ngRHS(2) + dims(2), &
-                                    ngRHS(3) + 1 : ngRHS(3) + dims(3)))
+                                Phi(lbound(Phi, 1) + ngPhi(1) : lbound(Phi, 1) + ngPhi(1) + dims(1) - 1, &
+                                    lbound(Phi, 2) + ngPhi(2) : lbound(Phi, 2) + ngPhi(2) + dims(2) - 1, &
+                                    lbound(Phi, 3) + ngPhi(3) : lbound(Phi, 3) + ngPhi(3) + dims(3) - 1), &
+                                RHS(lbound(Rhs, 1) + ngRHS(1) : lbound(Rhs, 1) + ngRHS(1) + dims(1) - 1, &
+                                    lbound(Rhs, 2) + ngRHS(2) : lbound(Rhs, 2) + ngRHS(2) + dims(2) - 1, &
+                                    lbound(Rhs, 3) + ngRHS(3) : lbound(Rhs, 3) + ngRHS(3) + dims(3) - 1))
 
     call system_clock(count=t2)
     if (master) then
