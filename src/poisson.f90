@@ -92,10 +92,6 @@ contains
     integer(int64), save :: trate
     integer(int64)       :: t1, t2
 
-    ! Used to strip the ghost cells later
-    integer :: ngPhi(3), ngRHS(3)
-    integer :: dims(3)
-
     integer :: discretization
     
     if (discretization_order == 4) then
@@ -129,18 +125,7 @@ contains
 
     call system_clock(count=t1)
 
-    ! Need to strip the arrays of ghost cells
-    dims = [Prnx, Prny, Prnz]
-    ngPhi = (shape(Phi) - dims) / 2
-    ngRHS = (shape(RHS) - dims) / 2
-    ! TODO - This forces a copy creation because the params are phi(*) and rhs(*)
-    call poisson_solver_execute(Solver, &
-                                Phi(lbound(Phi, 1) + ngPhi(1) : lbound(Phi, 1) + ngPhi(1) + dims(1) - 1, &
-                                    lbound(Phi, 2) + ngPhi(2) : lbound(Phi, 2) + ngPhi(2) + dims(2) - 1, &
-                                    lbound(Phi, 3) + ngPhi(3) : lbound(Phi, 3) + ngPhi(3) + dims(3) - 1), &
-                                RHS(lbound(Rhs, 1) + ngRHS(1) : lbound(Rhs, 1) + ngRHS(1) + dims(1) - 1, &
-                                    lbound(Rhs, 2) + ngRHS(2) : lbound(Rhs, 2) + ngRHS(2) + dims(2) - 1, &
-                                    lbound(Rhs, 3) + ngRHS(3) : lbound(Rhs, 3) + ngRHS(3) + dims(3) - 1))
+    call poisson_solver_execute(Solver, Phi, RHS)
 
     call system_clock(count=t2)
     if (master) then
