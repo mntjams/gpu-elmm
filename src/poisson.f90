@@ -75,10 +75,13 @@ contains
 
   subroutine Poiss_PoisSolver(Phi,RHS)
 #ifdef DPREC
-    use PoisSolver
+    use PoisSolver, pois_solver_new => poisson_solver_new, &
+                    pois_solver_execute => poisson_solver_execute, &
+                    pois_solver_finalize => poisson_solver_finalize
 #else
-    ! TODO Use single precision poisson-solver when it becomes available
-    use PoisFFT, PoisFFT_Solver => PoisFFT_Solver3D_SP
+    use PoisSolver, pois_solver_new => poisson_solver_new_float, &
+                    pois_solver_execute => poisson_solver_execute_float, &
+                    pois_solver_finalize => poisson_solver_finalize_float
 #endif
 #ifdef PAR
     use custom_par
@@ -109,12 +112,12 @@ contains
                                discretization, &
                                gPrns,offsets_to_global,poisfft_comm)
 #else
-      call poisson_solver_new(Solver, &
-                              3, &
-                              [Prnx,Prny,Prnz], &
-                              [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
-                              PoissonBtype, &
-                              discretization)
+      call pois_solver_new(Solver, &
+                           3, &
+                           [Prnx,Prny,Prnz], &
+                           [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
+                           PoissonBtype, &
+                           discretization)
 #endif
       called = .true.
 
@@ -125,7 +128,7 @@ contains
 
     call system_clock(count=t1)
 
-    call poisson_solver_execute(Solver, Phi, RHS)
+    call pois_solver_execute(Solver, Phi, RHS)
 
     call system_clock(count=t2)
     if (master) then
