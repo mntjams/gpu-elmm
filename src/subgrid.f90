@@ -13,12 +13,16 @@ module Subgrid
   integer :: sgstype
 
   integer, parameter, public :: SmagorinskyModel = 1, SigmaModel = 2, VremanModel = 3, &
-                                StabSubgridModel = 4, MixedTimeScaleModel = 5
+                                StabSubgridModel = 4, MixedTimeScaleModel = 5, WALEModel = 6
 
   real(knd), public :: C_Smagorinsky = 0.122_knd, &
                        C_Sigma = 1.04_knd, &
                        C_Vreman = 0.041_knd, &
-                       C_StabSubgrid = 1.04_knd
+                       C_StabSubgrid = 1.04_knd, &
+                       C_WALE = 0.58_knd
+                       
+  character(*), dimension(0:6), public, parameter :: subgrid_model_names(0:6) = &
+    [character(16) :: "none", "Smagorinsky", "sigma", "Vreman", "sigma_stability", "MTS", "WALE"]
                      
   
   contains
@@ -205,9 +209,160 @@ module Subgrid
     endsubroutine StrainIJ
     
     
+     subroutine S_Omega_IJ(i, j, k, U, V, W, S, Om)     !Computes components of the strain rate tensor.
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(out) :: S(1:3,1:3), Om(1:3,1:3)
+      integer, intent(in) :: i, j, k
+      real(knd) :: D(1:3,1:3)
+      integer :: ii, jj
+
+      D = 0
+
+      D(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
+      D(2,2) = (V(i,j,k)-V(i,j-1,k)) / dymin
+      D(3,3) = (W(i,j,k)-W(i,j,k-1)) / dzPr(k)
+      D(1,2) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) / (4 * dymin)
+      D(1,3) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) / (2 * (zPr(k+1)-zPr(k-1)))
+      D(2,1) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) / (4 * dxmin)
+      D(2,3) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) / (2 * (zPr(k+1)-zPr(k-1)))
+      D(3,1) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) / (4 * dxmin)
+      D(3,2) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) / (4 * dymin)
+
+      do jj = 1, 3
+        do ii = 1, 3
+          S(ii,jj) = (D(ii,jj) + D(jj,ii)) / 2
+          Om(ii,jj) = (D(ii,jj) - D(jj,ii)) / 2
+        end do
+      end do
+    endsubroutine S_Omega_IJ
     
     
-     function TKEDissipation(i, j, k, U, V, W) result(res)
+    subroutine StrainIJ_4ord(i, j, k, U, V, W, S)     !Computes components of the strain rate tensor.
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(out) :: S(1:3,1:3)
+      integer, intent(in) :: i, j, k
+      real(knd) :: D(1:3,1:3)
+      integer :: ii, jj
+      
+      real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+      real(knd), parameter :: D2 = 8._knd / 12, D4 = -1._knd / 12
+
+      D = 0
+      
+      call GradientTensorUG4(D, i, j, k)
+
+      do jj = 1, 3
+        do ii = 1, 3
+          S(ii,jj) = (D(ii,jj) + D(jj,ii)) / 2
+        end do
+      end do
+      
+    contains
+    
+      pure subroutine GradientTensorUG4(g ,i, j, k)
+        real(knd), intent(out) :: g(3,3)
+        integer, intent(in) :: i, j, k
+        real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+        real(knd), parameter :: D1 = 2._knd / 3, D3 = 1._knd / 12
+
+        g(1,1) = (C1*(U(i,j,k)-U(i-1,j,k)) - C3*(U(i+1,j,k)-U(i-2,j,k))) / dxmin
+        g(2,1) = ( &
+                    D1*(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) - &
+                    D3*(U(i,j+2,k)+U(i-1,j+2,k)-U(i,j-2,k)-U(i-1,j-2,k)) &
+                 ) / (2*dymin)
+        g(3,1) = ( &
+                    D1*(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) - &
+                    D1*(U(i,j,k+2)+U(i-1,j,k+2)-U(i,j,k-2)-U(i-1,j,k-2)) &
+                 ) / (2*dzmin)
+
+        g(2,2) = (C1*(V(i,j,k)-V(i,j-1,k)) - C3*(V(i,j+1,k)-V(i,j-2,k))) / dymin
+        g(1,2) = ( &
+                    D1*(V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) - &
+                    D3*(V(i+2,j,k)+V(i+2,j-1,k)-V(i-2,j,k)-V(i-2,j-1,k)) &
+                 ) / (2*dxmin)
+        g(3,2) = ( &
+                    D1*(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) - &
+                    D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
+                 ) / (2*dzmin)
+
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+        g(1,3) = ( &
+                    D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
+                    D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
+                 ) / (2*dxmin)
+        g(2,3) = ( &
+                    D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
+                    D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                 ) / (2*dymin)
+      end subroutine GradientTensorUG4
+    end subroutine StrainIJ_4ord
+    
+    
+    subroutine S_Omega_IJ_4ord(i, j, k, U, V, W, S, Om)     !Computes components of the strain rate tensor.
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(out) :: S(1:3,1:3), Om(1:3,1:3)
+      integer, intent(in) :: i, j, k
+      real(knd) :: D(1:3,1:3)
+      integer :: ii, jj
+      
+      real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+      real(knd), parameter :: D2 = 8._knd / 12, D4 = -1._knd / 12
+
+      D = 0
+      
+      call GradientTensorUG4(D, i, j, k)
+
+      do jj = 1, 3
+        do ii = 1, 3
+          S(ii,jj) = (D(ii,jj) + D(jj,ii)) / 2
+          Om(ii,jj) = (D(ii,jj) - D(jj,ii)) / 2
+        end do
+      end do
+      
+    contains
+    
+      pure subroutine GradientTensorUG4(g ,i, j, k)
+        real(knd), intent(out) :: g(3,3)
+        integer, intent(in) :: i, j, k
+        real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+        real(knd), parameter :: D1 = 2._knd / 3, D3 = 1._knd / 12
+
+        g(1,1) = (C1*(U(i,j,k)-U(i-1,j,k)) - C3*(U(i+1,j,k)-U(i-2,j,k))) / dxmin
+        g(2,1) = ( &
+                    D1*(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) - &
+                    D3*(U(i,j+2,k)+U(i-1,j+2,k)-U(i,j-2,k)-U(i-1,j-2,k)) &
+                 ) / (2*dymin)
+        g(3,1) = ( &
+                    D1*(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) - &
+                    D1*(U(i,j,k+2)+U(i-1,j,k+2)-U(i,j,k-2)-U(i-1,j,k-2)) &
+                 ) / (2*dzmin)
+
+        g(2,2) = (C1*(V(i,j,k)-V(i,j-1,k)) - C3*(V(i,j+1,k)-V(i,j-2,k))) / dymin
+        g(1,2) = ( &
+                    D1*(V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) - &
+                    D3*(V(i+2,j,k)+V(i+2,j-1,k)-V(i-2,j,k)-V(i-2,j-1,k)) &
+                 ) / (2*dxmin)
+        g(3,2) = ( &
+                    D1*(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) - &
+                    D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
+                 ) / (2*dzmin)
+
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+        g(1,3) = ( &
+                    D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
+                    D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
+                 ) / (2*dxmin)
+        g(2,3) = ( &
+                    D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
+                    D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                 ) / (2*dymin)
+      end subroutine GradientTensorUG4
+    end subroutine S_Omega_IJ_4ord
+    
+    
+    
+    
+    function TKEDissipation(i, j, k, U, V, W) result(res)
       !includes resolved and subgrid
       ! epsilon =  2*nu*Sij*Sij where Sij = (di_uj + dj_ui)/2
       real(knd) :: res
@@ -1009,6 +1164,76 @@ module Subgrid
 
     end subroutine SGS_Sigma_stability
     
+
+    
+    subroutine SGS_WALE(U,V,W, filter_ratio)
+      !WALE subgrid model - Flow, Turbul. Combust, Nicoud F., Ducros F. (1999)
+      ! original implementation by Vojtech Votruba
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(in) :: filter_ratio
+      integer :: i, j, k
+      integer :: ii, jj, kk, ll
+      real (knd) :: width
+      real(knd) :: S(1:3,1:3)
+      real(knd) :: Omega(1:3,1:3)
+      real (knd) :: S_sqr, Omega_sqr, IVs
+      real (knd) :: SdSd, OP1, OP2
+
+
+
+      !$omp parallel do private(i,j,k,ii,jj,kk,ll,Omega,S,S_sqr,Omega_sqr,IVs,SdSd,OP1,OP2)
+      do k = 1, Prnz
+      
+        width = filter_ratio * (dxmin*dymin*dzPr(k))**(1._knd/3._knd)
+      
+        do j = 1, Prny
+          do i = 1, Prnx
+            if (discretization_order==4) then
+              call S_Omega_IJ_4ord(i, j, k, U, V, W, S, Omega)
+            else
+              call S_Omega_IJ(i, j, k, U, V, W, S, Omega)
+            end if
+            
+            S_sqr = 0
+            Omega_sqr = 0
+            IVs = 0
+
+            do ii = 1, 3
+              do jj = 1, 3
+                S_sqr = S_sqr + S(ii, jj)*S(ii, jj)
+                Omega_sqr = Omega_sqr + Omega(ii, jj) * Omega(ii, jj)
+              end do
+            end do
+
+            do ii = 1, 3
+              do jj = 1, 3
+                do kk = 1, 3
+                  do ll = 1, 3
+                    IVs = IVs + S(ii, kk) * S(kk, jj) * Omega(jj, ll) * Omega(ll, ii)
+                  end do
+                end do
+              end do
+            end do
+
+            SdSd = (1._knd/6._knd)*(S_sqr*S_sqr + Omega_sqr*Omega_sqr) + (2._knd/3._knd)*(S_sqr * Omega_sqr) + 2._knd*IVs
+            SdSd = max(SdSd, 0._knd)
+
+            OP1 = (SdSd)**(3._knd/2._knd)
+            OP2 = (S_sqr)**(5._knd/2._knd) + (SdSd)**(5._knd/4._knd)
+            if (OP2 == 0) then
+              Viscosity(i,j,k) = 0._knd
+            else
+              Viscosity(i,j,k) = (C_WALE * width)**(2) * OP1/OP2
+            endif
+            Viscosity(i,j,k) = Viscosity(i,j,k) + molecular_viscosity
+          end do
+        end do
+      end do
+      !$omp end parallel do
+
+    endsubroutine SGS_WALE
+    
+    
     
     
     subroutine SubgridModel(U, V, W)
@@ -1026,6 +1251,8 @@ module Subgrid
                         call SGS_Sigma_stability(U, V, W, filter_ratios(filtertype))
       else if (sgstype==MixedTimeScaleModel) then
                         call SGS_MixedTimeScale(U, V, W)
+      else if (sgstype==WALEModel) then
+                        call SGS_WALE(U, V, W, filter_ratios(filtertype))
       else
 
         Viscosity = molecular_viscosity
