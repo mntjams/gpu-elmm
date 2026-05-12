@@ -787,7 +787,14 @@ contains
     
 #ifdef CUSTOM_OUTPUT
     interface
-      subroutine CustomTimeStepOutput
+      subroutine CustomTimeStepOutput(U,V,W,Pr,Temperature,Moisture,Scalar,dt)
+        use Kinds
+        real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)   :: U,V,W
+        real(knd), dimension(-1:,-1:,-1:), contiguous, intent(in)   :: Pr
+        real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)   :: Temperature
+        real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)   :: Moisture
+        real(knd), dimension(-2:,-2:,-2:,:), contiguous, intent(in) :: Scalar
+        real(knd), intent(in) :: dt
       end subroutine
     end interface   
 #endif
@@ -1188,7 +1195,7 @@ contains
     end if
     
 #ifdef CUSTOM_OUTPUT
-    call CustomTimeStepOutput
+    call CustomTimeStepOutput(U,V,W,Pr,Temperature,Moisture,Scalar,dt)
 #endif
 
 contains

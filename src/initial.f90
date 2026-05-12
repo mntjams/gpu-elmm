@@ -308,7 +308,7 @@ contains
 
    
 
-   call get_boundary_conditions_velocity("boundconds-new.conf")
+   call get_boundary_conditions_velocity("boundconds.conf")
 
    open(unit,file="large_scale.conf",status="old",action="read",iostat = io)
    if (io==0) then
@@ -1204,7 +1204,10 @@ contains
     
     inquire(file=fname, exist=ex)
 
-    if (.not.ex) return
+    if (.not.ex) then
+      write(*,*) "Error, '",trim(fname),"' does not found."
+      call error_stop()
+    end if
 
     call parse_file(tree, fname, stat)
 
@@ -2633,22 +2636,26 @@ contains
         t_s%U_min = abs(t_s%U_min)
 
         if (maxval(t_s%U_max) <=  0) &
-          call error_stop("Error, time_stepping%U_max must have at least one non-zero component.")
+          call error_stop("Error, time_stepping%dt_min must be set or &
+            &time_stepping%U_max must have at least one non-zero component.")
 
-        if (maxval(t_s%U_min) <=  0) &
-          call error_stop("Error, time_stepping%U_min must have at least one non-zero component.")
+        if (t_s%dt_max <= 0 .and. maxval(t_s%U_min) <=  0) &
+          call error_stop("Error, time_stepping%dt_max must be set or &
+            &time_stepping%U_min must have at least one non-zero component.")
 
         if (t_s%CFL <= 0) &
           call error_stop("Error, time_stepping%CFL must be positive.")
 
 
-        t_s%dt_min = t_s%CFL / (t_s%U_max(1) / dxmin + &
-                                t_s%U_max(2) / dymin + &
-                                t_s%U_max(3) / dzmin)
+        if (t_s%dt_min <= 0) &
+          t_s%dt_min = t_s%CFL / (t_s%U_max(1) / dxmin + &
+                                  t_s%U_max(2) / dymin + &
+                                  t_s%U_max(3) / dzmin)
         
-        t_s%dt_max = t_s%CFL / (t_s%U_min(1) / dxmin + &
-                                t_s%U_min(2) / dymin + &
-                                t_s%U_min(3) / dzmin)
+        if (t_s%dt_max <= 0) &
+          t_s%dt_max = t_s%CFL / (t_s%U_min(1) / dxmin + &
+                                  t_s%U_min(2) / dymin + &
+                                  t_s%U_min(3) / dzmin)
 
         t_s%dt = t_s%dt_min
 
