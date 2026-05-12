@@ -2490,7 +2490,7 @@ contains
       if (zone%scalar==0) then
         zone%active = .false.
       end if
-print *,zone
+
       if (zone%active) then
         call AddScalarRemovalZone(zone)
       end if
