@@ -418,9 +418,10 @@ contains
 
     !$omp do collapse(2)
     do k = 1, Unz
-      do j = 1, Uny
+Uj:   do j = 1, Uny
         p = 0
         do i = loU, hiU
+          if (Utype(i,j,k)>0) cycle Uj
           p = p + U(i,j,k)
         end do
         p = p / (hiU - loU + 1)
@@ -429,15 +430,16 @@ contains
           DF = DampF(xb)
           U(i,j,k) = p + DF * (U(i,j,k) - p)
         end do
-      end do
+      end do Uj
     end do
     !$omp end do
 
     !$omp do collapse(2)
     do k = 1, Vnz
-      do j = 1, Vny
+Vj: do j = 1, Vny
         p = 0
         do i = lo, hi
+          if (Vtype(i,j,k)>0) cycle Vj
           p = p + V(i,j,k)
         end do
         p = p / (hi - lo + 1)
@@ -446,15 +448,16 @@ contains
           DF = DampF(xb)
           V(i,j,k) = p + DF * (V(i,j,k) - p)
         end do
-      end do
+      end do Vj
     end do
     !$omp end do
 
     !$omp do collapse(2)
     do k = 1, Wnz
-      do j = 1, Wny
+Wj: do j = 1, Wny
         p = 0
         do i = lo, hi
+          if (Wtype(i,j,k)>0) cycle Wj
           p = p + W(i,j,k)
         end do
         p = p / (hi - lo + 1)
@@ -463,16 +466,17 @@ contains
           DF = DampF(xb)
           W(i,j,k) = p + DF * (W(i,j,k) - p)
         end do
-      end do
+      end do Wj
     end do
     !$omp end do
 
     if (enable_buoyancy) then
       !$omp do collapse(2)
       do k = 1, Prnz
-        do j = 1, Prny
+Prj:    do j = 1, Prny
           p = 0
           do i = lo, hi
+            if (Prtype(i,j,k)>0) cycle Prj
             p = p + temperature(i,j,k)
           end do
           p = p / (hi - lo + 1)
@@ -481,7 +485,7 @@ contains
             DF = DampF(xb)
             temperature(i,j,k) = p + DF * (temperature(i,j,k) - p)
           end do
-        end do
+        end do Prj
       end do
       !$omp end do
     end if

@@ -8,9 +8,11 @@ module ScalarAdvection
   
   private
   
-  public AdvScalar, AddScalarAdvVector, ScalarAdvection_Deallocate
+  public AdvScalar, AddScalarAdvVector, ScalarAdvection_Deallocate, enable_correct_divergence_scalar
   
   real(knd), allocatable :: Slope(:,:,:)
+
+  logical :: enable_correct_divergence_scalar = .false.
 
   
 contains
@@ -46,6 +48,8 @@ contains
                         temperature_flux_profileLoc)
 #endif
     end if
+
+    if (enable_correct_divergence_scalar) call correct_divergence(Scal2, Scal, U, V, W)
 
     if (present(temperature_flux_profile)) then
       if (size(temperature_flux_profile)==size(temperature_flux_profileLoc)) &
@@ -730,6 +734,55 @@ contains
 
   
   
+  subroutine correct_divergence(Scal2, Scal, U, V, W)
+    real(knd), contiguous, intent(out) :: Scal2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)  :: Scal(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    integer :: i, j, k
+    real(knd) :: div
+    real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+
+    ! u grad(S) = div(u S) - div(u) S
+
+    if (discretization_order==4) then
+      !$omp parallel do collapse(3) private(i,j,k,div)
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            if (Prtype(i,j,k)==0) then
+              div = ( C1*(U(i,j,k)-U(i-1,j,k)) - C3*(U(i+1,j,k)-U(i-2,j,k)) ) / dxmin &
+                  + ( C1*(V(i,j,k)-V(i,j-1,k)) - C3*(V(i,j+1,k)-V(i,j-2,k)) ) / dymin &
+                  + ( C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k+1)-W(i,j,k-2)) ) / dzmin
+              Scal2(i,j,k) = Scal2(i,j,k) + div * Scal(i,j,k)
+            end if
+          end do
+        end do
+      end do
+    else
+      !$omp parallel do collapse(3) private(i,j,k,div)
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            if (Prtype(i,j,k)==0) then
+              div = (U(i,j,k) - U(i-1,j,k)) / dxmin &
+                  + (V(i,j,k) - V(i,j-1,k)) / dymin &
+                  + (W(i,j,k) - W(i,j,k-1)) / dzPr(k)
+
+              div = 0
+              if (Scflx_mask(i,j,k)) div = div + U(i,j,k) / dxmin
+              if (Scflx_mask(i-1,j,k)) div = div - U(i-1,j,k) / dxmin
+              if (Scfly_mask(i,j,k)) div = div + V(i,j,k) / dymin
+              if (Scfly_mask(i,j-1,k)) div = div - V(i,j-1,k) / dymin
+              if (Scflz_mask(i,j,k)) div = div + W(i,j,k) / dzmin
+              if (Scflz_mask(i,j,k-1)) div = div - W(i,j,k-1) / dzPr(k)
+
+              Scal2(i,j,k) = Scal2(i,j,k) + div * Scal(i,j,k)
+            end if
+          end do
+        end do
+      end do
+    end if
+  end subroutine
 
 
 

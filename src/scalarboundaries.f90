@@ -16,11 +16,11 @@ contains
 
 
   subroutine CommonBase(arr,Sc_btype,side,in,BsideArr,BsideFlArr)
-    real(knd),intent(inout) :: arr(-2:,-2:,-2:)
-    integer  ,intent(in)    :: Sc_btype(6)
-    real(knd),intent(in)    :: side(6)
-    real(knd),intent(in),optional :: in(-2:,-2:)
-    real(knd),intent(in),allocatable,optional :: BsideArr(:,:), BsideFlArr(:,:)
+    real(knd), contiguous, intent(inout) :: arr(-2:,-2:,-2:)
+    integer, intent(in) :: Sc_btype(6)
+    real(knd), intent(in) :: side(6)
+    real(knd), contiguous, intent(in), optional :: in(-2:,-2:)
+    real(knd), intent(in), allocatable, optional :: BsideArr(:,:), BsideFlArr(:,:)
     integer :: i,j,k,nx,ny,nz
 
     nx = Prnx
@@ -282,7 +282,7 @@ contains
 
 
   subroutine BoundScalar(SCAL)
-    real(knd),intent(inout) :: Scal(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: Scal(-2:,-2:,-2:)
 
     call CommonBase(SCAL,ScalBtype,sideScal)
 
@@ -297,7 +297,7 @@ contains
 #ifdef PAR
     use domains_bc_par
 #endif
-    real(knd),intent(inout) :: Temperature(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: Temperature(-2:,-2:,-2:)
     
 #ifdef PAR
     call par_update_domain_bounds_temperature(Temperature, time_stepping%effective_time)
@@ -312,7 +312,7 @@ contains
 #ifdef PAR
     use domains_bc_par
 #endif
-    real(knd),intent(inout) :: Moisture(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: Moisture(-2:,-2:,-2:)
 
 #ifdef PAR
     call par_update_domain_bounds_moisture(Moisture, time_stepping%effective_time)
@@ -324,7 +324,7 @@ contains
 
 
   subroutine BoundViscosity(Nu)
-    real(knd),contiguous,intent(inout) :: Nu(-1:,-1:,-1:)
+    real(knd), contiguous, intent(inout) :: Nu(-1:,-1:,-1:)
     integer :: i,j,k,nx,ny,nz
 
     nx = Prnx

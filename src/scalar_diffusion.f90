@@ -28,7 +28,7 @@ module ScalarDiffusion
   abstract interface
     subroutine boundary_interface(array)
       use Parameters
-      real(knd), intent(inout) :: array(-2:,-2:,-2:)
+      real(knd), contiguous, intent(inout) :: array(-2:,-2:,-2:)
     end subroutine
   end interface
 
