@@ -1,34 +1,9 @@
-module Outputs
+module OutputData
   use Parameters
-  use Boundaries
-  use Scalars
-  use Wallmodels, only: GroundDeposition, &
-                        GroundUstar, GroundUstarUVW, &
-                        GroundTFlux, GroundTFluxUVW, &
-                        GroundMFlux, GroundMFluxUVW, &
-                        wallmodeltype
-  use ImmersedBoundary
-  use Turbinlet, only: turb_gen => default_turbulence_generator
-  use Endianness
-  use FreeUnit
-  use VTKFrames, only: SaveVTKFrames, FinalizeVTKFrames
-#ifdef PAR
-  use Frames_ParallelIO, only: SaveFrames_ParallelIO, FinalizeFrames_ParallelIO
-#endif
-  use SurfaceFrames, only: SaveSurfaceFrames, FinalizeSurfaceFrames
-  use StaggeredFrames, only: SaveStaggeredFrames, FinalizeStaggeredFrames
-  use Output_helpers
-  use VerticalProfiles
+  use VerticalProfiles, only: ProfileSwitches, TimeAveragedProfiles, InstantaneousProfiles, TimeAveragedProfiles
   
-
   implicit none
- 
-
-  !private
-  public store, display, probes, scalar_probes,  &
-         OutTStep, Output, CreateOutputDirectories, AllocateOutputs, ReadProbes,  &
-         ProfileSwitches, current_profiles, profiles_config, enable_profiles
-         
+  
   type(ProfileSwitches) :: profiles_config
   
   type(TimeAveragedProfiles), allocatable :: average_profiles
@@ -163,7 +138,44 @@ module Outputs
     integer :: mstar = 0
   end type
 
-  type(TDisplaySwitches), save :: display
+  type(TDisplaySwitches), save :: display  
+
+
+end module
+
+
+module Outputs
+  use Parameters
+  use OutputData
+  use Boundaries
+  use Scalars
+  use Wallmodels, only: GroundDeposition, &
+                        GroundUstar, GroundUstarUVW, &
+                        GroundTFlux, GroundTFluxUVW, &
+                        GroundMFlux, GroundMFluxUVW, &
+                        wallmodeltype
+  use ImmersedBoundary
+  use Turbinlet, only: turb_gen => default_turbulence_generator
+  use Endianness
+  use FreeUnit
+  use VTKFrames, only: SaveVTKFrames, FinalizeVTKFrames
+#ifdef PAR
+  use Frames_ParallelIO, only: SaveFrames_ParallelIO, FinalizeFrames_ParallelIO
+#endif
+  use SurfaceFrames, only: SaveSurfaceFrames, FinalizeSurfaceFrames
+  use StaggeredFrames, only: SaveStaggeredFrames, FinalizeStaggeredFrames
+  use Output_helpers
+  use VerticalProfiles
+  
+
+  implicit none
+ 
+
+  private
+  public store, display, probes, scalar_probes,  &
+         OutTStep, Output, CreateOutputDirectories, AllocateOutputs, ReadProbes,  &
+         ProfileSwitches, current_profiles, profiles_config, enable_profiles
+         
 
   !line feed
   character, parameter :: lf = achar(10)
