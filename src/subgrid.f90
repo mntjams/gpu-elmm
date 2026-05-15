@@ -6,7 +6,7 @@ module Subgrid
   implicit none
 
   private
-  public :: sgstype, SubgridModel, TKEDissipation, C_MixedTimeScale
+  public :: sgstype, SubgridModel, TKEDissipation, ScalarDissipation, C_MixedTimeScale
 
 !   real(knd),parameter :: CSmag = 0.122_knd
 
@@ -182,7 +182,7 @@ module Subgrid
 
 
 
-     subroutine StrainIJ(i, j, k, U, V, W, S)     !Computes components of the strain rate tensor.
+    subroutine StrainIJ(i, j, k, U, V, W, S)     !Computes components of the strain rate tensor.
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(out) :: S(1:3,1:3)
       integer, intent(in) :: i, j, k
@@ -206,10 +206,79 @@ module Subgrid
         S(ii,jj) = (D(ii,jj) + D(jj,ii)) / 2
        end do
       end do
-    endsubroutine StrainIJ
-    
-    
-     subroutine S_Omega_IJ(i, j, k, U, V, W, S, Om)     !Computes components of the strain rate tensor.
+    end subroutine StrainIJ
+
+
+    subroutine GradUIJ(i, j, k, U, V, W, g)     !Computes components of the strain rate tensor.
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd), intent(out) :: g(1:3,1:3)
+      integer, intent(in) :: i, j, k
+      real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+      real(knd), parameter :: D1 = 2._knd / 3, D3 = 1._knd / 12
+
+      if (discretization_order==4) then
+
+        g(1,1) = (C1*(U(i,j,k)-U(i-1,j,k)) - C3*(U(i+1,j,k)-U(i-2,j,k))) / dxmin
+        g(2,1) = ( &
+                    D1*(U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) - &
+                    D3*(U(i,j+2,k)+U(i-1,j+2,k)-U(i,j-2,k)-U(i-1,j-2,k)) &
+                 ) / (2*dymin)
+        g(3,1) = ( &
+                    D1*(U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) - &
+                    D1*(U(i,j,k+2)+U(i-1,j,k+2)-U(i,j,k-2)-U(i-1,j,k-2)) &
+                 ) / (2*dzmin)
+
+        g(2,2) = (C1*(V(i,j,k)-V(i,j-1,k)) - C3*(V(i,j+1,k)-V(i,j-2,k))) / dymin
+        g(1,2) = ( &
+                    D1*(V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) - &
+                    D3*(V(i+2,j,k)+V(i+2,j-1,k)-V(i-2,j,k)-V(i-2,j-1,k)) &
+                 ) / (2*dxmin)
+        g(3,2) = ( &
+                    D1*(V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) - &
+                    D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
+                 ) / (2*dzmin)
+
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k+1)-W(i,j,k-2))) / dzmin
+        g(1,3) = ( &
+                    D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
+                    D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
+                 ) / (2*dxmin)
+        g(2,3) = ( &
+                    D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
+                    D3*(W(i,j+2,k)+W(i,j+2,k-1)-W(i,j-2,k)-W(i,j-2,k-1)) &
+                 ) / (2*dymin)
+      else
+        g(1,1) = (U(i,j,k)-U(i-1,j,k)) / dxmin
+        g(2,2) = (V(i,j,k)-V(i,j-1,k)) / dymin
+        g(3,3) = (W(i,j,k)-W(i,j,k-1)) / dzPr(k)
+        g(1,2) = (U(i,j+1,k)+U(i-1,j+1,k)-U(i,j-1,k)-U(i-1,j-1,k)) / (4 * dymin)
+        g(1,3) = (U(i,j,k+1)+U(i-1,j,k+1)-U(i,j,k-1)-U(i-1,j,k-1)) / (2 * (zPr(k+1)-zPr(k-1)))
+        g(2,1) = (V(i+1,j,k)+V(i+1,j-1,k)-V(i-1,j,k)-V(i-1,j-1,k)) / (4 * dxmin)
+        g(2,3) = (V(i,j,k+1)+V(i,j-1,k+1)-V(i,j,k-1)-V(i,j-1,k-1)) / (2 * (zPr(k+1)-zPr(k-1)))
+        g(3,1) = (W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) / (4 * dxmin)
+        g(3,2) = (W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) / (4 * dymin)
+      end if
+    end subroutine GradUIJ
+
+    subroutine GradSIJ(i, j, k, S, g)     !Computes components of the strain rate tensor.
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: S
+      real(knd), intent(out) :: g(1:3)
+      integer, intent(in) :: i, j, k
+      real(knd), parameter :: D1 = 2._knd / 3, D3 = 1._knd / 12
+
+      if (discretization_order==4) then
+        g(1) = (D1*(S(i+1,j,k)-S(i-1,j,k)) - D3*(S(i+2,j,k)-S(i-2,j,k))) / dxmin
+        g(2) = (D1*(S(i,j+1,k)-S(i,j-1,k)) - D3*(S(i,j+2,k)-S(i,j-2,k))) / dymin
+        g(3) = (D1*(S(i,j,k+1)-S(i,j,k-1)) - D3*(S(i,j,k+2)-S(i,j,k-2))) / dzmin
+      else
+        g(1) = (S(i+1,j,k)-S(i-1,j,k)) / dxmin
+        g(2) = (S(i,j+1,k)-S(i,j-1,k)) / dymin
+        g(3) = (S(i,j,k+1)-S(i,j,k-1)) / dzPr(k)
+      end if
+    end subroutine GradSIJ
+
+
+    subroutine S_Omega_IJ(i, j, k, U, V, W, S, Om)     !Computes components of the strain rate tensor.
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(out) :: S(1:3,1:3), Om(1:3,1:3)
       integer, intent(in) :: i, j, k
@@ -234,7 +303,7 @@ module Subgrid
           Om(ii,jj) = (D(ii,jj) - D(jj,ii)) / 2
         end do
       end do
-    endsubroutine S_Omega_IJ
+    end subroutine S_Omega_IJ
     
     
     subroutine StrainIJ_4ord(i, j, k, U, V, W, S)     !Computes components of the strain rate tensor.
@@ -285,19 +354,19 @@ module Subgrid
                     D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
                  ) / (2*dzmin)
 
-        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k+1)-W(i,j,k-2))) / dzmin
         g(1,3) = ( &
                     D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
                     D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
                  ) / (2*dxmin)
         g(2,3) = ( &
                     D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
-                    D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                    D3*(W(i,j+2,k)+W(i,j+2,k-1)-W(i,j-2,k)-W(i,j-2,k-1)) &
                  ) / (2*dymin)
       end subroutine GradientTensorUG4
     end subroutine StrainIJ_4ord
-    
-    
+
+
     subroutine S_Omega_IJ_4ord(i, j, k, U, V, W, S, Om)     !Computes components of the strain rate tensor.
       real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
       real(knd), intent(out) :: S(1:3,1:3), Om(1:3,1:3)
@@ -347,14 +416,14 @@ module Subgrid
                     D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
                  ) / (2*dzmin)
 
-        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k+1)-W(i,j,k-2))) / dzmin
         g(1,3) = ( &
                     D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
                     D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
                  ) / (2*dxmin)
         g(2,3) = ( &
                     D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
-                    D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                    D3*(W(i,j+2,k)+W(i,j+2,k-1)-W(i,j-2,k)-W(i,j-2,k-1)) &
                  ) / (2*dymin)
       end subroutine GradientTensorUG4
     end subroutine S_Omega_IJ_4ord
@@ -364,21 +433,41 @@ module Subgrid
     
     function TKEDissipation(i, j, k, U, V, W) result(res)
       !includes resolved and subgrid
-      ! epsilon =  2*nu*Sij*Sij where Sij = (di_uj + dj_ui)/2
+      ! epsilon = 2*nu*Sij*Sij where Sij = (di_uj + dj_ui)/2
+      ! epsilon = nu * sum g_ij^2 where g_ij = dj_ui
       real(knd) :: res
       integer, intent(in) :: i,j,k
-      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U,V,W
-      real(knd) :: S(1:3,1:3)
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: U, V, W
+      real(knd) :: g(1:3,1:3)
       integer :: ii, jj
 
-      call StrainIJ(i, j, k, U, V, W, S)
+      call GradUIJ(i, j, k, U, V, W, g)
       res = 0
       do jj = 1, 3
         do ii = 1, 3
-          res = res + S(ii,jj)*S(ii,jj)
+          res = res + g(ii,jj)**2
         end do
       end do
-      res = 2 * Viscosity(i,j,k) * res
+      res = Viscosity(i,j,k) * res
+    end function
+
+
+    function ScalarDissipation(i, j, k, S) result(res)
+      ! 1/2 of the dissipation, e.g., epsilon_theta
+      !includes resolved and subgrid
+      ! epsilon_theta =  nu*(Sg)^2 where Sij = (di_uj + dj_ui)/2
+      real(knd) :: res
+      integer, intent(in) :: i,j,k
+      real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in) :: S
+      real(knd) :: g(1:3)
+      integer :: ii, jj
+
+      call GradSIJ(i, j, k, S, g)
+      res = 0
+      do ii = 1, 3
+        res = res + g(ii)**2
+      end do
+      res = Viscosity(i,j,k) * res
     end function
 
 
@@ -761,14 +850,14 @@ module Subgrid
                     D3*(V(i,j,k+2)+V(i,j-1,k+2)-V(i,j,k-2)-V(i,j-1,k-2)) &
                  ) / (2*dzmin)
 
-        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k)-W(i,j,k-1))) / dzmin
+        g(3,3) = (C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k+1)-W(i,j,k-2))) / dzmin
         g(1,3) = ( &
                     D1*(W(i+1,j,k)+W(i+1,j,k-1)-W(i-1,j,k)-W(i-1,j,k-1)) - &
                     D3*(W(i+2,j,k)+W(i+2,j,k-1)-W(i-2,j,k)-W(i-2,j,k-1)) &
                  ) / (2*dxmin)
         g(2,3) = ( &
                     D1*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) - &
-                    D3*(W(i,j+1,k)+W(i,j+1,k-1)-W(i,j-1,k)-W(i,j-1,k-1)) &
+                    D3*(W(i,j+2,k)+W(i,j+2,k-1)-W(i,j-2,k)-W(i,j-2,k-1)) &
                  ) / (2*dymin)
       end subroutine GradientTensorUG4
 

@@ -114,12 +114,15 @@ contains
             class default
               if (SB%rough) then
                 p%z0 = SB%z0
+                p%z0H = SB%z0H
+                p%temperature_flux = SB%temperature_flux
+                p%moisture_flux = SB%moisture_flux
               else
                 p%z0 = 0
               end if
           end select
           
-          p%z0H = p%z0
+          if (p%z0H==0.and.p%z0>0) p%z0H = p%z0
 
           call AddWMPoint(p)
         end if
@@ -260,6 +263,9 @@ contains
                   
                     if (SB%rough) then
                       p%z0 = SB%z0
+                      p%z0H = SB%z0H
+                      p%temperature_flux = SB%temperature_flux
+                      p%moisture_flux = SB%moisture_flux
                     else
                       p%z0 = 0
                     end if
@@ -276,7 +282,7 @@ contains
                   call error_stop("Error, WM point UVW is too close to the wall!")
                 end if
                 
-                p%z0H = p%z0
+                if (p%z0H==0.and.p%z0>0) p%z0H = p%z0
                 
                 call AddWMPointUVW(p, component, dir)
               end if

@@ -13,17 +13,31 @@ module Sponge
             enable_in_sponge_x, enable_out_sponge_x, enable_out_sponge_y, &
             SpongeTop, SpongeOut, SpongeTopScalar, &
             top_sponge_bottom, sponge_to_profiles, &
-            U_sponge_avg, V_sponge_avg, W_sponge_avg
+            U_sponge_avg, V_sponge_avg, W_sponge_avg, Temperature_sponge_avg, Moisture_sponge_avg, &
+            rayleigh_damping_uvw, rayleigh_damping_temperature, rayleigh_damping_moisture, &
+            init_rayleigh_damping_top, rayleigh_damping_top_properties
 
   logical :: enable_top_sponge = .false.
   logical :: enable_top_sponge_scalar = .false.
   logical :: enable_in_sponge_x = .false.
   logical :: enable_out_sponge_x = .false.
   logical :: enable_out_sponge_y = .false.
+  logical :: enable_top_rayleigh_damping = .false.
 
   logical :: sponge_to_profiles = .false.
 
-  real(knd), dimension(:), allocatable :: U_sponge_avg, V_sponge_avg, W_sponge_avg
+  real(knd), dimension(:), allocatable :: U_sponge_avg, V_sponge_avg, W_sponge_avg, Temperature_sponge_avg, Moisture_sponge_avg
+  
+  type damping_properties
+    real(knd) :: bottom, top !global constants for all images
+    real(knd), dimension(:), allocatable :: coefficient(:)
+    real(knd), dimension(:), allocatable :: coefficientW(:)
+    integer :: kbottom = 1, ktop = 0
+    integer :: kWbottom = 1, kWtop = 0
+    real(knd), dimension(:), allocatable :: u_prof, v_prof, w_prof, temperature_prof, moisture_prof
+  end type
+  
+  type(damping_properties) :: rayleigh_damping_top_properties
 
   real(knd) :: top_sponge_bottom = huge(1._knd)
 
@@ -591,7 +605,188 @@ Prj:    do j = 1, Prny
     end if
 
   end subroutine SpongeOut_Y
+  
+  
+  
+  
+  
+  
+  subroutine rayleigh_damping_uvw(U2, V2, W2, U, V, W)
+    real(knd), contiguous, intent(inout) :: U2(-2:,-2:,-2:), V2(-2:,-2:,-2:), W2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+  
+    if (enable_top_rayleigh_damping) call rayleigh_damping_top_uvw(U2, V2, W2, U, V, W)
+  end subroutine
+  
+  subroutine rayleigh_damping_temperature(Temperature2, Temperature)
+    real(knd), contiguous, intent(inout) :: Temperature2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in) :: Temperature(-2:,-2:,-2:)
+  
+    if (enable_top_rayleigh_damping) call rayleigh_damping_top_temperature(Temperature2, Temperature)
+  end subroutine
+  
+  subroutine rayleigh_damping_moisture(Moisture2, Moisture)
+    real(knd), contiguous, intent(inout) :: Moisture2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in) :: Moisture(-2:,-2:,-2:)
+  
+    if (enable_top_rayleigh_damping) call rayleigh_damping_top_moisture(Moisture2, Moisture)
+  end subroutine
+  
+  
+  subroutine rayleigh_damping_top_uvw(U2, V2, W2, U, V, W)
+    !an alternative formulation of the top sponge as a tendency
+    real(knd), contiguous, intent(inout) :: U2(-2:,-2:,-2:), V2(-2:,-2:,-2:), W2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in) :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    integer :: i, j, k
+  
+    associate(prop => rayleigh_damping_top_properties)
+    
+      do k = prop%kbottom, prop%ktop
+        do j = 1, Uny
+          do i = 1, Unx
+            U2(i,j,k) = U2(i,j,k) - prop%coefficient(k) * (U(i,j,k) - prop%u_prof(k))
+          end do
+        end do      
+      end do
+    
+      do k = prop%kbottom, prop%ktop
+        do j = 1, Vny
+          do i = 1, Vnx
+            V2(i,j,k) = V2(i,j,k) - prop%coefficient(k) * (V(i,j,k) - prop%v_prof(k))
+          end do
+        end do      
+      end do
+    
+      do k = prop%kWbottom, prop%kWtop
+        do j = 1, Wny
+          do i = 1, Wnx
+            W2(i,j,k) = W2(i,j,k) - prop%coefficientW(k) * (W(i,j,k) - prop%w_prof(k))
+          end do
+        end do      
+      end do
+    
+    end associate
+    
+  end subroutine
 
+  subroutine rayleigh_damping_top_Temperature(Temperature2, Temperature)
+    !an alternative formulation of the top sponge as a tendency
+    real(knd), contiguous, intent(inout) :: Temperature2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in) :: Temperature(-2:,-2:,-2:)
+    integer :: i, j, k
+  
+    associate(prop => rayleigh_damping_top_properties)
+    
+      do k = prop%kbottom, prop%ktop
+        do j = 1, Uny
+          do i = 1, Unx
+            Temperature2(i,j,k) = Temperature2(i,j,k) - prop%coefficient(k) * (Temperature(i,j,k) - prop%temperature_prof(k))
+          end do
+        end do      
+      end do
+    
+    end associate
+    
+  end subroutine
+
+  subroutine rayleigh_damping_top_Moisture(Moisture2, Moisture)
+    !an alternative formulation of the top sponge as a tendency
+    real(knd), contiguous, intent(inout) :: Moisture2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in) :: Moisture(-2:,-2:,-2:)
+    integer :: i, j, k
+  
+    associate(prop => rayleigh_damping_top_properties)
+    
+      do k = prop%kbottom, prop%ktop
+        do j = 1, Uny
+          do i = 1, Unx
+            Moisture2(i,j,k) = Moisture2(i,j,k) - prop%coefficient(k) * (Moisture(i,j,k) - prop%moisture_prof(k))
+          end do
+        end do      
+      end do
+    
+    end associate
+    
+  end subroutine
+  
+  
+  
+  subroutine init_rayleigh_damping_top(bottom, top, coefficient_fun)
+    real(knd), intent(in) :: bottom, top    
+    interface
+      function coefficient_fun(z) result(res)
+        use Kinds
+        real(knd) :: res
+        real(knd), intent(in) :: z
+      end function
+    end interface
+    
+    integer :: k
+    
+    if (top>bottom .and. top>zW(0) .and. bottom<zW(Prnz)) then
+      associate(prop => rayleigh_damping_top_properties)
+      
+        enable_top_rayleigh_damping = .true.
+      
+        prop%bottom = bottom
+        prop%top = top
+        
+        do k = 1, Prnz
+          if (zPr(k)>=bottom) then
+            if (prop%kbottom==0) prop%kbottom = k
+            if (zPr(k) <= top) prop%ktop = k
+          end if
+        end do
+        
+        if (prop%ktop>=prop%kbottom) allocate(prop%coefficient(prop%kbottom:prop%ktop))
+        
+        do k = prop%kbottom, prop%ktop
+          prop%coefficient(k) = coefficient_fun(zPr(k))
+        end do
+        
+        do k = 1, Wnz
+          if (zW(k)>=bottom) then
+            if (prop%kWbottom==0) prop%kWbottom = k
+            if (zW(k) <= top) prop%kWtop = k
+          end if
+        end do
+        
+        if (prop%kWtop>=prop%kWbottom) allocate(prop%coefficientW(prop%kWbottom:prop%kWtop))
+        
+        do k = prop%kWbottom, prop%kWtop
+          prop%coefficientW(k) = coefficient_fun(zW(k))
+        end do
+        
+        ! currently to be set by external code that calls this subroutine
+        allocate(prop%u_prof(prop%kbottom:prop%ktop))
+        allocate(prop%v_prof(prop%kbottom:prop%ktop))
+        allocate(prop%w_prof(prop%kWbottom:prop%kWtop))
+        prop%u_prof = 0
+        prop%v_prof = 0
+        prop%w_prof = 0
+        if (enable_buoyancy) then
+          allocate(prop%temperature_prof(prop%kbottom:prop%ktop))
+          prop%temperature_prof = temperature_ref
+        else
+          allocate(prop%temperature_prof(1:0))
+        end if
+        if (enable_moisture) then
+          allocate(prop%moisture_prof(prop%kbottom:prop%ktop))
+          prop%moisture_prof = moisture_ref
+        else
+          allocate(prop%moisture_prof(1:0))        
+        end if
+      end associate
+    else
+      associate(prop => rayleigh_damping_top_properties)
+        allocate(prop%u_prof(1:0))
+        allocate(prop%v_prof(1:0))
+        allocate(prop%w_prof(1:0))
+        allocate(prop%temperature_prof(1:0))
+        allocate(prop%moisture_prof(1:0))  
+      end associate
+    end if
+  end subroutine
 
 
 end module

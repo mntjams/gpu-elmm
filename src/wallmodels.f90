@@ -1795,6 +1795,7 @@ contains
     real(knd),intent(in)    :: z0,temperature_flux
     real(knd),intent(in)    :: distvect(3),uvect(3)
     real(knd) :: vect(3),vel,dist
+    real(knd) :: g_cos
 
     dist = norm2(distvect)
 
@@ -1803,7 +1804,11 @@ contains
     vel = norm2(vect)
 
     if (vel/=0) then
-      call WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_flux,temperature_ref,grav_acc)
+      !HACK: diminishes influence of MO in sloped terrain
+      !TODO: consider negative g for top solid boundaries
+      g_cos = abs(distvect(3)) / dist
+
+      call WM_MO_FLUX_ustar(vel,dist,ustar,z0,temperature_flux,temperature_ref,g_cos)
       
       if (ustar<0) ustar = 0
       

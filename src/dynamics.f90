@@ -235,7 +235,7 @@ contains
     use MomentumAdvection_variable_z
     use VolumeSources, only: ResistanceForce
     use LinearForcing, only: linear_forcing
-    use VTKArray
+    use Sponge, only: rayleigh_damping_uvw
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(in)    :: U, V, W
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(out)   :: U2, V2, W2
     real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: Ustar, Vstar ,Wstar
@@ -425,6 +425,8 @@ contains
     call ResistanceForce(Ustar, Vstar, Wstar, U, V, W)
     
     call linear_forcing(Ustar, Vstar, Wstar, U, V, W)
+    
+    call rayleigh_damping_uvw(Ustar, Vstar, Wstar, U, V, W)
 
     call StressBoundaryFlux(Ustar, Vstar, dt)
 
