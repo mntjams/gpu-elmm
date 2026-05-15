@@ -18,7 +18,8 @@ implicit none
      InitScalar, &
      SubsidenceGradient, InitSubsidenceProfile, &
      AddScalarAdvVector, AddScalarDiffVector, &
-     Scalars_Deallocate
+     Scalars_Deallocate, &
+     TScalarRemovalZone, InitScalarRemovalZones, AddScalarRemovalZone
 
 
   real(knd), dimension(:), allocatable :: partdiam, partrho, percdistrib !diameter of particles <=0 for gas
@@ -44,6 +45,21 @@ implicit none
   type(TScalarProfile) :: MoistureProfileObj
 
   type(TScalarProfile) :: SubsidenceProfileObj
+
+  integer, parameter, public :: removal_instantaneous = 0, removal_continuous = 1
+
+  type TScalarRemovalZone
+    !the value of active can be different in different images
+    logical :: active = .true.
+    real(knd) :: x1 = 0, x2 = -0, y1 = 0, y2 = -1, z1 = 0, z2 = -1
+    integer :: i1 = 0, i2 = -1, j1 = 0, j2 = -1, k1 = 0, k2 = -1
+    integer :: type = removal_instantaneous
+    ! -1 .. all, 0.. none, 1.. scalar 1, 2.. scalar 2, ...
+    integer :: scalar = -1
+    real(knd) :: relaxation_time = huge(1._knd)
+  end type
+
+  type(TScalarRemovalZone), dimension(:), allocatable :: ScalarRemovalZones
 
   !module variables to enable deallocation before program end
   real(knd), dimension(:,:,:),  allocatable :: Temperature_adv, Temperature_2
@@ -206,10 +222,11 @@ contains
                  BoundScalar, ScalarExtra)
     end do
 
-    if (computedeposition>0) call Deposition(Scalar_2,2._knd*RK_alpha(RK_stage)*dt)
+    if (computedeposition>0) call Deposition(Scalar, 2*RK_alpha(RK_stage)*dt)
 
-    if (computegravsettling>0) call GravSettling(Scalar_2,2._knd*RK_alpha(RK_stage)*dt)
+    if (computegravsettling>0) call GravSettling(Scalar, 2*RK_alpha(RK_stage)*dt)
 
+    call ScalarRemovalZones_Apply(Scalar, 2*RK_alpha(RK_stage)*dt)
 
     contains
 
@@ -837,5 +854,100 @@ contains
     end if
   end subroutine InitSubsidenceProfile
 
+
+
+
+  subroutine ScalarRemovalZones_Apply(Scalar, dt)
+    real(knd), contiguous, intent(inout) :: Scalar(-2:,-2:,-2:,1:)
+    real(knd), intent(in) :: dt
+    integer :: izone
+
+    do izone = 1, size(ScalarRemovalZones)
+      if (ScalarRemovalZones(izone)%active) then
+        call ScalarRemovalZone_Apply(ScalarRemovalZones(izone), Scalar, dt)
+      end if
+    end do
+  end subroutine ScalarRemovalZones_Apply
+
+  subroutine ScalarRemovalZone_Apply(zone, Scalar, dt)
+    type(TScalarRemovalZone), intent(in) :: zone
+    real(knd), contiguous, intent(inout) :: Scalar(-2:,-2:,-2:,1:)
+    real(knd), intent(in) :: dt
+    integer :: i, j, k
+
+  
+    if (zone%type==removal_continuous) then
+      if (zone%scalar==-1) then
+        do k = zone%k1, zone%k2
+          do j = zone%j1, zone%j2
+            do i = zone%i1, zone%i2
+              Scalar(i,j,k,:) = Scalar(i,j,k,:) * exp(-dt/zone%relaxation_time)
+            end do
+          end do
+        end do
+      else
+        do k = zone%k1, zone%k2
+          do j = zone%j1, zone%j2
+            do i = zone%i1, zone%i2
+              Scalar(i,j,k,zone%scalar) = Scalar(i,j,k,zone%scalar) * exp(-dt/zone%relaxation_time)
+            end do
+          end do
+        end do
+      end if
+    else if (zone%type==removal_instantaneous) then
+      if (zone%scalar==-1) then 
+        do k = zone%k1, zone%k2
+          do j = zone%j1, zone%j2
+            do i = zone%i1, zone%i2
+              Scalar(i,j,k,:) = 0
+            end do
+          end do
+        end do
+      else
+        do k = zone%k1, zone%k2
+          do j = zone%j1, zone%j2
+            do i = zone%i1, zone%i2
+              Scalar(i,j,k,zone%scalar) = 0
+            end do
+          end do
+        end do
+      end if
+    end if
+  end subroutine ScalarRemovalZone_Apply
+
+  subroutine AddScalarRemovalZone(zone)
+    type(TScalarRemovalZone), intent(in) :: zone
+    integer :: izone
+
+    if (.not.allocated(ScalarRemovalZones)) allocate(ScalarRemovalZones(0))
+      
+    ScalarRemovalZones = [ScalarRemovalZones, zone]
+  end subroutine AddScalarRemovalZone
+
+  subroutine InitScalarRemovalZones
+    integer :: izone
+
+    if (.not.allocated(ScalarRemovalZones)) allocate(ScalarRemovalZones(0))
+
+    do izone = 1, size(ScalarRemovalZones)
+      associate (z => ScalarRemovalZones(izone))
+          if (rectangles_overlap([im_xmin,im_xmax,im_ymin,im_ymax,im_zmin,im_zmax], &
+                                 [z%x1,z%x2,z%y1,z%y2,z%z1,z%z2])) then
+            z%active = .true.
+
+            call GridCoords(z%i1, z%j1, z%k1, z%x1, z%y1, z%z1)            
+            call GridCoords(z%i2, z%j2, z%k2, z%x2, z%y2, z%z2)
+            z%i1 = max(z%i1, 1)
+            z%j1 = max(z%j1, 1)
+            z%k1 = max(z%k1, 1)
+            z%i2 = min(z%i2, Prnx)
+            z%j2 = min(z%j2, Prny)
+            z%k2 = min(z%k2, Prnz)          
+          else
+            z%active = .false.
+          end if
+      end associate
+    end do
+  end subroutine InitScalarRemovalZones
 
 end module Scalars

@@ -11,6 +11,7 @@ implicit none
   public volumePr, &
          GridCoords, GridCoords_interp, GridCoords_interp_U, GridCoords_interp_V, GridCoords_interp_W, &
          InDomain, InGlobalDomain, &
+         rectangles_overlap, &
          BoundUVW, Bound_Phi, Bound_Pr, Bound_Q,&
          ShearInlet, ParabolicInlet, ConstantInlet
 
@@ -150,6 +151,13 @@ implicit none
   end subroutine
 
 
+
+  logical function rectangles_overlap(A, B)
+    real(knd), intent(in) :: A(6), B(6)
+    rectangles_overlap = (A(1)<=B(2) .and. A(2)>=B(1) .and. &
+                          A(3)<=B(4) .and. A(4)>=B(3) .and. &
+                          A(5)<=B(6) .and. A(6)>=B(5))
+  end function
 
 
   logical function InDomain_3r(x, y, z) result(res)

@@ -567,6 +567,8 @@ contains
       end if
    end if
 
+   call get_scalar_zones("scalar_removal_zones.conf")
+
    if (pressure_solution%poisson_solver==POISSON_SOLVER_MULTIGRID) then
      open(unit,file="mgopts.conf",status="old",action="read")
      call get(lmg)
@@ -3301,6 +3303,119 @@ contains
   
   
   
+  subroutine get_scalar_zones(fname)
+    use Strings
+    use ParseTrees
+    use Scalars
+
+    character(*), intent(in) :: fname
+    type(TScalarRemovalZone), target :: zone
+    real(knd), target :: bounds(6)
+    character(char_len), target :: type_str
+
+    type(tree_object), allocatable :: tree(:)
+    integer :: iobj, stat
+    logical :: ex
+
+    type(field_names) :: names(2)
+    type(field_names_a) :: names_a(1)
+    
+    type(field_names_str) :: names_str(1)
+    
+
+
+    names = [field_names_init("relaxation_time", zone%relaxation_time), &
+              field_names_init("scalar",  zone%scalar)]
+                 
+    names_a = [field_names_a_init("bounds", bounds)]
+                 
+    names_str = [field_names_str("type", type_str)]
+
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat/=0) then
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+    end if
+  
+    if (.not.allocated(tree)) then
+      write(*,*) "Error, no content in " // fname
+      call error_stop
+    end if
+   
+    do iobj = 1, size(tree)
+    
+      if (downcase(tree(iobj)%name)=="scalar_removal_zone") then
+      
+        zone = TScalarRemovalZone()
+        type_str = ""
+        bounds = 0
+        
+        call get_object_field_values(tree(iobj), stat, &
+                                     fields = names, fields_str = names_str, fields_a = names_a)
+                                     
+        if (stat/=0) then
+          call error_stop("Error interpretting fields in scalar_removal_zone '"//itoa(iobj)//"'.")
+        end if
+               
+        call init_zone
+
+      else
+        call error_stop("Error, unrecognized object '"//trim(tree(iobj)%name)//"' in " // fname)
+      end if
+      
+      call tree(iobj)%finalize
+    end do
+    
+
+  contains
+
+    subroutine init_zone
+      if (any(bounds/=0)) then
+        zone%x1 = bounds(1)
+        zone%x2 = bounds(2)
+        zone%y1 = bounds(3)
+        zone%y2 = bounds(4)
+        zone%z1 = bounds(5)
+        zone%z2 = bounds(6)
+      end if
+
+      if (zone%relaxation_time > 0 .and. zone%relaxation_time < huge(1._knd)) then
+        zone%type = removal_continuous
+      end if
+
+      if (len_trim(type_str)>0) then
+        select case (downcase(type_str(1:4)))
+          case ("cont")
+            zone%type = removal_continuous
+          case ("inst")
+            zone%type = removal_instantaneous
+          case default
+            call error_stop("Error, unrecognized type of scalar_removal_zone '"//trim(type_str)//"'.")
+        end select
+      end if
+
+      if (zone%x1>zone%x2 .or. zone%y1>zone%y2 .or. zone%z1>zone%z2) then
+        zone%active = .false.
+      end if
+
+      if (zone%scalar==0) then
+        zone%active = .false.
+      end if
+
+      if (zone%active) then
+        call AddScalarRemovalZone(zone)
+      end if
+    end subroutine
+    
+  end subroutine get_scalar_zones
+  
+  
+  
   
 #ifdef PAR
   subroutine get_domains(fname)
@@ -4571,6 +4686,10 @@ contains
     call par_sync_out("  ...getting puff scalar sources.")
     !add puff sources, each containing one or more points
     call InitPuffSources
+    
+    call par_sync_out("  ...setting scalar removal zones.")
+    !add puff sources, each containing one or more points
+    call InitScalarRemovalZones
     
     call par_sync_out("  ...creating output directories.")
 
