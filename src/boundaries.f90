@@ -2018,7 +2018,7 @@ implicit none
     else if ((PrBtype(So)<BC_MPI_BOUNDS_MIN) .or. (PrBtype(So)>BC_MPI_BOUNDS_MAX)) then
      do k = 1, nz
       do i = 1, nx
-       Pr(i,0,k) = Pr(i,j,k) - 3 * (Pr(i,2,k) - Pr(i,1,k))
+       Pr(i,0,k) = Pr(i,3,k) - 3 * (Pr(i,2,k) - Pr(i,1,k))
        Pr(i,-1,k) = Pr(i,2,k)
       end do
      end do
