@@ -89,7 +89,7 @@ contains
                        Temperature, Moisture, Scalar, &
                        RK_stage, dt, &
                        temperature_flux_profile, moisture_flux_profile)
-    use RK3
+    use RungeKutta_coefficients
     use VolumeSources, only: ScalarVolumeSources
     use Puffs, only: DoPuffs, PreparePuffs
     use WaterThermodynamics, only: compute_liquid_water_content

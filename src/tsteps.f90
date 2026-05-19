@@ -22,7 +22,7 @@ contains
 
 
   subroutine TMarchRK3(U, V, W, Pr, Temperature, Moisture, Scalar, delta)
-    use RK3
+    use RungeKutta_coefficients
 #ifdef PAR
     use custom_par
     use domains_bc_par

@@ -320,3 +320,25 @@ module RK3
   integer, parameter   :: RK_stages = 3
 
 end module RK3
+
+
+module RK1
+  use Kinds
+
+  implicit none
+
+  real(knd), parameter :: RK_alpha(1) = [ 1._knd ]
+  real(knd), parameter :: RK_beta(1)  = [ 1._knd ]
+  real(knd), parameter :: RK_rho(1)   = [ 0._knd ]
+  integer, parameter   :: RK_stages = 1
+
+end module RK1
+
+
+
+module RungeKutta_coefficients
+  use RK3
+
+end module
+
+
