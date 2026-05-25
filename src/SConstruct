@@ -227,9 +227,6 @@ if comp=='cray':
   except KeyError:
     pass
 
-
-env.Replace(LINK = env.Dump('F90'))
-
 if prof=="yes":
   prof_flag=' -pg'
 else:
