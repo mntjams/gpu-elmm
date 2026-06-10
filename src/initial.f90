@@ -1069,6 +1069,9 @@ contains
 #ifdef PAR
        use custom_par
 #endif
+
+       use ScalarAdvection, only: enable_correct_divergence_scalar
+
        namelist /cmd/ tilesize, debugparam, debuglevel, windangle, &
                        Prnx, Prny, Prnz,&
 #ifdef PAR
@@ -1079,7 +1082,8 @@ contains
                        enable_in_sponge_x, enable_out_sponge_x, enable_out_sponge_y, &
                        enable_top_sponge, enable_top_sponge_scalar, &
                        enable_liquid, &
-                       discretization_order
+                       discretization_order, &
+                       enable_correct_divergence_scalar
 
        if (len_trim(command_line)>0) then
          msg = ''
