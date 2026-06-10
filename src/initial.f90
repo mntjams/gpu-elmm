@@ -1083,6 +1083,7 @@ contains
                        enable_top_sponge, enable_top_sponge_scalar, &
                        enable_liquid, &
                        discretization_order, &
+                       explicit_diffusion, explicit_scalar_diffusion, &
                        enable_correct_divergence_scalar
 
        if (len_trim(command_line)>0) then
