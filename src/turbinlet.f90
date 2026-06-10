@@ -720,9 +720,9 @@ contains
 
   subroutine turbulence_generator_init_mean_profiles(g)
     class(turbulence_generator), intent(inout) :: g
-    real(knd) :: Ustar_prof, utmp
+    real(knd) :: Ustar_prof, utmp, z
     integer :: k, maxj, maxk
-    logical :: fix_direction
+    logical :: fix_direction, first_point
     
     
     if (g%direction==2) then
@@ -754,22 +754,41 @@ contains
         Ustar_prof = g%U_ref_inlet * Karman / log(g%z_ref_inlet / g%z0_inlet)
 
         do k = 1, Prnz
-          utmp = (Ustar_prof / Karman) * log(zPr(k) / g%z0_inlet)
+          z = zPr(k)
+          if (z > 0) then
+            utmp = (Ustar_prof / Karman) * log(z / g%z0_inlet)
+          else
+            utmp = 0
+          end if
           if (sign(1._knd,Ustar_prof) * utmp<abs(Ustar_prof) / 2) &
-            utmp = (Ustar_prof / 2) * zPr(k) / (g%z0_inlet * 1.22)
+            utmp = (Ustar_prof / 2) * z / (g%z0_inlet * 1.22)
           g%Uinavg(:,k) = utmp
         end do
 
         fix_direction = .true.
         
      else
-
-        utmp = (g%Ustar_inlet(1) / Karman) * log(zPr(1) / g%z0_inlet)
+        first_point = .true.
+        z = zPr(1)
+        if (z > 0) then
+          utmp = (g%Ustar_inlet(1) / Karman) * log(z / g%z0_inlet)
+          first_point = .false.
+        else
+          utmp = 0
+        end if
         g%Uinavg(:,1) = utmp
         do k = 2, Prnz
-          utmp = (g%Ustar_inlet(k) / Karman) * log(zPr(k) / zPr(k-1)) + utmp
+          z = zPr(k)
+          if (z > 0 .and. first_point) then
+            utmp = (g%Ustar_inlet(1) / Karman) * log(z / g%z0_inlet)
+            first_point = .false.
+          else if (z > 0) then
+            utmp = (g%Ustar_inlet(k) / Karman) * log(z / zPr(k-1)) + utmp
+          else
+            utmp = 0
+          end if
           if (sign(1._knd,g%Ustar_inlet(1)) * utmp < abs(g%Ustar_inlet(1)) / 2) &
-            utmp = (g%Ustar_inlet(1) / 2) * zPr(k) / (g%z0_inlet * 1.22)
+            utmp = (g%Ustar_inlet(1) / 2) * z / (g%z0_inlet * 1.22)
           g%Uinavg(:,k) = utmp
         end do
 
