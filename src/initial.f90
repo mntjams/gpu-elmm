@@ -128,6 +128,9 @@ contains
 
    open(unit,file="main.conf",status="old",action="read")
    call get(advection_method)
+   
+   if (discretization_order==4) advection_method=4
+   
    call get(limiter_type)
    call get(limiter_parameter)
 
