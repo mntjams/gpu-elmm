@@ -1925,6 +1925,10 @@ contains
           call error_stop("Error interpretting obstacle_file fields in " // trim(fname))
         end if
         
+        inquire(file=o_file%file, exist=ex)
+        if (.not.ex) then
+          call error_stop("Error, file " // trim(o_file%file) // " does not exist when interpretting obstacle_file fields in " // trim(fname))
+        end if
         
         allocate(Polyhedron :: gs)
         select type (gs)
