@@ -344,5 +344,25 @@ contains
     res = c(0,i) + h * c(1,i)
 
   end function
+  
+  
+  pure function trilinear_interpolation(a, b, c, &
+                                                  val000, val100, val010, val001, &
+                                                  val110, val101, val011, val111) &
+                          result(res)
+    real(knd) :: res
+    real(knd), intent(in) :: a, b, c
+    real(knd), intent(in) :: val000, val100, val010, val001, &
+                             val110, val101, val011, val111
+
+    res =  (1-a) * (1-b) * (1-c) * val000 + &
+           a     * (1-b) * (1-c) * val100 + &
+           (1-a) * b     * (1-c) * val010 + &
+           (1-a) * (1-b) * c     * val001 + &
+           a     * b     * (1-c) * val110 + &
+           a     * (1-b) * c     * val101 + &
+           (1-a) * b     * c     * val011 + &
+           a     * b     * c     * val111
+  end function trilinear_interpolation
 
 end module

@@ -97,9 +97,9 @@ module Parameters
 
     real(tim) :: dt
 
-    real(tim) :: dt_max           !minimal time step for diagnosing diverging simulation
+    real(tim) :: dt_max = 0       !minimal time step for diagnosing diverging simulation
     
-    real(tim) :: dt_min           !maximum time step, larger value will not be used
+    real(tim) :: dt_min = 0       !maximum time step, larger value will not be used
     
     real(knd) :: U_scaling(3) = 0 !velocity vector used to compute constant_U
 
@@ -145,7 +145,7 @@ module Parameters
 
   real(knd) :: grav_acc = 9.81, Coriolis_parameter = 0
 
-  real(knd) :: ShearInletTypeParameter, Uinlet, Uinlet_vec(3)
+  real(knd) :: ShearInletTypeParameter = 0, Uinlet = -1, Uinlet_vec(3) = huge(1.0_knd)
 
   real(knd) :: z0W, z0E, z0S, z0N, z0B, z0T
 
@@ -219,13 +219,18 @@ module Parameters
 
   real(knd) :: temperature_ref = 295
   real(knd) :: moisture_ref = 0.001 !TODO: compute from relative humidity
+  
+  logical, dimension(6) :: PrBtype_explicitly_set = .false.
 
   integer, dimension(6) :: Btype      !boundary condition types for velocity, see below for values
+  integer, dimension(6) :: PrBtype    !boundary consitions for the pressure solver
+                                      ! Dirichlet, Neumann or Periodic
   integer, dimension(6) :: TempBtype  !boundary condition types for temperature
   integer, dimension(6) :: MoistBtype !boundary condition types for temperature
   integer, dimension(6) :: ScalBtype  !boundary condition types for scalars
   
-  integer, dimension(6) :: PoissonBtype !boundary conditions for the pressure solver
+  integer, dimension(6) :: PoissonBtype !boundary conditions for the Poisson solver
+                                        !follows PrBtype
 
 
   real(knd), dimension(3,6)   :: sideU     !velocities on boundaries in case of Dirichlet BC
@@ -244,6 +249,7 @@ module Parameters
   integer, parameter :: BC_NOSLIP = 1, BC_FREESLIP = 2, BC_PERIODIC = 3, BC_DIRICHLET = 4, BC_NEUMANN = 5, BC_CONSTFLUX = 6, &  !boundary condition types
                         BC_TURBULENT_INLET = 7, BC_INLET_FROM_FILE = 8, &
                         BC_AUTOMATIC_FLUX = 9, &
+                        BC_INLET_NO_BACKFLOW = 10, BC_OUTLET_NO_BACKFLOW = 11, &
                         BC_MPI_BOUNDS_MIN = 1000, BC_MPI_BOUNDS_MAX = 1010, BC_MPI_BOUNDARY = 1000, BC_MPI_PERIODIC = 1001, &
                         BC_DOMAIN_BOUNDS_MIN = 2000, BC_DOMAIN_BOUNDS_MAX = 2010, &
                         BC_DOMAIN_NESTED = 2001, BC_DOMAIN_COPY = 2002, BC_DOMAIN_NESTED_TURBULENT = 2003
@@ -314,3 +320,25 @@ module RK3
   integer, parameter   :: RK_stages = 3
 
 end module RK3
+
+
+module RK1
+  use Kinds
+
+  implicit none
+
+  real(knd), parameter :: RK_alpha(1) = [ 1._knd ]
+  real(knd), parameter :: RK_beta(1)  = [ 1._knd ]
+  real(knd), parameter :: RK_rho(1)   = [ 0._knd ]
+  integer, parameter   :: RK_stages = 1
+
+end module RK1
+
+
+
+module RungeKutta_coefficients
+  use RK3
+
+end module
+
+

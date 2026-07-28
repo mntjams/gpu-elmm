@@ -74,7 +74,7 @@ module Types
     integer header_pos
     real(rp),allocatable :: x(:),y(:),z(:)
     character(1024) :: fname
-    real(rp), pointer, contiguous :: vec(:,:,:,:)
+    real(rp), allocatable :: vec(:,:,:,:)
     real(rp), pointer, contiguous :: sc(:,:,:) => null() ! to save space in memory
   contains
     procedure :: process_next
@@ -95,7 +95,7 @@ module Types
   ! in the efh header
   integer, parameter :: scalar_flag = 1001, vector_flag = 1002
   ! local here
-  integer, parameter :: SCALAR = 1, VECTOR = 2, EOF=-1
+  integer, parameter :: SCALAR = 1, VECTOR = 2, EOF=-1, IOERR=-2
   
   character,parameter :: lf = achar(10)
 
@@ -190,13 +190,15 @@ contains
   
   subroutine read_var_from_eaf(g, status)
     class(grid),intent(inout) :: g
-    integer, intent(in) :: status
+    integer, intent(inout) :: status
+    integer :: ier
 
     if (status == SCALAR) then
-      read(g%fu) g%sc
+      read(g%fu, iostat=ier) g%sc
     else
-      read(g%fu) g%vec
+      read(g%fu, iostat=ier) g%vec
     end if
+    if (ier/=0) ier = IOERR
   end subroutine
 
   subroutine save_header(g, fname)
@@ -276,7 +278,7 @@ contains
   
   subroutine finalize(g)
     type(grid) :: g
-    deallocate(g%vec)
+!     deallocate(g%vec)
   end subroutine
   
   subroutine rewind_header(g)
@@ -425,7 +427,12 @@ contains
       call g%open_frame(fname)
       do
         call g%process_next(status)
-        if (status==eof) exit
+        if (status==EOF) then
+          exit
+        else if (status==IOERR) then
+          write(*,*) "Error reading from '",fname,"'."
+          exit
+        end if
       end do
       
       call g%close_frame

@@ -56,7 +56,7 @@ contains
  subroutine ReadConfiguration
    use StaggeredFrames, only: rrange, TFrameTimes, TSaveFlags, &
                               TStaggeredFrameDomain,  AddDomain
-   use PoisSolver, only: PoisSolver_NeumannStag, PoisSolver_Periodic
+   use PoisSolver, only: PoisSolver_NeumannStag, PoisSolver_DirichletStag, PoisSolver_Periodic
    use Sponge, only: enable_in_sponge_x, enable_out_sponge_x, enable_out_sponge_y, &
                      enable_top_sponge, enable_top_sponge_scalar
    integer ::  lmg,minmglevel,bnx,bny,bnz,mgncgc,mgnpre,mgnpost,mgmaxinnerGSiter
@@ -128,6 +128,9 @@ contains
 
    open(unit,file="main.conf",status="old",action="read")
    call get(advection_method)
+   
+   if (discretization_order==4) advection_method=4
+   
    call get(limiter_type)
    call get(limiter_parameter)
 
@@ -153,17 +156,7 @@ contains
    close(unit)
 
 
-   open(unit,file="les.conf",status="old",action="read")
-   call get(sgstype)
-   call get(filtertype)
-
-   if (filtertype > size(filter_ratios)) then
-     if (master) write(*,*) "Chosen filter type does not exist. Maximum index is:",size(filter_ratios)
-     call error_stop
-   end if
-
-   call get(wallmodeltype)
-   close(unit)
+   call get_les("les.conf")
 
 
    open(unit,file="grid.conf",status="old",action="read")
@@ -318,32 +311,7 @@ contains
 
    
 
-   open(unit,file="boundconds.conf",status="old",action="read")
-   call get(Btype(We))
-   call get(Btype(Ea))
-   call get(Btype(So))
-   call get(Btype(No))
-   call get(Btype(Bo))
-   call get(Btype(To))
-   call get(sideU(1,So))
-   call get(sideU(2,So))
-   call get(sideU(3,So))
-   call get(sideU(1,No))
-   call get(sideU(2,No))
-   call get(sideU(3,No))
-   call get(sideU(1,Bo))
-   call get(sideU(2,Bo))
-   call get(sideU(3,Bo))
-   call get(sideU(1,To))
-   call get(sideU(2,To))
-   call get(sideU(3,To))
-   call get(z0W)
-   call get(z0E)
-   call get(z0S)
-   call get(z0N)
-   call get(z0B)
-   call get(z0T)
-   close(unit)
+   call get_boundary_conditions_velocity("boundconds.conf")
 
    open(unit,file="large_scale.conf",status="old",action="read",iostat = io)
    if (io==0) then
@@ -491,42 +459,42 @@ contains
    if (.not.(enable_buoyancy.and.enable_moisture)) enable_liquid = .false.
 
    
-   open(unit,file="inlet.conf",status="old",action="read")
-   call get(inlettype)
-   call get(profiletype)
-   call get(ShearInletTypeParameter)
-   if (master) write(*,*) "G=",ShearInletTypeParameter
-   call get(Uinlet_vec)
-   Uinlet = norm2(Uinlet_vec)
-   if (master) write(*,*) "Uinlet=",Uinlet_vec
-   call get(default_turbulence_generator%Ustar_surf_inlet)  !-<u'w'>
-   call get(default_turbulence_generator%stress_gradient_inlet) !in relative part per 1m
-   call get(default_turbulence_generator%z0_inlet)
-   call get(default_turbulence_generator%power_exponent_inlet)
-   call get(default_turbulence_generator%z_ref_inlet)
-   call get(default_turbulence_generator%U_ref_inlet)
-   call get(default_turbulence_generator%relative_stress(1,1))
-   call get(default_turbulence_generator%relative_stress(2,2))
-   call get(default_turbulence_generator%relative_stress(3,3))
-   call get(default_turbulence_generator%relative_stress(1,2))
-   call get(default_turbulence_generator%relative_stress(1,3))
-   call get(default_turbulence_generator%relative_stress(2,3))
-   call get(default_turbulence_generator%T_Lag)
-   call get(default_turbulence_generator%L_y)
-   call get(default_turbulence_generator%L_z)
-   close(unit)
-   
-   default_turbulence_generator%relative_stress(2,1) = default_turbulence_generator%relative_stress(1,2)
-   default_turbulence_generator%relative_stress(3,1) = default_turbulence_generator%relative_stress(1,3)
-   default_turbulence_generator%relative_stress(3,2) = default_turbulence_generator%relative_stress(2,3)
-   
-   if (Btype(We)==BC_TURBULENT_INLET .or. Btype(Ea)==BC_TURBULENT_INLET) then
-     default_turbulence_generator%direction = 1
-   else if (Btype(So)==BC_TURBULENT_INLET .or. Btype(No)==BC_TURBULENT_INLET) then
-     default_turbulence_generator%direction = 2
-   else
-     default_turbulence_generator%direction = 0
-   end if
+!    open(unit,file="inlet.conf",status="old",action="read")
+!    call get(inlettype)
+!    call get(profiletype)
+!    call get(ShearInletTypeParameter)
+!    if (master) write(*,*) "G=",ShearInletTypeParameter
+!    call get(Uinlet_vec)
+!    Uinlet = norm2(Uinlet_vec)
+!    if (master) write(*,*) "Uinlet=",Uinlet_vec
+!    call get(default_turbulence_generator%Ustar_surf_inlet)  !-<u'w'>
+!    call get(default_turbulence_generator%stress_gradient_inlet) !in relative part per 1m
+!    call get(default_turbulence_generator%z0_inlet)
+!    call get(default_turbulence_generator%power_exponent_inlet)
+!    call get(default_turbulence_generator%z_ref_inlet)
+!    call get(default_turbulence_generator%U_ref_inlet)
+!    call get(default_turbulence_generator%relative_stress(1,1))
+!    call get(default_turbulence_generator%relative_stress(2,2))
+!    call get(default_turbulence_generator%relative_stress(3,3))
+!    call get(default_turbulence_generator%relative_stress(1,2))
+!    call get(default_turbulence_generator%relative_stress(1,3))
+!    call get(default_turbulence_generator%relative_stress(2,3))
+!    call get(default_turbulence_generator%T_Lag)
+!    call get(default_turbulence_generator%L_y)
+!    call get(default_turbulence_generator%L_z)
+!    close(unit)
+!
+!    default_turbulence_generator%relative_stress(2,1) = default_turbulence_generator%relative_stress(1,2)
+!    default_turbulence_generator%relative_stress(3,1) = default_turbulence_generator%relative_stress(1,3)
+!    default_turbulence_generator%relative_stress(3,2) = default_turbulence_generator%relative_stress(2,3)
+!
+!    if (Btype(We)==BC_TURBULENT_INLET .or. Btype(Ea)==BC_TURBULENT_INLET) then
+!      default_turbulence_generator%direction = 1
+!    else if (Btype(So)==BC_TURBULENT_INLET .or. Btype(No)==BC_TURBULENT_INLET) then
+!      default_turbulence_generator%direction = 2
+!    else
+!      default_turbulence_generator%direction = 0
+!    end if
 
    open(unit,file="scalars.conf",status="old",action="read",iostat = io)
    if (io==0) then
@@ -601,6 +569,8 @@ contains
         close(unit)
       end if
    end if
+
+   call get_scalar_zones("scalar_removal_zones.conf")
 
    if (pressure_solution%poisson_solver==POISSON_SOLVER_MULTIGRID) then
      open(unit,file="mgopts.conf",status="old",action="read")
@@ -717,6 +687,8 @@ contains
          write(*,*) "dirichlet"
        case (BC_NEUMANN)
          write(*,*) "neumann"
+       case default
+         write(*,*) "other", Btype(We)
      endselect
 
      write(*,'(a2)',advance='no') " E "
@@ -731,6 +703,8 @@ contains
          write(*,*) "dirichlet"
        case (BC_NEUMANN)
          write(*,*) "neumann"
+       case default
+         write(*,*) "other", Btype(Ea)
      endselect
 
      write(*,'(a2)',advance='no') " S "
@@ -745,6 +719,8 @@ contains
          write(*,*) "dirichlet"
        case (BC_NEUMANN)
          write(*,*) "neumann"
+       case default
+         write(*,*) "other", Btype(So)
      endselect
 
      write(*,'(a2)',advance='no') " N "
@@ -759,6 +735,8 @@ contains
          write(*,*) "dirichlet"
        case (BC_NEUMANN)
          write(*,*) "neumann"
+       case default
+         write(*,*) "other", Btype(No)
      endselect
 
      write(*,'(a2)',advance='no') " B "
@@ -773,6 +751,8 @@ contains
          write(*,*) "dirichlet"
        case (BC_NEUMANN)
          write(*,*) "neumann"
+       case default
+         write(*,*) "other", Btype(Bo)
      endselect
 
      write(*,'(a2)',advance='no') " T "
@@ -787,6 +767,8 @@ contains
          write(*,*) "dirichlet"
        case (BC_NEUMANN)
          write(*,*) "neumann"
+       case default
+         write(*,*) "other", Btype(To)
      endselect
      
      if ((Btype(We)==BC_PERIODIC.or.Btype(Ea)==BC_PERIODIC).and.Btype(We)/=Btype(Ea)) &
@@ -833,13 +815,25 @@ contains
      if (master) write(*,*) "General grid not supported."; call error_stop
    end if
 
-   !Btype might get overwritten by MPI procedures
+   !Btype and PrBtype might get overwritten by MPI procedures
    do i = We, To
-     if (Btype(i)==BC_PERIODIC) then
+      if (.not.PrBtype_explicitly_set(i)) then
+        if (Btype(i)==BC_PERIODIC) then
+          PrBtype(i) = BC_PERIODIC
+        else
+          PrBtype(i) = BC_NEUMANN
+        end if
+      end if
+   end do
+   
+   do i = We, To
+      if (PrBtype(i)==BC_PERIODIC) then
         PoissonBtype(i) = PoisSolver_PERIODIC
-     else
+      else if (PrBtype(i)==BC_DIRICHLET) then
+        PoissonBtype(i) = PoisSolver_DirichletStag
+      else
         PoissonBtype(i) = PoisSolver_NeumannStag
-     end if
+      end if
    end do
    
 
@@ -866,8 +860,6 @@ contains
 
    call init_random_seed
 
-
-   call get_pressure_solution("pressure_solution.conf", pressure_solution)
 
 
    !both procedures below use the name of the output directory (affected by MPI)
@@ -976,7 +968,6 @@ contains
    if (master) write(*,*) "set"
    
    
-   
 
  contains
  
@@ -1081,6 +1072,9 @@ contains
 #ifdef PAR
        use custom_par
 #endif
+
+       use ScalarAdvection, only: enable_correct_divergence_scalar
+
        namelist /cmd/ tilesize, debugparam, debuglevel, windangle, &
                        Prnx, Prny, Prnz,&
 #ifdef PAR
@@ -1091,7 +1085,9 @@ contains
                        enable_in_sponge_x, enable_out_sponge_x, enable_out_sponge_y, &
                        enable_top_sponge, enable_top_sponge_scalar, &
                        enable_liquid, &
-                       discretization_order
+                       discretization_order, &
+                       explicit_diffusion, explicit_scalar_diffusion, &
+                       enable_correct_divergence_scalar
 
        if (len_trim(command_line)>0) then
          msg = ''
@@ -1195,7 +1191,626 @@ contains
      end subroutine read_staggered_frames
 
   end subroutine ReadConfiguration
+  
+  
+  
 
+  subroutine get_boundary_conditions_velocity(fname)
+    use Strings
+    use ParseTrees
+    character(*), intent(in) :: fname
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: iobj, stat
+    
+    real(knd), target :: Uinlet_conf(3)
+
+    Uinlet_conf = 0
+    Uinlet = -1
+
+    Btype = 0
+    
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) then
+      write(*,*) "Error, '",trim(fname),"' does not found."
+      call error_stop()
+    end if
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+
+      if (allocated(tree)) then
+        do iobj = 1, size(tree)
+          if (downcase(tree(iobj)%name)=="bc") then
+            call get_bc(tree(iobj))
+          else if (downcase(tree(iobj)%name)=="ic") then
+            call get_ic(tree(iobj))
+          end if
+          call tree(iobj)%finalize
+        end do
+      end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+
+    if (any(Btype<=0)) then
+      write(*,*) "Error, non-positive boundary type value."
+      write(*,*) "Btype:", Btype
+      call error_stop
+    end if
+  
+  contains
+  
+    subroutine get_bc(obj)
+      type(tree_object), intent(in) :: obj
+      
+      character(char_len), target :: selected_side_str, type_str
+      character(char_len), allocatable :: selected_sides_str(:)
+      type(tree_object_ptr), target :: stg_properties_obj
+      real(knd) :: u_vec(3)
+      real(knd) :: z0
+      
+      character(*), dimension(6), parameter :: sides_str = &
+        [character(len("bottom")) :: "west", "east", "south", "north", "bottom", "top"]
+      logical :: side_selected, sides_selected
+      integer, allocatable :: selected_sides(:)
+      integer :: bc_type
+      
+      
+      integer :: stat
+      integer :: iside
+      type(field_names) :: names(4)
+      type(field_names_a) :: names_a(1)
+      type(field_names_a_str_alloc) :: names_a_str_alloc(1)
+    
+      
+      names = [field_names_init("side", selected_side_str), &
+               field_names_init("type", type_str), &
+               field_names_init("z0", z0), &
+               field_names_init("stg", stg_properties_obj)]
+                
+      names_a = [field_names_a_init("u", u_vec)]
+      
+      names_a_str_alloc = [field_names_a_str_alloc("sides")]
+      
+      
+      u_vec = 0
+      z0 = 0
+      selected_side_str = ""
+      type_str = ""
+      side_selected = .false.
+      sides_selected = .false.
+      bc_type = 0
+      
+      call get_object_field_values(obj, stat, names, fields_a_str_alloc=names_a_str_alloc)
+      
+      if (stat/=0) then
+        write(*,*) "Error parsing a bc() object in " // fname
+        write(*,*) "Error status", stat
+        call error_stop()
+      end if
+      
+      side_selected = len_trim(selected_side_str) > 0
+      
+      sides_selected = allocated(names_a_str_alloc(1)%var)
+      
+      if (side_selected.and.sides_selected) then
+        write(*,*) "Error. Only one of `side=` and `sides=` can be specified in a bc object in " // fname
+        call error_stop()
+      else if (.not.(side_selected.or.sides_selected)) then
+        write(*,*) "Error. One of `side=` or `sides=` must be specified in a bc object in " // fname
+        call error_stop()
+      else if (side_selected) then
+        allocate(selected_sides(1))
+
+        select case(downcase(selected_side_str(1:1)))
+          case ("w")
+            selected_sides(1) = 1
+          case ("e")
+            selected_sides(1) = 2
+          case ("s")
+            selected_sides(1) = 3
+          case ("n")
+            selected_sides(1) = 4
+          case ("b")
+            selected_sides(1) = 5
+          case ("t")
+            selected_sides(1) = 6
+          case default
+            write(*,*) "Error. Unknown boundary side in " // fname
+            call error_stop()
+        end select
+      else if (sides_selected) then
+        call move_alloc(names_a_str_alloc(1)%var, selected_sides_str)
+        allocate(selected_sides(size(selected_sides_str)))
+        if (size(selected_sides)<=0 .or. size(selected_sides)>6) then
+          write(*,*) "Error. Selected_sizes array must contain from 1 to 6 elements in " // fname
+          call error_stop()
+        end if
+        do iside = 1, size(selected_sides)
+          select case(downcase(selected_sides_str(iside)(1:1)))
+            case ("w")
+              selected_sides(iside) = 1
+            case ("e")
+              selected_sides(iside) = 2
+            case ("s")
+              selected_sides(iside) = 3
+            case ("n")
+              selected_sides(iside) = 4
+            case ("b")
+              selected_sides(iside) = 5
+            case ("t")
+              selected_sides(iside) = 6
+            case default
+              write(*,*) "Error. Unknown boundary side in " // fname
+              call error_stop()
+          end select
+        end do
+      else
+        write(*,*) "Internal error when selecting side in " // fname
+        call error_stop()
+      end if
+      
+      if (len_trim(type_str)==0) then
+        write(*,*) "Error. The boundary type must be provided in " // fname
+        call error_stop()
+      end if
+    
+      select case(downcase(type_str))
+        case ("periodic")
+          bc_type = BC_PERIODIC
+        case ("noslip")
+          bc_type = BC_NOSLIP
+        case ("freeslip")
+          bc_type = BC_FREESLIP
+        case ("dirichlet")
+          bc_type = BC_DIRICHLET
+        case ("neumann")
+          bc_type = BC_NEUMANN
+        case ("turbulent_inlet")
+          bc_type = BC_TURBULENT_INLET
+        case ("from_file")
+          bc_type = BC_INLET_FROM_FILE
+        case ("inlet_no_backflow")
+          bc_type = BC_INLET_NO_BACKFLOW
+        case ("outlet_no_backflow")
+          bc_type = BC_OUTLET_NO_BACKFLOW
+        case default
+          write(*,*) "Error. Unknown boundary side in " // fname
+          call error_stop()
+      end select
+
+      Btype(selected_sides) = bc_type
+      
+      if (bc_type == BC_DIRICHLET .or. bc_type == BC_INLET_NO_BACKFLOW) then
+        do iside = 1, size(selected_sides)
+          sideU(:,selected_sides(iside)) = u_vec
+        end do
+        
+        if (norm2(u_vec)>0) then
+          Uinlet_vec = u_vec
+          Uinlet = norm2(Uinlet_vec)
+        end if
+      end if
+      
+      if (z0>0) then
+        !TODO: refactor the z0 information to an array accross sides
+        do iside = 1, size(selected_sides)
+          select case (selected_sides(iside))
+            case(1)
+              z0W = z0
+            case(2)
+              z0E = z0
+            case(3)
+              z0S = z0
+            case(4)
+              z0N = z0
+            case(5)
+              z0B = z0
+            case(6)
+              z0T = z0
+          end select
+        end do
+      end if
+        
+      if (bc_type == BC_TURBULENT_INLET) then
+        if (size(selected_sides)>1) then
+          write(*,*) "Error, multiple sides selected for the turbulent inlet boundary condition in " // fname
+          call error_stop()
+        end if
+        if (associated(stg_properties_obj%ptr)) then
+          call get_stg_properties(stg_properties_obj%ptr, selected_sides(1))
+        end if
+      end if
+      
+    end subroutine get_bc
+    
+    
+    subroutine get_ic(obj)
+      type(tree_object), intent(in) :: obj
+
+      type(tree_object_ptr), target :: stg_properties_obj
+      character(char_len), target :: inlet_type_str
+      real(knd), target :: inlet_parameter
+      
+      type(field_names) :: names(2)
+      type(field_names_a) :: names_a(1)
+
+      integer :: is, side
+      
+      names = [field_names_init("inlet_type", inlet_type_str), &
+               field_names_init("stg", stg_properties_obj)]
+
+      names_a = [field_names_a_init("Uinlet", Uinlet_conf)]
+      
+      
+      inlet_type_str = ""
+      inlet_parameter = 0
+      
+      call get_object_field_values(obj, stat, names, names_a)
+        
+      if (stat/=0) then
+        write(*,*) "Error parsing an ic() object in " // fname
+        write(*,*) "Error status", stat
+        call error_stop()
+      end if
+
+      if (associated(stg_properties_obj%ptr)) then
+        side = 0
+        !is there any side with the BC_TURBULENT_INLET condition?
+        do is = We, No
+          if (Btype(is)==BC_TURBULENT_INLET) then
+            side = is
+            exit
+          end if
+        end do
+
+        !if not, get the direction of Uinlet if known
+        if (side<=0) then
+          if (norm2(Uinlet_conf)>0) then
+            call u_vec_to_side(Uinlet_conf, side)
+
+            if (Uinlet<0) then
+              Uinlet_vec = Uinlet_conf
+              Uinlet = norm2(Uinlet_vec)
+            end if
+          end if
+        end if
+
+        ! now side could still be 0
+      
+        call get_stg_properties(stg_properties_obj%ptr, side)
+        inlettype = TurbulentInletType
+        
+      else if (len_trim(inlet_type_str)>0) then
+      
+        !TODO: Currently just setting the legacy configuration parameters. To be completely rewritten.
+        select case (downcase(inlet_type_str))
+          case ("zero")
+            inlettype = ZeroInletType
+          case ("shear")
+            inlettype = ShearInletType
+          case ("parabolic")
+            inlettype = ParabolicInletType
+          case ("turbulent")
+            inlettype = TurbulentInletType
+          case ("from_file")
+            inlettype = FromFileInletType
+          case ("geostrophic")
+            inlettype = GeostrophicInletType
+          case ("constant")
+            inlettype = ConstantInletType
+          case default
+            write(*,*) "Error, unknown inlet_type '"// trim(inlet_type_str)//"' at "  // fname
+            call error_stop()
+        end select
+
+        if (Uinlet<0) then
+          Uinlet_vec = Uinlet_conf
+          Uinlet = norm2(Uinlet_vec)
+        end if
+
+      else
+      
+        if (Uinlet<0) then
+          Uinlet_vec = Uinlet_conf
+          Uinlet = norm2(Uinlet_vec)
+        end if
+        inlettype = ConstantInletType
+
+      end if
+    end subroutine get_ic
+
+
+    subroutine u_vec_to_side(u_vec, side)
+      real(knd), intent(in) :: u_vec(3)
+      integer, intent(out) :: side
+      real(knd) :: theta
+      theta = atan2(u_vec(2), u_vec(1))
+      if (theta <= -3*pi/4 .or. theta >=3*pi/4) then
+        side = Ea
+      else if (theta < -pi/4) then
+        side = No
+      else if (theta > pi/4) then
+        side = So
+      else
+        side = We
+      end if
+    end subroutine
+    
+    
+      
+    subroutine get_vec_profile(obj)
+      type(tree_object), intent(in) :: obj
+
+    end subroutine
+    
+    subroutine get_stg_properties(obj, side)
+      use Turbinlet
+      use, intrinsic :: ieee_arithmetic
+      type(tree_object), intent(in) :: obj
+      integer, intent(inout) :: side
+      
+      
+      integer, target :: stg_method
+      character(char_len), target :: stg_method_str
+      
+      character(char_len), target :: profile_type_str
+      
+      real(knd), target :: u_ref, z_ref, u_star, z0, power_exponent, stress_grad
+      real(knd), target :: u_vec(3)
+      
+      real(knd), target :: T_Lag, L_y, L_z
+      
+      real(knd), target :: uu, vv, ww, uv, uw, vw
+      real(knd), target :: stress(6)
+      character(char_len), target :: stress_type_str
+      
+      integer, parameter :: STRESS_RELATIVE = 1, STRESS_ABSOLUTE = 2
+      
+      integer, target :: inlet_plane_i
+      real(knd), target :: inlet_plane_x
+      
+      character(char_len), target :: mean_profile, turbulence_profile
+      
+      integer :: profile_type
+      integer :: stress_type
+      
+      type(field_names), allocatable :: names(:)
+      type(field_names_a), allocatable :: names_a(:)
+      type(field_names_str), allocatable :: names_str(:)
+
+      integer :: stat
+      
+      names = [ field_names_init("method", stg_method_str), &
+                field_names_init("profile", profile_type_str), &
+                field_names_init("u_ref", u_ref), &
+                field_names_init("z_ref", z_ref), &
+                field_names_init("u_star", u_star), &
+                field_names_init("z0", z0), &
+                field_names_init("exponent", power_exponent), &
+                field_names_init("T_Lag", T_Lag), &
+                field_names_init("L_y", L_y), &
+                field_names_init("L_z", L_z), &
+                field_names_init("uu", uu), &
+                field_names_init("vv", vv), &
+                field_names_init("ww", ww), &
+                field_names_init("uv", uv), &
+                field_names_init("uw", uw), &
+                field_names_init("vw", vw), &
+                field_names_init("stress_type", stress_type), &
+                field_names_init("stress_gradeint", stress_grad), &
+                field_names_init("inlet_plane_i", inlet_plane_i), &
+                field_names_init("inlet_plane_x", inlet_plane_x) ]
+              
+      names_a = [ field_names_a_init("stress", stress), &
+                  field_names_a_init("Uinlet", u_vec)]
+
+      names_str = [ field_names_str("mean_profile", mean_profile), &
+                    field_names_str("turbulence_profile", turbulence_profile)]
+
+      
+      
+      stg_method = turbulent_inlet_XC
+      stg_method_str = ""
+      
+      profile_type = 0
+      profile_type_str = ""
+      
+      T_Lag = -1
+      L_y = -1
+      L_z = -1
+      
+      u_ref = -1
+      z_ref = -1
+      u_star = -1
+      z0 = -1
+      power_exponent = -1
+
+      u_vec = 0
+      
+      uu = -1
+      vv = -1
+      uu = -1
+      uv = 0
+      uw = 0
+      vw = 0
+      stress = -1
+      
+      stress_type_str = ""
+      stress_type = 0
+      stress_grad = 0
+      
+      inlet_plane_i = huge(1)
+      inlet_plane_x = huge(1._knd)
+
+      mean_profile = ""
+      turbulence_profile = ""
+        
+      call get_object_field_values(obj, stat, names, names_a, fields_str = names_str)
+      
+      if (stat/=0) then
+        write(*,*) "Error parsing an stg() object in " // fname
+        write(*,*) "Error status", stat
+        call error_stop()
+      end if
+
+      if (len_trim(stg_method_str)>0) then
+        select case (downcase(stg_method_str))
+          case ("xc","xiecastro","default")
+            stg_method = turbulent_inlet_XC
+          case ("xcdf","xc_div_free","kcx")
+            stg_method = turbulent_inlet_XCDF
+          case default
+            write(*,*) "Error, unknown stg method '" // trim(stg_method_str) // "' in " // fname
+            call error_stop()
+        end select
+        
+        turbulent_inlet_method = stg_method
+      end if
+      
+      select case (profile_type_str)
+        case ("log","logarithmic")
+          profiletype = PROFILE_LOGARITHMIC
+        case ("pow", "power", "power law", "power_law")
+          profiletype = PROFILE_POWER_LAW
+        case ("file", "from file", "from_file")
+          profiletype = PROFILE_FROM_FILE
+        case default
+          profiletype = PROFILE_CONSTANT
+      end select
+
+
+      if (norm2(u_vec)>0) then
+        if (Uinlet>0) then
+          write(*,*) "Error, multiple definitions of Uinlet in " // fname
+          call error_stop
+        end if
+
+        Uinlet_vec = u_vec
+        Uinlet = norm2(u_vec)
+
+        if (Uinlet==0) then
+          write(*,*) "Error, Uinlet vector must be nonzero in " // fname
+          call error_stop
+        end if
+
+        if (side<=0) then
+          call u_vec_to_side(u_vec, side)
+        end if
+      else if (Uinlet < 0 .and. profiletype == PROFILE_CONSTANT) then
+        write(*,*) "Error, Uinlet must be defined for the synthetic turbulence generator in" // fname
+        write(*,*) "when the profile type is constant."
+        call error_stop
+      end if
+
+        
+      associate(g=>default_turbulence_generator)
+        if (stg_method==turbulent_inlet_XCDF) then
+          if (inlet_plane_x < huge(1._knd)) &
+            g%inlet_plane_x = inlet_plane_x
+          if (inlet_plane_i < huge(1)) &
+            g%inlet_plane_i = inlet_plane_i
+
+          if (.not. allocated(g%inlet_plane_x) .and. .not. allocated(g%inlet_plane_i)) then
+            write(*,*) "Error, when method=XCDF in stg, then either inlet_plane_x or &
+                       &inlet_plane_i must be provided in " // fname
+            call error_stop
+          end if
+        end if
+        
+        g%Ustar_surf_inlet = u_star
+        !TODO more options
+        g%stress_gradient_inlet = stress_grad
+        
+        g%U_ref_inlet = u_ref
+        g%z_ref_inlet = z_ref
+        g%z0_inlet = z0
+        g%power_exponent_inlet = power_exponent
+        
+        if (T_Lag>0) then
+          g%T_Lag = T_Lag
+        else
+          write(*,*) "The Lagrangian time scale must be provided for the turbulence generator&
+          & in the T_Lag variable in " // fname
+          call error_stop()
+        end if
+        if (L_y>0 .and. L_z>0) then
+          g%L_y = L_y
+          g%L_z = L_z
+        else
+          write(*,*) "The integral length scales in the spanwise and vertical direction&
+          & must be provided for the turbulence generator in the L_y and L_z variables in " // fname
+          call error_stop()
+        end if
+
+        if (uu>0.and.vv>0.and.ww>0) then
+          g%relative_stress(1,1) = uu
+          g%relative_stress(2,2) = vv
+          g%relative_stress(3,3) = ww
+          g%relative_stress(1,2) = uv
+          g%relative_stress(2,1) = uv
+          g%relative_stress(1,3) = uw
+          g%relative_stress(3,1) = uw
+          g%relative_stress(2,3) = vw
+          g%relative_stress(3,2) = vw
+        else if (all(stress(1:3)>0)) then
+          g%relative_stress(1,1) = stress(1)
+          g%relative_stress(2,2) = stress(2)
+          g%relative_stress(3,3) = stress(3)
+          g%relative_stress(1,2) = stress(4)
+          g%relative_stress(2,1) = stress(4)
+          g%relative_stress(1,3) = stress(5)
+          g%relative_stress(3,1) = stress(5)
+          g%relative_stress(2,3) = stress(6)
+          g%relative_stress(3,2) = stress(6)
+        else if (.not. profiletype==PROFILE_FROM_FILE) then
+          write(*,*) "Relative stress with positive diagonal terms must be provided for the turbulence generator in " // fname
+          write(*,*) "Set either the uu, vv and ww variables or the stress array, ordered [uu, vvv, ww, uv, uw, vw]."
+          call error_stop()          
+        end if
+        
+        
+        select case (side)
+          case (We, Ea)
+            g%direction = 1
+          case (So, No)
+            g%direction = 2
+          case (0)
+            !no information on the direction has been given
+            !assuming +x
+            g%direction = 1
+          case default
+            write(*,*) "Error, synthetic turbulence generation supported only on boundaries in the horizontal directions (W,E,S,N)."
+            call error_stop()
+        end select
+
+        if (profiletype==PROFILE_FROM_FILE) then
+          if (len_trim(mean_profile)>0) then
+            g%mean_profile_file = trim(mean_profile)
+          else
+            g%mean_profile_file = "inlet_mean_profile.txt"
+          end if
+          if (len_trim(turbulence_profile)>0) then
+            g%turbulence_profile_file = trim(turbulence_profile)
+          else
+            g%turbulence_profile_file = "inlet_turbulence_profile.txt"
+          end if
+        end if
+
+      end associate
+      
+    end subroutine
+    
+  end subroutine get_boundary_conditions_velocity
+  
+  
 
 
   subroutine get_obstacles(fname)
@@ -1310,6 +1925,11 @@ contains
           call error_stop("Error interpretting obstacle_file fields in " // trim(fname))
         end if
         
+        inquire(file=o_file%file, exist=ex)
+        if (.not.ex) then
+          call error_stop("Error, file " // trim(o_file%file) // " does not exist when interpretting obstacle_file fields in " &
+          // trim(fname))
+        end if
         
         allocate(Polyhedron :: gs)
         select type (gs)
@@ -2029,22 +2649,26 @@ contains
         t_s%U_min = abs(t_s%U_min)
 
         if (maxval(t_s%U_max) <=  0) &
-          call error_stop("Error, time_stepping%U_max must have at least one non-zero component.")
+          call error_stop("Error, time_stepping%dt_min must be set or &
+            &time_stepping%U_max must have at least one non-zero component.")
 
-        if (maxval(t_s%U_min) <=  0) &
-          call error_stop("Error, time_stepping%U_min must have at least one non-zero component.")
+        if (t_s%dt_max <= 0 .and. maxval(t_s%U_min) <=  0) &
+          call error_stop("Error, time_stepping%dt_max must be set or &
+            &time_stepping%U_min must have at least one non-zero component.")
 
         if (t_s%CFL <= 0) &
           call error_stop("Error, time_stepping%CFL must be positive.")
 
 
-        t_s%dt_min = t_s%CFL / (t_s%U_max(1) / dxmin + &
-                                t_s%U_max(2) / dymin + &
-                                t_s%U_max(3) / dzmin)
+        if (t_s%dt_min <= 0) &
+          t_s%dt_min = t_s%CFL / (t_s%U_max(1) / dxmin + &
+                                  t_s%U_max(2) / dymin + &
+                                  t_s%U_max(3) / dzmin)
         
-        t_s%dt_max = t_s%CFL / (t_s%U_min(1) / dxmin + &
-                                t_s%U_min(2) / dymin + &
-                                t_s%U_min(3) / dzmin)
+        if (t_s%dt_max <= 0) &
+          t_s%dt_max = t_s%CFL / (t_s%U_min(1) / dxmin + &
+                                  t_s%U_min(2) / dymin + &
+                                  t_s%U_min(3) / dzmin)
 
         t_s%dt = t_s%dt_min
 
@@ -2108,23 +2732,222 @@ contains
   end subroutine get_time_stepping
   
   
+  subroutine get_les(fname)
+    use Strings
+    use ParseTrees
+    character(*), intent(in) :: fname
+    type(tree_object), allocatable :: tree(:)
+    logical :: ex
+    integer :: iobj, stat
+    
+    sgstype = -1
+    filtertype = -1
+    wallmodeltype = -1
+
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat==0) then
+
+      if (allocated(tree)) then
+        do iobj = 1, size(tree)
+          if (downcase(tree(iobj)%name)=="subgrid_model") then
+            call get_subgrid_model(tree(iobj))
+          else if (downcase(tree(iobj)%name)=="filter") then
+            call get_filter(tree(iobj))
+          else if (downcase(tree(iobj)%name)=="wall_model") then
+            call get_filter(tree(iobj))
+          end if
+          call tree(iobj)%finalize
+        end do
+      end if
+
+    else
+
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+
+    end if
+    
+    ! The default is laminar simulation.
+    ! If a subgrid model is enabled, the default is the wall model on.
+    
+    if (sgstype == -1) sgstype = 0
+    
+    if (filtertype == -1) filtertype = 0
+    
+    if (wallmodeltype == -1) then
+      if (sgstype>0) then
+        wallmodeltype = 1
+      else
+        wallmodeltype = 0
+      end if
+    end if
+    
+  contains
   
+    subroutine get_subgrid_model(obj)
+      use Subgrid
+      type(tree_object), intent(in) :: obj
+      integer :: i, j
+      real(knd) :: C_m
+      
+      sgstype = -1
+      C_m = -1
+      
+      if (allocated(obj%fields%array)) then
+
+        associate(fields => obj%fields%array)
+
+          do j = 1, size(fields)
+
+            if (downcase(fields(j)%name)=='type') then            
+              do i = 0, ubound(subgrid_model_names,1)
+                if (downcase(fields(j)%value)==downcase(subgrid_model_names(i))) then
+                  sgstype = i
+                  exit
+                end if                
+              end do
+              if (sgstype==-1) then
+                write(*,*) "Unknown subgrid model '"//trim(fields(j)%value)//"' in " // fname
+                write(*,'(1x,g0,*(/,tr4,g0))') "Valid values:", (trim(subgrid_model_names(i)),i=0,ubound(subgrid_model_names,1))
+                call error_stop
+              end if
+            else if (downcase(fields(j)%name)=='model_constant') then
+              read(fields(j)%value, *) C_m
+            else
+              write(*,*) "Unknown field '"//trim(fields(j)%name)//"' in the subgrid_model object in " // fname
+              call error_stop
+            end if
+
+          end do
+
+        end associate
+        
+        if (C_m > 0 .and. sgstype > 0) then
+          select case (sgstype)
+            case (1)
+              C_Smagorinsky = C_m
+            case (2)
+              C_sigma = C_m
+            case (3)
+              C_Vreman = C_m
+            case (4)
+              C_sigma = C_m
+            case (5)
+              C_MixedTimeScale = C_m
+            case (6)
+              C_WALE = C_m
+          end select
+        end if
+
+      else
+
+        write(*,*) "No fields in the subgrid_model object in " // fname
+        call error_stop
+
+      end if
+      
+    end subroutine
+    
+    subroutine get_filter(obj)
+      use Filters
+      type(tree_object), intent(in) :: obj
+      integer :: j
+      if (allocated(obj%fields%array)) then
+
+        associate(fields => obj%fields%array)
+
+          do j = 1, size(fields)
+            if (downcase(fields(j)%name)=='type') then 
+              select case (downcase(fields(j)%value))
+                case ('none')
+                  filtertype = 0
+                case ('default')
+                  filtertype = 1
+                case default
+                  write(*,*) "Unknown wall model type '"//trim(fields(j)%value)//"' in " // fname
+                  write(*,'(1x,g0,*(/,tr4,g0))') "Valid values: ", "none", "default"
+                  call error_stop
+              end select
+            else
+              write(*,*) "Unknown field '"//trim(fields(j)%name)//"' in the wall_model object in " // fname
+              call error_stop
+            end if
+          end do
+
+        end associate
+
+      else
+
+        write(*,*) "No fields in the wall_model object in " // fname
+        call error_stop
+
+      end if
+    end subroutine
+    
+    subroutine get_wall_model(obj)
+      use Filters
+      type(tree_object), intent(in) :: obj
+      integer :: j
+      if (allocated(obj%fields%array)) then
+
+        associate(fields => obj%fields%array)
+
+          do j = 1, size(fields)
+            if (downcase(fields(j)%name)=='type') then 
+              select case (downcase(fields(j)%value))
+                case ('none')
+                  filtertype = 0
+                case ('default')
+                  filtertype = 1
+                case default
+                  write(*,*) "Unknown filter type '"//trim(fields(j)%value)//"' in " // fname
+                  write(*,'(1x,g0,*(/,tr4,g0))') "Valid values: ", "none", "default"
+                  call error_stop
+              end select
+            else
+              write(*,*) "Unknown field '"//trim(fields(j)%name)//"' in the filter object in " // fname
+              call error_stop
+            end if
+          end do
+
+        end associate
+
+      else
+
+        write(*,*) "No fields in the filter object in " // fname
+        call error_stop
+
+      end if
+    end subroutine
+  end subroutine
   
 
   subroutine get_pressure_solution(fname, p_s)
     use Strings
     use ParseTrees
+    use Boundaries, only: InGlobalDomain, InDomain
     character(*), intent(in) :: fname
     type(pressure_solution_control), intent(inout), target :: p_s
     type(tree_object), allocatable :: tree(:)
+    type(tree_object_ptr) :: reference_obj_ptr
+    character(char_len), target :: boundary_index_str = "", reference_type_str = ""
     logical :: ex
     integer :: iobj, stat
 
-    type(field_names) :: names(13)
+    type(field_names) :: names(15)
     type(field_names_a) :: names_a(1)
+
+    type(field_names) :: reference_names(2)
+    type(field_names_a) :: reference_names_a(1)
 
     names = [field_names_init("check_mass_flux", p_s%check_mass_flux), &
              field_names_init("report_mass_flux", p_s%report_mass_flux), &
+             field_names_init("report_total_mass_flux", p_s%report_total_mass_flux), &
              field_names_init("correct_mass_flux_west",   p_s%correct_mass_flux(We)), &
              field_names_init("correct_mass_flux_east",   p_s%correct_mass_flux(Ea)), &
              field_names_init("correct_mass_flux_south",  p_s%correct_mass_flux(So)), &
@@ -2135,9 +2958,15 @@ contains
              field_names_init("projection_method",   p_s%projection_method), &
              field_names_init("check_divergence",    p_s%check_divergence), &
              field_names_init("check_poisson_residue", p_s%check_poisson_residue), &
-             field_names_init("bottom_pressure",     p_s%bottom_pressure)]
+             field_names_init("bottom_pressure",     p_s%bottom_pressure), &
+             field_names_init("reference", reference_obj_ptr)]
 
     names_a = [field_names_a_init("correct_mass_flux", p_s%correct_mass_flux)]
+    
+    reference_names = [field_names_init("type", reference_type_str), &
+                       field_names_init("boundary_index", boundary_index_str)]
+                            
+    reference_names_a = [field_names_a_init("reference_point", p_s%reference%reference_point_xyz)]
 
     inquire(file=fname, exist=ex)
 
@@ -2152,7 +2981,20 @@ contains
         call find_object_get_field_values(tree, "pressure_solution", stat, &
                                      fields = names, fields_a = names_a)
 
-        if (stat<=0) call init
+        if (stat<=0) then
+          if (associated(reference_obj_ptr%ptr)) then
+                      
+            call get_object_field_values(reference_obj_ptr%ptr, stat, &
+                                         fields = reference_names, &
+                                         fields_a = reference_names_a)
+            if (stat/=0) then
+              write(*,*) "Error parsing the reference object inside pressure_solution() in pressure_solution.conf"
+              call error_stop
+            end if
+          end if
+          
+          call init
+        end if
 
         do iobj = 1, size(tree)
           call tree(iobj)%finalize
@@ -2180,7 +3022,96 @@ contains
       where(Btype==BC_NOSLIP) p_s%correct_mass_flux = .false.
 
       where(Btype==BC_PERIODIC) p_s%correct_mass_flux = .false.
-    
+      
+      associate(p_s_ref => p_s%reference)
+        if (len_trim(reference_type_str)>0) then
+          select case (downcase(reference_type_str))
+            case ("boundary")
+              p_s_ref%type = PRESSURE_REFERENCE_BOUNDARY
+            case ("volume_average")
+              p_s_ref%type = PRESSURE_REFERENCE_VOLUME_AVERAGE
+            case ("point")
+              p_s_ref%type = PRESSURE_REFERENCE_POINT
+            case ("none")
+              p_s_ref%type = PRESSURE_REFERENCE_NONE
+            case default
+              write(*,*) "Error, unknown reference type '", &
+                        reference_type_str, &
+                        "' in reference() in pressure_solution() in pressure_solution.conf"
+              call error_stop
+          end select
+        end if
+        
+        if (p_s_ref%type ==PRESSURE_REFERENCE_BOUNDARY) then
+          if (len_trim(boundary_index_str)>0) then
+            select case (downcase(boundary_index_str(1:1)))
+              case("w","1")
+                p_s_ref%boundary_index = We
+              case("e","2")
+                p_s_ref%boundary_index = Ea
+              case("s","3")
+                p_s_ref%boundary_index = So
+              case("n","4")
+                p_s_ref%boundary_index = No
+              case("b","5")
+                p_s_ref%boundary_index = Bo
+              case("t","6")
+                p_s_ref%boundary_index = To
+              case default
+                write(*,*) "Error, invalid value '", &
+                            trim(boundary_index_str), &
+                            "' of boundary_index in reference() in pressure_solution() in pressure_solution.conf"
+                call error_stop
+            end select
+          end if
+        else if (p_s_ref%type == PRESSURE_REFERENCE_POINT) then 
+          if (.not. InGlobalDomain(p_s_ref%reference_point_xyz)) then
+            write(*,*) "Error, pressure reference point ", &
+                      p_s_ref%reference_point_xyz, &
+                      "outside of the grid domain."
+            call error_stop          
+          end if
+#ifdef PAR        
+          block
+            integer :: num
+            if (InDomain(p_s_ref%reference_point_xyz)) then
+              num = 1
+              num = par_co_sum(num)
+              
+              if (num>1) then
+                write(*,*) "Error, reference point on an image boundary, not yet implemented"
+                call error_stop
+              else
+                call GridCoords_interp(p_s_ref%reference_point(1), &
+                                      p_s_ref%reference_point(2), &
+                                      p_s_ref%reference_point(3), &
+                                      p_s_ref%reference_point_xyz(1), &
+                                      p_s_ref%reference_point_xyz(2), &
+                                      p_s_ref%reference_point_xyz(3))
+                p_s_ref%reference_point_im = myim
+              end if
+            else
+              num = 0
+              num = par_co_sum(num)
+              p_s_ref%reference_point_im = 0
+            end if
+          end block
+          
+          ! instead of a broadcast, we do not know on each image
+          ! which image will be broadcasting
+          p_s_ref%reference_point_im = par_co_sum(p_s_ref%reference_point_im)
+          
+#else
+          call GridCoords_interp(p_s_ref%reference_point(1), &
+                                p_s_ref%reference_point(2), &
+                                p_s_ref%reference_point(3), &
+                                p_s_ref%reference_point_xyz(1), &
+                                p_s_ref%reference_point_xyz(2), &
+                                p_s_ref%reference_point_xyz(3))
+          p_s_ref%reference_point_im = myim
+#endif        
+        end if
+      end associate
     end subroutine
 
   end subroutine get_pressure_solution
@@ -2382,6 +3313,119 @@ contains
     end subroutine
     
   end subroutine get_frames
+  
+  
+  
+  subroutine get_scalar_zones(fname)
+    use Strings
+    use ParseTrees
+    use Scalars
+
+    character(*), intent(in) :: fname
+    type(TScalarRemovalZone), target :: zone
+    real(knd), target :: bounds(6)
+    character(char_len), target :: type_str
+
+    type(tree_object), allocatable :: tree(:)
+    integer :: iobj, stat
+    logical :: ex
+
+    type(field_names) :: names(2)
+    type(field_names_a) :: names_a(1)
+    
+    type(field_names_str) :: names_str(1)
+    
+
+
+    names = [field_names_init("relaxation_time", zone%relaxation_time), &
+              field_names_init("scalar",  zone%scalar)]
+                 
+    names_a = [field_names_a_init("bounds", bounds)]
+                 
+    names_str = [field_names_str("type", type_str)]
+
+    inquire(file=fname, exist=ex)
+
+    if (.not.ex) return
+
+    call parse_file(tree, fname, stat)
+
+    if (stat/=0) then
+      write(*,*) "Error parsing file " // fname
+      call error_stop
+    end if
+  
+    if (.not.allocated(tree)) then
+      write(*,*) "Error, no content in " // fname
+      call error_stop
+    end if
+   
+    do iobj = 1, size(tree)
+    
+      if (downcase(tree(iobj)%name)=="scalar_removal_zone") then
+      
+        zone = TScalarRemovalZone()
+        type_str = ""
+        bounds = 0
+        
+        call get_object_field_values(tree(iobj), stat, &
+                                     fields = names, fields_str = names_str, fields_a = names_a)
+                                     
+        if (stat/=0) then
+          call error_stop("Error interpretting fields in scalar_removal_zone '"//itoa(iobj)//"'.")
+        end if
+               
+        call init_zone
+
+      else
+        call error_stop("Error, unrecognized object '"//trim(tree(iobj)%name)//"' in " // fname)
+      end if
+      
+      call tree(iobj)%finalize
+    end do
+    
+
+  contains
+
+    subroutine init_zone
+      if (any(bounds/=0)) then
+        zone%x1 = bounds(1)
+        zone%x2 = bounds(2)
+        zone%y1 = bounds(3)
+        zone%y2 = bounds(4)
+        zone%z1 = bounds(5)
+        zone%z2 = bounds(6)
+      end if
+
+      if (zone%relaxation_time > 0 .and. zone%relaxation_time < huge(1._knd)) then
+        zone%type = removal_continuous
+      end if
+
+      if (len_trim(type_str)>0) then
+        select case (downcase(type_str(1:4)))
+          case ("cont")
+            zone%type = removal_continuous
+          case ("inst")
+            zone%type = removal_instantaneous
+          case default
+            call error_stop("Error, unrecognized type of scalar_removal_zone '"//trim(type_str)//"'.")
+        end select
+      end if
+
+      if (zone%x1>zone%x2 .or. zone%y1>zone%y2 .or. zone%z1>zone%z2) then
+        zone%active = .false.
+      end if
+
+      if (zone%scalar==0) then
+        zone%active = .false.
+      end if
+
+      if (zone%active) then
+        call AddScalarRemovalZone(zone)
+      end if
+    end subroutine
+    
+  end subroutine get_scalar_zones
   
   
   
@@ -2829,15 +3873,14 @@ contains
       else
         call ReadInitialConditions(U,V,W,Pr,Temperature,Moisture,Scalar,scalars_optional=.false.)
       end if
-
       Viscosity = molecular_viscosity
 
       if (enable_buoyancy.or. &
           enable_moisture.or. &
           num_of_scalars>0)        TDiff = molecular_diffusivity
 
-        call BoundUVW(U, V, W)
-        call Bound_Pr(Pr)
+      call BoundUVW(U, V, W)
+      call Bound_Pr(Pr)
 
     else   !init conditions not from file
 
@@ -2962,7 +4005,7 @@ contains
             
                 do j = 1, Prny
                   
-                  call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+                  call default_turbulence_generator%step_xc(Uin, Vin, Win, time_stepping%dt)
 
                   !$omp parallel private(i,k)
                   !$omp do collapse(2)
@@ -3006,7 +4049,7 @@ contains
                   integer :: ierr, im
                   do im = 2, nyims
                     do j = 1, domain_grids(domain_index)%nys(im)
-                      call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+                      call default_turbulence_generator%step_xc(Uin, Vin, Win, time_stepping%dt)
                       
                       call MPI_Send(Uin(1:Unx,1:Unz), Unx*Unz, PAR_KND, &
                                     ranks_grid(iim,im,kim), 111, domain_comm, ierr)
@@ -3039,7 +4082,7 @@ contains
 
               do i = 1, Prnx
                 
-                call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+                call default_turbulence_generator%step_xc(Uin, Vin, Win, time_stepping%dt)
                 
                 !$omp parallel private(j,k)
                 !$omp do collapse(2)
@@ -3078,6 +4121,9 @@ contains
                 !$omp end parallel
               end do
             end if
+            
+            !sets the Uin to mean values
+            call default_turbulence_generator%Uin_reset(Uin, Vin, Win)
 
         else
 
@@ -3125,7 +4171,6 @@ contains
            !$omp end do
            !$omp end parallel
         end if  !task_type
-
 
 
         if (num_of_scalars>0) then
@@ -3239,12 +4284,10 @@ contains
      call par_sync_out("  ...setting ghost cell values.")
 
      call BoundUVW(U, V, W)
-
      call Bound_Pr(Pr)
 
      call par_sync_out("  ...computing pressure correction.")
      call PressureCorrection(U,V,W,Pr,Q,1._knd)
-
      call par_sync_out("  ...computing initial eddy viscosity.")
      call SubgridModel(U, V, W)
 
@@ -3311,7 +4354,6 @@ contains
 #endif
 
     call par_sync_out("initial conditions set.")
-
 
   end subroutine InitialConditions
 
@@ -3477,6 +4519,9 @@ contains
 
     !Requires grid coordinates
     call get_pressure_gradient("pressure_gradient_profile.conf")
+    
+    call get_pressure_solution("pressure_solution.conf", pressure_solution)
+
 
 
     call par_sync_out("  ...reading geostrophic wind.")
@@ -3517,7 +4562,7 @@ contains
         call ParabolicInlet
       case (TurbulentInletType)
         call default_turbulence_generator%init()
-        call default_turbulence_generator%time_step(Uin, Vin, Win, time_stepping%dt)
+        call default_turbulence_generator%step_xc(Uin, Vin, Win, time_stepping%dt)
       case (FromFileInletType)
         call GetInletFromFile(time_stepping%start_time)
       case (GeostrophicInletType)
@@ -3654,6 +4699,10 @@ contains
     call par_sync_out("  ...getting puff scalar sources.")
     !add puff sources, each containing one or more points
     call InitPuffSources
+    
+    call par_sync_out("  ...setting scalar removal zones.")
+    !add puff sources, each containing one or more points
+    call InitScalarRemovalZones
     
     call par_sync_out("  ...creating output directories.")
 

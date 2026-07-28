@@ -8,9 +8,11 @@ module ScalarAdvection
   
   private
   
-  public AdvScalar, AddScalarAdvVector, ScalarAdvection_Deallocate
+  public AdvScalar, AddScalarAdvVector, ScalarAdvection_Deallocate, enable_correct_divergence_scalar
   
   real(knd), allocatable :: Slope(:,:,:)
+
+  logical :: enable_correct_divergence_scalar = .false.
 
   
 contains
@@ -31,9 +33,16 @@ contains
 
     
     if (discretization_order==4) then
+#ifdef MODIFIED_KAPPA
+      call KappaScalar_4ord_mod_delta(Scal2, Scal, &
+                            U, V, W, &
+                            dt, &
+                            temperature_flux_profileLoc)
+#else
       call KappaScalar_4ord(Scal2, Scal, &
                             U, V, W, &
                             temperature_flux_profileLoc)
+#endif
     else
 #ifdef MODIFIED_KAPPA
       call KappaScalar_mod_delta(Scal2, Scal, &
@@ -46,6 +55,8 @@ contains
                         temperature_flux_profileLoc)
 #endif
     end if
+
+    if (enable_correct_divergence_scalar) call correct_divergence(Scal2, Scal, U, V, W)
 
     if (present(temperature_flux_profile)) then
       if (size(temperature_flux_profile)==size(temperature_flux_profileLoc)) &
@@ -267,10 +278,10 @@ contains
     ! c.f. Hokpunna, Manhart, 2010, eq. 11, https://dx.doi.org/10.1016/j.jcp.2010.05.042
     ! [U]i = -1/24 U(i+1) + 13/12 U(i) - 1/24 U(i-1)
     ! ([U]i - [U]i-1) / dx = 9/8*(U(i)-U(i-1)) / dx - 1/8*(U(i+1)-U(i-2))/(3*dx)
-                         
+
     !Kappa scheme with flux limiter
     !Hunsdorfer et al. 1995, JCP
-    real(knd), contiguous, intent(out) :: Scal2(-2:,-2:,-2:) 
+    real(knd), contiguous, intent(out) :: Scal2(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: Scal(-2:,-2:,-2:)
     real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
     real(knd), contiguous, intent(out) :: temperature_flux_profile(0:)
@@ -441,6 +452,196 @@ contains
     end function
 
   endsubroutine KappaScalar_4ord
+
+
+
+
+
+  subroutine KappaScalar_4ord_mod_delta(Scal2, Scal, &
+                         U, V, W, &
+                         dt, &
+                         temperature_flux_profile)
+    !version with advection velocities following the 4th-order discrete divergence-free condition
+    ! c.f. Hokpunna, Manhart, 2010, eq. 11, https://dx.doi.org/10.1016/j.jcp.2010.05.042
+    ! [U]i = -1/24 U(i+1) + 13/12 U(i) - 1/24 U(i-1)
+    ! ([U]i - [U]i-1) / dx = 9/8*(U(i)-U(i-1)) / dx - 1/8*(U(i+1)-U(i-2))/(3*dx)
+
+    !Kappa scheme with flux limiter
+    !Hunsdorfer et al. 1995, JCP
+    real(knd), contiguous, intent(out) :: Scal2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)  :: Scal(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    real(knd),             intent(in)  :: dt
+    real(knd), contiguous, intent(out) :: temperature_flux_profile(0:)
+    integer   :: i, j, k, l
+    real(knd) :: Ax, Ay, Az              !Auxiliary variables to store muliplication constants for efficiency
+    real(knd) :: sl, sr, flux
+    real(knd) :: Uadv, Vadv, Wadv
+    real(knd), parameter :: D0 = 13._knd / 12, D1 = -1._knd / 24
+    real(knd), parameter :: eps = 1e-8
+
+
+    if (.not.allocated(Slope)) then
+      allocate(Slope(-1:Prnx+2, -1:Prny+2, -1:Prnz+2))
+    end if
+
+    Ax = 1 / dxmin
+    Ay = 1 / dymin
+    Az = 1 / dzmin
+
+
+    call set(Scal2, 0._knd)
+    call set(Slope, 0._knd)
+
+    !$omp parallel private(i,j,k,l,Uadv,sl,sr,flux) shared(Slope,Scal,Scal2,temperature_flux_profile)
+    !$omp do schedule(runtime)
+    do k = 1, Prnz
+     do j = 1, Prny
+      do i = 0, Prnx
+       Uadv = D1 * U(i-1,j,k) + D0 * U(i,j,k) + D1 * U(i+1,j,k)
+       if (Uadv > 0) then
+        sr = Scal(i+1,j,k) - Scal(i,j,k)
+        sl = Scal(i,j,k) - Scal(i-1,j,k)
+       else
+        sr = Scal(i,j,k) - Scal(i+1,j,k)
+        sl = Scal(i+1,j,k) - Scal(i+2,j,k)
+       end if
+       Slope(i,j,k) = FluxLimiter((sr + eps*sign(1._knd, sl)) / (sl + eps*sign(1._knd, sl)), abs(Uadv) * dt / dxmin)
+      end do
+     end do
+    end do
+    !$omp end do
+
+    !$omp do schedule(runtime)
+    do k = 1, Prnz
+     do j = 1, Prny
+      do i = 0, Prnx
+        if (Scflx_mask(i,j,k)) then
+          Uadv = D1 * U(i-1,j,k) + D0 * U(i,j,k) + D1 * U(i+1,j,k)
+          if (Uadv > 0) then
+           flux = Uadv * (Scal(i,j,k) + (Scal(i,j,k)-Scal(i-1,j,k)) * Slope(i,j,k)/2._knd)
+          else
+           flux = Uadv * (Scal(i+1,j,k) + (Scal(i+1,j,k)-Scal(i+2,j,k)) * Slope(i,j,k)/2._knd)
+          end if
+
+          Scal2(i,j,k) = Scal2(i,j,k) - Ax * flux
+          Scal2(i+1,j,k) = Scal2(i+1,j,k) + Ax * flux
+        end if
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp end parallel
+
+
+    call set(Slope, 0._knd)
+
+    !$omp parallel private(i,j,k,l,Vadv,sl,sr,flux) shared(Slope,Scal,Scal2,temperature_flux_profile)
+    !$omp do schedule(runtime)
+    do k = 1, Prnz
+     do j = 0, Prny
+      do i = 1, Prnx
+       Vadv = D1 * V(i,j-1,k) + D0 * V(i,j,k) + D1 * V(i,j+1,k)
+       if (Vadv > 0) then
+        sr = Scal(i,j+1,k) - Scal(i,j,k)
+        sl = Scal(i,j,k) - Scal(i,j-1,k)
+       else
+        sr = Scal(i,j,k) - Scal(i,j+1,k)
+        sl = Scal(i,j+1,k) - Scal(i,j+2,k)
+       end if
+       Slope(i,j,k) = FluxLimiter((sr + eps*sign(1._knd, sl)) / (sl + eps*sign(1._knd, sl)), abs(Vadv) * dt / dxmin)
+      end do
+     end do
+    end do
+    !$omp end do
+
+
+    !$omp do schedule(runtime)
+    do k = 1, Prnz
+     do j = 0, Prny
+      do i = 1, Prnx
+        if (Scfly_mask(i,j,k)) then
+          Vadv = D1 * V(i,j-1,k) + D0 * V(i,j,k) + D1 * V(i,j+1,k)
+          if (Vadv > 0) then
+           flux = Vadv * (Scal(i,j,k) + (Scal(i,j,k)-Scal(i,j-1,k)) * Slope(i,j,k)/2._knd)
+          else
+           flux = Vadv * (Scal(i,j+1,k) + (Scal(i,j+1,k)-Scal(i,j+2,k)) * Slope(i,j,k)/2._knd)
+          end if
+
+          Scal2(i,j,k) = Scal2(i,j,k) - Ay * flux
+          Scal2(i,j+1,k) = Scal2(i,j+1,k) + Ay * flux
+        end if
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp end parallel
+
+
+    call set(Slope, 0._knd)
+
+    !$omp parallel private(i,j,k,l,Wadv,sl,sr,flux) shared(Slope,Scal,Scal2,temperature_flux_profile)
+    !$omp do schedule(runtime)
+    do k = 0, Prnz
+     do j = 1, Prny
+      do i = 1, Prnx
+       Wadv = D1 * W(i,j,k-1) + D0 * W(i,j,k) + D1 * W(i,j,k+1)
+       if (Wadv > 0) then
+        sr = Scal(i,j,k+1) - Scal(i,j,k)
+        sl = Scal(i,j,k) - Scal(i,j,k-1)
+       else
+        sr = Scal(i,j,k) - Scal(i,j,k+1)
+        sl = Scal(i,j,k+1) - Scal(i,j,k+2)
+       end if
+       Slope(i,j,k) = FluxLimiter((sr + eps*sign(1._knd, sl)) / (sl + eps*sign(1._knd, sl)), abs(Wadv) * dt / dxmin)
+      end do
+     end do
+    end do
+    !$omp end do nowait
+    !$omp end parallel
+
+    call set(temperature_flux_profile, 0._knd)
+
+    !$omp parallel private(i,j,k,l,Wadv,sl,sr,flux) shared(Slope,Scal,Scal2,temperature_flux_profile)
+    do l = 0, 1  !odd-even separation to avoid a race condition
+      !$omp do reduction(+:temperature_flux_profile) schedule(runtime)
+      do k = 0+l, Prnz, 2
+       do j = 1, Prny
+        do i = 1, Prnx
+          if (Scflz_mask(i,j,k)) then
+            Wadv = D1 * W(i,j,k-1) + D0 * W(i,j,k) + D1 * W(i,j,k+1)
+            if (Wadv > 0) then
+             flux = Wadv * (Scal(i,j,k) + (Scal(i,j,k)-Scal(i,j,k-1)) * Slope(i,j,k)/2._knd)
+            else
+             flux = Wadv * (Scal(i,j,k+1) + (Scal(i,j,k+1)-Scal(i,j,k+2)) * Slope(i,j,k)/2._knd)
+            end if
+
+            temperature_flux_profile(k) = temperature_flux_profile(k) + flux
+
+            Scal2(i,j,k) = Scal2(i,j,k) - Az * flux
+            Scal2(i,j,k+1) = Scal2(i,j,k+1) + Az * flux
+          end if
+        end do
+       end do
+      end do
+      !$omp end do
+    end do
+    !$omp end parallel
+
+  contains
+
+    real(knd) pure function  FluxLimiter(r, C)
+      real(knd), intent(in) :: r !slope ratio
+      real(knd), intent(in) :: C !Courant number
+      real(knd), parameter :: eps = 1e-6_knd
+
+      FluxLimiter = max(0._knd, &
+                        min(2 * r, &
+                            min(2 * max(1._knd, (1 - C) / (C + eps)), &
+                                (1 + 2 * r) / 3) ) )
+    end function
+
+  endsubroutine KappaScalar_4ord_mod_delta
 
 
 
@@ -730,6 +931,55 @@ contains
 
   
   
+  subroutine correct_divergence(Scal2, Scal, U, V, W)
+    real(knd), contiguous, intent(out) :: Scal2(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)  :: Scal(-2:,-2:,-2:)
+    real(knd), contiguous, intent(in)  :: U(-2:,-2:,-2:), V(-2:,-2:,-2:), W(-2:,-2:,-2:)
+    integer :: i, j, k
+    real(knd) :: div
+    real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
+
+    ! u grad(S) = div(u S) - div(u) S
+
+    if (discretization_order==4) then
+      !$omp parallel do collapse(3) private(i,j,k,div)
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            if (Prtype(i,j,k)==0) then
+              div = ( C1*(U(i,j,k)-U(i-1,j,k)) - C3*(U(i+1,j,k)-U(i-2,j,k)) ) / dxmin &
+                  + ( C1*(V(i,j,k)-V(i,j-1,k)) - C3*(V(i,j+1,k)-V(i,j-2,k)) ) / dymin &
+                  + ( C1*(W(i,j,k)-W(i,j,k-1)) - C3*(W(i,j,k+1)-W(i,j,k-2)) ) / dzmin
+              Scal2(i,j,k) = Scal2(i,j,k) + div * Scal(i,j,k)
+            end if
+          end do
+        end do
+      end do
+    else
+      !$omp parallel do collapse(3) private(i,j,k,div)
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            if (Prtype(i,j,k)==0) then
+              div = (U(i,j,k) - U(i-1,j,k)) / dxmin &
+                  + (V(i,j,k) - V(i,j-1,k)) / dymin &
+                  + (W(i,j,k) - W(i,j,k-1)) / dzPr(k)
+
+              div = 0
+              if (Scflx_mask(i,j,k)) div = div + U(i,j,k) / dxmin
+              if (Scflx_mask(i-1,j,k)) div = div - U(i-1,j,k) / dxmin
+              if (Scfly_mask(i,j,k)) div = div + V(i,j,k) / dymin
+              if (Scfly_mask(i,j-1,k)) div = div - V(i,j-1,k) / dymin
+              if (Scflz_mask(i,j,k)) div = div + W(i,j,k) / dzmin
+              if (Scflz_mask(i,j,k-1)) div = div - W(i,j,k-1) / dzPr(k)
+
+              Scal2(i,j,k) = Scal2(i,j,k) + div * Scal(i,j,k)
+            end if
+          end do
+        end do
+      end do
+    end if
+  end subroutine
 
 
 
@@ -925,7 +1175,7 @@ contains
     end function
 
   endsubroutine AddScalarAdvVector
-  
+
 
 
 

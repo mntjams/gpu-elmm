@@ -13,10 +13,15 @@ module TurbInlet
   private
   public :: turbulence_generator, turbulence_generator_nesting, &
             default_turbulence_generator, &
+            turbulent_inlet_method, &
             GetInletFromFile
 
   type turbulence_generator
     integer :: direction
+    
+    real(knd), allocatable :: inlet_plane_x !coordinate of the inlet plane in the `direction` direction
+    integer, allocatable  :: inlet_plane_i !grid index of the inlet plane in the `direction` direction
+                              !0 means the inlet arrays Uin, Vin, Win
 
     real(knd) :: T_lag
     real(knd) :: L_y
@@ -40,14 +45,20 @@ module TurbInlet
 
     real(knd),allocatable,dimension(:)     :: Ustar_inlet !friction velocity profile at inlet
     real(knd),allocatable,dimension(:,:)   :: Uinavg, Vinavg, Winavg !mean values of U,V,W at inflow
+    real(knd),allocatable,dimension(:,:)   :: Uin, Vin, Win !internal inflow-plane values
     real(knd),allocatable,dimension(:,:,:) :: transform_tensor
     real(knd),dimension(1:3,1:3) :: relative_stress
+    character(:), allocatable :: mean_profile_file
+    character(:), allocatable :: turbulence_profile_file
 #ifdef PAR    
     integer :: comm = PAR_COMM_NULL
 #endif    
   contains
     procedure :: init => turbulence_generator_init
-    procedure :: time_step => turbulence_generator_time_step
+    procedure :: step_xc => turbulence_generator_step_xc
+    procedure :: step_xcdf => turbulence_generator_step_xcdf
+    procedure :: Uin_reset => turbulence_generator_Uin_reset
+    procedure, private :: time_step => turbulence_generator_time_step
     procedure, private :: init_turbulence_profiles => turbulence_generator_init_turbulence_profiles
     procedure, private :: init_mean_profiles => turbulence_generator_init_mean_profiles
     procedure, private :: bound_Uin => bound_Uin
@@ -71,7 +82,12 @@ module TurbInlet
   end type
 
   type(turbulence_generator) :: default_turbulence_generator
+  
+  integer, public, parameter :: turbulent_inlet_XC = 1, & ! Xie, Castro (2008) http://dx.doi.org/10.1007/s10494-008-9151-5
+                                turbulent_inlet_XCDF = 2  ! Kim, Castro, Xie (2013) http://dx.doi.org/10.1016/j.compfluid.2013.06.001
 
+  integer :: turbulent_inlet_method = turbulent_inlet_XC
+                        
 contains
 
   subroutine turbulence_generator_init(g)
@@ -87,6 +103,11 @@ contains
     integer :: tid
     
     ! The synthetic turbulence generation method by Xie and Castro, 2008, https://dx.doi.org/10.1007/s10494-008-9151-5
+    
+    if (g%direction<1 .or. g%direction>2) then
+      write(*,*) "Error, invalid direction value in the turbulence generator. Value:", g%direction
+      call error_stop()
+    end if
 
 #ifdef PAR
     if (g%direction==2) then
@@ -100,6 +121,64 @@ contains
       g%comm = comm_plane_yz
     end if
 #endif
+
+    if (g%direction==2) then
+      allocate(g%Uin(-2:Unx+3,-2:Unz+3), g%Vin(-2:Vnx+3,-2:Vnz+3), g%Win(-2:Wnx+3,-2:Wnz+3))
+    else
+      allocate(g%Uin(-2:Uny+3,-2:Unz+3), g%Vin(-2:Vny+3,-2:Vnz+3), g%Win(-2:Wny+3,-2:Wnz+3))
+    end if
+    
+    if (turbulent_inlet_method==turbulent_inlet_XCDF) then
+      if (allocated(g%inlet_plane_i)) then
+        if (g%inlet_plane_i<1) then
+          write(*,*) "Error, inlet_plane_i for the XCDF turbulence generator must be positive. Value:", g%inlet_plane_i
+          call error_stop()
+        else if ((g%inlet_plane_i>Unx.and.g%direction==1).or.((g%inlet_plane_i>Vny.and.g%direction==2))) then
+          write(*,*) "Error, inlet_plane_i for the XCDF turbulence generator overflows the grid. Value", g%inlet_plane_i
+          call error_stop()
+        end if
+      !if inlet_plane_i is set, inlet_plane_x is ignored
+      else if (allocated(g%inlet_plane_x)) then
+        if (g%direction == 2) then
+          if (g%inlet_plane_x < gymin .or. g%inlet_plane_x > gymax) then
+            write(*,*) "Error, inlet_plane_x for the XCDF turbulence generator outside of the y extent of the domain."
+            write(*,*) "Value:", g%inlet_plane_x
+            call error_stop()
+          else if (g%inlet_plane_x<yV(0) .or. g%inlet_plane_x>yV(Prny)) then
+            write(*,*) "Error, inlet_plane_x outside of the image containing the boudary. Value:", g%inlet_plane_x
+            call error_stop()
+            write(*,*) "Boundary image y bounds:", yV(0), yV(Prny)
+            call error_stop()
+          end if
+        else
+          if (g%inlet_plane_x < gxmin .or. g%inlet_plane_x > gxmax) then
+            write(*,*) "Error, inlet_plane_x for the XCDF turbulence generator outside of the x extent of the domain."
+            write(*,*) "Value:", g%inlet_plane_x
+            call error_stop()
+          else if (g%inlet_plane_x<xU(0) .or. g%inlet_plane_x>xU(Prnx)) then
+            write(*,*) "Error, inlet_plane_x outside of the image containing the boudary. Value:", g%inlet_plane_x
+            call error_stop()
+            write(*,*) "Boundary image x bounds:", xU(0), xU(Prnx)
+            call error_stop()
+          end if
+        end if
+        
+        block
+          integer :: xi, yj, zk
+          real(knd) :: x, y, z
+          
+          if (g%direction==2) then
+            call GridCoords_scalar(xi, g%inlet_plane_i, zk, x, g%inlet_plane_x, z)
+          else
+            call GridCoords_scalar(g%inlet_plane_i, yj, zk, g%inlet_plane_x, y, z)
+          end if
+        end block
+      else
+        write(*,*) "Error, neither %inlet_plane_x nor %inlet_plane_i allocated &
+                   &in the turbulence generator and the XCDF method is selected."
+        call error_stop
+      end if
+    end if
 
     call g%init_turbulence_profiles
 
@@ -278,22 +357,64 @@ contains
     g%compat = par_co_sum(g%compat, g%comm)
 #endif
 
+  contains
+
+    !local version here to avoid needing to use Bondaries to avoid a dependency cycle
+    elemental subroutine GridCoords_scalar(xi, yj, zk, x, y, z)
+      integer, intent(out):: xi, yj, zk
+      real(knd), intent(in):: x, y, z
+      integer :: i
+
+
+      if (gridtype==GRID_UNIFORM) then
+
+          xi = min( max(nint( (x - xU(0))/dxmin + 0.5_knd ),1) , Prnx)
+          yj = min( max(nint( (y - yV(0))/dymin + 0.5_knd ),1) , Prny)
+          zk = min( max(nint( (z - zW(0))/dzmin + 0.5_knd ),1) , Prnz)
+
+      else
+
+        xi = Prnx
+        do i = 1, Prnx
+        if (xU(i)>=x) then
+                      xi = i
+                      exit
+                      end if
+        end do
+
+        yj = Prny
+        do i = 1, Prny
+        if (yV(i)>=y) then
+                      yj = i
+                      exit
+                      end if
+        end do
+        zk = Prnz
+        do i = 1, Prnz
+        if (zW(i)>=z) then
+                      zk = i
+                      exit
+                      end if
+        end do
+
+      end if
+    end subroutine GridCoords_scalar
+
   end subroutine
 
 
-  subroutine turbulence_generator_time_step(g, Uin, Vin, Win, dt)
+  subroutine turbulence_generator_time_step(g, dt)
 #ifdef PAR
     use custom_par, only: iim, jim, kim, nxims, nyims, nzims, par_co_sum, par_co_min
     use exchange_par
 #endif
     class(turbulence_generator), intent(inout) :: g
-    real(knd), intent(out), contiguous :: Uin(-2:,-2:), Vin(-2:,-2:), Win(-2:,-2:)
     real(knd), intent(in) :: dt
     integer :: i, j, k
     integer :: jlo, jup, klo, kup, ny
     real(knd) :: Ui, Vi, Wi, p
     integer :: tid
-    
+
 #ifdef PAR
     if (g%direction==2) then
       if (.not. (jim==1 .or. jim==nyims)) return
@@ -340,9 +461,9 @@ contains
     call multiply(g%Psiw(:,:,1),exp(-pi * dt / (2._knd * g%T_lag)))
     call add_multiplied(g%Psiw(:,:,1), g%Psiw(:,:,2), sqrt(1 - exp(-pi * dt / (g%T_lag))))
     
-    call set(Uin, 0._knd)
-    call set(Vin, 0._knd)
-    call set(Win, 0._knd)
+    call set(g%Uin, 0._knd)
+    call set(g%Vin, 0._knd)
+    call set(g%Win, 0._knd)
 
     if (allocated(g%Uinavg) .and. allocated(g%Vinavg) .and. allocated(g%Winavg)) then
       !$omp parallel do private(j,k,Ui,Vi,Wi)
@@ -352,12 +473,12 @@ contains
         Vi = g%Psiv(j,k,1)
         Wi = g%Psiw(j,k,1)
 
-        Uin(j,k) = g%Uinavg(j,k) + g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
+        g%Uin(j,k) = g%Uinavg(j,k) + g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
 
-        Vin(j,k) = g%Vinavg(j,k) + g%transform_tensor(2,j,k) * Ui &
+        g%Vin(j,k) = g%Vinavg(j,k) + g%transform_tensor(2,j,k) * Ui &
                                  + g%transform_tensor(3,j,k) * Vi
 
-        Win(j,k) = g%Winavg(j,k) + g%transform_tensor(4,j,k) * Ui &
+        g%Win(j,k) = g%Winavg(j,k) + g%transform_tensor(4,j,k) * Ui &
                                  + g%transform_tensor(5,j,k) * Vi &
                                  + g%transform_tensor(6,j,k) * Wi
        end do
@@ -371,12 +492,12 @@ contains
         Vi = g%Psiv(j,k,1)
         Wi = g%Psiw(j,k,1)
 
-        Uin(j,k) = g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
+        g%Uin(j,k) = g%transform_tensor(1,j,k) * Ui   !a12,a13,a23 = 0
 
-        Vin(j,k) =  g%transform_tensor(2,j,k) * Ui &
+        g%Vin(j,k) =  g%transform_tensor(2,j,k) * Ui &
                   + g%transform_tensor(3,j,k) * Vi
 
-        Win(j,k) =  g%transform_tensor(4,j,k) * Ui &
+        g%Win(j,k) =  g%transform_tensor(4,j,k) * Ui &
                   + g%transform_tensor(5,j,k) * Vi &
                   + g%transform_tensor(6,j,k) * Wi
        end do
@@ -386,11 +507,11 @@ contains
 
     if (g%direction==2) then
       !$omp parallel workshare
-      p = sum(Vin(1:Vnx,1:Vnz))
+      p = sum(g%Vin(1:Vnx,1:Vnz))
       !$omp end parallel workshare      
     else
       !$omp parallel workshare
-      p = sum(Uin(1:Uny,1:Unz))
+      p = sum(g%Uin(1:Uny,1:Unz))
       !$omp end parallel workshare
     end if
 
@@ -402,19 +523,20 @@ contains
     
     if (g%direction==2) then
       p = p / (gVnx * gVnz)      
-      call add(Vin, p)
+      call add(g%Vin, p)
     else
       p = p / (gUny * gUnz)
-      call add(Uin, p)
+      call add(g%Uin, p)
     end if
 
 
-    call g%bound_Uin(1, Uin)
+    call g%bound_Uin(1, g%Uin)
 
-    call g%bound_Uin(2, Vin)
+    call g%bound_Uin(2, g%Vin)
 
-    call g%bound_Uin(3, Win)
-
+    call g%bound_Uin(3, g%Win)
+    
+    
     !$omp parallel private(j,k,tid)
     tid = 0
     !$ tid = omp_get_thread_num()
@@ -502,7 +624,52 @@ contains
 
 
 
+  subroutine turbulence_generator_Uin_reset(g, Uin, Vin, Win)
+    class(turbulence_generator), intent(inout) :: g
+    real(knd), dimension(-2:,-2:), contiguous, intent(out) :: Uin, Vin, Win
+    ! sets the Uin fields to the mean values
+    
+    Uin = g%Uinavg
+    Vin = g%Vinavg
+    Win = g%Winavg
+   
+  end subroutine turbulence_generator_Uin_reset
 
+  subroutine turbulence_generator_step_xc(g, Uin, Vin, Win, dt)
+    class(turbulence_generator), intent(inout) :: g
+    real(knd), dimension(-2:,-2:), contiguous, intent(out) :: Uin, Vin, Win
+    real(knd), intent(in) :: dt
+    ! applies the resulting g%Uin fields as in the XC method
+    
+    call g%time_step(dt)
+    
+    Uin = g%Uin
+    Vin = g%Vin
+    Win = g%Win
+   
+  end subroutine turbulence_generator_step_xc
+
+
+  subroutine turbulence_generator_step_xcdf(g, U, V, W, dt)
+    class(turbulence_generator), intent(inout) :: g
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout) :: U, V, W
+    real(knd), intent(in) :: dt
+    ! applies the resulting g%Uin fields as in the XCDF method
+    ! XCDF originally implemented and tested by Jakub Herec
+    
+    call g%time_step(dt)
+
+    if (g%direction==2) then
+      U(:,g%inlet_plane_i,:) = g%Uin
+      V(:,g%inlet_plane_i,:) = g%Vin
+      W(:,g%inlet_plane_i,:) = g%Win
+    else
+      U(g%inlet_plane_i,:,:) = g%Uin
+      V(g%inlet_plane_i,:,:) = g%Vin
+      W(g%inlet_plane_i,:,:) = g%Win
+    end if
+   
+  end subroutine turbulence_generator_step_xcdf
 
 
 
@@ -522,7 +689,7 @@ contains
     end if
     
     if (profiletype==PROFILE_FROM_FILE) then
-      call g%get_turbulence_profile_from_file("inlet_stress_profile.txt")
+      call g%get_turbulence_profile_from_file(g%turbulence_profile_file)
       return
     end if
     
@@ -553,9 +720,9 @@ contains
 
   subroutine turbulence_generator_init_mean_profiles(g)
     class(turbulence_generator), intent(inout) :: g
-    real(knd) :: Ustar_prof, utmp
+    real(knd) :: Ustar_prof, utmp, z
     integer :: k, maxj, maxk
-    logical :: fix_direction
+    logical :: fix_direction, first_point
     
     
     if (g%direction==2) then
@@ -587,22 +754,41 @@ contains
         Ustar_prof = g%U_ref_inlet * Karman / log(g%z_ref_inlet / g%z0_inlet)
 
         do k = 1, Prnz
-          utmp = (Ustar_prof / Karman) * log(zPr(k) / g%z0_inlet)
+          z = zPr(k)
+          if (z > 0) then
+            utmp = (Ustar_prof / Karman) * log(z / g%z0_inlet)
+          else
+            utmp = 0
+          end if
           if (sign(1._knd,Ustar_prof) * utmp<abs(Ustar_prof) / 2) &
-            utmp = (Ustar_prof / 2) * zPr(k) / (g%z0_inlet * 1.22)
+            utmp = (Ustar_prof / 2) * z / (g%z0_inlet * 1.22)
           g%Uinavg(:,k) = utmp
         end do
 
         fix_direction = .true.
         
      else
-
-        utmp = (g%Ustar_inlet(1) / Karman) * log(zPr(1) / g%z0_inlet)
+        first_point = .true.
+        z = zPr(1)
+        if (z > 0) then
+          utmp = (g%Ustar_inlet(1) / Karman) * log(z / g%z0_inlet)
+          first_point = .false.
+        else
+          utmp = 0
+        end if
         g%Uinavg(:,1) = utmp
         do k = 2, Prnz
-          utmp = (g%Ustar_inlet(k) / Karman) * log(zPr(k) / zPr(k-1)) + utmp
+          z = zPr(k)
+          if (z > 0 .and. first_point) then
+            utmp = (g%Ustar_inlet(1) / Karman) * log(z / g%z0_inlet)
+            first_point = .false.
+          else if (z > 0) then
+            utmp = (g%Ustar_inlet(k) / Karman) * log(z / zPr(k-1)) + utmp
+          else
+            utmp = 0
+          end if
           if (sign(1._knd,g%Ustar_inlet(1)) * utmp < abs(g%Ustar_inlet(1)) / 2) &
-            utmp = (g%Ustar_inlet(1) / 2) * zPr(k) / (g%z0_inlet * 1.22)
+            utmp = (g%Ustar_inlet(1) / 2) * z / (g%z0_inlet * 1.22)
           g%Uinavg(:,k) = utmp
         end do
 
@@ -620,7 +806,7 @@ contains
       
     else if (profiletype==PROFILE_FROM_FILE) then
     
-      call g%get_mean_profile_from_file("inlet_mean_profile.txt")
+      call g%get_mean_profile_from_file(g%mean_profile_file)
       
       fix_direction = .false.
 
@@ -633,7 +819,7 @@ contains
     if (fix_direction) then
       maxj = min(ubound(g%Uinavg,1),ubound(g%Vinavg,1),ubound(g%Winavg,1))
       maxk = min(ubound(g%Uinavg,2),ubound(g%Vinavg,2),ubound(g%Winavg,2))
-      if (norm2(Uinlet_vec(2:3))>0) then
+      if (Uinlet>0 .and. norm2(Uinlet_vec(2:3))>0) then
         g%Vinavg(-2:maxj,-2:maxk) = (Uinlet_vec(2)/Uinlet) * g%Uinavg(-2:maxj,-2:maxk)
         g%Winavg(-2:maxj,-2:maxk) = (Uinlet_vec(3)/Uinlet) * g%Uinavg(-2:maxj,-2:maxk)
         g%Uinavg(-2:maxj,-2:maxk) = (Uinlet_vec(1)/Uinlet) * g%Uinavg(-2:maxj,-2:maxk)
@@ -671,7 +857,7 @@ contains
     
     open(newunit=unit,file=fname,status="old",action="read",iostat = io)
     if (io/=0) then
-      call error_stop("Cannot open profile of the mean inlet profile in: "//fname)
+      call error_stop("Cannot open the inlet mean profile in: "//fname)
     end if
 
     n = 0
@@ -773,7 +959,7 @@ contains
     
     open(newunit=unit,file=fname,status="old",action="read",iostat = io)
     if (io/=0) then
-      call error_stop("Cannot open profile of the mean inlet profile in: "//fname)
+      call error_stop("Cannot open the inlet turbulence profile in: "//fname)
     end if
 
     n = 0
@@ -819,7 +1005,7 @@ contains
       do i = 1, n
         read(unit,'(a)') line
         if (components==4) then
-          read(line, *) z(i), stress(i,[1,2,3,5])
+          read(line, *) z(i), stress(i,1), stress(i,2), stress(i,3), stress(i,5)
           stress(i,4) = 0
           stress(i,6) = 0
         else

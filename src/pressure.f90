@@ -25,16 +25,34 @@ module Pressure
   integer, parameter, public :: PROJECTION_METHOD_INCREMENTAL = 0, &
                                 PROJECTION_METHOD_PRESSURE = 1
 
+  integer, parameter, public :: PRESSURE_REFERENCE_NONE = 0, &
+                                PRESSURE_REFERENCE_BOUNDARY = 1, &
+                                PRESSURE_REFERENCE_VOLUME_AVERAGE = 2, &
+                                PRESSURE_REFERENCE_POINT = 3
+  type pressure_reference
+    integer :: type = PRESSURE_REFERENCE_BOUNDARY
+    integer :: boundary_index = To
+    integer :: reference_point(3) = [1, 1, 1]
+    real(knd) :: reference_point_xyz(3) = 0
+    integer :: reference_point_im = 1
+  end type
+                                
   type pressure_solution_control
     logical :: check_mass_flux = .false.
     logical :: report_mass_flux = .false.
+    logical :: report_total_mass_flux = .false.
     logical :: correct_mass_flux(6) = .false.
     integer :: poisson_solver = POISSON_SOLVER_POISSOLVER
     integer :: projection_method = PROJECTION_METHOD_INCREMENTAL
     logical :: check_divergence = .false.
     logical :: check_poisson_residue = .false.
+    
+    type(pressure_reference) :: reference
+
+    ! for classical atmospheric flows above Earth surface:
     real(knd) :: top_pressure = 0    !mean pressure at the top boundary - calculated
     real(knd) :: bottom_pressure = 0
+
   end type
   
   type(pressure_solution_control) :: pressure_solution
@@ -148,11 +166,12 @@ contains
   end subroutine
 
 
-  subroutine PressureCorrection(U,V,W,Pr,Q,coef)                    !Pressure correction
-    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout)     :: U, V, W !Phi is computed in Poisson eq. with div of U in RHS
-    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout)        :: Pr      !Depend ing on active projection method Phi becomes new pressure
-    real(knd), dimension(:,:,:), allocatable, intent(in) :: Q       !or is added to last pressure
+  subroutine PressureCorrection(U,V,W,Pr,Q,coef,do_not_update_pressure)          !Pressure correction
+    real(knd), dimension(-2:,-2:,-2:), contiguous, intent(inout)     :: U, V, W  !Phi is computed in Poisson eq. with div of U in RHS
+    real(knd), dimension(-1:,-1:,-1:), contiguous, intent(inout)        :: Pr    !Depend ing on active projection method Phi becomes new pressure
+    real(knd), dimension(:,:,:), allocatable, intent(in) :: Q                    !or is added to last pressure
     real(knd), intent(in) :: coef
+    logical, optional, intent(in) :: do_not_update_pressure
                                                            !U,V,W velocity field for correction
     real(knd), save, allocatable :: Phi(:,:,:), RHS(:,:,:) !Pr pressure
                                                            !coef cofficient from Runge Kutta, Q mass sources from immersed boundary
@@ -163,6 +182,8 @@ contains
     integer, save :: called = 0
     integer(int64), save :: trate
     integer(int64), save :: time1, time2, time3, time4
+    
+    logical :: update_pressure
 
     if (called==0) then
       allocate(Phi(-1:Prnx+2,-1:Prny+2,-1:Prnz+2))
@@ -175,6 +196,12 @@ contains
 
 
     if (debugparam>1 .and. called>1) call system_clock(count=time1)
+    
+    if (present(do_not_update_pressure)) then
+      update_pressure = .not. do_not_update_pressure
+    else
+      update_pressure = .true.
+    end if
 
     dt2 = coef
     dt3 = coef / 2
@@ -186,7 +213,7 @@ contains
     if (debugparam>1 .and. called>1) call system_clock(count=time2)
 
     if (pressure_solution%report_mass_flux .and. pressure_solution%check_mass_flux) then
-      if (master) write(*,*) "total mass flux:", mass_flux
+      if (master) write(*,*) "mass flux:", mass_flux
     end if
 
     if (pressure_solution%poisson_solver==POISSON_SOLVER_SOR) then
@@ -228,7 +255,7 @@ contains
     endif
 
 
-    call PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3)
+    call PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3,update_pressure)
 
 
     if (debugparam>1 .and. called>1) then
@@ -261,6 +288,59 @@ contains
     dt2_rec = 1._knd / dt2
 
     call BoundUVW(U, V, W)
+
+    !HACK
+    !Set all domain border velocities to zero inside solid bodies
+    ! to ensure zero total flux.
+    !For higher accuracy we may want to allow internal velocities that balance
+    ! the flux of the immersed boundary velocities.
+    !We may also want to consider all bodies separately to avoid net flow into one
+    ! and net outflow from another.
+    !Currently, that can be prevented by creating a solid bodyfor the floor
+    ! and extending the domain below it.
+    if (iim==1 .and. Btype(We)/=BC_NOSLIP .and. Btype(We)/=BC_PERIODIC .and. Btype(We)<BC_MPI_BOUNDS_MIN) then
+      do k = 1, Unz
+        do j = 1, Uny
+          if (Utype(0,j,k)>0) U(0,j,k) = 0
+        end do
+      end do
+    end if
+    if (iim==nxims .and. Btype(Ea)/=BC_NOSLIP .and. Btype(Ea)/=BC_PERIODIC .and. Btype(Ea)<BC_MPI_BOUNDS_MIN) then
+      do k = 1, Unz
+        do j = 1, Uny
+          if (Utype(Prnx,j,k)>0) U(Prnx,j,k) = 0
+        end do
+      end do
+    end if
+    if (jim==1 .and. Btype(So)/=BC_NOSLIP .and. Btype(So)/=BC_PERIODIC .and. Btype(So)<BC_MPI_BOUNDS_MIN) then
+      do k = 1, Vnz
+        do i = 1, Vnx
+          if (Vtype(i,0,k)>0) V(i,0,k) = 0
+        end do
+      end do
+    end if
+    if (jim==nyims .and. Btype(No)/=BC_NOSLIP .and. Btype(No)/=BC_PERIODIC .and. Btype(No)<BC_MPI_BOUNDS_MIN) then
+      do k = 1, Vnz
+        do i = 1, Vnx
+          if (Vtype(i,Prny,k)>0) V(i,Prny,k) = 0
+        end do
+      end do
+    end if
+    if (kim==1 .and. Btype(Bo)/=BC_NOSLIP .and. Btype(Bo)/=BC_PERIODIC .and. Btype(Bo)<BC_MPI_BOUNDS_MIN) then
+      do j = 1, Wny
+        do i = 1, Wnx
+          if (Wtype(i,j,0)>0) W(i,j,0) = 0
+        end do
+      end do
+    end if
+    if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC .and. Btype(To)<BC_MPI_BOUNDS_MIN) then
+      do j = 1, Wny
+        do i = 1, Wnx
+          if (Wtype(i,j,Prnz)>0) W(i,j,Prnz) = 0
+        end do
+      end do
+    end if
+
 
     flux = 0
     if (pressure_solution%check_mass_flux) then
@@ -423,6 +503,117 @@ contains
 
     end if !check mass flux    
 
+
+    !check total mass flux on whole domain boundaries including solid bodies
+    flux = 0
+    if (pressure_solution%report_total_mass_flux) then
+
+      if (gridtype==GRID_VARIABLE_Z) then
+        if (iim==1 .and. Btype(We)/=BC_NOSLIP .and. Btype(We)/=BC_PERIODIC) then
+          do k = 1, Unz
+            do j = 1, Uny
+              flux(We) = flux(We) + U(0,j,k) * dymin * dzPr(k)
+            end do
+          end do
+        end if
+        if (iim==nxims .and. Btype(Ea)/=BC_NOSLIP .and. Btype(Ea)/=BC_PERIODIC) then
+          do k = 1, Unz
+            do j = 1, Uny
+              flux(Ea) = flux(Ea) - U(Prnx,j,k) * dymin * dzPr(k)
+            end do
+          end do
+        end if
+        if (jim==1 .and. Btype(So)/=BC_NOSLIP .and. Btype(So)/=BC_PERIODIC) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              flux(So) = flux(So) + V(i,0,k) * dxmin * dzPr(k)
+            end do
+          end do
+        end if
+        if (jim==nyims .and. Btype(No)/=BC_NOSLIP .and. Btype(No)/=BC_PERIODIC) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              flux(No) = flux(No) - V(i,Prny,k) * dxmin * dzPr(k)
+            end do
+          end do
+        end if
+        if (kim==1 .and. Btype(Bo)/=BC_NOSLIP .and. Btype(Bo)/=BC_PERIODIC) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              flux(Bo) = flux(Bo) + W(i,j,0) * dxmin * dymin
+            end do
+          end do
+        end if
+        if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              flux(To) = flux(To) - W(i,j,Prnz) * dxmin * dymin
+            end do
+          end do
+        end if
+
+      else
+
+        if (iim==1 .and. Btype(We)/=BC_NOSLIP .and. Btype(We)/=BC_PERIODIC) then
+          do k = 1, Unz
+            do j = 1, Uny
+              flux(We) = flux(We) + U(0,j,k)
+            end do
+          end do
+        end if
+        if (iim==nxims .and. Btype(Ea)/=BC_NOSLIP .and. Btype(Ea)/=BC_PERIODIC) then
+          do k = 1, Unz
+            do j = 1, Uny
+             flux(Ea) = flux(Ea) - U(Prnx,j,k)
+            end do
+          end do
+        end if
+        if (jim==1 .and. Btype(So)/=BC_NOSLIP .and. Btype(So)/=BC_PERIODIC) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              flux(So) = flux(So) + V(i,0,k)
+            end do
+          end do
+        end if
+        if (jim==nyims .and. Btype(No)/=BC_NOSLIP .and. Btype(No)/=BC_PERIODIC) then
+          do k = 1, Vnz
+            do i = 1, Vnx
+              flux(No) = flux(No) - V(i,Prny,k)
+            end do
+          end do
+        end if
+        if (kim==1 .and. Btype(Bo)/=BC_NOSLIP .and. Btype(Bo)/=BC_PERIODIC) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              flux(Bo) = flux(Bo) + W(i,j,0)
+            end do
+          end do
+        end if
+        if (kim==nzims .and. Btype(To)/=BC_NOSLIP .and. Btype(To)/=BC_PERIODIC) then
+          do j = 1, Wny
+            do i = 1, Wnx
+              flux(To) = flux(To) - W(i,j,Prnz)
+            end do
+          end do
+        end if
+
+        flux = flux * bound_cell_area
+
+      end if
+#ifdef PAR
+      !TODO sum only the relevant images
+      flux = par_co_sum(flux)
+#endif
+      if (master) then
+        write(*,*) "total mass flux through domain boundaries including solid bodies:", flux
+        write(*,*) "total mass sum:", sum(flux)
+      end if
+
+    end if
+
+
+
+
     if (discretization_order == 4) then
     
       !$omp parallel private(i,j,k)
@@ -534,10 +725,9 @@ contains
 
 
 
-  subroutine PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3)
+  subroutine PostPoisson(U,V,W,Pr,Q,Phi,dt2,dt3,update_pressure)
 #ifdef PAR
-    use custom_par, only: kim, nzims, &
-                          par_co_max, par_broadcast_from_last_z, par_co_sum_plane_xy
+    use custom_par, only: par_co_max
     use exchange_par, only: par_exchange_UVW
 #endif
     real(knd), contiguous, intent(inout) :: U(-2:,-2:,-2:)
@@ -547,7 +737,8 @@ contains
     real(knd), allocatable, intent(in) :: Q(:,:,:)
     real(knd), intent(inout) :: Phi(-1:,-1:,-1:)
     real(knd), intent(in)    :: dt2,dt3
-    real(knd) :: Phi_ref,Au,Av,Aw,dxmin2,dymin2,dzmin2,S,p
+    logical, intent(in)      :: update_pressure
+    real(knd) :: Au,Av,Aw,dxmin2,dymin2,dzmin2,S,p
     integer   :: i,j,k
     real(knd), parameter :: C1 = 9._knd / 8, C3 = 1._knd / (8*3)
 
@@ -635,106 +826,60 @@ contains
         !$omp end do nowait
       end if
     end if
-
-    if (pressure_solution%projection_method==PROJECTION_METHOD_PRESSURE) then
-        !$omp do
-        do k = 1, Prnz
-          do j = 1, Prny
-            do i = 1, Prnx
-              Pr(i,j,k) = Phi(i,j,k)
-            end do
-          end do
-        end do
-        !$omp end do
-    else
-      if (explicit_diffusion) then
-        !$omp do
-        do k = 1, Prnz
-          do j = 1, Prny
-            do i = 1, Prnx
-              Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k)
-            end do
-          end do
-        end do
-        !$omp end do
-      else
-        !$omp do
-        do k = 1, Prnz
-          do j = 1, Prny
-            do i = 1, Prnx
-              Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k) - &
-                          dt3 * Viscosity(i,j,k) * (((Phi(i+1,j,k)-Phi(i,j,k)) - &
-                                                    (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
-                                                    ((Phi(i,j+1,k)-Phi(i,j,k)) - &
-                                                    (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
-                                                    ((Phi(i,j,k+1)-Phi(i,j,k)) - &
-                                                    (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
-            end do
-          end do
-        end do
-        !$omp end do
-      end if
-    end if
-
-    !$omp single
-    Phi_ref = 0
-    !$omp end single
-    
-#ifdef PAR
-    !images in top plane compute the reference pressure
-    if (kim==nzims) then
-      !$omp do reduction(+:Phi_ref)
-      do j = 1, Prny
-        do i = 1, Prnx
-          Phi_ref = Phi_ref + Pr(i,j,Prnz)
-        end do
-      end do
-      !$omp end do
-
-      !$omp single
-      Phi_ref = par_co_sum_plane_xy(Phi_ref)
-      Phi_ref = Phi_ref / (gPrnx * gPrny)
-      !$omp end single
-    end if
-
-    !all kim==nzims broadcast to images with smaller kim
-    !$omp single
-    call par_broadcast_from_last_z(Phi_ref)
-    !$omp end single
-
-#else
-
-    !$omp do reduction(+:Phi_ref)
-    do j = 1, Prny
-      do i = 1, Prnx
-        Phi_ref = Phi_ref + Pr(i,j,Prnz)
-      end do
-    end do
-    !$omp end do
-
-    !$omp single
-    Phi_ref = Phi_ref / (Prnx*Prny)
-    !$omp end single
-
-#endif
-
-    !$omp do reduction(+:Phi_ref)
-    do k = 1, Prnz
-      do j = 1, Prny
-        do i = 1, Prnx
-          Pr(i,j,k) = Pr(i,j,k) - (Phi_ref)
-        end do
-      end do
-    end do
-    !$omp end do   
-
     !$omp end parallel
+    
+    if (update_pressure) then
 
+      if (pressure_solution%projection_method==PROJECTION_METHOD_PRESSURE) then
+          !$omp parallel do
+          do k = 1, Prnz
+            do j = 1, Prny
+              do i = 1, Prnx
+                Pr(i,j,k) = Phi(i,j,k)
+              end do
+            end do
+          end do
+          !$omp end parallel do
+      else
+        if (explicit_diffusion) then
+          !$omp parallel do
+          do k = 1, Prnz
+            do j = 1, Prny
+              do i = 1, Prnx
+                Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k)
+              end do
+            end do
+          end do
+          !$omp end parallel do
+        else
+          !$omp parallel do
+          do k = 1, Prnz
+            do j = 1, Prny
+              do i = 1, Prnx
+                Pr(i,j,k) = Pr(i,j,k) + Phi(i,j,k) - &
+                            dt3 * Viscosity(i,j,k) * (((Phi(i+1,j,k)-Phi(i,j,k)) - &
+                                                      (Phi(i,j,k)-Phi(i-1,j,k)))/dxmin2 + &
+                                                      ((Phi(i,j+1,k)-Phi(i,j,k)) - &
+                                                      (Phi(i,j,k)-Phi(i,j-1,k)))/dymin2 + &
+                                                      ((Phi(i,j,k+1)-Phi(i,j,k)) - &
+                                                      (Phi(i,j,k)-Phi(i,j,k-1)))/dzmin2)
+              end do
+            end do
+          end do
+          !$omp end parallel do
+        end if
+      end if
+
+      call FixPressureToReference(Pr)
+    
+      call Bound_Pr(Pr)
+      
+    end if !update_pressure
+
+    
 #ifdef PAR    
     call par_exchange_UVW(U, V, W)
 #endif
-
-    call Bound_Pr(Pr)
 
     if (pressure_solution%check_divergence) then
       call BoundUVW(U,V,W)
@@ -844,6 +989,244 @@ contains
     end if
 
   end subroutine PostPoisson
+  
+  
+  subroutine FixPressureToReference(Pr)
+    use custom_par
+    real(knd), intent(inout), contiguous :: Pr(-1:,-1:,-1:)
+    integer :: i, j, k
+    integer :: i_ref, j_ref, k_ref
+    integer :: im_ref
+    real(knd) :: Phi_ref
+    
+    ! fixes the pressure to some reference, because
+    ! it is only determined up to an additive constant
+    
+    ! the value of Phi at the reference location
+    ! to be subtracted
+    Phi_ref = 0
+    associate(ref => pressure_solution%reference)
+    !$omp parallel private(i,j,k)
+
+    if (ref%type == PRESSURE_REFERENCE_NONE) then
+      continue
+    else if (ref%type == PRESSURE_REFERENCE_VOLUME_AVERAGE) then
+      !$omp do reduction(+:Phi_ref)
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            Phi_ref = Phi_ref + Pr(i,j,k)
+          end do
+        end do
+      end do
+      !$omp end do
+      
+      !$omp single
+#ifdef PAR
+      Phi_ref = par_co_sum(Phi_ref)
+      Phi_ref = Phi_ref / (gPrnx*gPrny*gPrnz)
+#else
+      Phi_ref = Phi_ref / (Prnx*Prny*Prnz)
+#endif
+      !$omp end single      
+    else if (ref%type == PRESSURE_REFERENCE_POINT) then
+      !$omp single    
+      if (myim==ref%reference_point_im) then
+        block
+          use Interpolation
+          real(knd) :: a, b, c
+          real(knd) :: p000, p100, p010, p001, p110, p101, p011, p111
+          i = ref%reference_point(1)
+          j = ref%reference_point(2)
+          k = ref%reference_point(3)
+          
+          p000 = Pr(i,j,k)
+          p100 = Pr(i+1,j,k)
+          p010 = Pr(i,j+1,k)
+          p001 = Pr(i,j,k+1)
+          p110 = Pr(i+1,j+1,k)
+          p101 = Pr(i+1,j,k+1)
+          p011 = Pr(i,j+1,k+1)
+          p111 = Pr(i+1,j+1,k+1)
+          a = (ref%reference_point_xyz(1) - xPr(i)) / (xPr(i+1) - xPr(i))
+          b = (ref%reference_point_xyz(2) - yPr(j)) / (yPr(j+1) - yPr(j))
+          c = (ref%reference_point_xyz(3) - zPr(k)) / (zPr(k+1) - zPr(k))
+          
+          Phi_ref = trilinear_interpolation(a, b, c, p000, p100, p010, p001, p110, p101, p011, p111)
+        end block 
+      end if
+#ifdef PAR
+      call par_co_broadcast(Phi_ref, ref%reference_point_im)
+#endif
+      !$omp end single
+    else if (ref%type == PRESSURE_REFERENCE_BOUNDARY) then
+      
+      if (ref%boundary_index==We .or. &
+          ref%boundary_index==Ea) then
+        !$omp single  
+        if (ref%boundary_index==We) then
+          i_ref = 1
+          im_ref = 1
+        else
+          i_ref = Prnx
+          im_ref = nxims
+        end if
+        !$omp end single
+#ifdef PAR
+        !images in top plane compute the reference pressure
+        if (iim==im_ref) then
+          !$omp do reduction(+:Phi_ref)
+          do k = 1, Prnz
+            do j = 1, Prny
+              Phi_ref = Phi_ref + Pr(i_ref,j,k)
+            end do
+          end do
+          !$omp end do
+
+          !$omp single
+          Phi_ref = par_co_sum_plane_yz(Phi_ref)
+          Phi_ref = Phi_ref / (gPrny * gPrnz)
+          !$omp end single
+        end if
+
+        !$omp single
+        if (im_ref==1) then
+          call par_broadcast_from_first_x(Phi_ref)
+        else
+          call par_broadcast_from_last_x(Phi_ref)
+        end if        
+        !$omp end single
+#else
+        !$omp do reduction(+:Phi_ref)
+        do k = 1, Prnz
+          do j = 1, Prny
+            Phi_ref = Phi_ref + Pr(i_ref,j,k)
+          end do
+        end do
+        !$omp end do
+
+        !$omp single
+        Phi_ref = Phi_ref / (Prny*Prnz)
+        !$omp end single
+#endif
+      else if (ref%boundary_index==So .or. &
+               ref%boundary_index==No) then
+        !$omp single       
+        if (ref%boundary_index==Bo) then
+          j_ref = 1
+          im_ref = 1
+        else
+          j_ref = Prny
+          im_ref = nyims
+        end if
+        !$omp end single
+#ifdef PAR
+        !images in top plane compute the reference pressure
+        if (jim==im_ref) then
+          !$omp do reduction(+:Phi_ref)
+          do k = 1, Prnz
+            do i = 1, Prnx
+              Phi_ref = Phi_ref + Pr(i,j_ref,k)
+            end do
+          end do
+          !$omp end do
+
+          !$omp single
+          Phi_ref = par_co_sum_plane_xz(Phi_ref)
+          Phi_ref = Phi_ref / (gPrnx * gPrnz)
+          !$omp end single
+        end if
+
+        !$omp single
+        if (im_ref==1) then
+          call par_broadcast_from_first_y(Phi_ref)
+        else
+          call par_broadcast_from_last_y(Phi_ref)
+        end if        
+        !$omp end single
+#else
+        !$omp do reduction(+:Phi_ref)
+        do k = 1, Prnz
+          do i = 1, Prnx
+            Phi_ref = Phi_ref + Pr(i,j_ref,k)
+          end do
+        end do
+        !$omp end do
+
+        !$omp single
+        Phi_ref = Phi_ref / (Prnx*Prnz)
+        !$omp end single
+#endif
+      else if (ref%boundary_index==Bo .or. &
+               ref%boundary_index==To) then
+        !$omp single       
+        if (ref%boundary_index==Bo) then
+          k_ref = 1
+          im_ref = 1
+        else
+          k_ref = Prnz
+          im_ref = nzims
+        end if
+        !$omp end single
+#ifdef PAR
+        !images in top plane compute the reference pressure
+        if (kim==im_ref) then
+          !$omp do reduction(+:Phi_ref)
+          do j = 1, Prny
+            do i = 1, Prnx
+              Phi_ref = Phi_ref + Pr(i,j,k_ref)
+            end do
+          end do
+          !$omp end do
+
+          !$omp single
+          Phi_ref = par_co_sum_plane_xy(Phi_ref)
+          Phi_ref = Phi_ref / (gPrnx * gPrny)
+          !$omp end single
+        end if
+
+        !$omp single
+        if (im_ref==1) then
+          call par_broadcast_from_first_z(Phi_ref)
+        else
+          call par_broadcast_from_last_z(Phi_ref)
+        end if        
+        !$omp end single
+#else
+        !$omp do reduction(+:Phi_ref)
+        do j = 1, Prny
+          do i = 1, Prnx
+            Phi_ref = Phi_ref + Pr(i,j,k_ref)
+          end do
+        end do
+        !$omp end do
+
+        !$omp single
+        Phi_ref = Phi_ref / (Prnx*Prny)
+        !$omp end single
+#endif
+      end if
+      
+    end if
+     
+    if (Phi_ref /=0 ) then
+      !$omp do
+      do k = 1, Prnz
+        do j = 1, Prny
+          do i = 1, Prnx
+            Pr(i,j,k) = Pr(i,j,k) - Phi_ref
+          end do
+        end do
+      end do
+      !$omp end do   
+    end if
+
+    !$omp end parallel
+    
+    end associate
+    
+    ! if no default, do not fix
+  end subroutine
 
 
   subroutine InitHydrostaticPressure(Pr, Temperature, Moisture)
@@ -874,7 +1257,7 @@ contains
 
       p = p - rho_air_ref * grav_acc*dzPr(k) * &
               (1 - &
-                      ( temperature_ref - t_virt ) &
+                      ( t_virt - temperature_ref) &
                       / temperature_ref &
               )
     end do
@@ -900,7 +1283,7 @@ contains
     do j = 1, Vny+1
       do i = 1, Unx+1
         t_virt_prev = theta_v(i,j,Prnz)
-        Pr(i,j,Prnz) = - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
+        Pr(i,j,Prnz) = - grav_acc*(zW(Prnz)-zPr(Prnz)) * &
                 ( t_virt_prev - temperature_ref ) &
                 / temperature_ref
         do k = Prnz-1, 1, -1
@@ -969,10 +1352,9 @@ contains
       t_virt = par_co_sum_plane_xy(sum(TempIn(1:Prny,k)))/gPrny
 
       if (enable_moisture) t_virt = theta_v(t_virt, par_co_sum_plane_xy(sum(MoistIn(1:Prny,k)))/gPrny)
-
       p = p - rho_air_ref * grav_acc*dzPr(k) * &
               (1 - &
-                      ( temperature_ref - t_virt ) &
+                      ( t_virt - temperature_ref ) &
                       / temperature_ref &
               )
     end do
@@ -1018,7 +1400,7 @@ contains
       
         if (kim == nzims) then
           t_virt_prev = theta_v(i,j,Prnz)
-          Pr(i,j,Prnz) = - grav_acc*(zW(Prnz+1)-zPr(Prnz)) * &
+          Pr(i,j,Prnz) = - grav_acc*(zW(Prnz)-zPr(Prnz)) * &
                   ( t_virt_prev - temperature_ref ) &
                   / temperature_ref
           nz = Prnz -1

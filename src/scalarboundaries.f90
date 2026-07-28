@@ -16,11 +16,11 @@ contains
 
 
   subroutine CommonBase(arr,Sc_btype,side,in,BsideArr,BsideFlArr)
-    real(knd),intent(inout) :: arr(-2:,-2:,-2:)
-    integer  ,intent(in)    :: Sc_btype(6)
-    real(knd),intent(in)    :: side(6)
-    real(knd),intent(in),optional :: in(-2:,-2:)
-    real(knd),intent(in),allocatable,optional :: BsideArr(:,:), BsideFlArr(:,:)
+    real(knd), contiguous, intent(inout) :: arr(-2:,-2:,-2:)
+    integer, intent(in) :: Sc_btype(6)
+    real(knd), intent(in) :: side(6)
+    real(knd), contiguous, intent(in), optional :: in(-2:,-2:)
+    real(knd), intent(in), allocatable, optional :: BsideArr(:,:), BsideFlArr(:,:)
     integer :: i,j,k,nx,ny,nz
 
     nx = Prnx
@@ -282,7 +282,7 @@ contains
 
 
   subroutine BoundScalar(SCAL)
-    real(knd),intent(inout) :: Scal(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: Scal(-2:,-2:,-2:)
 
     call CommonBase(SCAL,ScalBtype,sideScal)
 
@@ -297,7 +297,7 @@ contains
 #ifdef PAR
     use domains_bc_par
 #endif
-    real(knd),intent(inout) :: Temperature(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: Temperature(-2:,-2:,-2:)
     
 #ifdef PAR
     call par_update_domain_bounds_temperature(Temperature, time_stepping%effective_time)
@@ -312,7 +312,7 @@ contains
 #ifdef PAR
     use domains_bc_par
 #endif
-    real(knd),intent(inout) :: Moisture(-2:,-2:,-2:)
+    real(knd), contiguous, intent(inout) :: Moisture(-2:,-2:,-2:)
 
 #ifdef PAR
     call par_update_domain_bounds_moisture(Moisture, time_stepping%effective_time)
@@ -324,7 +324,7 @@ contains
 
 
   subroutine BoundViscosity(Nu)
-    real(knd),contiguous,intent(inout) :: Nu(-1:,-1:,-1:)
+    real(knd), contiguous, intent(inout) :: Nu(-1:,-1:,-1:)
     integer :: i,j,k,nx,ny,nz
 
     nx = Prnx
@@ -335,17 +335,29 @@ contains
     call par_exchange_visc_x(Nu, Btype)
 #endif
 
-    if (Btype(Ea)==BC_PERIODIC) then
+    if (Btype(We)==BC_PERIODIC) then
       do k = 1,nz
        do j = 1,ny
          Nu(0,j,k) = Nu(nx,j,k)
+       end do
+      end do
+    else if ((Btype(We)<BC_MPI_BOUNDS_MIN) .or. (Btype(We)>BC_MPI_BOUNDS_MAX)) then
+      do k = 1,nz
+       do j = 1,ny
+         Nu(0,j,k) = Nu(1,j,k)
+       end do
+      end do
+    end if
+
+    if (Btype(Ea)==BC_PERIODIC) then
+      do k = 1,nz
+       do j = 1,ny
          Nu(nx+1,j,k) = Nu(1,j,k)
        end do
       end do
     else if ((Btype(Ea)<BC_MPI_BOUNDS_MIN) .or. (Btype(Ea)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
        do j = 1,ny
-         Nu(0,j,k) = Nu(1,j,k)
          Nu(nx+1,j,k) = Nu(nx,j,k)
        end do
       end do
@@ -355,44 +367,68 @@ contains
     call par_exchange_visc_y(Nu, Btype)
 #endif
 
-    if (Btype(No)==BC_PERIODIC) then
+    if (Btype(So)==BC_PERIODIC) then
       do k = 1,nz
        do i = 0,nx+1
          Nu(i,0,k) = Nu(i,ny,k)
+       end do
+      end do
+    else if ((Btype(So)<BC_MPI_BOUNDS_MIN) .or. (Btype(So)>BC_MPI_BOUNDS_MAX)) then
+      do k = 1,nz
+       do i = 0,nx+1
+         Nu(i,0,k) = Nu(i,1,k)
+       end do
+      end do
+    end if
+    
+    if (Btype(No)==BC_PERIODIC) then
+      do k = 1,nz
+       do i = 0,nx+1
          Nu(i,ny+1,k) = Nu(i,1,k)
        end do
       end do
     else if ((Btype(No)<BC_MPI_BOUNDS_MIN) .or. (Btype(No)>BC_MPI_BOUNDS_MAX)) then
       do k = 1,nz
        do i = 0,nx+1
-         Nu(i,0,k) = Nu(i,1,k)
          Nu(i,ny+1,k) = Nu(i,ny,k)
        end do
       end do
     end if
+
     
 #ifdef PAR
     call par_exchange_visc_z(Nu, Btype)
 #endif
 
-    if (Btype(To)==BC_PERIODIC) then
+    if (Btype(Bo)==BC_PERIODIC) then
       do j = 0,ny+1
        do i = 0,nx+1
          Nu(i,j,0) = Nu(i,j,nz)
+       end do
+      end do
+    else if ((Btype(Bo)<BC_MPI_BOUNDS_MIN) .or. (Btype(Bo)>BC_MPI_BOUNDS_MAX)) then
+      do j = 0,ny+1
+       do i = 0,nx+1
+         Nu(i,j,0) = Nu(i,j,1)
+       end do
+      end do
+    end if
+    
+    if (Btype(To)==BC_PERIODIC) then
+      do j = 0,ny+1
+       do i = 0,nx+1
          Nu(i,j,nz+1) = Nu(i,j,1)
        end do
       end do
     else if ((Btype(To)<BC_MPI_BOUNDS_MIN) .or. (Btype(To)>BC_MPI_BOUNDS_MAX)) then
       do j = 0,ny+1
        do i = 0,nx+1
-         Nu(i,j,0) = Nu(i,j,1)
          Nu(i,j,nz+1) = Nu(i,j,nz)
        end do
       end do
     end if
     
   end subroutine BoundViscosity
-
 
 
 
