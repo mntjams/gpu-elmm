@@ -196,8 +196,7 @@ contains
     else if (pressure_solution%poisson_solver==POISSON_SOLVER_POISSOLVER) then
 
         if (gridtype==GRID_VARIABLE_Z) then
-          ! TODO: Uncomment when this type becomes available in poisson-solver
-          ! call Poiss_PoisFFT_variable_z(Phi,RHS)
+          call Poiss_PoisSolver_variable_z(Phi,RHS)
         else
           call Poiss_PoisSolver(Phi,RHS)
         end if
