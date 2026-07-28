@@ -145,9 +145,13 @@ contains
 
   subroutine Poiss_PoisSolver_variable_z(Phi,RHS)
 #ifdef DPREC
-    use PoisSolver, pois_solver_new => poisson_solver_new
+    use PoisSolver, pois_solver_new => poisson_solver_nonuniform_z_new, &
+                    pois_solver_execute => poisson_solver_nonuniform_z_execute, &
+                    pois_solver_finalize => poisson_solver_nonuniform_z_finalize
 #else
-    use PoisSolver, pois_solver_new => poisson_solver_new_float
+    use PoisSolver, pois_solver_new => poisson_solver_nonuniform_z_new_float, &
+                    pois_solver_execute => poisson_solver_nonuniform_z_execute_float, &
+                    pois_solver_finalize => poisson_solver_nonuniform_z_finalize_float
 #endif
 #ifdef PAR
     use custom_par
@@ -172,7 +176,6 @@ contains
     if (.not.called) then
 #ifdef PAR
       call pois_solver_new(Solver,&
-                           3,
                            [Prnx, Prny, Prnz],&
                            [gxmax-gxmin,gymax-gymin], gzPr(1:gPrnz), gzW(0:gPrnz),  &
                            PoissonBtype, &
@@ -180,7 +183,6 @@ contains
                            gPrns,offsets_to_global,poisfft_comm)
 #else
       call pois_solver_new(Solver, &
-                           3, &
                            [Prnx,Prny,Prnz], &
                            [gxmax-gxmin,gymax-gymin], zPr(1:Prnz), zW(0:Prnz), &
                            PoissonBtype, &
@@ -196,7 +198,7 @@ contains
     call system_clock(count=t1)
 
 
-    call Execute(Solver,Phi,RHS)
+    call pois_solver_execute(Solver,Phi,RHS)
 
 
     call system_clock(count=t2)
