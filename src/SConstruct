@@ -326,7 +326,7 @@ if ompp=='yes':
 
 env.Replace(FORTRANFLAGS=env['F90FLAGS'])
 
-env.Append(F90PATH = ['../../poisson-solver/build-release/modules'])
+env.Append(F90PATH = ['../../poisson-solver/build/modules'])
 env.Append(LIBPATH = ['../../poisson-solver/lib', '/usr/local/cuda/lib64'])
 env.Append(LIBS = ['poisson-solver', 'cufft', 'cudart'])
 # '-Wl' passes arguments to the run-time linker
