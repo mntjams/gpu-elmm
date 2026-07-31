@@ -106,7 +106,7 @@ contains
     if (.not.called) then
 #ifdef PAR
       call pois_solver_new(Solver,&
-                           3,
+                           3, &
                            [Prnx, Prny, Prnz],&
                            [gxmax-gxmin,gymax-gymin,gzmax-gzmin], &
                            PoissonBtype, &
