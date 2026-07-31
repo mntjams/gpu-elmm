@@ -878,7 +878,7 @@ contains
 
   
   subroutine par_init_grid
-    use PoisFFT
+    use PoisSolver
     use iso_c_binding
     use Parameters
 
@@ -941,9 +941,8 @@ contains
     master = (myrank==0)
     
     !creates a 2D! Cartesian communicator "poisfft_comm"
-    !2D because of the PFFT library
     !the dimensions in the poisfft_comm are z,y
-    call PoisFFT_InitMPIGrid(domain_comm, npxyz(3:2:-1), poisfft_comm, ie)
+    call poisson_solver_init_mpi_grid(domain_comm, npxyz(3:2:-1), poisfft_comm)
     
     call par_init_sub_comms
     
@@ -957,7 +956,9 @@ contains
     
     ng = gPrns
 
-    call PoisFFT_LocalGridSize(3,ng,cart_comm,nxyz,off,nxyz2,nsxyz2)
+    call poisson_solver_get_local_grid_info(ng,cart_comm,nxyz,off)
+    nxyz2 = nxyz
+    nsxyz2 = off
     if (any(nxyz/=nxyz2).or.any(off/=nsxyz2)) call error_stop("Process grid not supported by the FFT library.")
     
     call MPI_Barrier(domain_comm, ie)
