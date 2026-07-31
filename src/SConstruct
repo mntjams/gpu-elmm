@@ -328,7 +328,7 @@ env.Replace(FORTRANFLAGS=env['F90FLAGS'])
 
 env.Append(F90PATH = ['../../poisson-solver/build/modules'])
 env.Append(LIBPATH = ['../../poisson-solver/lib', '/usr/local/cuda/lib64'])
-env.Append(LIBS = ['poisson-solver', 'cufft', 'cudart'])
+env.Append(LIBS = ['poisson-solver', 'cufft', 'cudart', 'fftw3', 'fftw3f'])
 # '-Wl' passes arguments to the run-time linker
 # -rpath adds a directory to the run-time library search path
 env.Append(LINKFLAGS = ['-Wl,-rpath,/opt/build/poisson-solver/lib'])
@@ -342,6 +342,7 @@ if str(mpi)=='yes':
   objs += env.Object(target = target_dir + 'domains_bc_types_mpi', source = 'domains_bc_types_mpi.f90')
   objs += env.Object(target = target_dir + 'domains_bc_init_mpi', source = 'domains_bc_init_mpi.f90')
   objs += env.Object(target = target_dir + 'domains_bc_mpi', source = 'domains_bc_mpi.f90')
+  objs += env.Object(target = target_dir + 'customfftw3', source = 'customfftw3.f90')
 else:
   objs += env.Object(target = target_dir + 'dummy_par',        source = 'dummy_par.f90') 
 
