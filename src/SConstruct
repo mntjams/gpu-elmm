@@ -327,11 +327,11 @@ if ompp=='yes':
 env.Replace(FORTRANFLAGS=env['F90FLAGS'])
 
 env.Append(F90PATH = ['../../poisson-solver/build/modules'])
-env.Append(LIBPATH = ['../../poisson-solver/lib', '/usr/local/cuda/lib64'])
+env.Append(LIBPATH = ['../../poisson-solver/build/lib', '/usr/local/cuda/lib64'])
 env.Append(LIBS = ['poisson-solver', 'cufft', 'cudart', 'fftw3', 'fftw3f'])
 # '-Wl' passes arguments to the run-time linker
 # -rpath adds a directory to the run-time library search path
-env.Append(LINKFLAGS = ['-Wl,-rpath,/opt/build/poisson-solver/lib'])
+env.Append(LINKFLAGS = ['-Wl,-rpath,/opt/build/poisson-solver/build/lib'])
 
 objs = []
 
